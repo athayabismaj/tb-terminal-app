@@ -20,6 +20,8 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.ReceiptLong
 import androidx.compose.material.icons.outlined.AssignmentTurnedIn
 import androidx.compose.material.icons.outlined.GridView
+import androidx.compose.material.icons.outlined.Group
+import androidx.compose.material.icons.outlined.LocalShipping
 import androidx.compose.material.icons.outlined.Payments
 import androidx.compose.material.icons.outlined.Settings
 import androidx.compose.material3.Card
@@ -61,8 +63,15 @@ fun AdminBackofficePlaceholderScreen(
     onStockOpnameFormClick: () -> Unit,
     onIncomingGoodsClick: () -> Unit,
     onIncomingGoodsFormClick: () -> Unit,
+    onSuppliersClick: () -> Unit,
+    onPurchaseHistoryClick: () -> Unit,
+    onStockReportClick: () -> Unit,
     onSupplierDebtsClick: () -> Unit,
+    onCashSessionHistoryClick: () -> Unit,
+    onCashReconciliationDetailClick: () -> Unit,
+    onCashExpensesClick: () -> Unit,
     onReceivablesClick: () -> Unit,
+    onReceivablePaymentsClick: () -> Unit,
     onCustomersClick: () -> Unit,
     onOperationalAuditClick: () -> Unit,
     onProfileClick: () -> Unit = {},
@@ -86,8 +95,15 @@ fun AdminBackofficePlaceholderScreen(
         onStockOpnameFormClick = onStockOpnameFormClick,
         onIncomingGoodsClick = onIncomingGoodsClick,
         onIncomingGoodsFormClick = onIncomingGoodsFormClick,
+        onSuppliersClick = onSuppliersClick,
+        onPurchaseHistoryClick = onPurchaseHistoryClick,
+        onStockReportClick = onStockReportClick,
         onSupplierDebtsClick = onSupplierDebtsClick,
+        onCashSessionHistoryClick = onCashSessionHistoryClick,
+        onCashReconciliationDetailClick = onCashReconciliationDetailClick,
+        onCashExpensesClick = onCashExpensesClick,
         onReceivablesClick = onReceivablesClick,
+        onReceivablePaymentsClick = onReceivablePaymentsClick,
         onCustomersClick = onCustomersClick,
         onOperationalAuditClick = onOperationalAuditClick,
         onProfileClick = onProfileClick,
@@ -230,11 +246,20 @@ private fun PlaceholderListCard(
 private fun AdminDestination.icon(): ImageVector {
     return when (this) {
         AdminDestination.CashReconciliation -> Icons.Outlined.Payments
+        AdminDestination.CashSessionHistory -> Icons.AutoMirrored.Outlined.ReceiptLong
+        AdminDestination.CashReconciliationDetail -> Icons.Outlined.AssignmentTurnedIn
+        AdminDestination.CashExpenses -> Icons.Outlined.Payments
         AdminDestination.SalesTransactions -> Icons.AutoMirrored.Outlined.ReceiptLong
         AdminDestination.Reports -> Icons.Outlined.GridView
+        AdminDestination.StockReport -> Icons.Outlined.GridView
         AdminDestination.PriceManagement -> Icons.Outlined.Payments
+        AdminDestination.Suppliers -> Icons.Outlined.Group
+        AdminDestination.PurchaseHistory -> Icons.AutoMirrored.Outlined.ReceiptLong
+        AdminDestination.ReceivablePayments -> Icons.Outlined.Payments
         AdminDestination.OperationalAudit -> Icons.Outlined.AssignmentTurnedIn
         AdminDestination.Settings -> Icons.Outlined.Settings
+        AdminDestination.IncomingGoods,
+        AdminDestination.IncomingGoodsForm -> Icons.Outlined.LocalShipping
         else -> Icons.Outlined.GridView
     }
 }

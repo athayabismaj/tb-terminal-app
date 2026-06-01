@@ -1,5 +1,8 @@
 package com.tbterminal.app.ui.dashboard.admin
 
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.expandVertically
+import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -31,20 +34,18 @@ import androidx.compose.material.icons.outlined.GridView
 import androidx.compose.material.icons.outlined.Group
 import androidx.compose.material.icons.outlined.Inventory2
 import androidx.compose.material.icons.outlined.LocalShipping
-import androidx.compose.material.icons.outlined.Notifications
 import androidx.compose.material.icons.outlined.Payments
-import androidx.compose.material.icons.outlined.Search
-import androidx.compose.material.icons.outlined.Settings
+import androidx.compose.material.icons.outlined.Person
 import androidx.compose.material.icons.outlined.Straighten
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
-import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -52,6 +53,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.tbterminal.app.ui.dashboard.DashboardBackground
@@ -60,6 +62,8 @@ import com.tbterminal.app.ui.dashboard.DashboardBrandGreenDark
 import com.tbterminal.app.ui.dashboard.DashboardSurface
 import com.tbterminal.app.ui.dashboard.DashboardTextPrimary
 import com.tbterminal.app.ui.dashboard.DashboardTextSecondary
+
+internal val LocalAdminDestinationNavigator = staticCompositionLocalOf<((AdminDestination) -> Unit)?> { null }
 
 @Composable
 fun AdminDashboardShell(
@@ -79,8 +83,15 @@ fun AdminDashboardShell(
     onStockOpnameFormClick: () -> Unit = onStockOpnameClick,
     onIncomingGoodsClick: () -> Unit = {},
     onIncomingGoodsFormClick: () -> Unit = onIncomingGoodsClick,
+    onSuppliersClick: () -> Unit = onIncomingGoodsClick,
+    onPurchaseHistoryClick: () -> Unit = onIncomingGoodsClick,
+    onStockReportClick: () -> Unit = onReportsClick,
     onSupplierDebtsClick: () -> Unit = {},
+    onCashSessionHistoryClick: () -> Unit = onCashReconciliationClick,
+    onCashReconciliationDetailClick: () -> Unit = onCashReconciliationClick,
+    onCashExpensesClick: () -> Unit = onCashReconciliationClick,
     onReceivablesClick: () -> Unit = {},
+    onReceivablePaymentsClick: () -> Unit = onReceivablesClick,
     onCustomersClick: () -> Unit = {},
     onOperationalAuditClick: () -> Unit = {},
     onProfileClick: () -> Unit = {},
@@ -88,12 +99,19 @@ fun AdminDashboardShell(
     onLogout: () -> Unit,
     content: @Composable (Modifier) -> Unit
 ) {
+    val destinationNavigator = LocalAdminDestinationNavigator.current
+    fun navigateOrFallback(destination: AdminDestination, fallback: () -> Unit): () -> Unit = {
+        destinationNavigator?.invoke(destination) ?: fallback()
+    }
+
     Row(
         modifier = Modifier
             .fillMaxSize()
             .background(DashboardBackground)
     ) {
         AdminNavigationSidebar(
+            userName = userName,
+            role = role,
             activeDestination = activeDestination,
             onDashboardClick = onDashboardClick,
             onProductsClick = onProductsClick,
@@ -108,12 +126,18 @@ fun AdminDashboardShell(
             onStockOpnameFormClick = onStockOpnameFormClick,
             onIncomingGoodsClick = onIncomingGoodsClick,
             onIncomingGoodsFormClick = onIncomingGoodsFormClick,
+            onSuppliersClick = navigateOrFallback(AdminDestination.Suppliers, onSuppliersClick),
+            onPurchaseHistoryClick = navigateOrFallback(AdminDestination.PurchaseHistory, onPurchaseHistoryClick),
+            onStockReportClick = navigateOrFallback(AdminDestination.StockReport, onStockReportClick),
             onSupplierDebtsClick = onSupplierDebtsClick,
+            onCashSessionHistoryClick = navigateOrFallback(AdminDestination.CashSessionHistory, onCashSessionHistoryClick),
+            onCashReconciliationDetailClick = navigateOrFallback(AdminDestination.CashReconciliationDetail, onCashReconciliationDetailClick),
+            onCashExpensesClick = navigateOrFallback(AdminDestination.CashExpenses, onCashExpensesClick),
             onReceivablesClick = onReceivablesClick,
+            onReceivablePaymentsClick = navigateOrFallback(AdminDestination.ReceivablePayments, onReceivablePaymentsClick),
             onCustomersClick = onCustomersClick,
             onOperationalAuditClick = onOperationalAuditClick,
             onProfileClick = onProfileClick,
-        onSettingsClick = onSettingsClick,
             onLogout = onLogout,
             modifier = Modifier.width(260.dp)
         )
@@ -122,7 +146,6 @@ fun AdminDashboardShell(
                 .weight(1f)
                 .fillMaxHeight()
         ) {
-            AdminDashboardHeader(userName = userName, role = role)
             content(Modifier.weight(1f))
         }
     }
@@ -142,8 +165,15 @@ enum class AdminDestination {
     StockOpnameForm,
     IncomingGoods,
     IncomingGoodsForm,
+    Suppliers,
+    PurchaseHistory,
+    StockReport,
     SupplierDebts,
+    CashSessionHistory,
+    CashReconciliationDetail,
+    CashExpenses,
     Receivables,
+    ReceivablePayments,
     Customers,
     CustomerForm,
     OperationalAudit,
@@ -153,6 +183,8 @@ enum class AdminDestination {
 
 @Composable
 private fun AdminNavigationSidebar(
+    userName: String,
+    role: String,
     activeDestination: AdminDestination,
     onDashboardClick: () -> Unit,
     onProductsClick: () -> Unit,
@@ -167,12 +199,18 @@ private fun AdminNavigationSidebar(
     onStockOpnameFormClick: () -> Unit,
     onIncomingGoodsClick: () -> Unit,
     onIncomingGoodsFormClick: () -> Unit,
+    onSuppliersClick: () -> Unit,
+    onPurchaseHistoryClick: () -> Unit,
+    onStockReportClick: () -> Unit,
     onSupplierDebtsClick: () -> Unit,
+    onCashSessionHistoryClick: () -> Unit,
+    onCashReconciliationDetailClick: () -> Unit,
+    onCashExpensesClick: () -> Unit,
     onReceivablesClick: () -> Unit,
+    onReceivablePaymentsClick: () -> Unit,
     onCustomersClick: () -> Unit,
     onOperationalAuditClick: () -> Unit,
     onProfileClick: () -> Unit = {},
-    onSettingsClick: () -> Unit,
     onLogout: () -> Unit,
     modifier: Modifier = Modifier
 ) {
@@ -188,19 +226,26 @@ private fun AdminNavigationSidebar(
         AdminDestination.StockOpname,
         AdminDestination.StockOpnameForm,
         AdminDestination.IncomingGoods,
-        AdminDestination.IncomingGoodsForm -> true
+        AdminDestination.IncomingGoodsForm,
+        AdminDestination.Suppliers,
+        AdminDestination.PurchaseHistory,
+        AdminDestination.StockReport -> true
         else -> false
     }
     val isCustomerSectionActive = when (activeDestination) {
         AdminDestination.Customers,
         AdminDestination.CustomerForm,
-        AdminDestination.Receivables -> true
+        AdminDestination.Receivables,
+        AdminDestination.ReceivablePayments -> true
         else -> false
     }
     val isFinanceSectionActive = when (activeDestination) {
         AdminDestination.CashReconciliation,
         AdminDestination.SalesTransactions,
-        AdminDestination.SupplierDebts -> true
+        AdminDestination.SupplierDebts,
+        AdminDestination.CashSessionHistory,
+        AdminDestination.CashReconciliationDetail,
+        AdminDestination.CashExpenses -> true
         else -> false
     }
     val isReportSectionActive = when (activeDestination) {
@@ -325,8 +370,20 @@ private fun AdminNavigationSidebar(
                     onClick = onStockOpnameFormClick
                 )
                 ProductSubNavigationItem(
+                    icon = Icons.Outlined.GridView,
+                    text = "Laporan Stok",
+                    isActive = activeDestination == AdminDestination.StockReport,
+                    onClick = onStockReportClick
+                )
+                ProductSubNavigationItem(
+                    icon = Icons.Outlined.Group,
+                    text = "Supplier",
+                    isActive = activeDestination == AdminDestination.Suppliers,
+                    onClick = onSuppliersClick
+                )
+                ProductSubNavigationItem(
                     icon = Icons.AutoMirrored.Outlined.ListAlt,
-                    text = "Daftar Barang Masuk",
+                    text = "Riwayat Barang Masuk",
                     isActive = activeDestination == AdminDestination.IncomingGoods,
                     onClick = onIncomingGoodsClick
                 )
@@ -335,6 +392,12 @@ private fun AdminNavigationSidebar(
                     text = "Form Barang Masuk",
                     isActive = activeDestination == AdminDestination.IncomingGoodsForm,
                     onClick = onIncomingGoodsFormClick
+                )
+                ProductSubNavigationItem(
+                    icon = Icons.AutoMirrored.Outlined.ReceiptLong,
+                    text = "Nota Pembelian",
+                    isActive = activeDestination == AdminDestination.PurchaseHistory,
+                    onClick = onPurchaseHistoryClick
                 )
             }
             AdminExpandableNavigationItem(
@@ -358,6 +421,12 @@ private fun AdminNavigationSidebar(
                     isActive = activeDestination == AdminDestination.Receivables,
                     onClick = onReceivablesClick
                 )
+                ProductSubNavigationItem(
+                    icon = Icons.AutoMirrored.Outlined.ReceiptLong,
+                    text = "Pembayaran Piutang",
+                    isActive = activeDestination == AdminDestination.ReceivablePayments,
+                    onClick = onReceivablePaymentsClick
+                )
             }
             AdminExpandableNavigationItem(
                 icon = Icons.Outlined.Payments,
@@ -372,6 +441,24 @@ private fun AdminNavigationSidebar(
                     text = "Kas Harian",
                     isActive = activeDestination == AdminDestination.CashReconciliation,
                     onClick = onCashReconciliationClick
+                )
+                ProductSubNavigationItem(
+                    icon = Icons.AutoMirrored.Outlined.ListAlt,
+                    text = "Riwayat Kas Harian",
+                    isActive = activeDestination == AdminDestination.CashSessionHistory,
+                    onClick = onCashSessionHistoryClick
+                )
+                ProductSubNavigationItem(
+                    icon = Icons.Outlined.AssignmentTurnedIn,
+                    text = "Detail Rekonsiliasi",
+                    isActive = activeDestination == AdminDestination.CashReconciliationDetail,
+                    onClick = onCashReconciliationDetailClick
+                )
+                ProductSubNavigationItem(
+                    icon = Icons.Outlined.Payments,
+                    text = "Pengeluaran Kas",
+                    isActive = activeDestination == AdminDestination.CashExpenses,
+                    onClick = onCashExpensesClick
                 )
                 ProductSubNavigationItem(
                     icon = Icons.AutoMirrored.Outlined.ReceiptLong,
@@ -396,7 +483,7 @@ private fun AdminNavigationSidebar(
             if (isReportMenuExpanded) {
                 ProductSubNavigationItem(
                     icon = Icons.Outlined.GridView,
-                    text = "Laporan",
+                    text = "Laporan Analitik",
                     isActive = activeDestination == AdminDestination.Reports,
                     onClick = onReportsClick
                 )
@@ -407,19 +494,137 @@ private fun AdminNavigationSidebar(
                     onClick = onOperationalAuditClick
                 )
             }
-            AdminNavigationItem(
-                icon = Icons.Outlined.Settings,
-                text = "Pengaturan",
-                isActive = activeDestination == AdminDestination.Settings,
-                onClick = onSettingsClick
-            )
         }
 
-        AdminNavigationItem(
-            icon = Icons.AutoMirrored.Outlined.Logout,
-            text = "Keluar",
-            tint = DashboardTextSecondary,
-            onClick = onLogout
+        AdminAccountPanel(
+            userName = userName,
+            role = role,
+            onProfileClick = onProfileClick,
+            onLogout = onLogout
+        )
+    }
+}
+
+@Composable
+private fun AdminAccountPanel(
+    userName: String,
+    role: String,
+    onProfileClick: () -> Unit,
+    onLogout: () -> Unit
+) {
+    var isExpanded by rememberSaveable { mutableStateOf(false) }
+
+    Column(modifier = Modifier.fillMaxWidth()) {
+        AnimatedVisibility(
+            visible = isExpanded,
+            enter = expandVertically(),
+            exit = shrinkVertically()
+        ) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(bottom = 8.dp)
+                    .clip(RoundedCornerShape(12.dp))
+                    .background(Color(0xFFF8FAFC))
+                    .border(1.dp, Color(0xFFE2E8F0), RoundedCornerShape(12.dp))
+            ) {
+                AdminAccountAction(
+                    icon = Icons.Outlined.Person,
+                    text = "Profil",
+                    color = DashboardTextPrimary,
+                    onClick = {
+                        isExpanded = false
+                        onProfileClick()
+                    }
+                )
+                HorizontalDivider(color = Color(0xFFE2E8F0))
+                AdminAccountAction(
+                    icon = Icons.AutoMirrored.Outlined.Logout,
+                    text = "Keluar",
+                    color = Color(0xFFEF4444),
+                    onClick = {
+                        isExpanded = false
+                        onLogout()
+                    }
+                )
+            }
+        }
+
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(12.dp))
+                .background(
+                    if (isExpanded) DashboardBrandGreen.copy(alpha = 0.08f)
+                    else Color.Transparent
+                )
+                .clickable { isExpanded = !isExpanded }
+                .padding(horizontal = 12.dp, vertical = 10.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Box(
+                modifier = Modifier
+                    .size(38.dp)
+                    .clip(CircleShape)
+                    .background(DashboardBrandGreen.copy(alpha = 0.18f)),
+                contentAlignment = Alignment.Center
+            ) {
+                Text(
+                    text = userName.firstOrNull()?.uppercase() ?: "A",
+                    color = DashboardBrandGreenDark,
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 15.sp
+                )
+            }
+            Spacer(modifier = Modifier.width(12.dp))
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = userName,
+                    color = DashboardTextPrimary,
+                    fontSize = 13.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+                Text(
+                    text = role,
+                    color = DashboardTextSecondary,
+                    fontSize = 11.sp,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+            }
+            Icon(
+                imageVector = if (isExpanded) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
+                contentDescription = null,
+                tint = DashboardTextSecondary,
+                modifier = Modifier.size(20.dp)
+            )
+        }
+    }
+}
+
+@Composable
+private fun AdminAccountAction(
+    icon: ImageVector,
+    text: String,
+    color: Color,
+    onClick: () -> Unit
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(onClick = onClick)
+            .padding(horizontal = 16.dp, vertical = 14.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Icon(icon, contentDescription = null, tint = color, modifier = Modifier.size(18.dp))
+        Spacer(modifier = Modifier.width(12.dp))
+        Text(
+            text = text,
+            color = color,
+            fontSize = 13.sp,
+            fontWeight = if (color == Color(0xFFEF4444)) FontWeight.SemiBold else FontWeight.Medium
         )
     }
 }
@@ -525,60 +730,3 @@ private fun AdminNavigationItem(
     }
 }
 
-@Composable
-private fun AdminDashboardHeader(
-    userName: String,
-    role: String
-) {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .background(DashboardSurface)
-            .padding(horizontal = 32.dp, vertical = 16.dp),
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        OutlinedTextField(
-            value = "",
-            onValueChange = {},
-            placeholder = {
-                Text("Cari produk, stok, pembelian...", color = DashboardTextSecondary, fontSize = 14.sp)
-            },
-            leadingIcon = {
-                Icon(Icons.Outlined.Search, contentDescription = null, tint = DashboardTextSecondary)
-            },
-            modifier = Modifier
-                .width(420.dp)
-                .height(50.dp),
-            shape = RoundedCornerShape(24.dp),
-            singleLine = true,
-            colors = OutlinedTextFieldDefaults.colors(
-                unfocusedBorderColor = Color.Transparent,
-                focusedBorderColor = DashboardBrandGreenDark,
-                unfocusedContainerColor = DashboardBackground,
-                focusedContainerColor = DashboardBackground
-            )
-        )
-
-        Spacer(modifier = Modifier.weight(1f))
-        Icon(Icons.Outlined.Notifications, contentDescription = "Notifikasi", tint = DashboardTextSecondary)
-        Spacer(modifier = Modifier.width(32.dp))
-        Column(horizontalAlignment = Alignment.End) {
-            Text(userName, color = DashboardTextPrimary, fontSize = 14.sp, fontWeight = FontWeight.Bold)
-            Text("DASHBOARD ${role.uppercase()}", color = DashboardTextSecondary, fontSize = 10.sp)
-        }
-        Spacer(modifier = Modifier.width(12.dp))
-        Box(
-            modifier = Modifier
-                .size(40.dp)
-                .clip(CircleShape)
-                .background(DashboardBrandGreen.copy(alpha = 0.22f)),
-            contentAlignment = Alignment.Center
-        ) {
-            Text(
-                text = userName.firstOrNull()?.uppercase() ?: "A",
-                color = DashboardBrandGreenDark,
-                fontWeight = FontWeight.Bold
-            )
-        }
-    }
-}
