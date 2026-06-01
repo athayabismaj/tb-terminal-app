@@ -4,6 +4,7 @@ import com.tbterminal.app.data.model.CreateProductCommand
 import com.tbterminal.app.data.model.Product
 import com.tbterminal.app.data.model.ProductCategory
 import com.tbterminal.app.data.model.ProductCategoryPage
+import com.tbterminal.app.data.model.ProductPage
 import com.tbterminal.app.data.model.ProductDetail
 import com.tbterminal.app.data.model.ProductStock
 import com.tbterminal.app.data.model.ProductStockPage
@@ -43,6 +44,13 @@ interface InventoryRepository {
     suspend fun getProduct(id: String): RepositoryResult<Product>
 
     suspend fun getProductDetail(id: String): RepositoryResult<ProductDetail>
+
+    suspend fun getProductsPage(
+        page: Int = 1,
+        limit: Int = 20,
+        search: String? = null
+    ): RepositoryResult<ProductPage>
+
 
     suspend fun createProduct(command: CreateProductCommand): RepositoryResult<Product>
 
@@ -163,6 +171,27 @@ class RemoteInventoryRepository(
                     RepositoryResult.Success(product.toProduct())
                 }
             }
+    }
+
+
+    override suspend fun getProductsPage(
+        page: Int,
+        limit: Int,
+        search: String?
+    ): RepositoryResult<ProductPage> {
+        return safeApiCall {
+            inventoryApi.getProducts(page = page, limit = limit, search = search?.takeIf(String::isNotBlank))
+        }.toRepositoryResult { response ->
+            val productPage = response.data
+            if (!response.success || productPage == null) {
+                RepositoryResult.Error(
+                    code = response.code ?: "PRODUCTS_FAILED",
+                    message = response.message ?: response.error ?: "Produk gagal dimuat."
+                )
+            } else {
+                RepositoryResult.Success(productPage.toProductPage())
+            }
+        }
     }
 
     override suspend fun getProductDetail(id: String): RepositoryResult<ProductDetail> {

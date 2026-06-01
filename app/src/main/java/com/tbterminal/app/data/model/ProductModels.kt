@@ -46,6 +46,15 @@ data class Product(
     val isActive: Boolean
 )
 
+
+data class ProductPage(
+    val data: List<Product>,
+    val total: Long,
+    val page: Int,
+    val limit: Int,
+    val totalPages: Int
+)
+
 data class ProductStock(
     val productId: String,
     val sku: String,

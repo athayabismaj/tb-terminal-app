@@ -1,0 +1,130 @@
+package com.tbterminal.app.ui.products
+
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.lifecycle.viewmodel.compose.viewModel
+import com.tbterminal.app.data.model.ProductStock
+import com.tbterminal.app.data.repository.InventoryRepository
+import com.tbterminal.app.ui.dashboard.admin.AdminDashboardShell
+import com.tbterminal.app.ui.dashboard.admin.AdminDestination
+
+@Composable
+fun AdminProductListScreen(
+    name: String,
+    role: String,
+    inventoryRepository: InventoryRepository,
+    onDashboardClick: () -> Unit,
+    onProductsClick: () -> Unit,
+    onAddProductClick: () -> Unit,
+    onEditProductClick: (String) -> Unit,
+    onProductDetailClick: (String) -> Unit,
+    onCategoriesClick: () -> Unit,
+    onUnitsClick: () -> Unit,
+    onCashReconciliationClick: () -> Unit = {},
+    onSalesTransactionsClick: () -> Unit = {},
+    onReportsClick: () -> Unit = {},
+    onPriceManagementClick: () -> Unit = {},
+    onStockOpnameClick: () -> Unit,
+    onStockOpnameFormClick: () -> Unit,
+    onIncomingGoodsClick: () -> Unit,
+    onIncomingGoodsFormClick: () -> Unit,
+    onSupplierDebtsClick: () -> Unit = {},
+    onReceivablesClick: () -> Unit = {},
+    onCustomersClick: () -> Unit = {},
+    onOperationalAuditClick: () -> Unit = {},
+    onProfileClick: () -> Unit = {},
+    onSettingsClick: () -> Unit = {},
+    onLogout: () -> Unit,
+    viewModel: ProductListViewModel = viewModel(
+        factory = ProductListViewModel.factory(inventoryRepository)
+    )
+) {
+    val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+    var productToToggle by remember { mutableStateOf<ProductStock?>(null) }
+
+    AdminDashboardShell(
+        userName = name,
+        role = role,
+        activeDestination = AdminDestination.Products,
+        onDashboardClick = onDashboardClick,
+        onProductsClick = onProductsClick,
+        onAddProductClick = onAddProductClick,
+        onProductCategoriesClick = onCategoriesClick,
+        onProductUnitsClick = onUnitsClick,
+        onCashReconciliationClick = onCashReconciliationClick,
+        onSalesTransactionsClick = onSalesTransactionsClick,
+        onReportsClick = onReportsClick,
+        onPriceManagementClick = onPriceManagementClick,
+        onStockOpnameClick = onStockOpnameClick,
+        onStockOpnameFormClick = onStockOpnameFormClick,
+        onIncomingGoodsClick = onIncomingGoodsClick,
+        onIncomingGoodsFormClick = onIncomingGoodsFormClick,
+        onSupplierDebtsClick = onSupplierDebtsClick,
+        onReceivablesClick = onReceivablesClick,
+        onCustomersClick = onCustomersClick,
+        onOperationalAuditClick = onOperationalAuditClick,
+        onProfileClick = onProfileClick,
+        onSettingsClick = onSettingsClick,
+        onLogout = onLogout
+    ) { contentModifier ->
+        ProductListContent(
+            modifier = contentModifier,
+            uiState = uiState,
+            onSearchChanged = viewModel::onSearchChanged,
+            onRetry = { viewModel.loadProducts() },
+            onAddProductClick = onAddProductClick,
+            onEditProductClick = onEditProductClick,
+            onProductDetailClick = onProductDetailClick,
+            onCategoriesClick = onCategoriesClick,
+            onUnitsClick = onUnitsClick,
+            onToggleProductClick = { product -> productToToggle = product },
+            onPreviousPage = viewModel::previousPage,
+            onNextPage = viewModel::nextPage,
+            onDismissMessage = viewModel::clearActionMessage
+        )
+    }
+
+    productToToggle?.let { product ->
+        val isActivating = !product.isActive
+        AlertDialog(
+            onDismissRequest = { productToToggle = null },
+            title = { Text(if (isActivating) "Aktifkan Produk" else "Nonaktifkan Produk") },
+            text = {
+                Text(
+                    if (isActivating) {
+                        "Produk ${product.productName} akan tersedia kembali untuk transaksi dan pengelolaan stok."
+                    } else {
+                        "Produk ${product.productName} akan dinonaktifkan dari katalog aktif, tetapi riwayat transaksinya tetap tersimpan."
+                    }
+                )
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        productToToggle = null
+                        viewModel.toggleProductStatus(product)
+                    },
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = if (isActivating) ProductPrimary else ProductDanger
+                    )
+                ) {
+                    Text(if (isActivating) "Aktifkan" else "Nonaktifkan")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { productToToggle = null }) {
+                    Text("Batal")
+                }
+            }
+        )
+    }
+}

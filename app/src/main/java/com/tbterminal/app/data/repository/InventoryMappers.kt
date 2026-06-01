@@ -3,6 +3,7 @@ package com.tbterminal.app.data.repository
 import com.tbterminal.app.data.model.Product
 import com.tbterminal.app.data.model.ProductCategory
 import com.tbterminal.app.data.model.ProductCategoryPage
+import com.tbterminal.app.data.model.ProductPage
 import com.tbterminal.app.data.model.ProductStock
 import com.tbterminal.app.data.model.ProductStockPage
 import com.tbterminal.app.data.model.ProductUnit
@@ -67,3 +68,13 @@ internal fun UnitResponseDto.toProductUnit(): ProductUnit {
     return ProductUnit(id, name, symbol, createdAt)
 }
 
+
+internal fun PaginatedResponse<ProductResponseDto>.toProductPage(): ProductPage {
+    return ProductPage(
+        data = data.map { it.toProduct() },
+        total = total,
+        page = page,
+        limit = limit,
+        totalPages = totalPages
+    )
+}
