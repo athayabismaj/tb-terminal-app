@@ -12,4 +12,13 @@ interface AnalyticsApi {
         @retrofit2.http.Query("startDate") startDate: String?,
         @retrofit2.http.Query("endDate") endDate: String?
     ): Response<ApiResponse<List<DailySalesSummaryDto>>>
+
+    @GET("api/analytics/sales/report")
+    suspend fun getSalesReport(
+        @retrofit2.http.Query("startDate") startDate: String?,
+        @retrofit2.http.Query("endDate") endDate: String?,
+        @retrofit2.http.Query("cashierId") cashierId: String? = null,
+        @retrofit2.http.Query("sessionId") sessionId: String? = null,
+        @retrofit2.http.Query("topProductsLimit") topProductsLimit: Int = 10
+    ): Response<ApiResponse<SalesReportResponseDto>>
 }

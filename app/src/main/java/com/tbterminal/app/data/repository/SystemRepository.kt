@@ -4,6 +4,9 @@ import com.tbterminal.app.data.model.AuditLogPage
 import com.tbterminal.app.data.model.StoreSettings
 import com.tbterminal.app.data.model.UpdateStoreSettingsCommand
 import com.tbterminal.app.data.network.SystemApi
+import com.tbterminal.app.data.remote.safeApiCall
+import com.tbterminal.app.data.remote.NetworkResult
+import com.tbterminal.app.data.remote.ApiResponse
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
@@ -15,15 +18,15 @@ class SystemRepository(
         limit: Int = 20,
         action: String? = null,
         range: String? = null
-    ): RepositoryResult<AuditLogPage> = withContext(Dispatchers.IO) {
+    ): NetworkResult<ApiResponse<AuditLogPage>> = withContext(Dispatchers.IO) {
         safeApiCall { systemApi.getAuditLogs(page, limit, action, range) }
     }
 
-    suspend fun getStoreSettings(): RepositoryResult<StoreSettings> = withContext(Dispatchers.IO) {
+    suspend fun getStoreSettings(): NetworkResult<ApiResponse<StoreSettings>> = withContext(Dispatchers.IO) {
         safeApiCall { systemApi.getStoreSettings() }
     }
 
-    suspend fun updateStoreSettings(command: UpdateStoreSettingsCommand): RepositoryResult<StoreSettings> = withContext(Dispatchers.IO) {
+    suspend fun updateStoreSettings(command: UpdateStoreSettingsCommand): NetworkResult<ApiResponse<StoreSettings>> = withContext(Dispatchers.IO) {
         safeApiCall { systemApi.updateStoreSettings(command) }
     }
 }

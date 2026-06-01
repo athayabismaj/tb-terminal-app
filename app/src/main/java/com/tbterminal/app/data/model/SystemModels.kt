@@ -1,5 +1,8 @@
 package com.tbterminal.app.data.model
 
+import kotlinx.serialization.Serializable
+
+@Serializable
 data class AuditLogPage(
     val data: List<AuditLogItem>,
     val total: Long,
@@ -8,6 +11,7 @@ data class AuditLogPage(
     val totalPages: Int
 )
 
+@Serializable
 data class AuditLogItem(
     val id: String,
     val actorUserId: String?,
@@ -24,6 +28,7 @@ data class AuditLogItem(
     val createdAt: String
 )
 
+@Serializable
 data class StoreSettings(
     val id: String,
     val storeName: String,
@@ -35,6 +40,7 @@ data class StoreSettings(
     val updatedAt: String
 )
 
+@Serializable
 data class UpdateStoreSettingsCommand(
     val storeName: String,
     val address: String?,

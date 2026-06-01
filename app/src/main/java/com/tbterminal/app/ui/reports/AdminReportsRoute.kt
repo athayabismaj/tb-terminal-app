@@ -1,0 +1,76 @@
+package com.tbterminal.app.ui.reports
+
+import androidx.compose.runtime.Composable
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.lifecycle.viewmodel.compose.viewModel
+import com.tbterminal.app.data.repository.AnalyticsRepository
+import com.tbterminal.app.data.repository.CashReconciliationRepository
+
+@Composable
+fun AdminReportsRoute(
+    name: String,
+    role: String,
+    analyticsRepository: AnalyticsRepository,
+    cashReconciliationRepository: CashReconciliationRepository,
+    onDashboardClick: () -> Unit,
+    onProductsClick: () -> Unit,
+    onAddProductClick: () -> Unit,
+    onProductCategoriesClick: () -> Unit,
+    onProductUnitsClick: () -> Unit,
+    onCashReconciliationClick: () -> Unit,
+    onSalesTransactionsClick: () -> Unit,
+    onReportsClick: () -> Unit,
+    onPriceManagementClick: () -> Unit,
+    onStockOpnameClick: () -> Unit,
+    onStockOpnameFormClick: () -> Unit,
+    onIncomingGoodsClick: () -> Unit,
+    onIncomingGoodsFormClick: () -> Unit,
+    onSupplierDebtsClick: () -> Unit,
+    onReceivablesClick: () -> Unit,
+    onCustomersClick: () -> Unit,
+    onOperationalAuditClick: () -> Unit,
+    onProfileClick: () -> Unit,
+    onSettingsClick: () -> Unit,
+    onLogout: () -> Unit
+) {
+    val viewModel: AdminReportsViewModel = viewModel(
+        factory = AdminReportsViewModel.factory(
+            analyticsRepository = analyticsRepository,
+            cashReconciliationRepository = cashReconciliationRepository
+        )
+    )
+    val uiState = viewModel.uiState.collectAsStateWithLifecycle().value
+
+    AdminReportsScreen(
+        name = name,
+        role = role,
+        uiState = uiState,
+        onDateRangeChanged = viewModel::setDateRange,
+        onRefresh = viewModel::loadReports,
+        onRetry = viewModel::loadReports,
+        onSalesReportRetry = viewModel::loadSalesReport,
+        onTransactionsRetry = { viewModel.loadTransactions(uiState.transactionPage) },
+        onPreviousTransactionPage = viewModel::previousTransactionPage,
+        onNextTransactionPage = viewModel::nextTransactionPage,
+        onDashboardClick = onDashboardClick,
+        onProductsClick = onProductsClick,
+        onAddProductClick = onAddProductClick,
+        onProductCategoriesClick = onProductCategoriesClick,
+        onProductUnitsClick = onProductUnitsClick,
+        onCashReconciliationClick = onCashReconciliationClick,
+        onSalesTransactionsClick = onSalesTransactionsClick,
+        onReportsClick = onReportsClick,
+        onPriceManagementClick = onPriceManagementClick,
+        onStockOpnameClick = onStockOpnameClick,
+        onStockOpnameFormClick = onStockOpnameFormClick,
+        onIncomingGoodsClick = onIncomingGoodsClick,
+        onIncomingGoodsFormClick = onIncomingGoodsFormClick,
+        onSupplierDebtsClick = onSupplierDebtsClick,
+        onReceivablesClick = onReceivablesClick,
+        onCustomersClick = onCustomersClick,
+        onOperationalAuditClick = onOperationalAuditClick,
+        onProfileClick = onProfileClick,
+        onSettingsClick = onSettingsClick,
+        onLogout = onLogout
+    )
+}

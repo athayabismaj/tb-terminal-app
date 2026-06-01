@@ -1,6 +1,7 @@
 package com.tbterminal.app.data.remote
 
 import kotlinx.serialization.Serializable
+import java.math.BigDecimal
 
 @Serializable
 data class ApiErrorResponse(
@@ -71,4 +72,71 @@ data class DailySalesSummaryDto(
     val transactionCount: Long,
     val totalRevenue: Double,
     val totalDp: Double
+)
+
+@Serializable
+data class SalesReportResponseDto(
+    val range: SalesReportRangeDto,
+    val totals: SalesReportTotalsDto,
+    val paymentMethods: List<PaymentMethodSummaryDto> = emptyList(),
+    val transactionStatuses: List<TransactionStatusSummaryDto> = emptyList(),
+    val topProducts: List<TopProductSalesDto> = emptyList(),
+    val cashiers: List<CashierSalesSummaryDto> = emptyList(),
+    val receivables: SalesReceivableSummaryDto
+)
+
+@Serializable
+data class SalesReportRangeDto(
+    val startDate: String,
+    val endDate: String
+)
+
+@Serializable
+data class SalesReportTotalsDto(
+    val transactionCount: Long,
+    @Serializable(with = BigDecimalStringSerializer::class) val grossRevenue: BigDecimal,
+    @Serializable(with = BigDecimalStringSerializer::class) val paidAmount: BigDecimal,
+    @Serializable(with = BigDecimalStringSerializer::class) val outstandingAmount: BigDecimal,
+    @Serializable(with = BigDecimalStringSerializer::class) val grossProfit: BigDecimal
+)
+
+@Serializable
+data class PaymentMethodSummaryDto(
+    val method: String,
+    val paymentCount: Long,
+    @Serializable(with = BigDecimalStringSerializer::class) val amount: BigDecimal
+)
+
+@Serializable
+data class TransactionStatusSummaryDto(
+    val status: String,
+    val transactionCount: Long,
+    @Serializable(with = BigDecimalStringSerializer::class) val revenue: BigDecimal,
+    @Serializable(with = BigDecimalStringSerializer::class) val paidAmount: BigDecimal
+)
+
+@Serializable
+data class TopProductSalesDto(
+    val productId: String,
+    val productName: String,
+    @Serializable(with = BigDecimalStringSerializer::class) val qtySold: BigDecimal,
+    @Serializable(with = BigDecimalStringSerializer::class) val revenue: BigDecimal,
+    @Serializable(with = BigDecimalStringSerializer::class) val grossProfit: BigDecimal
+)
+
+@Serializable
+data class CashierSalesSummaryDto(
+    val userId: String,
+    val cashierName: String,
+    val transactionCount: Long,
+    @Serializable(with = BigDecimalStringSerializer::class) val revenue: BigDecimal,
+    @Serializable(with = BigDecimalStringSerializer::class) val grossProfit: BigDecimal
+)
+
+@Serializable
+data class SalesReceivableSummaryDto(
+    @Serializable(with = BigDecimalStringSerializer::class) val createdReceivableAmount: BigDecimal,
+    @Serializable(with = BigDecimalStringSerializer::class) val paidAmount: BigDecimal,
+    @Serializable(with = BigDecimalStringSerializer::class) val remainingAmount: BigDecimal,
+    val receivableCount: Long
 )

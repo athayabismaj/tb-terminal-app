@@ -15,7 +15,7 @@ data class AdminOperationalAuditUiState(
     val error: String? = null,
     val currentPage: Int = 1,
     val totalPages: Int = 1,
-    val limit: Int = 20,
+    val limit: Int = 100,
     val selectedAction: String? = null
 )
 
@@ -33,31 +33,55 @@ class AdminOperationalAuditViewModel(
     fun loadLogs(page: Int = _uiState.value.currentPage, action: String? = _uiState.value.selectedAction) {
         _uiState.value = _uiState.value.copy(isLoading = true, error = null)
         viewModelScope.launch {
-            systemRepository.getAuditLogs(
+            val result = systemRepository.getAuditLogs(
                 page = page,
                 limit = _uiState.value.limit,
                 action = action
-            ).fold(
-                onSuccess = { pageData ->
+            )
+            when (result) {
+                is com.tbterminal.app.data.remote.NetworkResult.Success -> {
+                    val apiResponse = result.data
+                    val pageData = apiResponse.data
+                    val operationalLogs = pageData
+                        ?.data
+                        .orEmpty()
+                        .filter(AuditLogItem::isOperationalAudit)
+
                     _uiState.value = _uiState.value.copy(
                         isLoading = false,
-                        logs = pageData.data,
-                        currentPage = pageData.page,
-                        totalPages = pageData.totalPages,
+                        logs = operationalLogs,
+                        currentPage = pageData?.page ?: 1,
+                        totalPages = pageData?.totalPages ?: 1,
                         selectedAction = action
                     )
-                },
-                onFailure = { err ->
+                }
+                is com.tbterminal.app.data.remote.NetworkResult.Error -> {
                     _uiState.value = _uiState.value.copy(
                         isLoading = false,
-                        error = err.message ?: "Terjadi kesalahan saat memuat log audit"
+                        error = result.message ?: "Terjadi kesalahan saat memuat log audit"
                     )
                 }
-            )
+                is com.tbterminal.app.data.remote.NetworkResult.Exception -> {
+                    _uiState.value = _uiState.value.copy(
+                        isLoading = false,
+                        error = result.e.message ?: "Terjadi kesalahan saat memuat log audit"
+                    )
+                }
+            }
         }
     }
 
     fun setActionFilter(action: String?) {
         loadLogs(page = 1, action = action)
+    }
+
+    companion object {
+        fun factory(repository: SystemRepository): androidx.lifecycle.ViewModelProvider.Factory = 
+            object : androidx.lifecycle.ViewModelProvider.Factory {
+                @Suppress("UNCHECKED_CAST")
+                override fun <T : androidx.lifecycle.ViewModel> create(modelClass: Class<T>): T {
+                    return AdminOperationalAuditViewModel(repository) as T
+                }
+            }
     }
 }

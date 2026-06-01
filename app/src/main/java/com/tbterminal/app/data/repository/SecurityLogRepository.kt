@@ -1,10 +1,12 @@
 package com.tbterminal.app.data.repository
 
-import com.tbterminal.app.data.model.AuditLog
+import com.tbterminal.app.data.model.AuditLogItem
 import com.tbterminal.app.data.model.AuditLogPage
 import com.tbterminal.app.data.remote.AuditLogResponseDto
 import com.tbterminal.app.data.remote.SecurityApi
 import com.tbterminal.app.data.remote.safeApiCall
+import com.tbterminal.app.data.remote.NetworkResult
+import com.tbterminal.app.data.remote.ApiResponse
 
 interface SecurityLogRepository {
     suspend fun getAuditLogs(
@@ -12,7 +14,7 @@ interface SecurityLogRepository {
         limit: Int,
         action: String?,
         range: String?
-    ): RepositoryResult<AuditLogPage>
+    ): NetworkResult<ApiResponse<AuditLogPage>>
 }
 
 class RemoteSecurityLogRepository(
@@ -23,19 +25,28 @@ class RemoteSecurityLogRepository(
         limit: Int,
         action: String?,
         range: String?
-    ): RepositoryResult<AuditLogPage> {
-        return safeApiCall {
+    ): NetworkResult<ApiResponse<AuditLogPage>> {
+        val result = safeApiCall {
             securityApi.getAuditLogs(page = page, limit = limit, action = action, range = range)
-        }.toRepositoryResult { response ->
-            val pageData = response.data
-            if (!response.success || pageData == null) {
-                RepositoryResult.Error(
-                    code = response.code ?: "AUDIT_LOGS_FAILED",
-                    message = response.message ?: response.error ?: "Log keamanan gagal dimuat."
-                )
-            } else {
-                RepositoryResult.Success(pageData.toAuditLogPage())
+        }
+        return when (result) {
+            is NetworkResult.Success -> {
+                val response = result.data
+                val pageData = response.data
+                if (response.success && pageData != null) {
+                    NetworkResult.Success(
+                        ApiResponse(
+                            success = true,
+                            data = pageData.toAuditLogPage(),
+                            message = response.message
+                        )
+                    )
+                } else {
+                    NetworkResult.Error(code = "AUDIT_LOGS_FAILED", message = response.message ?: "Log keamanan gagal dimuat.")
+                }
             }
+            is NetworkResult.Error -> result
+            is NetworkResult.Exception -> result
         }
     }
 }
@@ -43,7 +54,7 @@ class RemoteSecurityLogRepository(
 private fun com.tbterminal.app.data.remote.PaginatedResponse<AuditLogResponseDto>.toAuditLogPage(): AuditLogPage {
     return AuditLogPage(
         data = data.map { log ->
-            AuditLog(
+            AuditLogItem(
                 id = log.id,
                 actorUserId = log.actorUserId,
                 actorName = log.actorName,
@@ -53,6 +64,8 @@ private fun com.tbterminal.app.data.remote.PaginatedResponse<AuditLogResponseDto
                 tableName = log.tableName,
                 recordId = log.recordId,
                 ipAddress = log.ipAddress,
+                oldData = null,
+                newData = null,
                 activityLabel = log.activityLabel,
                 createdAt = log.createdAt
             )

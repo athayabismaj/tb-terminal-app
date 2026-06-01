@@ -8,8 +8,8 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
-import com.tbterminal.app.data.model.AuditLog
-import com.tbterminal.app.data.repository.RepositoryResult
+import com.tbterminal.app.data.model.AuditLogItem
+import com.tbterminal.app.data.remote.NetworkResult
 import com.tbterminal.app.data.repository.SecurityLogRepository
 import com.tbterminal.app.ui.common.viewModelFactory
 import java.time.Duration
@@ -126,24 +126,28 @@ class SecurityLogViewModel(
                     action = activityFilter.actionQuery,
                     range = dateFilter.queryValue
                 )) {
-                is RepositoryResult.Success -> {
-                    val page = result.data
-                    val logs = page.data.map(AuditLog::toSecurityLogItem)
-                    _uiState.update { state ->
-                        val updated = state.copy(
-                            logs = logs,
-                            totalLogs = page.total,
-                            page = page.page,
-                            limit = page.limit,
-                            totalPages = page.totalPages,
-                            isLoading = false,
-                            errorMessage = null
-                        )
-                        updated.copy(visibleLogs = updated.filteredLogs())
+                                is com.tbterminal.app.data.remote.NetworkResult.Success -> {
+                    val page = result.data.data
+                    if (page != null) {
+                        val logs = page.data.map(AuditLogItem::toSecurityLogItem)
+                        _uiState.update { state ->
+                            val updated = state.copy(
+                                logs = logs,
+                                totalLogs = page.total,
+                                page = page.page,
+                                limit = page.limit,
+                                totalPages = page.totalPages,
+                                isLoading = false,
+                                errorMessage = null
+                            )
+                            updated.copy(visibleLogs = updated.filteredLogs())
+                        }
+                    } else {
+                        setError("Data log keamanan kosong.")
                     }
                 }
-                is RepositoryResult.Error -> setError(result.message)
-                is RepositoryResult.Exception -> {
+                is NetworkResult.Error -> setError(result.message)
+                is NetworkResult.Exception -> {
                     setError("Log keamanan gagal dimuat karena koneksi ke server bermasalah.")
                 }
             }
@@ -220,7 +224,7 @@ private fun SecurityLogUiState.filteredLogs(): List<SecurityLogItem> {
     }
 }
 
-private fun AuditLog.toSecurityLogItem(): SecurityLogItem {
+private fun AuditLogItem.toSecurityLogItem(): SecurityLogItem {
     val createdAtInstant = createdAt.toServerInstantOrNull()
     val type = action.toSecurityLogType()
 
