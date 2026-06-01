@@ -3,7 +3,10 @@ package com.tbterminal.app.data.repository
 import com.tbterminal.app.data.model.CreatePurchaseCommand
 import com.tbterminal.app.data.model.CreateSupplierPaymentCommand
 import com.tbterminal.app.data.model.PurchaseItemCommand
+import com.tbterminal.app.data.model.PurchaseDetail
 import com.tbterminal.app.data.model.PurchaseReceipt
+import com.tbterminal.app.data.model.PurchaseSummary
+import com.tbterminal.app.data.model.PurchaseSummaryPage
 import com.tbterminal.app.data.model.Supplier
 import com.tbterminal.app.data.model.SupplierPayable
 import com.tbterminal.app.data.model.SupplierPayablePage
@@ -14,6 +17,7 @@ import com.tbterminal.app.data.remote.PayableResponseDto
 import com.tbterminal.app.data.remote.PurchaseItemRequestDto
 import com.tbterminal.app.data.remote.PurchaseRequestDto
 import com.tbterminal.app.data.remote.PurchaseResponseDto
+import com.tbterminal.app.data.remote.PurchaseSummaryDto
 import com.tbterminal.app.data.remote.PurchasingApi
 import com.tbterminal.app.data.remote.SupplierPaymentRequestDto
 import com.tbterminal.app.data.remote.SupplierPaymentResponseDto
@@ -35,7 +39,25 @@ interface PurchasingRepository {
         paymentTermDays: Int = 30
     ): RepositoryResult<Supplier>
 
+    suspend fun updateSupplier(
+        id: String,
+        name: String,
+        phone: String? = null,
+        address: String? = null,
+        paymentTermDays: Int = 30
+    ): RepositoryResult<Supplier>
+
+    suspend fun deleteSupplier(id: String): RepositoryResult<Unit>
+
     suspend fun createPurchase(command: CreatePurchaseCommand): RepositoryResult<PurchaseReceipt>
+
+    suspend fun getPurchases(
+        page: Int = 1,
+        limit: Int = 20,
+        supplierId: String? = null
+    ): RepositoryResult<PurchaseSummaryPage>
+
+    suspend fun getPurchaseById(id: String): RepositoryResult<PurchaseDetail>
 
     suspend fun getPayables(
         page: Int = 1,
@@ -101,6 +123,48 @@ class RemotePurchasingRepository(
             }
     }
 
+    override suspend fun updateSupplier(
+        id: String,
+        name: String,
+        phone: String?,
+        address: String?,
+        paymentTermDays: Int
+    ): RepositoryResult<Supplier> {
+        val request = SupplierRequestDto(
+            name = name,
+            phone = phone,
+            address = address,
+            paymentTermDays = paymentTermDays
+        )
+
+        return safeApiCall { purchasingApi.updateSupplier(id, request) }
+            .toRepositoryResult { response ->
+                val supplier = response.data
+                if (!response.success || supplier == null) {
+                    RepositoryResult.Error(
+                        code = response.code ?: "UPDATE_SUPPLIER_FAILED",
+                        message = response.message ?: response.error ?: "Supplier gagal diperbarui."
+                    )
+                } else {
+                    RepositoryResult.Success(supplier.toSupplier())
+                }
+            }
+    }
+
+    override suspend fun deleteSupplier(id: String): RepositoryResult<Unit> {
+        return safeApiCall { purchasingApi.deleteSupplier(id) }
+            .toRepositoryResult { response ->
+                if (!response.success) {
+                    RepositoryResult.Error(
+                        code = response.code ?: "DELETE_SUPPLIER_FAILED",
+                        message = response.message ?: response.error ?: "Supplier gagal dinonaktifkan."
+                    )
+                } else {
+                    RepositoryResult.Success(Unit)
+                }
+            }
+    }
+
     override suspend fun createPurchase(command: CreatePurchaseCommand): RepositoryResult<PurchaseReceipt> {
         val request = PurchaseRequestDto(
             supplierId = command.supplierId,
@@ -122,6 +186,45 @@ class RemotePurchasingRepository(
                     )
                 } else {
                     RepositoryResult.Success(purchase.toPurchaseReceipt())
+                }
+            }
+    }
+
+    override suspend fun getPurchases(
+        page: Int,
+        limit: Int,
+        supplierId: String?
+    ): RepositoryResult<PurchaseSummaryPage> {
+        return safeApiCall {
+            purchasingApi.getPurchases(
+                page = page,
+                limit = limit,
+                supplierId = supplierId?.takeIf(String::isNotBlank)
+            )
+        }.toRepositoryResult { response ->
+            val purchasePage = response.data
+            if (!response.success || purchasePage == null) {
+                RepositoryResult.Error(
+                    code = response.code ?: "PURCHASES_FAILED",
+                    message = response.message ?: response.error ?: "Nota pembelian gagal dimuat."
+                )
+            } else {
+                RepositoryResult.Success(purchasePage.toPurchaseSummaryPage())
+            }
+        }
+    }
+
+    override suspend fun getPurchaseById(id: String): RepositoryResult<PurchaseDetail> {
+        return safeApiCall { purchasingApi.getPurchaseById(id) }
+            .toRepositoryResult { response ->
+                val purchase = response.data
+                if (!response.success || purchase == null) {
+                    RepositoryResult.Error(
+                        code = response.code ?: "PURCHASE_DETAIL_FAILED",
+                        message = response.message ?: response.error ?: "Detail nota pembelian gagal dimuat."
+                    )
+                } else {
+                    RepositoryResult.Success(purchase.toPurchaseDetail())
                 }
             }
     }
@@ -213,6 +316,50 @@ private fun SupplierResponseDto.toSupplier(): Supplier {
         isActive = isActive,
         createdAt = createdAt,
         updatedAt = updatedAt
+    )
+}
+
+private fun PaginatedResponse<PurchaseSummaryDto>.toPurchaseSummaryPage(): PurchaseSummaryPage {
+    return PurchaseSummaryPage(
+        data = data.map(PurchaseSummaryDto::toPurchaseSummary),
+        total = total,
+        page = page,
+        limit = limit,
+        totalPages = totalPages
+    )
+}
+
+private fun PurchaseSummaryDto.toPurchaseSummary(): PurchaseSummary {
+    return PurchaseSummary(
+        id = id,
+        supplierId = supplierId,
+        supplierName = supplierName,
+        invoiceNo = invoiceNo,
+        total = total,
+        receivedAt = receivedAt,
+        createdAt = createdAt
+    )
+}
+
+private fun PurchaseResponseDto.toPurchaseDetail(): PurchaseDetail {
+    return PurchaseDetail(
+        id = id,
+        supplierId = supplierId,
+        supplierName = supplierName,
+        invoiceNo = invoiceNo,
+        total = total,
+        notes = notes,
+        receivedAt = receivedAt,
+        createdAt = createdAt,
+        items = items.map {
+            com.tbterminal.app.data.model.PurchaseItemDetail(
+                productId = it.productId,
+                productName = it.productName,
+                quantity = it.quantity,
+                priceAtTransaction = it.priceAtTransaction,
+                subtotal = it.subtotal
+            )
+        }
     )
 }
 

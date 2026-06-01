@@ -46,6 +46,44 @@ data class PurchaseReceipt(
     val receivedAt: String
 )
 
+data class PurchaseSummary(
+    val id: String,
+    val supplierId: String,
+    val supplierName: String,
+    val invoiceNo: String?,
+    val total: BigDecimal,
+    val receivedAt: String,
+    val createdAt: String
+)
+
+data class PurchaseSummaryPage(
+    val data: List<PurchaseSummary>,
+    val total: Long,
+    val page: Int,
+    val limit: Int,
+    val totalPages: Int
+)
+
+data class PurchaseDetail(
+    val id: String,
+    val supplierId: String,
+    val supplierName: String,
+    val invoiceNo: String?,
+    val total: BigDecimal,
+    val notes: String?,
+    val receivedAt: String,
+    val createdAt: String,
+    val items: List<PurchaseItemDetail>
+)
+
+data class PurchaseItemDetail(
+    val productId: String,
+    val productName: String,
+    val quantity: BigDecimal,
+    val priceAtTransaction: BigDecimal,
+    val subtotal: BigDecimal
+)
+
 data class SupplierPayable(
     val id: String,
     val supplierId: String,

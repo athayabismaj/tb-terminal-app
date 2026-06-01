@@ -4,9 +4,11 @@ import java.math.BigDecimal
 import kotlinx.serialization.Serializable
 import retrofit2.Response
 import retrofit2.http.Body
+import retrofit2.http.DELETE
 import retrofit2.http.GET
 import retrofit2.http.Path
 import retrofit2.http.POST
+import retrofit2.http.PUT
 import retrofit2.http.Query
 
 interface PurchasingApi {
@@ -22,9 +24,32 @@ interface PurchasingApi {
         @Body request: SupplierRequestDto
     ): Response<ApiResponse<SupplierResponseDto>>
 
+    @PUT("/api/purchasing/suppliers/{id}")
+    suspend fun updateSupplier(
+        @Path("id") id: String,
+        @Body request: SupplierRequestDto
+    ): Response<ApiResponse<SupplierResponseDto>>
+
+    @DELETE("/api/purchasing/suppliers/{id}")
+    suspend fun deleteSupplier(
+        @Path("id") id: String
+    ): Response<ApiResponse<Unit>>
+
     @POST("/api/purchasing/purchases")
     suspend fun createPurchase(
         @Body request: PurchaseRequestDto
+    ): Response<ApiResponse<PurchaseResponseDto>>
+
+    @GET("/api/purchasing/purchases")
+    suspend fun getPurchases(
+        @Query("page") page: Int = 1,
+        @Query("limit") limit: Int = 20,
+        @Query("supplierId") supplierId: String? = null
+    ): Response<ApiResponse<PaginatedResponse<PurchaseSummaryDto>>>
+
+    @GET("/api/purchasing/purchases/{id}")
+    suspend fun getPurchaseById(
+        @Path("id") id: String
     ): Response<ApiResponse<PurchaseResponseDto>>
 
     @GET("/api/purchasing/payables")
@@ -96,6 +121,17 @@ data class PurchaseResponseDto(
     val receivedAt: String,
     val createdAt: String,
     val items: List<PurchaseItemResponseDto>
+)
+
+@Serializable
+data class PurchaseSummaryDto(
+    val id: String,
+    val supplierId: String,
+    val supplierName: String,
+    val invoiceNo: String?,
+    @Serializable(with = BigDecimalStringSerializer::class) val total: BigDecimal,
+    val receivedAt: String,
+    val createdAt: String
 )
 
 @Serializable
