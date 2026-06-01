@@ -21,21 +21,17 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import androidx.lifecycle.viewmodel.compose.viewModel
 import com.tbterminal.app.data.model.Customer
-import com.tbterminal.app.data.repository.CashReconciliationRepository
-import com.tbterminal.app.data.repository.CheckoutRepository
-import com.tbterminal.app.data.repository.CustomerRepository
-import com.tbterminal.app.data.repository.InventoryRepository
 import com.tbterminal.app.ui.common.UiText
+import com.tbterminal.app.ui.checkout.components.CartCalculationRow
+import com.tbterminal.app.ui.checkout.components.CartEmptyState
+import com.tbterminal.app.ui.checkout.components.CartItemCard
+import com.tbterminal.app.ui.checkout.components.PaymentMethodSelector
 import com.tbterminal.app.ui.dashboard.cashier.CashierDashboardShell
 import com.tbterminal.app.ui.dashboard.cashier.CashierDestination
-import kotlinx.coroutines.flow.filterNotNull
 import java.math.BigDecimal
 import java.text.NumberFormat
 import java.util.Locale
@@ -52,11 +48,9 @@ private val CartOutlineVariant = Color(0xFFBCCAC0)
 private val CartOutline = Color(0xFF6D7A72)
 
 private val CartPrimary = Color(0xFF006948)
-private val CartPrimaryContainer = Color(0xFF00855D)
 private val CartOnPrimary = Color(0xFFFFFFFF)
 private val CartSecondary = Color(0xFF855300)
 private val CartSecondaryContainer = Color(0xFFFEA619)
-private val CartTertiary = Color(0xFF9B3E3B)
 
 private val CartError = Color(0xFFBA1A1A)
 
@@ -68,10 +62,19 @@ private val CartError = Color(0xFFBA1A1A)
 fun CashierCartScreen(
     name: String,
     role: String,
-    checkoutRepository: CheckoutRepository,
-    inventoryRepository: InventoryRepository,
-    customerRepository: CustomerRepository,
-    cashReconciliationRepository: CashReconciliationRepository,
+    state: CheckoutUiState,
+    snackbarHostState: SnackbarHostState,
+    onIncrease: (String) -> Unit,
+    onDecrease: (String) -> Unit,
+    onRemove: (String) -> Unit,
+    onCustomerSearchChanged: (String) -> Unit,
+    onSelectCustomer: (Customer) -> Unit,
+    onClearCustomer: () -> Unit,
+    onUseCustomerName: () -> Unit,
+    onSelectPayment: (PaymentMethod) -> Unit,
+    onAmountPaidChanged: (String) -> Unit,
+    onClearCart: () -> Unit,
+    onCheckout: () -> Unit,
     onBackToPos: () -> Unit,
     onDashboardClick: () -> Unit = {},
     onPosClick: () -> Unit = {},
@@ -80,37 +83,8 @@ fun CashierCartScreen(
     onStockCheckClick: () -> Unit = {},
     onProfileClick: () -> Unit = {},
     onSettingsClick: () -> Unit = {},
-    onLogout: () -> Unit = {},
-    onNavigateToReceipt: (String) -> Unit = {},
-    viewModel: CheckoutViewModel = viewModel(
-        factory = CheckoutViewModel.factory(
-            checkoutRepository = checkoutRepository,
-            inventoryRepository = inventoryRepository,
-            customerRepository = customerRepository,
-            cashReconciliationRepository = cashReconciliationRepository
-        )
-    )
+    onLogout: () -> Unit = {}
 ) {
-    val uiState by viewModel.uiState.collectAsStateWithLifecycle()
-    val snackbarHostState = remember { SnackbarHostState() }
-
-    LaunchedEffect(viewModel.errorEvent, snackbarHostState) {
-        viewModel.errorEvent
-            .filterNotNull()
-            .collect { error ->
-                snackbarHostState.showSnackbar(error.toMessage())
-                viewModel.clearErrorEvent()
-            }
-    }
-
-    LaunchedEffect(viewModel.checkoutEvents, onNavigateToReceipt) {
-        viewModel.checkoutEvents.collect { event ->
-            when (event) {
-                is CheckoutEvent.NavigateToReceipt -> onNavigateToReceipt(event.transactionId)
-            }
-        }
-    }
-
     CashierDashboardShell(
         userName = name,
         role = role,
@@ -131,7 +105,7 @@ fun CashierCartScreen(
             modifier = contentModifier,
             contentWindowInsets = WindowInsets(0.dp)
         ) { contentPadding ->
-            if (uiState.cartItems.isEmpty()) {
+            if (state.cartItems.isEmpty()) {
                 CartEmptyState(
                     onBackToPos = onBackToPos,
                     modifier = Modifier
@@ -140,37 +114,18 @@ fun CashierCartScreen(
                 )
             } else {
                 CartContent(
-                    state = uiState,
-                    onIncrease = { cartItemId ->
-                        val currentItem = uiState.cartItems.firstOrNull { it.cartItemId == cartItemId }
-                        if (currentItem != null) {
-                            viewModel.updateCartQuantity(cartItemId, currentItem.quantity + 1)
-                        }
-                    },
-                    onDecrease = { cartItemId ->
-                        val currentItem = uiState.cartItems.firstOrNull { it.cartItemId == cartItemId }
-                        if (currentItem != null) {
-                            viewModel.updateCartQuantity(cartItemId, currentItem.quantity - 1)
-                        }
-                    },
-                    onRemove = { cartItemId ->
-                        viewModel.updateCartQuantity(cartItemId, 0)
-                    },
-                    onCustomerSearchChanged = viewModel::onCustomerSearchChanged,
-                    onSelectCustomer = viewModel::selectCustomer,
-                    onClearCustomer = viewModel::clearSelectedCustomer,
-                    onUseCustomerName = viewModel::useQuickCustomerName,
-                    onSelectPayment = viewModel::selectPaymentMethod,
-                    onAmountPaidChanged = viewModel::onAmountPaidChanged,
-                    onClearCart = {
-                        viewModel.replaceCart(emptyList())
-                    },
-                    onCheckout = {
-                        viewModel.submitCheckout(
-                            paymentMethod = uiState.selectedPaymentMethod,
-                            amountPaid = uiState.finalTotal
-                        )
-                    },
+                    state = state,
+                    onIncrease = onIncrease,
+                    onDecrease = onDecrease,
+                    onRemove = onRemove,
+                    onCustomerSearchChanged = onCustomerSearchChanged,
+                    onSelectCustomer = onSelectCustomer,
+                    onClearCustomer = onClearCustomer,
+                    onUseCustomerName = onUseCustomerName,
+                    onSelectPayment = onSelectPayment,
+                    onAmountPaidChanged = onAmountPaidChanged,
+                    onClearCart = onClearCart,
+                    onCheckout = onCheckout,
                     onBackToPos = onBackToPos,
                     modifier = Modifier
                         .fillMaxSize()
@@ -480,193 +435,6 @@ private fun CartContent(
     }
 }
 
-// ==========================================
-// KARTU ITEM KERANJANG
-// ==========================================
-@Composable
-private fun CartItemCard(
-    item: CartItem,
-    sku: String,
-    unitName: String,
-    onIncrease: () -> Unit,
-    onDecrease: () -> Unit,
-    onRemove: () -> Unit
-) {
-    val subtotal = item.unitPrice.multiply(item.quantity.toBigDecimal())
-
-    Card(
-        modifier = Modifier.fillMaxWidth(),
-        colors = CardDefaults.cardColors(containerColor = CartSurface),
-        shape = RoundedCornerShape(16.dp),
-        border = BorderStroke(1.dp, CartOutlineVariant.copy(alpha = 0.4f)),
-        elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
-    ) {
-        Row(
-            modifier = Modifier.padding(16.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            // Pengganti Gambar: Kotak Initial
-            Box(
-                modifier = Modifier
-                    .size(72.dp)
-                    .background(CartSurfaceContainerLow, RoundedCornerShape(12.dp)),
-                contentAlignment = Alignment.Center
-            ) {
-                Text(
-                    item.productName.take(2).uppercase(),
-                    fontSize = 22.sp,
-                    fontWeight = FontWeight.Black,
-                    color = CartPrimaryContainer
-                )
-            }
-
-            Spacer(modifier = Modifier.width(20.dp))
-
-            // Info Barang
-            Column(modifier = Modifier.weight(1f)) {
-                Text(
-                    item.productName,
-                    fontSize = 16.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = CartOnSurface,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
-                )
-                Row {
-                    if (unitName.isNotBlank()) {
-                        Text(
-                            unitName,
-                            fontSize = 13.sp,
-                            color = CartOnSurfaceVariant
-                        )
-                    }
-                    if (sku.isNotBlank()) {
-                        if (unitName.isNotBlank()) {
-                            Text(
-                                " • ",
-                                fontSize = 13.sp,
-                                color = CartOnSurfaceVariant
-                            )
-                        }
-                        Text(
-                            "SKU: $sku",
-                            fontSize = 13.sp,
-                            color = CartOnSurfaceVariant
-                        )
-                    }
-                }
-            }
-
-            // Kontrol Qty
-            Row(
-                modifier = Modifier.padding(horizontal = 16.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                // Tombol Kurang / Hapus
-                if (item.quantity <= 1) {
-                    IconButton(
-                        onClick = onRemove,
-                        modifier = Modifier
-                            .size(36.dp)
-                            .border(1.dp, CartError.copy(alpha = 0.5f), RoundedCornerShape(8.dp))
-                    ) {
-                        Icon(
-                            Icons.Outlined.Delete,
-                            contentDescription = "Hapus",
-                            tint = CartError,
-                            modifier = Modifier.size(18.dp)
-                        )
-                    }
-                } else {
-                    IconButton(
-                        onClick = onDecrease,
-                        modifier = Modifier
-                            .size(36.dp)
-                            .border(1.dp, CartOutlineVariant, RoundedCornerShape(8.dp))
-                    ) {
-                        Icon(
-                            Icons.Outlined.Remove,
-                            contentDescription = "Kurang",
-                            tint = CartOnSurface,
-                            modifier = Modifier.size(18.dp)
-                        )
-                    }
-                }
-
-                Text(
-                    text = item.quantity.toString(),
-                    fontSize = 18.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = CartOnSurface,
-                    textAlign = TextAlign.Center,
-                    modifier = Modifier.width(44.dp)
-                )
-
-                IconButton(
-                    onClick = onIncrease,
-                    modifier = Modifier
-                        .size(36.dp)
-                        .background(CartPrimaryContainer, RoundedCornerShape(8.dp))
-                ) {
-                    Icon(
-                        Icons.Outlined.Add,
-                        contentDescription = "Tambah",
-                        tint = CartOnPrimary,
-                        modifier = Modifier.size(18.dp)
-                    )
-                }
-            }
-
-            // Subtotal
-            Column(
-                horizontalAlignment = Alignment.End,
-                modifier = Modifier.width(130.dp)
-            ) {
-                Text(
-                    "@ ${formatRupiah(item.unitPrice)}",
-                    fontSize = 11.sp,
-                    color = CartOnSurfaceVariant
-                )
-                Text(
-                    formatRupiah(subtotal),
-                    fontSize = 18.sp,
-                    fontWeight = FontWeight.ExtraBold,
-                    color = CartOnSurface
-                )
-            }
-        }
-    }
-}
-
-// ==========================================
-// BARIS KALKULASI
-// ==========================================
-@Composable
-private fun CartCalculationRow(
-    label: String,
-    value: String,
-    isDiscount: Boolean = false
-) {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(vertical = 6.dp),
-        horizontalArrangement = Arrangement.SpaceBetween,
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        Text(
-            label,
-            fontSize = 15.sp,
-            color = CartOnSurfaceVariant
-        )
-        Text(
-            value,
-            fontSize = 15.sp,
-            fontWeight = FontWeight.SemiBold,
-            color = if (isDiscount) CartTertiary else CartOnSurface
-        )
-    }
-}
 
 // ==========================================
 // PEMILIH PELANGGAN
@@ -928,149 +696,6 @@ private fun CartCustomerSelector(
                         }
                     }
                 }
-            }
-        }
-    }
-}
-
-// ==========================================
-// PEMILIH METODE PEMBAYARAN
-// ==========================================
-@Composable
-private fun PaymentMethodSelector(
-    selectedMethod: PaymentMethod,
-    onSelectPayment: (PaymentMethod) -> Unit
-) {
-    Column {
-        Text(
-            "Metode Pembayaran",
-            fontSize = 13.sp,
-            fontWeight = FontWeight.Bold,
-            color = CartOnSurfaceVariant,
-            letterSpacing = 0.5.sp,
-            modifier = Modifier.padding(bottom = 8.dp)
-        )
-
-        Row(
-            horizontalArrangement = Arrangement.spacedBy(6.dp),
-            modifier = Modifier.fillMaxWidth()
-        ) {
-            PaymentMethod.entries.forEach { method ->
-                val isSelected = method == selectedMethod
-                Surface(
-                    onClick = { onSelectPayment(method) },
-                    shape = RoundedCornerShape(10.dp),
-                    color = if (isSelected) CartPrimary else CartSurface,
-                    border = BorderStroke(
-                        1.dp,
-                        if (isSelected) Color.Transparent else CartOutlineVariant
-                    ),
-                    modifier = Modifier.weight(1f)
-                ) {
-                    Column(
-                        horizontalAlignment = Alignment.CenterHorizontally,
-                        modifier = Modifier.padding(vertical = 10.dp, horizontal = 4.dp)
-                    ) {
-                        Icon(
-                            when (method) {
-                                PaymentMethod.TUNAI -> Icons.Outlined.Payments
-                                PaymentMethod.TRANSFER -> Icons.Outlined.AccountBalance
-                                PaymentMethod.QRIS -> Icons.Outlined.QrCode2
-                                PaymentMethod.HUTANG -> Icons.Outlined.Receipt
-                                PaymentMethod.DP -> Icons.Outlined.AccountBalanceWallet
-                            },
-                            contentDescription = method.displayName(),
-                            tint = if (isSelected) CartOnPrimary else CartOnSurfaceVariant,
-                            modifier = Modifier.size(20.dp)
-                        )
-                        Spacer(modifier = Modifier.height(4.dp))
-                        Text(
-                            method.displayName(),
-                            fontSize = 11.sp,
-                            fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
-                            color = if (isSelected) CartOnPrimary else CartOnSurfaceVariant,
-                            textAlign = TextAlign.Center,
-                            maxLines = 1
-                        )
-                    }
-                }
-            }
-        }
-    }
-}
-
-// ==========================================
-// EMPTY CART STATE
-// ==========================================
-@Composable
-private fun CartEmptyState(
-    onBackToPos: () -> Unit,
-    modifier: Modifier = Modifier
-) {
-    Box(
-        contentAlignment = Alignment.Center,
-        modifier = modifier
-    ) {
-        Column(
-            horizontalAlignment = Alignment.CenterHorizontally
-        ) {
-            Box(
-                modifier = Modifier
-                    .size(100.dp)
-                    .background(
-                        CartSurfaceContainerLow,
-                        CircleShape
-                    ),
-                contentAlignment = Alignment.Center
-            ) {
-                Icon(
-                    Icons.Outlined.ShoppingCart,
-                    contentDescription = null,
-                    tint = CartOutline,
-                    modifier = Modifier.size(48.dp)
-                )
-            }
-
-            Spacer(modifier = Modifier.height(24.dp))
-
-            Text(
-                "Keranjang Kosong",
-                fontSize = 24.sp,
-                fontWeight = FontWeight.Bold,
-                color = CartOnSurface
-            )
-
-            Spacer(modifier = Modifier.height(8.dp))
-
-            Text(
-                "Tambahkan produk dari katalog untuk memulai transaksi",
-                fontSize = 15.sp,
-                color = CartOnSurfaceVariant,
-                textAlign = TextAlign.Center,
-                modifier = Modifier.widthIn(max = 320.dp)
-            )
-
-            Spacer(modifier = Modifier.height(32.dp))
-
-            Button(
-                onClick = onBackToPos,
-                shape = RoundedCornerShape(12.dp),
-                colors = ButtonDefaults.buttonColors(
-                    containerColor = CartPrimary
-                ),
-                modifier = Modifier.height(48.dp)
-            ) {
-                Icon(
-                    Icons.Outlined.Add,
-                    contentDescription = null,
-                    modifier = Modifier.size(18.dp)
-                )
-                Spacer(modifier = Modifier.width(8.dp))
-                Text(
-                    "Mulai Belanja",
-                    fontWeight = FontWeight.Bold,
-                    fontSize = 15.sp
-                )
             }
         }
     }
