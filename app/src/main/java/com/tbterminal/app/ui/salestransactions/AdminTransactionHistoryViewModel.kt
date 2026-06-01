@@ -51,17 +51,10 @@ class AdminTransactionHistoryViewModel(
             val statusParam = if (_uiState.value.statusFilter == "Semua") null else _uiState.value.statusFilter
             val searchParam = _uiState.value.query.takeIf { it.isNotBlank() }
 
-            // Convert selectedDate (yyyy-MM-dd) to exact UTC bounds in local timezone to avoid backend timezone mismatch
-            val startOfDay = _uiState.value.selectedDate?.let { dateStr ->
-                try {
-                    java.time.LocalDate.parse(dateStr).atStartOfDay(java.time.ZoneId.systemDefault()).toOffsetDateTime().toString()
-                } catch (e: Exception) { dateStr }
-            }
-            val endOfDay = _uiState.value.selectedDate?.let { dateStr ->
-                try {
-                    java.time.LocalDate.parse(dateStr).atStartOfDay(java.time.ZoneId.systemDefault()).toOffsetDateTime().toString()
-                } catch (e: Exception) { dateStr }
-            }
+            // Send plain date strings (yyyy-MM-dd) to the backend.
+            // The backend already handles timezone conversion and adding 1 day for endDate properly.
+            val startOfDay = _uiState.value.selectedDate
+            val endOfDay = _uiState.value.selectedDate
 
             when (
                 val result = repository.getTransactions(

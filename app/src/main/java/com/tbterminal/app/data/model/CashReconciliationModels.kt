@@ -5,6 +5,7 @@ import java.math.BigDecimal
 data class CashSession(
     val id: String,
     val userId: String,
+    val userName: String? = null,
     val openedAt: String,
     val closedAt: String?,
     val openingCash: BigDecimal,
@@ -16,11 +17,30 @@ data class CashSession(
     val status: String
 )
 
+data class CashSessionPage(
+    val data: List<CashSession>,
+    val total: Long,
+    val page: Int,
+    val limit: Int,
+    val totalPages: Int
+)
+
 data class CashExpense(
     val id: String,
+    val sessionId: String,
+    val userId: String,
+    val userName: String? = null,
     val amount: BigDecimal,
     val description: String,
     val createdAt: String
+)
+
+data class CashExpensePage(
+    val data: List<CashExpense>,
+    val total: Long,
+    val page: Int,
+    val limit: Int,
+    val totalPages: Int
 )
 
 data class CashTransaction(
@@ -33,6 +53,7 @@ data class CashTransaction(
     val status: String,
     val total: BigDecimal,
     val paidAmount: BigDecimal,
+    val remainingAmount: BigDecimal? = null,
     val createdAt: String
 )
 

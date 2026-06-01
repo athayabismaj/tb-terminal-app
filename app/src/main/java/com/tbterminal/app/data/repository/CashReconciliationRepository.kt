@@ -1,7 +1,9 @@
 package com.tbterminal.app.data.repository
 
 import com.tbterminal.app.data.model.CashSession
+import com.tbterminal.app.data.model.CashSessionPage
 import com.tbterminal.app.data.model.CashExpense
+import com.tbterminal.app.data.model.CashExpensePage
 import com.tbterminal.app.data.model.CashTransaction
 import com.tbterminal.app.data.model.CashTransactionDetail
 import com.tbterminal.app.data.model.CashTransactionItem
@@ -18,7 +20,9 @@ import com.tbterminal.app.data.remote.safeApiCall
 import java.math.BigDecimal
 
 interface CashReconciliationRepository {
+    suspend fun getSessions(page: Int, limit: Int, status: String? = null): RepositoryResult<CashSessionPage>
     suspend fun getActiveSession(): RepositoryResult<CashSession?>
+    suspend fun getSessionById(id: String): RepositoryResult<CashSession>
     suspend fun openSession(startingCash: BigDecimal): RepositoryResult<CashSession>
     suspend fun closeSession(endingCashPhysical: BigDecimal, notes: String?): RepositoryResult<CashSession>
     suspend fun getTransactions(
@@ -33,12 +37,28 @@ interface CashReconciliationRepository {
     suspend fun getTransactionById(id: String): RepositoryResult<CashTransactionDetail>
     suspend fun addExpense(amount: BigDecimal, description: String): RepositoryResult<CashExpense>
     suspend fun getExpenses(sessionId: String): RepositoryResult<List<CashExpense>>
+    suspend fun getExpenseHistory(page: Int, limit: Int, sessionId: String? = null): RepositoryResult<CashExpensePage>
     suspend fun payTransactionDebt(transactionId: String, amount: BigDecimal, method: String): RepositoryResult<CashTransactionDetail>
 }
 
 class RemoteCashReconciliationRepository(
     private val salesApi: SalesApi
 ) : CashReconciliationRepository {
+    override suspend fun getSessions(page: Int, limit: Int, status: String?): RepositoryResult<CashSessionPage> {
+        return safeApiCall { salesApi.getSessions(page, limit, status) }
+            .toRepositoryResult { response ->
+                val sessionPage = response.data
+                if (!response.success || sessionPage == null) {
+                    RepositoryResult.Error(
+                        code = response.code ?: "CASH_SESSIONS_FAILED",
+                        message = response.message ?: response.error ?: "Riwayat sesi kas gagal dimuat."
+                    )
+                } else {
+                    RepositoryResult.Success(sessionPage.toCashSessionPage())
+                }
+            }
+    }
+
     override suspend fun getActiveSession(): RepositoryResult<CashSession?> {
         return safeApiCall { salesApi.getActiveSession() }
             .toRepositoryResult { response ->
@@ -49,6 +69,21 @@ class RemoteCashReconciliationRepository(
                     )
                 } else {
                     RepositoryResult.Success(response.data?.toCashSession())
+                }
+            }
+    }
+
+    override suspend fun getSessionById(id: String): RepositoryResult<CashSession> {
+        return safeApiCall { salesApi.getSessionById(id) }
+            .toRepositoryResult { response ->
+                val session = response.data
+                if (!response.success || session == null) {
+                    RepositoryResult.Error(
+                        code = response.code ?: "CASH_SESSION_DETAIL_FAILED",
+                        message = response.message ?: response.error ?: "Detail sesi kas gagal dimuat."
+                    )
+                } else {
+                    RepositoryResult.Success(session.toCashSession())
                 }
             }
     }
@@ -171,6 +206,25 @@ class RemoteCashReconciliationRepository(
             }
     }
 
+    override suspend fun getExpenseHistory(
+        page: Int,
+        limit: Int,
+        sessionId: String?
+    ): RepositoryResult<CashExpensePage> {
+        return safeApiCall { salesApi.getExpenseHistory(page, limit, sessionId) }
+            .toRepositoryResult { response ->
+                val expenses = response.data
+                if (!response.success || expenses == null) {
+                    RepositoryResult.Error(
+                        code = response.code ?: "GET_EXPENSE_HISTORY_FAILED",
+                        message = response.message ?: response.error ?: "Gagal memuat riwayat pengeluaran."
+                    )
+                } else {
+                    RepositoryResult.Success(expenses.toCashExpensePage())
+                }
+            }
+    }
+
     override suspend fun payTransactionDebt(
         transactionId: String,
         amount: BigDecimal,
@@ -198,9 +252,22 @@ class RemoteCashReconciliationRepository(
 private fun com.tbterminal.app.data.remote.CashExpenseResponseDto.toCashExpense(): CashExpense {
     return CashExpense(
         id = id,
+        sessionId = sessionId,
+        userId = userId,
+        userName = userName,
         amount = amount,
         description = description,
         createdAt = createdAt
+    )
+}
+
+private fun PaginatedResponse<com.tbterminal.app.data.remote.CashExpenseResponseDto>.toCashExpensePage(): CashExpensePage {
+    return CashExpensePage(
+        data = data.map { it.toCashExpense() },
+        total = total,
+        page = page,
+        limit = limit,
+        totalPages = totalPages
     )
 }
 
@@ -208,6 +275,7 @@ private fun CashSessionResponseDto.toCashSession(): CashSession {
     return CashSession(
         id = id,
         userId = userId,
+        userName = userName,
         openedAt = openedAt,
         closedAt = closedAt,
         openingCash = openingCash,
@@ -217,6 +285,16 @@ private fun CashSessionResponseDto.toCashSession(): CashSession {
         totalExpenses = totalExpenses,
         notes = notes,
         status = status
+    )
+}
+
+private fun PaginatedResponse<CashSessionResponseDto>.toCashSessionPage(): CashSessionPage {
+    return CashSessionPage(
+        data = data.map { it.toCashSession() },
+        total = total,
+        page = page,
+        limit = limit,
+        totalPages = totalPages
     )
 }
 
@@ -231,6 +309,7 @@ private fun SalesTransactionSummaryDto.toCashTransaction(): CashTransaction {
         status = status,
         total = total,
         paidAmount = paidAmount,
+        remainingAmount = remainingAmount,
         createdAt = createdAt
     )
 }

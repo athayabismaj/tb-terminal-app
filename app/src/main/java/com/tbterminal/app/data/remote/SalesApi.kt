@@ -10,8 +10,20 @@ import retrofit2.http.Path
 import retrofit2.http.Query
 
 interface SalesApi {
+    @GET("/api/sales/sessions")
+    suspend fun getSessions(
+        @Query("page") page: Int = 1,
+        @Query("limit") limit: Int = 10,
+        @Query("status") status: String? = null
+    ): Response<ApiResponse<PaginatedResponse<CashSessionResponseDto>>>
+
     @GET("/api/sales/sessions/active")
     suspend fun getActiveSession(): Response<ApiResponse<CashSessionResponseDto?>>
+
+    @GET("/api/sales/sessions/{sessionId}")
+    suspend fun getSessionById(
+        @Path("sessionId") sessionId: String
+    ): Response<ApiResponse<CashSessionResponseDto>>
 
     @POST("/api/sales/sessions/open")
     suspend fun openSession(
@@ -27,6 +39,13 @@ interface SalesApi {
     suspend fun addExpense(
         @Body request: CashExpenseRequestDto
     ): Response<ApiResponse<CashExpenseResponseDto>>
+
+    @GET("/api/sales/sessions/expenses")
+    suspend fun getExpenseHistory(
+        @Query("page") page: Int = 1,
+        @Query("limit") limit: Int = 10,
+        @Query("sessionId") sessionId: String? = null
+    ): Response<ApiResponse<PaginatedResponse<CashExpenseResponseDto>>>
 
     @GET("/api/sales/sessions/{sessionId}/expenses")
     suspend fun getExpenses(
@@ -71,6 +90,7 @@ data class CloseSessionRequestDto(
 data class CashSessionResponseDto(
     val id: String,
     val userId: String,
+    val userName: String? = null,
     val openedAt: String,
     val closedAt: String?,
     @Serializable(with = BigDecimalStringSerializer::class) val openingCash: BigDecimal,
@@ -93,6 +113,7 @@ data class SalesTransactionSummaryDto(
     val status: String,
     @Serializable(with = BigDecimalStringSerializer::class) val total: BigDecimal,
     @Serializable(with = BigDecimalStringSerializer::class) val paidAmount: BigDecimal,
+    @Serializable(with = BigDecimalStringSerializer::class) val remainingAmount: BigDecimal? = null,
     val createdAt: String
 )
 
@@ -132,6 +153,7 @@ data class CashExpenseResponseDto(
     val id: String,
     val sessionId: String,
     val userId: String,
+    val userName: String? = null,
     @Serializable(with = BigDecimalStringSerializer::class) val amount: BigDecimal,
     val description: String,
     val createdAt: String

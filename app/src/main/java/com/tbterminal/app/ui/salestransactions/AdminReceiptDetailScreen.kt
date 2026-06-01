@@ -133,6 +133,7 @@ fun AdminReceiptDetailScreen(
         ReceiptDetailContent(
             state = uiState,
             transactionId = transactionId,
+            role = role,
             onBackClick = onBackClick,
             onShowPayDebt = viewModel::showPayDebtDialog,
             onHidePayDebt = viewModel::hidePayDebtDialog,
@@ -148,6 +149,7 @@ fun AdminReceiptDetailScreen(
 private fun ReceiptDetailContent(
     state: CashierTransactionHistoryUiState,
     transactionId: String,
+    role: String,
     onBackClick: () -> Unit,
     onShowPayDebt: () -> Unit,
     onHidePayDebt: () -> Unit,
@@ -172,6 +174,7 @@ private fun ReceiptDetailContent(
             else -> ReceiptSummaryCard(
                 transaction = state.selectedTransaction,
                 message = state.receiptMessage.orEmpty(),
+                role = role,
                 onShowPayDebt = onShowPayDebt
             )
         }
@@ -220,6 +223,7 @@ private fun ReceiptDetailHeader(onBackClick: () -> Unit) {
 private fun ReceiptSummaryCard(
     transaction: CashTransactionDetail,
     message: String,
+    role: String,
     onShowPayDebt: () -> Unit
 ) {
     var showPrintDialog by remember { mutableStateOf(false) }
@@ -245,6 +249,7 @@ private fun ReceiptSummaryCard(
             ReceiptItemsList(transaction.items)
             ReceiptActions(
                 transaction = transaction,
+                role = role,
                 onPrintClick = { showPrintDialog = true },
                 onShowPayDebt = onShowPayDebt
             )
@@ -341,11 +346,13 @@ private fun ReceiptItemsList(items: List<CashTransactionItem>) {
 @Composable
 private fun ReceiptActions(
     transaction: CashTransactionDetail,
+    role: String,
     onPrintClick: () -> Unit,
     onShowPayDebt: () -> Unit
 ) {
     Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
-        if (transaction.remainingAmount() > BigDecimal.ZERO) {
+        val canAcceptPayment = role.equals("KASIR", ignoreCase = true) || role.equals("OWNER", ignoreCase = true)
+        if (transaction.remainingAmount() > BigDecimal.ZERO && canAcceptPayment) {
             androidx.compose.material3.Button(
                 onClick = onShowPayDebt,
                 shape = RoundedCornerShape(12.dp),

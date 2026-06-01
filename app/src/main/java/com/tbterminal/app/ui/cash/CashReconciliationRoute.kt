@@ -1,10 +1,15 @@
 package com.tbterminal.app.ui.cash
 
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.lifecycle.viewmodel.compose.viewModel
 import com.tbterminal.app.data.repository.CashReconciliationRepository
+import com.tbterminal.app.ui.dashboard.admin.AdminDashboardShell
+import com.tbterminal.app.ui.dashboard.admin.AdminDestination
 
 @Composable
-fun AdminCashReconciliationScreen(
+fun CashReconciliationRoute(
     name: String,
     role: String,
     cashReconciliationRepository: CashReconciliationRepository,
@@ -27,12 +32,17 @@ fun AdminCashReconciliationScreen(
     onOperationalAuditClick: () -> Unit = {},
     onProfileClick: () -> Unit = {},
     onSettingsClick: () -> Unit = {},
-    onLogout: () -> Unit
+    onLogout: () -> Unit,
+    viewModel: CashReconciliationViewModel = viewModel(
+        factory = CashReconciliationViewModel.factory(cashReconciliationRepository)
+    )
 ) {
-    CashReconciliationRoute(
-        name = name,
+    val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+
+    AdminDashboardShell(
+        userName = name,
         role = role,
-        cashReconciliationRepository = cashReconciliationRepository,
+        activeDestination = AdminDestination.CashReconciliation,
         onDashboardClick = onDashboardClick,
         onProductsClick = onProductsClick,
         onAddProductClick = onAddProductClick,
@@ -53,5 +63,24 @@ fun AdminCashReconciliationScreen(
         onProfileClick = onProfileClick,
         onSettingsClick = onSettingsClick,
         onLogout = onLogout
-    )
+    ) { contentModifier ->
+        CashReconciliationScreen(
+            modifier = contentModifier,
+            uiState = uiState,
+            onDismissMessage = viewModel::clearMessage,
+            onOpeningCashChanged = viewModel::onOpeningCashChanged,
+            onOpenSession = viewModel::openSession,
+            onClosingCashChanged = viewModel::onClosingCashChanged,
+            onClosingNotesChanged = viewModel::onClosingNotesChanged,
+            onCloseSession = viewModel::closeSession,
+            onRefresh = { viewModel.loadCash() },
+            onPreviousPage = viewModel::previousPage,
+            onNextPage = viewModel::nextPage,
+            onShowExpenseDialog = viewModel::showExpenseDialog,
+            onHideExpenseDialog = viewModel::hideExpenseDialog,
+            onExpenseAmountChanged = viewModel::onExpenseAmountChanged,
+            onExpenseDescriptionChanged = viewModel::onExpenseDescriptionChanged,
+            onAddExpense = viewModel::addExpense
+        )
+    }
 }
