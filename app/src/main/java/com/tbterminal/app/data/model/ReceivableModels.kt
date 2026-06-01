@@ -42,3 +42,26 @@ data class ReceivablePaymentReceipt(
     val receivableStatus: String,
     val receivableRemainingAmount: BigDecimal
 )
+
+data class ReceivablePaymentHistory(
+    val id: String,
+    val receivableId: String,
+    val customerId: String,
+    val customerName: String,
+    val transactionId: String,
+    val amount: BigDecimal,
+    val method: String,
+    val reference: String?,
+    val notes: String?,
+    val paidAt: String,
+    val receivableStatus: String,
+    val receivableRemainingAmount: BigDecimal
+)
+
+data class ReceivablePaymentHistoryPage(
+    val data: List<ReceivablePaymentHistory>,
+    val total: Long,
+    val page: Int,
+    val limit: Int,
+    val totalPages: Int
+)

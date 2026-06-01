@@ -3,10 +3,13 @@ package com.tbterminal.app.data.repository
 import com.tbterminal.app.data.model.CreateReceivablePaymentCommand
 import com.tbterminal.app.data.model.Receivable
 import com.tbterminal.app.data.model.ReceivablePage
+import com.tbterminal.app.data.model.ReceivablePaymentHistory
+import com.tbterminal.app.data.model.ReceivablePaymentHistoryPage
 import com.tbterminal.app.data.model.ReceivablePaymentReceipt
 import com.tbterminal.app.data.remote.PaginatedResponse
 import com.tbterminal.app.data.remote.ReceivableApi
 import com.tbterminal.app.data.remote.ReceivablePaymentRequestDto
+import com.tbterminal.app.data.remote.ReceivablePaymentHistoryResponseDto
 import com.tbterminal.app.data.remote.ReceivablePaymentResponseDto
 import com.tbterminal.app.data.remote.ReceivableResponseDto
 import com.tbterminal.app.data.remote.safeApiCall
@@ -24,6 +27,12 @@ interface ReceivableRepository {
     suspend fun createReceivablePayment(
         command: CreateReceivablePaymentCommand
     ): RepositoryResult<ReceivablePaymentReceipt>
+
+    suspend fun getReceivablePayments(
+        page: Int = 1,
+        limit: Int = 20,
+        customerId: String? = null
+    ): RepositoryResult<ReceivablePaymentHistoryPage>
 }
 
 class RemoteReceivableRepository(
@@ -94,6 +103,30 @@ class RemoteReceivableRepository(
                 }
             }
     }
+
+    override suspend fun getReceivablePayments(
+        page: Int,
+        limit: Int,
+        customerId: String?
+    ): RepositoryResult<ReceivablePaymentHistoryPage> {
+        return safeApiCall {
+            receivableApi.getReceivablePayments(
+                page = page,
+                limit = limit,
+                customerId = customerId?.takeIf(String::isNotBlank)
+            )
+        }.toRepositoryResult { response ->
+            val paymentPage = response.data
+            if (!response.success || paymentPage == null) {
+                RepositoryResult.Error(
+                    code = response.code ?: "RECEIVABLE_PAYMENTS_FAILED",
+                    message = response.message ?: response.error ?: "Riwayat pembayaran piutang gagal dimuat."
+                )
+            } else {
+                RepositoryResult.Success(paymentPage.toReceivablePaymentHistoryPage())
+            }
+        }
+    }
 }
 
 private fun PaginatedResponse<ReceivableResponseDto>.toReceivablePage(): ReceivablePage {
@@ -125,6 +158,33 @@ private fun ReceivablePaymentResponseDto.toReceipt(): ReceivablePaymentReceipt {
     return ReceivablePaymentReceipt(
         id = id,
         receivableId = receivableId,
+        amount = amount,
+        method = method,
+        reference = reference,
+        notes = notes,
+        paidAt = paidAt,
+        receivableStatus = receivableStatus,
+        receivableRemainingAmount = receivableRemainingAmount
+    )
+}
+
+private fun PaginatedResponse<ReceivablePaymentHistoryResponseDto>.toReceivablePaymentHistoryPage(): ReceivablePaymentHistoryPage {
+    return ReceivablePaymentHistoryPage(
+        data = data.map(ReceivablePaymentHistoryResponseDto::toPaymentHistory),
+        total = total,
+        page = page,
+        limit = limit,
+        totalPages = totalPages
+    )
+}
+
+private fun ReceivablePaymentHistoryResponseDto.toPaymentHistory(): ReceivablePaymentHistory {
+    return ReceivablePaymentHistory(
+        id = id,
+        receivableId = receivableId,
+        customerId = customerId,
+        customerName = customerName,
+        transactionId = transactionId,
         amount = amount,
         method = method,
         reference = reference,

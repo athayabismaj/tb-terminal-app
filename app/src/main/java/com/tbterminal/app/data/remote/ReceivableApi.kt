@@ -57,6 +57,13 @@ interface ReceivableApi {
     suspend fun createReceivablePayment(
         @Body request: ReceivablePaymentRequestDto
     ): Response<ApiResponse<ReceivablePaymentResponseDto>>
+
+    @GET("/api/receivable/payments")
+    suspend fun getReceivablePayments(
+        @Query("page") page: Int = 1,
+        @Query("limit") limit: Int = 20,
+        @Query("customerId") customerId: String? = null
+    ): Response<ApiResponse<PaginatedResponse<ReceivablePaymentHistoryResponseDto>>>
 }
 
 @Serializable
@@ -110,6 +117,22 @@ data class ReceivablePaymentRequestDto(
 data class ReceivablePaymentResponseDto(
     val id: String,
     val receivableId: String,
+    @Serializable(with = BigDecimalStringSerializer::class) val amount: BigDecimal,
+    val method: String,
+    val reference: String?,
+    val notes: String?,
+    val paidAt: String,
+    val receivableStatus: String,
+    @Serializable(with = BigDecimalStringSerializer::class) val receivableRemainingAmount: BigDecimal
+)
+
+@Serializable
+data class ReceivablePaymentHistoryResponseDto(
+    val id: String,
+    val receivableId: String,
+    val customerId: String,
+    val customerName: String,
+    val transactionId: String,
     @Serializable(with = BigDecimalStringSerializer::class) val amount: BigDecimal,
     val method: String,
     val reference: String?,
