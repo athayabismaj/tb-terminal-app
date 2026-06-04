@@ -17,6 +17,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -27,6 +28,7 @@ import androidx.compose.material.icons.filled.ChevronLeft
 import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material.icons.outlined.CalendarMonth
 import androidx.compose.material.icons.outlined.Close
+import androidx.compose.material.icons.outlined.ExpandMore
 import androidx.compose.material.icons.outlined.History
 import androidx.compose.material.icons.outlined.Search
 import androidx.compose.material.icons.outlined.Visibility
@@ -34,10 +36,15 @@ import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.DatePicker
 import androidx.compose.material3.DatePickerDefaults
+import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -65,6 +72,8 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.tbterminal.app.data.model.CashTransaction
 import com.tbterminal.app.data.repository.CashReconciliationRepository
+import com.tbterminal.app.ui.components.HistoryDateFilter
+import com.tbterminal.app.ui.components.HistoryDatePickerDialog
 import com.tbterminal.app.ui.dashboard.DashboardBackground
 import com.tbterminal.app.ui.dashboard.DashboardBrandGreen
 import com.tbterminal.app.ui.dashboard.DashboardBrandGreenDark
@@ -79,6 +88,7 @@ import java.text.NumberFormat
 import java.text.SimpleDateFormat
 import java.time.LocalDate
 import java.time.OffsetDateTime
+import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 import java.util.Date
 import java.util.Locale
@@ -175,27 +185,21 @@ private fun CashierTransactionHistoryContent(
         modifier = modifier
             .fillMaxSize()
             .background(DashboardBackground)
-            .padding(32.dp)
-            .verticalScroll(rememberScrollState())
+            .padding(40.dp)
+            .verticalScroll(rememberScrollState()),
+        verticalArrangement = Arrangement.spacedBy(28.dp)
     ) {
         // ── Header ──
-        CashierHistoryHeader()
-
-        Spacer(modifier = Modifier.height(20.dp))
-
-        // ── Period Info ──
-        Text(
-            text = if (state.selectedDate != null)
-                "Periode data: ${state.selectedDate.formatDisplayDate()}"
-            else
-                "Periode data: Semua tanggal pada sesi aktif",
-            color = DashboardTextSecondary,
-            fontSize = 12.sp,
-            fontWeight = FontWeight.Medium
+        CashierHistoryHeader(
+            state = state,
+            onPreviousDate = viewModel::previousDate,
+            onNextDate = viewModel::nextDate,
+            onCalendarClick = { showCalendarPicker = true },
+            onClearDate = { viewModel.setDate(null) },
+            onDatePresetSelected = viewModel::setDatePreset
         )
 
-        Spacer(modifier = Modifier.height(12.dp))
-
+        // ── Period Info ──
         // ── Search + Date Navigator ──
         Row(
             modifier = Modifier.fillMaxWidth(),
@@ -230,43 +234,17 @@ private fun CashierTransactionHistoryContent(
                 }
             }
 
-            // Date Navigator Bar
-            CashierDateNavigator(
-                selectedDate = state.selectedDate,
-                onPreviousDate = viewModel::previousDate,
-                onNextDate = viewModel::nextDate,
-                onCalendarClick = { showCalendarPicker = true },
-                onClearDate = { viewModel.setDate(null) },
-                modifier = Modifier.weight(1f)
+            TransactionStatusDropdown(
+                selectedStatus = state.statusFilter,
+                onStatusChanged = viewModel::updateStatusFilter,
+                modifier = Modifier.width(220.dp)
             )
         }
 
-        Spacer(modifier = Modifier.height(16.dp))
 
         // ── Status Chips ──
-        val statuses = listOf("Semua", "Lunas", "DP", "Hutang")
-        LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            items(statuses.size) { index ->
-                val status = statuses[index]
-                val isSelected = status == state.statusFilter
-                Surface(
-                    shape = RoundedCornerShape(20.dp),
-                    color = if (isSelected) DashboardBrandGreenDark else Color.White,
-                    border = BorderStroke(1.dp, if (isSelected) Color.Transparent else CashierLine),
-                    onClick = { viewModel.updateStatusFilter(status) }
-                ) {
-                    Text(
-                        text = status,
-                        color = if (isSelected) Color.White else DashboardTextSecondary,
-                        fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
-                        fontSize = 13.sp,
-                        modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
-                    )
-                }
-            }
-        }
+        
 
-        Spacer(modifier = Modifier.height(24.dp))
 
         // ── Table Card ──
         Card(
@@ -301,8 +279,8 @@ private fun CashierTransactionHistoryContent(
 
     // ── Calendar Picker Dialog ──
     if (showCalendarPicker) {
-        CashierCalendarPickerDialog(
-            currentDate = state.selectedDate,
+        HistoryDatePickerDialog(
+            currentDate = state.endDate ?: state.selectedDate,
             onDismiss = { showCalendarPicker = false },
             onConfirm = { date ->
                 viewModel.setDate(date)
@@ -324,7 +302,7 @@ private fun CashierDateNavigator(
     onClearDate: () -> Unit,
     modifier: Modifier = Modifier
 ) {
-    val displayText = selectedDate?.formatDisplayDate() ?: "Semua Tanggal"
+    val displayText = selectedDate?.formatDisplayDate() ?: "Hari ini"
     val isToday = selectedDate == LocalDate.now().format(DateTimeFormatter.ISO_LOCAL_DATE)
 
     Surface(
@@ -489,47 +467,42 @@ private fun CashierCalendarPickerDialog(
 // HEADER
 // ═══════════════════════════════════════════════
 @Composable
-private fun CashierHistoryHeader() {
+private fun CashierHistoryHeader(
+    state: AdminTransactionHistoryUiState,
+    onPreviousDate: () -> Unit,
+    onNextDate: () -> Unit,
+    onCalendarClick: () -> Unit,
+    onClearDate: () -> Unit,
+    onDatePresetSelected: (String) -> Unit
+) {
     Row(
         modifier = Modifier.fillMaxWidth(),
         horizontalArrangement = Arrangement.SpaceBetween,
-        verticalAlignment = Alignment.CenterVertically
+        verticalAlignment = Alignment.Top
     ) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Box(
-                modifier = Modifier
-                    .clip(RoundedCornerShape(16.dp))
-                    .background(DashboardBrandGreenDark.copy(alpha = 0.12f))
-                    .padding(14.dp)
-            ) {
-                Icon(
-                    androidx.compose.material.icons.Icons.Outlined.History,
-                    contentDescription = null,
-                    tint = DashboardBrandGreenDark,
-                    modifier = Modifier.size(28.dp)
-                )
-            }
-            Spacer(modifier = Modifier.width(16.dp))
-            Column {
-                Text("Riwayat Transaksi", color = DashboardTextPrimary, fontSize = 28.sp, fontWeight = FontWeight.ExtraBold)
-                Text(
-                    text = "Lihat transaksi pada sesi kasir aktif dan buka detail struk.",
-                    color = DashboardTextSecondary,
-                    fontSize = 14.sp,
-                    fontWeight = FontWeight.Medium
-                )
-            }
-        }
+        Text(
+            "Riwayat Transaksi",
+            color = DashboardTextPrimary,
+            fontSize = 28.sp,
+            fontWeight = FontWeight.Medium
+        )
         Row(
-            modifier = Modifier
-                .clip(RoundedCornerShape(24.dp))
-                .background(DashboardBrandGreen.copy(alpha = 0.14f))
-                .padding(horizontal = 18.dp, vertical = 12.dp),
+            horizontalArrangement = Arrangement.spacedBy(10.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Icon(Icons.Outlined.History, contentDescription = null, tint = DashboardBrandGreenDark)
-            Spacer(modifier = Modifier.width(10.dp))
-            Text("Riwayat sesi kasir", color = DashboardBrandGreenDark, fontSize = 16.sp, fontWeight = FontWeight.Bold)
+            HistoryDateFilter(
+                selectedDate = state.endDate ?: state.selectedDate,
+                onPreviousDate = onPreviousDate,
+                onNextDate = onNextDate,
+                onCalendarClick = onCalendarClick,
+                onClearDate = onClearDate,
+                displayTextOverride = state.dateRangeLabel(),
+                modifier = Modifier.width(320.dp)
+            )
+            TransactionDatePresets(
+                selectedPreset = state.selectedPreset,
+                onSelected = onDatePresetSelected
+            )
         }
     }
 }
@@ -537,6 +510,97 @@ private fun CashierHistoryHeader() {
 // ═══════════════════════════════════════════════
 // TABLE HEADER, ROW, SKELETON, PAGINATION
 // ═══════════════════════════════════════════════
+@Composable
+private fun TransactionDatePresets(selectedPreset: String?, onSelected: (String) -> Unit) {
+    Surface(
+        shape = RoundedCornerShape(12.dp),
+        color = Color.White,
+        border = BorderStroke(1.dp, CashierLine),
+        modifier = Modifier.height(48.dp)
+    ) {
+        Row(
+            modifier = Modifier.padding(horizontal = 6.dp, vertical = 6.dp),
+            horizontalArrangement = Arrangement.spacedBy(4.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            listOf("Hari ini", "Minggu ini", "Bulan ini").forEach { preset ->
+                Surface(
+                    onClick = { onSelected(preset) },
+                    color = if (selectedPreset == preset) Color(0xFF86F8C9) else Color.Transparent,
+                    shape = RoundedCornerShape(10.dp),
+                    modifier = Modifier.height(36.dp)
+                ) {
+                    Box(
+                        modifier = Modifier.padding(horizontal = 14.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text(
+                            preset,
+                            color = if (selectedPreset == preset) Color(0xFF00513A) else DashboardTextSecondary,
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun TransactionStatusDropdown(
+    selectedStatus: String,
+    onStatusChanged: (String) -> Unit,
+    modifier: Modifier = Modifier
+) {
+    var expanded by remember { mutableStateOf(false) }
+    Box {
+        OutlinedButton(
+            onClick = { expanded = true },
+            modifier = modifier.height(48.dp),
+            shape = RoundedCornerShape(12.dp),
+            border = BorderStroke(1.dp, CashierLine),
+            colors = ButtonDefaults.outlinedButtonColors(
+                containerColor = Color.White,
+                contentColor = DashboardTextPrimary
+            )
+        ) {
+            Text(
+                text = selectedStatus.statusFilterLabel(),
+                modifier = Modifier.weight(1f),
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                fontSize = 13.sp,
+                fontWeight = FontWeight.Medium
+            )
+            Icon(
+                Icons.Outlined.ExpandMore,
+                contentDescription = "Pilih status pembayaran",
+                tint = DashboardTextSecondary,
+                modifier = Modifier.size(18.dp)
+            )
+        }
+        DropdownMenu(
+            expanded = expanded,
+            onDismissRequest = { expanded = false },
+            modifier = Modifier
+                .width(220.dp)
+                .widthIn(min = 220.dp)
+                .background(Color.White)
+        ) {
+            listOf("Semua", "Lunas", "DP", "Hutang").forEach { status ->
+                DropdownMenuItem(
+                    text = { Text(status.statusFilterLabel(), color = DashboardTextPrimary) },
+                    onClick = {
+                        onStatusChanged(status)
+                        expanded = false
+                    }
+                )
+            }
+        }
+    }
+}
+
 @Composable
 private fun CashierHistoryTableHeader() {
     Row(
@@ -758,6 +822,27 @@ internal fun String.statusColor(): Color = when (lowercase()) {
     "hutang", "unpaid" -> Color(0xFFEF4444)
     else -> DashboardTextSecondary
 }
+
+private fun String.statusFilterLabel(): String = when (this) {
+    "Semua" -> "Semua pembayaran"
+    "Lunas" -> "Lunas"
+    "DP" -> "DP"
+    "Hutang" -> "Hutang"
+    else -> this
+}
+
+private fun AdminTransactionHistoryUiState.dateRangeLabel(): String? {
+    val start = startDate ?: selectedDate
+    val end = endDate ?: selectedDate
+    if (start == null || end == null) return null
+    val startText = start.asShortDate()
+    val endText = end.asShortDate()
+    return if (start == end) startText else "$startText - $endText"
+}
+
+private fun String.asShortDate(): String = runCatching {
+    LocalDate.parse(this).format(DateTimeFormatter.ofPattern("dd MMM yyyy", Locale.forLanguageTag("id-ID")))
+}.getOrDefault(this)
 
 /** Format "yyyy-MM-dd" -> "dd/MM/yyyy" for display */
 internal fun String.formatDisplayDate(): String = runCatching {

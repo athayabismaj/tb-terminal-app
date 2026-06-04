@@ -10,6 +10,9 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import java.time.DayOfWeek
+import java.time.LocalDate
+import java.time.temporal.ChronoUnit
 
 class CashSessionHistoryViewModel(
     private val repository: CashReconciliationRepository
@@ -24,8 +27,11 @@ class CashSessionHistoryViewModel(
     fun loadSessions(page: Int = 1) {
         viewModelScope.launch {
             _uiState.update { it.copy(isLoading = true, errorMessage = null) }
-            val status = _uiState.value.statusFilter.takeUnless { it == "Semua" }
-            when (val result = repository.getSessions(page, _uiState.value.pageSize, status)) {
+            val state = _uiState.value
+            val status = state.statusFilter.takeUnless { it == "Semua" }
+            val startDate = state.startDate ?: state.selectedDate
+            val endDate = state.endDate ?: state.selectedDate
+            when (val result = repository.getSessions(page, state.pageSize, status, startDate, endDate)) {
                 is RepositoryResult.Success -> _uiState.update {
                     it.copy(
                         sessions = result.data.data,
@@ -46,8 +52,79 @@ class CashSessionHistoryViewModel(
     }
 
     fun setStatusFilter(status: String) {
-        _uiState.update { it.copy(statusFilter = status) }
+        _uiState.update { it.copy(statusFilter = status, page = 1) }
         loadSessions()
+    }
+
+    fun setSearchQuery(query: String) {
+        _uiState.update { it.copy(searchQuery = query) }
+    }
+
+    fun setDate(date: String?) {
+        val resolvedDate = date ?: LocalDate.now().toString()
+        _uiState.update {
+            it.copy(
+                selectedDate = resolvedDate,
+                startDate = resolvedDate,
+                endDate = resolvedDate,
+                selectedPreset = if (date == null) "Hari ini" else null,
+                page = 1
+            )
+        }
+        loadSessions()
+    }
+
+    fun setDatePreset(preset: String) {
+        val today = LocalDate.now()
+        val startDate = when (preset) {
+            "Minggu ini", "7 hari" -> today.with(DayOfWeek.MONDAY)
+            "Bulan ini", "30 hari" -> today.withDayOfMonth(1)
+            else -> today
+        }
+        val selectedPreset = when (preset) {
+            "7 hari" -> "Minggu ini"
+            "30 hari" -> "Bulan ini"
+            else -> preset
+        }
+        setDateRange(startDate, today, selectedPreset)
+    }
+
+    fun previousDate() {
+        val state = _uiState.value
+        val (startDate, endDate) = currentDateRange()
+
+        when (state.selectedPreset) {
+            "Minggu ini", "7 hari" -> {
+                val previousStart = startDate.minusWeeks(1).with(DayOfWeek.MONDAY)
+                setDateRange(previousStart, previousStart.plusDays(6), "Minggu ini")
+            }
+            "Bulan ini", "30 hari" -> {
+                val previousStart = startDate.minusMonths(1).withDayOfMonth(1)
+                setDateRange(previousStart, previousStart.endOfMonth(), "Bulan ini")
+            }
+            else -> shiftRange(daysDirection = -1)
+        }
+    }
+
+    fun nextDate() {
+        val state = _uiState.value
+        val (startDate, endDate) = currentDateRange()
+        val today = LocalDate.now()
+        if (endDate >= today) return
+
+        when (state.selectedPreset) {
+            "Minggu ini", "7 hari" -> {
+                val nextStart = startDate.plusWeeks(1).with(DayOfWeek.MONDAY)
+                if (nextStart > today) return
+                setDateRange(nextStart, minOf(nextStart.plusDays(6), today), "Minggu ini")
+            }
+            "Bulan ini", "30 hari" -> {
+                val nextStart = startDate.plusMonths(1).withDayOfMonth(1)
+                if (nextStart > today) return
+                setDateRange(nextStart, minOf(nextStart.endOfMonth(), today), "Bulan ini")
+            }
+            else -> shiftRange(daysDirection = 1)
+        }
     }
 
     fun previousPage() {
@@ -57,6 +134,41 @@ class CashSessionHistoryViewModel(
     fun nextPage() {
         if (_uiState.value.page < _uiState.value.totalPages) loadSessions(_uiState.value.page + 1)
     }
+
+    private fun setDateRange(startDate: LocalDate, endDate: LocalDate, preset: String?) {
+        _uiState.update {
+            it.copy(
+                selectedDate = endDate.toString(),
+                startDate = startDate.toString(),
+                endDate = endDate.toString(),
+                selectedPreset = preset,
+                page = 1
+            )
+        }
+        loadSessions()
+    }
+
+    private fun currentDateRange(): Pair<LocalDate, LocalDate> {
+        val state = _uiState.value
+        val endDate = (state.endDate ?: state.selectedDate)?.let(LocalDate::parse) ?: LocalDate.now()
+        val startDate = (state.startDate ?: state.selectedDate)?.let(LocalDate::parse) ?: endDate
+        return startDate to endDate
+    }
+
+    private fun shiftRange(daysDirection: Int) {
+        val (startDate, endDate) = currentDateRange()
+        val today = LocalDate.now()
+        val rangeLength = ChronoUnit.DAYS.between(startDate, endDate).coerceAtLeast(0) + 1
+        val shiftedStart = startDate.plusDays(rangeLength * daysDirection)
+        val shiftedEnd = endDate.plusDays(rangeLength * daysDirection)
+        if (daysDirection > 0 && shiftedEnd > today) {
+            setDateRange(today.minusDays(rangeLength - 1), today, null)
+        } else {
+            setDateRange(shiftedStart, shiftedEnd, null)
+        }
+    }
+
+    private fun LocalDate.endOfMonth(): LocalDate = withDayOfMonth(lengthOfMonth())
 
     companion object {
         fun factory(repository: CashReconciliationRepository): ViewModelProvider.Factory {

@@ -48,7 +48,12 @@ fun AdminCashExpenseHistoryScreen(
         CashExpenseHistoryScreen(
             modifier = modifier,
             uiState = uiState,
+            onSearchChanged = viewModel::setSearchQuery,
             onRefresh = { viewModel.loadExpenses(uiState.page) },
+            onDateChanged = viewModel::setDate,
+            onDatePresetSelected = viewModel::setDatePreset,
+            onPreviousDate = viewModel::previousDate,
+            onNextDate = viewModel::nextDate,
             onShowSessionDetail = onShowSessionDetail,
             onPreviousPage = viewModel::previousPage,
             onNextPage = viewModel::nextPage

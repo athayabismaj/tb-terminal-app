@@ -48,8 +48,13 @@ fun AdminCashSessionHistoryScreen(
         CashSessionHistoryScreen(
             modifier = modifier,
             uiState = uiState,
+            onSearchChanged = viewModel::setSearchQuery,
             onStatusFilterChanged = viewModel::setStatusFilter,
             onRefresh = { viewModel.loadSessions(uiState.page) },
+            onDateChanged = viewModel::setDate,
+            onDatePresetSelected = viewModel::setDatePreset,
+            onPreviousDate = viewModel::previousDate,
+            onNextDate = viewModel::nextDate,
             onShowDetail = onShowDetail,
             onPreviousPage = viewModel::previousPage,
             onNextPage = viewModel::nextPage

@@ -14,7 +14,9 @@ interface SalesApi {
     suspend fun getSessions(
         @Query("page") page: Int = 1,
         @Query("limit") limit: Int = 10,
-        @Query("status") status: String? = null
+        @Query("status") status: String? = null,
+        @Query("startDate") startDate: String? = null,
+        @Query("endDate") endDate: String? = null
     ): Response<ApiResponse<PaginatedResponse<CashSessionResponseDto>>>
 
     @GET("/api/sales/sessions/active")
@@ -44,7 +46,9 @@ interface SalesApi {
     suspend fun getExpenseHistory(
         @Query("page") page: Int = 1,
         @Query("limit") limit: Int = 10,
-        @Query("sessionId") sessionId: String? = null
+        @Query("sessionId") sessionId: String? = null,
+        @Query("startDate") startDate: String? = null,
+        @Query("endDate") endDate: String? = null
     ): Response<ApiResponse<PaginatedResponse<CashExpenseResponseDto>>>
 
     @GET("/api/sales/sessions/{sessionId}/expenses")

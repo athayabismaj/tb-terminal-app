@@ -20,7 +20,13 @@ import com.tbterminal.app.data.remote.safeApiCall
 import java.math.BigDecimal
 
 interface CashReconciliationRepository {
-    suspend fun getSessions(page: Int, limit: Int, status: String? = null): RepositoryResult<CashSessionPage>
+    suspend fun getSessions(
+        page: Int,
+        limit: Int,
+        status: String? = null,
+        startDate: String? = null,
+        endDate: String? = null
+    ): RepositoryResult<CashSessionPage>
     suspend fun getActiveSession(): RepositoryResult<CashSession?>
     suspend fun getSessionById(id: String): RepositoryResult<CashSession>
     suspend fun openSession(startingCash: BigDecimal): RepositoryResult<CashSession>
@@ -37,15 +43,27 @@ interface CashReconciliationRepository {
     suspend fun getTransactionById(id: String): RepositoryResult<CashTransactionDetail>
     suspend fun addExpense(amount: BigDecimal, description: String): RepositoryResult<CashExpense>
     suspend fun getExpenses(sessionId: String): RepositoryResult<List<CashExpense>>
-    suspend fun getExpenseHistory(page: Int, limit: Int, sessionId: String? = null): RepositoryResult<CashExpensePage>
+    suspend fun getExpenseHistory(
+        page: Int,
+        limit: Int,
+        sessionId: String? = null,
+        startDate: String? = null,
+        endDate: String? = null
+    ): RepositoryResult<CashExpensePage>
     suspend fun payTransactionDebt(transactionId: String, amount: BigDecimal, method: String): RepositoryResult<CashTransactionDetail>
 }
 
 class RemoteCashReconciliationRepository(
     private val salesApi: SalesApi
 ) : CashReconciliationRepository {
-    override suspend fun getSessions(page: Int, limit: Int, status: String?): RepositoryResult<CashSessionPage> {
-        return safeApiCall { salesApi.getSessions(page, limit, status) }
+    override suspend fun getSessions(
+        page: Int,
+        limit: Int,
+        status: String?,
+        startDate: String?,
+        endDate: String?
+    ): RepositoryResult<CashSessionPage> {
+        return safeApiCall { salesApi.getSessions(page, limit, status, startDate, endDate) }
             .toRepositoryResult { response ->
                 val sessionPage = response.data
                 if (!response.success || sessionPage == null) {
@@ -209,9 +227,11 @@ class RemoteCashReconciliationRepository(
     override suspend fun getExpenseHistory(
         page: Int,
         limit: Int,
-        sessionId: String?
+        sessionId: String?,
+        startDate: String?,
+        endDate: String?
     ): RepositoryResult<CashExpensePage> {
-        return safeApiCall { salesApi.getExpenseHistory(page, limit, sessionId) }
+        return safeApiCall { salesApi.getExpenseHistory(page, limit, sessionId, startDate, endDate) }
             .toRepositoryResult { response ->
                 val expenses = response.data
                 if (!response.success || expenses == null) {
