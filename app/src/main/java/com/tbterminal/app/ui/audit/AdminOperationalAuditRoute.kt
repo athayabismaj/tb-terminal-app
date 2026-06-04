@@ -63,6 +63,10 @@ fun AdminOperationalAuditRoute(
             modifier = contentModifier,
             uiState = uiState,
             onActionFilterChanged = viewModel::setActionFilter,
+            onDateChanged = viewModel::setDate,
+            onDatePresetSelected = viewModel::setDatePreset,
+            onPreviousDate = viewModel::previousDate,
+            onNextDate = viewModel::nextDate,
             onRetry = { viewModel.loadLogs() },
             onPreviousPage = { viewModel.loadLogs(page = uiState.currentPage - 1) },
             onNextPage = { viewModel.loadLogs(page = uiState.currentPage + 1) }
