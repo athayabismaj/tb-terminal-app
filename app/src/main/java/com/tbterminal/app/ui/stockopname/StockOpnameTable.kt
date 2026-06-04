@@ -1,13 +1,14 @@
 package com.tbterminal.app.ui.stockopname
 
-import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -15,8 +16,6 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ChevronLeft
 import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.OutlinedButton
@@ -28,6 +27,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import com.tbterminal.app.data.model.ProductStock
 
 @Composable
@@ -36,30 +36,20 @@ internal fun StockOpnameTableCard(
     uiState: StockOpnameUiState,
     onSearchChanged: (String) -> Unit,
     onCategoryFilterChanged: (String?) -> Unit,
-    onRefresh: () -> Unit,
     onSelectProduct: (ProductStock) -> Unit,
     onPreviousPage: () -> Unit,
     onNextPage: () -> Unit
 ) {
-    Card(
-        modifier = modifier,
-        colors = CardDefaults.cardColors(containerColor = OpnameSurface),
-        shape = RoundedCornerShape(16.dp),
-        border = BorderStroke(1.dp, OpnameLine)
-    ) {
-        Column(modifier = Modifier.fillMaxSize()) {
-            StockTableToolbar(uiState, onSearchChanged, onCategoryFilterChanged, onRefresh)
-            HorizontalDivider(color = OpnameLine)
-            StockTableHeader()
-            HorizontalDivider(color = OpnameLine)
-            StockTableRows(
-                modifier = Modifier.weight(1f),
-                uiState = uiState,
-                onSelectProduct = onSelectProduct
-            )
-            HorizontalDivider(color = OpnameLine)
-            StockTableFooter(uiState, onPreviousPage, onNextPage)
-        }
+    Column(modifier = modifier.fillMaxWidth()) {
+        StockTableToolbar(uiState, onSearchChanged, onCategoryFilterChanged)
+        Spacer(modifier = Modifier.height(28.dp))
+        StockTableHeader()
+        StockTableRows(
+            modifier = Modifier.fillMaxWidth(),
+            uiState = uiState,
+            onSelectProduct = onSelectProduct
+        )
+        StockTableFooter(uiState, onPreviousPage, onNextPage)
     }
 }
 
@@ -68,8 +58,8 @@ private fun StockTableHeader() {
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .background(OpnameSurface)
-            .padding(horizontal = 20.dp, vertical = 14.dp),
+            .background(OpnameSoft)
+            .padding(horizontal = 24.dp, vertical = 16.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
         HeaderText("PRODUK", Modifier.weight(2.45f).padding(end = 16.dp))
@@ -95,11 +85,20 @@ private fun StockTableFooter(
         horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.CenterVertically
     ) {
-        Text(
-            text = "Menampilkan ${uiState.tableStartIndex}-${uiState.tableEndIndex} dari ${uiState.totalTableProducts} produk",
-            color = OpnameMuted,
-            fontWeight = FontWeight.SemiBold
-        )
+        Column {
+            Text(
+                text = "Menampilkan ${uiState.tableStartIndex}-${uiState.tableEndIndex} dari ${uiState.totalTableProducts} produk",
+                color = OpnameText,
+                fontSize = 13.sp,
+                fontWeight = FontWeight.Medium
+            )
+            Text(
+                text = "Maksimal $STOCK_OPNAME_TABLE_PAGE_SIZE produk per halaman",
+                color = OpnameMuted,
+                fontSize = 11.sp,
+                modifier = Modifier.padding(top = 2.dp)
+            )
+        }
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
             TablePageButton(
                 enabled = uiState.tablePage > 1 && !uiState.isLoading,
@@ -108,9 +107,9 @@ private fun StockTableFooter(
             )
             Box(
                 modifier = Modifier
-                    .size(44.dp)
-                    .clip(RoundedCornerShape(12.dp))
-                    .background(OpnamePrimary),
+                    .size(34.dp)
+                    .clip(RoundedCornerShape(8.dp))
+                    .background(OpnamePrimaryDark),
                 contentAlignment = Alignment.Center
             ) {
                 Text("${uiState.tablePage}", color = OpnameSurface, fontWeight = FontWeight.Bold)
@@ -135,6 +134,8 @@ private fun TablePageButton(
         onClick = onClick,
         enabled = enabled,
         shape = RoundedCornerShape(12.dp),
+        contentPadding = PaddingValues(0.dp),
+        modifier = Modifier.size(34.dp),
         colors = ButtonDefaults.outlinedButtonColors(contentColor = OpnameText)
     ) {
         Icon(icon, contentDescription = null)

@@ -2,8 +2,6 @@ package com.tbterminal.app.ui.products
 
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -18,7 +16,6 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.outlined.AddPhotoAlternate
 import androidx.compose.material.icons.outlined.Info
 import androidx.compose.material.icons.outlined.Inventory2
 import androidx.compose.material.icons.outlined.Payments
@@ -70,7 +67,6 @@ private fun ProductLoadedForm(
     UnitSection(uiState = uiState, input = input, onInputChanged = onInputChanged)
     PriceSection(input = input, onInputChanged = onInputChanged)
     StockSection(input = input, onInputChanged = onInputChanged)
-    ProductPhotoSection()
 }
 
 @Composable
@@ -207,40 +203,6 @@ private fun StockSection(
 }
 
 @Composable
-private fun ProductPhotoSection() {
-    ProductFormSection(title = "Foto Produk", icon = Icons.Outlined.AddPhotoAlternate) {
-        Column {
-            Box(
-                modifier = Modifier
-                    .size(120.dp)
-                    .clip(RoundedCornerShape(8.dp))
-                    .background(ProductSoft)
-                    .border(BorderStroke(1.dp, ProductLine), RoundedCornerShape(8.dp))
-                    .clickable { },
-                contentAlignment = Alignment.Center
-            ) {
-                Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                    Icon(
-                        Icons.Outlined.AddPhotoAlternate,
-                        contentDescription = null,
-                        tint = ProductMuted,
-                        modifier = Modifier.size(32.dp)
-                    )
-                    Spacer(modifier = Modifier.height(4.dp))
-                    Text("Upload", color = ProductMuted, fontSize = 12.sp)
-                }
-            }
-            Spacer(modifier = Modifier.height(8.dp))
-            Text(
-                text = "Upload gambar produk akan disambungkan setelah endpoint file tersedia.",
-                color = ProductMuted,
-                fontSize = 12.sp
-            )
-        }
-    }
-}
-
-@Composable
 internal fun ProductFormSection(
     title: String,
     icon: ImageVector,
@@ -250,7 +212,7 @@ internal fun ProductFormSection(
     Card(
         modifier = Modifier.fillMaxWidth(),
         colors = CardDefaults.cardColors(containerColor = ProductSurface),
-        shape = RoundedCornerShape(12.dp),
+        shape = RoundedCornerShape(8.dp),
         border = BorderStroke(1.dp, ProductLine)
     ) {
         Column(modifier = Modifier.padding(24.dp)) {

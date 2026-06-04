@@ -2,6 +2,7 @@
 
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -255,14 +256,18 @@ internal fun ProductStatusPill(
         Box(
             modifier = Modifier
                 .clip(RoundedCornerShape(20.dp))
-                .background(if (isActive) ProductPrimary.copy(alpha = 0.14f) else ProductDanger.copy(alpha = 0.1f))
-                .padding(horizontal = 12.dp, vertical = 5.dp)
+                .border(
+                    width = 1.dp,
+                    color = if (isActive) ProductPrimaryDark else ProductDanger,
+                    shape = RoundedCornerShape(20.dp)
+                )
+                .padding(horizontal = 14.dp, vertical = 5.dp)
         ) {
             Text(
                 text = if (isActive) "AKTIF" else "NONAKTIF",
                 color = if (isActive) ProductPrimaryDark else ProductDanger,
-                fontSize = 10.sp,
-                fontWeight = FontWeight.Black
+                fontSize = 11.sp,
+                fontWeight = FontWeight.Medium
             )
         }
     }
@@ -279,25 +284,35 @@ internal fun ProductPagination(
     onNextPage: () -> Unit
 ) {
     val safePage = page.coerceAtLeast(1)
+    val safeTotalPages = totalPages.coerceAtLeast(1)
     val startItem = if (total == 0L) 0L else ((safePage - 1) * pageSize + 1L)
     val endItem = if (total == 0L) 0L else (startItem + visibleCount - 1L).coerceAtMost(total)
 
+    HorizontalDivider(color = ProductLine)
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .background(ProductSoft)
-            .padding(horizontal = 24.dp, vertical = 18.dp),
+            .background(ProductSoft.copy(alpha = 0.72f))
+            .padding(horizontal = 20.dp, vertical = 14.dp),
         horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.CenterVertically
     ) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Text("Menampilkan ", color = ProductMuted, fontSize = 13.sp)
-            Text("$startItem-$endItem", color = ProductText, fontSize = 13.sp, fontWeight = FontWeight.Bold)
-            Text(" dari ", color = ProductMuted, fontSize = 13.sp)
-            Text(total.toString(), color = ProductText, fontSize = 13.sp, fontWeight = FontWeight.Bold)
-            Text(" produk", color = ProductMuted, fontSize = 13.sp)
+        Column {
+            Text(
+                text = "Menampilkan $startItem-$endItem dari $total produk",
+                color = ProductText,
+                fontSize = 13.sp,
+                fontWeight = FontWeight.Medium
+            )
+            Text(
+                text = "Maksimal $pageSize produk per halaman",
+                color = ProductMuted,
+                fontSize = 11.sp,
+                modifier = Modifier.padding(top = 2.dp)
+            )
         }
-        Row(horizontalArrangement = Arrangement.spacedBy(10.dp), verticalAlignment = Alignment.CenterVertically) {
+
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
             ProductPageIconButton(
                 icon = Icons.Default.ChevronLeft,
                 enabled = page > 1,
@@ -305,22 +320,17 @@ internal fun ProductPagination(
             )
             Box(
                 modifier = Modifier
-                    .size(42.dp)
-                    .clip(RoundedCornerShape(12.dp))
-                    .background(ProductPrimary),
+                    .size(34.dp)
+                    .clip(RoundedCornerShape(8.dp))
+                    .background(ProductPrimaryDark),
                 contentAlignment = Alignment.Center
             ) {
-                Text(page.toString(), color = Color.White, fontWeight = FontWeight.Bold)
+                Text(safePage.toString(), color = Color.White, fontSize = 13.sp, fontWeight = FontWeight.Bold)
             }
-            Text(
-                text = "/ ${totalPages.coerceAtLeast(1)}",
-                color = ProductMuted,
-                fontSize = 13.sp,
-                fontWeight = FontWeight.Bold
-            )
+            Text("/ $safeTotalPages", color = ProductMuted, fontSize = 13.sp, fontWeight = FontWeight.Medium)
             ProductPageIconButton(
                 icon = Icons.Default.ChevronRight,
-                enabled = page < totalPages,
+                enabled = page < safeTotalPages,
                 onClick = onNextPage
             )
         }
@@ -339,7 +349,7 @@ private fun ProductPageIconButton(
         shape = RoundedCornerShape(12.dp),
         border = BorderStroke(1.dp, ProductLine),
         contentPadding = PaddingValues(0.dp),
-        modifier = Modifier.size(42.dp)
+        modifier = Modifier.size(34.dp)
     ) {
         Icon(
             icon,

@@ -4,6 +4,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import com.tbterminal.app.data.model.Product
+import com.tbterminal.app.data.model.ProductCategory
 import com.tbterminal.app.data.model.ProductStock
 import com.tbterminal.app.data.repository.RepositoryResult
 import com.tbterminal.app.data.model.UpdateProductCommand
@@ -19,20 +20,40 @@ import java.math.BigDecimal
 
 data class PriceManagementUiState(
     val products: List<ProductStock> = emptyList(),
+    val categories: List<ProductCategory> = emptyList(),
     val isLoading: Boolean = true,
     val isSaving: Boolean = false,
     val error: String? = null,
     val actionMessage: String? = null,
     val searchQuery: String = "",
+    val selectedCategory: String = ALL_PRICE_CATEGORIES,
     val currentPage: Int = 1,
+    val totalPages: Int = 1,
     val hasMorePages: Boolean = false,
     val totalProducts: Long = 0,
+    val pageSize: Int = 20,
     
     // Dialog State
     val selectedProductStock: ProductStock? = null,
     val selectedProductDetail: Product? = null,
     val isDetailLoading: Boolean = false
-)
+) {
+    val visibleProducts: List<ProductStock>
+        get() = if (selectedCategory == ALL_PRICE_CATEGORIES) {
+            products
+        } else {
+            products.filter { product -> product.categoryName == selectedCategory }
+        }
+
+    val availableCategories: List<String>
+        get() = listOf(ALL_PRICE_CATEGORIES) + categories
+            .map(ProductCategory::name)
+            .filter(String::isNotBlank)
+            .distinct()
+            .sorted()
+}
+
+internal const val ALL_PRICE_CATEGORIES = "Semua Kategori"
 
 class PriceManagementViewModel(
     private val inventoryRepository: InventoryRepository
@@ -44,7 +65,20 @@ class PriceManagementViewModel(
     private var searchJob: Job? = null
 
     init {
+        loadCategories()
         loadProducts()
+    }
+
+    private fun loadCategories() {
+        viewModelScope.launch {
+            when (val result = inventoryRepository.getCategories()) {
+                is RepositoryResult.Success -> {
+                    _uiState.update { it.copy(categories = result.data) }
+                }
+                is RepositoryResult.Error,
+                is RepositoryResult.Exception -> Unit
+            }
+        }
     }
 
     fun loadProducts(page: Int = 1) {
@@ -63,6 +97,7 @@ class PriceManagementViewModel(
                         it.copy(
                             products = result.data.data,
                             currentPage = result.data.page,
+                            totalPages = result.data.totalPages,
                             hasMorePages = result.data.page < result.data.totalPages,
                             totalProducts = result.data.total,
                             isLoading = false
@@ -86,6 +121,10 @@ class PriceManagementViewModel(
             delay(500) // Debounce
             loadProducts(page = 1)
         }
+    }
+
+    fun onCategorySelected(category: String) {
+        _uiState.update { it.copy(selectedCategory = category) }
     }
 
     fun nextPage() {

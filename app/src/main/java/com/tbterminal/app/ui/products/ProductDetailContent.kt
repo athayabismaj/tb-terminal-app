@@ -1,80 +1,42 @@
-﻿package com.tbterminal.app.ui.products
+package com.tbterminal.app.ui.products
 
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Add
-import androidx.compose.material.icons.filled.Block
-import androidx.compose.material.icons.filled.CheckCircle
-import androidx.compose.material.icons.filled.Delete
-import androidx.compose.material.icons.filled.Edit
-import androidx.compose.material.icons.filled.Refresh
-import androidx.compose.material.icons.filled.Save
-import androidx.compose.material.icons.outlined.Inventory2
-import androidx.compose.material.icons.outlined.Search
-import androidx.compose.material3.AlertDialog
+import androidx.compose.material.icons.outlined.Edit
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.DropdownMenu
-import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
-import androidx.compose.material3.OutlinedButton
-import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.alpha
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import androidx.lifecycle.viewmodel.compose.viewModel
-import com.tbterminal.app.data.model.ProductCategory
 import com.tbterminal.app.data.model.ProductDetail
 import com.tbterminal.app.data.model.ProductStock
-import com.tbterminal.app.data.model.ProductUnit
-import com.tbterminal.app.data.repository.InventoryRepository
-import com.tbterminal.app.ui.dashboard.admin.AdminDashboardShell
-import com.tbterminal.app.ui.dashboard.admin.AdminDestination
-import java.math.BigDecimal
-import java.text.NumberFormat
-import java.util.Locale
 
 @Composable
 internal fun ProductDetailContent(
@@ -88,84 +50,184 @@ internal fun ProductDetailContent(
         modifier = modifier
             .fillMaxSize()
             .background(ProductBackground)
-            .padding(32.dp)
             .verticalScroll(rememberScrollState())
+            .padding(40.dp)
     ) {
-        ProductHeader(
-            title = "Detail Produk",
-            subtitle = "Ringkasan master produk, harga, dan posisi stok terakhir.",
-            actions = {
-                TextButton(onClick = onBack) { Text("Kembali") }
-                Spacer(modifier = Modifier.width(12.dp))
-                uiState.detail?.let { detail ->
-                    Button(
-                        onClick = { onEditProductClick(detail.product.id) },
-                        colors = ButtonDefaults.buttonColors(containerColor = ProductPrimary),
-                        shape = RoundedCornerShape(12.dp)
-                    ) {
-                        Icon(Icons.Default.Edit, contentDescription = null, modifier = Modifier.size(18.dp))
-                        Spacer(modifier = Modifier.width(8.dp))
-                        Text("Edit Produk")
-                    }
-                }
+        ProductDetailHeader(
+            onBack = onBack,
+            onEdit = uiState.detail?.let { detail ->
+                { onEditProductClick(detail.product.id) }
             }
         )
-        Spacer(modifier = Modifier.height(24.dp))
+
+        Spacer(modifier = Modifier.height(32.dp))
 
         when {
             uiState.isLoading -> ProductLoadingState(modifier = Modifier.height(260.dp))
             uiState.errorMessage != null -> ProductErrorState(uiState.errorMessage, onRetry = onRetry)
-            uiState.detail != null -> ProductDetailCard(uiState.detail)
+            uiState.detail != null -> ProductDetailCards(detail = uiState.detail)
         }
     }
 }
 
 @Composable
-internal fun ProductDetailCard(detail: ProductDetail) {
-    Row(horizontalArrangement = Arrangement.spacedBy(24.dp)) {
-        Card(
-            modifier = Modifier.weight(1.4f),
-            colors = CardDefaults.cardColors(containerColor = ProductSurface),
-            shape = RoundedCornerShape(16.dp),
-            border = BorderStroke(1.dp, ProductLine)
+private fun ProductDetailHeader(
+    onBack: () -> Unit,
+    onEdit: (() -> Unit)?
+) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Text(
+            text = "Detail Produk",
+            modifier = Modifier.weight(1f),
+            color = ProductText,
+            fontSize = 28.sp,
+            fontWeight = FontWeight.Medium
+        )
+        TextButton(
+            onClick = onBack,
+            contentPadding = PaddingValues(horizontal = 12.dp, vertical = 8.dp)
         ) {
-            Column(modifier = Modifier.padding(28.dp), verticalArrangement = Arrangement.spacedBy(18.dp)) {
-                Text(detail.product.name, color = ProductText, fontSize = 28.sp, fontWeight = FontWeight.ExtraBold)
-                Text("SKU ${detail.product.sku}", color = ProductMuted, fontSize = 14.sp, fontWeight = FontWeight.SemiBold)
-                HorizontalDivider(color = ProductLine)
-                ProductInfoRow("Harga beli", detail.product.priceBuy.moneyText())
-                ProductInfoRow("Harga retail", detail.product.priceRetail.moneyText())
-                ProductInfoRow("Harga kontraktor", detail.product.priceContractor.moneyText())
-                ProductInfoRow("Stok minimum", detail.product.minStock.quantityText())
-                ProductInfoRow("Status", if (detail.product.isActive) "Aktif" else "Nonaktif")
-            }
+            Text("Kembali", color = ProductMuted, fontSize = 14.sp, fontWeight = FontWeight.Medium)
         }
-
-        Card(
-            modifier = Modifier
-                .weight(1f)
-                .height(320.dp),
-            colors = CardDefaults.cardColors(containerColor = ProductSurface),
-            shape = RoundedCornerShape(16.dp),
-            border = BorderStroke(1.dp, ProductLine)
-        ) {
-            Column(modifier = Modifier.padding(28.dp), verticalArrangement = Arrangement.spacedBy(18.dp)) {
-                Text("Posisi Stok", color = ProductText, fontSize = 20.sp, fontWeight = FontWeight.Bold)
-                val stock = detail.stock
-                if (stock == null) {
-                    Text("Data stok belum tersedia.", color = ProductMuted)
-                } else {
-                    ProductInfoRow("Kategori", stock.categoryName)
-                    ProductInfoRow("Satuan", stock.unitName)
-                    ProductInfoRow("Quantity", stock.quantity.quantityText())
-                    ProductInfoRow("Minimum", stock.minStock.quantityText())
-                    ProductInfoRow(
-                        "Kondisi",
-                        if (stock.quantity <= stock.minStock) "Perlu restock" else "Aman"
-                    )
-                }
+        if (onEdit != null) {
+            Spacer(modifier = Modifier.width(12.dp))
+            Button(
+                onClick = onEdit,
+                shape = RoundedCornerShape(8.dp),
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = ProductPrimaryDark,
+                    contentColor = Color.White
+                ),
+                contentPadding = PaddingValues(horizontal = 20.dp, vertical = 12.dp)
+            ) {
+                Icon(Icons.Outlined.Edit, contentDescription = null, modifier = Modifier.size(18.dp))
+                Spacer(modifier = Modifier.width(8.dp))
+                Text("Edit Produk", fontSize = 14.sp, fontWeight = FontWeight.Medium)
             }
         }
     }
 }
 
+@Composable
+private fun ProductDetailCards(detail: ProductDetail) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.spacedBy(24.dp),
+        verticalAlignment = Alignment.Top
+    ) {
+        ProductMasterInfoCard(
+            detail = detail,
+            modifier = Modifier
+                .weight(1.45f)
+                .heightIn(min = 372.dp)
+        )
+        ProductStockPositionCard(
+            stock = detail.stock,
+            modifier = Modifier
+                .weight(1f)
+                .heightIn(min = 314.dp)
+        )
+    }
+}
+
+@Composable
+private fun ProductMasterInfoCard(
+    detail: ProductDetail,
+    modifier: Modifier
+) {
+    Card(
+        modifier = modifier,
+        shape = RoundedCornerShape(8.dp),
+        colors = CardDefaults.cardColors(containerColor = ProductSurface),
+        border = BorderStroke(1.dp, ProductLine)
+    ) {
+        Column(modifier = Modifier.padding(28.dp)) {
+            Text(detail.product.name, color = ProductText, fontSize = 28.sp, fontWeight = FontWeight.Bold)
+            Spacer(modifier = Modifier.height(10.dp))
+            Text("SKU ${detail.product.sku}", color = ProductMuted, fontSize = 14.sp, fontWeight = FontWeight.Medium)
+            Spacer(modifier = Modifier.height(20.dp))
+            HorizontalDivider(color = ProductLine)
+            Spacer(modifier = Modifier.height(10.dp))
+            ProductDetailRow("Harga beli", detail.product.priceBuy.moneyText())
+            ProductDetailRow("Harga retail", detail.product.priceRetail.moneyText())
+            ProductDetailRow("Harga kontraktor", detail.product.priceContractor.moneyText())
+            ProductDetailRow("Stok minimum", detail.product.minStock.quantityText())
+            ProductDetailRow("Status", if (detail.product.isActive) "Aktif" else "Nonaktif")
+        }
+    }
+}
+
+@Composable
+private fun ProductStockPositionCard(
+    stock: ProductStock?,
+    modifier: Modifier
+) {
+    Card(
+        modifier = modifier,
+        shape = RoundedCornerShape(8.dp),
+        colors = CardDefaults.cardColors(containerColor = ProductSurface),
+        border = BorderStroke(1.dp, ProductLine)
+    ) {
+        Column(modifier = Modifier.padding(28.dp)) {
+            Text("Posisi Stok", color = ProductText, fontSize = 20.sp, fontWeight = FontWeight.Bold)
+            Spacer(modifier = Modifier.height(10.dp))
+            if (stock == null) {
+                Text("Data stok belum tersedia.", color = ProductMuted, fontSize = 14.sp)
+            } else {
+                ProductDetailRow("Kategori", stock.categoryName)
+                ProductDetailRow("Satuan", stock.unitName)
+                ProductDetailRow("Quantity", stock.quantity.quantityText())
+                ProductDetailRow("Minimum", stock.minStock.quantityText())
+                ProductStockConditionRow(stock)
+            }
+        }
+    }
+}
+
+@Composable
+private fun ProductStockConditionRow(stock: ProductStock) {
+    val needsRestock = stock.quantity <= stock.minStock
+    val background = if (needsRestock) ProductDanger.copy(alpha = 0.1f) else ProductPrimary.copy(alpha = 0.12f)
+    val content = if (needsRestock) ProductDanger else ProductPrimaryDark
+
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(vertical = 11.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Text("Kondisi", modifier = Modifier.weight(1f), color = ProductMuted, fontSize = 14.sp)
+        Box(
+            modifier = Modifier
+                .background(background, RoundedCornerShape(20.dp))
+                .padding(horizontal = 12.dp, vertical = 5.dp),
+            contentAlignment = Alignment.Center
+        ) {
+            Text(
+                text = if (needsRestock) "Perlu restock" else "Aman",
+                color = content,
+                fontSize = 13.sp,
+                fontWeight = FontWeight.SemiBold
+            )
+        }
+    }
+}
+
+@Composable
+private fun ProductDetailRow(
+    label: String,
+    value: String
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(vertical = 11.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Text(label, modifier = Modifier.weight(1f), color = ProductMuted, fontSize = 14.sp)
+        Text(value, color = ProductText, fontSize = 14.sp, fontWeight = FontWeight.Bold)
+    }
+}

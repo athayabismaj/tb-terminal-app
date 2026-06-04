@@ -72,7 +72,7 @@ fun AdminStockOpnameScreen(
             uiState = uiState,
             onSearchChanged = viewModel::onSearchChanged,
             onCategoryFilterChanged = viewModel::onCategoryFilterChanged,
-            onRefresh = viewModel::loadProducts,
+            onOpenForm = { onStockOpnameFormClick(null) },
             onSelectProduct = { product -> onStockOpnameFormClick(product.productId) },
             onPreviousPage = viewModel::previousPage,
             onNextPage = viewModel::nextPage,

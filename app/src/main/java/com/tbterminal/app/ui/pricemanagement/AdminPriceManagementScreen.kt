@@ -67,6 +67,11 @@ import com.tbterminal.app.ui.dashboard.DashboardTextPrimary
 import com.tbterminal.app.ui.dashboard.DashboardTextSecondary
 import com.tbterminal.app.ui.dashboard.admin.AdminDashboardShell
 import com.tbterminal.app.ui.dashboard.admin.AdminDestination
+import com.tbterminal.app.ui.products.ProductBanner
+import com.tbterminal.app.ui.products.ProductErrorState
+import com.tbterminal.app.ui.products.ProductLoadingState
+import com.tbterminal.app.ui.products.ProductSurface
+import com.tbterminal.app.ui.products.ProductText
 import java.math.BigDecimal
 import java.text.NumberFormat
 import java.util.Locale
@@ -133,7 +138,13 @@ fun AdminPriceManagementScreen(
     ) { contentModifier ->
         PriceManagementContent(
             state = uiState,
-            viewModel = viewModel,
+            onSearchChanged = viewModel::onSearchQueryChanged,
+            onCategorySelected = viewModel::onCategorySelected,
+            onRetry = { viewModel.loadProducts(uiState.currentPage) },
+            onEdit = viewModel::openPriceDialog,
+            onPreviousPage = viewModel::previousPage,
+            onNextPage = viewModel::nextPage,
+            onClearActionMessage = viewModel::clearActionMessage,
             modifier = contentModifier
         )
     }
@@ -150,224 +161,57 @@ fun AdminPriceManagementScreen(
 @Composable
 private fun PriceManagementContent(
     state: PriceManagementUiState,
-    viewModel: PriceManagementViewModel,
+    onSearchChanged: (String) -> Unit,
+    onCategorySelected: (String) -> Unit,
+    onRetry: () -> Unit,
+    onEdit: (ProductStock) -> Unit,
+    onPreviousPage: () -> Unit,
+    onNextPage: () -> Unit,
+    onClearActionMessage: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     Column(
         modifier = modifier
             .fillMaxSize()
-            .background(DashboardBackground)
-            .padding(32.dp)
+            .background(ProductSurface)
+            .padding(40.dp)
             .verticalScroll(rememberScrollState())
+            ,
+        verticalArrangement = Arrangement.spacedBy(28.dp)
     ) {
-        // Header
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Column {
-                Text(
-                    text = "Manajemen Harga",
-                    fontSize = 24.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = DashboardTextPrimary
-                )
-                Spacer(modifier = Modifier.height(4.dp))
-                Text(
-                    text = "Kelola Harga Beli, Eceran, Kontraktor & Diskon Produk",
-                    fontSize = 14.sp,
-                    color = DashboardTextSecondary
-                )
-            }
-        }
+        Text("Manajemen Harga", color = ProductText, fontSize = 28.sp, fontWeight = FontWeight.Medium)
 
-        Spacer(modifier = Modifier.height(24.dp))
-
-        // Search Bar
-        Surface(
-            shape = RoundedCornerShape(12.dp),
-            color = Color.White,
-            border = BorderStroke(1.dp, AdminLine),
-            modifier = Modifier.fillMaxWidth().height(48.dp)
-        ) {
-            Row(
-                modifier = Modifier.fillMaxSize().padding(horizontal = 16.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Icon(Icons.Outlined.Search, contentDescription = null, tint = DashboardTextSecondary, modifier = Modifier.size(20.dp))
-                Spacer(modifier = Modifier.width(12.dp))
-                Box(modifier = Modifier.weight(1f), contentAlignment = Alignment.CenterStart) {
-                    if (state.searchQuery.isEmpty()) {
-                        Text("Cari nama produk atau SKU...", color = DashboardTextSecondary.copy(alpha = 0.5f), fontSize = 14.sp)
-                    }
-                    BasicTextField(
-                        value = state.searchQuery,
-                        onValueChange = viewModel::onSearchQueryChanged,
-                        singleLine = true,
-                        textStyle = TextStyle(fontSize = 14.sp, color = DashboardTextPrimary),
-                        modifier = Modifier.fillMaxWidth()
-                    )
-                }
-            }
-        }
-
-        Spacer(modifier = Modifier.height(24.dp))
+        PriceManagementToolbar(
+            state = state,
+            onSearchChanged = onSearchChanged,
+            onCategorySelected = onCategorySelected
+        )
 
         if (state.actionMessage != null) {
-            Surface(
-                color = BrandBlueLight,
-                shape = RoundedCornerShape(8.dp),
-                border = BorderStroke(1.dp, BrandBlue.copy(alpha = 0.3f)),
-                modifier = Modifier.fillMaxWidth().padding(bottom = 16.dp)
-            ) {
-                Text(
-                    text = state.actionMessage,
-                    color = BrandBlue,
-                    fontSize = 14.sp,
-                    fontWeight = FontWeight.Medium,
-                    modifier = Modifier.padding(16.dp)
-                )
-            }
+            ProductBanner(message = state.actionMessage)
             LaunchedEffect(state.actionMessage) {
                 kotlinx.coroutines.delay(3000)
-                viewModel.clearActionMessage()
+                onClearActionMessage()
             }
         }
 
-        Card(
-            modifier = Modifier.fillMaxWidth(),
-            colors = CardDefaults.cardColors(containerColor = DashboardSurface),
-            shape = RoundedCornerShape(18.dp),
-            border = BorderStroke(1.dp, AdminLine)
-        ) {
-            if (state.isLoading && state.products.isEmpty()) {
-                Box(modifier = Modifier.fillMaxWidth().padding(48.dp), contentAlignment = Alignment.Center) {
-                    CircularProgressIndicator(color = BrandBlue)
-                }
-            } else if (state.products.isEmpty()) {
-                Box(modifier = Modifier.fillMaxWidth().padding(48.dp), contentAlignment = Alignment.Center) {
-                    Text("Tidak ada produk ditemukan.", color = DashboardTextSecondary)
-                }
-            } else {
-                PriceTable(
-                    products = state.products,
-                    onRowClick = viewModel::openPriceDialog
-                )
-            }
-
-            // Pagination Footer
-            HorizontalDivider(color = AdminLine)
-            Row(
-                modifier = Modifier.fillMaxWidth().padding(16.dp),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Text(
-                    text = "Total Produk: ${state.totalProducts} (Hal ${state.currentPage})",
-                    fontSize = 12.sp,
-                    color = DashboardTextSecondary
-                )
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    OutlinedButton(
-                        onClick = viewModel::previousPage,
-                        enabled = state.currentPage > 1,
-                        shape = RoundedCornerShape(8.dp)
-                    ) {
-                        Text("Sebelumnya")
-                    }
-                    OutlinedButton(
-                        onClick = viewModel::nextPage,
-                        enabled = state.hasMorePages,
-                        shape = RoundedCornerShape(8.dp)
-                    ) {
-                        Text("Selanjutnya")
+        Column(modifier = Modifier.fillMaxWidth()) {
+            when {
+                state.isLoading && state.products.isEmpty() -> ProductLoadingState(modifier = Modifier.height(220.dp))
+                state.error != null && state.products.isEmpty() -> ProductErrorState(message = state.error, onRetry = onRetry)
+                state.visibleProducts.isEmpty() -> {
+                    Box(modifier = Modifier.fillMaxWidth().padding(48.dp), contentAlignment = Alignment.Center) {
+                        Text("Tidak ada produk ditemukan.", color = DashboardTextSecondary)
                     }
                 }
+                else -> PriceManagementTable(products = state.visibleProducts, onEdit = onEdit)
             }
-        }
-    }
-}
-
-@Composable
-private fun PriceTable(
-    products: List<ProductStock>,
-    onRowClick: (ProductStock) -> Unit
-) {
-    Column(modifier = Modifier.fillMaxWidth()) {
-        // Table Header
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .background(Color(0xFFF8FAFC))
-                .padding(horizontal = 24.dp, vertical = 16.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Text("PRODUK / SKU", modifier = Modifier.weight(2.5f), fontSize = 12.sp, fontWeight = FontWeight.Bold, color = DashboardTextSecondary)
-            Text("HARGA BELI", modifier = Modifier.weight(1.5f), fontSize = 12.sp, fontWeight = FontWeight.Bold, color = DashboardTextSecondary, textAlign = TextAlign.End)
-            Text("HARGA RETAIL", modifier = Modifier.weight(1.5f), fontSize = 12.sp, fontWeight = FontWeight.Bold, color = DashboardTextSecondary, textAlign = TextAlign.End)
-            Text("HARGA GROSIR", modifier = Modifier.weight(1.5f), fontSize = 12.sp, fontWeight = FontWeight.Bold, color = DashboardTextSecondary, textAlign = TextAlign.End)
-            Text("DISKON (Rp)", modifier = Modifier.weight(1f), fontSize = 12.sp, fontWeight = FontWeight.Bold, color = DashboardTextSecondary, textAlign = TextAlign.End)
-        }
-
-        HorizontalDivider(color = AdminLine)
-
-        val idFormat = NumberFormat.getCurrencyInstance(Locale("id", "ID")).apply {
-            maximumFractionDigits = 0
-        }
-
-        products.forEach { product ->
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .clickable { onRowClick(product) }
-                    .padding(horizontal = 24.dp, vertical = 16.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Column(modifier = Modifier.weight(2.5f)) {
-                    Text(text = product.productName, fontSize = 14.sp, fontWeight = FontWeight.SemiBold, color = DashboardTextPrimary, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                    Text(text = "SKU: ${product.sku}", fontSize = 12.sp, color = DashboardTextSecondary)
-                }
-                
-                Text(
-                    text = idFormat.format(product.priceBuy),
-                    modifier = Modifier.weight(1.5f),
-                    fontSize = 14.sp,
-                    color = DashboardTextPrimary,
-                    textAlign = TextAlign.End
-                )
-                Text(
-                    text = idFormat.format(product.priceRetail),
-                    modifier = Modifier.weight(1.5f),
-                    fontSize = 14.sp,
-                    fontWeight = FontWeight.SemiBold,
-                    color = DashboardTextPrimary,
-                    textAlign = TextAlign.End
-                )
-                Text(
-                    text = idFormat.format(product.priceContractor),
-                    modifier = Modifier.weight(1.5f),
-                    fontSize = 14.sp,
-                    color = DashboardTextPrimary,
-                    textAlign = TextAlign.End
-                )
-                
-                Surface(
-                    shape = RoundedCornerShape(8.dp),
-                    color = if (product.discount > BigDecimal.ZERO) Color(0xFFFEF2F2) else Color.Transparent,
-                    modifier = Modifier.weight(1f)
-                ) {
-                    Text(
-                        text = if (product.discount > BigDecimal.ZERO) "-${idFormat.format(product.discount)}" else "-",
-                        fontSize = 14.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = if (product.discount > BigDecimal.ZERO) Color(0xFFEF4444) else DashboardTextSecondary,
-                        textAlign = TextAlign.End,
-                        modifier = Modifier.fillMaxWidth().padding(4.dp)
-                    )
-                }
-            }
-            HorizontalDivider(color = AdminLine)
+            PriceManagementPagination(
+                state = state,
+                visibleCount = state.visibleProducts.size,
+                onPreviousPage = onPreviousPage,
+                onNextPage = onNextPage
+            )
         }
     }
 }

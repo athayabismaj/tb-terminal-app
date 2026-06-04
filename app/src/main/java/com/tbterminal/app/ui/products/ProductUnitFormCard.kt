@@ -46,7 +46,7 @@ internal fun ProductUnitFormCard(
     Card(
         modifier = modifier,
         colors = CardDefaults.cardColors(containerColor = UnitWhite),
-        shape = RoundedCornerShape(12.dp),
+        shape = RoundedCornerShape(8.dp),
         border = BorderStroke(1.dp, UnitSlate200)
     ) {
         Column(modifier = Modifier.padding(24.dp)) {

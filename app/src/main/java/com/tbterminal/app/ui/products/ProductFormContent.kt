@@ -40,9 +40,9 @@ internal fun ProductFormContent(
                 .padding(padding)
                 .fillMaxSize()
                 .background(ProductBackground)
-                .padding(start = 32.dp, top = 16.dp, end = 32.dp, bottom = 8.dp)
+                .padding(start = 40.dp, top = 32.dp, end = 40.dp, bottom = 16.dp)
                 .verticalScroll(rememberScrollState()),
-            verticalArrangement = Arrangement.spacedBy(20.dp)
+            verticalArrangement = Arrangement.spacedBy(28.dp)
         ) {
             ProductFormHeader(isEditMode = uiState.isEditMode)
             ProductFormBody(uiState = uiState, onInputChanged = onInputChanged)
@@ -54,13 +54,17 @@ internal fun ProductFormContent(
 private fun ProductFormHeader(isEditMode: Boolean) {
     Column {
         Text(
-            text = if (isEditMode) "Detail Produk" else "Detail Produk Baru",
+            text = if (isEditMode) "Edit Produk" else "Tambah Produk",
             color = ProductText,
             fontSize = 28.sp,
-            fontWeight = FontWeight.ExtraBold
+            fontWeight = FontWeight.Medium
         )
         Text(
-            text = "Lengkapi informasi di bawah ini untuk menyimpan produk ke katalog.",
+            text = if (isEditMode) {
+                "Perbarui informasi produk tanpa mengubah riwayat transaksi."
+            } else {
+                "Lengkapi informasi produk untuk menyimpan produk ke katalog."
+            },
             color = ProductMuted,
             fontSize = 14.sp,
             fontWeight = FontWeight.Medium

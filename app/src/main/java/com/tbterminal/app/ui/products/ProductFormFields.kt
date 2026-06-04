@@ -138,7 +138,7 @@ internal fun ProductFormBottomBar(
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 32.dp, vertical = 16.dp),
+                .padding(horizontal = 40.dp, vertical = 16.dp),
             horizontalArrangement = Arrangement.End,
             verticalAlignment = Alignment.CenterVertically
         ) {

@@ -6,6 +6,7 @@ import java.math.BigDecimal
 data class StockReportUiState(
     val stocks: List<ProductStock> = emptyList(),
     val searchQuery: String = "",
+    val categoryFilter: String? = null,
     val page: Int = 1,
     val totalPages: Int = 1,
     val totalProducts: Long = 0,
@@ -13,14 +14,22 @@ data class StockReportUiState(
     val isLoading: Boolean = true,
     val errorMessage: String? = null
 ) {
+    val categoryOptions: List<String>
+        get() = stocks.map(ProductStock::categoryName).distinct().sorted()
+
+    val visibleStocks: List<ProductStock>
+        get() = stocks.filter { stock ->
+            categoryFilter == null || stock.categoryName == categoryFilter
+        }
+
     val pageStockValue: BigDecimal
-        get() = stocks.fold(BigDecimal.ZERO) { total, stock ->
+        get() = visibleStocks.fold(BigDecimal.ZERO) { total, stock ->
             total.add(stock.quantity.multiply(stock.priceBuy))
         }
 
     val pageLowStockCount: Int
-        get() = stocks.count { it.quantity > BigDecimal.ZERO && it.quantity <= it.minStock }
+        get() = visibleStocks.count { it.quantity > BigDecimal.ZERO && it.quantity <= it.minStock }
 
     val pageOutOfStockCount: Int
-        get() = stocks.count { it.quantity <= BigDecimal.ZERO }
+        get() = visibleStocks.count { it.quantity <= BigDecimal.ZERO }
 }

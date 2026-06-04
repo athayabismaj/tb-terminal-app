@@ -3,16 +3,21 @@ package com.tbterminal.app.ui.stockopname
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.outlined.AssignmentTurnedIn
 import androidx.compose.material.icons.outlined.Warning
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -25,8 +30,35 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 
 @Composable
+internal fun StockOpnameListHeader(onOpenForm: () -> Unit) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.Top
+    ) {
+        Text(
+            text = "Stok Opname",
+            color = OpnameText,
+            fontSize = 28.sp,
+            fontWeight = FontWeight.Medium
+        )
+        Button(
+            onClick = onOpenForm,
+            colors = ButtonDefaults.buttonColors(containerColor = OpnamePrimaryDark),
+            shape = RoundedCornerShape(8.dp),
+            contentPadding = PaddingValues(horizontal = 20.dp, vertical = 12.dp)
+        ) {
+            Icon(Icons.Default.Add, contentDescription = null, modifier = Modifier.size(18.dp))
+            Spacer(modifier = Modifier.width(8.dp))
+            Text("Buat Penyesuaian", fontSize = 14.sp, fontWeight = FontWeight.Medium)
+        }
+    }
+}
+
+@Composable
 internal fun StockOpnameHeader(
-    title: String = "Stok Opname"
+    title: String = "Stok Opname",
+    onOpenForm: (() -> Unit)? = null
 ) {
     Row(
         modifier = Modifier.fillMaxWidth(),
@@ -42,16 +74,30 @@ internal fun StockOpnameHeader(
                 fontWeight = FontWeight.Medium
             )
         }
-        Row(
-            modifier = Modifier
-                .clip(RoundedCornerShape(24.dp))
-                .background(OpnamePrimary.copy(alpha = 0.1f))
-                .padding(horizontal = 16.dp, vertical = 10.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Icon(Icons.Outlined.AssignmentTurnedIn, contentDescription = null, tint = OpnamePrimary)
-            Spacer(modifier = Modifier.width(8.dp))
-            Text("Mode audit stok", color = OpnamePrimaryDark, fontWeight = FontWeight.Bold)
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Row(
+                modifier = Modifier
+                    .clip(RoundedCornerShape(24.dp))
+                    .background(OpnamePrimary.copy(alpha = 0.1f))
+                    .padding(horizontal = 16.dp, vertical = 10.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Icon(Icons.Outlined.AssignmentTurnedIn, contentDescription = null, tint = OpnamePrimary)
+                Spacer(modifier = Modifier.width(8.dp))
+                Text("Mode audit stok", color = OpnamePrimaryDark, fontWeight = FontWeight.Bold)
+            }
+            onOpenForm?.let {
+                Spacer(modifier = Modifier.width(12.dp))
+                Button(
+                    onClick = it,
+                    colors = ButtonDefaults.buttonColors(containerColor = OpnamePrimary),
+                    shape = RoundedCornerShape(10.dp)
+                ) {
+                    Icon(Icons.Default.Add, contentDescription = null, modifier = Modifier.size(18.dp))
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text("Buat Penyesuaian", fontWeight = FontWeight.Bold)
+                }
+            }
         }
     }
 }

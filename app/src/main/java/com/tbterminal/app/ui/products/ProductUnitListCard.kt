@@ -6,7 +6,6 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -14,8 +13,6 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.ListAlt
@@ -41,6 +38,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.tbterminal.app.data.model.ProductUnit
+import com.tbterminal.app.ui.products.components.MasterDataPagination
 
 @Composable
 internal fun ProductUnitListCard(
@@ -56,7 +54,7 @@ internal fun ProductUnitListCard(
     Card(
         modifier = modifier,
         colors = CardDefaults.cardColors(containerColor = UnitWhite),
-        shape = RoundedCornerShape(12.dp),
+        shape = RoundedCornerShape(8.dp),
         border = BorderStroke(1.dp, UnitSlate200)
     ) {
         Column(modifier = Modifier.fillMaxWidth()) {
@@ -178,12 +176,8 @@ private fun ProductUnitTableBody(
     when {
         isLoading -> ProductLoadingState(modifier = Modifier.height(UnitPageListHeight))
         units.isEmpty() -> ProductUnitEmptyState()
-        else -> LazyColumn(
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(UnitPageListHeight)
-        ) {
-            items(items = units, key = ProductUnit::id) { unit ->
+        else -> Column(modifier = Modifier.fillMaxWidth()) {
+            units.forEach { unit ->
                 ProductUnitRow(unit = unit, onEdit = onEdit, onDelete = onDelete)
             }
         }
@@ -261,75 +255,16 @@ private fun ProductUnitFooter(
     onPreviousPage: () -> Unit,
     onNextPage: () -> Unit
 ) {
-    val firstItem = if (uiState.totalUnits == 0L) 0L else ((uiState.page - 1) * uiState.pageSize + 1).toLong()
-    val lastItem = (uiState.page * uiState.pageSize).toLong().coerceAtMost(uiState.totalUnits)
-    val rangeText = if (uiState.totalUnits == 0L) {
-        "Belum ada satuan"
-    } else {
-        "Menampilkan $firstItem-$lastItem dari ${uiState.totalUnits}"
-    }
-
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .background(UnitSlate50.copy(alpha = 0.5f))
-            .border(BorderStroke(1.dp, UnitSlate100))
-            .padding(horizontal = 24.dp, vertical = 18.dp),
-        horizontalArrangement = Arrangement.SpaceBetween,
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        Text(
-            text = rangeText,
-            fontSize = 10.sp,
-            fontWeight = FontWeight.Bold,
-            color = UnitSlate400
-        )
-        Row(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
-            UnitPageButton(
-                text = "Sebelumnya",
-                enabled = uiState.page > 1 && !uiState.isLoading,
-                onClick = onPreviousPage
-            )
-            UnitPageIndicator(page = uiState.page, totalPages = uiState.totalPages)
-            UnitPageButton(
-                text = "Berikutnya",
-                enabled = uiState.page < uiState.totalPages && !uiState.isLoading,
-                onClick = onNextPage
-            )
-        }
-    }
-}
-
-@Composable
-private fun UnitPageButton(
-    text: String,
-    enabled: Boolean,
-    onClick: () -> Unit
-) {
-    OutlinedButton(
-        onClick = onClick,
-        enabled = enabled,
-        shape = RoundedCornerShape(10.dp),
-        border = BorderStroke(1.dp, UnitSlate200),
-        colors = ButtonDefaults.outlinedButtonColors(contentColor = UnitSlate600),
-        contentPadding = PaddingValues(horizontal = 14.dp, vertical = 0.dp),
-        modifier = Modifier.height(36.dp)
-    ) {
-        Text(text, fontSize = 12.sp, fontWeight = FontWeight.Bold)
-    }
-}
-
-@Composable
-private fun UnitPageIndicator(page: Int, totalPages: Int) {
-    Box(
-        modifier = Modifier
-            .height(36.dp)
-            .background(UnitEmerald600, RoundedCornerShape(10.dp))
-            .padding(horizontal = 14.dp),
-        contentAlignment = Alignment.Center
-    ) {
-        Text("$page/$totalPages", color = UnitWhite, fontSize = 12.sp, fontWeight = FontWeight.Bold)
-    }
+    MasterDataPagination(
+        itemLabel = "satuan",
+        total = uiState.totalUnits,
+        page = uiState.page,
+        totalPages = uiState.totalPages,
+        pageSize = uiState.pageSize,
+        isLoading = uiState.isLoading,
+        onPreviousPage = onPreviousPage,
+        onNextPage = onNextPage
+    )
 }
 
 @Composable
@@ -343,4 +278,4 @@ private fun UnitTableHeader(
     }
 }
 
-private val UnitPageListHeight = 720.dp
+private val UnitPageListHeight = 240.dp

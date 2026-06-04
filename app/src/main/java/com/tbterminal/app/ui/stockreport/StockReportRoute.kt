@@ -62,7 +62,7 @@ fun AdminStockReportScreen(
             modifier = modifier,
             uiState = uiState,
             onSearchChanged = viewModel::onSearchChanged,
-            onRefresh = viewModel::loadStocks,
+            onCategoryFilterChanged = viewModel::onCategoryFilterChanged,
             onPreviousPage = viewModel::previousPage,
             onNextPage = viewModel::nextPage
         )

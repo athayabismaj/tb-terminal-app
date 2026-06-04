@@ -80,6 +80,7 @@ fun AdminProductListScreen(
             modifier = contentModifier,
             uiState = uiState,
             onSearchChanged = viewModel::onSearchChanged,
+            onCategorySelected = viewModel::onCategorySelected,
             onRetry = { viewModel.loadProducts() },
             onAddProductClick = onAddProductClick,
             onEditProductClick = onEditProductClick,

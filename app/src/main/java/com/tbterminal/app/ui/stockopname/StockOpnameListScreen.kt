@@ -6,6 +6,8 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
@@ -17,7 +19,7 @@ internal fun StockOpnameListScreen(
     uiState: StockOpnameUiState,
     onSearchChanged: (String) -> Unit,
     onCategoryFilterChanged: (String?) -> Unit,
-    onRefresh: () -> Unit,
+    onOpenForm: () -> Unit,
     onSelectProduct: (ProductStock) -> Unit,
     onPreviousPage: () -> Unit,
     onNextPage: () -> Unit,
@@ -26,20 +28,18 @@ internal fun StockOpnameListScreen(
     Column(
         modifier = modifier
             .fillMaxSize()
-            .background(OpnameBackground)
-            .padding(32.dp),
-        verticalArrangement = Arrangement.spacedBy(20.dp)
+            .background(OpnameSurface)
+            .verticalScroll(rememberScrollState())
+            .padding(40.dp),
+        verticalArrangement = Arrangement.spacedBy(28.dp)
     ) {
-        StockOpnameHeader()
+        StockOpnameListHeader(onOpenForm = onOpenForm)
         StockOpnameMessage(uiState, onDismissMessage)
         StockOpnameTableCard(
-            modifier = Modifier
-                .fillMaxWidth()
-                .weight(1f),
+            modifier = Modifier.fillMaxWidth(),
             uiState = uiState,
             onSearchChanged = onSearchChanged,
             onCategoryFilterChanged = onCategoryFilterChanged,
-            onRefresh = onRefresh,
             onSelectProduct = onSelectProduct,
             onPreviousPage = onPreviousPage,
             onNextPage = onNextPage

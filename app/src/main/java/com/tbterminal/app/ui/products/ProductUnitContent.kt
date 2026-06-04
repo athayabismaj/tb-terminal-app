@@ -7,17 +7,11 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.ChevronRight
-import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -42,15 +36,16 @@ internal fun ProductUnitContent(
     BoxWithConstraints(
         modifier = modifier
             .fillMaxSize()
-            .background(UnitSurfaceBg)
-            .padding(32.dp)
+            .background(ProductSurface)
+            .padding(40.dp)
     ) {
         val isDesktop = maxWidth > 900.dp
 
         Column(
             modifier = Modifier
                 .fillMaxSize()
-                .verticalScroll(rememberScrollState())
+                .verticalScroll(rememberScrollState()),
+            verticalArrangement = Arrangement.spacedBy(28.dp)
         ) {
             ProductUnitHeader()
             if (isDesktop) {
@@ -88,45 +83,7 @@ internal fun ProductUnitContent(
 
 @Composable
 private fun ProductUnitHeader() {
-    Column(modifier = Modifier.padding(bottom = 32.dp)) {
-        Row(
-            verticalAlignment = Alignment.CenterVertically,
-            modifier = Modifier.padding(bottom = 8.dp)
-        ) {
-            Text("Dashboard", fontSize = 14.sp, color = UnitSlate400)
-            Icon(
-                Icons.Default.ChevronRight,
-                contentDescription = null,
-                tint = UnitSlate400,
-                modifier = Modifier.size(16.dp)
-            )
-            Text("Master Data", fontSize = 14.sp, color = UnitSlate400)
-            Icon(
-                Icons.Default.ChevronRight,
-                contentDescription = null,
-                tint = UnitSlate400,
-                modifier = Modifier.size(16.dp)
-            )
-            Text(
-                text = "Satuan Produk",
-                fontSize = 14.sp,
-                color = UnitSlate900,
-                fontWeight = FontWeight.Bold
-            )
-        }
-        Text(
-            text = "Satuan Produk",
-            fontSize = 28.sp,
-            fontWeight = FontWeight.ExtraBold,
-            color = UnitSlate900
-        )
-        Text(
-            text = "Kelola satuan penjualan dan stok seperti pcs, sak, batang, meter, atau dus.",
-            fontSize = 14.sp,
-            color = UnitSlate500,
-            modifier = Modifier.padding(top = 4.dp)
-        )
-    }
+    Text("Satuan Produk", fontSize = 28.sp, fontWeight = FontWeight.Medium, color = UnitSlate900)
 }
 
 @Composable

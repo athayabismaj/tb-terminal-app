@@ -9,12 +9,11 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Text
@@ -38,13 +37,20 @@ internal fun StockTableRows(
     uiState: StockOpnameUiState,
     onSelectProduct: (ProductStock) -> Unit
 ) {
-    Box(modifier = modifier.fillMaxSize()) {
+    Box(modifier = modifier.fillMaxWidth()) {
         when {
-            uiState.isLoading -> LoadingState()
-            uiState.tableProducts.isEmpty() -> EmptyState("Tidak ada produk aktif yang cocok.")
-            else -> LazyColumn(modifier = Modifier.fillMaxSize()) {
-                items(items = uiState.tablePageProducts, key = ProductStock::productId) { product ->
-                    StockTableRow(product, product.toRowState(uiState)) { onSelectProduct(product) }
+            uiState.isLoading -> Box(modifier = Modifier.fillMaxWidth().height(180.dp)) { LoadingState() }
+            uiState.tableProducts.isEmpty() -> Box(modifier = Modifier.fillMaxWidth().height(180.dp)) {
+                EmptyState("Tidak ada produk aktif yang cocok.")
+            }
+            else -> Column(modifier = Modifier.fillMaxWidth()) {
+                uiState.tablePageProducts.forEachIndexed { index, product ->
+                    StockTableRow(
+                        product = product,
+                        rowState = product.toRowState(uiState),
+                        useAlternateBackground = index % 2 != 0,
+                        onClick = { onSelectProduct(product) }
+                    )
                     HorizontalDivider(color = OpnameLine.copy(alpha = 0.65f))
                 }
             }
@@ -56,15 +62,22 @@ internal fun StockTableRows(
 private fun StockTableRow(
     product: ProductStock,
     rowState: OpnameRowState,
+    useAlternateBackground: Boolean,
     onClick: () -> Unit
 ) {
+    val background = when {
+        rowState.isSelected -> OpnamePrimary.copy(alpha = 0.08f)
+        useAlternateBackground -> OpnameSoft.copy(alpha = 0.76f)
+        else -> OpnameSurface
+    }
+
     Row(
         modifier = Modifier
             .fillMaxWidth()
             .heightIn(min = 76.dp)
-            .background(if (rowState.isSelected) OpnamePrimary.copy(alpha = 0.08f) else Color.Transparent)
+            .background(background)
             .clickable(onClick = onClick)
-            .padding(horizontal = 20.dp, vertical = 16.dp),
+            .padding(horizontal = 24.dp, vertical = 20.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
         ProductNameCell(product, Modifier.weight(2.45f).padding(end = 16.dp))

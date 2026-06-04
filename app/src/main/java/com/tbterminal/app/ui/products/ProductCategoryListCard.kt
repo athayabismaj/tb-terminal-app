@@ -6,7 +6,6 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -14,8 +13,6 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.ListAlt
@@ -41,6 +38,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.tbterminal.app.data.model.ProductCategory
+import com.tbterminal.app.ui.products.components.MasterDataPagination
 
 @Composable
 internal fun ProductCategoryListCard(
@@ -56,7 +54,7 @@ internal fun ProductCategoryListCard(
     Card(
         modifier = modifier,
         colors = CardDefaults.cardColors(containerColor = CategoryWhite),
-        shape = RoundedCornerShape(12.dp),
+        shape = RoundedCornerShape(8.dp),
         border = BorderStroke(1.dp, CategorySlate200)
     ) {
         Column(modifier = Modifier.fillMaxWidth()) {
@@ -160,12 +158,8 @@ private fun CategoryTableBody(
     when {
         isLoading -> ProductLoadingState(modifier = Modifier.height(CategoryPageListHeight))
         categories.isEmpty() -> CategoryEmptyState()
-        else -> LazyColumn(
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(CategoryPageListHeight)
-        ) {
-            items(items = categories, key = ProductCategory::id) { category ->
+        else -> Column(modifier = Modifier.fillMaxWidth()) {
+            categories.forEach { category ->
                 CategoryRow(category = category, onEdit = onEdit, onDelete = onDelete)
             }
         }
@@ -241,58 +235,16 @@ private fun CategoryFooter(
     onPreviousPage: () -> Unit,
     onNextPage: () -> Unit
 ) {
-    val firstItem = if (uiState.totalCategories == 0L) 0L else ((uiState.page - 1) * uiState.pageSize + 1).toLong()
-    val lastItem = (uiState.page * uiState.pageSize).toLong().coerceAtMost(uiState.totalCategories)
-    val rangeText = if (uiState.totalCategories == 0L) {
-        "Belum ada kategori"
-    } else {
-        "Menampilkan $firstItem-$lastItem dari ${uiState.totalCategories}"
-    }
-
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .background(CategorySlate50.copy(alpha = 0.5f))
-            .border(BorderStroke(1.dp, CategorySlate100))
-            .padding(horizontal = 24.dp, vertical = 18.dp),
-        horizontalArrangement = Arrangement.SpaceBetween,
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        Text(rangeText, fontSize = 10.sp, fontWeight = FontWeight.Bold, color = CategorySlate400)
-        Row(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
-            CategoryPageButton("Sebelumnya", uiState.page > 1 && !uiState.isLoading, onPreviousPage)
-            CategoryPageIndicator(uiState.page, uiState.totalPages)
-            CategoryPageButton("Berikutnya", uiState.page < uiState.totalPages && !uiState.isLoading, onNextPage)
-        }
-    }
-}
-
-@Composable
-private fun CategoryPageButton(text: String, enabled: Boolean, onClick: () -> Unit) {
-    OutlinedButton(
-        onClick = onClick,
-        enabled = enabled,
-        shape = RoundedCornerShape(10.dp),
-        border = BorderStroke(1.dp, CategorySlate200),
-        colors = ButtonDefaults.outlinedButtonColors(contentColor = CategorySlate600),
-        contentPadding = PaddingValues(horizontal = 14.dp, vertical = 0.dp),
-        modifier = Modifier.height(36.dp)
-    ) {
-        Text(text, fontSize = 12.sp, fontWeight = FontWeight.Bold)
-    }
-}
-
-@Composable
-private fun CategoryPageIndicator(page: Int, totalPages: Int) {
-    Box(
-        modifier = Modifier
-            .height(36.dp)
-            .background(CategoryEmerald600, RoundedCornerShape(10.dp))
-            .padding(horizontal = 14.dp),
-        contentAlignment = Alignment.Center
-    ) {
-        Text("$page/$totalPages", color = CategoryWhite, fontSize = 12.sp, fontWeight = FontWeight.Bold)
-    }
+    MasterDataPagination(
+        itemLabel = "kategori",
+        total = uiState.totalCategories,
+        page = uiState.page,
+        totalPages = uiState.totalPages,
+        pageSize = uiState.pageSize,
+        isLoading = uiState.isLoading,
+        onPreviousPage = onPreviousPage,
+        onNextPage = onNextPage
+    )
 }
 
 @Composable
@@ -306,4 +258,4 @@ private fun CategoryHeaderText(
     }
 }
 
-private val CategoryPageListHeight = 720.dp
+private val CategoryPageListHeight = 240.dp

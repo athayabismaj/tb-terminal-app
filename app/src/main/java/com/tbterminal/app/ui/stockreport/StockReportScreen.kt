@@ -5,11 +5,13 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -17,27 +19,36 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.ChevronLeft
+import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material.icons.outlined.Assessment
+import androidx.compose.material.icons.outlined.ExpandMore
 import androidx.compose.material.icons.outlined.Inventory2
 import androidx.compose.material.icons.outlined.MonetizationOn
-import androidx.compose.material.icons.outlined.Refresh
 import androidx.compose.material.icons.outlined.Search
 import androidx.compose.material.icons.outlined.WarningAmber
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.tbterminal.app.data.model.ProductStock
@@ -45,30 +56,34 @@ import java.math.BigDecimal
 import java.text.NumberFormat
 import java.util.Locale
 
-private val StockReportBackground = Color(0xFFF4FAFD)
+private val StockReportBackground = Color.White
 private val StockReportBorder = Color(0xFFE2E8F0)
 private val StockReportText = Color(0xFF0F172A)
 private val StockReportMuted = Color(0xFF64748B)
 private val StockReportPrimary = Color(0xFF059669)
+private val StockReportSoft = Color(0xFFF1F5F9)
 
 @Composable
 internal fun StockReportScreen(
     modifier: Modifier,
     uiState: StockReportUiState,
     onSearchChanged: (String) -> Unit,
-    onRefresh: () -> Unit,
+    onCategoryFilterChanged: (String?) -> Unit,
     onPreviousPage: () -> Unit,
     onNextPage: () -> Unit
 ) {
     Column(
-        modifier = modifier.fillMaxSize().background(StockReportBackground).verticalScroll(rememberScrollState()).padding(32.dp)
+        modifier = modifier
+            .fillMaxSize()
+            .background(StockReportBackground)
+            .verticalScroll(rememberScrollState())
+            .padding(40.dp),
+        verticalArrangement = Arrangement.spacedBy(28.dp)
     ) {
-        Text("Laporan Stok", fontSize = 30.sp, fontWeight = FontWeight.ExtraBold, color = StockReportText)
-        Text("Pantau posisi stok, nilai persediaan, dan produk yang perlu ditindaklanjuti.", color = StockReportMuted, fontSize = 14.sp)
-        Spacer(Modifier.height(24.dp))
+        Text("Laporan Stok", fontSize = 28.sp, fontWeight = FontWeight.Medium, color = StockReportText)
         StockSummary(uiState)
-        Spacer(Modifier.height(20.dp))
-        StockTableCard(uiState, onSearchChanged, onRefresh, onPreviousPage, onNextPage)
+        StockReportToolbar(uiState, onSearchChanged, onCategoryFilterChanged)
+        StockTableCard(uiState, onPreviousPage, onNextPage)
     }
 }
 
@@ -98,33 +113,103 @@ private fun SummaryCard(title: String, value: String, note: String, icon: ImageV
 }
 
 @Composable
-private fun StockTableCard(
+private fun StockReportToolbar(
     uiState: StockReportUiState,
     onSearchChanged: (String) -> Unit,
-    onRefresh: () -> Unit,
+    onCategoryFilterChanged: (String?) -> Unit
+) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.spacedBy(16.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        OutlinedTextField(
+            value = uiState.searchQuery,
+            onValueChange = onSearchChanged,
+            trailingIcon = { Icon(Icons.Outlined.Search, "Cari produk", tint = StockReportMuted) },
+            placeholder = { Text("Cari SKU atau nama produk...", color = StockReportMuted) },
+            singleLine = true,
+            modifier = Modifier
+                .weight(1f)
+                .height(56.dp),
+            shape = RoundedCornerShape(8.dp),
+            colors = OutlinedTextFieldDefaults.colors(
+                focusedTextColor = StockReportText,
+                unfocusedTextColor = StockReportText,
+                cursorColor = StockReportPrimary,
+                focusedBorderColor = StockReportPrimary,
+                unfocusedBorderColor = StockReportBorder,
+                focusedContainerColor = Color.White,
+                unfocusedContainerColor = Color.White
+            )
+        )
+        StockCategoryDropdown(uiState.categoryFilter, uiState.categoryOptions, onCategoryFilterChanged)
+    }
+}
+
+@Composable
+private fun StockCategoryDropdown(
+    selectedCategory: String?,
+    categories: List<String>,
+    onCategoryFilterChanged: (String?) -> Unit
+) {
+    var expanded by remember { mutableStateOf(false) }
+
+    Box {
+        OutlinedButton(
+            onClick = { expanded = true },
+            modifier = Modifier
+                .width(220.dp)
+                .height(56.dp),
+            shape = RoundedCornerShape(8.dp),
+            border = BorderStroke(1.dp, StockReportBorder)
+        ) {
+            Text(
+                text = selectedCategory ?: "Semua kategori",
+                modifier = Modifier.weight(1f),
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                color = StockReportText,
+                fontWeight = FontWeight.Medium
+            )
+            Icon(Icons.Outlined.ExpandMore, "Pilih kategori", tint = StockReportMuted, modifier = Modifier.size(18.dp))
+        }
+        DropdownMenu(
+            expanded = expanded,
+            onDismissRequest = { expanded = false },
+            modifier = Modifier
+                .width(220.dp)
+                .heightIn(max = 320.dp)
+                .background(Color.White)
+        ) {
+            DropdownMenuItem(text = { Text("Semua kategori") }, onClick = {
+                expanded = false
+                onCategoryFilterChanged(null)
+            })
+            categories.forEach { category ->
+                DropdownMenuItem(text = { Text(category) }, onClick = {
+                    expanded = false
+                    onCategoryFilterChanged(category)
+                })
+            }
+        }
+    }
+}
+
+@Composable
+private fun StockTableCard(
+    uiState: StockReportUiState,
     onPreviousPage: () -> Unit,
     onNextPage: () -> Unit
 ) {
     Card(shape = RoundedCornerShape(12.dp), colors = CardDefaults.cardColors(Color.White), border = BorderStroke(1.dp, StockReportBorder), modifier = Modifier.fillMaxWidth()) {
         Column {
-            Row(Modifier.fillMaxWidth().padding(20.dp), verticalAlignment = Alignment.CenterVertically) {
-                OutlinedTextField(
-                    value = uiState.searchQuery,
-                    onValueChange = onSearchChanged,
-                    leadingIcon = { Icon(Icons.Outlined.Search, null) },
-                    placeholder = { Text("Cari SKU atau nama produk...") },
-                    singleLine = true,
-                    modifier = Modifier.weight(1f)
-                )
-                Spacer(Modifier.width(8.dp))
-                IconButton(onClick = onRefresh) { Icon(Icons.Outlined.Refresh, "Muat ulang", tint = StockReportPrimary) }
-            }
             StockTableHeader()
             when {
                 uiState.isLoading -> Box(Modifier.fillMaxWidth().height(180.dp), contentAlignment = Alignment.Center) { CircularProgressIndicator() }
-                uiState.errorMessage != null -> StockError(uiState.errorMessage, onRefresh)
-                uiState.stocks.isEmpty() -> Box(Modifier.fillMaxWidth().height(180.dp), contentAlignment = Alignment.Center) { Text("Belum ada data stok.", color = StockReportMuted) }
-                else -> uiState.stocks.forEach { stock -> StockRow(stock) }
+                uiState.errorMessage != null -> StockError(uiState.errorMessage)
+                uiState.visibleStocks.isEmpty() -> Box(Modifier.fillMaxWidth().height(180.dp), contentAlignment = Alignment.Center) { Text("Belum ada data stok.", color = StockReportMuted) }
+                else -> uiState.visibleStocks.forEachIndexed { index, stock -> StockRow(stock, index % 2 != 0) }
             }
             StockPagination(uiState, onPreviousPage, onNextPage)
         }
@@ -144,8 +229,14 @@ private fun StockTableHeader() {
 }
 
 @Composable
-private fun StockRow(stock: ProductStock) {
-    Row(Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 14.dp), verticalAlignment = Alignment.CenterVertically) {
+private fun StockRow(stock: ProductStock, useAlternateBackground: Boolean) {
+    Row(
+        Modifier
+            .fillMaxWidth()
+            .background(if (useAlternateBackground) StockReportSoft.copy(alpha = 0.76f) else Color.White)
+            .padding(horizontal = 20.dp, vertical = 16.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
         Column(Modifier.weight(2.4f)) {
             Text(stock.productName, color = StockReportText, fontWeight = FontWeight.Bold)
             Text(stock.sku, color = StockReportMuted, fontSize = 12.sp)
@@ -161,22 +252,73 @@ private fun StockRow(stock: ProductStock) {
 }
 
 @Composable
-private fun StockError(message: String, onRefresh: () -> Unit) {
+private fun StockError(message: String) {
     Column(Modifier.fillMaxWidth().height(180.dp), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.Center) {
         Text(message, color = Color(0xFFDC2626))
-        Spacer(Modifier.height(8.dp))
-        OutlinedButton(onClick = onRefresh) { Text("Coba Lagi") }
     }
 }
 
 @Composable
 private fun StockPagination(uiState: StockReportUiState, onPreviousPage: () -> Unit, onNextPage: () -> Unit) {
-    Row(Modifier.fillMaxWidth().background(Color(0xFFF8FAFC)).padding(16.dp), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
-        Text("Menampilkan halaman ${uiState.page} dari ${uiState.totalPages}, total ${uiState.totalProducts} produk", color = StockReportMuted, fontSize = 12.sp)
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            OutlinedButton(onClick = onPreviousPage, enabled = uiState.page > 1) { Text("Sebelumnya") }
-            OutlinedButton(onClick = onNextPage, enabled = uiState.page < uiState.totalPages) { Text("Berikutnya") }
+    val safePage = uiState.page.coerceAtLeast(1)
+    val safeTotalPages = uiState.totalPages.coerceAtLeast(1)
+    val startItem = if (uiState.totalProducts == 0L) 0L else ((safePage - 1) * uiState.pageSize + 1L)
+    val endItem = if (uiState.totalProducts == 0L) 0L else (startItem + uiState.visibleStocks.size - 1L).coerceAtMost(uiState.totalProducts)
+    val rangeText = if (uiState.categoryFilter == null) {
+        "Menampilkan $startItem-$endItem dari ${uiState.totalProducts} produk"
+    } else {
+        "Menampilkan ${uiState.visibleStocks.size} produk kategori pada halaman ini"
+    }
+
+    Row(
+        Modifier
+            .fillMaxWidth()
+            .background(StockReportSoft.copy(alpha = 0.72f))
+            .padding(horizontal = 20.dp, vertical = 14.dp),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Column {
+            Text(
+                rangeText,
+                color = StockReportText,
+                fontSize = 13.sp,
+                fontWeight = FontWeight.Medium
+            )
+            Text(
+                "Maksimal ${uiState.pageSize} produk per halaman",
+                color = StockReportMuted,
+                fontSize = 11.sp,
+                modifier = Modifier.padding(top = 2.dp)
+            )
         }
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
+            StockPageButton(Icons.Default.ChevronLeft, safePage > 1, onPreviousPage)
+            Box(
+                modifier = Modifier
+                    .size(34.dp)
+                    .background(StockReportPrimary, RoundedCornerShape(8.dp)),
+                contentAlignment = Alignment.Center
+            ) {
+                Text("$safePage", color = Color.White, fontSize = 13.sp, fontWeight = FontWeight.Bold)
+            }
+            Text("/ $safeTotalPages", color = StockReportMuted, fontSize = 13.sp, fontWeight = FontWeight.Medium)
+            StockPageButton(Icons.Default.ChevronRight, safePage < safeTotalPages, onNextPage)
+        }
+    }
+}
+
+@Composable
+private fun StockPageButton(icon: ImageVector, enabled: Boolean, onClick: () -> Unit) {
+    OutlinedButton(
+        onClick = onClick,
+        enabled = enabled,
+        shape = RoundedCornerShape(12.dp),
+        border = BorderStroke(1.dp, StockReportBorder),
+        contentPadding = PaddingValues(0.dp),
+        modifier = Modifier.size(34.dp)
+    ) {
+        Icon(icon, contentDescription = null, tint = if (enabled) StockReportText else StockReportMuted.copy(alpha = 0.35f))
     }
 }
 

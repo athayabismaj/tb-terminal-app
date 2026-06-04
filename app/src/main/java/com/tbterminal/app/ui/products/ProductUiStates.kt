@@ -24,7 +24,9 @@ import kotlinx.coroutines.launch
 
 data class ProductListUiState(
     val products: List<ProductStock> = emptyList(),
+    val categories: List<ProductCategory> = emptyList(),
     val searchQuery: String = "",
+    val selectedCategory: String = ALL_PRODUCT_CATEGORIES,
     val page: Int = 1,
     val totalPages: Int = 1,
     val totalProducts: Long = 0,
@@ -34,12 +36,28 @@ data class ProductListUiState(
     val errorMessage: String? = null,
     val actionMessage: String? = null
 ) {
+    val visibleProducts: List<ProductStock>
+        get() = if (selectedCategory == ALL_PRODUCT_CATEGORIES) {
+            products
+        } else {
+            products.filter { product -> product.categoryName == selectedCategory }
+        }
+
+    val availableCategories: List<String>
+        get() = listOf(ALL_PRODUCT_CATEGORIES) + categories
+            .map(ProductCategory::name)
+            .filter(String::isNotBlank)
+            .distinct()
+            .sorted()
+
     val lowStockCount: Int
         get() = products.count { product -> product.quantity <= product.minStock }
 
     val activeCount: Int
         get() = products.count(ProductStock::isActive)
 }
+
+internal const val ALL_PRODUCT_CATEGORIES = "Semua Kategori"
 
 
 data class ProductFormInput(

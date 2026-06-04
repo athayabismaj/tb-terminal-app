@@ -43,7 +43,7 @@ internal fun ProductCategoryFormCard(
     Card(
         modifier = modifier,
         colors = CardDefaults.cardColors(containerColor = CategoryWhite),
-        shape = RoundedCornerShape(12.dp),
+        shape = RoundedCornerShape(8.dp),
         border = BorderStroke(1.dp, CategorySlate200)
     ) {
         Column(modifier = Modifier.padding(24.dp)) {

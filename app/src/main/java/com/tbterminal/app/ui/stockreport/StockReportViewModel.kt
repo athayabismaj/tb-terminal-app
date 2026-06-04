@@ -42,6 +42,8 @@ class StockReportViewModel(
                     _uiState.update {
                         it.copy(
                             stocks = pageData.data,
+                            categoryFilter = it.categoryFilter
+                                ?.takeIf { category -> pageData.data.any { stock -> stock.categoryName == category } },
                             page = pageData.page,
                             totalPages = pageData.totalPages.coerceAtLeast(1),
                             totalProducts = pageData.total,
@@ -62,6 +64,10 @@ class StockReportViewModel(
             delay(300)
             loadStocks(page = 1)
         }
+    }
+
+    fun onCategoryFilterChanged(categoryName: String?) {
+        _uiState.update { it.copy(categoryFilter = categoryName) }
     }
 
     fun previousPage() {

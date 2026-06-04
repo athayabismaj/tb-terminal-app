@@ -30,7 +30,20 @@ class ProductListViewModel(
     private var searchJob: Job? = null
 
     init {
+        loadCategories()
         loadProducts()
+    }
+
+    private fun loadCategories() {
+        viewModelScope.launch {
+            when (val result = inventoryRepository.getCategories()) {
+                is RepositoryResult.Success -> {
+                    _uiState.update { state -> state.copy(categories = result.data) }
+                }
+                is RepositoryResult.Error,
+                is RepositoryResult.Exception -> Unit
+            }
+        }
     }
 
     fun loadProducts(page: Int = _uiState.value.page) {
@@ -111,6 +124,12 @@ class ProductListViewModel(
                 is RepositoryResult.Error -> setActionError(result.message)
                 is RepositoryResult.Exception -> setActionError(product.statusActionConnectionErrorMessage())
             }
+        }
+    }
+
+    fun onCategorySelected(category: String) {
+        _uiState.update { state ->
+            state.copy(selectedCategory = category)
         }
     }
 

@@ -3,20 +3,25 @@
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.lazy.LazyRow
-import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.sp
 import androidx.compose.ui.unit.dp
 import com.tbterminal.app.data.model.ProductStock
-import com.tbterminal.app.ui.products.components.ProductCategoryFilterChip
+import com.tbterminal.app.ui.products.components.ProductListToolbar
 import com.tbterminal.app.ui.products.components.ProductTableCard
 
 @Composable
@@ -24,6 +29,7 @@ internal fun ProductListContent(
     modifier: Modifier,
     uiState: ProductListUiState,
     onSearchChanged: (String) -> Unit,
+    onCategorySelected: (String) -> Unit,
     onRetry: () -> Unit,
     onAddProductClick: () -> Unit,
     onEditProductClick: (String) -> Unit,
@@ -35,55 +41,50 @@ internal fun ProductListContent(
     onNextPage: () -> Unit,
     onDismissMessage: () -> Unit
 ) {
-    var selectedCategory by remember { mutableStateOf("Semua") }
-    val filterCategories = remember(uiState.products) {
-        listOf("Semua") + uiState.products
-            .map(ProductStock::categoryName)
-            .filter(String::isNotBlank)
-            .distinct()
-            .sorted()
-    }
-
     Column(
         modifier = modifier
             .fillMaxSize()
-            .background(ProductBackground)
-            .padding(32.dp),
-        verticalArrangement = Arrangement.spacedBy(24.dp)
+            .background(ProductSurface)
+            .verticalScroll(rememberScrollState())
+            .padding(40.dp),
+        verticalArrangement = Arrangement.spacedBy(28.dp)
     ) {
-        ProductHeader(
-            title = "Daftar Produk",
-            subtitle = "Kelola inventaris stok dan harga barang Anda.",
-            actions = {}
-        )
-
-        LazyRow(
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
-            modifier = Modifier.fillMaxWidth()
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
         ) {
-            items(items = filterCategories, key = { category -> category }) { category ->
-                ProductCategoryFilterChip(
-                    text = category,
-                    isSelected = category == selectedCategory,
-                    onClick = {
-                        selectedCategory = category
-                        onSearchChanged(if (category == "Semua") "" else category)
-                    }
-                )
+            Text(
+                text = "Daftar Produk",
+                color = ProductText,
+                fontSize = 28.sp,
+                fontWeight = FontWeight.Medium
+            )
+            Button(
+                onClick = onAddProductClick,
+                colors = ButtonDefaults.buttonColors(containerColor = ProductPrimaryDark),
+                shape = RoundedCornerShape(8.dp),
+                contentPadding = PaddingValues(horizontal = 20.dp, vertical = 12.dp)
+            ) {
+                Text("Tambah Produk", fontSize = 14.sp, fontWeight = FontWeight.Medium)
             }
         }
+
+        ProductListToolbar(
+            searchQuery = uiState.searchQuery,
+            categories = uiState.availableCategories,
+            selectedCategory = uiState.selectedCategory,
+            onSearchChanged = onSearchChanged,
+            onCategorySelected = onCategorySelected
+        )
 
         if (uiState.actionMessage != null) {
             ProductBanner(message = uiState.actionMessage, onDismiss = onDismissMessage)
         }
 
         ProductTableCard(
-            modifier = Modifier.weight(1f),
             uiState = uiState,
-            onSearchChanged = { query ->
-                selectedCategory = "Semua"
-                onSearchChanged(query)
-            },
+            products = uiState.visibleProducts,
             onRetry = onRetry,
             onEditProductClick = onEditProductClick,
             onProductDetailClick = onProductDetailClick,
