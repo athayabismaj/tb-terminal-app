@@ -62,6 +62,7 @@ fun AdminPurchaseHistoryScreen(
             modifier = modifier,
             uiState = uiState,
             onSupplierSelected = viewModel::onSupplierSelected,
+            onSearchChanged = viewModel::onSearchChanged,
             onRefresh = { viewModel.loadPurchases() },
             onShowDetail = viewModel::showDetail,
             onDismissDetail = viewModel::dismissDetail,

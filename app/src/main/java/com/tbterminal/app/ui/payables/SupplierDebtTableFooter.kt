@@ -31,7 +31,7 @@ internal fun SupplierDebtFooter(
         modifier = Modifier
             .fillMaxWidth()
             .background(DebtSoft.copy(alpha = 0.7f))
-            .padding(horizontal = 24.dp, vertical = 16.dp),
+            .padding(horizontal = 20.dp, vertical = 14.dp),
         horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.CenterVertically
     ) {
@@ -45,8 +45,8 @@ internal fun SupplierDebtFooter(
             PageIconButton(Icons.Default.ChevronLeft, enabled = uiState.page > 1, onClick = onPreviousPage)
             Box(
                 modifier = Modifier
-                    .size(44.dp)
-                    .clip(RoundedCornerShape(12.dp))
+                    .size(34.dp)
+                    .clip(RoundedCornerShape(8.dp))
                     .background(DebtPrimaryDark),
                 contentAlignment = Alignment.Center
             ) {

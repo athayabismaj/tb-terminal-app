@@ -5,13 +5,11 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Button
@@ -58,27 +56,37 @@ internal fun SupplierDebtRows(
 ) {
     Box(modifier = modifier.fillMaxWidth()) {
         when {
-            uiState.isLoading -> CircularProgressIndicator(
-                modifier = Modifier.align(Alignment.Center),
-                color = DebtPrimaryDark
-            )
+            uiState.isLoading -> Box(
+                modifier = Modifier.fillMaxWidth().height(180.dp),
+                contentAlignment = Alignment.Center
+            ) {
+                CircularProgressIndicator(color = DebtPrimaryDark)
+            }
 
-            uiState.errorMessage != null && uiState.payables.isEmpty() -> Text(
-                "Utang supplier gagal dimuat.",
-                modifier = Modifier.align(Alignment.Center),
-                color = DebtDanger,
-                fontWeight = FontWeight.Bold
-            )
+            uiState.errorMessage != null && uiState.payables.isEmpty() -> Box(
+                modifier = Modifier.fillMaxWidth().height(180.dp),
+                contentAlignment = Alignment.Center
+            ) {
+                Text(
+                    "Utang supplier gagal dimuat.",
+                    color = DebtDanger,
+                    fontWeight = FontWeight.Bold
+                )
+            }
 
-            uiState.filteredPayables.isEmpty() -> Text(
-                "Belum ada utang supplier yang cocok.",
-                modifier = Modifier.align(Alignment.Center),
-                color = DebtMuted,
-                fontWeight = FontWeight.SemiBold
-            )
+            uiState.filteredPayables.isEmpty() -> Box(
+                modifier = Modifier.fillMaxWidth().height(180.dp),
+                contentAlignment = Alignment.Center
+            ) {
+                Text(
+                    "Belum ada utang supplier yang cocok.",
+                    color = DebtMuted,
+                    fontWeight = FontWeight.SemiBold
+                )
+            }
 
-            else -> LazyColumn(modifier = Modifier.fillMaxSize()) {
-                items(uiState.filteredPayables, key = SupplierPayable::id) { payable ->
+            else -> Column(modifier = Modifier.fillMaxWidth()) {
+                uiState.filteredPayables.forEach { payable ->
                     SupplierDebtRow(payable, onPayClick)
                     HorizontalDivider(color = DebtLine.copy(alpha = 0.75f))
                 }

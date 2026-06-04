@@ -94,7 +94,7 @@ internal fun PageIconButton(icon: ImageVector, enabled: Boolean, onClick: () -> 
         onClick = onClick,
         enabled = enabled,
         modifier = Modifier
-            .size(44.dp)
+            .size(34.dp)
             .clip(RoundedCornerShape(12.dp))
             .background(if (enabled) Color.White else DebtSoft)
     ) {

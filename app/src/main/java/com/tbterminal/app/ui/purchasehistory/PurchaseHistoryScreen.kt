@@ -5,6 +5,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -20,11 +21,15 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.ReceiptLong
+import androidx.compose.material.icons.filled.ChevronLeft
+import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material.icons.outlined.Business
+import androidx.compose.material.icons.outlined.ExpandMore
 import androidx.compose.material.icons.outlined.Inventory2
 import androidx.compose.material.icons.outlined.MonetizationOn
-import androidx.compose.material.icons.outlined.Refresh
+import androidx.compose.material.icons.outlined.Search
 import androidx.compose.material.icons.outlined.Visibility
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
@@ -34,6 +39,8 @@ import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -43,9 +50,11 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
@@ -57,38 +66,44 @@ import java.time.OffsetDateTime
 import java.time.format.DateTimeFormatter
 import java.util.Locale
 
-private val PurchaseBackground = Color(0xFFF4FAFD)
+private val PurchaseBackground = Color.White
 private val PurchaseBorder = Color(0xFFE2E8F0)
 private val PurchaseText = Color(0xFF0F172A)
 private val PurchaseMuted = Color(0xFF64748B)
 private val PurchasePrimary = Color(0xFF059669)
+private val PurchaseSoft = Color(0xFFF8FAFC)
 
 @Composable
 internal fun PurchaseHistoryScreen(
     modifier: Modifier,
     uiState: PurchaseHistoryUiState,
     onSupplierSelected: (String?) -> Unit,
+    onSearchChanged: (String) -> Unit,
     onRefresh: () -> Unit,
     onShowDetail: (String) -> Unit,
     onDismissDetail: () -> Unit,
     onPreviousPage: () -> Unit,
     onNextPage: () -> Unit
 ) {
-    Column(modifier.fillMaxSize().background(PurchaseBackground).verticalScroll(rememberScrollState()).padding(32.dp)) {
+    Column(
+        modifier = modifier
+            .fillMaxSize()
+            .background(PurchaseBackground)
+            .verticalScroll(rememberScrollState())
+            .padding(40.dp),
+        verticalArrangement = Arrangement.spacedBy(28.dp)
+    ) {
         PurchaseHeader()
         PurchaseSummaryCards(uiState)
-        Spacer(Modifier.height(20.dp))
-        PurchaseTableCard(uiState, onSupplierSelected, onRefresh, onShowDetail, onPreviousPage, onNextPage)
+        PurchaseToolbar(uiState, onSupplierSelected, onSearchChanged)
+        PurchaseTable(uiState, onRefresh, onShowDetail, onPreviousPage, onNextPage)
     }
     uiState.selectedPurchase?.let { PurchaseDetailDialog(it, onDismissDetail) }
 }
 
 @Composable
 private fun PurchaseHeader() {
-    Column(Modifier.padding(bottom = 24.dp)) {
-        Text("Nota Pembelian", fontSize = 30.sp, fontWeight = FontWeight.ExtraBold, color = PurchaseText)
-        Text("Riwayat restok dan dokumen pembelian dari supplier.", fontSize = 14.sp, color = PurchaseMuted)
-    }
+    Text("Nota Pembelian", fontSize = 28.sp, fontWeight = FontWeight.Medium, color = PurchaseText)
 }
 
 @Composable
@@ -116,57 +131,113 @@ private fun PurchaseMetric(title: String, value: String, note: String, icon: Ima
 }
 
 @Composable
-private fun PurchaseTableCard(
+private fun PurchaseTable(
     uiState: PurchaseHistoryUiState,
-    onSupplierSelected: (String?) -> Unit,
     onRefresh: () -> Unit,
     onShowDetail: (String) -> Unit,
     onPreviousPage: () -> Unit,
     onNextPage: () -> Unit
 ) {
-    Card(Modifier.fillMaxWidth(), colors = CardDefaults.cardColors(Color.White), border = BorderStroke(1.dp, PurchaseBorder), shape = RoundedCornerShape(12.dp)) {
-        Column {
-            PurchaseToolbar(uiState, onSupplierSelected, onRefresh)
-            PurchaseTableHeader()
-            when {
-                uiState.isLoading -> LoadingBox()
-                uiState.errorMessage != null -> PurchaseError(uiState.errorMessage, onRefresh)
-                uiState.purchases.isEmpty() -> EmptyBox()
-                else -> uiState.purchases.forEach { PurchaseRow(it, onShowDetail) }
+    Column(Modifier.fillMaxWidth()) {
+        PurchaseTableHeader()
+        when {
+            uiState.isLoading -> LoadingBox()
+            uiState.errorMessage != null -> PurchaseError(uiState.errorMessage, onRefresh)
+            uiState.visiblePurchases.isEmpty() -> EmptyBox(uiState.searchQuery)
+            else -> uiState.visiblePurchases.forEachIndexed { index, purchase ->
+                PurchaseRow(purchase, index, onShowDetail)
             }
-            PurchasePagination(uiState, onPreviousPage, onNextPage)
         }
+        PurchasePagination(uiState, onPreviousPage, onNextPage)
     }
 }
 
 @Composable
-private fun PurchaseToolbar(uiState: PurchaseHistoryUiState, onSupplierSelected: (String?) -> Unit, onRefresh: () -> Unit) {
+private fun PurchaseToolbar(
+    uiState: PurchaseHistoryUiState,
+    onSupplierSelected: (String?) -> Unit,
+    onSearchChanged: (String) -> Unit
+) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.spacedBy(16.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        OutlinedTextField(
+            value = uiState.searchQuery,
+            onValueChange = onSearchChanged,
+            placeholder = { Text("Cari no. nota atau supplier...", color = PurchaseMuted) },
+            trailingIcon = { Icon(Icons.Outlined.Search, contentDescription = "Cari nota", tint = PurchaseMuted) },
+            singleLine = true,
+            modifier = Modifier
+                .weight(1f)
+                .height(56.dp),
+            shape = RoundedCornerShape(8.dp),
+            colors = OutlinedTextFieldDefaults.colors(
+                focusedTextColor = PurchaseText,
+                unfocusedTextColor = PurchaseText,
+                cursorColor = PurchasePrimary,
+                focusedBorderColor = PurchasePrimary,
+                unfocusedBorderColor = PurchaseBorder,
+                focusedContainerColor = PurchaseBackground,
+                unfocusedContainerColor = PurchaseBackground
+            )
+        )
+        SupplierFilterDropdown(uiState, onSupplierSelected)
+    }
+}
+
+@Composable
+private fun SupplierFilterDropdown(uiState: PurchaseHistoryUiState, onSupplierSelected: (String?) -> Unit) {
     var expanded by remember { mutableStateOf(false) }
     val supplierName = uiState.suppliers.firstOrNull { it.id == uiState.selectedSupplierId }?.name ?: "Semua supplier"
-    Row(Modifier.fillMaxWidth().padding(20.dp), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
-        Column {
-            Text("Daftar Nota", fontSize = 18.sp, fontWeight = FontWeight.Bold, color = PurchaseText)
-            Text("Status hutang dikelola pada menu Hutang Supplier.", fontSize = 12.sp, color = PurchaseMuted)
+    Box {
+        OutlinedButton(
+            onClick = { expanded = true },
+            modifier = Modifier
+                .width(220.dp)
+                .height(56.dp),
+            shape = RoundedCornerShape(8.dp),
+            border = BorderStroke(1.dp, PurchaseBorder),
+            colors = ButtonDefaults.outlinedButtonColors(
+                containerColor = PurchaseBackground,
+                contentColor = PurchaseText
+            )
+        ) {
+            Text(
+                text = supplierName,
+                modifier = Modifier.weight(1f),
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                fontWeight = FontWeight.Medium
+            )
+            Icon(Icons.Outlined.ExpandMore, contentDescription = "Pilih supplier", tint = PurchaseMuted, modifier = Modifier.size(18.dp))
         }
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Box {
-                OutlinedButton(onClick = { expanded = true }) { Text(supplierName) }
-                DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
-                    DropdownMenuItem(text = { Text("Semua supplier") }, onClick = { expanded = false; onSupplierSelected(null) })
-                    uiState.suppliers.forEach { supplier ->
-                        DropdownMenuItem(text = { Text(supplier.name) }, onClick = { expanded = false; onSupplierSelected(supplier.id) })
-                    }
-                }
+        DropdownMenu(
+            expanded = expanded,
+            onDismissRequest = { expanded = false },
+            modifier = Modifier
+                .width(220.dp)
+                .heightIn(max = 320.dp)
+                .background(PurchaseBackground)
+        ) {
+            DropdownMenuItem(text = { Text("Semua supplier") }, onClick = {
+                onSupplierSelected(null)
+                expanded = false
+            })
+            uiState.suppliers.forEach { supplier ->
+                DropdownMenuItem(text = { Text(supplier.name) }, onClick = {
+                    onSupplierSelected(supplier.id)
+                    expanded = false
+                })
             }
-            Spacer(Modifier.width(8.dp))
-            IconButton(onClick = onRefresh) { Icon(Icons.Outlined.Refresh, "Muat ulang", tint = PurchasePrimary) }
         }
     }
 }
 
 @Composable
 private fun PurchaseTableHeader() {
-    Row(Modifier.fillMaxWidth().background(Color(0xFFF8FAFC)).padding(horizontal = 20.dp, vertical = 12.dp)) {
+    Row(Modifier.fillMaxWidth().background(PurchaseSoft).padding(horizontal = 20.dp, vertical = 14.dp)) {
         TableLabel("NO. NOTA", Modifier.weight(1.6f))
         TableLabel("SUPPLIER", Modifier.weight(1.8f))
         TableLabel("TANGGAL MASUK", Modifier.weight(1.4f))
@@ -176,8 +247,14 @@ private fun PurchaseTableHeader() {
 }
 
 @Composable
-private fun PurchaseRow(purchase: PurchaseSummary, onShowDetail: (String) -> Unit) {
-    Row(Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 14.dp), verticalAlignment = Alignment.CenterVertically) {
+private fun PurchaseRow(purchase: PurchaseSummary, index: Int, onShowDetail: (String) -> Unit) {
+    Row(
+        Modifier
+            .fillMaxWidth()
+            .background(if (index % 2 == 0) PurchaseBackground else PurchaseSoft.copy(alpha = 0.7f))
+            .padding(horizontal = 20.dp, vertical = 14.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
         Text(purchase.invoiceNo ?: "Tanpa nomor nota", Modifier.weight(1.6f), color = PurchaseText, fontWeight = FontWeight.Bold, fontSize = 13.sp)
         Text(purchase.supplierName, Modifier.weight(1.8f), color = PurchaseMuted, fontSize = 13.sp)
         Text(purchase.receivedAt.asDisplayDate(), Modifier.weight(1.4f), color = PurchaseMuted, fontSize = 13.sp)
@@ -191,12 +268,55 @@ private fun PurchaseRow(purchase: PurchaseSummary, onShowDetail: (String) -> Uni
 
 @Composable
 private fun PurchasePagination(uiState: PurchaseHistoryUiState, onPreviousPage: () -> Unit, onNextPage: () -> Unit) {
-    Row(Modifier.fillMaxWidth().background(Color(0xFFF8FAFC)).padding(16.dp), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
-        Text("Halaman ${uiState.page} dari ${uiState.totalPages}, total ${uiState.totalPurchases} nota", color = PurchaseMuted, fontSize = 12.sp)
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            OutlinedButton(onClick = onPreviousPage, enabled = uiState.page > 1) { Text("Sebelumnya") }
-            OutlinedButton(onClick = onNextPage, enabled = uiState.page < uiState.totalPages) { Text("Berikutnya") }
+    Row(
+        Modifier
+            .fillMaxWidth()
+            .background(PurchaseSoft.copy(alpha = 0.7f))
+            .padding(horizontal = 20.dp, vertical = 14.dp),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Column {
+            Text(
+                if (uiState.searchQuery.isBlank()) {
+                    "Menampilkan ${uiState.pageStartIndex}-${uiState.pageEndIndex} dari ${uiState.totalPurchases} nota"
+                } else {
+                    "Menampilkan ${uiState.visiblePurchases.size} nota cocok pada halaman ini"
+                },
+                color = PurchaseText,
+                fontSize = 13.sp,
+                fontWeight = FontWeight.Medium
+            )
+            Text("Maksimal ${uiState.pageSize} nota per halaman", color = PurchaseMuted, fontSize = 11.sp, modifier = Modifier.padding(top = 2.dp))
         }
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
+            PurchasePageButton(uiState.page > 1 && !uiState.isLoading, onPreviousPage, Icons.Default.ChevronLeft)
+            Box(
+                Modifier
+                    .size(34.dp)
+                    .clip(RoundedCornerShape(8.dp))
+                    .background(PurchasePrimary),
+                contentAlignment = Alignment.Center
+            ) {
+                Text("${uiState.page}", color = PurchaseBackground, fontWeight = FontWeight.Bold)
+            }
+            Text("/ ${uiState.totalPages}", color = PurchaseMuted, fontWeight = FontWeight.SemiBold)
+            PurchasePageButton(uiState.page < uiState.totalPages && !uiState.isLoading, onNextPage, Icons.Default.ChevronRight)
+        }
+    }
+}
+
+@Composable
+private fun PurchasePageButton(enabled: Boolean, onClick: () -> Unit, icon: ImageVector) {
+    OutlinedButton(
+        onClick = onClick,
+        enabled = enabled,
+        shape = RoundedCornerShape(12.dp),
+        contentPadding = PaddingValues(0.dp),
+        modifier = Modifier.size(34.dp),
+        colors = ButtonDefaults.outlinedButtonColors(contentColor = PurchaseText)
+    ) {
+        Icon(icon, contentDescription = null)
     }
 }
 
@@ -253,7 +373,9 @@ private fun DetailInfo(label: String, value: String) {
 private fun LoadingBox() = Box(Modifier.fillMaxWidth().height(180.dp), contentAlignment = Alignment.Center) { CircularProgressIndicator() }
 
 @Composable
-private fun EmptyBox() = Box(Modifier.fillMaxWidth().height(180.dp), contentAlignment = Alignment.Center) { Text("Belum ada nota pembelian.", color = PurchaseMuted) }
+private fun EmptyBox(searchQuery: String) = Box(Modifier.fillMaxWidth().height(180.dp), contentAlignment = Alignment.Center) {
+    Text(if (searchQuery.isBlank()) "Belum ada nota pembelian." else "Nota pembelian tidak ditemukan.", color = PurchaseMuted)
+}
 
 @Composable
 private fun PurchaseError(message: String, onRefresh: () -> Unit) {

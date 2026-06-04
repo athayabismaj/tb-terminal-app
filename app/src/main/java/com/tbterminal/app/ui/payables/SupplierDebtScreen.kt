@@ -13,7 +13,9 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.ReceiptLong
 import androidx.compose.material.icons.filled.CheckCircle
@@ -52,16 +54,15 @@ internal fun SupplierDebtScreen(
         modifier = modifier
             .fillMaxSize()
             .background(DebtBackground)
-            .padding(32.dp),
-        verticalArrangement = Arrangement.spacedBy(20.dp)
+            .verticalScroll(rememberScrollState())
+            .padding(40.dp),
+        verticalArrangement = Arrangement.spacedBy(28.dp)
     ) {
         SupplierDebtHeader()
         SupplierDebtMessage(uiState, onDismissMessage)
         SupplierDebtMetrics(uiState)
         SupplierDebtTableCard(
-            modifier = Modifier
-                .fillMaxWidth()
-                .weight(1f),
+            modifier = Modifier.fillMaxWidth(),
             uiState = uiState,
             onSearchChanged = onSearchChanged,
             onStatusFilterChanged = onStatusFilterChanged,
@@ -78,28 +79,9 @@ private fun SupplierDebtHeader() {
     Row(
         modifier = Modifier.fillMaxWidth(),
         horizontalArrangement = Arrangement.SpaceBetween,
-        verticalAlignment = Alignment.Bottom
+        verticalAlignment = Alignment.Top
     ) {
-        Column {
-            Text("Utang Supplier", color = DebtText, fontSize = 32.sp, fontWeight = FontWeight.ExtraBold)
-            Text(
-                "Pantau tagihan supplier dari barang masuk dan catat pembayaran secara terkontrol.",
-                color = DebtMuted,
-                fontSize = 14.sp,
-                fontWeight = FontWeight.Medium
-            )
-        }
-        Row(
-            modifier = Modifier
-                .clip(RoundedCornerShape(24.dp))
-                .background(DebtPrimary.copy(alpha = 0.1f))
-                .padding(horizontal = 16.dp, vertical = 10.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Icon(Icons.AutoMirrored.Outlined.ReceiptLong, contentDescription = null, tint = DebtPrimaryDark)
-            Spacer(modifier = Modifier.width(8.dp))
-            Text("Kontrol utang supplier", color = DebtPrimaryDark, fontWeight = FontWeight.Bold)
-        }
+        Text("Utang Supplier", color = DebtText, fontSize = 28.sp, fontWeight = FontWeight.Medium)
     }
 }
 

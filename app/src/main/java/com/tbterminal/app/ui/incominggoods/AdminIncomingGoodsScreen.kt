@@ -10,16 +10,23 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.outlined.ArrowBack
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.outlined.LocalShipping
 import androidx.compose.material.icons.outlined.Warning
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Icon
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -107,8 +114,11 @@ fun AdminIncomingGoodsScreen(
             modifier = contentModifier,
             uiState = uiState,
             onSearchChanged = viewModel::onProductSearchChanged,
-            onRefresh = viewModel::refresh,
+            onCategoryFilterChanged = viewModel::onCategoryFilterChanged,
+            onOpenForm = { onIncomingGoodsFormClick(null) },
             onSelectProduct = { product -> onIncomingGoodsFormClick(product.productId) },
+            onPreviousPage = viewModel::previousPage,
+            onNextPage = viewModel::nextPage,
             onDismissMessage = viewModel::clearMessage
         )
     }
@@ -182,6 +192,7 @@ fun AdminIncomingGoodsFormScreen(
         IncomingGoodsFormContent(
             modifier = contentModifier,
             uiState = uiState,
+            onBackToList = onIncomingGoodsClick,
             onSelectProduct = viewModel::selectProduct,
             onSelectSupplier = viewModel::selectSupplier,
             onSupplierNameChanged = viewModel::onSupplierNameChanged,
@@ -205,27 +216,31 @@ private fun IncomingGoodsListContent(
     modifier: Modifier,
     uiState: IncomingGoodsUiState,
     onSearchChanged: (String) -> Unit,
-    onRefresh: () -> Unit,
+    onCategoryFilterChanged: (String?) -> Unit,
+    onOpenForm: () -> Unit,
     onSelectProduct: (ProductStock) -> Unit,
+    onPreviousPage: () -> Unit,
+    onNextPage: () -> Unit,
     onDismissMessage: () -> Unit
 ) {
     Column(
         modifier = modifier
             .fillMaxSize()
-            .background(IncomingBackground)
-            .padding(32.dp),
-        verticalArrangement = Arrangement.spacedBy(20.dp)
+            .background(IncomingSurface)
+            .verticalScroll(rememberScrollState())
+            .padding(40.dp),
+        verticalArrangement = Arrangement.spacedBy(28.dp)
     ) {
-        IncomingGoodsHeader()
+        IncomingGoodsHeader(onOpenForm = onOpenForm, compact = true)
         IncomingGoodsMessage(uiState, onDismissMessage)
         ProductSelectorCard(
-            modifier = Modifier
-                .fillMaxWidth()
-                .weight(1f),
+            modifier = Modifier.fillMaxWidth(),
             uiState = uiState,
             onSearchChanged = onSearchChanged,
-            onRefresh = onRefresh,
-            onSelectProduct = onSelectProduct
+            onCategoryFilterChanged = onCategoryFilterChanged,
+            onSelectProduct = onSelectProduct,
+            onPreviousPage = onPreviousPage,
+            onNextPage = onNextPage
         )
     }
 }
@@ -234,6 +249,7 @@ private fun IncomingGoodsListContent(
 private fun IncomingGoodsFormContent(
     modifier: Modifier,
     uiState: IncomingGoodsUiState,
+    onBackToList: () -> Unit,
     onSelectProduct: (ProductStock) -> Unit,
     onSelectSupplier: (Supplier) -> Unit,
     onSupplierNameChanged: (String) -> Unit,
@@ -253,10 +269,10 @@ private fun IncomingGoodsFormContent(
         modifier = modifier
             .fillMaxSize()
             .background(IncomingBackground)
-            .padding(32.dp),
-        verticalArrangement = Arrangement.spacedBy(20.dp)
+            .padding(40.dp),
+        verticalArrangement = Arrangement.spacedBy(28.dp)
     ) {
-        IncomingGoodsHeader()
+        IncomingGoodsHeader(onBackClick = onBackToList)
         IncomingGoodsMessage(uiState, onDismissMessage)
         Box(
             modifier = Modifier
@@ -288,31 +304,51 @@ private fun IncomingGoodsFormContent(
 }
 
 @Composable
-private fun IncomingGoodsHeader() {
+private fun IncomingGoodsHeader(
+    onOpenForm: (() -> Unit)? = null,
+    onBackClick: (() -> Unit)? = null,
+    compact: Boolean = false
+) {
     Row(
         modifier = Modifier.fillMaxWidth(),
         horizontalArrangement = Arrangement.SpaceBetween,
-        verticalAlignment = Alignment.Bottom
+        verticalAlignment = if (compact) Alignment.Top else Alignment.Bottom
     ) {
         Column {
-            Text("Barang Masuk", color = IncomingText, fontSize = 32.sp, fontWeight = FontWeight.ExtraBold)
             Text(
-                "Catat restok dari supplier, perbarui HPP, dan buat utang jika belum lunas.",
-                color = IncomingMuted,
-                fontSize = 14.sp,
+                if (compact) "Restok Barang" else "Barang Masuk",
+                color = IncomingText,
+                fontSize = 28.sp,
                 fontWeight = FontWeight.Medium
             )
         }
-        Row(
-            modifier = Modifier
-                .clip(RoundedCornerShape(24.dp))
-                .background(IncomingPrimary.copy(alpha = 0.1f))
-                .padding(horizontal = 16.dp, vertical = 10.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Icon(Icons.Outlined.LocalShipping, contentDescription = null, tint = IncomingPrimary)
-            Spacer(modifier = Modifier.width(8.dp))
-            Text("Mode restok supplier", color = IncomingPrimaryDark, fontWeight = FontWeight.Bold)
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            onBackClick?.let {
+                OutlinedButton(
+                    onClick = it,
+                    shape = RoundedCornerShape(10.dp),
+                    border = BorderStroke(1.dp, IncomingLine),
+                    colors = ButtonDefaults.outlinedButtonColors(
+                        containerColor = IncomingSurface,
+                        contentColor = IncomingText
+                    )
+                ) {
+                    Icon(Icons.AutoMirrored.Outlined.ArrowBack, contentDescription = null, modifier = Modifier.size(18.dp))
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text("Kembali ke Restok", fontWeight = FontWeight.Bold)
+                }
+            }
+            onOpenForm?.let {
+                Button(
+                    onClick = it,
+                    colors = ButtonDefaults.buttonColors(containerColor = IncomingPrimary),
+                    shape = RoundedCornerShape(10.dp)
+                ) {
+                    Icon(Icons.Outlined.LocalShipping, contentDescription = null, modifier = Modifier.size(18.dp))
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text("Catat Barang Masuk", fontWeight = FontWeight.Bold)
+                }
+            }
         }
     }
 }

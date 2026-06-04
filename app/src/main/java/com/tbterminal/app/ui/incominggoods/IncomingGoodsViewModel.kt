@@ -73,11 +73,27 @@ class IncomingGoodsViewModel(
     }
 
     fun onProductSearchChanged(query: String) {
-        _uiState.update { it.copy(productSearchQuery = query) }
+        _uiState.update { it.copy(productSearchQuery = query, currentPage = 1) }
         productSearchJob?.cancel()
         productSearchJob = viewModelScope.launch {
             delay(350)
             loadProducts()
+        }
+    }
+
+    fun onCategoryFilterChanged(categoryName: String?) {
+        _uiState.update { it.copy(categoryFilter = categoryName, currentPage = 1) }
+    }
+
+    fun nextPage() {
+        _uiState.update { state ->
+            state.copy(currentPage = (state.tablePage + 1).coerceAtMost(state.totalTablePages))
+        }
+    }
+
+    fun previousPage() {
+        _uiState.update { state ->
+            state.copy(currentPage = (state.tablePage - 1).coerceAtLeast(1))
         }
     }
 
@@ -236,9 +252,13 @@ class IncomingGoodsViewModel(
     private fun applyProducts(products: List<ProductStock>) {
         _uiState.update { state ->
             val selectedProduct = resolveSelectedProduct(state, products)
+            val categoryFilter = state.categoryFilter
+                ?.takeIf { filter -> products.any { it.categoryName == filter } }
             state.copy(
                 products = products,
                 selectedProduct = selectedProduct,
+                categoryFilter = categoryFilter,
+                currentPage = state.currentPage.coerceAtLeast(1),
                 buyPriceInput = state.buyPriceInput.ifBlank { selectedProduct?.priceBuy?.toInputText().orEmpty() },
                 isLoadingProducts = false,
                 errorMessage = null

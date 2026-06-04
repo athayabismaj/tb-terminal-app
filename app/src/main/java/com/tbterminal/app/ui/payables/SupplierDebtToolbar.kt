@@ -5,15 +5,12 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ExpandMore
-import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.outlined.Search
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
@@ -35,14 +32,11 @@ import androidx.compose.ui.unit.dp
 internal fun SupplierDebtToolbar(
     uiState: SupplierDebtUiState,
     onSearchChanged: (String) -> Unit,
-    onStatusFilterChanged: (SupplierDebtStatusFilter) -> Unit,
-    onRefresh: () -> Unit
+    onStatusFilterChanged: (SupplierDebtStatusFilter) -> Unit
 ) {
     Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(20.dp),
-        horizontalArrangement = Arrangement.spacedBy(12.dp),
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.spacedBy(16.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
         OutlinedTextField(
@@ -54,21 +48,10 @@ internal fun SupplierDebtToolbar(
                 .weight(1f)
                 .height(56.dp),
             singleLine = true,
-            shape = RoundedCornerShape(16.dp),
+            shape = RoundedCornerShape(8.dp),
             colors = DebtTextFieldColors()
         )
         StatusFilterButton(uiState.statusFilter, onStatusFilterChanged)
-        OutlinedButton(
-            onClick = onRefresh,
-            modifier = Modifier.height(56.dp),
-            shape = RoundedCornerShape(16.dp),
-            border = BorderStroke(1.dp, DebtLine),
-            contentPadding = PaddingValues(horizontal = 18.dp)
-        ) {
-            Icon(Icons.Default.Refresh, contentDescription = null, tint = DebtPrimaryDark)
-            Spacer(modifier = Modifier.width(8.dp))
-            Text("Muat Ulang", color = DebtAccentText, fontWeight = FontWeight.Bold)
-        }
     }
 }
 
@@ -81,13 +64,14 @@ private fun StatusFilterButton(
     Box {
         OutlinedButton(
             onClick = { expanded = true },
-            modifier = Modifier.height(56.dp),
-            shape = RoundedCornerShape(16.dp),
+            modifier = Modifier
+                .width(220.dp)
+                .height(56.dp),
+            shape = RoundedCornerShape(8.dp),
             border = BorderStroke(1.dp, DebtLine),
             contentPadding = PaddingValues(horizontal = 18.dp)
         ) {
-            Text(selected.label, color = DebtText, fontWeight = FontWeight.SemiBold)
-            Spacer(modifier = Modifier.width(18.dp))
+            Text(selected.label, color = DebtText, fontWeight = FontWeight.SemiBold, modifier = Modifier.weight(1f))
             Icon(Icons.Default.ExpandMore, contentDescription = null, tint = DebtMuted)
         }
         DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {

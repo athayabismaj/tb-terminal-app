@@ -10,6 +10,8 @@ data class IncomingGoodsUiState(
     val selectedProduct: ProductStock? = null,
     val selectedSupplier: Supplier? = null,
     val productSearchQuery: String = "",
+    val categoryFilter: String? = null,
+    val currentPage: Int = 1,
     val newSupplierNameInput: String = "",
     val invoiceNoInput: String = "",
     val quantityInput: String = "",
@@ -56,6 +58,35 @@ data class IncomingGoodsUiState(
             val paid = effectiveAmountPaid ?: return null
             return currentTotal.subtract(paid)
         }
+
+    val categoryOptions: List<String>
+        get() = products.map(ProductStock::categoryName).distinct().sorted()
+
+    val tableProducts: List<ProductStock>
+        get() = products.filter { product ->
+            categoryFilter == null || product.categoryName == categoryFilter
+        }
+
+    val tablePage: Int
+        get() = currentPage.coerceIn(1, totalTablePages)
+
+    val tablePageProducts: List<ProductStock>
+        get() = tableProducts
+            .drop((tablePage - 1) * INCOMING_GOODS_TABLE_PAGE_SIZE)
+            .take(INCOMING_GOODS_TABLE_PAGE_SIZE)
+
+    val totalTableProducts: Int
+        get() = tableProducts.size
+
+    val totalTablePages: Int
+        get() = ((totalTableProducts + INCOMING_GOODS_TABLE_PAGE_SIZE - 1) / INCOMING_GOODS_TABLE_PAGE_SIZE)
+            .coerceAtLeast(1)
+
+    val tableStartIndex: Int
+        get() = if (totalTableProducts == 0) 0 else ((tablePage - 1) * INCOMING_GOODS_TABLE_PAGE_SIZE) + 1
+
+    val tableEndIndex: Int
+        get() = minOf(tablePage * INCOMING_GOODS_TABLE_PAGE_SIZE, totalTableProducts)
 }
 
 enum class IncomingPaymentMethod(
@@ -71,6 +102,7 @@ enum class IncomingPaymentMethod(
 }
 
 internal const val INCOMING_GOODS_PRODUCT_LIMIT = 50
+internal const val INCOMING_GOODS_TABLE_PAGE_SIZE = 10
 internal const val INCOMING_GOODS_SUPPLIER_LIMIT = 50
 internal const val DEFAULT_DUE_DAYS = 30
 

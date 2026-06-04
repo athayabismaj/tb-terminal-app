@@ -58,6 +58,10 @@ class PurchaseHistoryViewModel(
         loadPurchases(page = 1)
     }
 
+    fun onSearchChanged(query: String) {
+        _uiState.update { it.copy(searchQuery = query) }
+    }
+
     fun showDetail(purchaseId: String) {
         viewModelScope.launch {
             _uiState.update { it.copy(isLoadingDetail = true, errorMessage = null) }
