@@ -21,7 +21,12 @@ fun AppNavGraph(
     CompositionLocalProvider(
         LocalAdminDestinationNavigator provides { destination ->
             destination.adminRouteOrNull()?.let { route ->
-                navController.navigate(route) { launchSingleTop = true }
+                navController.navigate(route) {
+                    launchSingleTop = true
+                    popUpTo(AppRoute.Dashboard.route) {
+                        saveState = false
+                    }
+                }
             }
         }
     ) {
@@ -44,13 +49,29 @@ fun AppNavGraph(
 
 private fun AdminDestination.adminRouteOrNull(): String? {
     return when (this) {
+        AdminDestination.Dashboard -> AppRoute.Dashboard.route
+        AdminDestination.Products -> AppRoute.Products.route
+        AdminDestination.ProductCategories -> AppRoute.ProductCategories.route
+        AdminDestination.ProductUnits -> AppRoute.ProductUnits.route
+        AdminDestination.PriceManagement -> AppRoute.PriceManagement.route
+        AdminDestination.StockOpname -> AppRoute.StockOpname.route
+        AdminDestination.IncomingGoods -> AppRoute.IncomingGoods.route
         AdminDestination.Suppliers -> AppRoute.Suppliers.route
         AdminDestination.PurchaseHistory -> AppRoute.PurchaseHistory.route
         AdminDestination.StockReport -> AppRoute.StockReport.route
+        AdminDestination.Customers -> AppRoute.Customers.route
+        AdminDestination.Receivables -> AppRoute.Receivables.route
+        AdminDestination.CashReconciliation -> AppRoute.CashReconciliation.route
+        AdminDestination.SalesTransactions -> AppRoute.SalesTransactions.route
+        AdminDestination.SupplierDebts -> AppRoute.SupplierDebts.route
         AdminDestination.CashSessionHistory -> AppRoute.CashSessionHistory.route
         AdminDestination.CashReconciliationDetail -> AppRoute.CashReconciliationDetail.createRoute()
         AdminDestination.CashExpenses -> AppRoute.CashExpenses.route
         AdminDestination.ReceivablePayments -> AppRoute.ReceivablePayments.route
+        AdminDestination.Reports -> AppRoute.Reports.route
+        AdminDestination.OperationalAudit -> AppRoute.OperationalAudit.route
+        AdminDestination.Profile -> AppRoute.AdminProfile.route
+        AdminDestination.Settings -> AppRoute.AdminSettings.route
         else -> null
     }
 }
