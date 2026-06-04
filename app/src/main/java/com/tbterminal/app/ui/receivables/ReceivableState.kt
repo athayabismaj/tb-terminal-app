@@ -51,7 +51,7 @@ enum class ReceivableStatusFilter(
     val apiValue: String?,
     val label: String
 ) {
-    All(null, "Semua"),
+    All(null, "Semua status"),
     Unpaid("belum_lunas", "Belum lunas"),
     Partial("sebagian", "Sebagian"),
     Paid("lunas", "Lunas")

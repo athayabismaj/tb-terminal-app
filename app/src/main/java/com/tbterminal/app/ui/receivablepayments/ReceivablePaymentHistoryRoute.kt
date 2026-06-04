@@ -47,7 +47,8 @@ fun AdminReceivablePaymentHistoryScreen(
         ReceivablePaymentHistoryScreen(
             modifier = modifier,
             uiState = uiState,
-            onRefresh = { viewModel.loadPayments() },
+            onSearchChanged = viewModel::onSearchChanged,
+            onMethodFilterChanged = viewModel::onMethodFilterChanged,
             onShowDetail = viewModel::showDetail,
             onDismissDetail = viewModel::dismissDetail,
             onPreviousPage = viewModel::previousPage,

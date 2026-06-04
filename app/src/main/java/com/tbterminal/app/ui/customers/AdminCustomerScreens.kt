@@ -12,11 +12,10 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -28,10 +27,10 @@ import androidx.compose.material.icons.filled.ChevronLeft
 import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
-import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Save
 import androidx.compose.material.icons.outlined.AccountBalanceWallet
 import androidx.compose.material.icons.outlined.Badge
+import androidx.compose.material.icons.outlined.ExpandMore
 import androidx.compose.material.icons.outlined.Group
 import androidx.compose.material.icons.outlined.Person
 import androidx.compose.material.icons.outlined.Phone
@@ -43,6 +42,8 @@ import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -142,7 +143,7 @@ fun AdminCustomerListScreen(
             modifier = contentModifier,
             uiState = uiState,
             onSearchChanged = viewModel::onSearchChanged,
-            onRefresh = { viewModel.loadCustomers() },
+            onCategoryFilterChanged = viewModel::onCategoryFilterChanged,
             onAddCustomerClick = onAddCustomerClick,
             onEditCustomerClick = onEditCustomerClick,
             onCustomerDetailClick = onCustomerDetailClick,
@@ -324,7 +325,7 @@ private fun CustomerListContent(
     modifier: Modifier,
     uiState: CustomerListUiState,
     onSearchChanged: (String) -> Unit,
-    onRefresh: () -> Unit,
+    onCategoryFilterChanged: (CustomerCategoryFilter) -> Unit,
     onAddCustomerClick: () -> Unit,
     onEditCustomerClick: (String) -> Unit,
     onCustomerDetailClick: (String) -> Unit,
@@ -336,39 +337,50 @@ private fun CustomerListContent(
     Column(
         modifier = modifier
             .fillMaxSize()
-            .background(CustomerBackground)
-            .padding(32.dp),
-        verticalArrangement = Arrangement.spacedBy(20.dp)
+            .background(CustomerSurface)
+            .verticalScroll(rememberScrollState())
+            .padding(40.dp),
+        verticalArrangement = Arrangement.spacedBy(28.dp)
     ) {
-        CustomerHeader(
-            title = "Pelanggan",
-            subtitle = "Kelola data pelanggan, limit kredit, dan termin pembayaran.",
-            action = {
-                Button(
-                    onClick = onAddCustomerClick,
-                    colors = ButtonDefaults.buttonColors(containerColor = CustomerPrimary),
-                    shape = RoundedCornerShape(18.dp),
-                    contentPadding = PaddingValues(horizontal = 18.dp, vertical = 12.dp)
-                ) {
-                    Icon(Icons.Default.Add, contentDescription = null, modifier = Modifier.size(18.dp))
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Text("Tambah Pelanggan", fontWeight = FontWeight.Bold)
-                }
-            }
-        )
+        CustomerListHeader(onAddCustomerClick = onAddCustomerClick)
         CustomerMessage(uiState.message ?: uiState.errorMessage, uiState.errorMessage != null, onDismissMessage)
-        CustomerMetrics(uiState)
         CustomerTableCard(
-            modifier = Modifier.weight(1f),
+            modifier = Modifier.fillMaxWidth(),
             uiState = uiState,
             onSearchChanged = onSearchChanged,
-            onRefresh = onRefresh,
+            onCategoryFilterChanged = onCategoryFilterChanged,
             onEditCustomerClick = onEditCustomerClick,
             onCustomerDetailClick = onCustomerDetailClick,
             onDeactivateClick = onDeactivateClick,
             onPreviousPage = onPreviousPage,
             onNextPage = onNextPage
         )
+    }
+}
+
+@Composable
+private fun CustomerListHeader(onAddCustomerClick: () -> Unit) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.Top
+    ) {
+        Text(
+            text = "Pelanggan",
+            color = CustomerText,
+            fontSize = 28.sp,
+            fontWeight = FontWeight.Medium
+        )
+        Button(
+            onClick = onAddCustomerClick,
+            colors = ButtonDefaults.buttonColors(containerColor = CustomerPrimaryDark),
+            shape = RoundedCornerShape(8.dp),
+            contentPadding = PaddingValues(horizontal = 20.dp, vertical = 12.dp)
+        ) {
+            Icon(Icons.Default.Add, contentDescription = null, modifier = Modifier.size(18.dp))
+            Spacer(modifier = Modifier.width(8.dp))
+            Text("Tambah Pelanggan", fontSize = 14.sp, fontWeight = FontWeight.Medium)
+        }
     }
 }
 
@@ -486,61 +498,113 @@ private fun CustomerTableCard(
     modifier: Modifier,
     uiState: CustomerListUiState,
     onSearchChanged: (String) -> Unit,
-    onRefresh: () -> Unit,
+    onCategoryFilterChanged: (CustomerCategoryFilter) -> Unit,
     onEditCustomerClick: (String) -> Unit,
     onCustomerDetailClick: (String) -> Unit,
     onDeactivateClick: (Customer) -> Unit,
     onPreviousPage: () -> Unit,
     onNextPage: () -> Unit
 ) {
-    Card(
-        modifier = modifier.fillMaxWidth(),
-        colors = CardDefaults.cardColors(containerColor = CustomerSurface),
-        shape = RoundedCornerShape(18.dp),
-        border = BorderStroke(1.dp, CustomerLine)
+    Column(modifier = modifier.fillMaxWidth()) {
+        CustomerTableToolbar(
+            uiState = uiState,
+            onSearchChanged = onSearchChanged,
+            onCategoryFilterChanged = onCategoryFilterChanged
+        )
+        Spacer(modifier = Modifier.height(28.dp))
+        CustomerTableHeader()
+        HorizontalDivider(color = CustomerLine)
+        when {
+            uiState.isLoading -> CustomerLoading()
+            uiState.errorMessage != null -> CustomerEmpty("Pelanggan gagal dimuat.")
+            uiState.visibleCustomers.isEmpty() -> CustomerEmpty()
+            else -> Column(modifier = Modifier.fillMaxWidth()) {
+                uiState.visibleCustomers.forEach { customer ->
+                    CustomerTableRow(customer, onCustomerDetailClick, onEditCustomerClick, onDeactivateClick)
+                    HorizontalDivider(color = CustomerLine.copy(alpha = 0.7f))
+                }
+            }
+        }
+        CustomerPagination(uiState, onPreviousPage, onNextPage)
+    }
+}
+
+@Composable
+private fun CustomerTableToolbar(
+    uiState: CustomerListUiState,
+    onSearchChanged: (String) -> Unit,
+    onCategoryFilterChanged: (CustomerCategoryFilter) -> Unit
+) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.spacedBy(16.dp),
+        verticalAlignment = Alignment.CenterVertically
     ) {
-        Column(modifier = Modifier.fillMaxSize()) {
-            Row(
-                modifier = Modifier.padding(24.dp),
-                horizontalArrangement = Arrangement.spacedBy(12.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                OutlinedTextField(
-                    value = uiState.searchQuery,
-                    onValueChange = onSearchChanged,
-                    placeholder = { Text("Cari nama atau nomor HP...") },
-                    leadingIcon = { Icon(Icons.Outlined.Search, contentDescription = null) },
-                    singleLine = true,
-                    modifier = Modifier.weight(1f).height(58.dp),
-                    shape = RoundedCornerShape(18.dp),
-                    colors = customerTextFieldColors()
-                )
-                OutlinedButton(
-                    onClick = onRefresh,
-                    modifier = Modifier.height(58.dp),
-                    shape = RoundedCornerShape(18.dp),
-                    border = BorderStroke(1.dp, CustomerLine)
-                ) {
-                    Icon(Icons.Default.Refresh, contentDescription = null)
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Text("Muat Ulang", fontWeight = FontWeight.Bold)
-                }
-            }
-            HorizontalDivider(color = CustomerLine)
-            CustomerTableHeader()
-            HorizontalDivider(color = CustomerLine)
-            when {
-                uiState.isLoading -> CustomerLoading()
-                uiState.errorMessage != null -> CustomerCenteredError(uiState.errorMessage, onRefresh)
-                uiState.customers.isEmpty() -> CustomerEmpty()
-                else -> LazyColumn(modifier = Modifier.weight(1f)) {
-                    items(uiState.customers, key = Customer::id) { customer ->
-                        CustomerTableRow(customer, onCustomerDetailClick, onEditCustomerClick, onDeactivateClick)
-                        HorizontalDivider(color = CustomerLine.copy(alpha = 0.7f))
+        OutlinedTextField(
+            value = uiState.searchQuery,
+            onValueChange = onSearchChanged,
+            placeholder = { Text("Cari nama atau nomor HP...", color = CustomerMuted) },
+            trailingIcon = { Icon(Icons.Outlined.Search, contentDescription = "Cari pelanggan", tint = CustomerMuted) },
+            singleLine = true,
+            modifier = Modifier.weight(1f).height(56.dp),
+            shape = RoundedCornerShape(8.dp),
+            colors = customerToolbarTextFieldColors()
+        )
+        CustomerCategoryDropdown(
+            selectedFilter = uiState.categoryFilter,
+            onCategoryFilterChanged = onCategoryFilterChanged
+        )
+    }
+}
+
+@Composable
+private fun CustomerCategoryDropdown(
+    selectedFilter: CustomerCategoryFilter,
+    onCategoryFilterChanged: (CustomerCategoryFilter) -> Unit
+) {
+    var expanded by remember { mutableStateOf(false) }
+    Box {
+        OutlinedButton(
+            onClick = { expanded = true },
+            modifier = Modifier.width(220.dp).height(56.dp),
+            shape = RoundedCornerShape(8.dp),
+            border = BorderStroke(1.dp, CustomerLine),
+            colors = ButtonDefaults.outlinedButtonColors(
+                containerColor = CustomerSurface,
+                contentColor = CustomerText
+            )
+        ) {
+            Text(
+                text = selectedFilter.label,
+                modifier = Modifier.weight(1f),
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                fontWeight = FontWeight.Medium
+            )
+            Icon(
+                imageVector = Icons.Outlined.ExpandMore,
+                contentDescription = "Pilih kategori pelanggan",
+                tint = CustomerMuted,
+                modifier = Modifier.size(18.dp)
+            )
+        }
+        DropdownMenu(
+            expanded = expanded,
+            onDismissRequest = { expanded = false },
+            modifier = Modifier
+                .width(220.dp)
+                .heightIn(max = 240.dp)
+                .background(CustomerSurface)
+        ) {
+            CustomerCategoryFilter.entries.forEach { filter ->
+                DropdownMenuItem(
+                    text = { Text(filter.label) },
+                    onClick = {
+                        onCategoryFilterChanged(filter)
+                        expanded = false
                     }
-                }
+                )
             }
-            CustomerPagination(uiState, onPreviousPage, onNextPage)
         }
     }
 }
@@ -568,7 +632,11 @@ private fun CustomerTableRow(
     onDeactivate: (Customer) -> Unit
 ) {
     Row(
-        modifier = Modifier.fillMaxWidth().clickable { onDetail(customer.id) }.padding(horizontal = 24.dp, vertical = 18.dp),
+        modifier = Modifier
+            .fillMaxWidth()
+            .background(CustomerSurface)
+            .clickable { onDetail(customer.id) }
+            .padding(horizontal = 24.dp, vertical = 18.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
         Row(modifier = Modifier.weight(2.5f), verticalAlignment = Alignment.CenterVertically) {
@@ -702,11 +770,28 @@ private fun CustomerMessage(message: String?, isError: Boolean, onDismiss: () ->
 
 @Composable
 private fun CustomerPagination(uiState: CustomerListUiState, onPreviousPage: () -> Unit, onNextPage: () -> Unit) {
-    Row(modifier = Modifier.fillMaxWidth().background(CustomerSoft.copy(alpha = 0.6f)).padding(horizontal = 24.dp, vertical = 18.dp), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
-        Text("Menampilkan ${uiState.currentStart}-${uiState.currentEnd} dari ${uiState.totalCustomers} pelanggan", color = CustomerMuted, fontWeight = FontWeight.Bold)
+    Row(modifier = Modifier.fillMaxWidth().background(CustomerSoft.copy(alpha = 0.7f)).padding(horizontal = 20.dp, vertical = 14.dp), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+        Column {
+            Text(
+                text = if (uiState.categoryFilter == CustomerCategoryFilter.ALL) {
+                    "Menampilkan ${uiState.currentStart}-${uiState.currentEnd} dari ${uiState.totalCustomers} pelanggan"
+                } else {
+                    "Menampilkan ${uiState.visibleCustomers.size} ${uiState.categoryFilter.label.lowercase()} pada halaman ini"
+                },
+                color = CustomerText,
+                fontSize = 13.sp,
+                fontWeight = FontWeight.Medium
+            )
+            Text(
+                text = "Maksimal $CUSTOMER_PAGE_SIZE pelanggan per halaman",
+                color = CustomerMuted,
+                fontSize = 11.sp,
+                modifier = Modifier.padding(top = 2.dp)
+            )
+        }
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
             PaginationButton(Icons.Default.ChevronLeft, enabled = uiState.page > 1, onClick = onPreviousPage)
-            Box(modifier = Modifier.size(44.dp).clip(RoundedCornerShape(12.dp)).background(CustomerPrimary), contentAlignment = Alignment.Center) {
+            Box(modifier = Modifier.size(34.dp).clip(RoundedCornerShape(8.dp)).background(CustomerPrimary), contentAlignment = Alignment.Center) {
                 Text(uiState.page.toString(), color = Color.White, fontWeight = FontWeight.Bold)
             }
             Text("/ ${uiState.totalPages}", color = CustomerMuted, fontWeight = FontWeight.Bold)
@@ -717,7 +802,7 @@ private fun CustomerPagination(uiState: CustomerListUiState, onPreviousPage: () 
 
 @Composable
 private fun PaginationButton(icon: ImageVector, enabled: Boolean, onClick: () -> Unit) {
-    OutlinedButton(onClick = onClick, enabled = enabled, modifier = Modifier.size(44.dp), shape = RoundedCornerShape(12.dp), contentPadding = PaddingValues(0.dp)) {
+    OutlinedButton(onClick = onClick, enabled = enabled, modifier = Modifier.size(34.dp), shape = RoundedCornerShape(12.dp), contentPadding = PaddingValues(0.dp)) {
         Icon(icon, contentDescription = null)
     }
 }
@@ -763,9 +848,9 @@ private fun CustomerCenteredError(message: String, onRetry: () -> Unit) {
 }
 
 @Composable
-private fun CustomerEmpty() {
+private fun CustomerEmpty(message: String = "Belum ada pelanggan yang cocok.") {
     Box(modifier = Modifier.fillMaxWidth().height(220.dp), contentAlignment = Alignment.Center) {
-        Text("Belum ada pelanggan yang cocok.", color = CustomerMuted, fontSize = 16.sp)
+        Text(message, color = CustomerMuted, fontSize = 16.sp)
     }
 }
 
@@ -775,6 +860,14 @@ private fun customerTextFieldColors() = OutlinedTextFieldDefaults.colors(
     unfocusedBorderColor = CustomerLine,
     focusedContainerColor = CustomerSoft.copy(alpha = 0.72f),
     unfocusedContainerColor = CustomerSoft.copy(alpha = 0.72f)
+)
+
+@Composable
+private fun customerToolbarTextFieldColors() = OutlinedTextFieldDefaults.colors(
+    focusedBorderColor = CustomerPrimary,
+    unfocusedBorderColor = CustomerLine,
+    focusedContainerColor = CustomerSurface,
+    unfocusedContainerColor = CustomerSurface
 )
 
 private fun String.initialText(): String {

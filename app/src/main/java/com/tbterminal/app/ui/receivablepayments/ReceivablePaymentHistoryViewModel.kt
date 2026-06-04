@@ -58,6 +58,14 @@ class ReceivablePaymentHistoryViewModel(
         _uiState.update { it.copy(selectedPayment = null) }
     }
 
+    fun onSearchChanged(query: String) {
+        _uiState.update { it.copy(searchQuery = query) }
+    }
+
+    fun onMethodFilterChanged(filter: ReceivablePaymentMethodFilter) {
+        _uiState.update { it.copy(methodFilter = filter) }
+    }
+
     fun previousPage() {
         val state = _uiState.value
         if (state.page > 1 && !state.isLoading) loadPayments(state.page - 1)

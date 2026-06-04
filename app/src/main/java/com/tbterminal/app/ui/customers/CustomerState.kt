@@ -5,9 +5,16 @@ import java.math.BigDecimal
 
 internal const val CUSTOMER_PAGE_SIZE = 10
 
+enum class CustomerCategoryFilter(val label: String) {
+    ALL("Semua kategori"),
+    GENERAL("Pelanggan umum"),
+    CONTRACTOR("Kontraktor")
+}
+
 data class CustomerListUiState(
     val customers: List<Customer> = emptyList(),
     val searchQuery: String = "",
+    val categoryFilter: CustomerCategoryFilter = CustomerCategoryFilter.ALL,
     val page: Int = 1,
     val totalPages: Int = 1,
     val totalCustomers: Long = 0,
@@ -17,6 +24,13 @@ data class CustomerListUiState(
     val errorMessage: String? = null,
     val message: String? = null
 ) {
+    val visibleCustomers: List<Customer>
+        get() = when (categoryFilter) {
+            CustomerCategoryFilter.ALL -> customers
+            CustomerCategoryFilter.GENERAL -> customers.filterNot(Customer::isContractor)
+            CustomerCategoryFilter.CONTRACTOR -> customers.filter(Customer::isContractor)
+        }
+
     val contractorCount: Int
         get() = customers.count(Customer::isContractor)
 

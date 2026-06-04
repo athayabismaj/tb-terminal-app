@@ -8,26 +8,21 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ChevronLeft
 import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material.icons.filled.ExpandMore
-import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.outlined.Search
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
@@ -56,27 +51,20 @@ internal fun ReceivableTableCard(
     uiState: ReceivableUiState,
     onSearchChanged: (String) -> Unit,
     onStatusFilterChanged: (ReceivableStatusFilter) -> Unit,
-    onRefresh: () -> Unit,
     onPayClick: (Receivable) -> Unit,
     onPreviousPage: () -> Unit,
     onNextPage: () -> Unit
 ) {
-    Card(
-        modifier = modifier,
-        colors = CardDefaults.cardColors(containerColor = ReceivableSurface),
-        shape = RoundedCornerShape(16.dp),
-        border = BorderStroke(1.dp, ReceivableLine)
-    ) {
-        Column(modifier = Modifier.fillMaxSize()) {
-            ReceivableToolbar(uiState, onSearchChanged, onStatusFilterChanged, onRefresh)
-            ReceivableTableHeader()
-            ReceivableRows(
-                modifier = Modifier.weight(1f),
-                uiState = uiState,
-                onPayClick = onPayClick
-            )
-            ReceivableFooter(uiState, onPreviousPage, onNextPage)
-        }
+    Column(modifier = modifier.fillMaxWidth()) {
+        ReceivableToolbar(uiState, onSearchChanged, onStatusFilterChanged)
+        Spacer(modifier = Modifier.height(28.dp))
+        ReceivableTableHeader()
+        ReceivableRows(
+            modifier = Modifier.fillMaxWidth(),
+            uiState = uiState,
+            onPayClick = onPayClick
+        )
+        ReceivableFooter(uiState, onPreviousPage, onNextPage)
     }
 }
 
@@ -84,40 +72,26 @@ internal fun ReceivableTableCard(
 private fun ReceivableToolbar(
     uiState: ReceivableUiState,
     onSearchChanged: (String) -> Unit,
-    onStatusFilterChanged: (ReceivableStatusFilter) -> Unit,
-    onRefresh: () -> Unit
+    onStatusFilterChanged: (ReceivableStatusFilter) -> Unit
 ) {
     Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(20.dp),
-        horizontalArrangement = Arrangement.spacedBy(12.dp),
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.spacedBy(16.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
         OutlinedTextField(
             value = uiState.searchQuery,
             onValueChange = onSearchChanged,
             placeholder = { Text("Cari pelanggan atau ID transaksi...", color = ReceivableMuted) },
-            leadingIcon = { Icon(Icons.Outlined.Search, contentDescription = null, tint = ReceivableMuted) },
+            trailingIcon = { Icon(Icons.Outlined.Search, contentDescription = "Cari piutang", tint = ReceivableMuted) },
             modifier = Modifier
                 .weight(1f)
                 .height(56.dp),
             singleLine = true,
-            shape = RoundedCornerShape(16.dp),
-            colors = ReceivableTextFieldColors()
+            shape = RoundedCornerShape(8.dp),
+            colors = ReceivableToolbarTextFieldColors()
         )
         ReceivableStatusFilterButton(uiState.statusFilter, onStatusFilterChanged)
-        OutlinedButton(
-            onClick = onRefresh,
-            modifier = Modifier.height(56.dp),
-            shape = RoundedCornerShape(16.dp),
-            border = BorderStroke(1.dp, ReceivableLine),
-            contentPadding = PaddingValues(horizontal = 18.dp)
-        ) {
-            Icon(Icons.Default.Refresh, contentDescription = null, tint = ReceivablePrimaryDark)
-            Spacer(modifier = Modifier.width(8.dp))
-            Text("Muat Ulang", color = ReceivableAccentText, fontWeight = FontWeight.Bold)
-        }
     }
 }
 
@@ -130,16 +104,19 @@ private fun ReceivableStatusFilterButton(
     Box {
         OutlinedButton(
             onClick = { expanded = true },
-            modifier = Modifier.height(56.dp),
-            shape = RoundedCornerShape(16.dp),
+            modifier = Modifier.width(220.dp).height(56.dp),
+            shape = RoundedCornerShape(8.dp),
             border = BorderStroke(1.dp, ReceivableLine),
             contentPadding = PaddingValues(horizontal = 18.dp)
         ) {
-            Text(selected.label, color = ReceivableText, fontWeight = FontWeight.SemiBold)
-            Spacer(modifier = Modifier.width(18.dp))
+            Text(selected.label, modifier = Modifier.weight(1f), color = ReceivableText, fontWeight = FontWeight.SemiBold)
             Icon(Icons.Default.ExpandMore, contentDescription = null, tint = ReceivableMuted)
         }
-        DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
+        DropdownMenu(
+            expanded = expanded,
+            onDismissRequest = { expanded = false },
+            modifier = Modifier.width(220.dp).heightIn(max = 280.dp).background(ReceivableSurface)
+        ) {
             ReceivableStatusFilter.entries.forEach { filter ->
                 DropdownMenuItem(
                     text = { Text(filter.label) },
@@ -179,45 +156,51 @@ private fun ReceivableRows(
     uiState: ReceivableUiState,
     onPayClick: (Receivable) -> Unit
 ) {
-    Box(modifier = modifier.fillMaxWidth()) {
-        when {
-            uiState.isLoading -> CircularProgressIndicator(
-                modifier = Modifier.align(Alignment.Center),
-                color = ReceivablePrimaryDark
-            )
+    when {
+        uiState.isLoading -> ReceivableCenteredContent(modifier) {
+            CircularProgressIndicator(color = ReceivablePrimaryDark)
+        }
 
-            uiState.errorMessage != null && uiState.receivables.isEmpty() -> Text(
-                "Piutang pelanggan gagal dimuat.",
-                modifier = Modifier.align(Alignment.Center),
-                color = ReceivableDanger,
-                fontWeight = FontWeight.Bold
-            )
+        uiState.errorMessage != null && uiState.receivables.isEmpty() -> ReceivableCenteredContent(modifier) {
+            Text("Piutang pelanggan gagal dimuat.", color = ReceivableDanger, fontWeight = FontWeight.Bold)
+        }
 
-            uiState.filteredReceivables.isEmpty() -> Text(
-                "Belum ada piutang pelanggan yang cocok.",
-                modifier = Modifier.align(Alignment.Center),
-                color = ReceivableMuted,
-                fontWeight = FontWeight.SemiBold
-            )
+        uiState.filteredReceivables.isEmpty() -> ReceivableCenteredContent(modifier) {
+            Text("Belum ada piutang pelanggan yang cocok.", color = ReceivableMuted, fontWeight = FontWeight.SemiBold)
+        }
 
-            else -> LazyColumn(modifier = Modifier.fillMaxSize()) {
-                items(uiState.filteredReceivables, key = Receivable::id) { receivable ->
-                    ReceivableRow(receivable, onPayClick)
+        else -> Column(modifier = modifier.fillMaxWidth()) {
+            uiState.filteredReceivables.forEachIndexed { index, receivable ->
+                ReceivableRow(receivable, useAlternateBackground = index % 2 != 0, onPayClick = onPayClick)
                     HorizontalDivider(color = ReceivableLine.copy(alpha = 0.75f))
-                }
             }
         }
     }
 }
 
 @Composable
+private fun ReceivableCenteredContent(
+    modifier: Modifier,
+    content: @Composable () -> Unit
+) {
+    Box(
+        modifier = modifier.fillMaxWidth().height(180.dp),
+        contentAlignment = Alignment.Center
+    ) {
+        content()
+    }
+}
+
+@Composable
 private fun ReceivableRow(
     receivable: Receivable,
+    useAlternateBackground: Boolean,
     onPayClick: (Receivable) -> Unit
 ) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
+            .background(if (useAlternateBackground) ReceivableSoft.copy(alpha = 0.76f) else ReceivableSurface)
             .padding(horizontal = 24.dp, vertical = 18.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
@@ -280,22 +263,30 @@ private fun ReceivableFooter(
         modifier = Modifier
             .fillMaxWidth()
             .background(ReceivableSoft.copy(alpha = 0.7f))
-            .padding(horizontal = 24.dp, vertical = 16.dp),
+            .padding(horizontal = 20.dp, vertical = 14.dp),
         horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.CenterVertically
     ) {
-        Text(
-            "Menampilkan ${uiState.currentStart}-${uiState.currentEnd} dari ${uiState.total} piutang",
-            color = ReceivableMuted,
-            fontSize = 13.sp,
-            fontWeight = FontWeight.SemiBold
-        )
+        Column {
+            Text(
+                "Menampilkan ${uiState.currentStart}-${uiState.currentEnd} dari ${uiState.total} piutang",
+                color = ReceivableText,
+                fontSize = 13.sp,
+                fontWeight = FontWeight.Medium
+            )
+            Text(
+                "Maksimal $RECEIVABLE_PAGE_SIZE piutang per halaman",
+                color = ReceivableMuted,
+                fontSize = 11.sp,
+                modifier = Modifier.padding(top = 2.dp)
+            )
+        }
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
             ReceivablePageIconButton(Icons.Default.ChevronLeft, enabled = uiState.page > 1, onClick = onPreviousPage)
             Box(
                 modifier = Modifier
-                    .size(44.dp)
-                    .clip(RoundedCornerShape(12.dp))
+                    .size(34.dp)
+                    .clip(RoundedCornerShape(8.dp))
                     .background(ReceivablePrimaryDark),
                 contentAlignment = Alignment.Center
             ) {

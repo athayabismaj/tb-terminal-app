@@ -6,6 +6,8 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
@@ -17,7 +19,6 @@ internal fun ReceivableScreen(
     uiState: ReceivableUiState,
     onSearchChanged: (String) -> Unit,
     onStatusFilterChanged: (ReceivableStatusFilter) -> Unit,
-    onRefresh: () -> Unit,
     onPayClick: (Receivable) -> Unit,
     onPreviousPage: () -> Unit,
     onNextPage: () -> Unit,
@@ -26,21 +27,18 @@ internal fun ReceivableScreen(
     Column(
         modifier = modifier
             .fillMaxSize()
-            .background(ReceivableBackground)
-            .padding(32.dp),
-        verticalArrangement = Arrangement.spacedBy(20.dp)
+            .background(ReceivableSurface)
+            .verticalScroll(rememberScrollState())
+            .padding(40.dp),
+        verticalArrangement = Arrangement.spacedBy(28.dp)
     ) {
         ReceivableHeader()
         ReceivableMessage(uiState, onDismissMessage)
-        ReceivableMetrics(uiState)
         ReceivableTableCard(
-            modifier = Modifier
-                .fillMaxWidth()
-                .weight(1f),
+            modifier = Modifier.fillMaxWidth(),
             uiState = uiState,
             onSearchChanged = onSearchChanged,
             onStatusFilterChanged = onStatusFilterChanged,
-            onRefresh = onRefresh,
             onPayClick = onPayClick,
             onPreviousPage = onPreviousPage,
             onNextPage = onNextPage

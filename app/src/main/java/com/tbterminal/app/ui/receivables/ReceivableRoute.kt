@@ -69,7 +69,6 @@ fun AdminReceivableScreen(
             uiState = uiState,
             onSearchChanged = viewModel::onSearchChanged,
             onStatusFilterChanged = viewModel::onStatusFilterChanged,
-            onRefresh = { viewModel.loadReceivables() },
             onPayClick = viewModel::openPayment,
             onPreviousPage = viewModel::previousPage,
             onNextPage = viewModel::nextPage,

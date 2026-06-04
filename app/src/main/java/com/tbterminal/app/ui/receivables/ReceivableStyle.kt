@@ -48,6 +48,17 @@ internal fun ReceivableTextFieldColors() = OutlinedTextFieldDefaults.colors(
 )
 
 @Composable
+internal fun ReceivableToolbarTextFieldColors() = OutlinedTextFieldDefaults.colors(
+    focusedTextColor = ReceivableText,
+    unfocusedTextColor = ReceivableText,
+    cursorColor = ReceivablePrimaryDark,
+    focusedBorderColor = ReceivablePrimaryDark,
+    unfocusedBorderColor = ReceivableLine,
+    focusedContainerColor = ReceivableSurface,
+    unfocusedContainerColor = ReceivableSurface
+)
+
+@Composable
 internal fun ReceivableHeaderText(
     text: String,
     modifier: Modifier,
@@ -94,7 +105,7 @@ internal fun ReceivablePageIconButton(icon: ImageVector, enabled: Boolean, onCli
         onClick = onClick,
         enabled = enabled,
         modifier = Modifier
-            .size(44.dp)
+            .size(34.dp)
             .clip(RoundedCornerShape(12.dp))
             .background(if (enabled) Color.White else ReceivableSoft)
     ) {
