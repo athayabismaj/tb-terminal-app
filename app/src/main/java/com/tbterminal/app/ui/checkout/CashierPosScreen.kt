@@ -80,15 +80,16 @@ fun CashierPosScreen(
     onNavigateToCart: () -> Unit,
     modifier: Modifier = Modifier
 ) {
-    val categories = listOf("All Products") + state.products.map { it.categoryName }.filter { it.isNotBlank() }.distinct()
-    var selectedCategory by remember { mutableStateOf("All Products") }
+    val allCategory = "Semua kategori"
+    val categories = listOf(allCategory) + state.products.map { it.categoryName }.filter { it.isNotBlank() }.distinct()
+    var selectedCategory by remember { mutableStateOf(allCategory) }
     LaunchedEffect(categories) {
         if (selectedCategory !in categories) {
-            selectedCategory = "All Products"
+            selectedCategory = allCategory
         }
     }
     
-    val filteredProducts = if (selectedCategory == "All Products") state.products else state.products.filter { it.categoryName == selectedCategory }
+    val filteredProducts = if (selectedCategory == allCategory) state.products else state.products.filter { it.categoryName == selectedCategory }
     
     val cartItemCount = state.cartItems.sumOf { it.quantity }
 
@@ -146,52 +147,15 @@ fun CashierPosScreen(
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Box(
-                        modifier = Modifier
-                            .size(56.dp)
-                            .clip(RoundedCornerShape(16.dp))
-                            .background(Primary.copy(alpha = 0.12f)),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Icon(
-                            Icons.Outlined.PointOfSale,
-                            contentDescription = null,
-                            tint = Primary,
-                            modifier = Modifier.size(32.dp)
-                        )
-                    }
-                    Spacer(modifier = Modifier.width(16.dp))
-                    Column {
-                        Text(
-                            text = "Kasir POS",
-                            color = OnSurface,
-                            fontSize = 28.sp,
-                            fontWeight = FontWeight.ExtraBold
-                        )
-                        Text(
-                            text = "Cari produk, tambahkan ke keranjang, dan proses transaksi.",
-                            color = Outline,
-                            fontSize = 14.sp,
-                            fontWeight = FontWeight.Medium
-                        )
-                    }
-                }
-
-                Row(
-                    modifier = Modifier
-                        .clip(RoundedCornerShape(24.dp))
-                        .background(Primary.copy(alpha = 0.14f))
-                        .padding(horizontal = 18.dp, vertical = 12.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Icon(Icons.Outlined.Storefront, contentDescription = null, tint = Primary)
-                    Spacer(modifier = Modifier.width(10.dp))
-                    Text("Sesi Kasir Aktif", color = Primary, fontSize = 16.sp, fontWeight = FontWeight.Bold)
-                }
+                Text(
+                    text = "Kasir POS",
+                    color = OnSurface,
+                    fontSize = 28.sp,
+                    fontWeight = FontWeight.ExtraBold
+                )
             }
 
-            // 1. Search Bar
+            // 1. Search & Filter
             Row(
                 modifier = Modifier.fillMaxWidth().padding(bottom = 16.dp),
                 horizontalArrangement = Arrangement.spacedBy(16.dp),
@@ -212,32 +176,14 @@ fun CashierPosScreen(
                     ),
                     singleLine = true
                 )
+                CashierCategoryDropdown(
+                    categories = categories,
+                    selectedCategory = selectedCategory,
+                    onCategorySelected = { selectedCategory = it }
+                )
             }
 
-            // 2. Kategori Chips
-            LazyRow(
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                modifier = Modifier.padding(bottom = 16.dp)
-            ) {
-                items(categories) { category ->
-                    val isSelected = category == selectedCategory
-                    Surface(
-                        shape = RoundedCornerShape(24.dp),
-                        color = if (isSelected) Primary else Color.White,
-                        border = BorderStroke(1.dp, if (isSelected) Color.Transparent else OutlineVariant),
-                        onClick = { selectedCategory = category }
-                    ) {
-                        Text(
-                            text = category,
-                            color = if (isSelected) OnPrimary else OnSurface,
-                            fontWeight = FontWeight.SemiBold,
-                            modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
-                        )
-                    }
-                }
-            }
-
-            // 3. Kartu Produk
+            // 2. Kartu Produk
             Box(modifier = Modifier.weight(1f).fillMaxWidth()) {
                 when {
                     state.isProductLoading -> CircularProgressIndicator(modifier = Modifier.align(Alignment.Center))
@@ -273,6 +219,76 @@ fun CashierPosScreen(
                 onNext = { onProductPageChanged(state.productPage + 1) },
                 modifier = Modifier.padding(top = 12.dp)
             )
+        }
+    }
+}
+
+@Composable
+private fun CashierCategoryDropdown(
+    categories: List<String>,
+    selectedCategory: String,
+    onCategorySelected: (String) -> Unit
+) {
+    var expanded by remember { mutableStateOf(false) }
+
+    Box {
+        Surface(
+            onClick = { expanded = true },
+            shape = RoundedCornerShape(12.dp),
+            color = Color.White,
+            border = BorderStroke(1.dp, OutlineVariant),
+            modifier = Modifier
+                .width(220.dp)
+                .height(56.dp)
+        ) {
+            Row(
+                modifier = Modifier.padding(horizontal = 16.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = selectedCategory,
+                    color = OnSurface,
+                    fontSize = 14.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.weight(1f)
+                )
+                Spacer(modifier = Modifier.width(8.dp))
+                Icon(
+                    Icons.Outlined.ExpandMore,
+                    contentDescription = "Pilih kategori",
+                    tint = Outline,
+                    modifier = Modifier.size(20.dp)
+                )
+            }
+        }
+
+        DropdownMenu(
+            expanded = expanded,
+            onDismissRequest = { expanded = false },
+            modifier = Modifier
+                .width(220.dp)
+                .background(Color.White)
+        ) {
+            categories.forEach { category ->
+                DropdownMenuItem(
+                    text = {
+                        Text(
+                            text = category,
+                            color = if (category == selectedCategory) Primary else OnSurface,
+                            fontWeight = if (category == selectedCategory) FontWeight.Bold else FontWeight.Medium,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                    },
+                    onClick = {
+                        expanded = false
+                        onCategorySelected(category)
+                    }
+                )
+            }
         }
     }
 }

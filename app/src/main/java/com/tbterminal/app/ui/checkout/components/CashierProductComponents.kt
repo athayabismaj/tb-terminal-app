@@ -143,48 +143,71 @@ internal fun ProductPaginationBar(
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                OutlinedButton(
+                ProductPageIconButton(
                     onClick = onPrevious,
-                    enabled = safePage > 1 && !isLoading,
-                    shape = RoundedCornerShape(10.dp),
-                    contentPadding = PaddingValues(horizontal = 10.dp, vertical = 6.dp)
+                    enabled = safePage > 1 && !isLoading
                 ) {
                     Icon(
                         Icons.AutoMirrored.Outlined.KeyboardArrowLeft,
-                        contentDescription = null,
+                        contentDescription = "Halaman sebelumnya",
                         modifier = Modifier.size(18.dp)
                     )
-                    Text("Sebelumnya", fontSize = 12.sp, fontWeight = FontWeight.Bold)
                 }
 
                 Surface(
-                    color = SurfaceContainerLow,
-                    shape = RoundedCornerShape(10.dp)
+                    color = Primary,
+                    shape = RoundedCornerShape(12.dp),
+                    modifier = Modifier.size(40.dp)
                 ) {
-                    Text(
-                        text = "Halaman $safePage/$safeTotalPages",
-                        color = OnSurface,
-                        fontSize = 12.sp,
-                        fontWeight = FontWeight.Bold,
-                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp)
-                    )
+                    Box(contentAlignment = Alignment.Center) {
+                        Text(
+                            text = safePage.toString(),
+                            color = Color.White,
+                            fontSize = 14.sp,
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
                 }
 
-                Button(
+                Text(
+                    text = "/ $safeTotalPages",
+                    color = OnSurfaceVariant,
+                    fontSize = 14.sp,
+                    fontWeight = FontWeight.SemiBold
+                )
+
+                ProductPageIconButton(
                     onClick = onNext,
-                    enabled = safePage < safeTotalPages && !isLoading,
-                    shape = RoundedCornerShape(10.dp),
-                    colors = ButtonDefaults.buttonColors(containerColor = Primary),
-                    contentPadding = PaddingValues(horizontal = 10.dp, vertical = 6.dp)
+                    enabled = safePage < safeTotalPages && !isLoading
                 ) {
-                    Text("Berikutnya", fontSize = 12.sp, fontWeight = FontWeight.Bold)
                     Icon(
                         Icons.AutoMirrored.Outlined.KeyboardArrowRight,
-                        contentDescription = null,
+                        contentDescription = "Halaman berikutnya",
                         modifier = Modifier.size(18.dp)
                     )
                 }
             }
+        }
+    }
+}
+
+@Composable
+private fun ProductPageIconButton(
+    enabled: Boolean,
+    onClick: () -> Unit,
+    content: @Composable () -> Unit
+) {
+    Surface(
+        onClick = onClick,
+        enabled = enabled,
+        color = Color.White,
+        contentColor = if (enabled) OnSurfaceVariant else OutlineVariant,
+        border = BorderStroke(1.dp, OutlineVariant.copy(alpha = 0.55f)),
+        shape = RoundedCornerShape(12.dp),
+        modifier = Modifier.size(40.dp)
+    ) {
+        Box(contentAlignment = Alignment.Center) {
+            content()
         }
     }
 }

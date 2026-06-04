@@ -19,25 +19,23 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ChevronLeft
 import androidx.compose.material.icons.filled.ChevronRight
+import androidx.compose.material.icons.outlined.ExpandMore
 import androidx.compose.material.icons.outlined.Inventory2
 import androidx.compose.material.icons.outlined.Search
-import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
-import androidx.compose.material3.OutlinedButton
-import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -49,8 +47,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.focus.FocusRequester
-import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -64,8 +60,6 @@ import com.tbterminal.app.data.repository.InventoryRepository
 import com.tbterminal.app.ui.dashboard.cashier.CashierDashboardShell
 import com.tbterminal.app.ui.dashboard.cashier.CashierDestination
 import java.math.BigDecimal
-import java.text.NumberFormat
-import java.util.Locale
 import com.tbterminal.app.ui.dashboard.DashboardBackground
 
 // ==========================================
@@ -265,35 +259,12 @@ fun CashierStockCheckScreen(
 // ==========================================
 @Composable
 private fun StockPageTitle() {
-    Row(verticalAlignment = Alignment.CenterVertically) {
-        Box(
-            modifier = Modifier
-                .clip(RoundedCornerShape(14.dp))
-                .background(StockPrimary.copy(alpha = 0.12f))
-                .padding(12.dp)
-        ) {
-            Icon(
-                Icons.Outlined.Inventory2,
-                contentDescription = null,
-                tint = StockPrimary,
-                modifier = Modifier.size(26.dp)
-            )
-        }
-        Spacer(modifier = Modifier.width(16.dp))
-        Column {
-            Text(
-                "Cek Stok",
-                fontSize = 28.sp,
-                fontWeight = FontWeight.ExtraBold,
-                color = StockTextPrimary
-            )
-            Text(
-                "Cari stok dan harga retail produk",
-                fontSize = 14.sp,
-                color = StockTextSecondary
-            )
-        }
-    }
+    Text(
+        "Cek Stok",
+        fontSize = 28.sp,
+        fontWeight = FontWeight.ExtraBold,
+        color = StockTextPrimary
+    )
 }
 
 // ==========================================
@@ -319,16 +290,18 @@ private fun StockToolbar(
     }
 
 
-    Column(
-        modifier = Modifier.fillMaxWidth()
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.spacedBy(16.dp),
+        verticalAlignment = Alignment.CenterVertically
     ) {
         // Search Bar Custom
         Surface(
             shape = RoundedCornerShape(12.dp),
             color = StockSurface,
-            border = BorderStroke(1.dp, StockPrimary),
+            border = BorderStroke(1.dp, StockBorder),
             modifier = Modifier
-                .fillMaxWidth()
+                .weight(1f)
                 .height(48.dp)
         ) {
             Row(
@@ -347,7 +320,7 @@ private fun StockToolbar(
                 Box(modifier = Modifier.weight(1f), contentAlignment = Alignment.CenterStart) {
                     if (query.isEmpty()) {
                         Text(
-                            "Cari produk, SKU, atau kategori...",
+                            "Cari produk atau SKU...",
                             color = StockTextMuted,
                             fontSize = 14.sp
                         )
@@ -366,62 +339,83 @@ private fun StockToolbar(
             }
         }
 
-        // Filter Kategori
-        if (isLoading) {
-            Spacer(modifier = Modifier.height(12.dp))
-            LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                item {
-                    Surface(
-                        shape = RoundedCornerShape(20.dp),
-                        color = StockPrimary,
-                        border = BorderStroke(1.dp, Color.Transparent)
-                    ) {
-                        Text(
-                            text = "Semua",
-                            color = StockOnPrimary,
-                            fontWeight = FontWeight.Bold,
-                            fontSize = 13.sp,
-                            modifier = Modifier.padding(horizontal = 14.dp, vertical = 7.dp)
-                        )
-                    }
-                }
-                items(3) {
-                    ShimmerBox(
-                        modifier = Modifier
-                            .height(32.dp)
-                            .width(80.dp)
-                            .clip(RoundedCornerShape(20.dp))
-                    )
-                }
-            }
-        } else if (categories.size > 1) {
-            Spacer(modifier = Modifier.height(12.dp))
-            LazyRow(
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
+        StockCategoryDropdown(
+            categories = categories,
+            selectedCategory = selectedCategory,
+            enabled = !isLoading && categories.size > 1,
+            onCategorySelected = onCategorySelected
+        )
+    }
+}
+
+@Composable
+private fun StockCategoryDropdown(
+    categories: List<String>,
+    selectedCategory: String,
+    enabled: Boolean,
+    onCategorySelected: (String) -> Unit
+) {
+    var expanded by remember { mutableStateOf(false) }
+
+    Box {
+        Surface(
+            onClick = { if (enabled) expanded = true },
+            enabled = enabled,
+            shape = RoundedCornerShape(12.dp),
+            color = StockSurface,
+            border = BorderStroke(1.dp, StockBorder),
+            modifier = Modifier
+                .width(220.dp)
+                .height(48.dp)
+        ) {
+            Row(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(horizontal = 16.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween
             ) {
-                items(categories) { category ->
-                    val isSelected = category == selectedCategory
-                    Surface(
-                        onClick = { onCategorySelected(category) },
-                        shape = RoundedCornerShape(20.dp),
-                        color = if (isSelected) StockPrimary else StockSurface,
-                        border = BorderStroke(
-                            1.dp,
-                            if (isSelected) Color.Transparent else StockBorder
-                        )
-                    ) {
+                Text(
+                    text = if (selectedCategory == "Semua") "Semua kategori" else selectedCategory,
+                    color = if (enabled) StockTextPrimary else StockTextMuted,
+                    fontSize = 14.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.weight(1f)
+                )
+                Spacer(modifier = Modifier.width(8.dp))
+                Icon(
+                    Icons.Outlined.ExpandMore,
+                    contentDescription = null,
+                    tint = if (enabled) StockTextSecondary else StockTextMuted,
+                    modifier = Modifier.size(20.dp)
+                )
+            }
+        }
+
+        DropdownMenu(
+            expanded = expanded,
+            onDismissRequest = { expanded = false },
+            modifier = Modifier.width(220.dp)
+        ) {
+            categories.forEach { category ->
+                DropdownMenuItem(
+                    text = {
                         Text(
-                            text = category,
-                            color = if (isSelected) StockOnPrimary else StockTextSecondary,
-                            fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
-                            fontSize = 13.sp,
-                            modifier = Modifier.padding(
-                                horizontal = 14.dp,
-                                vertical = 7.dp
-                            )
+                            text = if (category == "Semua") "Semua kategori" else category,
+                            fontSize = 14.sp,
+                            fontWeight = if (category == selectedCategory) FontWeight.Bold else FontWeight.Medium,
+                            color = if (category == selectedCategory) StockPrimary else StockTextPrimary,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
                         )
+                    },
+                    onClick = {
+                        onCategorySelected(category)
+                        expanded = false
                     }
-                }
+                )
             }
         }
     }
@@ -454,15 +448,6 @@ private fun StockTableHeader() {
             fontSize = 11.sp,
             fontWeight = FontWeight.Bold,
             letterSpacing = 0.8.sp
-        )
-        Text(
-            "HARGA RITEL / KONTRAKTOR",
-            modifier = Modifier.weight(2.7f),
-            color = StockTextSecondary,
-            fontSize = 11.sp,
-            fontWeight = FontWeight.Bold,
-            letterSpacing = 0.8.sp,
-            textAlign = TextAlign.End
         )
         Text(
             "STOK",
@@ -546,32 +531,6 @@ private fun StockTableRow(product: ProductStock) {
             }
         }
 
-        // Kolom: Harga
-        Column(
-            modifier = Modifier.weight(2.7f),
-            horizontalAlignment = Alignment.End
-        ) {
-            Text(
-                text = product.priceRetail.stockMoney(),
-                fontSize = 15.sp,
-                fontWeight = FontWeight.ExtraBold,
-                color = StockTextPrimary,
-                textAlign = TextAlign.End,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis
-            )
-            Spacer(modifier = Modifier.height(4.dp))
-            Text(
-                text = product.priceContractor.stockMoney(),
-                fontSize = 12.sp,
-                fontWeight = FontWeight.Medium,
-                color = StockTextSecondary,
-                textAlign = TextAlign.End,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis
-            )
-        }
-
         // Kolom: Stok
         Row(
             modifier = Modifier.weight(1.4f),
@@ -636,16 +595,6 @@ private fun StockTableRowSkeleton() {
         // SKU & Kategori
         Column(modifier = Modifier.weight(2f)) {
             ShimmerBox(modifier = Modifier.height(18.dp).fillMaxWidth(0.7f))
-            Spacer(modifier = Modifier.height(8.dp))
-            ShimmerBox(modifier = Modifier.height(16.dp).fillMaxWidth(0.4f))
-        }
-
-        // Harga
-        Column(
-            modifier = Modifier.weight(2.7f),
-            horizontalAlignment = Alignment.End
-        ) {
-            ShimmerBox(modifier = Modifier.height(20.dp).fillMaxWidth(0.6f))
             Spacer(modifier = Modifier.height(8.dp))
             ShimmerBox(modifier = Modifier.height(16.dp).fillMaxWidth(0.4f))
         }
@@ -762,12 +711,6 @@ private fun StockPagination(
 // ==========================================
 // HELPER
 // ==========================================
-private fun BigDecimal.stockMoney(): String {
-    return NumberFormat.getCurrencyInstance(Locale.forLanguageTag("id-ID")).apply {
-        maximumFractionDigits = 0
-    }.format(this)
-}
-
 private fun BigDecimal.stockQuantity(): String {
     return stripTrailingZeros().toPlainString()
 }
