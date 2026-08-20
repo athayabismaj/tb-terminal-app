@@ -62,7 +62,7 @@ internal fun NavGraphBuilder.userGraph(navController: NavHostController, session
 
             if (sessionUser == null) {
                 LaunchedEffect(Unit) {
-                    sessionManager.clearSession()
+                    sessionManager.logout()
                     navController.navigate(AppRoute.Login.route) {
                         popUpTo(0)
                         launchSingleTop = true
@@ -104,8 +104,16 @@ internal fun NavGraphBuilder.userGraph(navController: NavHostController, session
                             launchSingleTop = true
                         }
                     },
+                    onReportsClick = { navController.navigateOwnerModule(AppRoute.Reports.route) },
+                    onSyncCenterClick = { navController.navigateOwnerModule(AppRoute.SyncCenter.route) },
+                    onStockReportClick = { navController.navigateOwnerModule(AppRoute.StockReport.route) },
+                    onReceivablesClick = { navController.navigateOwnerModule(AppRoute.Receivables.route) },
+                    onSupplierDebtsClick = { navController.navigateOwnerModule(AppRoute.SupplierDebts.route) },
+                    onCashReconciliationClick = { navController.navigateOwnerModule(AppRoute.CashReconciliation.route) },
+                    onOperationalAuditClick = { navController.navigateOwnerModule(AppRoute.OperationalAudit.route) },
+                    onSettingsClick = { navController.navigateOwnerModule(AppRoute.AdminSettings.route) },
                     onLogout = {
-                        sessionManager.clearSession()
+                        sessionManager.logout()
                         navController.navigate(AppRoute.Login.route) {
                             popUpTo(0)
                             launchSingleTop = true
@@ -128,7 +136,7 @@ internal fun NavGraphBuilder.userGraph(navController: NavHostController, session
 
             if (sessionUser == null || userId.isNullOrBlank()) {
                 LaunchedEffect(Unit) {
-                    sessionManager.clearSession()
+                    sessionManager.logout()
                     navController.navigate(AppRoute.Login.route) {
                         popUpTo(0)
                         launchSingleTop = true
@@ -157,6 +165,14 @@ internal fun NavGraphBuilder.userGraph(navController: NavHostController, session
                             launchSingleTop = true
                         }
                     },
+                    onReportsClick = { navController.navigateOwnerModule(AppRoute.Reports.route) },
+                    onSyncCenterClick = { navController.navigateOwnerModule(AppRoute.SyncCenter.route) },
+                    onStockReportClick = { navController.navigateOwnerModule(AppRoute.StockReport.route) },
+                    onReceivablesClick = { navController.navigateOwnerModule(AppRoute.Receivables.route) },
+                    onSupplierDebtsClick = { navController.navigateOwnerModule(AppRoute.SupplierDebts.route) },
+                    onCashReconciliationClick = { navController.navigateOwnerModule(AppRoute.CashReconciliation.route) },
+                    onOperationalAuditClick = { navController.navigateOwnerModule(AppRoute.OperationalAudit.route) },
+                    onSettingsClick = { navController.navigateOwnerModule(AppRoute.AdminSettings.route) },
                     onChangePasswordClick = { targetUserId ->
                         navController.navigate(AppRoute.ChangeUserPassword.createRoute(targetUserId)) {
                             launchSingleTop = true
@@ -168,7 +184,7 @@ internal fun NavGraphBuilder.userGraph(navController: NavHostController, session
                         }
                     },
                     onLogout = {
-                        sessionManager.clearSession()
+                        sessionManager.logout()
                         navController.navigate(AppRoute.Login.route) {
                             popUpTo(0)
                             launchSingleTop = true
@@ -191,7 +207,7 @@ internal fun NavGraphBuilder.userGraph(navController: NavHostController, session
 
             if (sessionUser == null || userId.isNullOrBlank()) {
                 LaunchedEffect(Unit) {
-                    sessionManager.clearSession()
+                    sessionManager.logout()
                     navController.navigate(AppRoute.Login.route) {
                         popUpTo(0)
                         launchSingleTop = true
@@ -227,8 +243,16 @@ internal fun NavGraphBuilder.userGraph(navController: NavHostController, session
                             launchSingleTop = true
                         }
                     },
+                    onReportsClick = { navController.navigateOwnerModule(AppRoute.Reports.route) },
+                    onSyncCenterClick = { navController.navigateOwnerModule(AppRoute.SyncCenter.route) },
+                    onStockReportClick = { navController.navigateOwnerModule(AppRoute.StockReport.route) },
+                    onReceivablesClick = { navController.navigateOwnerModule(AppRoute.Receivables.route) },
+                    onSupplierDebtsClick = { navController.navigateOwnerModule(AppRoute.SupplierDebts.route) },
+                    onCashReconciliationClick = { navController.navigateOwnerModule(AppRoute.CashReconciliation.route) },
+                    onOperationalAuditClick = { navController.navigateOwnerModule(AppRoute.OperationalAudit.route) },
+                    onSettingsClick = { navController.navigateOwnerModule(AppRoute.AdminSettings.route) },
                     onLogout = {
-                        sessionManager.clearSession()
+                        sessionManager.logout()
                         navController.navigate(AppRoute.Login.route) {
                             popUpTo(0)
                             launchSingleTop = true
@@ -251,7 +275,7 @@ internal fun NavGraphBuilder.userGraph(navController: NavHostController, session
 
             if (sessionUser == null || userId.isNullOrBlank()) {
                 LaunchedEffect(Unit) {
-                    sessionManager.clearSession()
+                    sessionManager.logout()
                     navController.navigate(AppRoute.Login.route) {
                         popUpTo(0)
                         launchSingleTop = true
@@ -287,8 +311,16 @@ internal fun NavGraphBuilder.userGraph(navController: NavHostController, session
                             launchSingleTop = true
                         }
                     },
+                    onReportsClick = { navController.navigateOwnerModule(AppRoute.Reports.route) },
+                    onSyncCenterClick = { navController.navigateOwnerModule(AppRoute.SyncCenter.route) },
+                    onStockReportClick = { navController.navigateOwnerModule(AppRoute.StockReport.route) },
+                    onReceivablesClick = { navController.navigateOwnerModule(AppRoute.Receivables.route) },
+                    onSupplierDebtsClick = { navController.navigateOwnerModule(AppRoute.SupplierDebts.route) },
+                    onCashReconciliationClick = { navController.navigateOwnerModule(AppRoute.CashReconciliation.route) },
+                    onOperationalAuditClick = { navController.navigateOwnerModule(AppRoute.OperationalAudit.route) },
+                    onSettingsClick = { navController.navigateOwnerModule(AppRoute.AdminSettings.route) },
                     onLogout = {
-                        sessionManager.clearSession()
+                        sessionManager.logout()
                         navController.navigate(AppRoute.Login.route) {
                             popUpTo(0)
                             launchSingleTop = true
@@ -303,7 +335,7 @@ internal fun NavGraphBuilder.userGraph(navController: NavHostController, session
 
             if (sessionUser == null) {
                 LaunchedEffect(Unit) {
-                    sessionManager.clearSession()
+                    sessionManager.logout()
                     navController.navigate(AppRoute.Login.route) {
                         popUpTo(0)
                         launchSingleTop = true
@@ -325,8 +357,16 @@ internal fun NavGraphBuilder.userGraph(navController: NavHostController, session
                             launchSingleTop = true
                         }
                     },
+                    onReportsClick = { navController.navigateOwnerModule(AppRoute.Reports.route) },
+                    onSyncCenterClick = { navController.navigateOwnerModule(AppRoute.SyncCenter.route) },
+                    onStockReportClick = { navController.navigateOwnerModule(AppRoute.StockReport.route) },
+                    onReceivablesClick = { navController.navigateOwnerModule(AppRoute.Receivables.route) },
+                    onSupplierDebtsClick = { navController.navigateOwnerModule(AppRoute.SupplierDebts.route) },
+                    onCashReconciliationClick = { navController.navigateOwnerModule(AppRoute.CashReconciliation.route) },
+                    onOperationalAuditClick = { navController.navigateOwnerModule(AppRoute.OperationalAudit.route) },
+                    onSettingsClick = { navController.navigateOwnerModule(AppRoute.AdminSettings.route) },
                     onLogout = {
-                        sessionManager.clearSession()
+                        sessionManager.logout()
                         navController.navigate(AppRoute.Login.route) {
                             popUpTo(0)
                             launchSingleTop = true
@@ -341,7 +381,7 @@ internal fun NavGraphBuilder.userGraph(navController: NavHostController, session
 
             if (sessionUser == null) {
                 LaunchedEffect(Unit) {
-                    sessionManager.clearSession()
+                    sessionManager.logout()
                     navController.navigate(AppRoute.Login.route) {
                         popUpTo(0)
                         launchSingleTop = true
@@ -369,8 +409,16 @@ internal fun NavGraphBuilder.userGraph(navController: NavHostController, session
                             launchSingleTop = true
                         }
                     },
+                    onReportsClick = { navController.navigateOwnerModule(AppRoute.Reports.route) },
+                    onSyncCenterClick = { navController.navigateOwnerModule(AppRoute.SyncCenter.route) },
+                    onStockReportClick = { navController.navigateOwnerModule(AppRoute.StockReport.route) },
+                    onReceivablesClick = { navController.navigateOwnerModule(AppRoute.Receivables.route) },
+                    onSupplierDebtsClick = { navController.navigateOwnerModule(AppRoute.SupplierDebts.route) },
+                    onCashReconciliationClick = { navController.navigateOwnerModule(AppRoute.CashReconciliation.route) },
+                    onOperationalAuditClick = { navController.navigateOwnerModule(AppRoute.OperationalAudit.route) },
+                    onSettingsClick = { navController.navigateOwnerModule(AppRoute.AdminSettings.route) },
                     onLogout = {
-                        sessionManager.clearSession()
+                        sessionManager.logout()
                         navController.navigate(AppRoute.Login.route) {
                             popUpTo(0)
                             launchSingleTop = true
@@ -379,4 +427,10 @@ internal fun NavGraphBuilder.userGraph(navController: NavHostController, session
                 )
             }
         }
+}
+
+private fun NavHostController.navigateOwnerModule(route: String) {
+    navigate(route) {
+        launchSingleTop = true
+    }
 }

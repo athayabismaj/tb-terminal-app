@@ -1,7 +1,12 @@
 package com.tbterminal.app.ui.settings
 
 import androidx.compose.runtime.Composable
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
+import com.tbterminal.app.data.local.database.LocalAppSettingsDataSource
+import com.tbterminal.app.data.repository.SystemRepository
 import com.tbterminal.app.ui.dashboard.admin.AdminDashboardShell
 import com.tbterminal.app.ui.dashboard.admin.AdminDestination
 
@@ -9,6 +14,8 @@ import com.tbterminal.app.ui.dashboard.admin.AdminDestination
 fun AdminSettingsScreen(
     name: String,
     role: String,
+    systemRepository: SystemRepository,
+    localAppSettingsDataSource: LocalAppSettingsDataSource,
     onDashboardClick: () -> Unit = {},
     onProductsClick: () -> Unit = {},
     onAddProductClick: () -> Unit = {},
@@ -22,14 +29,29 @@ fun AdminSettingsScreen(
     onStockOpnameFormClick: () -> Unit = {},
     onIncomingGoodsClick: () -> Unit = {},
     onIncomingGoodsFormClick: () -> Unit = {},
+    onSuppliersClick: () -> Unit = onIncomingGoodsClick,
+    onPurchaseHistoryClick: () -> Unit = onIncomingGoodsClick,
+    onStockReportClick: () -> Unit = onReportsClick,
     onSupplierDebtsClick: () -> Unit = {},
+    onCashSessionHistoryClick: () -> Unit = onCashReconciliationClick,
+    onCashReconciliationDetailClick: () -> Unit = onCashReconciliationClick,
+    onCashExpensesClick: () -> Unit = onCashReconciliationClick,
     onReceivablesClick: () -> Unit = {},
+    onReceivablePaymentsClick: () -> Unit = onReceivablesClick,
     onCustomersClick: () -> Unit = {},
     onOperationalAuditClick: () -> Unit = {},
+    onUserManagementClick: () -> Unit = {},
+    onSecurityLogClick: () -> Unit = {},
     onProfileClick: () -> Unit = {},
     onSettingsClick: () -> Unit = {},
-    onLogout: () -> Unit = {}
+    onLogout: () -> Unit = {},
+    viewModel: SettingsViewModel = viewModel(
+        factory = SettingsViewModel.factory(systemRepository, localAppSettingsDataSource)
+    )
 ) {
+    val context = LocalContext.current
+    val uiState = viewModel.uiState.collectAsStateWithLifecycle().value
+
     AdminDashboardShell(
         userName = name,
         role = role,
@@ -47,14 +69,51 @@ fun AdminSettingsScreen(
         onStockOpnameFormClick = onStockOpnameFormClick,
         onIncomingGoodsClick = onIncomingGoodsClick,
         onIncomingGoodsFormClick = onIncomingGoodsFormClick,
+        onSuppliersClick = onSuppliersClick,
+        onPurchaseHistoryClick = onPurchaseHistoryClick,
+        onStockReportClick = onStockReportClick,
         onSupplierDebtsClick = onSupplierDebtsClick,
+        onCashSessionHistoryClick = onCashSessionHistoryClick,
+        onCashReconciliationDetailClick = onCashReconciliationDetailClick,
+        onCashExpensesClick = onCashExpensesClick,
         onReceivablesClick = onReceivablesClick,
+        onReceivablePaymentsClick = onReceivablePaymentsClick,
         onCustomersClick = onCustomersClick,
         onOperationalAuditClick = onOperationalAuditClick,
+        onUserManagementClick = onUserManagementClick,
+        onSecurityLogClick = onSecurityLogClick,
         onProfileClick = onProfileClick,
         onSettingsClick = onSettingsClick,
         onLogout = onLogout
     ) { contentModifier ->
-        SharedSettingsScreen(userName = name, role = role, modifier = contentModifier)
+        SharedSettingsScreen(
+            userName = name,
+            role = role,
+            uiState = uiState,
+            onReload = viewModel::loadSettings,
+            onSaveStoreSettings = viewModel::saveStoreSettings,
+            onSaveLocalPreferences = viewModel::saveLocalPreferences,
+            onStoreNameChanged = viewModel::onStoreNameChanged,
+            onAddressChanged = viewModel::onAddressChanged,
+            onPhoneChanged = viewModel::onPhoneChanged,
+            onReceiptHeaderChanged = viewModel::onReceiptHeaderChanged,
+            onReceiptFooterChanged = viewModel::onReceiptFooterChanged,
+            onPrinterSizeChanged = viewModel::onPrinterSizeChanged,
+            onDefaultCreditLimitChanged = viewModel::onDefaultCreditLimitChanged,
+            onDefaultTermDaysChanged = viewModel::onDefaultTermDaysChanged,
+            onCashToleranceChanged = viewModel::onCashToleranceChanged,
+            onAutoLockMinutesChanged = viewModel::onAutoLockMinutesChanged,
+            onAutoPrintReceiptChanged = viewModel::onAutoPrintReceiptChanged,
+            onBarcodeScannerChanged = viewModel::onBarcodeScannerChanged,
+            onOfflineCacheChanged = viewModel::onOfflineCacheChanged,
+            onSelectPrinter = {
+                if (launchAndroidPrintDialog(context, uiState.printerSize)) {
+                    viewModel.onPrinterFrameworkOpened()
+                } else {
+                    viewModel.onPrinterFrameworkFailed()
+                }
+            },
+            modifier = contentModifier
+        )
     }
 }

@@ -27,6 +27,8 @@ fun AdminOperationalAuditRoute(
     onReceivablesClick: () -> Unit,
     onCustomersClick: () -> Unit,
     onOperationalAuditClick: () -> Unit,
+    onUserManagementClick: () -> Unit,
+    onSecurityLogClick: () -> Unit,
     onProfileClick: () -> Unit,
     onSettingsClick: () -> Unit,
     onLogout: () -> Unit,
@@ -55,6 +57,8 @@ fun AdminOperationalAuditRoute(
         onReceivablesClick = onReceivablesClick,
         onCustomersClick = onCustomersClick,
         onOperationalAuditClick = onOperationalAuditClick,
+        onUserManagementClick = onUserManagementClick,
+        onSecurityLogClick = onSecurityLogClick,
         onProfileClick = onProfileClick,
         onSettingsClick = onSettingsClick,
         onLogout = onLogout

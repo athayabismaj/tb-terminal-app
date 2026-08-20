@@ -14,7 +14,11 @@
 
 # Uncomment this to preserve the line number information for
 # debugging stack traces.
-#-keepattributes SourceFile,LineNumberTable
+-keepattributes Signature,*Annotation*
+
+# DTOs are decoded by Gson/Retrofit in a few legacy endpoints.
+-keep class com.tbterminal.app.data.model.** { *; }
+-keep class com.tbterminal.app.data.remote.**Dto { *; }
 
 # If you keep the line number information, uncomment this to
 # hide the original source file name.

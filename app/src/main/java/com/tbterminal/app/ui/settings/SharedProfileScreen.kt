@@ -2,296 +2,275 @@ package com.tbterminal.app.ui.settings
 
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
-import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.AlternateEmail
-import androidx.compose.material.icons.filled.Badge
-import androidx.compose.material.icons.filled.CalendarToday
-import androidx.compose.material.icons.filled.Edit
-import androidx.compose.material.icons.filled.Person
-import androidx.compose.material.icons.filled.Verified
-import androidx.compose.material.icons.filled.AdminPanelSettings
-import androidx.compose.material3.*
-import androidx.compose.runtime.*
+import androidx.compose.material.icons.filled.Lock
+import androidx.compose.material.icons.filled.Pin
+import androidx.compose.material.icons.filled.Refresh
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Button
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.Icon
+import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.tbterminal.app.data.model.UserProfile
 import java.util.Locale
 
-// ==========================================
-// TEMA & WARNA
-// ==========================================
-val SurfaceBg = Color.Transparent
-val Slate50 = Color(0xFFF8FAFC)
-val Slate100 = Color(0xFFF1F5F9)
-val Slate200 = Color(0xFFE2E8F0)
-val Slate300 = Color(0xFFCBD5E1)
-val Slate400 = Color(0xFF94A3B8)
-val Slate500 = Color(0xFF64748B)
-val Slate900 = Color(0xFF0F172A)
-val Primary = Color(0xFF00694C) // Sesuai desain TB Terminal
-val PrimaryLight = Primary.copy(alpha = 0.05f)
+private val ProfilePrimary = Color(0xFF00694C)
+private val ProfileText = Color(0xFF0F172A)
+private val ProfileMuted = Color(0xFF64748B)
 
-// ==========================================
-// KONTROLER UTAMA
-// ==========================================
 @Composable
 fun SharedProfileScreen(
-    userName: String,
-    role: String,
-    isActive: Boolean = true,
-    joinedAt: String = "Mar 2024",
-    lastLoginAt: String? = null,
+    uiState: ProfileUiState,
+    onReload: () -> Unit,
+    onChangePassword: (String, String, String) -> Unit,
+    onChangePin: (String, String, String) -> Unit,
+    onClearMessage: () -> Unit,
     modifier: Modifier = Modifier
 ) {
-    // State (Nantinya diikat ke ViewModel Ktor Anda)
-    var fullName by remember { mutableStateOf(userName) }
-    var username by remember { mutableStateOf(userName.lowercase(Locale.ROOT).replace(" ", "")) }
-    var email by remember { mutableStateOf(userName.lowercase(Locale.ROOT).replace(" ", "") + "@tbterminal.com") }
+    var dialog by remember { mutableStateOf<CredentialDialog?>(null) }
+    LaunchedEffect(uiState.message) {
+        if (uiState.message != null) dialog = null
+    }
 
     Column(
         modifier = modifier
             .fillMaxSize()
-            .background(SurfaceBg)
-            // Hilangkan padding statis 48.dp karena parent sudah memberi margin/padding (CashierProfileScreen)
-            // Cukup berikan padding agar konten tidak mepet jika di-scroll ke mentok ujung
             .padding(24.dp)
-            .verticalScroll(rememberScrollState())
+            .verticalScroll(rememberScrollState()),
+        verticalArrangement = Arrangement.spacedBy(20.dp)
     ) {
-        // 1. Header Page
         Row(
-            modifier = Modifier.fillMaxWidth().padding(bottom = 32.dp),
+            modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Box(
-                    modifier = Modifier
-                        .clip(RoundedCornerShape(16.dp))
-                        .background(Primary.copy(alpha = 0.12f))
-                        .padding(14.dp)
-                ) {
-                    Icon(
-                        Icons.Default.Person,
-                        contentDescription = null,
-                        tint = Primary,
-                        modifier = Modifier.size(28.dp)
-                    )
-                }
-                Spacer(modifier = Modifier.width(16.dp))
-                Column {
-                    Text("Account Profile", color = Slate900, fontSize = 28.sp, fontWeight = FontWeight.ExtraBold)
-                    Text(
-                        text = "Manage your personal information and terminal preferences.",
-                        color = Slate500,
-                        fontSize = 14.sp,
-                        fontWeight = FontWeight.Medium
-                    )
-                }
+            Column {
+                Text("Profil Akun", color = ProfileText, fontSize = 28.sp, fontWeight = FontWeight.ExtraBold)
+                Text("Identitas akun berasal dari server dan tidak dapat diedit dari terminal.", color = ProfileMuted)
             }
-            Row(
-                modifier = Modifier
-                    .clip(RoundedCornerShape(24.dp))
-                    .background(Primary.copy(alpha = 0.14f))
-                    .padding(horizontal = 18.dp, vertical = 12.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Icon(Icons.Default.Verified, contentDescription = null, tint = Primary)
-                Spacer(modifier = Modifier.width(10.dp))
-                Text(if (isActive) "Profil Aktif" else "Profil Inaktif", color = Primary, fontSize = 16.sp, fontWeight = FontWeight.Bold)
+            OutlinedButton(onClick = onReload, enabled = !uiState.isLoading) {
+                Icon(Icons.Default.Refresh, contentDescription = null)
+                Spacer(Modifier.width(8.dp))
+                Text("Muat Ulang")
             }
         }
 
-        // Layout Responsif: Membagi Kiri (Form) dan Kanan (Stats)
-        BoxWithConstraints(modifier = Modifier.fillMaxWidth()) {
-            val isDesktop = maxWidth > 800.dp
+        uiState.error?.let { MessageCard(it, Color(0xFFB91C1C), onClearMessage) }
+        uiState.message?.let { MessageCard(it, ProfilePrimary, onClearMessage) }
 
-            if (isDesktop) {
-                Row(horizontalArrangement = Arrangement.spacedBy(48.dp)) {
-                    ProfileFormSection(modifier = Modifier.weight(2f), fullName, username, email, role, { fullName = it }, { username = it }, { email = it })
-                    AccountStatsSection(modifier = Modifier.weight(1f), isActive = isActive, joinedAt = joinedAt, lastLoginAt = lastLoginAt)
-                }
-            } else {
-                Column(verticalArrangement = Arrangement.spacedBy(48.dp)) {
-                    ProfileFormSection(modifier = Modifier.fillMaxWidth(), fullName, username, email, role, { fullName = it }, { username = it }, { email = it })
-                    AccountStatsSection(modifier = Modifier.fillMaxWidth(), isActive = isActive, joinedAt = joinedAt, lastLoginAt = lastLoginAt)
-                }
-            }
-        }
-        
-        Spacer(modifier = Modifier.weight(1f))
-        
-        // Footer Placeholder
-        Box(modifier = Modifier.fillMaxWidth().padding(top = 64.dp), contentAlignment = Alignment.Center) {
-            Text("© 2025 TB TERMINAL V.1.0.0", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = Slate400, letterSpacing = 1.sp)
-        }
-    }
-}
-
-// ==========================================
-// SEGMEN KIRI: FORM PROFIL
-// ==========================================
-@Composable
-fun ProfileFormSection(
-    modifier: Modifier = Modifier,
-    fullName: String, username: String, email: String, role: String,
-    onNameChange: (String) -> Unit, onUserChange: (String) -> Unit, onEmailChange: (String) -> Unit
-) {
-    Column(modifier = modifier, horizontalAlignment = Alignment.CenterHorizontally) {
-        // Avatar Area
-        Box(modifier = Modifier.padding(bottom = 16.dp), contentAlignment = Alignment.BottomEnd) {
-            Box(
-                modifier = Modifier.size(128.dp).clip(CircleShape).background(Slate50).border(1.dp, Slate100, CircleShape),
+        when {
+            uiState.isLoading && uiState.profile == null -> Box(
+                modifier = Modifier.fillMaxWidth().height(220.dp),
                 contentAlignment = Alignment.Center
-            ) {
-                Text(fullName.take(1).uppercase(Locale.ROOT), fontSize = 48.sp, fontWeight = FontWeight.Black, color = Primary)
-            }
-            IconButton(
-                onClick = { /* Ubah Foto */ },
-                modifier = Modifier.size(40.dp).clip(CircleShape).background(Color.White).border(1.dp, Slate100, CircleShape)
-            ) {
-                Icon(Icons.Default.Edit, contentDescription = "Edit Avatar", tint = Slate500, modifier = Modifier.size(20.dp))
-            }
-        }
-        
-        Text(username, fontSize = 20.sp, fontWeight = FontWeight.Bold, color = Slate900)
-        Text(role, fontSize = 10.sp, fontWeight = FontWeight.Bold, color = Primary, letterSpacing = 2.sp, modifier = Modifier.padding(top = 4.dp, bottom = 48.dp))
-
-        // Form Fields (Max Width dibatasi agar tidak terlalu lebar di layar besar)
-        Column(modifier = Modifier.widthIn(max = 500.dp).fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(32.dp)) {
-            UnderlinedInputField("NAMA LENGKAP", fullName, onNameChange, icon = Icons.Default.Badge)
-            UnderlinedInputField("USERNAME", username, onUserChange, icon = Icons.Default.Person)
-            UnderlinedInputField("EMAIL", email, onEmailChange, icon = Icons.Default.AlternateEmail)
-            UnderlinedInputField("ROLE", role, {}, isEnabled = false, icon = Icons.Default.AdminPanelSettings)
-
-            Button(
-                onClick = { /* Handle Ktor PUT Request */ },
-                modifier = Modifier.fillMaxWidth().height(56.dp).padding(top = 16.dp),
-                shape = CircleShape,
-                colors = ButtonDefaults.buttonColors(containerColor = Primary)
-            ) {
-                Text("Simpan Perubahan", fontSize = 16.sp, fontWeight = FontWeight.Bold)
-            }
+            ) { CircularProgressIndicator(color = ProfilePrimary) }
+            uiState.profile != null -> ProfileContent(
+                profile = uiState.profile,
+                isSaving = uiState.isSaving,
+                onPassword = { dialog = CredentialDialog.PASSWORD },
+                onPin = { dialog = CredentialDialog.PIN }
+            )
+            else -> Text("Profil tidak tersedia.", color = ProfileMuted)
         }
     }
-}
 
-// ==========================================
-// SEGMEN KANAN: STATISTIK AKUN
-// ==========================================
-@Composable
-fun AccountStatsSection(
-    modifier: Modifier = Modifier,
-    isActive: Boolean,
-    joinedAt: String,
-    lastLoginAt: String?
-) {
-    Card(
-        modifier = modifier,
-        colors = CardDefaults.cardColors(containerColor = Color.White),
-        shape = RoundedCornerShape(24.dp),
-        border = BorderStroke(1.dp, Slate100)
-    ) {
-        Column(modifier = Modifier.padding(32.dp)) {
-            Text("ACCOUNT STATS", fontSize = 11.sp, fontWeight = FontWeight.Black, color = Slate900, letterSpacing = 2.sp, modifier = Modifier.padding(bottom = 32.dp))
-
-            StatRow(icon = Icons.Default.CalendarToday, label = "Joined", value = formatDateTimeToDate(joinedAt))
-            Spacer(modifier = Modifier.height(24.dp))
-            
-            // Status Active
-            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Icon(Icons.Default.Verified, contentDescription = null, tint = Slate400, modifier = Modifier.size(20.dp))
-                    Spacer(modifier = Modifier.width(12.dp))
-                    Text("Status", fontSize = 12.sp, fontWeight = FontWeight.SemiBold, color = Slate500)
-                }
-                Box(modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp)) {
-                    Text(if (isActive) "ACTIVE" else "INACTIVE", fontSize = 10.sp, fontWeight = FontWeight.Black, color = Slate500, letterSpacing = 1.sp)
+    dialog?.let { type ->
+        CredentialChangeDialog(
+            type = type,
+            isSaving = uiState.isSaving,
+            onDismiss = { if (!uiState.isSaving) dialog = null },
+            onSubmit = { oldValue, newValue, confirmation ->
+                if (type == CredentialDialog.PASSWORD) {
+                    onChangePassword(oldValue, newValue, confirmation)
+                } else {
+                    onChangePin(oldValue, newValue, confirmation)
                 }
             }
-
-            HorizontalDivider(modifier = Modifier.padding(vertical = 16.dp), color = Slate200)
-            
-            Text("Last login: ${lastLoginAt?.let { formatDateTimeToTime(it) } ?: "-"}", fontSize = 10.sp, color = Slate400, style = androidx.compose.ui.text.TextStyle(fontStyle = androidx.compose.ui.text.font.FontStyle.Italic))
-        }
-    }
-}
-
-// Helper to format ISO DateTime to readable format (simplified)
-fun formatDateTimeToDate(isoString: String): String {
-    try {
-        if (isoString.length >= 10) {
-            val parts = isoString.substring(0, 10).split("-")
-            if (parts.size == 3) {
-                val months = listOf("", "Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec")
-                val monthIndex = parts[1].toIntOrNull() ?: 1
-                return "${months.getOrNull(monthIndex) ?: ""} ${parts[0]}"
-            }
-        }
-    } catch (e: Exception) {}
-    return isoString
-}
-
-fun formatDateTimeToTime(isoString: String): String {
-    try {
-        if (isoString.length >= 16) {
-            val dateParts = isoString.substring(0, 10)
-            val timeParts = isoString.substring(11, 16)
-            return "$dateParts at $timeParts"
-        }
-    } catch (e: Exception) {}
-    return isoString
-}
-
-// ==========================================
-// KOMPONEN INPUT KUSTOM
-// ==========================================
-@Composable
-fun UnderlinedInputField(label: String, value: String, onValueChange: (String) -> Unit, isEnabled: Boolean = true, icon: ImageVector? = null) {
-    Column {
-        Text(label, fontSize = 11.sp, fontWeight = FontWeight.Bold, color = if (isEnabled) Slate400 else Slate300, letterSpacing = 1.sp)
-        TextField(
-            value = value,
-            onValueChange = onValueChange,
-            enabled = isEnabled,
-            modifier = Modifier.fillMaxWidth(),
-            leadingIcon = icon?.let { 
-                { Icon(it, contentDescription = null, tint = if (isEnabled) Primary else Slate300) }
-            },
-            colors = TextFieldDefaults.colors(
-                focusedContainerColor = Color.Transparent,
-                unfocusedContainerColor = Color.Transparent,
-                disabledContainerColor = Color.Transparent,
-                focusedIndicatorColor = Primary,
-                unfocusedIndicatorColor = Slate400,
-                disabledIndicatorColor = Slate200,
-                focusedTextColor = Slate900,
-                unfocusedTextColor = Slate900,
-                disabledTextColor = Slate500
-            ),
-            textStyle = androidx.compose.ui.text.TextStyle(fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
         )
     }
 }
 
 @Composable
-fun StatRow(icon: ImageVector, label: String, value: String) {
-    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Icon(icon, contentDescription = null, tint = Slate400, modifier = Modifier.size(20.dp))
-            Spacer(modifier = Modifier.width(12.dp))
-            Text(label, fontSize = 12.sp, fontWeight = FontWeight.SemiBold, color = Slate500)
+private fun ProfileContent(
+    profile: UserProfile,
+    isSaving: Boolean,
+    onPassword: () -> Unit,
+    onPin: () -> Unit
+) {
+    Card(
+        colors = CardDefaults.cardColors(containerColor = Color.White),
+        shape = RoundedCornerShape(20.dp),
+        border = BorderStroke(1.dp, Color(0xFFE2E8F0))
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth().padding(28.dp),
+            horizontalArrangement = Arrangement.spacedBy(28.dp),
+            verticalAlignment = Alignment.Top
+        ) {
+            Box(
+                modifier = Modifier.size(88.dp).background(ProfilePrimary.copy(alpha = 0.12f), CircleShape),
+                contentAlignment = Alignment.Center
+            ) {
+                Text(
+                    profile.name.take(1).uppercase(Locale.ROOT),
+                    color = ProfilePrimary,
+                    fontSize = 34.sp,
+                    fontWeight = FontWeight.Black
+                )
+            }
+            Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(14.dp)) {
+                ProfileValue("Nama", profile.name)
+                ProfileValue("Username", profile.username)
+                profile.email?.let { ProfileValue("Email", it) }
+                ProfileValue("Role", profile.role)
+                ProfileValue("Status", if (profile.isActive) "Aktif" else "Tidak aktif")
+                ProfileValue("Bergabung", formatDateTimeToDate(profile.joinedAt))
+                ProfileValue("Login terakhir", profile.lastLoginAt?.let(::formatDateTimeToTime) ?: "-")
+            }
         }
-        Text(value, fontSize = 12.sp, fontWeight = FontWeight.Bold, color = Slate900)
+    }
+
+    Card(
+        colors = CardDefaults.cardColors(containerColor = Color.White),
+        shape = RoundedCornerShape(20.dp),
+        border = BorderStroke(1.dp, Color(0xFFE2E8F0))
+    ) {
+        Column(modifier = Modifier.fillMaxWidth().padding(28.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
+            Text("Keamanan Akun", color = ProfileText, fontSize = 19.sp, fontWeight = FontWeight.Bold)
+            Text("Perubahan hanya berlaku untuk akun yang sedang login dan dicatat oleh backend.", color = ProfileMuted)
+            HorizontalDivider()
+            Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                Button(onClick = onPassword, enabled = !isSaving) {
+                    Icon(Icons.Default.Lock, contentDescription = null)
+                    Spacer(Modifier.width(8.dp))
+                    Text("Ubah Password")
+                }
+                OutlinedButton(onClick = onPin, enabled = !isSaving) {
+                    Icon(Icons.Default.Pin, contentDescription = null)
+                    Spacer(Modifier.width(8.dp))
+                    Text("Ubah PIN")
+                }
+            }
+        }
     }
 }
+
+@Composable
+private fun ProfileValue(label: String, value: String) {
+    Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+        Text(label.uppercase(Locale.ROOT), color = ProfileMuted, fontSize = 10.sp, fontWeight = FontWeight.Bold)
+        Text(value, color = ProfileText, fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
+    }
+}
+
+@Composable
+private fun MessageCard(message: String, color: Color, onDismiss: () -> Unit) {
+    Card(colors = CardDefaults.cardColors(containerColor = color.copy(alpha = 0.08f))) {
+        Row(
+            modifier = Modifier.fillMaxWidth().padding(14.dp),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text(message, color = color, modifier = Modifier.weight(1f))
+            TextButton(onClick = onDismiss) { Text("Tutup") }
+        }
+    }
+}
+
+private enum class CredentialDialog { PASSWORD, PIN }
+
+@Composable
+private fun CredentialChangeDialog(
+    type: CredentialDialog,
+    isSaving: Boolean,
+    onDismiss: () -> Unit,
+    onSubmit: (String, String, String) -> Unit
+) {
+    var oldValue by remember(type) { mutableStateOf("") }
+    var newValue by remember(type) { mutableStateOf("") }
+    var confirmation by remember(type) { mutableStateOf("") }
+    val isPin = type == CredentialDialog.PIN
+    val label = if (isPin) "PIN" else "Password"
+    val keyboard = if (isPin) KeyboardType.NumberPassword else KeyboardType.Password
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Ubah $label") },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                CredentialField("$label lama", oldValue, { oldValue = credentialInput(it, isPin) }, keyboard, !isSaving)
+                CredentialField("$label baru", newValue, { newValue = credentialInput(it, isPin) }, keyboard, !isSaving)
+                CredentialField("Konfirmasi $label baru", confirmation, { confirmation = credentialInput(it, isPin) }, keyboard, !isSaving)
+            }
+        },
+        confirmButton = {
+            Button(onClick = { onSubmit(oldValue, newValue, confirmation) }, enabled = !isSaving) {
+                Text(if (isSaving) "Menyimpan..." else "Simpan")
+            }
+        },
+        dismissButton = { TextButton(onClick = onDismiss, enabled = !isSaving) { Text("Batal") } }
+    )
+}
+
+@Composable
+private fun CredentialField(
+    label: String,
+    value: String,
+    onValueChange: (String) -> Unit,
+    keyboardType: KeyboardType,
+    enabled: Boolean
+) {
+    OutlinedTextField(
+        value = value,
+        onValueChange = onValueChange,
+        label = { Text(label) },
+        visualTransformation = PasswordVisualTransformation(),
+        keyboardOptions = KeyboardOptions(keyboardType = keyboardType),
+        enabled = enabled,
+        singleLine = true
+    )
+}
+
+private fun credentialInput(value: String, pin: Boolean): String =
+    if (pin) value.filter(Char::isDigit).take(6) else value
+
+fun formatDateTimeToDate(isoString: String): String =
+    isoString.takeIf { it.length >= 10 }?.substring(0, 10) ?: isoString
+
+fun formatDateTimeToTime(isoString: String): String =
+    isoString.takeIf { it.length >= 16 }?.let { "${it.substring(0, 10)} ${it.substring(11, 16)}" } ?: isoString

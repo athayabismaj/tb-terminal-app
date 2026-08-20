@@ -2,6 +2,9 @@ package com.tbterminal.app.ui.settings
 
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.lifecycle.viewmodel.compose.viewModel
+import com.tbterminal.app.data.repository.AuthRepository
 import com.tbterminal.app.ui.dashboard.admin.AdminDashboardShell
 import com.tbterminal.app.ui.dashboard.admin.AdminDestination
 
@@ -9,9 +12,7 @@ import com.tbterminal.app.ui.dashboard.admin.AdminDestination
 fun AdminProfileScreen(
     name: String,
     role: String,
-    isActive: Boolean = true,
-    joinedAt: String = "Jan 2024",
-    lastLoginAt: String? = null,
+    authRepository: AuthRepository,
     onDashboardClick: () -> Unit = {},
     onProductsClick: () -> Unit = {},
     onAddProductClick: () -> Unit = {},
@@ -31,8 +32,10 @@ fun AdminProfileScreen(
     onOperationalAuditClick: () -> Unit = {},
     onProfileClick: () -> Unit = {},
     onSettingsClick: () -> Unit = {},
-    onLogout: () -> Unit = {}
+    onLogout: () -> Unit = {},
+    profileViewModel: ProfileViewModel = viewModel(factory = ProfileViewModel.factory(authRepository))
 ) {
+    val uiState = profileViewModel.uiState.collectAsStateWithLifecycle().value
     AdminDashboardShell(
         userName = name,
         role = role,
@@ -59,11 +62,11 @@ fun AdminProfileScreen(
         onLogout = onLogout
     ) { contentModifier ->
         SharedProfileScreen(
-            userName = name,
-            role = role,
-            isActive = isActive,
-            joinedAt = joinedAt,
-            lastLoginAt = lastLoginAt,
+            uiState = uiState,
+            onReload = profileViewModel::loadProfile,
+            onChangePassword = profileViewModel::changePassword,
+            onChangePin = profileViewModel::changePin,
+            onClearMessage = profileViewModel::clearMessage,
             modifier = contentModifier
         )
     }

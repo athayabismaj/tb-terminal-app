@@ -19,6 +19,7 @@ import androidx.navigation.compose.rememberNavController
 import com.tbterminal.app.data.session.SessionEvent
 import com.tbterminal.app.navigation.AppNavGraph
 import com.tbterminal.app.navigation.AppRoute
+import com.tbterminal.app.navigation.AppRouteAccessPolicy
 import com.tbterminal.app.navigation.resolveStartDestination
 import com.tbterminal.app.ui.auth.AuthViewModel
 import com.tbterminal.app.ui.theme.TbterminalappTheme
@@ -48,11 +49,35 @@ class MainActivity : ComponentActivity() {
                             sessionManager.events.collect { event ->
                                 when (event) {
                                     SessionEvent.Unauthorized -> {
+                                        authViewModel.notifySessionExpired()
                                         navController.navigate(AppRoute.Login.route) {
                                             popUpTo(0)
                                             launchSingleTop = true
                                         }
                                     }
+                                }
+                            }
+                        }
+                    }
+
+                    LaunchedEffect(navController, sessionManager) {
+                        navController.currentBackStackEntryFlow.collect { entry ->
+                            val route = entry.destination.route
+                            val role = sessionManager.readSessionUser()?.role
+                            if (!AppRouteAccessPolicy.isAllowed(route, role)) {
+                                navController.navigate(AppRoute.Dashboard.route) {
+                                    popUpTo(route ?: AppRoute.Dashboard.route) { inclusive = true }
+                                    launchSingleTop = true
+                                }
+                            }
+                        }
+                    }
+
+                    LaunchedEffect(appContainer) {
+                        lifecycle.repeatOnLifecycle(Lifecycle.State.STARTED) {
+                            appContainer.networkMonitor.observeOnline().collect { isOnline ->
+                                if (isOnline) {
+                                    appContainer.offlineSyncScheduler.scheduleIfEnabled()
                                 }
                             }
                         }

@@ -35,6 +35,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -44,6 +45,9 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.lifecycle.viewmodel.compose.viewModel
+import com.tbterminal.app.data.repository.OfflineDashboardRepository
 import com.tbterminal.app.ui.dashboard.DashboardBrandGreenDark
 import com.tbterminal.app.ui.dashboard.DashboardDangerRed
 import com.tbterminal.app.ui.dashboard.DashboardInfoBlue
@@ -51,31 +55,65 @@ import com.tbterminal.app.ui.dashboard.DashboardSurface
 import com.tbterminal.app.ui.dashboard.DashboardTextPrimary
 import com.tbterminal.app.ui.dashboard.DashboardTextSecondary
 import com.tbterminal.app.ui.dashboard.DashboardWarningOrange
+import com.tbterminal.app.ui.dashboard.offline.OfflineDashboardSection
+import com.tbterminal.app.ui.dashboard.offline.OfflineDashboardViewModel
 
 @Composable
 fun OwnerDashboardScreen(
     name: String,
     role: String,
+    offlineDashboardRepository: OfflineDashboardRepository,
     onLogout: () -> Unit,
+    onReportsClick: () -> Unit = {},
+    onLocalReportsClick: () -> Unit = onReportsClick,
+    onStockReportClick: () -> Unit = {},
+    onReceivablesClick: () -> Unit = {},
+    onSupplierDebtsClick: () -> Unit = {},
+    onCashReconciliationClick: () -> Unit = {},
+    onOperationalAuditClick: () -> Unit = {},
+    onSyncCenterClick: () -> Unit = {},
+    onBackupRestoreClick: () -> Unit = onSyncCenterClick,
     onUserManagementClick: () -> Unit,
-    onSecurityLogClick: () -> Unit
+    onSecurityLogClick: () -> Unit,
+    onSettingsClick: () -> Unit = {},
+    offlineDashboardViewModel: OfflineDashboardViewModel = viewModel(
+        factory = OfflineDashboardViewModel.factory(offlineDashboardRepository)
+    )
 ) {
+    val offlineUiState by offlineDashboardViewModel.uiState.collectAsStateWithLifecycle()
+
     OwnerDashboardShell(
         userName = name,
         role = role,
         activeDestination = OwnerDestination.Dashboard,
         onDashboardClick = {},
+        onReportsClick = onReportsClick,
+        onLocalReportsClick = onLocalReportsClick,
+        onStockReportClick = onStockReportClick,
+        onReceivablesClick = onReceivablesClick,
+        onSupplierDebtsClick = onSupplierDebtsClick,
+        onCashReconciliationClick = onCashReconciliationClick,
+        onOperationalAuditClick = onOperationalAuditClick,
+        onSyncCenterClick = onSyncCenterClick,
+        onBackupRestoreClick = onBackupRestoreClick,
         onUserManagementClick = onUserManagementClick,
         onSecurityLogClick = onSecurityLogClick,
+        onSettingsClick = onSettingsClick,
         onLogout = onLogout
     ) { contentModifier ->
-        OwnerDashboardContent(modifier = contentModifier)
+        OwnerDashboardContent(
+            modifier = contentModifier,
+            offlineUiState = offlineUiState,
+            onSyncCenterClick = onSyncCenterClick
+        )
     }
 }
 
 @Composable
 private fun OwnerDashboardContent(
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    offlineUiState: com.tbterminal.app.ui.dashboard.offline.OfflineDashboardUiState,
+    onSyncCenterClick: () -> Unit
 ) {
     Column(
         modifier = modifier
@@ -114,6 +152,12 @@ private fun OwnerDashboardContent(
                 DashboardFilterChip(text = "Bulan Ini", isSelected = false)
             }
         }
+
+        OfflineDashboardSection(
+            uiState = offlineUiState,
+            onSyncCenterClick = onSyncCenterClick,
+            modifier = Modifier.padding(bottom = 24.dp)
+        )
 
         LazyRow(
             modifier = Modifier.padding(bottom = 24.dp),

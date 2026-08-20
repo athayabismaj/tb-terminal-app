@@ -21,7 +21,9 @@ import androidx.compose.material.icons.automirrored.outlined.ListAlt
 import androidx.compose.material.icons.automirrored.outlined.Logout
 import androidx.compose.material.icons.automirrored.outlined.ReceiptLong
 import androidx.compose.material.icons.outlined.AssignmentTurnedIn
+import androidx.compose.material.icons.outlined.Assessment
 import androidx.compose.material.icons.outlined.AttachMoney
+import androidx.compose.material.icons.outlined.Backup
 import androidx.compose.material.icons.outlined.Category
 import androidx.compose.material.icons.outlined.CreditCard
 import androidx.compose.material.icons.outlined.Description
@@ -35,6 +37,7 @@ import androidx.compose.material.icons.outlined.Inventory2
 import androidx.compose.material.icons.outlined.Payments
 import androidx.compose.material.icons.outlined.Person
 import androidx.compose.material.icons.outlined.ShoppingCart
+import androidx.compose.material.icons.outlined.Sync
 import androidx.compose.material.icons.outlined.Straighten
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
@@ -54,6 +57,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.tbterminal.app.ui.offline.OfflineStatusIndicatorHost
 
 private val SidebarBackground = Color(0xFFF4F8FA)
 private val SidebarTextPrimary = Color(0xFF111111)
@@ -86,6 +90,9 @@ internal fun TbTerminalSidebar(
     onSalesTransactionsClick: () -> Unit,
     onSupplierDebtsClick: () -> Unit,
     onReportsClick: () -> Unit,
+    onLocalReportsClick: () -> Unit = onReportsClick,
+    onSyncCenterClick: () -> Unit,
+    onBackupRestoreClick: () -> Unit,
     onOperationalAuditClick: () -> Unit,
     onProfileClick: () -> Unit,
     onLogout: () -> Unit,
@@ -215,11 +222,17 @@ internal fun TbTerminalSidebar(
                 SidebarSubMenu(
                     items = listOf(
                         SidebarEntry("Laporan Analitik", Icons.Outlined.GridView, activeDestination == AdminDestination.Reports, onReportsClick),
+                        SidebarEntry("Laporan Lokal", Icons.Outlined.Assessment, activeDestination == AdminDestination.LocalReports, onLocalReportsClick),
+                        SidebarEntry("Sinkronisasi & Konflik", Icons.Outlined.Sync, activeDestination == AdminDestination.SyncCenter, onSyncCenterClick),
+                        SidebarEntry("Backup & Restore", Icons.Outlined.Backup, activeDestination == AdminDestination.BackupRestore, onBackupRestoreClick),
                         SidebarEntry("Audit Operasional", Icons.Outlined.AssignmentTurnedIn, activeDestination == AdminDestination.OperationalAudit, onOperationalAuditClick)
                     )
                 )
             }
         }
+        OfflineStatusIndicatorHost(
+            modifier = Modifier.padding(horizontal = 16.dp, vertical = 10.dp)
+        )
         HorizontalDivider(color = SidebarLine)
         SidebarProfileSection(
             userName = userName,
@@ -266,6 +279,9 @@ private val financeDestinations = setOf(
 
 private val reportDestinations = setOf(
     AdminDestination.Reports,
+    AdminDestination.LocalReports,
+    AdminDestination.SyncCenter,
+    AdminDestination.BackupRestore,
     AdminDestination.OperationalAudit
 )
 

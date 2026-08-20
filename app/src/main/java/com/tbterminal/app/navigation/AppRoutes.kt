@@ -33,6 +33,10 @@ sealed interface AppRoute {
         override val route = "admin/reports"
     }
 
+    data object OfflineReports : AppRoute {
+        override val route = "admin/reports/local"
+    }
+
     data object StockReport : AppRoute {
         override val route = "admin/reports/stock"
     }
@@ -43,6 +47,14 @@ sealed interface AppRoute {
 
     data object OperationalAudit : AppRoute {
         override val route = "admin/operational-audit"
+    }
+
+    data object SyncCenter : AppRoute {
+        override val route = "admin/sync-center"
+    }
+
+    data object BackupRestore : AppRoute {
+        override val route = "admin/backup-restore"
     }
 
     data object CashierProfile : AppRoute { override val route = "cashier_profile" }

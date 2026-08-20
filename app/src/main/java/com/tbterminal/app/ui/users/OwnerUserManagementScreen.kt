@@ -21,7 +21,15 @@ fun OwnerUserManagementScreen(
     onEditUserClick: (String) -> Unit,
     onChangePasswordClick: (String) -> Unit,
     onChangePinClick: (String) -> Unit,
+    onReportsClick: () -> Unit = {},
+    onSyncCenterClick: () -> Unit = {},
+    onStockReportClick: () -> Unit = {},
+    onReceivablesClick: () -> Unit = {},
+    onSupplierDebtsClick: () -> Unit = {},
+    onCashReconciliationClick: () -> Unit = {},
+    onOperationalAuditClick: () -> Unit = {},
     onSecurityLogClick: () -> Unit,
+    onSettingsClick: () -> Unit = {},
     onLogout: () -> Unit,
     userRepository: UserRepository,
     viewModel: UserManagementViewModel = viewModel(
@@ -36,8 +44,16 @@ fun OwnerUserManagementScreen(
         role = role,
         activeDestination = OwnerDestination.UserManagement,
         onDashboardClick = onDashboardClick,
+        onReportsClick = onReportsClick,
+        onSyncCenterClick = onSyncCenterClick,
+        onStockReportClick = onStockReportClick,
+        onReceivablesClick = onReceivablesClick,
+        onSupplierDebtsClick = onSupplierDebtsClick,
+        onCashReconciliationClick = onCashReconciliationClick,
+        onOperationalAuditClick = onOperationalAuditClick,
         onUserManagementClick = {},
         onSecurityLogClick = onSecurityLogClick,
+        onSettingsClick = onSettingsClick,
         onLogout = onLogout
     ) { contentModifier ->
         UserManagementContent(

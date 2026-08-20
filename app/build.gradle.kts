@@ -1,7 +1,37 @@
+import java.net.URI
+
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.compose)
+    id("com.google.devtools.ksp")
     id("org.jetbrains.kotlin.plugin.serialization") version "2.0.21"
+}
+
+val developmentBaseUrl = providers.gradleProperty("DEV_BASE_URL")
+    .orElse("http://10.0.2.2:8080/")
+val productionBaseUrl = providers.gradleProperty("PROD_BASE_URL")
+    .orElse(providers.environmentVariable("PROD_BASE_URL"))
+val releaseRequested = gradle.startParameter.taskNames.any { it.contains("release", ignoreCase = true) }
+val releaseStorePath = providers.gradleProperty("RELEASE_STORE_FILE").orElse(providers.environmentVariable("RELEASE_STORE_FILE")).orNull
+val releaseStorePassword = providers.gradleProperty("RELEASE_STORE_PASSWORD").orElse(providers.environmentVariable("RELEASE_STORE_PASSWORD")).orNull
+val releaseKeyAlias = providers.gradleProperty("RELEASE_KEY_ALIAS").orElse(providers.environmentVariable("RELEASE_KEY_ALIAS")).orNull
+val releaseKeyPassword = providers.gradleProperty("RELEASE_KEY_PASSWORD").orElse(providers.environmentVariable("RELEASE_KEY_PASSWORD")).orNull
+val releaseSigningReady = listOf(releaseStorePath, releaseStorePassword, releaseKeyAlias, releaseKeyPassword).all { !it.isNullOrBlank() }
+
+if (releaseRequested) {
+    val url = productionBaseUrl.orNull
+    val parsedUrl = url?.let { candidate -> runCatching { URI(candidate) }.getOrNull() }
+    val host = parsedUrl?.host?.lowercase()
+    require(!url.isNullOrBlank() && parsedUrl?.scheme.equals("https", ignoreCase = true) &&
+        !host.isNullOrBlank() && parsedUrl?.userInfo == null &&
+        host != "localhost" && host != "127.0.0.1" && host != "10.0.2.2" &&
+        !host.endsWith(".localhost") && !host.endsWith(".invalid")) {
+        "PROD_BASE_URL wajib berupa URL HTTPS production non-lokal"
+    }
+    require(releaseSigningReady) {
+        "RELEASE_STORE_FILE, RELEASE_STORE_PASSWORD, RELEASE_KEY_ALIAS, dan RELEASE_KEY_PASSWORD wajib untuk build release"
+    }
+    require(file(releaseStorePath!!).isFile) { "RELEASE_STORE_FILE tidak ditemukan" }
 }
 
 android {
@@ -20,13 +50,28 @@ android {
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
 
+    signingConfigs {
+        if (releaseSigningReady) {
+            create("release") {
+                storeFile = file(releaseStorePath!!)
+                storePassword = releaseStorePassword
+                keyAlias = releaseKeyAlias
+                keyPassword = releaseKeyPassword
+            }
+        }
+    }
+
     buildTypes {
         debug {
-            buildConfigField("String", "BASE_URL", "\"http://10.0.2.2:8080/\"")
+            buildConfigField("String", "BASE_URL", "\"${developmentBaseUrl.get()}\"")
         }
         release {
-            buildConfigField("String", "BASE_URL", "\"http://10.0.2.2:8080/\"")
-            isMinifyEnabled = false
+            val releaseUrl = productionBaseUrl.orNull ?: "https://production-url-required.invalid/"
+            buildConfigField("String", "BASE_URL", "\"$releaseUrl\"")
+            isDebuggable = false
+            isMinifyEnabled = true
+            isShrinkResources = true
+            if (releaseSigningReady) signingConfig = signingConfigs.getByName("release")
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
@@ -69,4 +114,8 @@ dependencies {
     implementation("androidx.compose.material:material-icons-extended:1.7.5")
     implementation("io.coil-kt:coil-compose:2.7.0")
     implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.7.3")
+    implementation("androidx.room:room-runtime:2.8.4")
+    implementation("androidx.room:room-ktx:2.8.4")
+    ksp("androidx.room:room-compiler:2.8.4")
+    implementation("androidx.work:work-runtime-ktx:2.9.1")
 }

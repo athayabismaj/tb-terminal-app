@@ -69,7 +69,10 @@ private fun AdminDestination.adminRouteOrNull(): String? {
         AdminDestination.CashExpenses -> AppRoute.CashExpenses.route
         AdminDestination.ReceivablePayments -> AppRoute.ReceivablePayments.route
         AdminDestination.Reports -> AppRoute.Reports.route
+        AdminDestination.LocalReports -> AppRoute.OfflineReports.route
         AdminDestination.OperationalAudit -> AppRoute.OperationalAudit.route
+        AdminDestination.SyncCenter -> AppRoute.SyncCenter.route
+        AdminDestination.BackupRestore -> AppRoute.BackupRestore.route
         AdminDestination.Profile -> AppRoute.AdminProfile.route
         AdminDestination.Settings -> AppRoute.AdminSettings.route
         else -> null

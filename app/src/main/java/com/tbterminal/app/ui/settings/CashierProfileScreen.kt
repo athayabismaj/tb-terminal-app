@@ -1,9 +1,9 @@
 package com.tbterminal.app.ui.settings
 
-import androidx.compose.foundation.layout.padding
 import androidx.compose.runtime.Composable
-import androidx.compose.ui.Modifier
-import androidx.compose.ui.unit.dp
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.lifecycle.viewmodel.compose.viewModel
+import com.tbterminal.app.data.repository.AuthRepository
 import com.tbterminal.app.ui.dashboard.cashier.CashierDashboardShell
 import com.tbterminal.app.ui.dashboard.cashier.CashierDestination
 
@@ -11,9 +11,7 @@ import com.tbterminal.app.ui.dashboard.cashier.CashierDestination
 fun CashierProfileScreen(
     userName: String,
     role: String,
-    isActive: Boolean,
-    joinedAt: String,
-    lastLoginAt: String?,
+    authRepository: AuthRepository,
     onDashboardClick: () -> Unit = {},
     onPosClick: () -> Unit = {},
     onCashSessionClick: () -> Unit = {},
@@ -21,8 +19,10 @@ fun CashierProfileScreen(
     onStockCheckClick: () -> Unit = {},
     onProfileClick: () -> Unit = {},
     onSettingsClick: () -> Unit = {},
-    onLogout: () -> Unit
+    onLogout: () -> Unit,
+    profileViewModel: ProfileViewModel = viewModel(factory = ProfileViewModel.factory(authRepository))
 ) {
+    val uiState = profileViewModel.uiState.collectAsStateWithLifecycle().value
     CashierDashboardShell(
         userName = userName,
         role = role,
@@ -37,11 +37,11 @@ fun CashierProfileScreen(
         onLogout = onLogout
     ) { contentModifier ->
         SharedProfileScreen(
-            userName = userName,
-            role = role,
-            isActive = isActive,
-            joinedAt = joinedAt,
-            lastLoginAt = lastLoginAt,
+            uiState = uiState,
+            onReload = profileViewModel::loadProfile,
+            onChangePassword = profileViewModel::changePassword,
+            onChangePin = profileViewModel::changePin,
+            onClearMessage = profileViewModel::clearMessage,
             modifier = contentModifier
         )
     }

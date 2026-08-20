@@ -54,6 +54,8 @@ import com.tbterminal.app.ui.salestransactions.AdminTransactionHistoryScreen
 import com.tbterminal.app.ui.security.OwnerSecurityLogScreen
 import com.tbterminal.app.ui.settings.CashierProfileScreen
 import com.tbterminal.app.ui.settings.CashierSettingsScreen
+import com.tbterminal.app.ui.settings.AdminProfileScreen
+import com.tbterminal.app.ui.settings.AdminSettingsScreen
 import com.tbterminal.app.ui.stockopname.AdminStockOpnameFormScreen
 import com.tbterminal.app.ui.stockopname.AdminStockOpnameScreen
 import com.tbterminal.app.ui.stockreport.AdminStockReportScreen
@@ -69,7 +71,7 @@ internal fun NavGraphBuilder.dashboardGraph(navController: NavHostController, se
 
             if (sessionUser == null) {
                 LaunchedEffect(Unit) {
-                    sessionManager.clearSession()
+                    sessionManager.logout()
                     navController.navigate(AppRoute.Login.route) {
                         popUpTo(0)
                         launchSingleTop = true
@@ -77,7 +79,7 @@ internal fun NavGraphBuilder.dashboardGraph(navController: NavHostController, se
                 }
             } else {
                 val logout: () -> Unit = {
-                    sessionManager.clearSession()
+                    sessionManager.logout()
                     navController.navigate(AppRoute.Login.route) {
                         popUpTo(0)
                         launchSingleTop = true
@@ -89,6 +91,52 @@ internal fun NavGraphBuilder.dashboardGraph(navController: NavHostController, se
                         OwnerDashboardScreen(
                             name = sessionUser.name,
                             role = sessionUser.role,
+                            offlineDashboardRepository = appContainer.offlineDashboardRepository,
+                            onReportsClick = {
+                                navController.navigate(AppRoute.Reports.route) {
+                                    launchSingleTop = true
+                                }
+                            },
+                            onLocalReportsClick = {
+                                navController.navigate(AppRoute.OfflineReports.route) {
+                                    launchSingleTop = true
+                                }
+                            },
+                            onSyncCenterClick = {
+                                navController.navigate(AppRoute.SyncCenter.route) {
+                                    launchSingleTop = true
+                                }
+                            },
+                            onBackupRestoreClick = {
+                                navController.navigate(AppRoute.BackupRestore.route) {
+                                    launchSingleTop = true
+                                }
+                            },
+                            onStockReportClick = {
+                                navController.navigate(AppRoute.StockReport.route) {
+                                    launchSingleTop = true
+                                }
+                            },
+                            onReceivablesClick = {
+                                navController.navigate(AppRoute.Receivables.route) {
+                                    launchSingleTop = true
+                                }
+                            },
+                            onSupplierDebtsClick = {
+                                navController.navigate(AppRoute.SupplierDebts.route) {
+                                    launchSingleTop = true
+                                }
+                            },
+                            onCashReconciliationClick = {
+                                navController.navigate(AppRoute.CashReconciliation.route) {
+                                    launchSingleTop = true
+                                }
+                            },
+                            onOperationalAuditClick = {
+                                navController.navigate(AppRoute.OperationalAudit.route) {
+                                    launchSingleTop = true
+                                }
+                            },
                             onUserManagementClick = {
                                 navController.navigate(AppRoute.UserManagement.route) {
                                     launchSingleTop = true
@@ -96,6 +144,11 @@ internal fun NavGraphBuilder.dashboardGraph(navController: NavHostController, se
                             },
                             onSecurityLogClick = {
                                 navController.navigate(AppRoute.SecurityLog.route) {
+                                    launchSingleTop = true
+                                }
+                            },
+                            onSettingsClick = {
+                                navController.navigate(AppRoute.AdminSettings.route) {
                                     launchSingleTop = true
                                 }
                             },
@@ -108,6 +161,7 @@ internal fun NavGraphBuilder.dashboardGraph(navController: NavHostController, se
                             name = sessionUser.name,
                             role = sessionUser.role,
                             analyticsRepository = appContainer.analyticsRepository,
+                            offlineDashboardRepository = appContainer.offlineDashboardRepository,
                             onProductsClick = {
                                 navController.navigate(AppRoute.Products.route) {
                                     launchSingleTop = true
@@ -140,6 +194,16 @@ internal fun NavGraphBuilder.dashboardGraph(navController: NavHostController, se
                             },
                             onReportsClick = {
                                 navController.navigate(AppRoute.Reports.route) {
+                                    launchSingleTop = true
+                                }
+                            },
+                            onLocalReportsClick = {
+                                navController.navigate(AppRoute.OfflineReports.route) {
+                                    launchSingleTop = true
+                                }
+                            },
+                            onSyncCenterClick = {
+                                navController.navigate(AppRoute.SyncCenter.route) {
                                     launchSingleTop = true
                                 }
                             },
@@ -279,7 +343,7 @@ internal fun NavGraphBuilder.dashboardGraph(navController: NavHostController, se
 
                     else -> {
                         LaunchedEffect(sessionUser.role) {
-                            sessionManager.clearSession()
+                            sessionManager.logout()
                             navController.navigate(AppRoute.Login.route) {
                                 popUpTo(0)
                                 launchSingleTop = true
@@ -295,7 +359,7 @@ internal fun NavGraphBuilder.dashboardGraph(navController: NavHostController, se
 
             if (sessionUser == null) {
                 LaunchedEffect(Unit) {
-                    sessionManager.clearSession()
+                    sessionManager.logout()
                     navController.navigate(AppRoute.Login.route) {
                         popUpTo(0)
                         launchSingleTop = true
@@ -305,9 +369,7 @@ internal fun NavGraphBuilder.dashboardGraph(navController: NavHostController, se
                 CashierProfileScreen(
                     userName = sessionUser.name,
                     role = sessionUser.role,
-                    isActive = sessionUser.isActive,
-                    joinedAt = sessionUser.joinedAt,
-                    lastLoginAt = sessionUser.lastLoginAt,
+                    authRepository = appContainer.authRepository,
                     onDashboardClick = {
                         navController.navigate(AppRoute.Dashboard.route) {
                             popUpTo(AppRoute.Dashboard.route) { inclusive = true }
@@ -344,7 +406,7 @@ internal fun NavGraphBuilder.dashboardGraph(navController: NavHostController, se
                         }
                     },
                     onLogout = {
-                        sessionManager.clearSession()
+                        sessionManager.logout()
                         navController.navigate(AppRoute.Login.route) {
                             popUpTo(0)
                             launchSingleTop = true
@@ -359,7 +421,7 @@ internal fun NavGraphBuilder.dashboardGraph(navController: NavHostController, se
 
             if (sessionUser == null) {
                 LaunchedEffect(Unit) {
-                    sessionManager.clearSession()
+                    sessionManager.logout()
                     navController.navigate(AppRoute.Login.route) {
                         popUpTo(0)
                         launchSingleTop = true
@@ -369,6 +431,8 @@ internal fun NavGraphBuilder.dashboardGraph(navController: NavHostController, se
                 CashierSettingsScreen(
                     userName = sessionUser.name,
                     role = sessionUser.role,
+                    systemRepository = appContainer.systemRepository,
+                    localAppSettingsDataSource = appContainer.localAppSettingsDataSource,
                     onDashboardClick = {
                         navController.navigate(AppRoute.Dashboard.route) {
                             popUpTo(AppRoute.Dashboard.route) { inclusive = true }
@@ -405,7 +469,7 @@ internal fun NavGraphBuilder.dashboardGraph(navController: NavHostController, se
                         }
                     },
                     onLogout = {
-                        sessionManager.clearSession()
+                        sessionManager.logout()
                         navController.navigate(AppRoute.Login.route) {
                             popUpTo(0)
                             launchSingleTop = true
@@ -416,38 +480,101 @@ internal fun NavGraphBuilder.dashboardGraph(navController: NavHostController, se
         }
 
         composable(AppRoute.AdminProfile.route) {
-            AdminPlaceholderRoute(
-                sessionManager = sessionManager,
-                navController = navController,
-                destination = AdminDestination.Profile,
-                title = "Profil Akun",
-                subtitle = "Lihat dan ubah informasi profil Anda.",
-                badgeText = "Profil",
-                focusItems = listOf("Informasi Nama, Role, Email", "Ubah Password"),
-                integrationNotes = listOf("Butuh endpoint update profil")
-            )
+            val sessionUser = sessionManager.readSessionUser()
+            if (sessionUser == null) {
+                LaunchedEffect(Unit) { logout(sessionManager, navController) }
+            } else {
+                fun navigate(route: String) {
+                    navController.navigate(route) { launchSingleTop = true }
+                }
+                AdminProfileScreen(
+                    name = sessionUser.name,
+                    role = sessionUser.role,
+                    authRepository = appContainer.authRepository,
+                    onDashboardClick = { navigate(AppRoute.Dashboard.route) },
+                    onProductsClick = { navigate(AppRoute.Products.route) },
+                    onAddProductClick = { navigate(AppRoute.AddProduct.route) },
+                    onProductCategoriesClick = { navigate(AppRoute.ProductCategories.route) },
+                    onProductUnitsClick = { navigate(AppRoute.ProductUnits.route) },
+                    onCashReconciliationClick = { navigate(AppRoute.CashReconciliation.route) },
+                    onSalesTransactionsClick = { navigate(AppRoute.SalesTransactions.route) },
+                    onReportsClick = { navigate(AppRoute.Reports.route) },
+                    onPriceManagementClick = { navigate(AppRoute.PriceManagement.route) },
+                    onStockOpnameClick = { navigate(AppRoute.StockOpname.route) },
+                    onStockOpnameFormClick = { navigate(AppRoute.StockOpnameForm.createRoute()) },
+                    onIncomingGoodsClick = { navigate(AppRoute.IncomingGoods.route) },
+                    onIncomingGoodsFormClick = { navigate(AppRoute.IncomingGoodsForm.createRoute()) },
+                    onSupplierDebtsClick = { navigate(AppRoute.SupplierDebts.route) },
+                    onReceivablesClick = { navigate(AppRoute.Receivables.route) },
+                    onCustomersClick = { navigate(AppRoute.Customers.route) },
+                    onOperationalAuditClick = { navigate(AppRoute.OperationalAudit.route) },
+                    onProfileClick = { navigate(AppRoute.AdminProfile.route) },
+                    onSettingsClick = { navigate(AppRoute.AdminSettings.route) },
+                    onLogout = { logout(sessionManager, navController) }
+                )
+            }
         }
 
         composable(AppRoute.AdminSettings.route) {
-            AdminPlaceholderRoute(
-                sessionManager = sessionManager,
-                navController = navController,
-                destination = AdminDestination.Settings,
-                title = "Pengaturan",
-                subtitle = "Atur profil toko, printer, struk, metode pembayaran, dan nomor dokumen.",
-                badgeText = "Konfigurasi toko",
-                focusItems = listOf(
-                    "Profil toko dan informasi yang muncul di struk.",
-                    "Printer struk dan opsi cetak otomatis.",
-                    "Metode pembayaran aktif untuk kasir.",
-                    "Format nomor nota POS, barang masuk, dan dokumen lain."
-                ),
-                integrationNotes = listOf(
-                    "Butuh endpoint konfigurasi toko.",
-                    "Butuh penyimpanan lokal untuk preferensi printer terminal.",
-                    "Butuh fail-closed default jika konfigurasi pembayaran belum valid."
+            val sessionUser = sessionManager.readSessionUser()
+
+            if (sessionUser == null) {
+                LaunchedEffect(Unit) {
+                    sessionManager.logout()
+                    navController.navigate(AppRoute.Login.route) {
+                        popUpTo(0)
+                        launchSingleTop = true
+                    }
+                }
+            } else {
+                fun navigate(route: String) {
+                    navController.navigate(route) {
+                        launchSingleTop = true
+                    }
+                }
+
+                AdminSettingsScreen(
+                    name = sessionUser.name,
+                    role = sessionUser.role,
+                    systemRepository = appContainer.systemRepository,
+                    localAppSettingsDataSource = appContainer.localAppSettingsDataSource,
+                    onDashboardClick = { navigate(AppRoute.Dashboard.route) },
+                    onProductsClick = { navigate(AppRoute.Products.route) },
+                    onAddProductClick = { navigate(AppRoute.AddProduct.route) },
+                    onProductCategoriesClick = { navigate(AppRoute.ProductCategories.route) },
+                    onProductUnitsClick = { navigate(AppRoute.ProductUnits.route) },
+                    onCashReconciliationClick = { navigate(AppRoute.CashReconciliation.route) },
+                    onSalesTransactionsClick = { navigate(AppRoute.SalesTransactions.route) },
+                    onReportsClick = { navigate(AppRoute.Reports.route) },
+                    onPriceManagementClick = { navigate(AppRoute.PriceManagement.route) },
+                    onStockOpnameClick = { navigate(AppRoute.StockOpname.route) },
+                    onStockOpnameFormClick = { navigate(AppRoute.StockOpnameForm.createRoute()) },
+                    onIncomingGoodsClick = { navigate(AppRoute.IncomingGoods.route) },
+                    onIncomingGoodsFormClick = { navigate(AppRoute.IncomingGoodsForm.createRoute()) },
+                    onSuppliersClick = { navigate(AppRoute.Suppliers.route) },
+                    onPurchaseHistoryClick = { navigate(AppRoute.PurchaseHistory.route) },
+                    onStockReportClick = { navigate(AppRoute.StockReport.route) },
+                    onSupplierDebtsClick = { navigate(AppRoute.SupplierDebts.route) },
+                    onCashSessionHistoryClick = { navigate(AppRoute.CashSessionHistory.route) },
+                    onCashReconciliationDetailClick = { navigate(AppRoute.CashReconciliationDetail.createRoute()) },
+                    onCashExpensesClick = { navigate(AppRoute.CashExpenses.route) },
+                    onReceivablesClick = { navigate(AppRoute.Receivables.route) },
+                    onReceivablePaymentsClick = { navigate(AppRoute.ReceivablePayments.route) },
+                    onCustomersClick = { navigate(AppRoute.Customers.route) },
+                    onOperationalAuditClick = { navigate(AppRoute.OperationalAudit.route) },
+                    onUserManagementClick = { navigate(AppRoute.UserManagement.route) },
+                    onSecurityLogClick = { navigate(AppRoute.SecurityLog.route) },
+                    onProfileClick = { navigate(AppRoute.AdminProfile.route) },
+                    onSettingsClick = { navigate(AppRoute.AdminSettings.route) },
+                    onLogout = {
+                        sessionManager.logout()
+                        navController.navigate(AppRoute.Login.route) {
+                            popUpTo(0)
+                            launchSingleTop = true
+                        }
+                    }
                 )
-            )
+            }
         }
 
         composable(AppRoute.Suppliers.route) {
@@ -759,7 +886,7 @@ private fun RedirectToLogin(sessionManager: SessionManager, navController: NavHo
 }
 
 private fun logout(sessionManager: SessionManager, navController: NavHostController) {
-    sessionManager.clearSession()
+    sessionManager.logout()
     navController.navigate(AppRoute.Login.route) {
         popUpTo(0)
         launchSingleTop = true
@@ -781,7 +908,7 @@ private fun AdminPlaceholderRoute(
 
     if (sessionUser == null) {
         LaunchedEffect(Unit) {
-            sessionManager.clearSession()
+            sessionManager.logout()
             navController.navigate(AppRoute.Login.route) {
                 popUpTo(0)
                 launchSingleTop = true
@@ -830,7 +957,7 @@ private fun AdminPlaceholderRoute(
             onProfileClick = { navigate(AppRoute.AdminProfile.route) },
             onSettingsClick = { navigate(AppRoute.AdminSettings.route) },
             onLogout = {
-                sessionManager.clearSession()
+                sessionManager.logout()
                 navController.navigate(AppRoute.Login.route) {
                     popUpTo(0)
                     launchSingleTop = true

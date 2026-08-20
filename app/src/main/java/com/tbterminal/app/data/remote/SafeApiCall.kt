@@ -1,6 +1,9 @@
 package com.tbterminal.app.data.remote
 
 import java.io.IOException
+import java.net.ConnectException
+import java.net.SocketTimeoutException
+import java.net.UnknownHostException
 import kotlinx.coroutines.CancellationException
 import kotlinx.serialization.SerializationException
 import kotlinx.serialization.json.Json
@@ -31,8 +34,16 @@ suspend fun <T> safeApiCall(
         }
     } catch (cancellation: CancellationException) {
         throw cancellation
+    } catch (timeout: SocketTimeoutException) {
+        NetworkResult.Error("NETWORK_TIMEOUT", "Server terlalu lama merespons. Silakan coba lagi.")
+    } catch (unknownHost: UnknownHostException) {
+        NetworkResult.Error("NETWORK_UNAVAILABLE", "Server tidak dapat ditemukan. Periksa koneksi dan alamat server.")
+    } catch (connect: ConnectException) {
+        NetworkResult.Error("CONNECTION_FAILED", "Tidak dapat terhubung ke server.")
+    } catch (serialization: SerializationException) {
+        NetworkResult.Error("INVALID_RESPONSE", "Response server tidak sesuai format yang diharapkan.")
     } catch (io: IOException) {
-        NetworkResult.Exception(io)
+        NetworkResult.Error("CONNECTION_INTERRUPTED", "Koneksi ke server terputus.")
     } catch (exception: Exception) {
         NetworkResult.Exception(exception)
     }

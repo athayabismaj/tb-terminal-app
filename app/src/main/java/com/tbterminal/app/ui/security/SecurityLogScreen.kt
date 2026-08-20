@@ -95,6 +95,14 @@ fun OwnerSecurityLogScreen(
     role: String,
     onDashboardClick: () -> Unit,
     onUserManagementClick: () -> Unit,
+    onReportsClick: () -> Unit = {},
+    onSyncCenterClick: () -> Unit = {},
+    onStockReportClick: () -> Unit = {},
+    onReceivablesClick: () -> Unit = {},
+    onSupplierDebtsClick: () -> Unit = {},
+    onCashReconciliationClick: () -> Unit = {},
+    onOperationalAuditClick: () -> Unit = {},
+    onSettingsClick: () -> Unit = {},
     onLogout: () -> Unit,
     securityLogRepository: SecurityLogRepository,
     viewModel: SecurityLogViewModel = viewModel(
@@ -108,8 +116,16 @@ fun OwnerSecurityLogScreen(
         role = role,
         activeDestination = OwnerDestination.SecurityLog,
         onDashboardClick = onDashboardClick,
+        onReportsClick = onReportsClick,
+        onSyncCenterClick = onSyncCenterClick,
+        onStockReportClick = onStockReportClick,
+        onReceivablesClick = onReceivablesClick,
+        onSupplierDebtsClick = onSupplierDebtsClick,
+        onCashReconciliationClick = onCashReconciliationClick,
+        onOperationalAuditClick = onOperationalAuditClick,
         onUserManagementClick = onUserManagementClick,
         onSecurityLogClick = {},
+        onSettingsClick = onSettingsClick,
         onLogout = onLogout
     ) { contentModifier ->
         SecurityLogContent(

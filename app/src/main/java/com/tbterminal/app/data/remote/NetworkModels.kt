@@ -24,7 +24,17 @@ data class UnlockRequest(
 @Serializable
 data class LoginResponse(
     val token: String,
+    val refreshToken: String,
     val user: UserDto
+)
+
+@Serializable
+data class RefreshTokenRequest(val refreshToken: String)
+
+@Serializable
+data class RefreshTokenResponse(
+    val token: String,
+    val refreshToken: String
 )
 
 @Serializable
@@ -34,8 +44,27 @@ data class UserDto(
     val name: String,
     val role: String,
     val isActive: Boolean,
+    val email: String? = null,
     val joinedAt: String,
     val lastLoginAt: String? = null
+)
+
+@Serializable
+data class CurrentUserDto(
+    val username: String,
+    val role: String
+)
+
+@Serializable
+data class ChangePasswordRequestDto(
+    val oldPassword: String,
+    val newPassword: String
+)
+
+@Serializable
+data class ChangePinRequestDto(
+    val oldPin: String,
+    val newPin: String
 )
 
 @Serializable
@@ -71,7 +100,9 @@ data class DailySalesSummaryDto(
     val date: String,
     val transactionCount: Long,
     val totalRevenue: Double,
-    val totalDp: Double
+    val totalDp: Double,
+    val voidedTransactionCount: Long = 0,
+    val voidedAmount: Double = 0.0
 )
 
 @Serializable
@@ -82,7 +113,15 @@ data class SalesReportResponseDto(
     val transactionStatuses: List<TransactionStatusSummaryDto> = emptyList(),
     val topProducts: List<TopProductSalesDto> = emptyList(),
     val cashiers: List<CashierSalesSummaryDto> = emptyList(),
-    val receivables: SalesReceivableSummaryDto
+    val receivables: SalesReceivableSummaryDto,
+    val voided: VoidedSalesSummaryDto = VoidedSalesSummaryDto()
+)
+
+@Serializable
+data class VoidedSalesSummaryDto(
+    val transactionCount: Long = 0,
+    @Serializable(with = BigDecimalStringSerializer::class) val amount: BigDecimal = BigDecimal.ZERO,
+    @Serializable(with = BigDecimalStringSerializer::class) val paidAmount: BigDecimal = BigDecimal.ZERO
 )
 
 @Serializable

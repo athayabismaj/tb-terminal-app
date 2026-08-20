@@ -36,14 +36,23 @@ class AuthViewModel(
     val unlockState: StateFlow<UnlockState> = _unlockState.asStateFlow()
 
     fun login(username: String, password: String) {
-        if (username.isBlank() || password.isBlank()) {
+        val normalizedUsername = username.trim()
+        if (normalizedUsername.isBlank() || password.isBlank()) {
             _authState.value = AuthState.Error("Username dan password tidak boleh kosong")
+            return
+        }
+        if (normalizedUsername.length > 50) {
+            _authState.value = AuthState.Error("Username maksimal 50 karakter")
+            return
+        }
+        if (password.length < 6) {
+            _authState.value = AuthState.Error("Password minimal 6 karakter")
             return
         }
 
         _authState.value = AuthState.Loading
         viewModelScope.launch {
-            when (val result = authRepository.login(username, password)) {
+            when (val result = authRepository.login(normalizedUsername, password)) {
                 is RepositoryResult.Success -> {
                     val session = result.data
                     _authState.value = AuthState.Success(
@@ -58,17 +67,15 @@ class AuthViewModel(
                 }
 
                 is RepositoryResult.Exception -> {
-                    _authState.value = AuthState.Error(
-                        "Terjadi kesalahan jaringan: ${result.throwable.message ?: "tidak diketahui"}"
-                    )
+                    _authState.value = AuthState.Error("Terjadi kesalahan tak terduga. Silakan coba lagi.")
                 }
             }
         }
     }
 
     fun unlock(pin: String) {
-        if (pin.isBlank()) {
-            _unlockState.value = UnlockState.Error("PIN tidak boleh kosong")
+        if (!pin.matches(Regex("\\d{4,6}"))) {
+            _unlockState.value = UnlockState.Error("PIN harus terdiri dari 4 sampai 6 digit")
             return
         }
 
@@ -84,9 +91,7 @@ class AuthViewModel(
                 }
 
                 is RepositoryResult.Exception -> {
-                    _unlockState.value = UnlockState.Error(
-                        "Terjadi kesalahan jaringan: ${result.throwable.message ?: "tidak diketahui"}"
-                    )
+                    _unlockState.value = UnlockState.Error("Terjadi kesalahan tak terduga. Silakan coba lagi.")
                 }
             }
         }
@@ -98,6 +103,10 @@ class AuthViewModel(
 
     fun resetUnlockState() {
         _unlockState.value = UnlockState.Idle
+    }
+
+    fun notifySessionExpired() {
+        _authState.value = AuthState.Error("Sesi telah berakhir. Silakan login kembali.")
     }
 
     companion object {

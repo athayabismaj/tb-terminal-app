@@ -15,7 +15,15 @@ fun OwnerAddUserScreen(
     role: String,
     onDashboardClick: () -> Unit,
     onUserManagementClick: () -> Unit,
+    onReportsClick: () -> Unit = {},
+    onSyncCenterClick: () -> Unit = {},
+    onStockReportClick: () -> Unit = {},
+    onReceivablesClick: () -> Unit = {},
+    onSupplierDebtsClick: () -> Unit = {},
+    onCashReconciliationClick: () -> Unit = {},
+    onOperationalAuditClick: () -> Unit = {},
     onSecurityLogClick: () -> Unit,
+    onSettingsClick: () -> Unit = {},
     onLogout: () -> Unit,
     userRepository: UserRepository,
     viewModel: AddUserViewModel = viewModel(
@@ -37,8 +45,16 @@ fun OwnerAddUserScreen(
         role = role,
         activeDestination = OwnerDestination.UserManagement,
         onDashboardClick = onDashboardClick,
+        onReportsClick = onReportsClick,
+        onSyncCenterClick = onSyncCenterClick,
+        onStockReportClick = onStockReportClick,
+        onReceivablesClick = onReceivablesClick,
+        onSupplierDebtsClick = onSupplierDebtsClick,
+        onCashReconciliationClick = onCashReconciliationClick,
+        onOperationalAuditClick = onOperationalAuditClick,
         onUserManagementClick = onUserManagementClick,
         onSecurityLogClick = onSecurityLogClick,
+        onSettingsClick = onSettingsClick,
         onLogout = onLogout
     ) { contentModifier ->
         AddUserContent(

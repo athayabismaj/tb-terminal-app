@@ -73,7 +73,7 @@ internal fun NavGraphBuilder.authGraph(navController: NavHostController, authVie
 
             if (sessionUser == null) {
                 LaunchedEffect(Unit) {
-                    sessionManager.clearSession()
+                    sessionManager.logout()
                     navController.navigate(AppRoute.Login.route) {
                         popUpTo(0)
                         launchSingleTop = true
@@ -89,7 +89,7 @@ internal fun NavGraphBuilder.authGraph(navController: NavHostController, authVie
                         }
                     },
                     onBackToLogin = {
-                        sessionManager.clearSession()
+                        sessionManager.logout()
                         navController.navigate(AppRoute.Login.route) {
                             popUpTo(0)
                             launchSingleTop = true

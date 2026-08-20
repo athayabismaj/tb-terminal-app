@@ -41,6 +41,7 @@ import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.tbterminal.app.data.repository.AnalyticsRepository
+import com.tbterminal.app.data.repository.OfflineDashboardRepository
 import com.tbterminal.app.ui.dashboard.DashboardBrandGreen
 import com.tbterminal.app.ui.dashboard.DashboardBrandGreenDark
 import com.tbterminal.app.ui.dashboard.DashboardInfoBlue
@@ -48,12 +49,15 @@ import com.tbterminal.app.ui.dashboard.DashboardSurface
 import com.tbterminal.app.ui.dashboard.DashboardTextPrimary
 import com.tbterminal.app.ui.dashboard.DashboardTextSecondary
 import com.tbterminal.app.ui.dashboard.DashboardWarningOrange
+import com.tbterminal.app.ui.dashboard.offline.OfflineDashboardSection
+import com.tbterminal.app.ui.dashboard.offline.OfflineDashboardViewModel
 
 @Composable
 fun AdminDashboardScreen(
     name: String,
     role: String,
     analyticsRepository: AnalyticsRepository,
+    offlineDashboardRepository: OfflineDashboardRepository,
     onProductsClick: () -> Unit,
     onAddProductClick: () -> Unit,
     onProductCategoriesClick: () -> Unit,
@@ -61,6 +65,8 @@ fun AdminDashboardScreen(
     onCashReconciliationClick: () -> Unit,
     onSalesTransactionsClick: () -> Unit,
     onReportsClick: () -> Unit,
+    onLocalReportsClick: () -> Unit = onReportsClick,
+    onSyncCenterClick: () -> Unit = {},
     onPriceManagementClick: () -> Unit,
     onStockOpnameClick: () -> Unit,
     onStockOpnameFormClick: () -> Unit,
@@ -82,9 +88,13 @@ fun AdminDashboardScreen(
     onLogout: () -> Unit,
     viewModel: AdminDashboardViewModel = viewModel(
         factory = AdminDashboardViewModel.factory(analyticsRepository)
+    ),
+    offlineDashboardViewModel: OfflineDashboardViewModel = viewModel(
+        factory = OfflineDashboardViewModel.factory(offlineDashboardRepository)
     )
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+    val offlineUiState by offlineDashboardViewModel.uiState.collectAsStateWithLifecycle()
 
     AdminDashboardShell(
         userName = name,
@@ -98,6 +108,8 @@ fun AdminDashboardScreen(
         onCashReconciliationClick = onCashReconciliationClick,
         onSalesTransactionsClick = onSalesTransactionsClick,
         onReportsClick = onReportsClick,
+        onLocalReportsClick = onLocalReportsClick,
+        onSyncCenterClick = onSyncCenterClick,
         onPriceManagementClick = onPriceManagementClick,
         onStockOpnameClick = onStockOpnameClick,
         onStockOpnameFormClick = onStockOpnameFormClick,
@@ -120,6 +132,8 @@ fun AdminDashboardScreen(
     ) { contentModifier ->
         AdminDashboardContent(
             uiState = uiState,
+            offlineUiState = offlineUiState,
+            onSyncCenterClick = onSyncCenterClick,
             modifier = contentModifier.padding(32.dp)
         )
     }
@@ -128,6 +142,8 @@ fun AdminDashboardScreen(
 @Composable
 private fun AdminDashboardContent(
     uiState: AdminDashboardUiState,
+    offlineUiState: com.tbterminal.app.ui.dashboard.offline.OfflineDashboardUiState,
+    onSyncCenterClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     Column(
@@ -178,6 +194,11 @@ private fun AdminDashboardContent(
                 tint = DashboardInfoBlue
             )
         }
+
+        OfflineDashboardSection(
+            uiState = offlineUiState,
+            onSyncCenterClick = onSyncCenterClick
+        )
 
         Row(horizontalArrangement = Arrangement.spacedBy(24.dp)) {
             Card(

@@ -7,5 +7,17 @@ data class AuthenticatedSession(
 
 data class AuthenticatedUser(
     val name: String,
-    val role: String
+    val role: String,
+    val userId: String? = null
+)
+
+data class UserProfile(
+    val id: String?,
+    val username: String,
+    val name: String,
+    val role: String,
+    val email: String?,
+    val isActive: Boolean,
+    val joinedAt: String,
+    val lastLoginAt: String?
 )

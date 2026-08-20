@@ -18,7 +18,15 @@ fun OwnerUserCredentialScreen(
     onDashboardClick: () -> Unit,
     onEditUserClick: (String) -> Unit,
     onUserManagementClick: () -> Unit,
+    onReportsClick: () -> Unit = {},
+    onSyncCenterClick: () -> Unit = {},
+    onStockReportClick: () -> Unit = {},
+    onReceivablesClick: () -> Unit = {},
+    onSupplierDebtsClick: () -> Unit = {},
+    onCashReconciliationClick: () -> Unit = {},
+    onOperationalAuditClick: () -> Unit = {},
     onSecurityLogClick: () -> Unit,
+    onSettingsClick: () -> Unit = {},
     onLogout: () -> Unit,
     userRepository: UserRepository,
     viewModel: UserCredentialViewModel = viewModel(
@@ -44,8 +52,16 @@ fun OwnerUserCredentialScreen(
         role = role,
         activeDestination = OwnerDestination.UserManagement,
         onDashboardClick = onDashboardClick,
+        onReportsClick = onReportsClick,
+        onSyncCenterClick = onSyncCenterClick,
+        onStockReportClick = onStockReportClick,
+        onReceivablesClick = onReceivablesClick,
+        onSupplierDebtsClick = onSupplierDebtsClick,
+        onCashReconciliationClick = onCashReconciliationClick,
+        onOperationalAuditClick = onOperationalAuditClick,
         onUserManagementClick = onUserManagementClick,
         onSecurityLogClick = onSecurityLogClick,
+        onSettingsClick = onSettingsClick,
         onLogout = onLogout
     ) { contentModifier ->
         UserCredentialContent(
