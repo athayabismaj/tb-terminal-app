@@ -66,6 +66,16 @@ fun SalesReportAggregateSection(
         report == null -> SalesReportEmptyCard()
         else -> Column(verticalArrangement = Arrangement.spacedBy(24.dp)) {
             PrimaryKpiSection(report = report)
+            if (report.voided.transactionCount > 0) {
+                BaseCard(title = "Transaksi VOID (tidak masuk total aktif)") {
+                    StatusRow(
+                        label = "VOIDED",
+                        qty = "${report.voided.transactionCount} Trx",
+                        amount = report.voided.amount.toShortCurrency(),
+                        color = ReportColors.Error
+                    )
+                }
+            }
             Row(
                 modifier = Modifier
                     .fillMaxWidth()

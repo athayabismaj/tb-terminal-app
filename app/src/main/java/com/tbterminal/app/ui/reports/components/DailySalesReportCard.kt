@@ -3,6 +3,7 @@ package com.tbterminal.app.ui.reports.components
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -47,15 +48,21 @@ fun DailySalesReportCard(
                         .padding(horizontal = 12.dp, vertical = 10.dp),
                     horizontalArrangement = Arrangement.SpaceBetween
                 ) {
-                    Text(
-                        text = sale.date,
+                    Column(
                         modifier = Modifier.weight(1f),
-                        style = MaterialTheme.typography.bodySmall,
-                        color = ReportColors.OnSurface,
-                        fontWeight = FontWeight.Bold,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis
-                    )
+                    ) {
+                        Text(
+                            text = sale.date,
+                            style = MaterialTheme.typography.bodySmall,
+                            color = ReportColors.OnSurface,
+                            fontWeight = FontWeight.Bold,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                        if (sale.voidedTransactionCount > 0) {
+                            Text("${sale.voidedTransactionCount} void", style = MaterialTheme.typography.labelSmall, color = ReportColors.Error)
+                        }
+                    }
                     Text(
                         text = sale.transactionCount.toString(),
                         modifier = Modifier.weight(1f),

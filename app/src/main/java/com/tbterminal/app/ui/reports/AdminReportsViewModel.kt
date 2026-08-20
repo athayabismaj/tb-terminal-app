@@ -7,6 +7,8 @@ import com.tbterminal.app.data.remote.DashboardMetricsDto
 import com.tbterminal.app.data.remote.DailySalesSummaryDto
 import com.tbterminal.app.data.remote.SalesReportResponseDto
 import com.tbterminal.app.data.repository.AnalyticsRepository
+import com.tbterminal.app.data.repository.AnalyticsFilter
+import com.tbterminal.app.data.repository.ReportCsvType
 import com.tbterminal.app.data.repository.CashReconciliationRepository
 import com.tbterminal.app.data.repository.RepositoryResult
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -15,6 +17,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import java.time.LocalDate
 import java.time.format.DateTimeFormatter
+import java.io.OutputStream
 
 data class AdminReportsUiState(
     val isLoading: Boolean = false,
@@ -34,7 +37,9 @@ data class AdminReportsUiState(
     val transactionCurrentEnd: Int = 0,
     val salesReport: SalesReportResponseDto? = null,
     val isLoadingSalesReport: Boolean = false,
-    val salesReportError: String? = null
+    val salesReportError: String? = null,
+    val isExporting: Boolean = false,
+    val exportMessage: String? = null
 )
 
 class AdminReportsViewModel(
@@ -166,6 +171,32 @@ class AdminReportsViewModel(
             transactionPage = 1
         )
         loadReports()
+    }
+
+    fun exportCsv(type: ReportCsvType, output: OutputStream) {
+        if (_uiState.value.isExporting) {
+            output.close()
+            return
+        }
+        _uiState.value = _uiState.value.copy(isExporting = true, exportMessage = null)
+        viewModelScope.launch {
+            try {
+                val state = _uiState.value
+                analyticsRepository.exportCsv(
+                    type = type,
+                    filter = AnalyticsFilter(startDate = state.startDate, endDate = state.endDate),
+                    output = output
+                )
+                _uiState.value = _uiState.value.copy(isExporting = false, exportMessage = "Ekspor ${type.label} berhasil disimpan")
+            } catch (e: Exception) {
+                runCatching { output.close() }
+                _uiState.value = _uiState.value.copy(isExporting = false, exportMessage = e.message ?: "Ekspor gagal")
+            }
+        }
+    }
+
+    fun clearExportMessage() {
+        _uiState.value = _uiState.value.copy(exportMessage = null)
     }
 
     companion object {

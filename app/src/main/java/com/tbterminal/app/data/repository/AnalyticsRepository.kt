@@ -5,6 +5,27 @@ import com.tbterminal.app.data.remote.DashboardMetricsDto
 import com.tbterminal.app.data.remote.SalesReportResponseDto
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import java.io.OutputStream
+
+data class AnalyticsFilter(
+    val startDate: String,
+    val endDate: String,
+    val cashierId: String? = null,
+    val customerId: String? = null,
+    val productId: String? = null,
+    val categoryId: String? = null,
+    val paymentMethod: String? = null,
+    val status: String? = null
+)
+
+enum class ReportCsvType(val path: String, val label: String) {
+    TRANSACTIONS("transactions", "Transaksi"),
+    SALES_DETAILS("sales-details", "Detail penjualan"),
+    STOCK("stock", "Stok"),
+    STOCK_CARD("stock-card", "Kartu stok"),
+    RECEIVABLES("receivables", "Piutang"),
+    PAYMENTS("payments", "Pembayaran")
+}
 
 interface AnalyticsRepository {
     suspend fun getDashboardMetrics(): DashboardMetricsDto
@@ -14,8 +35,14 @@ interface AnalyticsRepository {
         endDate: String?,
         cashierId: String? = null,
         sessionId: String? = null,
+        customerId: String? = null,
+        productId: String? = null,
+        categoryId: String? = null,
+        paymentMethod: String? = null,
+        status: String? = null,
         topProductsLimit: Int = 10
     ): SalesReportResponseDto
+    suspend fun exportCsv(type: ReportCsvType, filter: AnalyticsFilter, output: OutputStream)
 }
 
 class RemoteAnalyticsRepository(
@@ -60,6 +87,11 @@ class RemoteAnalyticsRepository(
         endDate: String?,
         cashierId: String?,
         sessionId: String?,
+        customerId: String?,
+        productId: String?,
+        categoryId: String?,
+        paymentMethod: String?,
+        status: String?,
         topProductsLimit: Int
     ): SalesReportResponseDto = withContext(Dispatchers.IO) {
         try {
@@ -68,6 +100,11 @@ class RemoteAnalyticsRepository(
                 endDate = endDate,
                 cashierId = cashierId,
                 sessionId = sessionId,
+                customerId = customerId,
+                productId = productId,
+                categoryId = categoryId,
+                paymentMethod = paymentMethod,
+                status = status,
                 topProductsLimit = topProductsLimit
             )
             if (response.isSuccessful) {
@@ -82,5 +119,23 @@ class RemoteAnalyticsRepository(
         } catch (e: Exception) {
             throw Exception("Terjadi kesalahan: ${e.message}")
         }
+    }
+
+    override suspend fun exportCsv(type: ReportCsvType, filter: AnalyticsFilter, output: OutputStream) = withContext(Dispatchers.IO) {
+        val response = api.exportCsv(
+            type = type.path,
+            startDate = filter.startDate,
+            endDate = filter.endDate,
+            cashierId = filter.cashierId,
+            customerId = filter.customerId,
+            productId = filter.productId,
+            categoryId = filter.categoryId,
+            paymentMethod = filter.paymentMethod,
+            status = filter.status
+        )
+        if (!response.isSuccessful) throw Exception("Ekspor gagal: server merespons ${response.code()}")
+        val body = response.body() ?: throw Exception("Ekspor gagal: respons server kosong")
+        body.byteStream().use { input -> output.use { input.copyTo(it) } }
+        Unit
     }
 }
