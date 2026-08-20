@@ -51,12 +51,13 @@ internal fun ReceivableTableCard(
     uiState: ReceivableUiState,
     onSearchChanged: (String) -> Unit,
     onStatusFilterChanged: (ReceivableStatusFilter) -> Unit,
+    onDueFilterChanged: (ReceivableDueFilter) -> Unit,
     onPayClick: (Receivable) -> Unit,
     onPreviousPage: () -> Unit,
     onNextPage: () -> Unit
 ) {
     Column(modifier = modifier.fillMaxWidth()) {
-        ReceivableToolbar(uiState, onSearchChanged, onStatusFilterChanged)
+        ReceivableToolbar(uiState, onSearchChanged, onStatusFilterChanged, onDueFilterChanged)
         Spacer(modifier = Modifier.height(28.dp))
         ReceivableTableHeader()
         ReceivableRows(
@@ -72,7 +73,8 @@ internal fun ReceivableTableCard(
 private fun ReceivableToolbar(
     uiState: ReceivableUiState,
     onSearchChanged: (String) -> Unit,
-    onStatusFilterChanged: (ReceivableStatusFilter) -> Unit
+    onStatusFilterChanged: (ReceivableStatusFilter) -> Unit,
+    onDueFilterChanged: (ReceivableDueFilter) -> Unit
 ) {
     Row(
         modifier = Modifier.fillMaxWidth(),
@@ -92,6 +94,34 @@ private fun ReceivableToolbar(
             colors = ReceivableToolbarTextFieldColors()
         )
         ReceivableStatusFilterButton(uiState.statusFilter, onStatusFilterChanged)
+        ReceivableDueFilterButton(uiState.dueFilter, onDueFilterChanged)
+    }
+}
+
+@Composable
+private fun ReceivableDueFilterButton(
+    selected: ReceivableDueFilter,
+    onSelect: (ReceivableDueFilter) -> Unit
+) {
+    var expanded by remember { mutableStateOf(false) }
+    Box {
+        OutlinedButton(
+            onClick = { expanded = true },
+            modifier = Modifier.width(220.dp).height(56.dp),
+            shape = RoundedCornerShape(8.dp),
+            border = BorderStroke(1.dp, ReceivableLine)
+        ) {
+            Text(selected.label, modifier = Modifier.weight(1f), color = ReceivableText)
+            Icon(Icons.Default.ExpandMore, contentDescription = null, tint = ReceivableMuted)
+        }
+        DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
+            ReceivableDueFilter.entries.forEach { filter ->
+                DropdownMenuItem(
+                    text = { Text(filter.label) },
+                    onClick = { expanded = false; onSelect(filter) }
+                )
+            }
+        }
     }
 }
 
@@ -212,7 +242,14 @@ private fun ReceivableRow(
                 Text(receivable.createdAt.simpleDate(), color = ReceivableMuted, fontSize = 11.sp)
             }
         }
-        Text(receivable.transactionId.shortTransactionId(), modifier = Modifier.weight(1.45f), color = ReceivableMuted, fontSize = 12.sp)
+        Text(
+            receivable.transactionId?.shortTransactionId()
+                ?: receivable.legacyInvoiceNumber?.takeIf(String::isNotBlank)
+                ?: receivable.source,
+            modifier = Modifier.weight(1.45f),
+            color = ReceivableMuted,
+            fontSize = 12.sp
+        )
         ReceivableAmountText(receivable.amount, Modifier.weight(1.2f))
         ReceivableAmountText(receivable.paidAmount, Modifier.weight(1.2f))
         ReceivableAmountText(receivable.remainingAmount, Modifier.weight(1.2f), strong = true)

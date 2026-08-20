@@ -13,6 +13,7 @@ import androidx.compose.material.icons.outlined.Warning
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.material3.Button
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -22,13 +23,25 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 
 @Composable
-internal fun ReceivableHeader() {
-    Text(
-        text = "Piutang Pelanggan",
-        color = ReceivableText,
-        fontSize = 28.sp,
-        fontWeight = FontWeight.Medium
-    )
+internal fun ReceivableHeader(
+    canAdjust: Boolean,
+    onAddOpeningBalance: () -> Unit,
+    onAddAdjustment: () -> Unit
+) {
+    Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+        Text(
+            text = "Piutang Pelanggan",
+            modifier = Modifier.weight(1f),
+            color = ReceivableText,
+            fontSize = 28.sp,
+            fontWeight = FontWeight.Medium
+        )
+        if (canAdjust) {
+            Button(onClick = onAddAdjustment) { Text("Adjustment") }
+            Spacer(modifier = Modifier.width(10.dp))
+            Button(onClick = onAddOpeningBalance) { Text("Tambah Saldo Awal") }
+        }
+    }
 }
 
 @Composable

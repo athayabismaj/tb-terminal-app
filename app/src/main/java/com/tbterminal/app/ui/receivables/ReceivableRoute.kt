@@ -5,14 +5,17 @@ import androidx.compose.runtime.getValue
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.tbterminal.app.data.repository.ReceivableRepository
+import com.tbterminal.app.data.repository.CustomerRepository
 import com.tbterminal.app.ui.dashboard.admin.AdminDashboardShell
 import com.tbterminal.app.ui.dashboard.admin.AdminDestination
+import com.tbterminal.app.ui.receivablepayments.ReceivablePaymentReceiptDialog
 
 @Composable
 fun AdminReceivableScreen(
     name: String,
     role: String,
     receivableRepository: ReceivableRepository,
+    customerRepository: CustomerRepository,
     onDashboardClick: () -> Unit,
     onProductsClick: () -> Unit,
     onAddProductClick: () -> Unit,
@@ -34,7 +37,7 @@ fun AdminReceivableScreen(
     onSettingsClick: () -> Unit = {},
     onLogout: () -> Unit,
     viewModel: ReceivableViewModel = viewModel(
-        factory = ReceivableViewModel.factory(receivableRepository)
+        factory = ReceivableViewModel.factory(receivableRepository, customerRepository, role)
     )
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
@@ -69,6 +72,10 @@ fun AdminReceivableScreen(
             uiState = uiState,
             onSearchChanged = viewModel::onSearchChanged,
             onStatusFilterChanged = viewModel::onStatusFilterChanged,
+            onDueFilterChanged = viewModel::onDueFilterChanged,
+            canAdjust = canManageReceivableAdjustment(role),
+            onAddOpeningBalance = viewModel::openOpeningBalance,
+            onAddAdjustment = viewModel::openAdjustment,
             onPayClick = viewModel::openPayment,
             onPreviousPage = viewModel::previousPage,
             onNextPage = viewModel::nextPage,
@@ -86,6 +93,41 @@ fun AdminReceivableScreen(
             onNotesChanged = viewModel::onNotesChanged,
             onDismiss = viewModel::closePayment,
             onSubmit = viewModel::submitPayment
+        )
+    }
+
+    if (uiState.isOpeningBalanceOpen) {
+        OpeningReceivableDialog(
+            uiState = uiState,
+            onCustomerChanged = viewModel::onOpeningCustomerChanged,
+            onAmountChanged = viewModel::onOpeningAmountChanged,
+            onDebtDateChanged = viewModel::onOpeningDebtDateChanged,
+            onDueDateChanged = viewModel::onOpeningDueDateChanged,
+            onLegacyInvoiceChanged = viewModel::onOpeningLegacyInvoiceChanged,
+            onNotesChanged = viewModel::onOpeningNotesChanged,
+            onDismiss = viewModel::closeOpeningBalance,
+            onSubmit = viewModel::submitOpeningBalance
+        )
+    }
+
+    if (uiState.isAdjustmentOpen) {
+        AdjustmentReceivableDialog(
+            uiState = uiState,
+            onCustomerChanged = viewModel::onAdjustmentCustomerChanged,
+            onAmountChanged = viewModel::onAdjustmentAmountChanged,
+            onDebtDateChanged = viewModel::onAdjustmentDebtDateChanged,
+            onDueDateChanged = viewModel::onAdjustmentDueDateChanged,
+            onReferenceChanged = viewModel::onAdjustmentReferenceChanged,
+            onReasonChanged = viewModel::onAdjustmentReasonChanged,
+            onDismiss = viewModel::closeAdjustment,
+            onSubmit = viewModel::submitAdjustment
+        )
+    }
+
+    uiState.lastPaymentReceipt?.let { receipt ->
+        ReceivablePaymentReceiptDialog(
+            receipt = receipt,
+            onDismiss = viewModel::dismissPaymentReceipt
         )
     }
 }

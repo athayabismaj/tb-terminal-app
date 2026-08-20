@@ -84,9 +84,9 @@ internal fun ReceivableAmountText(amount: BigDecimal, modifier: Modifier, strong
 
 @Composable
 internal fun ReceivableStatusBadge(status: String) {
-    val color = when (status) {
-        "lunas" -> ReceivablePrimaryDark
-        "sebagian" -> ReceivableWarning
+    val color = when (status.lowercase()) {
+        "paid", "lunas" -> ReceivablePrimaryDark
+        "partial", "sebagian" -> ReceivableWarning
         else -> ReceivableDanger
     }
     Box(
@@ -118,10 +118,10 @@ internal fun String.initial(): String = firstOrNull()?.uppercase() ?: "P"
 internal fun String.shortTransactionId(): String = take(10).uppercase()
 
 internal fun String.statusLabel(): String {
-    return when (this) {
-        "belum_lunas" -> "BELUM LUNAS"
-        "sebagian" -> "SEBAGIAN"
-        "lunas" -> "LUNAS"
+    return when (lowercase()) {
+        "unpaid", "belum_lunas" -> "BELUM LUNAS"
+        "partial", "sebagian" -> "SEBAGIAN"
+        "paid", "lunas" -> "LUNAS"
         else -> uppercase()
     }
 }

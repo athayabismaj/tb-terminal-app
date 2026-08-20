@@ -1,12 +1,19 @@
 package com.tbterminal.app.ui.receivables
 
 import com.tbterminal.app.data.model.Receivable
+import com.tbterminal.app.data.model.Customer
+import com.tbterminal.app.data.model.CustomerReceivableSummary
+import com.tbterminal.app.data.model.ReceivablePaymentReceipt
 import java.math.BigDecimal
+import java.time.LocalDate
 
 data class ReceivableUiState(
     val receivables: List<Receivable> = emptyList(),
     val searchQuery: String = "",
     val statusFilter: ReceivableStatusFilter = ReceivableStatusFilter.All,
+    val dueFilter: ReceivableDueFilter = ReceivableDueFilter.All,
+    val customerSummaries: List<CustomerReceivableSummary> = emptyList(),
+    val customers: List<Customer> = emptyList(),
     val page: Int = 1,
     val limit: Int = RECEIVABLE_PAGE_SIZE,
     val total: Long = 0,
@@ -16,8 +23,26 @@ data class ReceivableUiState(
     val paymentMethod: ReceivablePaymentMethod = ReceivablePaymentMethod.Cash,
     val referenceInput: String = "",
     val notesInput: String = "",
+    val paymentIdempotencyKey: String = "",
+    val lastPaymentReceipt: ReceivablePaymentReceipt? = null,
     val isLoading: Boolean = false,
     val isSubmittingPayment: Boolean = false,
+    val isOpeningBalanceOpen: Boolean = false,
+    val openingCustomerId: String = "",
+    val openingAmountInput: String = "",
+    val openingDebtDateInput: String = LocalDate.now().toString(),
+    val openingDueDateInput: String = LocalDate.now().toString(),
+    val openingLegacyInvoiceInput: String = "",
+    val openingNotesInput: String = "",
+    val isSubmittingOpeningBalance: Boolean = false,
+    val isAdjustmentOpen: Boolean = false,
+    val adjustmentCustomerId: String = "",
+    val adjustmentAmountInput: String = "",
+    val adjustmentDebtDateInput: String = LocalDate.now().toString(),
+    val adjustmentDueDateInput: String = LocalDate.now().toString(),
+    val adjustmentReferenceInput: String = "",
+    val adjustmentReasonInput: String = "",
+    val isSubmittingAdjustment: Boolean = false,
     val errorMessage: String? = null,
     val message: String? = null
 ) {
@@ -27,7 +52,8 @@ data class ReceivableUiState(
             if (query.isBlank()) return receivables
             return receivables.filter { receivable ->
                 receivable.customerName.contains(query, ignoreCase = true) ||
-                    receivable.transactionId.contains(query, ignoreCase = true) ||
+                    receivable.transactionId?.contains(query, ignoreCase = true) == true ||
+                    receivable.legacyInvoiceNumber?.contains(query, ignoreCase = true) == true ||
                     receivable.status.contains(query, ignoreCase = true)
             }
         }
@@ -52,9 +78,16 @@ enum class ReceivableStatusFilter(
     val label: String
 ) {
     All(null, "Semua status"),
-    Unpaid("belum_lunas", "Belum lunas"),
-    Partial("sebagian", "Sebagian"),
-    Paid("lunas", "Lunas")
+    Unpaid("UNPAID", "Belum lunas"),
+    Partial("PARTIAL", "Sebagian"),
+    Paid("PAID", "Lunas")
+}
+
+enum class ReceivableDueFilter(val apiValue: String?, val label: String) {
+    All(null, "Semua jatuh tempo"),
+    Overdue("OVERDUE", "Lewat jatuh tempo"),
+    DueToday("DUE_TODAY", "Jatuh tempo hari ini"),
+    Upcoming("UPCOMING", "Akan jatuh tempo")
 }
 
 enum class ReceivablePaymentMethod(

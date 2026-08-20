@@ -48,11 +48,26 @@ fun AdminReceivablePaymentHistoryScreen(
             modifier = modifier,
             uiState = uiState,
             onSearchChanged = viewModel::onSearchChanged,
+            onReceiverSearchChanged = viewModel::onReceiverSearchChanged,
+            onReceivableIdChanged = viewModel::onReceivableIdChanged,
+            onDateFromChanged = viewModel::onDateFromChanged,
+            onDateToChanged = viewModel::onDateToChanged,
             onMethodFilterChanged = viewModel::onMethodFilterChanged,
+            onStatusFilterChanged = viewModel::onStatusFilterChanged,
+            onApplyFilters = viewModel::applyFilters,
             onShowDetail = viewModel::showDetail,
             onDismissDetail = viewModel::dismissDetail,
+            canReverse = role.equals("admin", true) || role.equals("owner", true),
+            onOpenReversal = viewModel::openReversal,
+            onReversalReasonChanged = viewModel::onReversalReasonChanged,
+            onDismissReversal = viewModel::dismissReversal,
+            onSubmitReversal = viewModel::submitReversal,
             onPreviousPage = viewModel::previousPage,
             onNextPage = viewModel::nextPage
         )
+    }
+
+    uiState.lastReversalReceipt?.let { receipt ->
+        ReceivablePaymentReceiptDialog(receipt, viewModel::dismissReversalReceipt)
     }
 }

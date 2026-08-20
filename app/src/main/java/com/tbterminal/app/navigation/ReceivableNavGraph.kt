@@ -62,7 +62,7 @@ internal fun NavGraphBuilder.receivableGraph(navController: NavHostController, s
 
             if (sessionUser == null) {
                 LaunchedEffect(Unit) {
-                    sessionManager.clearSession()
+                    sessionManager.logout()
                     navController.navigate(AppRoute.Login.route) {
                         popUpTo(0)
                         launchSingleTop = true
@@ -73,6 +73,7 @@ internal fun NavGraphBuilder.receivableGraph(navController: NavHostController, s
                     name = sessionUser.name,
                     role = sessionUser.role,
                     receivableRepository = appContainer.receivableRepository,
+                    customerRepository = appContainer.customerRepository,
                     onDashboardClick = {
                         navController.navigate(AppRoute.Dashboard.route) {
                             launchSingleTop = true
@@ -163,7 +164,7 @@ internal fun NavGraphBuilder.receivableGraph(navController: NavHostController, s
                             launchSingleTop = true
                         }
                     },                                    onLogout = {
-                        sessionManager.clearSession()
+                        sessionManager.logout()
                         navController.navigate(AppRoute.Login.route) {
                             popUpTo(0)
                             launchSingleTop = true
@@ -178,7 +179,7 @@ internal fun NavGraphBuilder.receivableGraph(navController: NavHostController, s
 
             if (sessionUser == null) {
                 LaunchedEffect(Unit) {
-                    sessionManager.clearSession()
+                    sessionManager.logout()
                     navController.navigate(AppRoute.Login.route) {
                         popUpTo(0)
                         launchSingleTop = true
@@ -280,7 +281,7 @@ internal fun NavGraphBuilder.receivableGraph(navController: NavHostController, s
                         }
                     },
                     onLogout = {
-                        sessionManager.clearSession()
+                        sessionManager.logout()
                         navController.navigate(AppRoute.Login.route) {
                             popUpTo(0)
                             launchSingleTop = true
@@ -295,7 +296,7 @@ internal fun NavGraphBuilder.receivableGraph(navController: NavHostController, s
 
             if (sessionUser == null) {
                 LaunchedEffect(Unit) {
-                    sessionManager.clearSession()
+                    sessionManager.logout()
                     navController.navigate(AppRoute.Login.route) {
                         popUpTo(0)
                         launchSingleTop = true
@@ -406,7 +407,7 @@ internal fun NavGraphBuilder.receivableGraph(navController: NavHostController, s
                         }
                     },
                     onLogout = {
-                        sessionManager.clearSession()
+                        sessionManager.logout()
                         navController.navigate(AppRoute.Login.route) {
                             popUpTo(0)
                             launchSingleTop = true
@@ -430,7 +431,7 @@ internal fun NavGraphBuilder.receivableGraph(navController: NavHostController, s
 
             if (sessionUser == null || customerId.isNullOrBlank()) {
                 LaunchedEffect(Unit) {
-                    sessionManager.clearSession()
+                    sessionManager.logout()
                     navController.navigate(AppRoute.Login.route) {
                         popUpTo(0)
                         launchSingleTop = true
@@ -541,7 +542,7 @@ internal fun NavGraphBuilder.receivableGraph(navController: NavHostController, s
                         }
                     },
                     onLogout = {
-                        sessionManager.clearSession()
+                        sessionManager.logout()
                         navController.navigate(AppRoute.Login.route) {
                             popUpTo(0)
                             launchSingleTop = true
@@ -565,7 +566,7 @@ internal fun NavGraphBuilder.receivableGraph(navController: NavHostController, s
 
             if (sessionUser == null || customerId.isNullOrBlank()) {
                 LaunchedEffect(Unit) {
-                    sessionManager.clearSession()
+                    sessionManager.logout()
                     navController.navigate(AppRoute.Login.route) {
                         popUpTo(0)
                         launchSingleTop = true
@@ -676,7 +677,7 @@ internal fun NavGraphBuilder.receivableGraph(navController: NavHostController, s
                         }
                     },
                     onLogout = {
-                        sessionManager.clearSession()
+                        sessionManager.logout()
                         navController.navigate(AppRoute.Login.route) {
                             popUpTo(0)
                             launchSingleTop = true

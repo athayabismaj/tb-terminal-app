@@ -32,6 +32,8 @@ import androidx.compose.material.icons.outlined.Visibility
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Button
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.HorizontalDivider
@@ -53,11 +55,13 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import com.tbterminal.app.data.model.ReceivablePaymentHistory
+import com.tbterminal.app.data.model.ReceivablePaymentReceipt
 import java.math.BigDecimal
 import java.text.NumberFormat
 import java.time.OffsetDateTime
@@ -76,9 +80,20 @@ internal fun ReceivablePaymentHistoryScreen(
     modifier: Modifier,
     uiState: ReceivablePaymentHistoryUiState,
     onSearchChanged: (String) -> Unit,
+    onReceiverSearchChanged: (String) -> Unit,
+    onReceivableIdChanged: (String) -> Unit,
+    onDateFromChanged: (String) -> Unit,
+    onDateToChanged: (String) -> Unit,
     onMethodFilterChanged: (ReceivablePaymentMethodFilter) -> Unit,
+    onStatusFilterChanged: (ReceivablePaymentStatusFilter) -> Unit,
+    onApplyFilters: () -> Unit,
     onShowDetail: (ReceivablePaymentHistory) -> Unit,
     onDismissDetail: () -> Unit,
+    canReverse: Boolean,
+    onOpenReversal: (ReceivablePaymentHistory) -> Unit,
+    onReversalReasonChanged: (String) -> Unit,
+    onDismissReversal: () -> Unit,
+    onSubmitReversal: () -> Unit,
     onPreviousPage: () -> Unit,
     onNextPage: () -> Unit
 ) {
@@ -91,9 +106,25 @@ internal fun ReceivablePaymentHistoryScreen(
         verticalArrangement = Arrangement.spacedBy(28.dp)
     ) {
         PaymentHistoryHeader()
-        PaymentTable(uiState, onSearchChanged, onMethodFilterChanged, onShowDetail, onPreviousPage, onNextPage)
+        PaymentTable(
+            uiState, onSearchChanged, onReceiverSearchChanged, onReceivableIdChanged, onDateFromChanged, onDateToChanged,
+            onMethodFilterChanged, onStatusFilterChanged, onApplyFilters, onShowDetail,
+            onPreviousPage, onNextPage
+        )
     }
-    uiState.selectedPayment?.let { PaymentDetailDialog(it, onDismissDetail) }
+    uiState.selectedPayment?.let {
+        PaymentDetailDialog(it, onDismissDetail, canReverse, onOpenReversal)
+    }
+    uiState.paymentToReverse?.let { payment ->
+        ReversalDialog(
+            payment = payment,
+            reason = uiState.reversalReason,
+            isSubmitting = uiState.isReversing,
+            onReasonChanged = onReversalReasonChanged,
+            onDismiss = onDismissReversal,
+            onSubmit = onSubmitReversal
+        )
+    }
 }
 
 @Composable
@@ -157,13 +188,22 @@ private fun PaymentMetric(
 private fun PaymentTable(
     uiState: ReceivablePaymentHistoryUiState,
     onSearchChanged: (String) -> Unit,
+    onReceiverSearchChanged: (String) -> Unit,
+    onReceivableIdChanged: (String) -> Unit,
+    onDateFromChanged: (String) -> Unit,
+    onDateToChanged: (String) -> Unit,
     onMethodFilterChanged: (ReceivablePaymentMethodFilter) -> Unit,
+    onStatusFilterChanged: (ReceivablePaymentStatusFilter) -> Unit,
+    onApplyFilters: () -> Unit,
     onShowDetail: (ReceivablePaymentHistory) -> Unit,
     onPreviousPage: () -> Unit,
     onNextPage: () -> Unit
 ) {
     Column(Modifier.fillMaxWidth()) {
-        PaymentToolbar(uiState, onSearchChanged, onMethodFilterChanged)
+        PaymentToolbar(
+            uiState, onSearchChanged, onReceiverSearchChanged, onReceivableIdChanged, onDateFromChanged, onDateToChanged,
+            onMethodFilterChanged, onStatusFilterChanged, onApplyFilters
+        )
         Spacer(Modifier.height(28.dp))
         PaymentTableHeader()
         when {
@@ -182,25 +222,73 @@ private fun PaymentTable(
 private fun PaymentToolbar(
     uiState: ReceivablePaymentHistoryUiState,
     onSearchChanged: (String) -> Unit,
-    onMethodFilterChanged: (ReceivablePaymentMethodFilter) -> Unit
+    onReceiverSearchChanged: (String) -> Unit,
+    onReceivableIdChanged: (String) -> Unit,
+    onDateFromChanged: (String) -> Unit,
+    onDateToChanged: (String) -> Unit,
+    onMethodFilterChanged: (ReceivablePaymentMethodFilter) -> Unit,
+    onStatusFilterChanged: (ReceivablePaymentStatusFilter) -> Unit,
+    onApplyFilters: () -> Unit
 ) {
-    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(16.dp), verticalAlignment = Alignment.CenterVertically) {
-        OutlinedTextField(
-            value = uiState.searchQuery,
-            onValueChange = onSearchChanged,
-            placeholder = { Text("Cari pelanggan atau transaksi...", color = PaymentMuted) },
-            trailingIcon = { Icon(Icons.Outlined.Search, "Cari pembayaran", tint = PaymentMuted) },
-            singleLine = true,
-            modifier = Modifier.weight(1f).height(56.dp),
-            shape = RoundedCornerShape(8.dp),
-            colors = OutlinedTextFieldDefaults.colors(
-                focusedBorderColor = PaymentPrimary,
-                unfocusedBorderColor = PaymentBorder,
-                focusedContainerColor = PaymentSurface,
-                unfocusedContainerColor = PaymentSurface
-            )
+    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(16.dp), verticalAlignment = Alignment.CenterVertically) {
+            PaymentFilterField(uiState.searchQuery, onSearchChanged, "Nama pelanggan", Modifier.weight(1f))
+            PaymentFilterField(uiState.receiverSearch, onReceiverSearchChanged, "Nama kasir/penerima", Modifier.weight(1f))
+            PaymentMethodFilterDropdown(uiState.methodFilter, onMethodFilterChanged)
+            PaymentStatusFilterDropdown(uiState.statusFilter, onStatusFilterChanged)
+        }
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(16.dp), verticalAlignment = Alignment.CenterVertically) {
+            PaymentFilterField(uiState.receivableIdFilter, onReceivableIdChanged, "ID piutang", Modifier.weight(1f))
+            PaymentFilterField(uiState.dateFrom, onDateFromChanged, "Dari (yyyy-MM-dd)", Modifier.weight(1f))
+            PaymentFilterField(uiState.dateTo, onDateToChanged, "Sampai (yyyy-MM-dd)", Modifier.weight(1f))
+            Button(onClick = onApplyFilters, modifier = Modifier.height(56.dp)) { Text("Terapkan filter") }
+        }
+    }
+}
+
+@Composable
+private fun PaymentFilterField(
+    value: String,
+    onValueChange: (String) -> Unit,
+    placeholder: String,
+    modifier: Modifier
+) {
+    OutlinedTextField(
+        value = value,
+        onValueChange = onValueChange,
+        placeholder = { Text(placeholder, color = PaymentMuted) },
+        trailingIcon = { Icon(Icons.Outlined.Search, null, tint = PaymentMuted) },
+        singleLine = true,
+        modifier = modifier.height(56.dp),
+        shape = RoundedCornerShape(8.dp),
+        colors = OutlinedTextFieldDefaults.colors(
+            focusedBorderColor = PaymentPrimary,
+            unfocusedBorderColor = PaymentBorder,
+            focusedContainerColor = PaymentSurface,
+            unfocusedContainerColor = PaymentSurface
         )
-        PaymentMethodFilterDropdown(uiState.methodFilter, onMethodFilterChanged)
+    )
+}
+
+@Composable
+private fun PaymentStatusFilterDropdown(
+    selected: ReceivablePaymentStatusFilter,
+    onSelect: (ReceivablePaymentStatusFilter) -> Unit
+) {
+    var expanded by remember { mutableStateOf(false) }
+    Box {
+        OutlinedButton(onClick = { expanded = true }, modifier = Modifier.width(190.dp).height(56.dp)) {
+            Text(selected.label, modifier = Modifier.weight(1f))
+            Icon(Icons.Outlined.ExpandMore, null)
+        }
+        DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
+            ReceivablePaymentStatusFilter.entries.forEach { filter ->
+                DropdownMenuItem(text = { Text(filter.label) }, onClick = {
+                    expanded = false
+                    onSelect(filter)
+                })
+            }
+        }
     }
 }
 
@@ -242,7 +330,7 @@ private fun PaymentMethodFilterDropdown(
 private fun PaymentTableHeader() {
     Row(Modifier.fillMaxWidth().background(PaymentSoft).padding(horizontal = 20.dp, vertical = 12.dp)) {
         TableLabel("PELANGGAN", Modifier.weight(1.7f))
-        TableLabel("TRANSAKSI", Modifier.weight(1.6f))
+        TableLabel("NOMOR / PIUTANG", Modifier.weight(1.6f))
         TableLabel("TANGGAL BAYAR", Modifier.weight(1.4f))
         TableLabel("METODE", Modifier.weight(0.9f))
         TableLabel("NOMINAL", Modifier.weight(1.1f))
@@ -265,7 +353,10 @@ private fun PaymentTableRow(
         verticalAlignment = Alignment.CenterVertically
     ) {
         Text(payment.customerName, Modifier.weight(1.7f), color = PaymentText, fontSize = 13.sp, fontWeight = FontWeight.Bold)
-        Text(payment.transactionId.shortId(), Modifier.weight(1.6f), color = PaymentMuted, fontSize = 13.sp)
+        Column(Modifier.weight(1.6f)) {
+            Text(payment.paymentNumber, color = PaymentText, fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
+            Text(payment.receivableId.shortId(), color = PaymentMuted, fontSize = 10.sp)
+        }
         Text(payment.paidAt.asDisplayDate(), Modifier.weight(1.4f), color = PaymentMuted, fontSize = 13.sp)
         Text(payment.method.paymentMethodLabel(), Modifier.weight(0.9f), color = PaymentMuted, fontSize = 13.sp)
         Text(payment.amount.asCurrency(), Modifier.weight(1.1f), color = PaymentText, fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
@@ -281,7 +372,7 @@ private fun PaymentTableRow(
 
 @Composable
 private fun ReceivableStatusBadge(status: String) {
-    val isPaid = status.equals("lunas", ignoreCase = true)
+    val isPaid = status.equals("PAID", ignoreCase = true) || status.equals("lunas", ignoreCase = true)
     val tint = if (isPaid) PaymentPrimary else Color(0xFFF59E0B)
     Surface(color = tint.copy(alpha = 0.1f), shape = RoundedCornerShape(16.dp)) {
         Text(status.replace('_', ' ').uppercase(), Modifier.padding(horizontal = 10.dp, vertical = 4.dp), color = tint, fontSize = 10.sp, fontWeight = FontWeight.Bold)
@@ -333,30 +424,83 @@ private fun PaymentPageButton(icon: ImageVector, enabled: Boolean, onClick: () -
 }
 
 @Composable
-private fun PaymentDetailDialog(payment: ReceivablePaymentHistory, onDismiss: () -> Unit) {
+private fun PaymentDetailDialog(
+    payment: ReceivablePaymentHistory,
+    onDismiss: () -> Unit,
+    canReverse: Boolean,
+    onOpenReversal: (ReceivablePaymentHistory) -> Unit
+) {
+    val context = LocalContext.current
     Dialog(onDismissRequest = onDismiss) {
         Card(Modifier.widthIn(max = 560.dp), colors = CardDefaults.cardColors(PaymentSurface), shape = RoundedCornerShape(12.dp)) {
             Column(Modifier.padding(24.dp)) {
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
                     Column {
                         Text("Detail Pembayaran Piutang", color = PaymentText, fontSize = 20.sp, fontWeight = FontWeight.Bold)
-                        Text(payment.id.shortId(), color = PaymentPrimary, fontSize = 12.sp)
+                        Text(payment.paymentNumber, color = PaymentPrimary, fontSize = 12.sp)
                     }
                     TextButton(onClick = onDismiss) { Text("Tutup") }
                 }
                 Spacer(Modifier.height(16.dp))
                 DetailInfo("Pelanggan", payment.customerName)
-                DetailInfo("Transaksi", payment.transactionId.shortId())
+                DetailInfo("Transaksi", payment.transactionId?.shortId() ?: payment.source)
                 DetailInfo("Tanggal bayar", payment.paidAt.asDisplayDate())
                 DetailInfo("Metode", payment.method.paymentMethodLabel())
-                DetailInfo("Nominal masuk", payment.amount.asCurrency())
-                DetailInfo("Sisa piutang saat ini", payment.receivableRemainingAmount.asCurrency())
+                DetailInfo("Jenis entri", payment.entryType)
+                DetailInfo("Nominal", payment.amount.asCurrency())
+                DetailInfo("Penerima", payment.receivedByName)
+                DetailInfo("Saldo sebelum", payment.balanceBefore.asCurrency())
+                DetailInfo("Saldo sesudah", payment.balanceAfter.asCurrency())
                 DetailInfo("Status piutang", payment.receivableStatus.replace('_', ' ').uppercase())
                 DetailInfo("Referensi", payment.reference ?: "-")
                 DetailInfo("Catatan", payment.notes ?: "-")
+                Spacer(Modifier.height(16.dp))
+                Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                    Button(onClick = { printReceivablePaymentReceipt(context, payment.toReceipt()) }) {
+                        Text("Cetak bukti")
+                    }
+                    if (canReverse && payment.entryType == "PAYMENT" && !payment.isReversed) {
+                        OutlinedButton(onClick = { onDismiss(); onOpenReversal(payment) }) {
+                            Text("Reversal")
+                        }
+                    }
+                }
             }
         }
     }
+}
+
+@Composable
+private fun ReversalDialog(
+    payment: ReceivablePaymentHistory,
+    reason: String,
+    isSubmitting: Boolean,
+    onReasonChanged: (String) -> Unit,
+    onDismiss: () -> Unit,
+    onSubmit: () -> Unit
+) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Reversal ${payment.paymentNumber}") },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                Text("Reversal akan mengembalikan saldo piutang sebesar ${payment.amount.asCurrency()}.")
+                OutlinedTextField(
+                    value = reason,
+                    onValueChange = onReasonChanged,
+                    label = { Text("Alasan koreksi") },
+                    minLines = 3,
+                    modifier = Modifier.fillMaxWidth()
+                )
+            }
+        },
+        confirmButton = {
+            Button(onClick = onSubmit, enabled = !isSubmitting) {
+                Text(if (isSubmitting) "Memproses..." else "Catat reversal")
+            }
+        },
+        dismissButton = { TextButton(onClick = onDismiss) { Text("Batal") } }
+    )
 }
 
 @Composable
@@ -401,3 +545,26 @@ private fun String.asDisplayDate(): String {
         OffsetDateTime.parse(this).format(DateTimeFormatter.ofPattern("dd MMM yyyy HH:mm", Locale.forLanguageTag("id-ID")))
     }.getOrDefault(this)
 }
+
+private fun ReceivablePaymentHistory.toReceipt() = ReceivablePaymentReceipt(
+    id = id,
+    paymentNumber = paymentNumber,
+    receivableId = receivableId,
+    customerId = customerId,
+    customerName = customerName,
+    amount = amount,
+    method = method,
+    reference = reference,
+    notes = notes,
+    paidAt = paidAt,
+    paymentDate = paymentDate,
+    entryType = entryType,
+    reversedPaymentId = reversedPaymentId,
+    receivedBy = receivedBy,
+    receivedByName = receivedByName,
+    balanceBefore = balanceBefore,
+    balanceAfter = balanceAfter,
+    receivableStatus = receivableStatus,
+    receivableRemainingAmount = receivableRemainingAmount,
+    idempotentReplay = false
+)

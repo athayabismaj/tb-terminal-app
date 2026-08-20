@@ -19,6 +19,10 @@ internal fun ReceivableScreen(
     uiState: ReceivableUiState,
     onSearchChanged: (String) -> Unit,
     onStatusFilterChanged: (ReceivableStatusFilter) -> Unit,
+    onDueFilterChanged: (ReceivableDueFilter) -> Unit,
+    canAdjust: Boolean,
+    onAddOpeningBalance: () -> Unit,
+    onAddAdjustment: () -> Unit,
     onPayClick: (Receivable) -> Unit,
     onPreviousPage: () -> Unit,
     onNextPage: () -> Unit,
@@ -32,13 +36,15 @@ internal fun ReceivableScreen(
             .padding(40.dp),
         verticalArrangement = Arrangement.spacedBy(28.dp)
     ) {
-        ReceivableHeader()
+        ReceivableHeader(canAdjust, onAddOpeningBalance, onAddAdjustment)
         ReceivableMessage(uiState, onDismissMessage)
+        ReceivableCustomerSummaries(uiState.customerSummaries)
         ReceivableTableCard(
             modifier = Modifier.fillMaxWidth(),
             uiState = uiState,
             onSearchChanged = onSearchChanged,
             onStatusFilterChanged = onStatusFilterChanged,
+            onDueFilterChanged = onDueFilterChanged,
             onPayClick = onPayClick,
             onPreviousPage = onPreviousPage,
             onNextPage = onNextPage
