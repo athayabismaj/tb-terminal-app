@@ -70,8 +70,10 @@ import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.tbterminal.app.data.local.dao.TransactionDao
 import com.tbterminal.app.data.model.CashTransaction
 import com.tbterminal.app.data.repository.CashReconciliationRepository
+import com.tbterminal.app.data.sync.OfflineCheckoutSyncService
 import com.tbterminal.app.ui.components.HistoryDateFilter
 import com.tbterminal.app.ui.components.HistoryDatePickerDialog
 import com.tbterminal.app.ui.dashboard.DashboardBackground
@@ -83,6 +85,7 @@ import com.tbterminal.app.ui.dashboard.DashboardTextSecondary
 import com.tbterminal.app.ui.dashboard.DashboardWarningOrange
 
 import com.tbterminal.app.ui.dashboard.cashier.CashierDestination
+import com.tbterminal.app.ui.offline.LocalPendingTransactionsCard
 import java.math.BigDecimal
 import java.text.NumberFormat
 import java.text.SimpleDateFormat
@@ -102,6 +105,8 @@ fun AdminTransactionHistoryScreen(
     name: String,
     role: String,
     cashReconciliationRepository: CashReconciliationRepository,
+    transactionDao: TransactionDao? = null,
+    offlineCheckoutSyncService: OfflineCheckoutSyncService? = null,
     onDashboardClick: () -> Unit,
     onProductsClick: () -> Unit,
     onAddProductClick: () -> Unit,
@@ -124,7 +129,11 @@ fun AdminTransactionHistoryScreen(
     onReceiptClick: (String) -> Unit,
     onLogout: () -> Unit,
     viewModel: AdminTransactionHistoryViewModel = viewModel(
-        factory = AdminTransactionHistoryViewModel.factory(cashReconciliationRepository)
+        factory = AdminTransactionHistoryViewModel.factory(
+            repository = cashReconciliationRepository,
+            transactionDao = transactionDao,
+            offlineCheckoutSyncService = offlineCheckoutSyncService
+        )
     )
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
@@ -221,7 +230,7 @@ private fun CashierTransactionHistoryContent(
                     Spacer(modifier = Modifier.width(12.dp))
                     Box(modifier = Modifier.weight(1f), contentAlignment = Alignment.CenterStart) {
                         if (state.query.isEmpty()) {
-                            Text("Cari no struk atau pembeli...", color = DashboardTextSecondary.copy(alpha = 0.5f), fontSize = 14.sp)
+                            Text("Cari no struk, pembeli, atau kasir...", color = DashboardTextSecondary.copy(alpha = 0.5f), fontSize = 14.sp)
                         }
                         BasicTextField(
                             value = state.query,
@@ -239,6 +248,12 @@ private fun CashierTransactionHistoryContent(
                 onStatusChanged = viewModel::updateStatusFilter,
                 modifier = Modifier.width(220.dp)
             )
+            TransactionFilterDropdown(
+                selected = state.paymentMethodFilter,
+                choices = listOf("Semua", "tunai", "transfer", "qris", "hutang", "dp"),
+                onChanged = viewModel::updatePaymentMethodFilter,
+                modifier = Modifier.width(180.dp)
+            )
         }
 
 
@@ -247,6 +262,15 @@ private fun CashierTransactionHistoryContent(
 
 
         // ── Table Card ──
+        LocalPendingTransactionsCard(
+            transactions = state.localPendingTransactions,
+            message = state.localSyncMessage,
+            bulkProgressMessage = state.bulkSyncProgressMessage,
+            isBulkSyncing = state.isBulkSyncing,
+            onSyncClick = viewModel::syncLocalTransaction,
+            onSyncAllClick = viewModel::syncAllLocalTransactions
+        )
+
         Card(
             modifier = Modifier.fillMaxWidth(),
             colors = CardDefaults.cardColors(containerColor = DashboardSurface),
@@ -588,7 +612,7 @@ private fun TransactionStatusDropdown(
                 .widthIn(min = 220.dp)
                 .background(Color.White)
         ) {
-            listOf("Semua", "Lunas", "DP", "Hutang").forEach { status ->
+            listOf("Semua", "Lunas", "DP", "Hutang", "Voided").forEach { status ->
                 DropdownMenuItem(
                     text = { Text(status.statusFilterLabel(), color = DashboardTextPrimary) },
                     onClick = {
@@ -596,6 +620,30 @@ private fun TransactionStatusDropdown(
                         expanded = false
                     }
                 )
+            }
+        }
+    }
+}
+
+@Composable
+private fun TransactionFilterDropdown(
+    selected: String,
+    choices: List<String>,
+    onChanged: (String) -> Unit,
+    modifier: Modifier = Modifier
+) {
+    var expanded by remember { mutableStateOf(false) }
+    Box {
+        OutlinedButton(onClick = { expanded = true }, modifier = modifier.height(48.dp)) {
+            Text(if (selected == "Semua") "Semua metode" else selected.uppercase(), modifier = Modifier.weight(1f))
+            Icon(Icons.Outlined.ExpandMore, contentDescription = null)
+        }
+        DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
+            choices.forEach { value ->
+                DropdownMenuItem(text = { Text(if (value == "Semua") "Semua metode" else value.uppercase()) }, onClick = {
+                    expanded = false
+                    onChanged(value)
+                })
             }
         }
     }
@@ -820,6 +868,7 @@ internal fun String.statusColor(): Color = when (lowercase()) {
     "lunas", "paid", "success", "completed" -> DashboardBrandGreenDark
     "dp", "partial" -> DashboardWarningOrange
     "hutang", "unpaid" -> Color(0xFFEF4444)
+    "voided" -> Color(0xFF7F1D1D)
     else -> DashboardTextSecondary
 }
 
@@ -828,6 +877,7 @@ private fun String.statusFilterLabel(): String = when (this) {
     "Lunas" -> "Lunas"
     "DP" -> "DP"
     "Hutang" -> "Hutang"
+    "Voided" -> "Dibatalkan"
     else -> this
 }
 

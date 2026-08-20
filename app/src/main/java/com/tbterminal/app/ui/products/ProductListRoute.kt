@@ -10,6 +10,16 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.tbterminal.app.data.model.ProductStock
@@ -50,6 +60,15 @@ fun AdminProductListScreen(
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     var productToToggle by remember { mutableStateOf<ProductStock?>(null) }
+    val context = LocalContext.current
+    val csvLauncher = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
+        if (uri != null) {
+            val csv = runCatching {
+                context.contentResolver.openInputStream(uri)?.bufferedReader(Charsets.UTF_8)?.use { it.readText() }
+            }.getOrNull()
+            if (!csv.isNullOrBlank()) viewModel.previewCsv(csv)
+        }
+    }
 
     AdminDashboardShell(
         userName = name,
@@ -83,6 +102,7 @@ fun AdminProductListScreen(
             onCategorySelected = viewModel::onCategorySelected,
             onRetry = { viewModel.loadProducts() },
             onAddProductClick = onAddProductClick,
+            onImportProductClick = { csvLauncher.launch(arrayOf("text/csv", "text/comma-separated-values", "text/plain")) },
             onEditProductClick = onEditProductClick,
             onProductDetailClick = onProductDetailClick,
             onCategoriesClick = onCategoriesClick,
@@ -91,6 +111,38 @@ fun AdminProductListScreen(
             onPreviousPage = viewModel::previousPage,
             onNextPage = viewModel::nextPage,
             onDismissMessage = viewModel::clearActionMessage
+        )
+    }
+
+    if (uiState.showImportDialog) {
+        val preview = uiState.importPreview
+        AlertDialog(
+            onDismissRequest = viewModel::dismissImport,
+            title = { Text("Preview Impor Produk") },
+            text = {
+                Column(
+                    modifier = Modifier.verticalScroll(rememberScrollState()),
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    if (uiState.isImporting && preview == null) {
+                        Text("Memvalidasi CSV...")
+                    } else if (preview != null) {
+                        Text("Total ${preview.totalRows} baris • ${preview.validRows} valid • ${preview.invalidRows} gagal")
+                        preview.rows.filter { !it.valid }.forEach { row ->
+                            Text("Baris ${row.rowNumber} (${row.sku.ifBlank { "tanpa SKU" }}): ${row.errors.joinToString("; ")}")
+                        }
+                    }
+                }
+            },
+            confirmButton = {
+                Button(
+                    onClick = viewModel::commitCsv,
+                    enabled = !uiState.isImporting && preview != null && preview.invalidRows == 0 && preview.totalRows > 0
+                ) { Text(if (uiState.isImporting) "Memproses..." else "Simpan Atomik") }
+            },
+            dismissButton = {
+                TextButton(onClick = viewModel::dismissImport, enabled = !uiState.isImporting) { Text("Batal") }
+            }
         )
     }
 

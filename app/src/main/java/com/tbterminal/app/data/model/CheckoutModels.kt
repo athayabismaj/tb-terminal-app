@@ -1,6 +1,7 @@
 package com.tbterminal.app.data.model
 
 data class CheckoutSubmitCommand(
+    val idempotencyKey: String,
     val items: List<CheckoutSubmitItem>,
     val paymentMethod: String,
     val amountPaid: String,
@@ -16,5 +17,8 @@ data class CheckoutSubmitItem(
 
 data class CheckoutReceipt(
     val receiptId: String,
-    val transactionId: String
+    val transactionId: String,
+    val amountTendered: String,
+    val changeAmount: String,
+    val idempotentReplay: Boolean
 )

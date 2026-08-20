@@ -62,7 +62,7 @@ internal fun NavGraphBuilder.checkoutGraph(navController: NavHostController, ses
 
             if (sessionUser == null) {
                 LaunchedEffect(Unit) {
-                    sessionManager.clearSession()
+                    sessionManager.logout()
                     navController.navigate(AppRoute.Login.route) {
                         popUpTo(0)
                         launchSingleTop = true
@@ -70,7 +70,7 @@ internal fun NavGraphBuilder.checkoutGraph(navController: NavHostController, ses
                 }
             } else {
                 val logout: () -> Unit = {
-                    sessionManager.clearSession()
+                    sessionManager.logout()
                     navController.navigate(AppRoute.Login.route) {
                         popUpTo(0)
                         launchSingleTop = true
@@ -140,7 +140,7 @@ internal fun NavGraphBuilder.checkoutGraph(navController: NavHostController, ses
 
             if (sessionUser == null) {
                 LaunchedEffect(Unit) {
-                    sessionManager.clearSession()
+                    sessionManager.logout()
                     navController.navigate(AppRoute.Login.route) {
                         popUpTo(0)
                         launchSingleTop = true
@@ -148,7 +148,7 @@ internal fun NavGraphBuilder.checkoutGraph(navController: NavHostController, ses
                 }
             } else {
                 val logout: () -> Unit = {
-                    sessionManager.clearSession()
+                    sessionManager.logout()
                     navController.navigate(AppRoute.Login.route) {
                         popUpTo(0)
                         launchSingleTop = true
@@ -232,7 +232,12 @@ private fun cashierCheckoutViewModel(
             checkoutRepository = appContainer.checkoutRepository,
             inventoryRepository = appContainer.inventoryRepository,
             customerRepository = appContainer.customerRepository,
-            cashReconciliationRepository = appContainer.cashReconciliationRepository
+            cashReconciliationRepository = appContainer.cashReconciliationRepository,
+            cashSessionLocalDataSource = appContainer.cashSessionLocalDataSource,
+            localCheckoutLookupService = appContainer.localCheckoutLookupService,
+            localCheckoutService = appContainer.localCheckoutService,
+            offlineStatusRepository = appContainer.offlineStatusRepository,
+            offlineSyncScheduler = appContainer.offlineSyncScheduler
         )
     )
 }

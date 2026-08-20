@@ -8,6 +8,7 @@ import com.tbterminal.app.data.model.CashTransaction
 import com.tbterminal.app.data.model.CashTransactionDetail
 import com.tbterminal.app.data.model.CashTransactionItem
 import com.tbterminal.app.data.model.CashTransactionPage
+import com.tbterminal.app.data.model.TransactionVoidResult
 import com.tbterminal.app.data.remote.CashSessionResponseDto
 import com.tbterminal.app.data.remote.CloseSessionRequestDto
 import com.tbterminal.app.data.remote.OpenSessionRequestDto
@@ -17,6 +18,7 @@ import com.tbterminal.app.data.remote.SalesTransactionSummaryDto
 import com.tbterminal.app.data.remote.TransactionDetailDto
 import com.tbterminal.app.data.remote.TransactionItemDto
 import com.tbterminal.app.data.remote.safeApiCall
+import com.tbterminal.app.data.sync.BackendHealthMonitor
 import java.math.BigDecimal
 
 interface CashReconciliationRepository {
@@ -36,11 +38,16 @@ interface CashReconciliationRepository {
         limit: Int,
         sessionId: String?,
         search: String? = null,
+        receiptNumber: String? = null,
+        cashierId: String? = null,
+        customerId: String? = null,
+        paymentMethod: String? = null,
         status: String? = null,
         startDate: String? = null,
         endDate: String? = null
     ): RepositoryResult<CashTransactionPage>
     suspend fun getTransactionById(id: String): RepositoryResult<CashTransactionDetail>
+    suspend fun voidTransaction(id: String, reason: String, idempotencyKey: String): RepositoryResult<TransactionVoidResult>
     suspend fun addExpense(amount: BigDecimal, description: String): RepositoryResult<CashExpense>
     suspend fun getExpenses(sessionId: String): RepositoryResult<List<CashExpense>>
     suspend fun getExpenseHistory(
@@ -54,7 +61,8 @@ interface CashReconciliationRepository {
 }
 
 class RemoteCashReconciliationRepository(
-    private val salesApi: SalesApi
+    private val salesApi: SalesApi,
+    private val backendHealthMonitor: BackendHealthMonitor? = null
 ) : CashReconciliationRepository {
     override suspend fun getSessions(
         page: Int,
@@ -86,6 +94,7 @@ class RemoteCashReconciliationRepository(
                         message = response.message ?: response.error ?: "Sesi kas gagal dimuat."
                     )
                 } else {
+                    backendHealthMonitor?.markConnected()
                     RepositoryResult.Success(response.data?.toCashSession())
                 }
             }
@@ -148,6 +157,10 @@ class RemoteCashReconciliationRepository(
         limit: Int,
         sessionId: String?,
         search: String?,
+        receiptNumber: String?,
+        cashierId: String?,
+        customerId: String?,
+        paymentMethod: String?,
         status: String?,
         startDate: String?,
         endDate: String?
@@ -158,6 +171,10 @@ class RemoteCashReconciliationRepository(
                 limit = limit, 
                 sessionId = sessionId,
                 search = search,
+                receiptNumber = receiptNumber,
+                cashierId = cashierId,
+                customerId = customerId,
+                paymentMethod = paymentMethod,
                 status = status,
                 startDate = startDate,
                 endDate = endDate
@@ -170,8 +187,31 @@ class RemoteCashReconciliationRepository(
                     message = response.message ?: response.error ?: "Transaksi kas gagal dimuat."
                 )
             } else {
+                backendHealthMonitor?.markConnected()
                 RepositoryResult.Success(transactionPage.toCashTransactionPage())
             }
+        }
+    }
+
+    override suspend fun voidTransaction(
+        id: String,
+        reason: String,
+        idempotencyKey: String
+    ): RepositoryResult<TransactionVoidResult> {
+        val request = com.tbterminal.app.data.remote.VoidTransactionRequestDto(idempotencyKey, reason.trim())
+        return safeApiCall { salesApi.voidTransaction(id, request) }.toRepositoryResult { response ->
+            val result = response.data
+            if (!response.success || result == null) {
+                RepositoryResult.Error(
+                    response.code ?: "VOID_TRANSACTION_FAILED",
+                    response.message ?: response.error ?: "Transaksi gagal dibatalkan."
+                )
+            } else RepositoryResult.Success(
+                TransactionVoidResult(
+                    result.voidId, result.transactionId, result.receiptId,
+                    result.reason, result.voidedAt, result.idempotentReplay
+                )
+            )
         }
     }
 
@@ -325,12 +365,17 @@ private fun SalesTransactionSummaryDto.toCashTransaction(): CashTransaction {
         sessionId = sessionId,
         customerId = customerId,
         customerName = customerName,
+        cashierId = cashierId,
+        cashierName = cashierName,
+        paymentMethods = paymentMethods,
         type = type,
         status = status,
         total = total,
         paidAmount = paidAmount,
         remainingAmount = remainingAmount,
-        createdAt = createdAt
+        createdAt = createdAt,
+        voidedAt = voidedAt,
+        voidReason = voidReason
     )
 }
 
@@ -341,11 +386,19 @@ private fun TransactionDetailDto.toCashTransactionDetail(): CashTransactionDetai
         sessionId = sessionId,
         customerId = customerId,
         customerName = customerName,
+        userId = userId,
+        cashierName = cashierName,
+        paymentMethods = paymentMethods,
         type = type,
         status = status,
         total = total,
         paidAmount = paidAmount,
+        amountTendered = amountTendered,
+        changeAmount = changeAmount,
         createdAt = createdAt,
+        voidedAt = voidedAt,
+        voidedByName = voidedByName,
+        voidReason = voidReason,
         items = items.map { it.toCashTransactionItem() }
     )
 }

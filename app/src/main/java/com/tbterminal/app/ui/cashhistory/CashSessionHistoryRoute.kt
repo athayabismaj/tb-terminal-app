@@ -24,6 +24,8 @@ fun AdminCashSessionHistoryScreen(
     onOperationalAuditClick: () -> Unit,
     onShowDetail: (String) -> Unit,
     onLogout: () -> Unit,
+    activeDestination: AdminDestination = AdminDestination.CashSessionHistory,
+    title: String = "Riwayat Kas Harian",
     viewModel: CashSessionHistoryViewModel = viewModel(
         factory = CashSessionHistoryViewModel.factory(cashRepository)
     )
@@ -33,7 +35,7 @@ fun AdminCashSessionHistoryScreen(
     AdminDashboardShell(
         userName = name,
         role = role,
-        activeDestination = AdminDestination.CashSessionHistory,
+        activeDestination = activeDestination,
         onDashboardClick = onDashboardClick,
         onProductsClick = onProductsClick,
         onStockOpnameClick = onStockOpnameClick,
@@ -48,6 +50,7 @@ fun AdminCashSessionHistoryScreen(
         CashSessionHistoryScreen(
             modifier = modifier,
             uiState = uiState,
+            title = title,
             onSearchChanged = viewModel::setSearchQuery,
             onStatusFilterChanged = viewModel::setStatusFilter,
             onRefresh = { viewModel.loadSessions(uiState.page) },

@@ -3,11 +3,19 @@ package com.tbterminal.app.ui.salestransactions
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
+import com.tbterminal.app.data.local.dao.TransactionDao
+import com.tbterminal.app.data.local.model.SyncEntityType
+import com.tbterminal.app.data.local.model.SyncStatus
 import com.tbterminal.app.data.model.CashTransaction
 import com.tbterminal.app.data.repository.RepositoryResult
 import com.tbterminal.app.data.repository.CashReconciliationRepository
+import com.tbterminal.app.data.sync.OfflineCheckoutSyncResult
+import com.tbterminal.app.data.sync.OfflineCheckoutSyncService
+import com.tbterminal.app.ui.offline.LocalPendingTransactionUi
+import com.tbterminal.app.ui.offline.toLocalPendingTransactionUi
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -15,14 +23,19 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import java.time.DayOfWeek
 import java.time.LocalDate
+import java.time.LocalDateTime
+import java.time.OffsetDateTime
+import java.time.ZoneId
 import java.time.temporal.ChronoUnit
 
 data class AdminTransactionHistoryUiState(
     val transactions: List<CashTransaction> = emptyList(),
+    val localPendingTransactions: List<LocalPendingTransactionUi> = emptyList(),
     val isLoading: Boolean = true,
     val error: String? = null,
     val query: String = "",
     val statusFilter: String = "Semua", // Semua, Lunas, DP, Hutang
+    val paymentMethodFilter: String = "Semua",
     val selectedDate: String? = LocalDate.now().toString(),
     val startDate: String? = LocalDate.now().toString(),
     val endDate: String? = LocalDate.now().toString(),
@@ -32,11 +45,16 @@ data class AdminTransactionHistoryUiState(
     val total: Long = 0,
     val page: Int = 1,
     val totalPages: Int = 1,
-    val hasMorePages: Boolean = false
+    val hasMorePages: Boolean = false,
+    val localSyncMessage: String? = null,
+    val isBulkSyncing: Boolean = false,
+    val bulkSyncProgressMessage: String? = null
 )
 
 class AdminTransactionHistoryViewModel(
-    private val repository: CashReconciliationRepository
+    private val repository: CashReconciliationRepository,
+    private val transactionDao: TransactionDao? = null,
+    private val offlineCheckoutSyncService: OfflineCheckoutSyncService? = null
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(AdminTransactionHistoryUiState())
@@ -45,7 +63,29 @@ class AdminTransactionHistoryViewModel(
     private var searchJob: Job? = null
 
     init {
+        observeLocalPendingTransactions()
         loadTransactions()
+    }
+
+    private fun observeLocalPendingTransactions() {
+        val dao = transactionDao ?: return
+        viewModelScope.launch {
+            offlineCheckoutSyncService?.recoverStaleSyncing()
+            dao.observeUnsyncedTransactionsWithError(
+                pending = SyncStatus.PENDING,
+                syncing = SyncStatus.SYNCING,
+                failed = SyncStatus.FAILED,
+                conflict = SyncStatus.CONFLICT,
+                entityType = SyncEntityType.TRANSACTION,
+                limit = 10
+            ).collect { localTransactions ->
+                _uiState.update { state ->
+                    state.copy(
+                        localPendingTransactions = localTransactions.map { it.toLocalPendingTransactionUi() }
+                    )
+                }
+            }
+        }
     }
 
     fun loadTransactions(page: Int = 1) {
@@ -65,6 +105,7 @@ class AdminTransactionHistoryViewModel(
                     limit = 50,
                     sessionId = null,
                     search = searchParam,
+                    paymentMethod = _uiState.value.paymentMethodFilter.takeUnless { it == "Semua" },
                     status = statusParam,
                     startDate = startOfDay,
                     endDate = endOfDay
@@ -73,13 +114,18 @@ class AdminTransactionHistoryViewModel(
                 is RepositoryResult.Success -> {
                     _uiState.update {
                         val data = result.data.data
-                        val currentStart = if (data.isEmpty()) 0 else (result.data.page - 1) * 50 + 1
-                        val currentEnd = currentStart + data.size - 1
+                        val mergedData = if (page == 1) {
+                            mergeActiveSessionTransactions(data)
+                        } else {
+                            data
+                        }
+                        val currentStart = if (mergedData.isEmpty()) 0 else (result.data.page - 1) * 50 + 1
+                        val currentEnd = currentStart + mergedData.size - 1
                         it.copy(
-                            transactions = data,
+                            transactions = mergedData,
                             page = result.data.page,
                             totalPages = result.data.totalPages,
-                            total = result.data.total,
+                            total = maxOf(result.data.total, mergedData.size.toLong()),
                             currentStart = currentStart,
                             currentEnd = currentEnd,
                             hasMorePages = result.data.page < result.data.totalPages,
@@ -109,6 +155,131 @@ class AdminTransactionHistoryViewModel(
     fun updateStatusFilter(status: String) {
         _uiState.update { it.copy(statusFilter = status, page = 1) }
         loadTransactions(page = 1)
+    }
+
+    fun updatePaymentMethodFilter(method: String) {
+        _uiState.update { it.copy(paymentMethodFilter = method, page = 1) }
+        loadTransactions(page = 1)
+    }
+
+    fun syncLocalTransaction(localId: Long) {
+        if (_uiState.value.isBulkSyncing) return
+        val service = offlineCheckoutSyncService ?: run {
+            _uiState.update { it.copy(localSyncMessage = "Service sinkronisasi belum tersedia") }
+            return
+        }
+        viewModelScope.launch {
+            _uiState.update { it.copy(localSyncMessage = null) }
+            when (val result = service.syncOne(localId)) {
+                is OfflineCheckoutSyncResult.Success -> {
+                    _uiState.update { it.copy(localSyncMessage = "Transaksi lokal berhasil disinkronkan") }
+                    loadTransactions(page = 1)
+                }
+                is OfflineCheckoutSyncResult.Failed -> {
+                    _uiState.update { it.copy(localSyncMessage = result.message) }
+                }
+            }
+        }
+    }
+
+    private suspend fun mergeActiveSessionTransactions(
+        remoteTransactions: List<CashTransaction>
+    ): List<CashTransaction> {
+        val activeSession = when (val sessionResult = repository.getActiveSession()) {
+            is RepositoryResult.Success -> sessionResult.data
+            else -> null
+        } ?: return remoteTransactions
+
+        val activeTransactions = when (
+            val sessionTransactions = repository.getTransactions(
+                page = 1,
+                limit = 200,
+                sessionId = activeSession.id,
+                search = null,
+                status = null,
+                startDate = null,
+                endDate = null
+            )
+        ) {
+            is RepositoryResult.Success -> sessionTransactions.data.data
+            else -> emptyList()
+        }
+
+        if (activeTransactions.isEmpty()) return remoteTransactions
+
+        val state = _uiState.value
+        return (activeTransactions.filter { it.matchesCurrentFilter(state) } + remoteTransactions)
+            .distinctBy { it.id }
+            .sortedByDescending { it.createdAt }
+            .take(50)
+    }
+
+    private fun CashTransaction.matchesCurrentFilter(state: AdminTransactionHistoryUiState): Boolean {
+        val query = state.query.trim()
+        if (query.isNotBlank()) {
+            val matchesQuery = receiptId.contains(query, ignoreCase = true) ||
+                id.contains(query, ignoreCase = true) ||
+                (customerName?.contains(query, ignoreCase = true) == true)
+            if (!matchesQuery) return false
+        }
+
+        if (state.statusFilter != "Semua") {
+            val targetStatus = state.statusFilter.lowercase()
+            val normalizedStatus = status.lowercase()
+            val matchesStatus = normalizedStatus == targetStatus ||
+                (targetStatus == "lunas" && normalizedStatus in listOf("lunas", "paid", "success", "completed")) ||
+                (targetStatus == "dp" && normalizedStatus in listOf("dp", "partial")) ||
+                (targetStatus == "hutang" && normalizedStatus in listOf("hutang", "unpaid"))
+            if (!matchesStatus) return false
+        }
+        if (state.paymentMethodFilter != "Semua" &&
+            paymentMethods.none { it.equals(state.paymentMethodFilter, true) }
+        ) return false
+
+        val start = (state.startDate ?: state.selectedDate)?.let(LocalDate::parse)
+        val end = (state.endDate ?: state.selectedDate)?.let(LocalDate::parse)
+        if (start != null && end != null) {
+            val transactionDate = createdAt.toTransactionLocalDate() ?: return false
+            if (transactionDate.isBefore(start) || transactionDate.isAfter(end)) return false
+        }
+
+        return true
+    }
+
+    fun syncAllLocalTransactions() {
+        if (_uiState.value.isBulkSyncing) return
+        val service = offlineCheckoutSyncService ?: run {
+            _uiState.update { it.copy(localSyncMessage = "Service sinkronisasi belum tersedia") }
+            return
+        }
+        viewModelScope.launch {
+            _uiState.update {
+                it.copy(
+                    isBulkSyncing = true,
+                    localSyncMessage = null,
+                    bulkSyncProgressMessage = "Menyiapkan sinkronisasi..."
+                )
+            }
+            val result = service.syncPendingAndFailed { current, total ->
+                _uiState.update {
+                    it.copy(bulkSyncProgressMessage = "Menyinkronkan $current dari $total transaksi...")
+                }
+            }
+            val message = when {
+                result.total == 0 -> "Tidak ada transaksi offline yang perlu disinkronkan."
+                result.successCount == result.total -> "Semua transaksi berhasil disinkronkan."
+                result.successCount == 0 -> "Sinkronisasi gagal. Periksa koneksi atau data transaksi."
+                else -> "Sebagian transaksi gagal disinkronkan. Periksa detail error."
+            }
+            _uiState.update {
+                it.copy(
+                    isBulkSyncing = false,
+                    bulkSyncProgressMessage = null,
+                    localSyncMessage = message
+                )
+            }
+            loadTransactions(page = 1)
+        }
     }
 
     fun setDate(date: String?) {
@@ -226,13 +397,27 @@ class AdminTransactionHistoryViewModel(
     private fun LocalDate.endOfMonth(): LocalDate = withDayOfMonth(lengthOfMonth())
 
     companion object {
-        fun factory(repository: CashReconciliationRepository): ViewModelProvider.Factory {
+        fun factory(
+            repository: CashReconciliationRepository,
+            transactionDao: TransactionDao? = null,
+            offlineCheckoutSyncService: OfflineCheckoutSyncService? = null
+        ): ViewModelProvider.Factory {
             return object : ViewModelProvider.Factory {
                 @Suppress("UNCHECKED_CAST")
                 override fun <T : ViewModel> create(modelClass: Class<T>): T {
-                    return AdminTransactionHistoryViewModel(repository) as T
+                    return AdminTransactionHistoryViewModel(repository, transactionDao, offlineCheckoutSyncService) as T
                 }
             }
         }
     }
+}
+
+private fun String.toTransactionLocalDate(): LocalDate? {
+    return runCatching {
+        OffsetDateTime.parse(this)
+            .atZoneSameInstant(ZoneId.systemDefault())
+            .toLocalDate()
+    }.getOrNull()
+        ?: runCatching { LocalDateTime.parse(this).toLocalDate() }.getOrNull()
+        ?: runCatching { LocalDate.parse(take(10)) }.getOrNull()
 }

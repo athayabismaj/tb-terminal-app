@@ -48,7 +48,6 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import com.tbterminal.app.data.model.CashTransactionDetail
 import com.tbterminal.app.data.model.CashTransactionItem
 import com.tbterminal.app.data.repository.CashReconciliationRepository
-import com.tbterminal.app.ui.dashboard.DashboardBackground
 import com.tbterminal.app.ui.dashboard.DashboardBrandGreen
 import com.tbterminal.app.ui.dashboard.DashboardBrandGreenDark
 import com.tbterminal.app.ui.dashboard.DashboardSurface
@@ -128,7 +127,7 @@ private fun ReceiptDetailContent(
     Column(
         modifier = modifier
             .fillMaxSize()
-            .background(DashboardBackground)
+            .background(Color.White)
             .verticalScroll(rememberScrollState())
             .padding(32.dp),
         verticalArrangement = Arrangement.spacedBy(24.dp)
@@ -259,6 +258,10 @@ private fun ReceiptTotalsSection(transaction: CashTransactionDetail) {
         ReceiptInfoRow("Pelanggan", transaction.customerName ?: "Umum")
         ReceiptInfoRow("Subtotal", transaction.total.moneyText())
         ReceiptInfoRow("Dibayar", transaction.paidAmount.moneyText())
+        ReceiptInfoRow("Uang diterima", transaction.amountTendered.moneyText())
+        if (transaction.changeAmount > BigDecimal.ZERO) {
+            ReceiptInfoRow("Kembalian", transaction.changeAmount.moneyText(), emphasized = true)
+        }
         ReceiptInfoRow("Sisa tagihan", transaction.remainingAmount().moneyText(), emphasized = transaction.remainingAmount() > BigDecimal.ZERO)
     }
 }
@@ -423,6 +426,16 @@ fun CetakStrukPreviewDialog(
                 Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
                     Text("DIBAYAR", fontSize = 12.sp, color = Color.Black)
                     Text(transaction.paidAmount.moneyText(), fontSize = 12.sp, color = Color.Black)
+                }
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                    Text("Uang diterima", fontSize = 12.sp, color = Color.Black)
+                    Text(transaction.amountTendered.moneyText(), fontSize = 12.sp, color = Color.Black)
+                }
+                if (transaction.changeAmount > BigDecimal.ZERO) {
+                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                        Text("Kembalian", fontSize = 12.sp, color = Color.Black)
+                        Text(transaction.changeAmount.moneyText(), fontSize = 12.sp, color = Color.Black)
+                    }
                 }
                 if (transaction.remainingAmount() > BigDecimal.ZERO) {
                     Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {

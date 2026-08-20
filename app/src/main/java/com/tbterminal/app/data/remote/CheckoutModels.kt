@@ -4,6 +4,7 @@ import kotlinx.serialization.Serializable
 
 @Serializable
 data class CheckoutRequest(
+    val idempotencyKey: String,
     val customerId: String? = null,
     val items: List<CheckoutLineItemRequest>,
     val paymentMethod: String,
@@ -22,5 +23,8 @@ data class CheckoutLineItemRequest(
 @Serializable
 data class CheckoutResponse(
     val id: String,
-    val receiptId: String? = null
+    val receiptId: String? = null,
+    val amountTendered: String = "0",
+    val changeAmount: String = "0",
+    val idempotentReplay: Boolean = false
 )

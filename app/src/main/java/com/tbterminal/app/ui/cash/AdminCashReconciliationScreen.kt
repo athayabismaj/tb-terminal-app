@@ -2,6 +2,8 @@ package com.tbterminal.app.ui.cash
 
 import androidx.compose.runtime.Composable
 import com.tbterminal.app.data.repository.CashReconciliationRepository
+import com.tbterminal.app.ui.cashhistory.AdminCashSessionHistoryScreen
+import com.tbterminal.app.ui.dashboard.admin.AdminDestination
 
 @Composable
 fun AdminCashReconciliationScreen(
@@ -25,33 +27,27 @@ fun AdminCashReconciliationScreen(
     onReceivablesClick: () -> Unit,
     onCustomersClick: () -> Unit,
     onOperationalAuditClick: () -> Unit = {},
+    onCashSessionDetailClick: (String) -> Unit = {},
     onProfileClick: () -> Unit = {},
     onSettingsClick: () -> Unit = {},
     onLogout: () -> Unit
 ) {
-    CashReconciliationRoute(
+    AdminCashSessionHistoryScreen(
         name = name,
         role = role,
-        cashReconciliationRepository = cashReconciliationRepository,
+        cashRepository = cashReconciliationRepository,
         onDashboardClick = onDashboardClick,
         onProductsClick = onProductsClick,
-        onAddProductClick = onAddProductClick,
-        onProductCategoriesClick = onProductCategoriesClick,
-        onProductUnitsClick = onProductUnitsClick,
-        onCashReconciliationClick = onCashReconciliationClick,
-        onSalesTransactionsClick = onSalesTransactionsClick,
-        onReportsClick = onReportsClick,
-        onPriceManagementClick = onPriceManagementClick,
         onStockOpnameClick = onStockOpnameClick,
-        onStockOpnameFormClick = onStockOpnameFormClick,
         onIncomingGoodsClick = onIncomingGoodsClick,
-        onIncomingGoodsFormClick = onIncomingGoodsFormClick,
         onSupplierDebtsClick = onSupplierDebtsClick,
         onReceivablesClick = onReceivablesClick,
         onCustomersClick = onCustomersClick,
+        onReportsClick = onReportsClick,
         onOperationalAuditClick = onOperationalAuditClick,
-        onProfileClick = onProfileClick,
-        onSettingsClick = onSettingsClick,
-        onLogout = onLogout
+        onShowDetail = onCashSessionDetailClick,
+        onLogout = onLogout,
+        activeDestination = AdminDestination.CashReconciliation,
+        title = "Kas Harian Kasir"
     )
 }

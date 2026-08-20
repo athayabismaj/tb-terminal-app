@@ -22,6 +22,7 @@ internal fun StockOpnameFormScreen(
     onSelectProduct: (ProductStock) -> Unit,
     onActualQtyChanged: (String) -> Unit,
     onNotesChanged: (String) -> Unit,
+    onOpeningDateChanged: (String) -> Unit,
     onAdjustmentTypeChanged: (StockAdjustmentType) -> Unit,
     onSubmit: () -> Unit,
     onDismissMessage: () -> Unit
@@ -48,6 +49,7 @@ internal fun StockOpnameFormScreen(
                 uiState = uiState,
                 onActualQtyChanged = onActualQtyChanged,
                 onNotesChanged = onNotesChanged,
+                onOpeningDateChanged = onOpeningDateChanged,
                 onAdjustmentTypeChanged = onAdjustmentTypeChanged,
                 onSubmit = onSubmit,
                 onSelectProduct = onSelectProduct

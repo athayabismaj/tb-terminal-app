@@ -92,6 +92,8 @@ data class StockAdjustment(
     val difference: BigDecimal,
     val reason: String,
     val userId: String,
+    val source: String,
+    val occurredOn: String,
     val createdAt: String
 )
 
@@ -131,4 +133,27 @@ data class UpdateProductCommand(
     val discount: BigDecimal,
     val minStock: BigDecimal,
     val photoFilename: String? = null
+)
+
+data class ProductCsvRowPreview(
+    val rowNumber: Int,
+    val sku: String,
+    val name: String,
+    val category: String,
+    val unit: String,
+    val errors: List<String>
+) {
+    val valid: Boolean get() = errors.isEmpty()
+}
+
+data class ProductCsvPreview(
+    val totalRows: Int,
+    val validRows: Int,
+    val invalidRows: Int,
+    val rows: List<ProductCsvRowPreview>
+)
+
+data class ProductCsvImportResult(
+    val importedProducts: Int,
+    val openingBalances: Int
 )

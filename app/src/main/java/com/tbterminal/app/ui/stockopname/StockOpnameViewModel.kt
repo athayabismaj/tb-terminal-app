@@ -97,6 +97,10 @@ class StockOpnameViewModel(
         _uiState.update { state -> state.copy(notesInput = value) }
     }
 
+    fun onOpeningDateChanged(value: String) {
+        _uiState.update { state -> state.copy(openingDateInput = value.take(10)) }
+    }
+
     fun onAdjustmentTypeChanged(type: StockAdjustmentType) {
         _uiState.update { state -> state.copy(adjustmentType = type) }
     }
@@ -106,16 +110,34 @@ class StockOpnameViewModel(
         val product = state.selectedProduct ?: return setActionError("Pilih produk terlebih dahulu.")
         val actualQty = state.actualQty ?: return setActionError("Stok fisik wajib diisi dengan angka valid.")
         if (actualQty < BigDecimal.ZERO) return setActionError("Stok fisik tidak boleh negatif.")
+        if (actualQty.scale() > 2) return setActionError("Jumlah stok maksimal 2 angka desimal.")
+        if (state.adjustmentType == StockAdjustmentType.OPENING_BALANCE) {
+            if (product.quantity.compareTo(BigDecimal.ZERO) != 0) return setActionError("Saldo awal hanya dapat dicatat saat stok masih nol.")
+            if (actualQty <= BigDecimal.ZERO) return setActionError("Saldo awal harus lebih dari nol.")
+            if (runCatching { java.time.LocalDate.parse(state.openingDateInput) }.getOrNull() == null) {
+                return setActionError("Tanggal saldo awal wajib berformat YYYY-MM-DD.")
+            }
+            if (state.notesInput.isBlank()) return setActionError("Catatan saldo awal wajib diisi.")
+        }
         if (state.isSubmitting) return
 
         viewModelScope.launch {
             _uiState.update { it.copy(isSubmitting = true, message = null, errorMessage = null) }
-            val result = inventoryRepository.executeStockOpname(
-                productId = product.productId,
-                adjustmentType = state.adjustmentType.apiValue,
-                actualQty = actualQty,
-                notes = state.notesInput
-            )
+            val result = if (state.adjustmentType == StockAdjustmentType.OPENING_BALANCE) {
+                inventoryRepository.createOpeningStock(
+                    productId = product.productId,
+                    date = state.openingDateInput,
+                    quantity = actualQty,
+                    note = state.notesInput
+                )
+            } else {
+                inventoryRepository.executeStockOpname(
+                    productId = product.productId,
+                    adjustmentType = state.adjustmentType.apiValue,
+                    actualQty = actualQty,
+                    notes = state.notesInput
+                )
+            }
 
             when (result) {
                 is RepositoryResult.Success -> {
@@ -124,7 +146,9 @@ class StockOpnameViewModel(
                             isSubmitting = false,
                             actualQtyInput = "",
                             notesInput = "",
-                            message = "Stok ${product.productName} berhasil disesuaikan."
+                            message = if (state.adjustmentType == StockAdjustmentType.OPENING_BALANCE) {
+                                "Saldo awal ${product.productName} berhasil dicatat."
+                            } else "Stok ${product.productName} berhasil disesuaikan."
                         )
                     }
                     loadProducts()

@@ -201,7 +201,7 @@ private fun ProductPageIconButton(
         onClick = onClick,
         enabled = enabled,
         color = Color.White,
-        contentColor = if (enabled) OnSurfaceVariant else OutlineVariant,
+        contentColor = if (enabled) OnSurfaceVariant else Color(0xFFCBD5E1),
         border = BorderStroke(1.dp, OutlineVariant.copy(alpha = 0.55f)),
         shape = RoundedCornerShape(12.dp),
         modifier = Modifier.size(40.dp)

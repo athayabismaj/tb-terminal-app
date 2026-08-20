@@ -38,11 +38,11 @@ import java.util.Locale
 // ==========================================
 // TEMA & WARNA
 // ==========================================
-val SurfaceBright = Color(0xFFF8F9FF)
+val SurfaceBright = Color.White
 val SurfaceContainerLow = Color(0xFFEFF4FF)
 val OnSurface = Color(0xFF121C2A)
 val OnSurfaceVariant = Color(0xFF3D4A42)
-val OutlineVariant = Color(0xBCCAC0)
+val OutlineVariant = Color(0xFFD8E2E7)
 val Outline = Color(0xFF6D7A72)
 
 val Primary = Color(0xFF006948)
@@ -517,7 +517,7 @@ fun CartSection(
                 )
             }
 
-            if (selectedPaymentMethod.requiresReceivable()) {
+            if (selectedPaymentMethod == PaymentMethod.TUNAI || selectedPaymentMethod.requiresReceivable()) {
                 item {
                     ReceivablePaymentInput(
                         paymentMethod = selectedPaymentMethod,
@@ -981,17 +981,21 @@ private fun ReceivablePaymentInput(
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
             Text(
-                text = if (paymentMethod == PaymentMethod.HUTANG) "Hutang Pelanggan" else "Nominal DP",
+                text = when (paymentMethod) {
+                    PaymentMethod.TUNAI -> "Uang Diterima"
+                    PaymentMethod.HUTANG -> "Hutang Pelanggan"
+                    else -> "Nominal DP"
+                },
                 color = OnSurface,
                 fontWeight = FontWeight.Bold,
                 fontSize = 14.sp
             )
 
-            if (paymentMethod == PaymentMethod.DP) {
+            if (paymentMethod == PaymentMethod.DP || paymentMethod == PaymentMethod.TUNAI) {
                 OutlinedTextField(
                     value = amountPaidInput,
                     onValueChange = onAmountPaidChanged,
-                    placeholder = { Text("Masukkan DP", color = Outline) },
+                    placeholder = { Text(if (paymentMethod == PaymentMethod.TUNAI) "Masukkan uang diterima" else "Masukkan DP", color = Outline) },
                     leadingIcon = { Text("Rp", color = Outline, fontWeight = FontWeight.Bold) },
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                     modifier = Modifier.fillMaxWidth().height(52.dp),
@@ -1004,6 +1008,13 @@ private fun ReceivablePaymentInput(
                         focusedBorderColor = Primary
                     )
                 )
+                if (paymentMethod == PaymentMethod.TUNAI) {
+                    Text(
+                        "Kembalian: ${checkoutChange(amountPaidInput, finalTotal).moneyText()}",
+                        color = Primary,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
             }
         }
     }
@@ -1049,6 +1060,7 @@ private fun PaymentMethod.paidAmount(amountPaidInput: String, finalTotal: BigDec
     return when (this) {
         PaymentMethod.HUTANG -> BigDecimal.ZERO
         PaymentMethod.DP -> amountPaidInput.toBigDecimalOrNull() ?: BigDecimal.ZERO
+        PaymentMethod.TUNAI -> amountPaidInput.toBigDecimalOrNull() ?: BigDecimal.ZERO
         else -> finalTotal
     }
 }
@@ -1062,7 +1074,8 @@ private fun PaymentMethod.canSubmit(amountPaidInput: String, finalTotal: BigDeci
     return when (this) {
         PaymentMethod.HUTANG -> finalTotal > BigDecimal.ZERO
         PaymentMethod.DP -> paid > BigDecimal.ZERO && paid < finalTotal
-        else -> true
+        PaymentMethod.TUNAI -> paid >= finalTotal
+        else -> finalTotal > BigDecimal.ZERO
     }
 }
 

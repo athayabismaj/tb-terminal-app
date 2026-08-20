@@ -137,6 +137,48 @@ class ProductListViewModel(
         _uiState.update { state -> state.copy(actionMessage = null) }
     }
 
+    fun previewCsv(csv: String) {
+        if (_uiState.value.isImporting) return
+        viewModelScope.launch {
+            _uiState.update { it.copy(isImporting = true, showImportDialog = true, importCsv = csv, importPreview = null, actionMessage = null) }
+            when (val result = inventoryRepository.previewProductCsv(csv)) {
+                is RepositoryResult.Success -> _uiState.update { it.copy(isImporting = false, importPreview = result.data) }
+                is RepositoryResult.Error -> _uiState.update { it.copy(isImporting = false, showImportDialog = false, actionMessage = result.message) }
+                is RepositoryResult.Exception -> _uiState.update { it.copy(isImporting = false, showImportDialog = false, actionMessage = "Preview CSV gagal karena koneksi bermasalah.") }
+            }
+        }
+    }
+
+    fun commitCsv() {
+        val state = _uiState.value
+        val csv = state.importCsv ?: return
+        if (state.isImporting || state.importPreview?.invalidRows != 0) return
+        viewModelScope.launch {
+            _uiState.update { it.copy(isImporting = true) }
+            when (val result = inventoryRepository.commitProductCsv(csv)) {
+                is RepositoryResult.Success -> {
+                    _uiState.update {
+                        it.copy(
+                            isImporting = false,
+                            showImportDialog = false,
+                            importCsv = null,
+                            importPreview = null,
+                            actionMessage = "${result.data.importedProducts} produk dan ${result.data.openingBalances} saldo awal berhasil diimpor."
+                        )
+                    }
+                    loadProducts(page = 1)
+                }
+                is RepositoryResult.Error -> _uiState.update { it.copy(isImporting = false, actionMessage = result.message) }
+                is RepositoryResult.Exception -> _uiState.update { it.copy(isImporting = false, actionMessage = "Impor CSV gagal karena koneksi bermasalah.") }
+            }
+        }
+    }
+
+    fun dismissImport() {
+        if (_uiState.value.isImporting) return
+        _uiState.update { it.copy(showImportDialog = false, importCsv = null, importPreview = null) }
+    }
+
     private fun setLoadError(message: String) {
         _uiState.update { state ->
             state.copy(isLoading = false, errorMessage = message)
@@ -167,6 +209,7 @@ private fun ProductStock.statusActionSuccessMessage(): String {
     } else {
         "Produk $productName berhasil diaktifkan kembali."
     }
+
 }
 
 private fun ProductStock.statusActionConnectionErrorMessage(): String {

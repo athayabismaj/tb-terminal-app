@@ -24,6 +24,7 @@ internal fun StockOpnameFormCard(
     uiState: StockOpnameUiState,
     onActualQtyChanged: (String) -> Unit,
     onNotesChanged: (String) -> Unit,
+    onOpeningDateChanged: (String) -> Unit,
     onAdjustmentTypeChanged: (StockAdjustmentType) -> Unit,
     onSubmit: () -> Unit,
     onSelectProduct: ((com.tbterminal.app.data.model.ProductStock) -> Unit)? = null
@@ -66,6 +67,9 @@ internal fun StockOpnameFormCard(
                 ) {
                     AdjustmentTypeCards(uiState.adjustmentType, onAdjustmentTypeChanged)
                     QuantityInput(uiState.actualQtyInput, onActualQtyChanged)
+                    if (uiState.adjustmentType == StockAdjustmentType.OPENING_BALANCE) {
+                        OpeningDateInput(uiState.openingDateInput, onOpeningDateChanged)
+                    }
                     NotesInput(uiState.notesInput, onNotesChanged)
                 }
             }

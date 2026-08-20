@@ -49,12 +49,17 @@ data class CashTransaction(
     val sessionId: String,
     val customerId: String?,
     val customerName: String?,
+    val cashierId: String = "",
+    val cashierName: String? = null,
+    val paymentMethods: List<String> = emptyList(),
     val type: String,
     val status: String,
     val total: BigDecimal,
     val paidAmount: BigDecimal,
     val remainingAmount: BigDecimal? = null,
-    val createdAt: String
+    val createdAt: String,
+    val voidedAt: String? = null,
+    val voidReason: String? = null
 )
 
 data class CashTransactionDetail(
@@ -63,12 +68,29 @@ data class CashTransactionDetail(
     val sessionId: String,
     val customerId: String?,
     val customerName: String?,
+    val userId: String = "",
+    val cashierName: String? = null,
+    val paymentMethods: List<String> = emptyList(),
     val type: String,
     val status: String,
     val total: BigDecimal,
     val paidAmount: BigDecimal,
+    val amountTendered: BigDecimal,
+    val changeAmount: BigDecimal,
     val createdAt: String,
+    val voidedAt: String? = null,
+    val voidedByName: String? = null,
+    val voidReason: String? = null,
     val items: List<CashTransactionItem>
+)
+
+data class TransactionVoidResult(
+    val voidId: String,
+    val transactionId: String,
+    val receiptId: String,
+    val reason: String,
+    val voidedAt: String,
+    val idempotentReplay: Boolean
 )
 
 data class CashTransactionItem(

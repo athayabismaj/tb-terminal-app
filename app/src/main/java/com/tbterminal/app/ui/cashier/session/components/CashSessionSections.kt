@@ -67,6 +67,53 @@ import com.tbterminal.app.ui.cashier.session.Slate50
 import com.tbterminal.app.ui.cashier.session.Slate500
 
 @Composable
+fun LocalCashSessionBadges(
+    uiState: CashReconciliationUiState,
+    modifier: Modifier = Modifier
+) {
+    if (!uiState.isUsingLocalActiveSession) return
+
+    Row(
+        modifier = modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        CashSessionBadge(
+            text = if (uiState.hasActiveSession) "Sesi Lokal" else "Sesi Ditutup Lokal",
+            background = PrimaryLight,
+            foreground = Primary
+        )
+        CashSessionBadge(
+            text = "Belum Tersinkron",
+            background = Color(0xFFFFF7ED),
+            foreground = Color(0xFFEA580C)
+        )
+    }
+}
+
+@Composable
+private fun CashSessionBadge(
+    text: String,
+    background: Color,
+    foreground: Color
+) {
+    Box(
+        modifier = Modifier
+            .background(background, RoundedCornerShape(999.dp))
+            .padding(horizontal = 12.dp, vertical = 6.dp),
+        contentAlignment = Alignment.Center
+    ) {
+        Text(
+            text = text,
+            fontSize = 11.sp,
+            fontWeight = FontWeight.Black,
+            color = foreground,
+            letterSpacing = 0.6.sp
+        )
+    }
+}
+
+@Composable
 fun SessionSummarySection(
     modifier: Modifier = Modifier,
     uiState: CashReconciliationUiState,
@@ -435,79 +482,66 @@ fun CloseShiftSection(
 
 @Composable
 fun OpenShiftForm(
+    modifier: Modifier = Modifier,
     uiState: CashReconciliationUiState,
     onOpeningCashChanged: (String) -> Unit,
     onOpenSession: () -> Unit
 ) {
     Card(
         colors = CardDefaults.cardColors(containerColor = Color.White),
-        shape = RoundedCornerShape(32.dp),
+        shape = RoundedCornerShape(20.dp),
         border = BorderStroke(1.dp, Slate100),
-        elevation = CardDefaults.cardElevation(defaultElevation = 8.dp),
-        modifier = Modifier.width(500.dp)
+        elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
+        modifier = modifier.fillMaxWidth()
     ) {
-        Column(modifier = Modifier.fillMaxWidth()) {
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(8.dp)
-                    .background(Primary)
-            )
-            Column(modifier = Modifier.padding(32.dp), verticalArrangement = Arrangement.spacedBy(20.dp)) {
-                Text("Buka Sesi Kasir", fontSize = 24.sp, fontWeight = FontWeight.ExtraBold, color = OnSurface)
-                Text(
-                    "Masukkan modal awal (uang receh) di dalam laci sebelum mulai melayani pelanggan.",
-                    color = Slate500,
-                    fontSize = 14.sp
-                )
+        Column(modifier = Modifier.padding(28.dp), verticalArrangement = Arrangement.spacedBy(18.dp)) {
+            Text("Buka Sesi Kasir", fontSize = 22.sp, fontWeight = FontWeight.ExtraBold, color = OnSurface)
 
-                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Text("MODAL AWAL", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = Slate400)
-                    OutlinedTextField(
-                        value = uiState.openingCashInput,
-                        onValueChange = onOpeningCashChanged,
-                        placeholder = { Text("0", color = Slate300) },
-                        leadingIcon = {
-                            Text(
-                                "Rp",
-                                color = Primary,
-                                fontWeight = FontWeight.Bold,
-                                modifier = Modifier.padding(start = 16.dp, end = 8.dp)
-                            )
-                        },
-                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(72.dp),
-                        singleLine = true,
-                        shape = RoundedCornerShape(16.dp),
-                        colors = OutlinedTextFieldDefaults.colors(
-                            focusedContainerColor = Slate50,
-                            unfocusedContainerColor = Slate50,
-                            focusedBorderColor = Primary,
-                            unfocusedBorderColor = Slate100
-                        ),
-                        textStyle = androidx.compose.ui.text.TextStyle(fontSize = 24.sp, fontWeight = FontWeight.Bold)
-                    )
-                }
-
-                Button(
-                    onClick = onOpenSession,
-                    enabled = !uiState.isSubmitting,
-                    colors = ButtonDefaults.buttonColors(containerColor = Primary),
-                    shape = RoundedCornerShape(24.dp),
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Text("MODAL AWAL", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = Slate400)
+                OutlinedTextField(
+                    value = uiState.openingCashInput,
+                    onValueChange = onOpeningCashChanged,
+                    placeholder = { Text("0", color = Slate300) },
+                    leadingIcon = {
+                        Text(
+                            "Rp",
+                            color = Primary,
+                            fontWeight = FontWeight.Bold,
+                            modifier = Modifier.padding(start = 16.dp, end = 8.dp)
+                        )
+                    },
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
                     modifier = Modifier
                         .fillMaxWidth()
-                        .height(60.dp)
-                        .padding(top = 12.dp)
-                ) {
-                    if (uiState.isSubmitting) {
-                        CircularProgressIndicator(modifier = Modifier.size(24.dp), color = Color.White, strokeWidth = 2.dp)
-                    } else {
-                        Icon(Icons.Outlined.AccountBalanceWallet, contentDescription = null, modifier = Modifier.size(24.dp))
-                        Spacer(modifier = Modifier.width(12.dp))
-                        Text("Buka Sesi", fontSize = 18.sp, fontWeight = FontWeight.Bold)
-                    }
+                        .height(58.dp),
+                    singleLine = true,
+                    shape = RoundedCornerShape(14.dp),
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedContainerColor = Slate50,
+                        unfocusedContainerColor = Slate50,
+                        focusedBorderColor = Primary,
+                        unfocusedBorderColor = Slate100
+                    ),
+                    textStyle = androidx.compose.ui.text.TextStyle(fontSize = 18.sp, fontWeight = FontWeight.Bold)
+                )
+            }
+
+            Button(
+                onClick = onOpenSession,
+                enabled = !uiState.isSubmitting,
+                colors = ButtonDefaults.buttonColors(containerColor = Primary),
+                shape = RoundedCornerShape(14.dp),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(52.dp)
+            ) {
+                if (uiState.isSubmitting) {
+                    CircularProgressIndicator(modifier = Modifier.size(22.dp), color = Color.White, strokeWidth = 2.dp)
+                } else {
+                    Icon(Icons.Outlined.AccountBalanceWallet, contentDescription = null, modifier = Modifier.size(20.dp))
+                    Spacer(modifier = Modifier.width(10.dp))
+                    Text("Buka Sesi", fontSize = 16.sp, fontWeight = FontWeight.Bold)
                 }
             }
         }

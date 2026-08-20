@@ -8,7 +8,11 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.tbterminal.app.data.local.cashexpense.LocalCashExpenseService
+import com.tbterminal.app.data.local.cashsession.LocalCashSessionService
+import com.tbterminal.app.data.local.database.CashSessionLocalDataSource
 import com.tbterminal.app.data.repository.CashReconciliationRepository
+import com.tbterminal.app.data.sync.OfflineStatusRepository
 import com.tbterminal.app.ui.cash.CashExpenseDialog
 import com.tbterminal.app.ui.cash.CashReconciliationViewModel
 import com.tbterminal.app.ui.cashier.session.components.CashSessionErrorOverlay
@@ -21,6 +25,12 @@ fun CashierCashSessionRoute(
     name: String,
     role: String,
     cashReconciliationRepository: CashReconciliationRepository,
+    cashSessionLocalDataSource: CashSessionLocalDataSource? = null,
+    localCashSessionService: LocalCashSessionService? = null,
+    localCashExpenseService: LocalCashExpenseService? = null,
+    offlineStatusRepository: OfflineStatusRepository? = null,
+    cashierUserId: String? = null,
+    cashierNameFallback: String? = null,
     onDashboardClick: () -> Unit,
     onPosClick: () -> Unit,
     onTransactionHistoryClick: () -> Unit = {},
@@ -29,7 +39,15 @@ fun CashierCashSessionRoute(
     onSettingsClick: () -> Unit = {},
     onLogout: () -> Unit,
     viewModel: CashReconciliationViewModel = viewModel(
-        factory = CashReconciliationViewModel.factory(cashReconciliationRepository)
+        factory = CashReconciliationViewModel.factory(
+            repository = cashReconciliationRepository,
+            cashSessionLocalDataSource = cashSessionLocalDataSource,
+            localCashSessionService = localCashSessionService,
+            localCashExpenseService = localCashExpenseService,
+            offlineStatusRepository = offlineStatusRepository,
+            cashierUserId = cashierUserId,
+            cashierNameFallback = cashierNameFallback
+        )
     )
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()

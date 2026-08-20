@@ -19,6 +19,9 @@ data class CashReconciliationUiState(
     val totalPages: Int = 1,
     val isLoading: Boolean = false,
     val isSubmitting: Boolean = false,
+    val isUsingLocalActiveSession: Boolean = false,
+    val localCashSessionId: Long? = null,
+    val localCashSessionSyncStatus: String? = null,
     val errorMessage: String? = null,
     val message: String? = null
 ) {

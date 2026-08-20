@@ -115,6 +115,8 @@ class ProductUnitViewModel(
         when {
             name.isBlank() -> setMessage("Nama satuan tidak boleh kosong.")
             symbol.isBlank() -> setMessage("Simbol satuan tidak boleh kosong.")
+            name.length > 50 -> setMessage("Nama satuan maksimal 50 karakter.")
+            symbol.length > 20 -> setMessage("Simbol satuan maksimal 20 karakter.")
             else -> submit(name, symbol, state.editingUnit)
         }
     }

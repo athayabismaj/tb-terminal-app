@@ -148,6 +148,7 @@ fun AdminStockOpnameFormScreen(
             onSelectProduct = viewModel::selectProduct,
             onActualQtyChanged = viewModel::onActualQtyChanged,
             onNotesChanged = viewModel::onNotesChanged,
+            onOpeningDateChanged = viewModel::onOpeningDateChanged,
             onAdjustmentTypeChanged = viewModel::onAdjustmentTypeChanged,
             onSubmit = viewModel::submitOpname,
             onDismissMessage = viewModel::clearMessage

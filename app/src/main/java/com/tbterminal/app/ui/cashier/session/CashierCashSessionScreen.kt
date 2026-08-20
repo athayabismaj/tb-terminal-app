@@ -16,13 +16,14 @@ import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import com.tbterminal.app.ui.cash.CashReconciliationUiState
 import com.tbterminal.app.ui.cashier.session.components.CashSessionHeader
 import com.tbterminal.app.ui.cashier.session.components.CloseShiftSection
+import com.tbterminal.app.ui.cashier.session.components.LocalCashSessionBadges
 import com.tbterminal.app.ui.cashier.session.components.OpenShiftForm
 import com.tbterminal.app.ui.cashier.session.components.SessionSummarySection
-import com.tbterminal.app.ui.dashboard.DashboardBackground
 
 @Composable
 fun CashierCashSessionScreen(
@@ -39,7 +40,7 @@ fun CashierCashSessionScreen(
     BoxWithConstraints(
         modifier = modifier
             .fillMaxSize()
-            .background(DashboardBackground)
+            .background(Color.White)
     ) {
         val isDesktop = maxWidth > 900.dp
 
@@ -51,6 +52,7 @@ fun CashierCashSessionScreen(
             verticalArrangement = Arrangement.spacedBy(24.dp)
         ) {
             CashSessionHeader()
+            LocalCashSessionBadges(uiState = uiState)
 
             if (uiState.isLoading && !uiState.isSubmitting) {
                 Box(
@@ -62,18 +64,12 @@ fun CashierCashSessionScreen(
                     CircularProgressIndicator(color = Primary)
                 }
             } else if (!uiState.hasActiveSession) {
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(400.dp),
-                    contentAlignment = Alignment.Center
-                ) {
-                    OpenShiftForm(
-                        uiState = uiState,
-                        onOpeningCashChanged = onOpeningCashChanged,
-                        onOpenSession = onOpenSession
-                    )
-                }
+                OpenShiftForm(
+                    modifier = Modifier.fillMaxWidth(),
+                    uiState = uiState,
+                    onOpeningCashChanged = onOpeningCashChanged,
+                    onOpenSession = onOpenSession
+                )
             } else {
                 if (isDesktop) {
                     Row(

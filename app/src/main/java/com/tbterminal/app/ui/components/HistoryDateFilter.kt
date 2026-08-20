@@ -35,6 +35,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -59,6 +60,7 @@ fun HistoryDateFilter(
     onCalendarClick: () -> Unit,
     onClearDate: () -> Unit,
     displayTextOverride: String? = null,
+    showClearButton: Boolean = true,
     modifier: Modifier = Modifier
 ) {
     val displayText = displayTextOverride ?: selectedDate?.toDisplayDate() ?: "Hari ini"
@@ -86,7 +88,7 @@ fun HistoryDateFilter(
                 )
             }
 
-            Row(
+            Box(
                 modifier = Modifier
                     .weight(1f)
                     .height(40.dp)
@@ -94,40 +96,45 @@ fun HistoryDateFilter(
                     .clip(RoundedCornerShape(10.dp))
                     .clickable(onClick = onCalendarClick)
                     .padding(horizontal = 8.dp),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.Center
+                contentAlignment = Alignment.Center
             ) {
-                Icon(
-                    Icons.Outlined.CalendarMonth,
-                    "Pilih tanggal",
-                    tint = HistoryPrimary,
-                    modifier = Modifier.size(18.dp)
-                )
-                Spacer(Modifier.width(8.dp))
-                Text(
-                    displayText,
-                    color = HistoryText,
-                    fontSize = 14.sp,
-                    fontWeight = FontWeight.SemiBold,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                    modifier = Modifier.weight(1f)
-                )
-                if (selectedDate != null) {
-                    Spacer(Modifier.width(6.dp))
-                    Box(
-                        modifier = Modifier
-                            .size(24.dp)
-                            .clip(RoundedCornerShape(8.dp))
-                            .clickable(onClick = onClearDate),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Icon(
-                            Icons.Outlined.Close,
-                            "Kembali ke hari ini",
-                            tint = HistoryMuted.copy(alpha = 0.6f),
-                            modifier = Modifier.size(15.dp)
-                        )
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.Center
+                ) {
+                    Icon(
+                        Icons.Outlined.CalendarMonth,
+                        "Pilih tanggal",
+                        tint = HistoryPrimary,
+                        modifier = Modifier.size(18.dp)
+                    )
+                    Spacer(Modifier.width(10.dp))
+                    Text(
+                        displayText,
+                        color = HistoryText,
+                        fontSize = 14.sp,
+                        fontWeight = FontWeight.SemiBold,
+                        textAlign = TextAlign.Center,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.widthIn(max = 210.dp)
+                    )
+                    if (selectedDate != null && showClearButton) {
+                        Spacer(Modifier.width(6.dp))
+                        Box(
+                            modifier = Modifier
+                                .size(24.dp)
+                                .clip(RoundedCornerShape(8.dp))
+                                .clickable(onClick = onClearDate),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Icon(
+                                Icons.Outlined.Close,
+                                "Kembali ke hari ini",
+                                tint = HistoryMuted.copy(alpha = 0.6f),
+                                modifier = Modifier.size(15.dp)
+                            )
+                        }
                     }
                 }
             }

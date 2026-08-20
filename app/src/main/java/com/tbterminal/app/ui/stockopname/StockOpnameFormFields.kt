@@ -176,6 +176,16 @@ internal fun QuantityInput(value: String, onValueChanged: (String) -> Unit) {
 }
 
 @Composable
+internal fun OpeningDateInput(value: String, onValueChanged: (String) -> Unit) {
+    LabeledInput(
+        label = "TANGGAL SALDO AWAL",
+        value = value,
+        onValueChanged = onValueChanged,
+        placeholder = "YYYY-MM-DD"
+    )
+}
+
+@Composable
 internal fun NotesInput(value: String, onValueChanged: (String) -> Unit) {
     LabeledInput(
         label = "ALASAN / CATATAN",

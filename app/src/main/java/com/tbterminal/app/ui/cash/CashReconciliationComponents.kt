@@ -248,7 +248,20 @@ private fun ActiveSessionCard(modifier: Modifier, uiState: CashReconciliationUiS
         border = BorderStroke(1.dp, CashLine)
     ) {
         Column(modifier = Modifier.padding(24.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
-            Text("Sesi Aktif", color = CashText, fontSize = 20.sp, fontWeight = FontWeight.ExtraBold)
+            Text(
+                if (uiState.isUsingLocalActiveSession) "Sesi kas aktif dari data lokal" else "Sesi Aktif",
+                color = CashText,
+                fontSize = 20.sp,
+                fontWeight = FontWeight.ExtraBold
+            )
+            if (uiState.isUsingLocalActiveSession) {
+                Text(
+                    "Server tidak tersambung. Transaksi akan disimpan lokal.",
+                    color = CashMuted,
+                    fontSize = 13.sp,
+                    fontWeight = FontWeight.SemiBold
+                )
+            }
             CashInfoRow("Sesi Dibuka", session?.openedAt.displayDateTime())
             CashInfoRow("Modal Awal", session?.openingCash.money())
             CashInfoRow("Kas Sistem", uiState.systemCash.money())

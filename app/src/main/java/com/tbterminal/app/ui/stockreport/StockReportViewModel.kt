@@ -13,6 +13,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import com.tbterminal.app.ui.cashier.transactions.stockCardBalancesReconciled
 
 class StockReportViewModel(
     private val inventoryRepository: InventoryRepository
@@ -68,6 +69,31 @@ class StockReportViewModel(
 
     fun onCategoryFilterChanged(categoryName: String?) {
         _uiState.update { it.copy(categoryFilter = categoryName) }
+    }
+
+    fun selectProduct(productId: String) {
+        viewModelScope.launch {
+            _uiState.update {
+                it.copy(selectedProductId = productId, isCardLoading = true, cardErrorMessage = null)
+            }
+            when (val result = inventoryRepository.getStockCard(productId = productId, limit = 100)) {
+                is RepositoryResult.Success -> _uiState.update {
+                    it.copy(
+                        stockMovements = result.data.data,
+                        isCardLoading = false,
+                        cardReconciled = result.data.reconciled && stockCardBalancesReconciled(
+                            result.data.currentStock, result.data.ledgerBalance
+                        )
+                    )
+                }
+                is RepositoryResult.Error -> _uiState.update {
+                    it.copy(isCardLoading = false, cardErrorMessage = result.message)
+                }
+                is RepositoryResult.Exception -> _uiState.update {
+                    it.copy(isCardLoading = false, cardErrorMessage = "Kartu stok gagal dimuat karena koneksi bermasalah.")
+                }
+            }
+        }
     }
 
     fun previousPage() {

@@ -102,6 +102,7 @@ class ProductCategoryViewModel(
         val state = _uiState.value
         val name = state.nameInput.trim()
         if (name.isBlank()) return setMessage("Nama kategori tidak boleh kosong.")
+        if (name.length > 100) return setMessage("Nama kategori maksimal 100 karakter.")
 
         viewModelScope.launch {
             _uiState.update { current -> current.copy(isSaving = true, message = null) }

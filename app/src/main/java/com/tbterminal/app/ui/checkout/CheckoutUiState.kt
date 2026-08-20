@@ -20,6 +20,7 @@ data class CheckoutUiState(
     val finalTotal: BigDecimal = BigDecimal.ZERO,
     val selectedPaymentMethod: PaymentMethod = PaymentMethod.TUNAI,
     val amountPaidInput: String = "",
+    val activeCashSession: ActiveCashSessionUi? = null,
     val hasActiveCashSession: Boolean = false,
     val isCashSessionLoading: Boolean = false,
     val isOpeningCashSession: Boolean = false,
@@ -31,6 +32,15 @@ data class CheckoutUiState(
     val productError: UiText? = null,
     val customerError: UiText? = null,
     val errorEvent: UiText? = null
+)
+
+data class ActiveCashSessionUi(
+    val localId: Long? = null,
+    val serverId: String,
+    val cashierUserId: String,
+    val openedAt: String,
+    val startingCash: BigDecimal,
+    val status: String
 )
 
 data class Product(

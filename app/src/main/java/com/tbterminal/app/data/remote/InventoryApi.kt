@@ -119,10 +119,36 @@ interface InventoryApi {
         @Query("type") type: String? = null
     ): Response<ApiResponse<PaginatedResponse<StockAdjustmentResponseDto>>>
 
+    @GET("/api/inventory/stock/card")
+    suspend fun getStockCard(
+        @Query("page") page: Int = 1,
+        @Query("limit") limit: Int = 20,
+        @Query("productId") productId: String? = null,
+        @Query("search") search: String? = null,
+        @Query("type") type: String? = null,
+        @Query("startDate") startDate: String? = null,
+        @Query("endDate") endDate: String? = null
+    ): Response<ApiResponse<StockCardResponseDto>>
+
     @POST("/api/inventory/stock/opname")
     suspend fun executeStockOpname(
         @Body request: StockOpnameRequestDto
     ): Response<ApiResponse<Unit>>
+
+    @POST("/api/inventory/stock/opening-balance")
+    suspend fun createOpeningStock(
+        @Body request: OpeningStockRequestDto
+    ): Response<ApiResponse<OpeningStockResponseDto>>
+
+    @POST("/api/inventory/imports/products/preview")
+    suspend fun previewProductCsv(
+        @Body request: ProductCsvImportRequestDto
+    ): Response<ApiResponse<ProductCsvPreviewResponseDto>>
+
+    @POST("/api/inventory/imports/products/commit")
+    suspend fun commitProductCsv(
+        @Body request: ProductCsvImportRequestDto
+    ): Response<ApiResponse<ProductCsvImportResponseDto>>
 }
 
 @Serializable
@@ -225,7 +251,40 @@ data class StockAdjustmentResponseDto(
     @Serializable(with = BigDecimalStringSerializer::class) val difference: BigDecimal,
     val reason: String,
     val userId: String,
+    val source: String = "manual",
+    val occurredOn: String = "",
     val createdAt: String
+)
+
+@Serializable
+data class StockMovementResponseDto(
+    val id: String,
+    val productId: String,
+    val sku: String,
+    val productName: String,
+    val unitName: String,
+    val type: String,
+    @Serializable(with = BigDecimalStringSerializer::class) val balanceBefore: BigDecimal,
+    @Serializable(with = BigDecimalStringSerializer::class) val qtyIn: BigDecimal,
+    @Serializable(with = BigDecimalStringSerializer::class) val qtyOut: BigDecimal,
+    @Serializable(with = BigDecimalStringSerializer::class) val balanceAfter: BigDecimal,
+    val referenceType: String,
+    val referenceId: String,
+    val referenceNumber: String? = null,
+    val userId: String? = null,
+    val occurredAt: String
+)
+
+@Serializable
+data class StockCardResponseDto(
+    val data: List<StockMovementResponseDto>,
+    val total: Long,
+    val page: Int,
+    val limit: Int,
+    val totalPages: Int,
+    @Serializable(with = BigDecimalStringSerializer::class) val currentStock: BigDecimal? = null,
+    @Serializable(with = BigDecimalStringSerializer::class) val ledgerBalance: BigDecimal? = null,
+    val reconciled: Boolean
 )
 
 @Serializable
@@ -234,6 +293,58 @@ data class StockOpnameRequestDto(
     val adjustmentType: String,
     @Serializable(with = BigDecimalStringSerializer::class) val actualQty: BigDecimal,
     val notes: String? = null
+)
+
+@Serializable
+data class OpeningStockRequestDto(
+    val productId: String,
+    val date: String,
+    @Serializable(with = BigDecimalStringSerializer::class) val quantity: BigDecimal,
+    val note: String
+)
+
+@Serializable
+data class OpeningStockResponseDto(
+    val adjustmentId: String,
+    val productId: String,
+    @Serializable(with = BigDecimalStringSerializer::class) val quantity: BigDecimal,
+    val date: String,
+    val note: String,
+    val userId: String
+)
+
+@Serializable
+data class ProductCsvImportRequestDto(val csv: String)
+
+@Serializable
+data class ProductCsvRowPreviewDto(
+    val rowNumber: Int,
+    val sku: String,
+    val name: String,
+    val category: String,
+    val unit: String,
+    val priceBuy: String,
+    val priceRetail: String,
+    val priceContractor: String,
+    val minStock: String,
+    val openingStock: String,
+    val openingDate: String,
+    val openingNote: String,
+    val errors: List<String>
+)
+
+@Serializable
+data class ProductCsvPreviewResponseDto(
+    val totalRows: Int,
+    val validRows: Int,
+    val invalidRows: Int,
+    val rows: List<ProductCsvRowPreviewDto>
+)
+
+@Serializable
+data class ProductCsvImportResponseDto(
+    val importedProducts: Int,
+    val openingBalances: Int
 )
 
 object BigDecimalStringSerializer : KSerializer<BigDecimal> {

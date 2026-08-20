@@ -73,6 +73,7 @@ private val SessionPrimary = Color(0xFF059669)
 internal fun CashSessionHistoryScreen(
     modifier: Modifier,
     uiState: CashSessionHistoryUiState,
+    title: String = "Riwayat Kas Harian",
     onSearchChanged: (String) -> Unit,
     onStatusFilterChanged: (String) -> Unit,
     onRefresh: () -> Unit,
@@ -92,6 +93,7 @@ internal fun CashSessionHistoryScreen(
         verticalArrangement = Arrangement.spacedBy(28.dp)
     ) {
         CashSessionHistoryHeader(
+            title = title,
             uiState = uiState,
             onPreviousDate = onPreviousDate,
             onNextDate = onNextDate,
@@ -125,6 +127,7 @@ internal fun CashSessionHistoryScreen(
 
 @Composable
 private fun CashSessionHistoryHeader(
+    title: String,
     uiState: CashSessionHistoryUiState,
     onPreviousDate: () -> Unit,
     onNextDate: () -> Unit,
@@ -138,7 +141,7 @@ private fun CashSessionHistoryHeader(
         verticalAlignment = Alignment.Top
     ) {
         Text(
-            "Riwayat Kas Harian",
+            title,
             color = SessionText,
             fontSize = 28.sp,
             fontWeight = FontWeight.Medium

@@ -56,6 +56,8 @@ internal fun StockAdjustmentResponseDto.toStockAdjustment(): StockAdjustment {
         difference = difference,
         reason = reason,
         userId = userId,
+        source = source,
+        occurredOn = occurredOn,
         createdAt = createdAt
     )
 }

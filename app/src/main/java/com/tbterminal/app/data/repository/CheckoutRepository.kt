@@ -18,6 +18,7 @@ class RemoteCheckoutRepository(
         command: CheckoutSubmitCommand
     ): RepositoryResult<CheckoutReceipt> {
         val request = CheckoutRequest(
+            idempotencyKey = command.idempotencyKey,
             customerId = command.customerId,
             items = command.items.map { item ->
                 CheckoutLineItemRequest(
@@ -44,7 +45,10 @@ class RemoteCheckoutRepository(
                         CheckoutReceipt(
                             receiptId = checkout.receiptId?.takeIf(String::isNotBlank)
                                 ?: "TRX-${checkout.id.take(8).uppercase()}",
-                            transactionId = checkout.id
+                            transactionId = checkout.id,
+                            amountTendered = checkout.amountTendered,
+                            changeAmount = checkout.changeAmount,
+                            idempotentReplay = checkout.idempotentReplay
                         )
                     )
                 }

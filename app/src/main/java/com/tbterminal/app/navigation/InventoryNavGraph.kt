@@ -62,7 +62,7 @@ internal fun NavGraphBuilder.inventoryGraph(navController: NavHostController, se
 
             if (sessionUser == null) {
                 LaunchedEffect(Unit) {
-                    sessionManager.clearSession()
+                    sessionManager.logout()
                     navController.navigate(AppRoute.Login.route) {
                         popUpTo(0)
                         launchSingleTop = true
@@ -70,7 +70,7 @@ internal fun NavGraphBuilder.inventoryGraph(navController: NavHostController, se
                 }
             } else {
                 val logout: () -> Unit = {
-                    sessionManager.clearSession()
+                    sessionManager.logout()
                     navController.navigate(AppRoute.Login.route) {
                         popUpTo(0)
                         launchSingleTop = true
@@ -126,7 +126,7 @@ internal fun NavGraphBuilder.inventoryGraph(navController: NavHostController, se
 
             if (sessionUser == null) {
                 LaunchedEffect(Unit) {
-                    sessionManager.clearSession()
+                    sessionManager.logout()
                     navController.navigate(AppRoute.Login.route) {
                         popUpTo(0)
                         launchSingleTop = true
@@ -238,7 +238,7 @@ internal fun NavGraphBuilder.inventoryGraph(navController: NavHostController, se
                         }
                     },
                         onLogout = {
-                        sessionManager.clearSession()
+                        sessionManager.logout()
                         navController.navigate(AppRoute.Login.route) {
                             popUpTo(0)
                             launchSingleTop = true
@@ -253,7 +253,7 @@ internal fun NavGraphBuilder.inventoryGraph(navController: NavHostController, se
 
             if (sessionUser == null) {
                 LaunchedEffect(Unit) {
-                    sessionManager.clearSession()
+                    sessionManager.logout()
                     navController.navigate(AppRoute.Login.route) {
                         popUpTo(0)
                         launchSingleTop = true
@@ -366,7 +366,7 @@ internal fun NavGraphBuilder.inventoryGraph(navController: NavHostController, se
                         }
                     },
                     onLogout = {
-                        sessionManager.clearSession()
+                        sessionManager.logout()
                         navController.navigate(AppRoute.Login.route) {
                             popUpTo(0)
                             launchSingleTop = true
@@ -389,7 +389,7 @@ internal fun NavGraphBuilder.inventoryGraph(navController: NavHostController, se
 
             if (sessionUser == null || productId.isNullOrBlank()) {
                 LaunchedEffect(Unit) {
-                    sessionManager.clearSession()
+                    sessionManager.logout()
                     navController.navigate(AppRoute.Login.route) {
                         popUpTo(0)
                         launchSingleTop = true
@@ -502,7 +502,7 @@ internal fun NavGraphBuilder.inventoryGraph(navController: NavHostController, se
                         }
                     },
                     onLogout = {
-                        sessionManager.clearSession()
+                        sessionManager.logout()
                         navController.navigate(AppRoute.Login.route) {
                             popUpTo(0)
                             launchSingleTop = true
@@ -525,7 +525,7 @@ internal fun NavGraphBuilder.inventoryGraph(navController: NavHostController, se
 
             if (sessionUser == null || productId.isNullOrBlank()) {
                 LaunchedEffect(Unit) {
-                    sessionManager.clearSession()
+                    sessionManager.logout()
                     navController.navigate(AppRoute.Login.route) {
                         popUpTo(0)
                         launchSingleTop = true
@@ -643,7 +643,7 @@ internal fun NavGraphBuilder.inventoryGraph(navController: NavHostController, se
                         }
                     },
                     onLogout = {
-                        sessionManager.clearSession()
+                        sessionManager.logout()
                         navController.navigate(AppRoute.Login.route) {
                             popUpTo(0)
                             launchSingleTop = true
@@ -658,7 +658,7 @@ internal fun NavGraphBuilder.inventoryGraph(navController: NavHostController, se
 
             if (sessionUser == null) {
                 LaunchedEffect(Unit) {
-                    sessionManager.clearSession()
+                    sessionManager.logout()
                     navController.navigate(AppRoute.Login.route) {
                         popUpTo(0)
                         launchSingleTop = true
@@ -764,7 +764,7 @@ internal fun NavGraphBuilder.inventoryGraph(navController: NavHostController, se
                             launchSingleTop = true
                         }
                     },                                    onLogout = {
-                        sessionManager.clearSession()
+                        sessionManager.logout()
                         navController.navigate(AppRoute.Login.route) {
                             popUpTo(0)
                             launchSingleTop = true
@@ -779,7 +779,7 @@ internal fun NavGraphBuilder.inventoryGraph(navController: NavHostController, se
 
             if (sessionUser == null) {
                 LaunchedEffect(Unit) {
-                    sessionManager.clearSession()
+                    sessionManager.logout()
                     navController.navigate(AppRoute.Login.route) {
                         popUpTo(0)
                         launchSingleTop = true
@@ -885,7 +885,7 @@ internal fun NavGraphBuilder.inventoryGraph(navController: NavHostController, se
                             launchSingleTop = true
                         }
                     },                                    onLogout = {
-                        sessionManager.clearSession()
+                        sessionManager.logout()
                         navController.navigate(AppRoute.Login.route) {
                             popUpTo(0)
                             launchSingleTop = true
@@ -900,7 +900,7 @@ internal fun NavGraphBuilder.inventoryGraph(navController: NavHostController, se
 
             if (sessionUser == null) {
                 LaunchedEffect(Unit) {
-                    sessionManager.clearSession()
+                    sessionManager.logout()
                     navController.navigate(AppRoute.Login.route) {
                         popUpTo(0)
                         launchSingleTop = true
@@ -1001,7 +1001,7 @@ internal fun NavGraphBuilder.inventoryGraph(navController: NavHostController, se
                             launchSingleTop = true
                         }
                     },                                    onLogout = {
-                        sessionManager.clearSession()
+                        sessionManager.logout()
                         navController.navigate(AppRoute.Login.route) {
                             popUpTo(0)
                             launchSingleTop = true
@@ -1027,7 +1027,7 @@ internal fun NavGraphBuilder.inventoryGraph(navController: NavHostController, se
 
             if (sessionUser == null) {
                 LaunchedEffect(Unit) {
-                    sessionManager.clearSession()
+                    sessionManager.logout()
                     navController.navigate(AppRoute.Login.route) {
                         popUpTo(0)
                         launchSingleTop = true
@@ -1129,7 +1129,7 @@ internal fun NavGraphBuilder.inventoryGraph(navController: NavHostController, se
                             launchSingleTop = true
                         }
                     },                                    onLogout = {
-                        sessionManager.clearSession()
+                        sessionManager.logout()
                         navController.navigate(AppRoute.Login.route) {
                             popUpTo(0)
                             launchSingleTop = true

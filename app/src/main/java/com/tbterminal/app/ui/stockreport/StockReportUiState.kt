@@ -1,6 +1,7 @@
 package com.tbterminal.app.ui.stockreport
 
 import com.tbterminal.app.data.model.ProductStock
+import com.tbterminal.app.data.model.StockMovement
 import java.math.BigDecimal
 
 data class StockReportUiState(
@@ -12,7 +13,12 @@ data class StockReportUiState(
     val totalProducts: Long = 0,
     val pageSize: Int = 10,
     val isLoading: Boolean = true,
-    val errorMessage: String? = null
+    val errorMessage: String? = null,
+    val selectedProductId: String? = null,
+    val stockMovements: List<StockMovement> = emptyList(),
+    val isCardLoading: Boolean = false,
+    val cardErrorMessage: String? = null,
+    val cardReconciled: Boolean? = null
 ) {
     val categoryOptions: List<String>
         get() = stocks.map(ProductStock::categoryName).distinct().sorted()

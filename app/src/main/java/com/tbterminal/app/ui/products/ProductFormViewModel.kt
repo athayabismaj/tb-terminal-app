@@ -51,22 +51,16 @@ class ProductFormViewModel(
         val priceContractor = input.priceContractor.toProductDecimalOrNull()
         val minStock = input.minStock.toProductDecimalOrNull()
 
+        val validationError = validateProductFormInput(input, state.isEditMode)
         when {
             state.isSaving -> return
-            input.name.isBlank() -> setError("Nama produk tidak boleh kosong.")
-            input.sku.isBlank() && !state.isEditMode -> setError("SKU produk tidak boleh kosong.")
-            input.categoryId.isBlank() -> setError("Kategori wajib dipilih.")
-            input.baseUnitId.isBlank() -> setError("Satuan wajib dipilih.")
-            priceBuy == null -> setError("Harga beli harus berupa angka valid.")
-            priceRetail == null -> setError("Harga retail harus berupa angka valid.")
-            priceContractor == null -> setError("Harga kontraktor harus berupa angka valid.")
-            minStock == null -> setError("Stok minimum harus berupa angka valid.")
+            validationError != null -> setError(validationError)
             else -> submit(
-                priceBuy = priceBuy,
-                priceRetail = priceRetail,
-                priceContractor = priceContractor,
+                priceBuy = requireNotNull(priceBuy),
+                priceRetail = requireNotNull(priceRetail),
+                priceContractor = requireNotNull(priceContractor),
                 discount = java.math.BigDecimal.ZERO,
-                minStock = minStock
+                minStock = requireNotNull(minStock)
             )
         }
     }
@@ -132,7 +126,7 @@ class ProductFormViewModel(
                     CreateProductCommand(
                         categoryId = input.categoryId,
                         baseUnitId = input.baseUnitId,
-                        sku = input.sku.trim(),
+                        sku = normalizeProductSku(input.sku),
                         name = input.name.trim(),
                         priceBuy = priceBuy,
                         priceRetail = priceRetail,
@@ -209,13 +203,4 @@ private fun Product.toFormInput(): ProductFormInput {
         minStock = minStock.toPlainString()
     )
 }
-
-private fun String.toProductDecimalOrNull(): BigDecimal? {
-    return trim()
-        .replace(",", ".")
-        .takeIf(String::isNotBlank)
-        ?.runCatching { toBigDecimal() }
-        ?.getOrNull()
-}
-
 

@@ -4,6 +4,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.tbterminal.app.data.local.database.CashSessionLocalDataSource
 import com.tbterminal.app.data.repository.CashReconciliationRepository
 import com.tbterminal.app.ui.dashboard.cashier.CashierDashboardShell
 import com.tbterminal.app.ui.dashboard.cashier.CashierDestination
@@ -13,6 +14,7 @@ fun CashierCashReconciliationScreen(
     name: String,
     role: String,
     cashReconciliationRepository: CashReconciliationRepository,
+    cashSessionLocalDataSource: CashSessionLocalDataSource? = null,
     onDashboardClick: () -> Unit,
     onPosClick: () -> Unit,
     onCashSessionClick: () -> Unit = {},
@@ -22,7 +24,10 @@ fun CashierCashReconciliationScreen(
     onSettingsClick: () -> Unit = {},
     onLogout: () -> Unit,
     viewModel: CashReconciliationViewModel = viewModel(
-        factory = CashReconciliationViewModel.factory(cashReconciliationRepository)
+        factory = CashReconciliationViewModel.factory(
+            repository = cashReconciliationRepository,
+            cashSessionLocalDataSource = cashSessionLocalDataSource
+        )
     )
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()

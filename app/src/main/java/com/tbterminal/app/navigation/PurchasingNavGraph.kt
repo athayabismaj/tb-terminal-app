@@ -62,7 +62,7 @@ internal fun NavGraphBuilder.purchasingGraph(navController: NavHostController, s
 
             if (sessionUser == null) {
                 LaunchedEffect(Unit) {
-                    sessionManager.clearSession()
+                    sessionManager.logout()
                     navController.navigate(AppRoute.Login.route) {
                         popUpTo(0)
                         launchSingleTop = true
@@ -165,7 +165,7 @@ internal fun NavGraphBuilder.purchasingGraph(navController: NavHostController, s
                             launchSingleTop = true
                         }
                     },                                    onLogout = {
-                        sessionManager.clearSession()
+                        sessionManager.logout()
                         navController.navigate(AppRoute.Login.route) {
                             popUpTo(0)
                             launchSingleTop = true
@@ -191,7 +191,7 @@ internal fun NavGraphBuilder.purchasingGraph(navController: NavHostController, s
 
             if (sessionUser == null) {
                 LaunchedEffect(Unit) {
-                    sessionManager.clearSession()
+                    sessionManager.logout()
                     navController.navigate(AppRoute.Login.route) {
                         popUpTo(0)
                         launchSingleTop = true
@@ -295,7 +295,7 @@ internal fun NavGraphBuilder.purchasingGraph(navController: NavHostController, s
                             launchSingleTop = true
                         }
                     },                                    onLogout = {
-                        sessionManager.clearSession()
+                        sessionManager.logout()
                         navController.navigate(AppRoute.Login.route) {
                             popUpTo(0)
                             launchSingleTop = true
@@ -310,7 +310,7 @@ internal fun NavGraphBuilder.purchasingGraph(navController: NavHostController, s
 
             if (sessionUser == null) {
                 LaunchedEffect(Unit) {
-                    sessionManager.clearSession()
+                    sessionManager.logout()
                     navController.navigate(AppRoute.Login.route) {
                         popUpTo(0)
                         launchSingleTop = true
@@ -411,7 +411,7 @@ internal fun NavGraphBuilder.purchasingGraph(navController: NavHostController, s
                             launchSingleTop = true
                         }
                     },                                    onLogout = {
-                        sessionManager.clearSession()
+                        sessionManager.logout()
                         navController.navigate(AppRoute.Login.route) {
                             popUpTo(0)
                             launchSingleTop = true

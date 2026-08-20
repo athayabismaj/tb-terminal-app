@@ -3,6 +3,7 @@ package com.tbterminal.app.ui.stockopname
 import com.tbterminal.app.data.model.ProductStock
 import com.tbterminal.app.data.model.StockAdjustment
 import java.math.BigDecimal
+import java.time.LocalDate
 
 data class StockOpnameUiState(
     val products: List<ProductStock> = emptyList(),
@@ -12,6 +13,7 @@ data class StockOpnameUiState(
     val categoryFilter: String? = null,
     val actualQtyInput: String = "",
     val notesInput: String = "",
+    val openingDateInput: String = LocalDate.now().toString(),
     val adjustmentType: StockAdjustmentType = StockAdjustmentType.OPNAME,
     val currentPage: Int = 1,
     val isLoading: Boolean = false,
@@ -62,7 +64,8 @@ enum class StockAdjustmentType(
 ) {
     OPNAME("OPNAME", "Opname", "Hasil hitung fisik rutin"),
     CORRECTION("CORRECTION", "Koreksi", "Perbaikan data administrasi"),
-    DAMAGE("DAMAGE", "Rusak/Retur", "Barang rusak atau retur supplier")
+    DAMAGE("DAMAGE", "Rusak/Retur", "Barang rusak atau retur supplier"),
+    OPENING_BALANCE("OPENING_BALANCE", "Saldo Awal", "Stok awal sebelum operasional")
 }
 
 internal const val STOCK_OPNAME_PAGE_SIZE = 50

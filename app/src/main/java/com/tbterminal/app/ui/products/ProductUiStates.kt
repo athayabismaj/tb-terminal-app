@@ -10,6 +10,7 @@ import com.tbterminal.app.data.model.ProductDetail
 import com.tbterminal.app.data.model.ProductStock
 import com.tbterminal.app.data.model.ProductUnit
 import com.tbterminal.app.data.model.UpdateProductCommand
+import com.tbterminal.app.data.model.ProductCsvPreview
 import com.tbterminal.app.data.repository.InventoryRepository
 import com.tbterminal.app.data.repository.RepositoryResult
 import com.tbterminal.app.ui.common.viewModelFactory
@@ -34,7 +35,11 @@ data class ProductListUiState(
     val isLoading: Boolean = false,
     val isMutating: Boolean = false,
     val errorMessage: String? = null,
-    val actionMessage: String? = null
+    val actionMessage: String? = null,
+    val importCsv: String? = null,
+    val importPreview: ProductCsvPreview? = null,
+    val isImporting: Boolean = false,
+    val showImportDialog: Boolean = false
 ) {
     val visibleProducts: List<ProductStock>
         get() = if (selectedCategory == ALL_PRODUCT_CATEGORIES) {

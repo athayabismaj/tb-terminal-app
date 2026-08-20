@@ -1,5 +1,18 @@
 package com.tbterminal.app.ui.salestransactions
 
+import android.content.Context
+import android.graphics.Paint
+import android.graphics.pdf.PdfDocument
+import android.os.Bundle
+import android.os.CancellationSignal
+import android.os.ParcelFileDescriptor
+import android.print.PageRange
+import android.print.PrintAttributes
+import android.print.PrintDocumentAdapter
+import android.print.PrintDocumentInfo
+import android.print.PrintManager
+import android.print.pdf.PrintedPdfDocument
+
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
@@ -22,12 +35,16 @@ import androidx.compose.material.icons.automirrored.outlined.ReceiptLong
 import androidx.compose.material.icons.outlined.Info
 import androidx.compose.material.icons.outlined.Print
 import androidx.compose.material3.Card
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Button
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -48,6 +65,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.window.Dialog
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
@@ -64,6 +82,7 @@ import com.tbterminal.app.ui.dashboard.admin.AdminDashboardShell
 import com.tbterminal.app.ui.dashboard.admin.AdminDestination
 
 import java.math.BigDecimal
+import java.io.FileOutputStream
 
 private val ReceiptLine = Color(0xFFE2E8F0)
 private val ReceiptSurfaceSoft = Color(0xFFF1F5F9)
@@ -140,6 +159,10 @@ fun AdminReceiptDetailScreen(
             onPayDebtAmountChanged = viewModel::onPayDebtAmountChanged,
             onPayDebtMethodChanged = viewModel::onPayDebtMethodChanged,
             onPayDebt = viewModel::payDebt,
+            onShowVoid = viewModel::showVoidDialog,
+            onHideVoid = viewModel::hideVoidDialog,
+            onVoidReasonChanged = viewModel::onVoidReasonChanged,
+            onSubmitVoid = viewModel::submitVoid,
             modifier = contentModifier
         )
     }
@@ -156,6 +179,10 @@ private fun ReceiptDetailContent(
     onPayDebtAmountChanged: (String) -> Unit,
     onPayDebtMethodChanged: (String) -> Unit,
     onPayDebt: () -> Unit,
+    onShowVoid: () -> Unit,
+    onHideVoid: () -> Unit,
+    onVoidReasonChanged: (String) -> Unit,
+    onSubmitVoid: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     Column(
@@ -175,7 +202,8 @@ private fun ReceiptDetailContent(
                 transaction = state.selectedTransaction,
                 message = state.receiptMessage.orEmpty(),
                 role = role,
-                onShowPayDebt = onShowPayDebt
+                onShowPayDebt = onShowPayDebt,
+                onShowVoid = onShowVoid
             )
         }
     }
@@ -188,6 +216,9 @@ private fun ReceiptDetailContent(
             onMethodChanged = onPayDebtMethodChanged,
             onConfirm = onPayDebt
         )
+    }
+    if (state.isVoidDialogOpen) {
+        VoidTransactionDialog(state, onHideVoid, onVoidReasonChanged, onSubmitVoid)
     }
 }
 
@@ -224,7 +255,8 @@ private fun ReceiptSummaryCard(
     transaction: CashTransactionDetail,
     message: String,
     role: String,
-    onShowPayDebt: () -> Unit
+    onShowPayDebt: () -> Unit,
+    onShowVoid: () -> Unit
 ) {
     var showPrintDialog by remember { mutableStateOf(false) }
 
@@ -251,7 +283,8 @@ private fun ReceiptSummaryCard(
                 transaction = transaction,
                 role = role,
                 onPrintClick = { showPrintDialog = true },
-                onShowPayDebt = onShowPayDebt
+                onShowPayDebt = onShowPayDebt,
+                onShowVoid = onShowVoid
             )
         }
     }
@@ -293,9 +326,17 @@ private fun ReceiptTotalsSection(transaction: CashTransactionDetail) {
         ReceiptInfoRow("ID transaksi", transaction.receiptNumber())
         ReceiptInfoRow("Tipe transaksi", transaction.type.ifBlank { "-" })
         ReceiptInfoRow("Pelanggan", transaction.customerName ?: "Umum")
+        ReceiptInfoRow("Kasir", transaction.cashierName ?: "-")
+        ReceiptInfoRow("Metode", transaction.paymentMethods.joinToString(", ").ifBlank { "-" })
         ReceiptInfoRow("Subtotal", transaction.total.moneyText())
         ReceiptInfoRow("Dibayar", transaction.paidAmount.moneyText())
+        ReceiptInfoRow("Uang diterima", transaction.amountTendered.moneyText())
+        if (transaction.changeAmount > BigDecimal.ZERO) {
+            ReceiptInfoRow("Kembalian", transaction.changeAmount.moneyText(), emphasized = true)
+        }
         ReceiptInfoRow("Sisa tagihan", transaction.remainingAmount().moneyText(), emphasized = transaction.remainingAmount() > BigDecimal.ZERO)
+        transaction.voidedAt?.let { ReceiptInfoRow("Dibatalkan", it.displayDateTime()) }
+        transaction.voidReason?.let { ReceiptInfoRow("Alasan void", it, emphasized = true) }
     }
 }
 
@@ -348,11 +389,12 @@ private fun ReceiptActions(
     transaction: CashTransactionDetail,
     role: String,
     onPrintClick: () -> Unit,
-    onShowPayDebt: () -> Unit
+    onShowPayDebt: () -> Unit,
+    onShowVoid: () -> Unit
 ) {
     Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
         val canAcceptPayment = role.equals("KASIR", ignoreCase = true) || role.equals("OWNER", ignoreCase = true)
-        if (transaction.remainingAmount() > BigDecimal.ZERO && canAcceptPayment) {
+        if (!transaction.status.equals("voided", true) && transaction.remainingAmount() > BigDecimal.ZERO && canAcceptPayment) {
             androidx.compose.material3.Button(
                 onClick = onShowPayDebt,
                 shape = RoundedCornerShape(12.dp),
@@ -362,6 +404,15 @@ private fun ReceiptActions(
                 Spacer(modifier = Modifier.width(8.dp))
                 Text("Terima Pelunasan", fontWeight = FontWeight.Bold)
             }
+            Spacer(modifier = Modifier.width(12.dp))
+        }
+        val canVoid = role.equals("OWNER", true) || role.equals("ADMIN", true)
+        if (canVoid && !transaction.status.equals("voided", true)) {
+            Button(
+                onClick = onShowVoid,
+                colors = androidx.compose.material3.ButtonDefaults.buttonColors(containerColor = Color(0xFFB91C1C)),
+                shape = RoundedCornerShape(12.dp)
+            ) { Text("Void transaksi", fontWeight = FontWeight.Bold) }
             Spacer(modifier = Modifier.width(12.dp))
         }
         
@@ -376,6 +427,40 @@ private fun ReceiptActions(
             Text("Cetak struk")
         }
     }
+}
+
+@Composable
+private fun VoidTransactionDialog(
+    state: CashierTransactionHistoryUiState,
+    onDismiss: () -> Unit,
+    onReasonChanged: (String) -> Unit,
+    onConfirm: () -> Unit
+) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Void transaksi") },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                Text("Transaksi tidak dihapus. Stok, piutang, pembayaran, dan kas akan dikompensasi secara atomik.")
+                OutlinedTextField(
+                    value = state.voidReasonInput,
+                    onValueChange = onReasonChanged,
+                    label = { Text("Alasan wajib") },
+                    minLines = 3,
+                    enabled = !state.isSubmittingVoid,
+                    supportingText = { state.voidErrorMessage?.let { Text(it, color = Color(0xFFB91C1C)) } }
+                )
+            }
+        },
+        confirmButton = {
+            Button(
+                onClick = onConfirm,
+                enabled = !state.isSubmittingVoid && state.voidReasonInput.trim().length >= 5,
+                colors = androidx.compose.material3.ButtonDefaults.buttonColors(containerColor = Color(0xFFB91C1C))
+            ) { Text(if (state.isSubmittingVoid) "Memproses..." else "Konfirmasi void") }
+        },
+        dismissButton = { TextButton(onClick = onDismiss, enabled = !state.isSubmittingVoid) { Text("Batal") } }
+    )
 }
 
 @Composable
@@ -404,6 +489,7 @@ fun CetakStrukPreviewDialog(
     transaction: CashTransactionDetail,
     onDismiss: () -> Unit
 ) {
+    val context = LocalContext.current
     Dialog(onDismissRequest = onDismiss) {
         Card(
             modifier = Modifier.fillMaxWidth().padding(16.dp),
@@ -419,6 +505,10 @@ fun CetakStrukPreviewDialog(
             ) {
                 Text("TB TERMINAL", fontSize = 18.sp, fontWeight = FontWeight.Black, color = Color.Black)
                 Text("Struk Pembelian", fontSize = 14.sp, color = Color.Black)
+                if (transaction.status.equals("voided", true)) {
+                    Text("*** DIBATALKAN / VOID ***", fontSize = 16.sp, fontWeight = FontWeight.Black, color = Color(0xFFB91C1C))
+                    transaction.voidReason?.let { Text("Alasan: $it", fontSize = 11.sp, color = Color(0xFFB91C1C)) }
+                }
                 Spacer(modifier = Modifier.height(16.dp))
                 HorizontalDivider(color = Color.Black, thickness = 1.dp)
                 Spacer(modifier = Modifier.height(8.dp))
@@ -462,6 +552,16 @@ fun CetakStrukPreviewDialog(
                     Text("DIBAYAR", fontSize = 12.sp, color = Color.Black)
                     Text(transaction.paidAmount.moneyText(), fontSize = 12.sp, color = Color.Black)
                 }
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                    Text("Uang diterima", fontSize = 12.sp, color = Color.Black)
+                    Text(transaction.amountTendered.moneyText(), fontSize = 12.sp, color = Color.Black)
+                }
+                if (transaction.changeAmount > BigDecimal.ZERO) {
+                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                        Text("Kembalian", fontSize = 12.sp, color = Color.Black)
+                        Text(transaction.changeAmount.moneyText(), fontSize = 12.sp, color = Color.Black)
+                    }
+                }
                 if (transaction.remainingAmount() > BigDecimal.ZERO) {
                     Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
                         Text("SISA TAGIHAN", fontSize = 12.sp, color = Color.Black)
@@ -473,15 +573,95 @@ fun CetakStrukPreviewDialog(
                 Text("TERIMA KASIH", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = Color.Black)
                 Spacer(modifier = Modifier.height(24.dp))
                 
-                OutlinedButton(
-                    onClick = onDismiss,
+                Button(
+                    onClick = { printTransactionReceipt(context, transaction) },
                     modifier = Modifier.fillMaxWidth(),
                     shape = RoundedCornerShape(8.dp)
                 ) {
-                    Text("Tutup", color = Color.Black)
+                    Icon(Icons.Outlined.Print, contentDescription = null)
+                    Spacer(Modifier.width(8.dp))
+                    Text(if (transaction.status.equals("voided", true)) "Cetak struk void" else "Cetak struk")
                 }
+                TextButton(onClick = onDismiss) { Text("Tutup") }
             }
         }
+    }
+}
+
+internal fun printTransactionReceipt(context: Context, transaction: CashTransactionDetail) {
+    val printManager = context.getSystemService(Context.PRINT_SERVICE) as PrintManager
+    printManager.print(
+        "${if (transaction.status.equals("voided", true)) "Void" else "Struk"}-${transaction.receiptNumber()}",
+        TransactionReceiptPrintAdapter(context, transaction),
+        PrintAttributes.Builder()
+            .setMediaSize(PrintAttributes.MediaSize.ISO_A5)
+            .setColorMode(PrintAttributes.COLOR_MODE_MONOCHROME)
+            .build()
+    )
+}
+
+private class TransactionReceiptPrintAdapter(
+    private val context: Context,
+    private val transaction: CashTransactionDetail
+) : PrintDocumentAdapter() {
+    private lateinit var attributes: PrintAttributes
+
+    override fun onLayout(oldAttributes: PrintAttributes?, newAttributes: PrintAttributes, signal: CancellationSignal, callback: LayoutResultCallback, extras: Bundle?) {
+        if (signal.isCanceled) return callback.onLayoutCancelled()
+        attributes = newAttributes
+        callback.onLayoutFinished(
+            PrintDocumentInfo.Builder("struk-${transaction.receiptNumber()}.pdf")
+                .setContentType(PrintDocumentInfo.CONTENT_TYPE_DOCUMENT).setPageCount(1).build(),
+            true
+        )
+    }
+
+    override fun onWrite(pages: Array<out PageRange>, destination: ParcelFileDescriptor, signal: CancellationSignal, callback: WriteResultCallback) {
+        val document = PrintedPdfDocument(context, attributes)
+        try {
+            if (signal.isCanceled) return callback.onWriteCancelled()
+            val page = document.startPage(0)
+            draw(page)
+            document.finishPage(page)
+            FileOutputStream(destination.fileDescriptor).use(document::writeTo)
+            callback.onWriteFinished(arrayOf(PageRange.ALL_PAGES))
+        } catch (error: Exception) {
+            callback.onWriteFailed(error.message ?: "Struk gagal dicetak")
+        } finally {
+            document.close()
+        }
+    }
+
+    private fun draw(page: PdfDocument.Page) {
+        val normal = Paint().apply { color = android.graphics.Color.BLACK; textSize = 11f }
+        val bold = Paint(normal).apply { isFakeBoldText = true; textSize = 16f }
+        val canvas = page.canvas
+        var y = 42f
+        val isVoided = transaction.status.equals("voided", true)
+        canvas.drawText(if (isVoided) "STRUK VOID" else "TB TERMINAL", 32f, y, bold)
+        y += 24f
+        listOf(
+            "Nomor: ${transaction.receiptNumber()}",
+            "Tanggal: ${transaction.createdAt.displayDateTime()}",
+            "Kasir: ${transaction.cashierName ?: "-"}",
+            "Pelanggan: ${transaction.customerName ?: "Umum"}",
+            "Status: ${transaction.status.uppercase()}"
+        ).forEach { canvas.drawText(it.take(82), 32f, y, normal); y += 18f }
+        if (isVoided) {
+            canvas.drawText("Alasan void: ${transaction.voidReason ?: "-"}".take(82), 32f, y, normal)
+            y += 22f
+        }
+        transaction.items.forEach { item ->
+            if (y < page.info.pageHeight - 130) {
+                canvas.drawText(item.productName.take(48), 32f, y, normal); y += 16f
+                canvas.drawText("  ${item.quantity} x ${item.priceAtTransaction.moneyText()} = ${item.subtotal.moneyText()}".take(82), 32f, y, normal); y += 18f
+            }
+        }
+        y += 6f
+        canvas.drawText("TOTAL: ${transaction.total.moneyText()}", 32f, y, bold); y += 22f
+        canvas.drawText("Dibayar: ${transaction.paidAmount.moneyText()}", 32f, y, normal); y += 18f
+        canvas.drawText("Kembalian: ${transaction.changeAmount.moneyText()}", 32f, y, normal); y += 18f
+        canvas.drawText("Sisa: ${transaction.remainingAmount().moneyText()}", 32f, y, normal)
     }
 }
 

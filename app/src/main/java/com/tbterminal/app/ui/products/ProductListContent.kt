@@ -32,6 +32,7 @@ internal fun ProductListContent(
     onCategorySelected: (String) -> Unit,
     onRetry: () -> Unit,
     onAddProductClick: () -> Unit,
+    onImportProductClick: () -> Unit,
     onEditProductClick: (String) -> Unit,
     onProductDetailClick: (String) -> Unit,
     onCategoriesClick: () -> Unit,
@@ -60,13 +61,21 @@ internal fun ProductListContent(
                 fontSize = 28.sp,
                 fontWeight = FontWeight.Medium
             )
-            Button(
-                onClick = onAddProductClick,
-                colors = ButtonDefaults.buttonColors(containerColor = ProductPrimaryDark),
-                shape = RoundedCornerShape(8.dp),
-                contentPadding = PaddingValues(horizontal = 20.dp, vertical = 12.dp)
-            ) {
-                Text("Tambah Produk", fontSize = 14.sp, fontWeight = FontWeight.Medium)
+            Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                Button(
+                    onClick = onImportProductClick,
+                    colors = ButtonDefaults.buttonColors(containerColor = ProductPrimary),
+                    shape = RoundedCornerShape(8.dp),
+                    contentPadding = PaddingValues(horizontal = 20.dp, vertical = 12.dp)
+                ) { Text("Impor CSV", fontSize = 14.sp) }
+                Button(
+                    onClick = onAddProductClick,
+                    colors = ButtonDefaults.buttonColors(containerColor = ProductPrimaryDark),
+                    shape = RoundedCornerShape(8.dp),
+                    contentPadding = PaddingValues(horizontal = 20.dp, vertical = 12.dp)
+                ) {
+                    Text("Tambah Produk", fontSize = 14.sp, fontWeight = FontWeight.Medium)
+                }
             }
         }
 

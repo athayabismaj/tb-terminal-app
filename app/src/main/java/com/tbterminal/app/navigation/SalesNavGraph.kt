@@ -62,7 +62,7 @@ internal fun NavGraphBuilder.salesGraph(navController: NavHostController, sessio
 
             if (sessionUser == null) {
                 LaunchedEffect(Unit) {
-                    sessionManager.clearSession()
+                    sessionManager.logout()
                     navController.navigate(AppRoute.Login.route) {
                         popUpTo(0)
                         launchSingleTop = true
@@ -70,7 +70,7 @@ internal fun NavGraphBuilder.salesGraph(navController: NavHostController, sessio
                 }
             } else {
                 val logout: () -> Unit = {
-                    sessionManager.clearSession()
+                    sessionManager.logout()
                     navController.navigate(AppRoute.Login.route) {
                         popUpTo(0)
                         launchSingleTop = true
@@ -81,6 +81,12 @@ internal fun NavGraphBuilder.salesGraph(navController: NavHostController, sessio
                     name = sessionUser.name,
                     role = sessionUser.role,
                     cashReconciliationRepository = appContainer.cashReconciliationRepository,
+                    cashSessionLocalDataSource = appContainer.cashSessionLocalDataSource,
+                    localCashSessionService = appContainer.localCashSessionService,
+                    localCashExpenseService = appContainer.localCashExpenseService,
+                    offlineStatusRepository = appContainer.offlineStatusRepository,
+                    cashierUserId = sessionUser.userId ?: sessionUser.name,
+                    cashierNameFallback = sessionUser.name,
                     onDashboardClick = {
                         navController.navigate(AppRoute.Dashboard.route) {
                             launchSingleTop = true
@@ -121,7 +127,7 @@ internal fun NavGraphBuilder.salesGraph(navController: NavHostController, sessio
 
             if (sessionUser == null) {
                 LaunchedEffect(Unit) {
-                    sessionManager.clearSession()
+                    sessionManager.logout()
                     navController.navigate(AppRoute.Login.route) {
                         popUpTo(0)
                         launchSingleTop = true
@@ -129,7 +135,7 @@ internal fun NavGraphBuilder.salesGraph(navController: NavHostController, sessio
                 }
             } else {
                 val logout: () -> Unit = {
-                    sessionManager.clearSession()
+                    sessionManager.logout()
                     navController.navigate(AppRoute.Login.route) {
                         popUpTo(0)
                         launchSingleTop = true
@@ -140,6 +146,8 @@ internal fun NavGraphBuilder.salesGraph(navController: NavHostController, sessio
                     name = sessionUser.name,
                     role = sessionUser.role,
                     cashReconciliationRepository = appContainer.cashReconciliationRepository,
+                    transactionDao = appContainer.localDatabase.transactionDao(),
+                    offlineCheckoutSyncService = appContainer.offlineCheckoutSyncService,
                     onDashboardClick = {
                         navController.navigate(AppRoute.Dashboard.route) {
                             launchSingleTop = true
@@ -196,7 +204,7 @@ internal fun NavGraphBuilder.salesGraph(navController: NavHostController, sessio
 
             if (sessionUser == null) {
                 LaunchedEffect(Unit) {
-                    sessionManager.clearSession()
+                    sessionManager.logout()
                     navController.navigate(AppRoute.Login.route) {
                         popUpTo(0)
                         launchSingleTop = true
@@ -204,7 +212,7 @@ internal fun NavGraphBuilder.salesGraph(navController: NavHostController, sessio
                 }
             } else {
                 val logout: () -> Unit = {
-                    sessionManager.clearSession()
+                    sessionManager.logout()
                     navController.navigate(AppRoute.Login.route) {
                         popUpTo(0)
                         launchSingleTop = true
@@ -262,7 +270,7 @@ internal fun NavGraphBuilder.salesGraph(navController: NavHostController, sessio
 
             if (sessionUser == null) {
                 LaunchedEffect(Unit) {
-                    sessionManager.clearSession()
+                    sessionManager.logout()
                     navController.navigate(AppRoute.Login.route) {
                         popUpTo(0)
                         launchSingleTop = true
@@ -270,7 +278,7 @@ internal fun NavGraphBuilder.salesGraph(navController: NavHostController, sessio
                 }
             } else {
                 val logout: () -> Unit = {
-                    sessionManager.clearSession()
+                    sessionManager.logout()
                     navController.navigate(AppRoute.Login.route) {
                         popUpTo(0)
                         launchSingleTop = true
@@ -362,6 +370,11 @@ internal fun NavGraphBuilder.salesGraph(navController: NavHostController, sessio
                             launchSingleTop = true
                         }
                     },
+                    onCashSessionDetailClick = { sessionId ->
+                        navController.navigate(AppRoute.CashReconciliationDetail.createRoute(sessionId)) {
+                            launchSingleTop = true
+                        }
+                    },
                     onProfileClick = {
                         navController.navigate(AppRoute.AdminProfile.route) {
                             launchSingleTop = true
@@ -382,7 +395,7 @@ internal fun NavGraphBuilder.salesGraph(navController: NavHostController, sessio
 
             if (sessionUser == null) {
                 LaunchedEffect(Unit) {
-                    sessionManager.clearSession()
+                    sessionManager.logout()
                     navController.navigate(AppRoute.Login.route) {
                         popUpTo(0)
                         launchSingleTop = true
@@ -393,6 +406,8 @@ internal fun NavGraphBuilder.salesGraph(navController: NavHostController, sessio
                     name = sessionUser.name,
                     role = sessionUser.role,
                     cashReconciliationRepository = appContainer.cashReconciliationRepository,
+                    transactionDao = appContainer.localDatabase.transactionDao(),
+                    offlineCheckoutSyncService = appContainer.offlineCheckoutSyncService,
                     onReceiptClick = { transactionId ->
                         navController.navigate(AppRoute.AdminReceiptDetail.createRoute(transactionId)) { launchSingleTop = true }
                     },
@@ -486,7 +501,7 @@ internal fun NavGraphBuilder.salesGraph(navController: NavHostController, sessio
                             launchSingleTop = true
                         }
                     },                                    onLogout = {
-                        sessionManager.clearSession()
+                        sessionManager.logout()
                         navController.navigate(AppRoute.Login.route) {
                             popUpTo(0)
                             launchSingleTop = true
@@ -505,7 +520,7 @@ internal fun NavGraphBuilder.salesGraph(navController: NavHostController, sessio
 
             if (sessionUser == null) {
                 LaunchedEffect(Unit) {
-                    sessionManager.clearSession()
+                    sessionManager.logout()
                     navController.navigate(AppRoute.Login.route) {
                         popUpTo(0)
                         launchSingleTop = true
@@ -608,7 +623,7 @@ internal fun NavGraphBuilder.salesGraph(navController: NavHostController, sessio
                             launchSingleTop = true
                         }
                     },                                    onLogout = {
-                        sessionManager.clearSession()
+                        sessionManager.logout()
                         navController.navigate(AppRoute.Login.route) {
                             popUpTo(0)
                             launchSingleTop = true

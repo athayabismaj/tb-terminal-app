@@ -2,6 +2,7 @@ package com.tbterminal.app.ui.stockreport
 
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -52,6 +53,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.tbterminal.app.data.model.ProductStock
+import com.tbterminal.app.data.model.StockMovement
 import java.math.BigDecimal
 import java.text.NumberFormat
 import java.util.Locale
@@ -69,6 +71,7 @@ internal fun StockReportScreen(
     uiState: StockReportUiState,
     onSearchChanged: (String) -> Unit,
     onCategoryFilterChanged: (String?) -> Unit,
+    onProductSelected: (String) -> Unit,
     onPreviousPage: () -> Unit,
     onNextPage: () -> Unit
 ) {
@@ -83,7 +86,8 @@ internal fun StockReportScreen(
         Text("Laporan Stok", fontSize = 28.sp, fontWeight = FontWeight.Medium, color = StockReportText)
         StockSummary(uiState)
         StockReportToolbar(uiState, onSearchChanged, onCategoryFilterChanged)
-        StockTableCard(uiState, onPreviousPage, onNextPage)
+        StockTableCard(uiState, onPreviousPage, onNextPage, onProductSelected)
+        StockCardLedger(uiState)
     }
 }
 
@@ -200,7 +204,8 @@ private fun StockCategoryDropdown(
 private fun StockTableCard(
     uiState: StockReportUiState,
     onPreviousPage: () -> Unit,
-    onNextPage: () -> Unit
+    onNextPage: () -> Unit,
+    onProductSelected: (String) -> Unit
 ) {
     Card(shape = RoundedCornerShape(12.dp), colors = CardDefaults.cardColors(Color.White), border = BorderStroke(1.dp, StockReportBorder), modifier = Modifier.fillMaxWidth()) {
         Column {
@@ -209,7 +214,7 @@ private fun StockTableCard(
                 uiState.isLoading -> Box(Modifier.fillMaxWidth().height(180.dp), contentAlignment = Alignment.Center) { CircularProgressIndicator() }
                 uiState.errorMessage != null -> StockError(uiState.errorMessage)
                 uiState.visibleStocks.isEmpty() -> Box(Modifier.fillMaxWidth().height(180.dp), contentAlignment = Alignment.Center) { Text("Belum ada data stok.", color = StockReportMuted) }
-                else -> uiState.visibleStocks.forEachIndexed { index, stock -> StockRow(stock, index % 2 != 0) }
+                else -> uiState.visibleStocks.forEachIndexed { index, stock -> StockRow(stock, index % 2 != 0, onProductSelected) }
             }
             StockPagination(uiState, onPreviousPage, onNextPage)
         }
@@ -229,10 +234,11 @@ private fun StockTableHeader() {
 }
 
 @Composable
-private fun StockRow(stock: ProductStock, useAlternateBackground: Boolean) {
+private fun StockRow(stock: ProductStock, useAlternateBackground: Boolean, onProductSelected: (String) -> Unit) {
     Row(
         Modifier
             .fillMaxWidth()
+            .clickable { onProductSelected(stock.productId) }
             .background(if (useAlternateBackground) StockReportSoft.copy(alpha = 0.76f) else Color.White)
             .padding(horizontal = 20.dp, vertical = 16.dp),
         verticalAlignment = Alignment.CenterVertically
@@ -247,6 +253,68 @@ private fun StockRow(stock: ProductStock, useAlternateBackground: Boolean) {
         Text(formatCurrency(stock.quantity.multiply(stock.priceBuy)), Modifier.weight(1.2f), color = StockReportText, fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
         val status = stockStatus(stock)
         Text(status.first, Modifier.weight(0.9f), color = status.second, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+    }
+    HorizontalDivider(color = StockReportBorder)
+}
+
+@Composable
+private fun StockCardLedger(uiState: StockReportUiState) {
+    val selected = uiState.visibleStocks.firstOrNull { it.productId == uiState.selectedProductId }
+    Card(
+        shape = RoundedCornerShape(12.dp),
+        colors = CardDefaults.cardColors(Color.White),
+        border = BorderStroke(1.dp, StockReportBorder),
+        modifier = Modifier.fillMaxWidth()
+    ) {
+        Column(Modifier.padding(20.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            Text("Kartu Stok", color = StockReportText, fontSize = 20.sp, fontWeight = FontWeight.Bold)
+            Text(
+                selected?.let { "${it.sku} · ${it.productName}" } ?: "Pilih produk pada tabel untuk melihat seluruh mutasi.",
+                color = StockReportMuted
+            )
+            when {
+                uiState.isCardLoading -> CircularProgressIndicator()
+                uiState.cardErrorMessage != null -> Text(uiState.cardErrorMessage, color = Color(0xFFDC2626))
+                selected == null -> Unit
+                uiState.stockMovements.isEmpty() -> Text("Belum ada mutasi stok.", color = StockReportMuted)
+                else -> {
+                    Text(
+                        if (uiState.cardReconciled == true) "Saldo ledger sesuai stok produk" else "PERINGATAN: saldo ledger tidak sesuai stok produk",
+                        color = if (uiState.cardReconciled == true) StockReportPrimary else Color(0xFFDC2626),
+                        fontWeight = FontWeight.Bold
+                    )
+                    StockMovementHeader()
+                    uiState.stockMovements.forEach { movement -> StockMovementRow(movement) }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun StockMovementHeader() {
+    Row(Modifier.fillMaxWidth().background(StockReportSoft).padding(10.dp)) {
+        StockLabel("WAKTU / REFERENSI", Modifier.weight(2f))
+        StockLabel("JENIS", Modifier.weight(1f))
+        StockLabel("SALDO AWAL", Modifier.weight(1f))
+        StockLabel("MASUK", Modifier.weight(0.8f))
+        StockLabel("KELUAR", Modifier.weight(0.8f))
+        StockLabel("SALDO AKHIR", Modifier.weight(1f))
+    }
+}
+
+@Composable
+private fun StockMovementRow(row: StockMovement) {
+    Row(Modifier.fillMaxWidth().padding(10.dp), verticalAlignment = Alignment.CenterVertically) {
+        Column(Modifier.weight(2f)) {
+            Text(row.occurredAt.take(19).replace('T', ' '), color = StockReportText, fontSize = 12.sp)
+            Text(row.referenceNumber ?: row.referenceType, color = StockReportMuted, fontSize = 11.sp)
+        }
+        Text(row.type.replace('_', ' '), Modifier.weight(1f), color = StockReportText, fontSize = 11.sp)
+        Text(formatQuantity(row.balanceBefore), Modifier.weight(1f), color = StockReportText)
+        Text(formatQuantity(row.qtyIn), Modifier.weight(0.8f), color = StockReportPrimary)
+        Text(formatQuantity(row.qtyOut), Modifier.weight(0.8f), color = Color(0xFFDC2626))
+        Text(formatQuantity(row.balanceAfter), Modifier.weight(1f), color = StockReportText, fontWeight = FontWeight.Bold)
     }
     HorizontalDivider(color = StockReportBorder)
 }

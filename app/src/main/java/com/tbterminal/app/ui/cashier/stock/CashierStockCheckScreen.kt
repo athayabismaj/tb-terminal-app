@@ -60,7 +60,6 @@ import com.tbterminal.app.data.repository.InventoryRepository
 import com.tbterminal.app.ui.dashboard.cashier.CashierDashboardShell
 import com.tbterminal.app.ui.dashboard.cashier.CashierDestination
 import java.math.BigDecimal
-import com.tbterminal.app.ui.dashboard.DashboardBackground
 
 // ==========================================
 // WARNA
@@ -122,7 +121,7 @@ fun CashierStockCheckScreen(
         Column(
             modifier = contentModifier
                 .fillMaxSize()
-                .background(DashboardBackground)
+                .background(Color.White)
                 .padding(32.dp)
         ) {
             // ── Header Judul ──
@@ -645,7 +644,7 @@ private fun StockPagination(
                 onClick = onPreviousPage,
                 enabled = uiState.page > 1,
                 shape = RoundedCornerShape(10.dp),
-                color = if (uiState.page > 1) StockSurface else DashboardBackground,
+                color = if (uiState.page > 1) StockSurface else Color.White,
                 border = BorderStroke(1.dp, if (uiState.page > 1) StockBorder else StockBorderLight)
             ) {
                 Box(
@@ -689,7 +688,7 @@ private fun StockPagination(
                 onClick = onNextPage,
                 enabled = uiState.page < uiState.totalPages,
                 shape = RoundedCornerShape(10.dp),
-                color = if (uiState.page < uiState.totalPages) StockSurface else DashboardBackground,
+                color = if (uiState.page < uiState.totalPages) StockSurface else Color.White,
                 border = BorderStroke(1.dp, if (uiState.page < uiState.totalPages) StockBorder else StockBorderLight)
             ) {
                 Box(

@@ -39,7 +39,7 @@ import java.util.Locale
 // ==========================================
 // TEMA & WARNA KERANJANG
 // ==========================================
-private val CartBackground = Color(0xFFF8F9FF)
+private val CartBackground = Color.White
 private val CartSurface = Color(0xFFFFFFFF)
 private val CartSurfaceContainerLow = Color(0xFFEFF4FF)
 private val CartOnSurface = Color(0xFF121C2A)
@@ -158,6 +158,13 @@ private fun CartContent(
     modifier: Modifier = Modifier
 ) {
     val totalItems = state.cartItems.sumOf { it.quantity }
+    val paymentIsValid = validateCheckoutPaymentInput(
+        paymentMethod = state.selectedPaymentMethod,
+        amountPaidInput = state.amountPaidInput,
+        total = state.finalTotal
+    ).error == null
+    val creditCustomerIsValid = state.selectedPaymentMethod !in setOf(PaymentMethod.HUTANG, PaymentMethod.DP) ||
+        state.selectedCustomer != null
 
     Row(modifier = modifier.fillMaxSize()) {
         // BAGIAN KIRI: Daftar Item (2/3 Lebar)
@@ -339,13 +346,18 @@ private fun CartContent(
                     onSelectPayment = onSelectPayment
                 )
 
-                // Input DP jika metode = DP
-                if (state.selectedPaymentMethod == PaymentMethod.DP) {
+                // Input uang diterima/DP
+                if (state.selectedPaymentMethod == PaymentMethod.DP || state.selectedPaymentMethod == PaymentMethod.TUNAI) {
                     Spacer(modifier = Modifier.height(12.dp))
                     OutlinedTextField(
                         value = state.amountPaidInput,
                         onValueChange = onAmountPaidChanged,
-                        placeholder = { Text("Nominal DP", color = CartOutline) },
+                        placeholder = {
+                            Text(
+                                if (state.selectedPaymentMethod == PaymentMethod.TUNAI) "Uang diterima" else "Nominal DP",
+                                color = CartOutline
+                            )
+                        },
                         leadingIcon = {
                             Text(
                                 "Rp",
@@ -365,6 +377,13 @@ private fun CartContent(
                         ),
                         singleLine = true
                     )
+                    if (state.selectedPaymentMethod == PaymentMethod.TUNAI) {
+                        Text(
+                            "Kembalian: ${checkoutChange(state.amountPaidInput, state.finalTotal)}",
+                            color = CartPrimary,
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
                 }
 
                 Spacer(modifier = Modifier.weight(1f))
@@ -400,7 +419,7 @@ private fun CartContent(
 
                     Button(
                         onClick = onCheckout,
-                        enabled = !state.isLoading && state.cartItems.isNotEmpty(),
+                        enabled = !state.isLoading && state.cartItems.isNotEmpty() && paymentIsValid && creditCustomerIsValid,
                         modifier = Modifier
                             .height(56.dp)
                             .weight(1f),
