@@ -1,39 +1,31 @@
 package com.tbterminal.app.ui.auth
 
-import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxHeight
-import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.layout.widthIn
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Build
-import androidx.compose.material.icons.filled.CheckCircle
-import androidx.compose.material.icons.filled.Lock
-import androidx.compose.material.icons.filled.Person
-import androidx.compose.material.icons.filled.ShoppingCart
-import androidx.compose.material.icons.filled.Visibility
-import androidx.compose.material.icons.filled.VisibilityOff
+import androidx.compose.material.icons.outlined.ErrorOutline
+import androidx.compose.material.icons.outlined.Lock
+import androidx.compose.material.icons.outlined.Person
+import androidx.compose.material.icons.outlined.Visibility
+import androidx.compose.material.icons.outlined.VisibilityOff
 import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
-import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextField
+import androidx.compose.material3.TextFieldDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -43,31 +35,17 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
+import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
-
-private val LoginBackground = Color(0xFFF8F9FF)
-private val LoginOnSurface = Color(0xFF121C2A)
-private val LoginPrimary = Color(0xFF006948)
-private val LoginOnPrimary = Color.White
-private val LoginSurfaceTint = Color(0xFF006C4A)
-private val LoginPrimaryFixedDim = Color(0xFF68DBA9)
-private val LoginPrimaryFixed = Color(0xFF85F8C4)
-private val LoginSecondaryFixed = Color(0xFFFFDDB8)
-private val LoginSurfaceContainerHigh = Color(0xFFDEE9FC)
-private val LoginSurface = Color(0xFFF8F9FF)
-private val LoginOutline = Color(0xFF6D7A72)
-private val LoginOutlineVariant = Color(0xFFBCCAC0)
-private val LoginSecondaryContainer = Color(0xFFFEA619)
-private val LoginOnSecondaryContainer = Color(0xFF684000)
-private val LoginError = Color(0xFFB3261E)
 
 @Composable
 fun LoginScreen(
@@ -86,384 +64,147 @@ fun LoginScreen(
         }
     }
 
-    BoxWithConstraints(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(LoginBackground)
-    ) {
-        val isWide = maxWidth >= 840.dp
-
-        if (isWide) {
-            Row(modifier = Modifier.fillMaxSize()) {
-                LoginBrandPanel(
-                    modifier = Modifier
-                        .weight(5f)
-                        .fillMaxHeight()
-                )
-                LoginFormPanel(
-                    username = username,
-                    password = password,
-                    authState = authState,
-                    onUsernameChange = { username = it },
-                    onPasswordChange = { password = it },
-                    onSubmit = { viewModel.login(username, password) },
-                    modifier = Modifier
-                        .weight(7f)
-                        .fillMaxHeight(),
-                    isWide = true
-                )
-            }
-        } else {
-            LoginFormPanel(
-                username = username,
-                password = password,
-                authState = authState,
-                onUsernameChange = { username = it },
-                onPasswordChange = { password = it },
-                onSubmit = { viewModel.login(username, password) },
-                modifier = Modifier.fillMaxSize(),
-                isWide = false
-            )
-        }
-    }
+    LoginContent(
+        username = username,
+        password = password,
+        authState = authState,
+        onUsernameChange = { username = it },
+        onPasswordChange = { password = it },
+        onSubmit = { viewModel.login(username.trim(), password) }
+    )
 }
 
 @Composable
-private fun LoginBrandPanel(
-    modifier: Modifier = Modifier
-) {
-    Box(
-        modifier = modifier.background(
-            brush = Brush.linearGradient(
-                colors = listOf(LoginPrimary, LoginPrimary, LoginSurfaceTint)
-            )
-        )
-    ) {
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(48.dp),
-            verticalArrangement = Arrangement.SpaceBetween
-        ) {
-            Column {
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    modifier = Modifier.padding(bottom = 48.dp)
-                ) {
-                    LoginLogo(
-                        containerColor = LoginSurface,
-                        iconColor = LoginPrimary,
-                        size = 48.dp
-                    )
-                    Spacer(modifier = Modifier.width(12.dp))
-                    Text(
-                        text = "TB Terminal",
-                        color = LoginOnPrimary,
-                        fontSize = 24.sp,
-                        fontWeight = FontWeight.SemiBold
-                    )
-                }
-
-                Text(
-                    text = "Selamat Datang di TB Terminal",
-                    color = LoginOnPrimary,
-                    fontSize = 48.sp,
-                    fontWeight = FontWeight.ExtraBold,
-                    lineHeight = 56.sp,
-                    modifier = Modifier.padding(bottom = 16.dp)
-                )
-                Text(
-                    text = "Sistem manajemen penjualan bahan bangunan untuk stok, transaksi, dan laporan operasional harian.",
-                    color = LoginPrimaryFixedDim,
-                    fontSize = 18.sp,
-                    lineHeight = 28.sp
-                )
-            }
-
-            TodayActivityPanel()
-        }
-    }
-}
-
-@Composable
-private fun TodayActivityPanel() {
-    Box(
-        modifier = Modifier
-            .clip(RoundedCornerShape(12.dp))
-            .background(LoginPrimary.copy(alpha = 0.4f))
-            .border(1.dp, Color.White.copy(alpha = 0.1f), RoundedCornerShape(12.dp))
-            .padding(24.dp)
-    ) {
-        Column {
-            Text(
-                text = "AKTIVITAS HARI INI",
-                color = LoginPrimaryFixed,
-                fontSize = 14.sp,
-                fontWeight = FontWeight.SemiBold,
-                modifier = Modifier.padding(bottom = 16.dp)
-            )
-            Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
-                LoginMetricTile(
-                    modifier = Modifier.weight(1f),
-                    icon = {
-                        Icon(
-                            imageVector = Icons.Default.ShoppingCart,
-                            contentDescription = null,
-                            tint = LoginSecondaryFixed,
-                            modifier = Modifier.size(24.dp)
-                        )
-                    },
-                    label = "Transaksi"
-                ) {
-                    Text(
-                        text = "1,284",
-                        color = LoginOnPrimary,
-                        fontSize = 24.sp,
-                        fontWeight = FontWeight.SemiBold
-                    )
-                }
-
-                LoginMetricTile(
-                    modifier = Modifier.weight(1f),
-                    icon = {
-                        Icon(
-                            imageVector = Icons.Default.CheckCircle,
-                            contentDescription = null,
-                            tint = LoginPrimaryFixed,
-                            modifier = Modifier.size(24.dp)
-                        )
-                    },
-                    label = "Sistem"
-                ) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Box(
-                            modifier = Modifier
-                                .size(8.dp)
-                                .clip(CircleShape)
-                                .background(LoginPrimaryFixed)
-                        )
-                        Spacer(modifier = Modifier.width(8.dp))
-                        Text(
-                            text = "Online",
-                            color = LoginOnPrimary,
-                            fontSize = 14.sp,
-                            fontWeight = FontWeight.SemiBold
-                        )
-                    }
-                }
-            }
-        }
-    }
-}
-
-@Composable
-private fun LoginMetricTile(
-    icon: @Composable () -> Unit,
-    label: String,
-    modifier: Modifier = Modifier,
-    content: @Composable () -> Unit
-) {
-    Row(
-        modifier = modifier
-            .clip(RoundedCornerShape(8.dp))
-            .background(Color.White.copy(alpha = 0.1f))
-            .border(1.dp, Color.White.copy(alpha = 0.05f), RoundedCornerShape(8.dp))
-            .padding(12.dp),
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        icon()
-        Spacer(modifier = Modifier.width(12.dp))
-        Column {
-            Text(
-                text = label,
-                color = LoginSurfaceContainerHigh,
-                fontSize = 12.sp
-            )
-            content()
-        }
-    }
-}
-
-@Composable
-private fun LoginFormPanel(
+internal fun LoginContent(
     username: String,
     password: String,
     authState: AuthState,
     onUsernameChange: (String) -> Unit,
     onPasswordChange: (String) -> Unit,
-    onSubmit: () -> Unit,
-    modifier: Modifier = Modifier,
-    isWide: Boolean
+    onSubmit: () -> Unit
 ) {
     var passwordVisible by remember { mutableStateOf(false) }
+    val passwordFocusRequester = remember { FocusRequester() }
+    val isLoading = authState is AuthState.Loading
 
-    Box(
-        modifier = modifier
-            .background(LoginSurface)
-            .padding(horizontal = 32.dp, vertical = 24.dp)
-    ) {
-        Column(
-            modifier = Modifier
-                .widthIn(max = 400.dp)
-                .fillMaxWidth()
-                .align(Alignment.Center),
-            horizontalAlignment = if (isWide) Alignment.Start else Alignment.CenterHorizontally
-        ) {
-            if (!isWide) {
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    modifier = Modifier.padding(bottom = 40.dp)
-                ) {
-                    LoginLogo(
-                        containerColor = LoginPrimary,
-                        iconColor = LoginOnPrimary,
-                        size = 40.dp
-                    )
-                    Spacer(modifier = Modifier.width(12.dp))
-                    Text(
-                        text = "TB Terminal",
-                        color = LoginPrimary,
-                        fontSize = 24.sp,
-                        fontWeight = FontWeight.SemiBold
-                    )
-                }
+    AuthAdaptiveScaffold(
+        compactFooter = { LoginSecurityNote() }
+    ) { compact ->
+        Column(verticalArrangement = Arrangement.spacedBy(18.dp)) {
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Text(
+                    text = "Masuk ke TB Terminal",
+                    style = MaterialTheme.typography.headlineMedium,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.onSurface
+                )
+                Text(
+                    text = "Masukkan nama pengguna dan kata sandi.",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
             }
 
-            Text(
-                text = "Masuk ke Akun Anda",
-                color = LoginOnSurface,
-                fontSize = 32.sp,
-                fontWeight = FontWeight.Bold,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(bottom = 8.dp),
-                textAlign = if (isWide) TextAlign.Start else TextAlign.Center
-            )
-            Text(
-                text = "Masukkan kredensial Anda untuk melanjutkan ke dashboard operasional.",
-                color = LoginOutline,
-                fontSize = 16.sp,
-                lineHeight = 24.sp,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(bottom = 36.dp),
-                textAlign = if (isWide) TextAlign.Start else TextAlign.Center
+            TextField(
+                value = username,
+                onValueChange = onUsernameChange,
+                modifier = Modifier.fillMaxWidth(),
+                label = { Text("Nama pengguna") },
+                placeholder = { Text("Contoh: admin.toko") },
+                leadingIcon = { Icon(Icons.Outlined.Person, contentDescription = null) },
+                singleLine = true,
+                enabled = !isLoading,
+                shape = RoundedCornerShape(16.dp),
+                colors = tonalAuthTextFieldColors(),
+                keyboardOptions = KeyboardOptions(
+                    capitalization = KeyboardCapitalization.None,
+                    keyboardType = KeyboardType.Ascii,
+                    imeAction = ImeAction.Next
+                ),
+                keyboardActions = KeyboardActions(onNext = { passwordFocusRequester.requestFocus() })
             )
 
-            Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
-                OutlinedTextField(
-                    value = username,
-                    onValueChange = onUsernameChange,
-                    label = { Text("Username") },
-                    leadingIcon = { Icon(Icons.Default.Person, contentDescription = null) },
-                    modifier = Modifier.fillMaxWidth(),
-                    singleLine = true,
-                    shape = RoundedCornerShape(8.dp)
-                )
-                OutlinedTextField(
-                    value = password,
-                    onValueChange = onPasswordChange,
-                    label = { Text("Password") },
-                    leadingIcon = { Icon(Icons.Default.Lock, contentDescription = null) },
-                    trailingIcon = {
-                        IconButton(onClick = { passwordVisible = !passwordVisible }) {
-                            Icon(
-                                imageVector = if (passwordVisible) {
-                                    Icons.Default.VisibilityOff
-                                } else {
-                                    Icons.Default.Visibility
-                                },
-                                contentDescription = if (passwordVisible) {
-                                    "Sembunyikan password"
-                                } else {
-                                    "Tampilkan password"
-                                },
-                                tint = LoginPrimary
-                            )
-                        }
-                    },
-                    modifier = Modifier.fillMaxWidth(),
-                    singleLine = true,
-                    visualTransformation = if (passwordVisible) {
-                        androidx.compose.ui.text.input.VisualTransformation.None
-                    } else {
-                        PasswordVisualTransformation()
-                    },
-                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
-                    shape = RoundedCornerShape(8.dp)
-                )
+            TextField(
+                value = password,
+                onValueChange = onPasswordChange,
+                modifier = Modifier.fillMaxWidth().focusRequester(passwordFocusRequester),
+                label = { Text("Kata sandi") },
+                leadingIcon = { Icon(Icons.Outlined.Lock, contentDescription = null) },
+                trailingIcon = {
+                    IconButton(onClick = { passwordVisible = !passwordVisible }, enabled = !isLoading) {
+                        Icon(
+                            imageVector = if (passwordVisible) Icons.Outlined.VisibilityOff else Icons.Outlined.Visibility,
+                            contentDescription = if (passwordVisible) "Sembunyikan kata sandi" else "Tampilkan kata sandi"
+                        )
+                    }
+                },
+                singleLine = true,
+                enabled = !isLoading,
+                visualTransformation = if (passwordVisible) VisualTransformation.None else PasswordVisualTransformation(),
+                shape = RoundedCornerShape(16.dp),
+                colors = tonalAuthTextFieldColors(),
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password, imeAction = ImeAction.Done),
+                keyboardActions = KeyboardActions(onDone = { if (!isLoading) onSubmit() })
+            )
 
-                if (authState is AuthState.Error) {
-                    Text(
-                        text = authState.message,
-                        color = LoginError,
-                        fontSize = 13.sp,
-                        lineHeight = 18.sp,
-                        modifier = Modifier.fillMaxWidth()
-                    )
-                }
-
-                Spacer(modifier = Modifier.height(4.dp))
-
-                Button(
-                    onClick = onSubmit,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(48.dp),
-                    enabled = authState !is AuthState.Loading,
-                    colors = ButtonDefaults.buttonColors(
-                        containerColor = LoginSecondaryContainer,
-                        contentColor = LoginOnSecondaryContainer
-                    ),
-                    shape = RoundedCornerShape(8.dp)
+            if (authState is AuthState.Error) {
+                Surface(
+                    color = MaterialTheme.colorScheme.errorContainer,
+                    contentColor = MaterialTheme.colorScheme.onErrorContainer,
+                    shape = RoundedCornerShape(14.dp)
                 ) {
-                    if (authState is AuthState.Loading) {
-                        CircularProgressIndicator(
-                            modifier = Modifier.size(22.dp),
-                            color = LoginOnSecondaryContainer,
-                            strokeWidth = 2.dp
-                        )
-                    } else {
-                        Text(
-                            text = "Masuk Sistem",
-                            fontSize = 14.sp,
-                            fontWeight = FontWeight.SemiBold
-                        )
+                    Row(
+                        modifier = Modifier.fillMaxWidth().padding(14.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(10.dp)
+                    ) {
+                        Icon(Icons.Outlined.ErrorOutline, contentDescription = null, modifier = Modifier.size(20.dp))
+                        Text(authState.message, style = MaterialTheme.typography.bodySmall, modifier = Modifier.weight(1f))
                     }
                 }
             }
-        }
 
-        Text(
-            text = "TB Terminal System\nv1.0.0",
-            color = LoginOutlineVariant,
-            fontSize = 12.sp,
-            lineHeight = 18.sp,
-            textAlign = if (isWide) TextAlign.Start else TextAlign.Center,
-            modifier = Modifier
-                .align(if (isWide) Alignment.BottomStart else Alignment.BottomCenter)
-                .padding(bottom = 8.dp)
-        )
+            Spacer(Modifier.height(2.dp))
+            Button(
+                onClick = onSubmit,
+                enabled = !isLoading,
+                modifier = Modifier.fillMaxWidth().height(52.dp),
+                shape = RoundedCornerShape(16.dp)
+            ) {
+                if (isLoading) {
+                    CircularProgressIndicator(
+                        modifier = Modifier.size(22.dp),
+                        color = MaterialTheme.colorScheme.onPrimary,
+                        strokeWidth = 2.dp
+                    )
+                } else {
+                    Text("Masuk", fontWeight = FontWeight.SemiBold)
+                }
+            }
+
+            if (!compact) LoginSecurityNote()
+        }
     }
 }
 
 @Composable
-private fun LoginLogo(
-    containerColor: Color,
-    iconColor: Color,
-    size: androidx.compose.ui.unit.Dp
-) {
-    Box(
-        modifier = Modifier
-            .size(size)
-            .clip(RoundedCornerShape(8.dp))
-            .background(containerColor),
-        contentAlignment = Alignment.Center
-    ) {
-        Icon(
-            imageVector = Icons.Default.Build,
-            contentDescription = null,
-            tint = iconColor
-        )
-    }
+private fun LoginSecurityNote() {
+    Text(
+        text = "Jaga kerahasiaan kata sandi dan PIN.",
+        modifier = Modifier.fillMaxWidth(),
+        style = MaterialTheme.typography.bodySmall,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+        textAlign = TextAlign.Center
+    )
 }
+
+@Composable
+private fun tonalAuthTextFieldColors() = TextFieldDefaults.colors(
+    focusedContainerColor = MaterialTheme.colorScheme.surfaceContainer,
+    unfocusedContainerColor = MaterialTheme.colorScheme.surfaceContainer,
+    disabledContainerColor = MaterialTheme.colorScheme.surfaceContainer.copy(alpha = 0.6f),
+    focusedIndicatorColor = Color.Transparent,
+    unfocusedIndicatorColor = Color.Transparent,
+    disabledIndicatorColor = Color.Transparent,
+    errorIndicatorColor = Color.Transparent
+)
