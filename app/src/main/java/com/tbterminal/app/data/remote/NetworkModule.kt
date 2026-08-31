@@ -21,60 +21,74 @@ class NetworkModule(
     val tokenStore: TokenStore = SharedPreferencesTokenStore(context.applicationContext)
     val sessionManager: SessionManager = SessionManager(tokenStore)
 
-    private val json = Json {
-        ignoreUnknownKeys = true
-        explicitNulls = false
+    private val json: Json by lazy {
+        Json {
+            ignoreUnknownKeys = true
+            explicitNulls = false
+        }
     }
 
     private val normalizedBaseUrl = baseUrl.asRetrofitBaseUrl()
 
-    private val refreshOkHttpClient: OkHttpClient = OkHttpClient.Builder()
-        .applyStandardTimeouts()
-        .build()
+    private val refreshOkHttpClient: OkHttpClient by lazy {
+        OkHttpClient.Builder().applyStandardTimeouts().build()
+    }
 
-    private val refreshApi: TokenRefreshApi = Retrofit.Builder()
-        .baseUrl(normalizedBaseUrl)
-        .client(refreshOkHttpClient)
-        .addConverterFactory(json.asConverterFactory(JSON_MEDIA_TYPE))
-        .build()
-        .create(TokenRefreshApi::class.java)
+    private val refreshApi: TokenRefreshApi by lazy {
+        Retrofit.Builder()
+            .baseUrl(normalizedBaseUrl)
+            .client(refreshOkHttpClient)
+            .addConverterFactory(json.asConverterFactory(JSON_MEDIA_TYPE))
+            .build()
+            .create(TokenRefreshApi::class.java)
+    }
 
-    val okHttpClient: OkHttpClient = OkHttpClient.Builder()
-        .applyStandardTimeouts()
-        .addInterceptor(AuthInterceptor(tokenStore))
-        .authenticator(RefreshTokenAuthenticator(tokenStore, sessionManager, refreshApi))
-        .build()
+    val okHttpClient: OkHttpClient by lazy {
+        OkHttpClient.Builder()
+            .applyStandardTimeouts()
+            .addInterceptor(AuthInterceptor(tokenStore))
+            .authenticator(RefreshTokenAuthenticator(tokenStore, sessionManager, refreshApi))
+            .build()
+    }
 
-    private val healthOkHttpClient: OkHttpClient = OkHttpClient.Builder()
-        .connectTimeout(HEALTH_TIMEOUT_SECONDS, TimeUnit.SECONDS)
-        .readTimeout(HEALTH_TIMEOUT_SECONDS, TimeUnit.SECONDS)
-        .callTimeout(HEALTH_TIMEOUT_SECONDS, TimeUnit.SECONDS)
-        .build()
+    private val healthOkHttpClient: OkHttpClient by lazy {
+        OkHttpClient.Builder()
+            .connectTimeout(HEALTH_TIMEOUT_SECONDS, TimeUnit.SECONDS)
+            .readTimeout(HEALTH_TIMEOUT_SECONDS, TimeUnit.SECONDS)
+            .callTimeout(HEALTH_TIMEOUT_SECONDS, TimeUnit.SECONDS)
+            .build()
+    }
 
-    val retrofit: Retrofit = Retrofit.Builder()
-        .baseUrl(normalizedBaseUrl)
-        .client(okHttpClient)
-        .addConverterFactory(json.asConverterFactory(JSON_MEDIA_TYPE))
-        .build()
+    val retrofit: Retrofit by lazy {
+        Retrofit.Builder()
+            .baseUrl(normalizedBaseUrl)
+            .client(okHttpClient)
+            .addConverterFactory(json.asConverterFactory(JSON_MEDIA_TYPE))
+            .build()
+    }
 
-    private val backupRetrofit: Retrofit = Retrofit.Builder()
-        .baseUrl(normalizedBaseUrl)
-        .client(
-            okHttpClient.newBuilder()
-                .readTimeout(BACKUP_READ_TIMEOUT_MINUTES, TimeUnit.MINUTES)
-                .writeTimeout(BACKUP_WRITE_TIMEOUT_MINUTES, TimeUnit.MINUTES)
-                .callTimeout(BACKUP_CALL_TIMEOUT_MINUTES, TimeUnit.MINUTES)
-                .retryOnConnectionFailure(false)
-                .build()
-        )
-        .addConverterFactory(json.asConverterFactory(JSON_MEDIA_TYPE))
-        .build()
+    private val backupRetrofit: Retrofit by lazy {
+        Retrofit.Builder()
+            .baseUrl(normalizedBaseUrl)
+            .client(
+                okHttpClient.newBuilder()
+                    .readTimeout(BACKUP_READ_TIMEOUT_MINUTES, TimeUnit.MINUTES)
+                    .writeTimeout(BACKUP_WRITE_TIMEOUT_MINUTES, TimeUnit.MINUTES)
+                    .callTimeout(BACKUP_CALL_TIMEOUT_MINUTES, TimeUnit.MINUTES)
+                    .retryOnConnectionFailure(false)
+                    .build()
+            )
+            .addConverterFactory(json.asConverterFactory(JSON_MEDIA_TYPE))
+            .build()
+    }
 
-    private val healthRetrofit: Retrofit = Retrofit.Builder()
-        .baseUrl(normalizedBaseUrl)
-        .client(healthOkHttpClient)
-        .addConverterFactory(json.asConverterFactory(JSON_MEDIA_TYPE))
-        .build()
+    private val healthRetrofit: Retrofit by lazy {
+        Retrofit.Builder()
+            .baseUrl(normalizedBaseUrl)
+            .client(healthOkHttpClient)
+            .addConverterFactory(json.asConverterFactory(JSON_MEDIA_TYPE))
+            .build()
+    }
 
     val authApi: AuthApi by lazy {
         retrofit.create(AuthApi::class.java)

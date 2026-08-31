@@ -11,6 +11,8 @@ import com.tbterminal.app.data.remote.UnlockRequest
 import com.tbterminal.app.data.remote.safeApiCall
 import com.tbterminal.app.data.session.SessionManager
 import com.tbterminal.app.data.session.SessionUser
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 
 interface AuthRepository {
     suspend fun login(username: String, password: String): RepositoryResult<AuthenticatedSession>
@@ -24,10 +26,17 @@ interface AuthRepository {
     suspend fun changeMyPin(oldPin: String, newPin: String): RepositoryResult<Unit>
 }
 
-class RemoteAuthRepository(
-    private val authApi: AuthApi,
+class RemoteAuthRepository private constructor(
+    authApiProvider: () -> AuthApi,
     private val sessionManager: SessionManager
 ) : AuthRepository {
+    constructor(authApi: AuthApi, sessionManager: SessionManager) : this({ authApi }, sessionManager)
+
+    constructor(sessionManager: SessionManager, authApiProvider: () -> AuthApi) :
+        this(authApiProvider, sessionManager)
+
+    private val authApi: AuthApi by lazy(authApiProvider)
+
     override suspend fun login(
         username: String,
         password: String
@@ -50,20 +59,22 @@ class RemoteAuthRepository(
                         role = login.user.role,
                         userId = userId
                     )
-                    sessionManager.saveAuthenticatedSession(
-                        token = login.token,
-                        refreshToken = login.refreshToken,
-                        user = SessionUser(
-                            name = login.user.name,
-                            role = login.user.role,
-                            isActive = login.user.isActive,
-                            joinedAt = login.user.joinedAt,
-                            lastLoginAt = login.user.lastLoginAt,
-                            userId = userId,
-                            username = login.user.username,
-                            email = login.user.email
+                    withContext(Dispatchers.IO) {
+                        sessionManager.saveAuthenticatedSession(
+                            token = login.token,
+                            refreshToken = login.refreshToken,
+                            user = SessionUser(
+                                name = login.user.name,
+                                role = login.user.role,
+                                isActive = login.user.isActive,
+                                joinedAt = login.user.joinedAt,
+                                lastLoginAt = login.user.lastLoginAt,
+                                userId = userId,
+                                username = login.user.username,
+                                email = login.user.email
+                            )
                         )
-                    )
+                    }
                     RepositoryResult.Success(
                         AuthenticatedSession(
                             token = login.token,

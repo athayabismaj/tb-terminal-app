@@ -270,8 +270,8 @@ class DefaultAppContainer(
 
     override val authRepository: AuthRepository by lazy {
         RemoteAuthRepository(
-            authApi = networkModule.authApi,
-            sessionManager = networkModule.sessionManager
+            sessionManager = networkModule.sessionManager,
+            authApiProvider = { networkModule.authApi }
         )
     }
 

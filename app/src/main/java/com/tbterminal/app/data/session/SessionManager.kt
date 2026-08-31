@@ -16,6 +16,11 @@ import javax.crypto.spec.GCMParameterSpec
 
 interface TokenStore {
     fun readAccessToken(): String?
+    /**
+     * Checks session presence without decrypting the token. Implementations backed by
+     * Android Keystore must override this so startup never waits for Keystore I/O.
+     */
+    fun hasStoredAccessToken(): Boolean = !readAccessToken().isNullOrBlank()
     fun readRefreshToken(): String?
     fun saveAccessToken(token: String)
     fun saveTokens(accessToken: String, refreshToken: String)
@@ -42,6 +47,10 @@ class SharedPreferencesTokenStore(
 
     override fun readAccessToken(): String? {
         return readSecret(ACCESS_TOKEN_KEY)
+    }
+
+    override fun hasStoredAccessToken(): Boolean {
+        return !preferences.getString(ACCESS_TOKEN_KEY, null).isNullOrBlank()
     }
 
     override fun saveAccessToken(token: String) {
@@ -233,7 +242,7 @@ class SessionManager(
     }
 
     fun hasAccessToken(): Boolean {
-        return !tokenStore.readAccessToken().isNullOrBlank()
+        return tokenStore.hasStoredAccessToken()
     }
 
     fun lockForResume() {

@@ -8,6 +8,25 @@ import org.junit.Test
 
 class SessionManagerTest {
     @Test
+    fun `initialization checks session marker without decrypting token`() {
+        val store = object : TokenStore {
+            override fun readAccessToken(): String? = error("Token must not be decrypted during startup")
+            override fun hasStoredAccessToken(): Boolean = true
+            override fun readRefreshToken(): String? = null
+            override fun saveAccessToken(token: String) = Unit
+            override fun saveTokens(accessToken: String, refreshToken: String) = Unit
+            override fun readSessionUser(): SessionUser? = null
+            override fun saveSessionUser(user: SessionUser) = Unit
+            override fun clearAccessToken() = Unit
+        }
+
+        val manager = SessionManager(store)
+
+        assertTrue(manager.hasAccessToken())
+        assertTrue(manager.requiresPinUnlock())
+    }
+
+    @Test
     fun saveAuthenticatedSession_persistsBothTokensAndUser() {
         val store = FakeTokenStore()
         val manager = SessionManager(store)
