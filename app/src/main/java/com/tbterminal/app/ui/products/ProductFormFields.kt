@@ -44,6 +44,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.tbterminal.app.data.model.ProductCategory
+import com.tbterminal.app.data.model.ProductUnit
 
 @Composable
 internal fun SkuField(
@@ -110,21 +111,42 @@ internal fun CategoryField(
 }
 
 @Composable
-internal fun ConversionPreview(modifier: Modifier) {
+internal fun ConversionFields(
+    modifier: Modifier,
+    units: List<ProductUnit>,
+    input: ProductFormInput,
+    onInputChanged: (ProductFormInput) -> Unit
+) {
+    val availableUnits = units.filterNot { it.id == input.baseUnitId }
+    val baseSymbol = units.firstOrNull { it.id == input.baseUnitId }?.symbol ?: "satuan utama"
+    val secondarySymbol = units.firstOrNull { it.id == input.secondaryUnitId }?.symbol ?: "satuan kedua"
+
     Row(modifier = modifier, horizontalArrangement = Arrangement.spacedBy(16.dp)) {
-        ReadOnlyInfoField(
+        ProductFormSelectField(
             modifier = Modifier.weight(1f),
-            label = "SATUAN KEDUA",
-            value = "Belum aktif",
-            helper = "Endpoint konversi satuan belum tersedia."
+            label = "SATUAN KEDUA *",
+            selectedText = availableUnits.selectedUnitLabel(input.secondaryUnitId),
+            options = availableUnits,
+            optionText = { unit -> "${unit.name} (${unit.symbol})" },
+            onSelect = { unit -> onInputChanged(input.copy(secondaryUnitId = unit.id)) }
         )
-        ReadOnlyInfoField(
+        ProductFormInputField(
             modifier = Modifier.weight(1f),
-            label = "FAKTOR KONVERSI",
-            value = "-",
-            helper = "Akan disimpan lewat modul konversi."
+            label = "FAKTOR KONVERSI *",
+            value = input.secondaryUnitFactor,
+            placeholder = "Contoh: 12",
+            isNumber = true,
+            onValueChange = { value ->
+                onInputChanged(input.copy(secondaryUnitFactor = value.numericInput()))
+            }
         )
     }
+    Text(
+        text = "1 $secondarySymbol = ${input.secondaryUnitFactor.ifBlank { "..." }} $baseSymbol. Stok tetap dicatat dalam satuan utama.",
+        color = ProductMuted,
+        fontSize = 11.sp,
+        modifier = Modifier.padding(top = 6.dp)
+    )
 }
 
 @Composable

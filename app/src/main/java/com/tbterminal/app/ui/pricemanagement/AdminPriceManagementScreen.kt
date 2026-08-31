@@ -5,6 +5,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -14,6 +15,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
@@ -115,6 +117,7 @@ fun AdminPriceManagementScreen(
         userName = name,
         role = role,
         activeDestination = AdminDestination.PriceManagement,
+        pageTitle = "Harga Produk",
         onDashboardClick = onDashboardClick,
         onProductsClick = onProductsClick,
         onAddProductClick = onAddProductClick,
@@ -170,16 +173,9 @@ private fun PriceManagementContent(
     onClearActionMessage: () -> Unit,
     modifier: Modifier = Modifier
 ) {
-    Column(
-        modifier = modifier
-            .fillMaxSize()
-            .background(ProductSurface)
-            .padding(40.dp)
-            .verticalScroll(rememberScrollState())
-            ,
-        verticalArrangement = Arrangement.spacedBy(28.dp)
-    ) {
-        Text("Manajemen Harga", color = ProductText, fontSize = 28.sp, fontWeight = FontWeight.Medium)
+    BoxWithConstraints(modifier.fillMaxSize().background(ProductSurface)) {
+        val compact = maxWidth < 700.dp
+        Column(modifier = Modifier.fillMaxSize().padding(horizontal = if (compact) 16.dp else 32.dp, vertical = if (compact) 14.dp else 24.dp).verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(if (compact) 14.dp else 22.dp)) {
 
         PriceManagementToolbar(
             state = state,
@@ -204,14 +200,16 @@ private fun PriceManagementContent(
                         Text("Tidak ada produk ditemukan.", color = DashboardTextSecondary)
                     }
                 }
-                else -> PriceManagementTable(products = state.visibleProducts, onEdit = onEdit)
+                else -> PriceManagementTable(products = state.visibleProducts, onEdit = onEdit, compact = compact)
             }
             PriceManagementPagination(
                 state = state,
                 visibleCount = state.visibleProducts.size,
                 onPreviousPage = onPreviousPage,
-                onNextPage = onNextPage
+                onNextPage = onNextPage,
+                compact = compact
             )
+        }
         }
     }
 }
@@ -242,7 +240,7 @@ private fun PriceUpdateDialog(
         properties = DialogProperties(usePlatformDefaultWidth = false)
     ) {
         Surface(
-            modifier = Modifier.width(480.dp),
+            modifier = Modifier.fillMaxWidth(0.92f).widthIn(max = 480.dp),
             shape = RoundedCornerShape(24.dp),
             color = Color.White
         ) {

@@ -61,18 +61,44 @@ internal fun PriceManagementToolbar(
 @Composable
 internal fun PriceManagementTable(
     products: List<ProductStock>,
-    onEdit: (ProductStock) -> Unit
+    onEdit: (ProductStock) -> Unit,
+    compact: Boolean = false
 ) {
     Column(modifier = Modifier.fillMaxWidth()) {
-        PriceTableHeader()
+        if (!compact) PriceTableHeader()
         products.forEachIndexed { index, product ->
-            PriceTableRow(
+            if (compact) PriceMobileRow(product) { onEdit(product) } else PriceTableRow(
                 product = product,
                 useAlternateBackground = index % 2 != 0,
                 onEdit = { onEdit(product) }
             )
         }
     }
+}
+
+@Composable
+private fun PriceMobileRow(product: ProductStock, onEdit: () -> Unit) {
+    Column(Modifier.fillMaxWidth().clickable(onClick = onEdit).padding(horizontal = 16.dp, vertical = 14.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+        Row(verticalAlignment = Alignment.Top) {
+            Column(Modifier.weight(1f)) {
+                Text(product.productName, color = ProductText, fontWeight = FontWeight.Bold, maxLines = 2, overflow = TextOverflow.Ellipsis)
+                Text("${product.sku} · ${product.categoryName}", color = ProductMuted, fontSize = 11.sp)
+            }
+            Icon(Icons.Outlined.Edit, "Edit harga", tint = ProductMuted)
+        }
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+            PriceMobileValue("Beli", product.priceBuy.moneyText())
+            PriceMobileValue("Jual", product.priceRetail.moneyText(), Alignment.CenterHorizontally)
+            PriceMobileValue("Kontraktor", product.priceContractor.moneyText(), Alignment.End)
+        }
+        if (product.discount > BigDecimal.ZERO) Text("Diskon ${product.discount.moneyText()}", color = Color(0xFFEF4444), fontSize = 12.sp, fontWeight = FontWeight.Bold)
+    }
+    HorizontalDivider(color = ProductLine)
+}
+
+@Composable
+private fun PriceMobileValue(label: String, value: String, alignment: Alignment.Horizontal = Alignment.Start) {
+    Column(horizontalAlignment = alignment) { Text(label, color = ProductMuted, fontSize = 10.sp); Text(value, color = ProductText, fontSize = 12.sp, fontWeight = FontWeight.SemiBold) }
 }
 
 @Composable
@@ -189,7 +215,8 @@ internal fun PriceManagementPagination(
     state: PriceManagementUiState,
     visibleCount: Int,
     onPreviousPage: () -> Unit,
-    onNextPage: () -> Unit
+    onNextPage: () -> Unit,
+    compact: Boolean = false
 ) {
     val safePage = state.currentPage.coerceAtLeast(1)
     val safeTotalPages = state.totalPages.coerceAtLeast(1)
@@ -201,7 +228,15 @@ internal fun PriceManagementPagination(
         "Menampilkan $visibleCount produk kategori pada halaman ini"
     }
 
-    Row(
+    val controls: @Composable () -> Unit = { Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
+        PricePageButton(Icons.Default.ChevronLeft, safePage > 1, onPreviousPage)
+        Text("$safePage / $safeTotalPages", color = ProductText, fontWeight = FontWeight.Bold)
+        PricePageButton(Icons.Default.ChevronRight, safePage < safeTotalPages, onNextPage)
+    } }
+    if (compact) Column(Modifier.fillMaxWidth().background(ProductSoft).padding(14.dp), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(10.dp)) {
+        Text("${state.totalProducts} produk", color = ProductMuted, fontSize = 12.sp)
+        controls()
+    } else Row(
         modifier = Modifier
             .fillMaxWidth()
             .background(ProductSoft.copy(alpha = 0.72f))
@@ -218,19 +253,7 @@ internal fun PriceManagementPagination(
                 modifier = Modifier.padding(top = 2.dp)
             )
         }
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
-            PricePageButton(Icons.Default.ChevronLeft, safePage > 1, onPreviousPage)
-            Box(
-                modifier = Modifier
-                    .size(34.dp)
-                    .background(ProductPrimaryDark, RoundedCornerShape(8.dp)),
-                contentAlignment = Alignment.Center
-            ) {
-                Text("$safePage", color = Color.White, fontSize = 13.sp, fontWeight = FontWeight.Bold)
-            }
-            Text("/ $safeTotalPages", color = ProductMuted, fontSize = 13.sp, fontWeight = FontWeight.Medium)
-            PricePageButton(Icons.Default.ChevronRight, state.hasMorePages, onNextPage)
-        }
+        controls()
     }
 }
 

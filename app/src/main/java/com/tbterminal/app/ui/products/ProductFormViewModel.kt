@@ -50,6 +50,7 @@ class ProductFormViewModel(
         val priceRetail = input.priceRetail.toProductDecimalOrNull()
         val priceContractor = input.priceContractor.toProductDecimalOrNull()
         val minStock = input.minStock.toProductDecimalOrNull()
+        val secondaryUnitFactor = input.secondaryUnitFactor.toProductDecimalOrNull()
 
         val validationError = validateProductFormInput(input, state.isEditMode)
         when {
@@ -60,7 +61,8 @@ class ProductFormViewModel(
                 priceRetail = requireNotNull(priceRetail),
                 priceContractor = requireNotNull(priceContractor),
                 discount = java.math.BigDecimal.ZERO,
-                minStock = requireNotNull(minStock)
+                minStock = requireNotNull(minStock),
+                secondaryUnitFactor = secondaryUnitFactor
             )
         }
     }
@@ -115,7 +117,8 @@ class ProductFormViewModel(
         priceRetail: BigDecimal,
         priceContractor: BigDecimal,
         discount: BigDecimal,
-        minStock: BigDecimal
+        minStock: BigDecimal,
+        secondaryUnitFactor: BigDecimal?
     ) {
         viewModelScope.launch {
             val input = _uiState.value.input
@@ -131,8 +134,10 @@ class ProductFormViewModel(
                         priceBuy = priceBuy,
                         priceRetail = priceRetail,
                         priceContractor = priceContractor,
-                discount = java.math.BigDecimal.ZERO,
-                        minStock = minStock
+                        discount = java.math.BigDecimal.ZERO,
+                        minStock = minStock,
+                        secondaryUnitId = input.secondaryUnitId.takeIf { input.usesSecondaryUnit },
+                        secondaryUnitFactor = secondaryUnitFactor.takeIf { input.usesSecondaryUnit }
                     )
                 )
             } else {
@@ -145,8 +150,10 @@ class ProductFormViewModel(
                         priceBuy = priceBuy,
                         priceRetail = priceRetail,
                         priceContractor = priceContractor,
-                discount = java.math.BigDecimal.ZERO,
-                        minStock = minStock
+                        discount = java.math.BigDecimal.ZERO,
+                        minStock = minStock,
+                        secondaryUnitId = input.secondaryUnitId.takeIf { input.usesSecondaryUnit },
+                        secondaryUnitFactor = secondaryUnitFactor.takeIf { input.usesSecondaryUnit }
                     )
                 )
             }
@@ -197,6 +204,9 @@ private fun Product.toFormInput(): ProductFormInput {
         name = name,
         categoryId = categoryId,
         baseUnitId = baseUnitId,
+        usesSecondaryUnit = secondaryUnitId != null && secondaryUnitFactor != null,
+        secondaryUnitId = secondaryUnitId.orEmpty(),
+        secondaryUnitFactor = secondaryUnitFactor?.stripTrailingZeros()?.toPlainString().orEmpty(),
         priceBuy = priceBuy.toPlainString(),
         priceRetail = priceRetail.toPlainString(),
         priceContractor = priceContractor.toPlainString(),

@@ -43,7 +43,9 @@ data class Product(
     val discount: BigDecimal,
     val minStock: BigDecimal,
     val photoFilename: String?,
-    val isActive: Boolean
+    val isActive: Boolean,
+    val secondaryUnitId: String? = null,
+    val secondaryUnitFactor: BigDecimal? = null
 )
 
 
@@ -120,7 +122,9 @@ data class CreateProductCommand(
     val priceContractor: BigDecimal,
     val discount: BigDecimal,
     val minStock: BigDecimal,
-    val photoFilename: String? = null
+    val photoFilename: String? = null,
+    val secondaryUnitId: String? = null,
+    val secondaryUnitFactor: BigDecimal? = null
 )
 
 data class UpdateProductCommand(
@@ -132,7 +136,9 @@ data class UpdateProductCommand(
     val priceContractor: BigDecimal,
     val discount: BigDecimal,
     val minStock: BigDecimal,
-    val photoFilename: String? = null
+    val photoFilename: String? = null,
+    val secondaryUnitId: String? = null,
+    val secondaryUnitFactor: BigDecimal? = null
 )
 
 data class ProductCsvRowPreview(

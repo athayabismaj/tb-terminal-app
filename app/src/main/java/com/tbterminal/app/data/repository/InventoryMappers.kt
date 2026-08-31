@@ -34,7 +34,22 @@ internal fun PaginatedResponse<UnitResponseDto>.toProductUnitPage(): ProductUnit
 }
 
 internal fun ProductResponseDto.toProduct(): Product {
-    return Product(id, categoryId, baseUnitId, sku, name, priceBuy, priceRetail, priceContractor, discount, minStock, photoFilename, isActive)
+    return Product(
+        id = id,
+        categoryId = categoryId,
+        baseUnitId = baseUnitId,
+        sku = sku,
+        name = name,
+        priceBuy = priceBuy,
+        priceRetail = priceRetail,
+        priceContractor = priceContractor,
+        discount = discount,
+        minStock = minStock,
+        photoFilename = photoFilename,
+        isActive = isActive,
+        secondaryUnitId = secondaryUnitId,
+        secondaryUnitFactor = secondaryUnitFactor?.toBigDecimalOrNull()
+    )
 }
 
 internal fun StockDetailResponseDto.toProductStock(): ProductStock {

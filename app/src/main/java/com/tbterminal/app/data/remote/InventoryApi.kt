@@ -190,7 +190,9 @@ data class ProductResponseDto(
     @Serializable(with = BigDecimalStringSerializer::class) val discount: BigDecimal = BigDecimal.ZERO,
     @Serializable(with = BigDecimalStringSerializer::class) val minStock: BigDecimal,
     val photoFilename: String? = null,
-    val isActive: Boolean
+    val isActive: Boolean,
+    val secondaryUnitId: String? = null,
+    val secondaryUnitFactor: String? = null
 )
 
 @Serializable
@@ -204,7 +206,9 @@ data class ProductCreateRequestDto(
     @Serializable(with = BigDecimalStringSerializer::class) val priceContractor: BigDecimal,
     @Serializable(with = BigDecimalStringSerializer::class) val discount: BigDecimal = BigDecimal.ZERO,
     @Serializable(with = BigDecimalStringSerializer::class) val minStock: BigDecimal,
-    val photoFilename: String? = null
+    val photoFilename: String? = null,
+    val secondaryUnitId: String? = null,
+    val secondaryUnitFactor: String? = null
 )
 
 @Serializable
@@ -217,7 +221,9 @@ data class ProductUpdateRequestDto(
     @Serializable(with = BigDecimalStringSerializer::class) val priceContractor: BigDecimal,
     @Serializable(with = BigDecimalStringSerializer::class) val discount: BigDecimal = BigDecimal.ZERO,
     @Serializable(with = BigDecimalStringSerializer::class) val minStock: BigDecimal,
-    val photoFilename: String? = null
+    val photoFilename: String? = null,
+    val secondaryUnitId: String? = null,
+    val secondaryUnitFactor: String? = null
 )
 
 @Serializable

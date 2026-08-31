@@ -331,7 +331,9 @@ class RemoteInventoryRepository(
             priceContractor = command.priceContractor,
             discount = command.discount,
             minStock = command.minStock,
-            photoFilename = command.photoFilename
+            photoFilename = command.photoFilename,
+            secondaryUnitId = command.secondaryUnitId,
+            secondaryUnitFactor = command.secondaryUnitFactor?.stripTrailingZeros()?.toPlainString()
         )
 
         return safeApiCall { inventoryApi.createProduct(request) }
@@ -362,7 +364,9 @@ class RemoteInventoryRepository(
             priceContractor = command.priceContractor,
             discount = command.discount,
             minStock = command.minStock,
-            photoFilename = command.photoFilename
+            photoFilename = command.photoFilename,
+            secondaryUnitId = command.secondaryUnitId,
+            secondaryUnitFactor = command.secondaryUnitFactor?.stripTrailingZeros()?.toPlainString()
         )
 
         return safeApiCall { inventoryApi.updateProduct(id, request) }

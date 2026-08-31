@@ -23,4 +23,18 @@ class ProductInputValidationTest {
         assertNotNull(validateProductFormInput(valid.copy(priceBuy = "-1"), false))
         assertNotNull(validateProductFormInput(valid.copy(minStock = "1.001"), false))
     }
+
+    @Test
+    fun secondaryUnitRequiresDifferentUnitAndValidFactor() {
+        val withSecondary = valid.copy(
+            usesSecondaryUnit = true,
+            secondaryUnitId = "box",
+            secondaryUnitFactor = "12"
+        )
+
+        assertNull(validateProductFormInput(withSecondary, false))
+        assertNotNull(validateProductFormInput(withSecondary.copy(secondaryUnitId = "unit"), false))
+        assertNotNull(validateProductFormInput(withSecondary.copy(secondaryUnitFactor = "0"), false))
+        assertNotNull(validateProductFormInput(withSecondary.copy(secondaryUnitFactor = "1.00001"), false))
+    }
 }

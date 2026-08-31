@@ -3,6 +3,7 @@
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
@@ -42,40 +43,51 @@ internal fun ProductListContent(
     onNextPage: () -> Unit,
     onDismissMessage: () -> Unit
 ) {
-    Column(
-        modifier = modifier
-            .fillMaxSize()
-            .background(ProductSurface)
-            .verticalScroll(rememberScrollState())
-            .padding(40.dp),
-        verticalArrangement = Arrangement.spacedBy(28.dp)
-    ) {
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
+    BoxWithConstraints(modifier = modifier.fillMaxSize().background(ProductSurface)) {
+        val compact = maxWidth < 720.dp
+        Column(
+            modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState())
+                .padding(if (compact) 16.dp else 32.dp),
+            verticalArrangement = Arrangement.spacedBy(if (compact) 16.dp else 24.dp)
         ) {
+            val actionButton: @Composable (String, Modifier, androidx.compose.ui.graphics.Color, () -> Unit) -> Unit =
+                { label, buttonModifier, color, onClick ->
+                Button(
+                    onClick = onClick,
+                    modifier = buttonModifier,
+                    colors = ButtonDefaults.buttonColors(containerColor = color),
+                    shape = RoundedCornerShape(12.dp),
+                    contentPadding = PaddingValues(horizontal = 18.dp, vertical = 12.dp)
+                ) { Text(label, fontSize = 14.sp, fontWeight = FontWeight.SemiBold) }
+            }
+
+            if (compact) {
+                Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    Text(
+                        text = "Daftar Produk",
+                        color = ProductText,
+                        fontSize = 26.sp,
+                        fontWeight = FontWeight.Bold
+                    )
+                    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                        actionButton("Impor CSV", Modifier.weight(1f), ProductPrimary, onImportProductClick)
+                        actionButton("Tambah", Modifier.weight(1f), ProductPrimaryDark, onAddProductClick)
+                    }
+                }
+            } else Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
             Text(
                 text = "Daftar Produk",
                 color = ProductText,
                 fontSize = 28.sp,
-                fontWeight = FontWeight.Medium
+                fontWeight = FontWeight.Bold
             )
             Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                Button(
-                    onClick = onImportProductClick,
-                    colors = ButtonDefaults.buttonColors(containerColor = ProductPrimary),
-                    shape = RoundedCornerShape(8.dp),
-                    contentPadding = PaddingValues(horizontal = 20.dp, vertical = 12.dp)
-                ) { Text("Impor CSV", fontSize = 14.sp) }
-                Button(
-                    onClick = onAddProductClick,
-                    colors = ButtonDefaults.buttonColors(containerColor = ProductPrimaryDark),
-                    shape = RoundedCornerShape(8.dp),
-                    contentPadding = PaddingValues(horizontal = 20.dp, vertical = 12.dp)
-                ) {
-                    Text("Tambah Produk", fontSize = 14.sp, fontWeight = FontWeight.Medium)
-                }
+                actionButton("Impor CSV", Modifier, ProductPrimary, onImportProductClick)
+                actionButton("Tambah", Modifier, ProductPrimaryDark, onAddProductClick)
             }
         }
 
@@ -84,7 +96,8 @@ internal fun ProductListContent(
             categories = uiState.availableCategories,
             selectedCategory = uiState.selectedCategory,
             onSearchChanged = onSearchChanged,
-            onCategorySelected = onCategorySelected
+            onCategorySelected = onCategorySelected,
+            compact = compact
         )
 
         if (uiState.actionMessage != null) {
@@ -99,8 +112,10 @@ internal fun ProductListContent(
             onProductDetailClick = onProductDetailClick,
             onToggleProductClick = onToggleProductClick,
             onPreviousPage = onPreviousPage,
-            onNextPage = onNextPage
+            onNextPage = onNextPage,
+            compact = compact
         )
+        }
     }
 }
 

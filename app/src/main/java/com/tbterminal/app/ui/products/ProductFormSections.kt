@@ -28,10 +28,6 @@ import androidx.compose.material3.Switch
 import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -106,8 +102,6 @@ private fun UnitSection(
     input: ProductFormInput,
     onInputChanged: (ProductFormInput) -> Unit
 ) {
-    var enableSecondUnit by remember { mutableStateOf(false) }
-
     ProductFormSection(
         title = "Satuan & Konversi",
         icon = Icons.Outlined.Straighten,
@@ -116,8 +110,16 @@ private fun UnitSection(
                 Text("Satuan Kedua", color = ProductMuted, fontSize = 13.sp)
                 Spacer(modifier = Modifier.width(12.dp))
                 Switch(
-                    checked = enableSecondUnit,
-                    onCheckedChange = { enableSecondUnit = it },
+                    checked = input.usesSecondaryUnit,
+                    onCheckedChange = { enabled ->
+                        onInputChanged(
+                            input.copy(
+                                usesSecondaryUnit = enabled,
+                                secondaryUnitId = if (enabled) input.secondaryUnitId else "",
+                                secondaryUnitFactor = if (enabled) input.secondaryUnitFactor else ""
+                            )
+                        )
+                    },
                     colors = SwitchDefaults.colors(
                         checkedThumbColor = Color.White,
                         checkedTrackColor = ProductPrimary
@@ -126,19 +128,29 @@ private fun UnitSection(
             }
         }
     ) {
-        Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
-            ProductFormSelectField(
-                modifier = Modifier.weight(1f),
-                label = "SATUAN UTAMA *",
-                selectedText = uiState.units.selectedUnitLabel(input.baseUnitId),
-                options = uiState.units,
-                optionText = { unit -> "${unit.name} (${unit.symbol})" },
-                onSelect = { unit -> onInputChanged(input.copy(baseUnitId = unit.id)) }
-            )
-
-            if (enableSecondUnit) {
-                ConversionPreview(modifier = Modifier.weight(2f))
+        ProductFormSelectField(
+            modifier = Modifier.fillMaxWidth(),
+            label = "SATUAN UTAMA *",
+            selectedText = uiState.units.selectedUnitLabel(input.baseUnitId),
+            options = uiState.units,
+            optionText = { unit -> "${unit.name} (${unit.symbol})" },
+            onSelect = { unit ->
+                onInputChanged(
+                    input.copy(
+                        baseUnitId = unit.id,
+                        secondaryUnitId = input.secondaryUnitId.takeUnless { it == unit.id }.orEmpty()
+                    )
+                )
             }
+        )
+
+        if (input.usesSecondaryUnit) {
+            ConversionFields(
+                modifier = Modifier.fillMaxWidth(),
+                units = uiState.units,
+                input = input,
+                onInputChanged = onInputChanged
+            )
         }
     }
 }

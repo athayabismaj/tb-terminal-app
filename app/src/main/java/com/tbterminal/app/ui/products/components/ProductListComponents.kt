@@ -77,10 +77,11 @@ internal fun ProductTableCard(
     onProductDetailClick: (String) -> Unit,
     onToggleProductClick: (ProductStock) -> Unit,
     onPreviousPage: () -> Unit,
-    onNextPage: () -> Unit
+    onNextPage: () -> Unit,
+    compact: Boolean = false
 ) {
     Column(modifier = modifier.fillMaxWidth()) {
-        ProductTableHeader()
+        if (!compact) ProductTableHeader()
 
         when {
             uiState.isLoading -> ProductTableSkeletonRows()
@@ -88,13 +89,22 @@ internal fun ProductTableCard(
             products.isEmpty() -> ProductEmptyState()
             else -> {
                 products.forEachIndexed { index, product ->
-                    ProductTableRow(
-                        product = product,
-                        useAlternateBackground = index % 2 != 0,
-                        onDetail = { onProductDetailClick(product.productId) },
-                        onEdit = { onEditProductClick(product.productId) },
-                        onToggleStatus = { onToggleProductClick(product) }
-                    )
+                    if (compact) {
+                        ProductCompactCard(
+                            product = product,
+                            onDetail = { onProductDetailClick(product.productId) },
+                            onEdit = { onEditProductClick(product.productId) },
+                            onToggleStatus = { onToggleProductClick(product) }
+                        )
+                    } else {
+                        ProductTableRow(
+                            product = product,
+                            useAlternateBackground = index % 2 != 0,
+                            onDetail = { onProductDetailClick(product.productId) },
+                            onEdit = { onEditProductClick(product.productId) },
+                            onToggleStatus = { onToggleProductClick(product) }
+                        )
+                    }
                 }
             }
         }
@@ -117,86 +127,121 @@ internal fun ProductListToolbar(
     categories: List<String>,
     selectedCategory: String,
     onSearchChanged: (String) -> Unit,
-    onCategorySelected: (String) -> Unit
+    onCategorySelected: (String) -> Unit,
+    compact: Boolean = false
 ) {
     var categoriesExpanded by remember { mutableStateOf(false) }
 
-    Row(
-        modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.spacedBy(16.dp),
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        OutlinedTextField(
-            value = searchQuery,
-            onValueChange = onSearchChanged,
-            placeholder = { Text("Cari SKU atau nama produk...", color = ProductMuted, fontSize = 14.sp) },
-            trailingIcon = { Icon(Icons.Outlined.Search, contentDescription = "Cari produk", tint = ProductMuted) },
-            singleLine = true,
-            modifier = Modifier
-                .weight(1f)
-                .height(56.dp),
-            shape = RoundedCornerShape(8.dp),
-            colors = OutlinedTextFieldDefaults.colors(
-                focusedTextColor = ProductText,
-                unfocusedTextColor = ProductText,
-                cursorColor = ProductPrimaryDark,
-                focusedBorderColor = ProductPrimaryDark,
-                unfocusedBorderColor = ProductLine,
-                focusedContainerColor = ProductSurface,
-                unfocusedContainerColor = ProductSurface
-            )
-        )
+    val filter: @Composable () -> Unit = {
         Box {
             OutlinedButton(
                 onClick = { categoriesExpanded = true },
-                modifier = Modifier
-                    .width(220.dp)
-                    .height(56.dp),
-                shape = RoundedCornerShape(8.dp),
+                modifier = Modifier.fillMaxWidth().height(56.dp),
+                shape = RoundedCornerShape(12.dp),
                 border = BorderStroke(1.dp, ProductLine),
                 colors = androidx.compose.material3.ButtonDefaults.outlinedButtonColors(
                     containerColor = ProductSurface,
                     contentColor = ProductText
                 )
             ) {
-                Text(
-                    text = selectedCategory,
-                    modifier = Modifier.weight(1f),
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                    fontSize = 14.sp,
-                    fontWeight = FontWeight.Medium
-                )
-                Icon(
-                    imageVector = Icons.Outlined.ExpandMore,
-                    contentDescription = "Pilih kategori",
-                    tint = ProductMuted,
-                    modifier = Modifier.size(18.dp)
-                )
+                Text(selectedCategory, Modifier.weight(1f), maxLines = 1, overflow = TextOverflow.Ellipsis)
+                Icon(Icons.Outlined.ExpandMore, "Pilih kategori", tint = ProductMuted)
             }
             DropdownMenu(
                 expanded = categoriesExpanded,
                 onDismissRequest = { categoriesExpanded = false },
-                modifier = Modifier
-                    .width(220.dp)
-                    .heightIn(max = 320.dp)
-                    .background(ProductSurface)
+                modifier = Modifier.width(260.dp).heightIn(max = 320.dp).background(ProductSurface)
             ) {
                 categories.forEach { category ->
                     DropdownMenuItem(
-                        text = {
-                            Text(
-                                text = category,
-                                color = if (category == selectedCategory) ProductPrimaryDark else ProductText,
-                                fontWeight = if (category == selectedCategory) FontWeight.SemiBold else FontWeight.Normal
-                            )
-                        },
-                        onClick = {
-                            categoriesExpanded = false
-                            onCategorySelected(category)
-                        }
+                        text = { Text(category, fontWeight = if (category == selectedCategory) FontWeight.SemiBold else FontWeight.Normal) },
+                        onClick = { categoriesExpanded = false; onCategorySelected(category) }
                     )
                 }
+            }
+        }
+    }
+    val search: @Composable (Modifier) -> Unit = { fieldModifier ->
+        OutlinedTextField(
+            value = searchQuery,
+            onValueChange = onSearchChanged,
+            placeholder = { Text("Cari SKU atau nama produk...", color = ProductMuted, fontSize = 14.sp) },
+            trailingIcon = { Icon(Icons.Outlined.Search, contentDescription = "Cari produk", tint = ProductMuted) },
+            singleLine = true,
+            modifier = fieldModifier.height(56.dp),
+            shape = RoundedCornerShape(12.dp),
+            colors = OutlinedTextFieldDefaults.colors(
+                focusedTextColor = ProductText, unfocusedTextColor = ProductText,
+                cursorColor = ProductPrimaryDark, focusedBorderColor = ProductPrimaryDark,
+                unfocusedBorderColor = ProductLine, focusedContainerColor = ProductSurface,
+                unfocusedContainerColor = ProductSurface
+            )
+        )
+    }
+
+    if (compact) Column(
+        modifier = Modifier.fillMaxWidth(),
+        verticalArrangement = Arrangement.spacedBy(10.dp)
+    ) {
+        search(Modifier.fillMaxWidth())
+        filter()
+    } else Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.spacedBy(16.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        search(Modifier.weight(1f))
+        Box(modifier = Modifier.width(220.dp)) { filter() }
+    }
+}
+
+@Composable
+private fun ProductCompactCard(
+    product: ProductStock,
+    onDetail: () -> Unit,
+    onEdit: () -> Unit,
+    onToggleStatus: () -> Unit
+) {
+    val lowStock = product.quantity <= product.minStock
+    Card(
+        modifier = Modifier.fillMaxWidth().padding(bottom = 10.dp).clickable(onClick = onDetail),
+        colors = CardDefaults.cardColors(containerColor = ProductSurface),
+        shape = RoundedCornerShape(16.dp),
+        border = BorderStroke(1.dp, ProductLine)
+    ) {
+        Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+            Row(verticalAlignment = Alignment.Top) {
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(product.productName, color = ProductText, fontWeight = FontWeight.Bold, maxLines = 2)
+                    Text("${product.sku} · ${product.categoryName}", color = ProductMuted, fontSize = 12.sp)
+                }
+                ProductStatusPill(product.isActive)
+            }
+            Row(horizontalArrangement = Arrangement.SpaceBetween, modifier = Modifier.fillMaxWidth()) {
+                Column {
+                    Text("Harga retail", color = ProductMuted, fontSize = 11.sp)
+                    Text(product.priceRetail.moneyText(), color = ProductText, fontWeight = FontWeight.SemiBold)
+                }
+                Column(horizontalAlignment = Alignment.End) {
+                    Text("Stok", color = ProductMuted, fontSize = 11.sp)
+                    Text(
+                        "${product.quantity.quantityText()} ${product.unitName}",
+                        color = if (lowStock) ProductDanger else ProductText,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
+            }
+            HorizontalDivider(color = ProductLine)
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                OutlinedButton(onClick = onEdit, shape = RoundedCornerShape(10.dp)) {
+                    Icon(Icons.Default.Edit, null, modifier = Modifier.size(18.dp))
+                    Spacer(Modifier.width(8.dp))
+                    Text("Edit")
+                }
+                Spacer(Modifier.weight(1f))
+                Text(if (product.isActive) "Aktif" else "Nonaktif", color = ProductMuted, fontSize = 12.sp)
+                Spacer(Modifier.width(8.dp))
+                Switch(checked = product.isActive, onCheckedChange = { onToggleStatus() })
             }
         }
     }
