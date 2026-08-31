@@ -34,6 +34,7 @@ fun AdminCashExpenseHistoryScreen(
         userName = name,
         role = role,
         activeDestination = AdminDestination.CashExpenses,
+        pageTitle = "Pengeluaran Kas",
         onDashboardClick = onDashboardClick,
         onProductsClick = onProductsClick,
         onStockOpnameClick = onStockOpnameClick,

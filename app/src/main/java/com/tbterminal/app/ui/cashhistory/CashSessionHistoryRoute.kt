@@ -23,6 +23,7 @@ fun AdminCashSessionHistoryScreen(
     onReportsClick: () -> Unit,
     onOperationalAuditClick: () -> Unit,
     onShowDetail: (String) -> Unit,
+    onBack: () -> Unit = {},
     onLogout: () -> Unit,
     activeDestination: AdminDestination = AdminDestination.CashSessionHistory,
     title: String = "Riwayat Kas Harian",
@@ -45,12 +46,13 @@ fun AdminCashSessionHistoryScreen(
         onCustomersClick = onCustomersClick,
         onReportsClick = onReportsClick,
         onOperationalAuditClick = onOperationalAuditClick,
+        pageTitle = title,
+        onBack = onBack,
         onLogout = onLogout
     ) { modifier ->
         CashSessionHistoryScreen(
             modifier = modifier,
             uiState = uiState,
-            title = title,
             onSearchChanged = viewModel::setSearchQuery,
             onStatusFilterChanged = viewModel::setStatusFilter,
             onRefresh = { viewModel.loadSessions(uiState.page) },

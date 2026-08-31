@@ -30,6 +30,7 @@ fun AdminCashReconciliationScreen(
     onCashSessionDetailClick: (String) -> Unit = {},
     onProfileClick: () -> Unit = {},
     onSettingsClick: () -> Unit = {},
+    onBack: () -> Unit = {},
     onLogout: () -> Unit
 ) {
     AdminCashSessionHistoryScreen(
@@ -46,8 +47,9 @@ fun AdminCashReconciliationScreen(
         onReportsClick = onReportsClick,
         onOperationalAuditClick = onOperationalAuditClick,
         onShowDetail = onCashSessionDetailClick,
+        onBack = onBack,
         onLogout = onLogout,
         activeDestination = AdminDestination.CashReconciliation,
-        title = "Kas Harian Kasir"
+        title = "Kas Harian"
     )
 }

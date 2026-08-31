@@ -57,23 +57,27 @@ internal fun CashReconciliationDetailScreen(
     onPreviousPage: () -> Unit,
     onNextPage: () -> Unit
 ) {
+    val compact = androidx.compose.ui.platform.LocalConfiguration.current.screenWidthDp < 700
     Column(
         modifier = modifier.fillMaxSize().background(DetailBackground)
-            .verticalScroll(rememberScrollState()).padding(32.dp)
+            .verticalScroll(rememberScrollState()).padding(if (compact) 16.dp else 32.dp)
     ) {
-        DetailHeader(onOpenHistory)
+        DetailHeader(onOpenHistory, compact)
         when {
             uiState.sessionId.isBlank() -> SelectSessionPrompt(onOpenHistory)
             uiState.isLoading -> LoadingBox()
             uiState.errorMessage != null -> ErrorBox(uiState.errorMessage, onRetry)
-            uiState.session != null -> DetailContent(uiState, onPreviousPage, onNextPage)
+            uiState.session != null -> DetailContent(uiState, onPreviousPage, onNextPage, compact)
         }
     }
 }
 
 @Composable
-private fun DetailHeader(onOpenHistory: () -> Unit) {
-    Row(Modifier.fillMaxWidth().padding(bottom = 22.dp), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+private fun DetailHeader(onOpenHistory: () -> Unit, compact: Boolean) {
+    if (compact) Column(Modifier.fillMaxWidth().padding(bottom = 16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        Text("Detail Kas", color = DetailText, fontSize = 24.sp, fontWeight = FontWeight.ExtraBold)
+        OutlinedButton(onClick = onOpenHistory, modifier = Modifier.fillMaxWidth().height(48.dp)) { Text("Buka Riwayat Kas") }
+    } else Row(Modifier.fillMaxWidth().padding(bottom = 22.dp), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
         Column {
             Text("Detail Rekonsiliasi Kas", color = DetailText, fontSize = 30.sp, fontWeight = FontWeight.ExtraBold)
             Text("Audit kas sistem, kas fisik, pengeluaran, dan transaksi pada satu shift.", color = DetailMuted, fontSize = 14.sp)
@@ -83,17 +87,17 @@ private fun DetailHeader(onOpenHistory: () -> Unit) {
 }
 
 @Composable
-private fun DetailContent(uiState: CashReconciliationDetailUiState, onPreviousPage: () -> Unit, onNextPage: () -> Unit) {
+private fun DetailContent(uiState: CashReconciliationDetailUiState, onPreviousPage: () -> Unit, onNextPage: () -> Unit, compact: Boolean) {
     val session = requireNotNull(uiState.session)
-    SessionSummary(session)
+    SessionSummary(session, compact)
     Spacer(Modifier.height(16.dp))
-    TransactionSection(uiState, onPreviousPage, onNextPage)
+    TransactionSection(uiState, onPreviousPage, onNextPage, compact)
     Spacer(Modifier.height(16.dp))
-    ExpenseSection(uiState.expenses)
+    ExpenseSection(uiState.expenses, compact)
 }
 
 @Composable
-private fun SessionSummary(session: CashSession) {
+private fun SessionSummary(session: CashSession, compact: Boolean) {
     Card(Modifier.fillMaxWidth(), colors = CardDefaults.cardColors(Color.White), border = BorderStroke(1.dp, DetailBorder), shape = RoundedCornerShape(12.dp)) {
         Column(Modifier.padding(20.dp)) {
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
@@ -104,7 +108,13 @@ private fun SessionSummary(session: CashSession) {
                 StatusBadge(session.status)
             }
             Spacer(Modifier.height(18.dp))
-            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+            if (compact) Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                SummaryValue("MODAL AWAL", session.openingCash.asCurrency(), Modifier.fillMaxWidth())
+                SummaryValue("KAS SISTEM", (session.systemCash ?: session.openingCash).asCurrency(), Modifier.fillMaxWidth())
+                SummaryValue("KAS FISIK", session.closingCash?.asCurrency() ?: "-", Modifier.fillMaxWidth())
+                SummaryValue("PENGELUARAN", session.totalExpenses.asCurrency(), Modifier.fillMaxWidth())
+                SummaryValue("SELISIH", session.difference?.asCurrency() ?: "-", Modifier.fillMaxWidth())
+            } else Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                 SummaryValue("MODAL AWAL", session.openingCash.asCurrency(), Modifier.weight(1f))
                 SummaryValue("KAS SISTEM", (session.systemCash ?: session.openingCash).asCurrency(), Modifier.weight(1f))
                 SummaryValue("KAS FISIK", session.closingCash?.asCurrency() ?: "-", Modifier.weight(1f))
@@ -131,21 +141,21 @@ private fun SummaryValue(title: String, value: String, modifier: Modifier) {
 }
 
 @Composable
-private fun TransactionSection(uiState: CashReconciliationDetailUiState, onPreviousPage: () -> Unit, onNextPage: () -> Unit) {
+private fun TransactionSection(uiState: CashReconciliationDetailUiState, onPreviousPage: () -> Unit, onNextPage: () -> Unit, compact: Boolean) {
     Card(Modifier.fillMaxWidth(), colors = CardDefaults.cardColors(Color.White), border = BorderStroke(1.dp, DetailBorder), shape = RoundedCornerShape(12.dp)) {
         Column {
             SectionTitle("Transaksi Dalam Sesi", "${uiState.totalTransactions} transaksi")
-            TransactionHeader()
+            if (!compact) TransactionHeader()
             if (uiState.transactions.isEmpty()) {
                 EmptyRow("Belum ada transaksi pada sesi ini.")
             } else {
-                uiState.transactions.forEach { TransactionRow(it) }
+                uiState.transactions.forEach { if (compact) TransactionMobileRow(it) else TransactionRow(it) }
             }
             Row(Modifier.fillMaxWidth().background(Color(0xFFF8FAFC)).padding(14.dp), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
                 Text("Halaman ${uiState.page} dari ${uiState.totalPages}", color = DetailMuted, fontSize = 12.sp)
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    OutlinedButton(onClick = onPreviousPage, enabled = uiState.page > 1) { Text("Sebelumnya") }
-                    OutlinedButton(onClick = onNextPage, enabled = uiState.page < uiState.totalPages) { Text("Berikutnya") }
+                    OutlinedButton(onClick = onPreviousPage, enabled = uiState.page > 1) { Text(if (compact) "‹" else "Sebelumnya") }
+                    OutlinedButton(onClick = onNextPage, enabled = uiState.page < uiState.totalPages) { Text(if (compact) "›" else "Berikutnya") }
                 }
             }
         }
@@ -176,11 +186,29 @@ private fun TransactionRow(item: CashTransaction) {
 }
 
 @Composable
-private fun ExpenseSection(expenses: List<CashExpense>) {
+private fun TransactionMobileRow(item: CashTransaction) {
+    Column(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 13.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+            Text(item.receiptId, color = DetailPrimary, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+            StatusBadge(item.status)
+        }
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+            Column(Modifier.weight(1f)) {
+                Text(item.customerName ?: "Pelanggan umum", color = DetailText, fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
+                Text(item.createdAt.asDateTime(), color = DetailMuted, fontSize = 11.sp)
+            }
+            Text(item.total.asCurrency(), color = DetailText, fontSize = 13.sp, fontWeight = FontWeight.Bold)
+        }
+    }
+    HorizontalDivider(color = DetailBorder)
+}
+
+@Composable
+private fun ExpenseSection(expenses: List<CashExpense>, compact: Boolean) {
     Card(Modifier.fillMaxWidth(), colors = CardDefaults.cardColors(Color.White), border = BorderStroke(1.dp, DetailBorder), shape = RoundedCornerShape(12.dp)) {
         Column {
             SectionTitle("Pengeluaran Kas", "${expenses.size} catatan")
-            Row(Modifier.fillMaxWidth().background(Color(0xFFF8FAFC)).padding(horizontal = 18.dp, vertical = 11.dp)) {
+            if (!compact) Row(Modifier.fillMaxWidth().background(Color(0xFFF8FAFC)).padding(horizontal = 18.dp, vertical = 11.dp)) {
                 Label("DESKRIPSI", Modifier.weight(2f))
                 Label("WAKTU", Modifier.weight(1.4f))
                 Label("NOMINAL", Modifier.weight(1f))
@@ -188,7 +216,7 @@ private fun ExpenseSection(expenses: List<CashExpense>) {
             if (expenses.isEmpty()) {
                 EmptyRow("Tidak ada pengeluaran pada sesi ini.")
             } else {
-                expenses.forEach { ExpenseRow(it) }
+                expenses.forEach { if (compact) ExpenseMobileRow(it) else ExpenseRow(it) }
             }
         }
     }
@@ -200,6 +228,22 @@ private fun ExpenseRow(item: CashExpense) {
         Text(item.description, Modifier.weight(2f), color = DetailText, fontSize = 12.sp)
         Text(item.createdAt.asDateTime(), Modifier.weight(1.4f), color = DetailMuted, fontSize = 12.sp)
         Text(item.amount.asCurrency(), Modifier.weight(1f), color = Color(0xFFDC2626), fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
+    }
+    HorizontalDivider(color = DetailBorder)
+}
+
+@Composable
+private fun ExpenseMobileRow(item: CashExpense) {
+    Row(
+        Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 13.dp),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Column(Modifier.weight(1f)) {
+            Text(item.description, color = DetailText, fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
+            Text(item.createdAt.asDateTime(), color = DetailMuted, fontSize = 11.sp)
+        }
+        Text(item.amount.asCurrency(), color = Color(0xFFDC2626), fontSize = 12.sp, fontWeight = FontWeight.Bold)
     }
     HorizontalDivider(color = DetailBorder)
 }

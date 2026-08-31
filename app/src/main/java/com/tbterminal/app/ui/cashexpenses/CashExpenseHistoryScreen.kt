@@ -4,6 +4,7 @@ import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -81,28 +82,31 @@ internal fun CashExpenseHistoryScreen(
 ) {
     var showDatePicker by remember { mutableStateOf(false) }
 
-    Column(
-        modifier = modifier.fillMaxSize().background(ExpenseBackground)
-            .verticalScroll(rememberScrollState()).padding(40.dp),
-        verticalArrangement = Arrangement.spacedBy(28.dp)
-    ) {
+    BoxWithConstraints(modifier.fillMaxSize().background(ExpenseBackground)) {
+        val compact = maxWidth < 700.dp
+        Column(modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState())
+            .padding(horizontal = if (compact) 16.dp else 32.dp, vertical = if (compact) 14.dp else 24.dp),
+            verticalArrangement = Arrangement.spacedBy(if (compact) 14.dp else 22.dp)) {
         ExpenseHistoryHeader(
             uiState = uiState,
             onPreviousDate = onPreviousDate,
             onNextDate = onNextDate,
             onCalendarClick = { showDatePicker = true },
             onClearDate = { onDateChanged(null) },
-            onDatePresetSelected = onDatePresetSelected
+            onDatePresetSelected = onDatePresetSelected,
+            compact = compact
         )
-        ExpenseMetrics(uiState)
+        ExpenseMetrics(uiState, compact)
         ExpenseTable(
             uiState = uiState,
+            compact = compact,
             onSearchChanged = onSearchChanged,
             onRefresh = onRefresh,
             onShowSessionDetail = onShowSessionDetail,
             onPreviousPage = onPreviousPage,
             onNextPage = onNextPage
         )
+        }
     }
 
     if (showDatePicker) {
@@ -124,23 +128,14 @@ private fun ExpenseHistoryHeader(
     onNextDate: () -> Unit,
     onCalendarClick: () -> Unit,
     onClearDate: () -> Unit,
-    onDatePresetSelected: (String) -> Unit
+    onDatePresetSelected: (String) -> Unit,
+    compact: Boolean
 ) {
-    Row(
-        modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.SpaceBetween,
-        verticalAlignment = Alignment.Top
-    ) {
-        Text(
-            "Pengeluaran Kas",
-            color = ExpenseText,
-            fontSize = 28.sp,
-            fontWeight = FontWeight.Medium
-        )
-        Row(
-            horizontalArrangement = Arrangement.spacedBy(10.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
+    if (compact) Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+        HistoryDateFilter(selectedDate = uiState.endDate ?: uiState.selectedDate, onPreviousDate = onPreviousDate, onNextDate = onNextDate, onCalendarClick = onCalendarClick, onClearDate = onClearDate, displayTextOverride = uiState.dateRangeLabel(), modifier = Modifier.fillMaxWidth())
+        ExpenseDatePresets(uiState.selectedPreset, onDatePresetSelected, Modifier.fillMaxWidth())
+    } else Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End, verticalAlignment = Alignment.Top) {
+        Row(horizontalArrangement = Arrangement.spacedBy(10.dp), verticalAlignment = Alignment.CenterVertically) {
             HistoryDateFilter(
                 selectedDate = uiState.endDate ?: uiState.selectedDate,
                 onPreviousDate = onPreviousDate,
@@ -159,12 +154,12 @@ private fun ExpenseHistoryHeader(
 }
 
 @Composable
-private fun ExpenseDatePresets(selectedPreset: String?, onSelected: (String) -> Unit) {
+private fun ExpenseDatePresets(selectedPreset: String?, onSelected: (String) -> Unit, modifier: Modifier = Modifier) {
     Surface(
         shape = RoundedCornerShape(12.dp),
         color = Color.White,
         border = BorderStroke(1.dp, ExpenseBorder),
-        modifier = Modifier.height(48.dp)
+        modifier = modifier.height(48.dp)
     ) {
         Row(
             modifier = Modifier.padding(horizontal = 6.dp, vertical = 6.dp),
@@ -205,10 +200,16 @@ private fun ExpenseDatePresetChip(text: String, selected: Boolean, onClick: () -
 }
 
 @Composable
-private fun ExpenseMetrics(uiState: CashExpenseHistoryUiState) {
+private fun ExpenseMetrics(uiState: CashExpenseHistoryUiState, compact: Boolean) {
     val totalValue = uiState.expenses.fold(BigDecimal.ZERO) { total, item -> total + item.amount }
     val sessionCount = uiState.expenses.map(CashExpense::sessionId).distinct().size
-    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+    if (compact) Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+            ExpenseMetric("Total catatan", uiState.totalExpenses.toString(), "Data tersimpan", Icons.AutoMirrored.Outlined.ReceiptLong, ExpensePrimary, Modifier.weight(1f), true)
+            ExpenseMetric("Nilai halaman", totalValue.asCurrency(), "Halaman ini", Icons.Outlined.Payments, ExpenseDanger, Modifier.weight(1f), true)
+        }
+        ExpenseMetric("Sesi terkait", sessionCount.toString(), "Pada halaman ini", Icons.AutoMirrored.Outlined.ReceiptLong, Color(0xFF2563EB), Modifier.fillMaxWidth(), true)
+    } else Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(16.dp)) {
         ExpenseMetric("TOTAL CATATAN", uiState.totalExpenses.toString(), "Sesuai data tersimpan", Icons.AutoMirrored.Outlined.ReceiptLong, ExpensePrimary, Modifier.weight(1f))
         ExpenseMetric("NILAI HALAMAN INI", totalValue.asCurrency(), "Maksimal 10 pengeluaran", Icons.Outlined.Payments, ExpenseDanger, Modifier.weight(1f))
         ExpenseMetric("SESI TERKAIT", sessionCount.toString(), "Pada halaman yang tampil", Icons.AutoMirrored.Outlined.ReceiptLong, Color(0xFF2563EB), Modifier.weight(1f))
@@ -216,15 +217,15 @@ private fun ExpenseMetrics(uiState: CashExpenseHistoryUiState) {
 }
 
 @Composable
-private fun ExpenseMetric(title: String, value: String, note: String, icon: ImageVector, tint: Color, modifier: Modifier) {
-    Card(modifier, colors = CardDefaults.cardColors(Color.White), border = BorderStroke(1.dp, ExpenseBorder), shape = RoundedCornerShape(12.dp)) {
-        Column(Modifier.padding(18.dp)) {
+private fun ExpenseMetric(title: String, value: String, note: String, icon: ImageVector, tint: Color, modifier: Modifier, compact: Boolean = false) {
+    Card(modifier, colors = CardDefaults.cardColors(Color.White), border = BorderStroke(1.dp, ExpenseBorder), shape = RoundedCornerShape(if (compact) 18.dp else 12.dp)) {
+        Column(Modifier.padding(if (compact) 14.dp else 18.dp)) {
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
                 Text(title, color = Color(0xFF94A3B8), fontSize = 10.sp, fontWeight = FontWeight.Bold)
                 Icon(icon, null, tint = tint, modifier = Modifier.size(20.dp))
             }
             Spacer(Modifier.height(10.dp))
-            Text(value, color = ExpenseText, fontSize = 22.sp, fontWeight = FontWeight.ExtraBold)
+            Text(value, color = ExpenseText, fontSize = if (compact) 18.sp else 22.sp, fontWeight = FontWeight.ExtraBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
             Text(note, color = ExpenseMuted, fontSize = 11.sp)
         }
     }
@@ -233,6 +234,7 @@ private fun ExpenseMetric(title: String, value: String, note: String, icon: Imag
 @Composable
 private fun ExpenseTable(
     uiState: CashExpenseHistoryUiState,
+    compact: Boolean,
     onSearchChanged: (String) -> Unit,
     onRefresh: () -> Unit,
     onShowSessionDetail: (String) -> Unit,
@@ -245,16 +247,16 @@ private fun ExpenseTable(
             searchQuery = uiState.searchQuery,
             onSearchChanged = onSearchChanged
         )
-        Spacer(Modifier.height(28.dp))
-        ExpenseHeader()
+        Spacer(Modifier.height(if (compact) 12.dp else 28.dp))
+        if (!compact) ExpenseHeader()
         when {
             uiState.isLoading -> LoadingBox()
             uiState.errorMessage != null -> ErrorBox(uiState.errorMessage, onRefresh)
             uiState.expenses.isEmpty() -> EmptyBox()
             visibleExpenses.isEmpty() -> EmptyBox("Tidak ada pengeluaran yang cocok.")
-            else -> visibleExpenses.forEach { ExpenseRow(it, onShowSessionDetail) }
+            else -> visibleExpenses.forEach { if (compact) ExpenseMobileRow(it, onShowSessionDetail) else ExpenseRow(it, onShowSessionDetail) }
         }
-        ExpensePagination(uiState, visibleExpenses.size, onPreviousPage, onNextPage)
+        ExpensePagination(uiState, visibleExpenses.size, compact, onPreviousPage, onNextPage)
     }
 }
 
@@ -263,13 +265,13 @@ private fun ExpenseToolbar(searchQuery: String, onSearchChanged: (String) -> Uni
     OutlinedTextField(
         value = searchQuery,
         onValueChange = onSearchChanged,
-        placeholder = { Text("Cari kasir, sesi, atau deskripsi...", color = ExpenseMuted) },
+        placeholder = { Text("Cari kasir atau deskripsi", color = ExpenseMuted) },
         trailingIcon = { Icon(Icons.Outlined.Search, contentDescription = "Cari pengeluaran", tint = ExpenseMuted) },
         singleLine = true,
         modifier = Modifier
             .fillMaxWidth()
             .height(56.dp),
-        shape = RoundedCornerShape(8.dp),
+        shape = RoundedCornerShape(16.dp),
         colors = OutlinedTextFieldDefaults.colors(
             focusedTextColor = ExpenseText,
             unfocusedTextColor = ExpenseText,
@@ -280,6 +282,25 @@ private fun ExpenseToolbar(searchQuery: String, onSearchChanged: (String) -> Uni
             unfocusedContainerColor = Color.White
         )
     )
+}
+
+@Composable
+private fun ExpenseMobileRow(item: CashExpense, onShowSessionDetail: (String) -> Unit) {
+    Column(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 14.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        Row(verticalAlignment = Alignment.Top) {
+            Column(Modifier.weight(1f)) {
+                Text(item.userName ?: "Kasir", color = ExpenseText, fontWeight = FontWeight.Bold)
+                Text(item.createdAt.asDateTime(), color = ExpenseMuted, fontSize = 11.sp)
+            }
+            Text(item.amount.asCurrency(), color = ExpenseDanger, fontWeight = FontWeight.Bold)
+        }
+        Text(item.description, color = ExpenseText, fontSize = 13.sp, maxLines = 2, overflow = TextOverflow.Ellipsis)
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+            Text("Sesi ${item.sessionId.take(8)}", color = ExpenseMuted, fontSize = 11.sp)
+            IconButton(onClick = { onShowSessionDetail(item.sessionId) }) { Icon(Icons.Outlined.Visibility, "Lihat sesi", tint = ExpensePrimary) }
+        }
+    }
+    HorizontalDivider(color = ExpenseBorder)
 }
 
 @Composable
@@ -318,6 +339,7 @@ private fun ExpenseRow(item: CashExpense, onShowSessionDetail: (String) -> Unit)
 private fun ExpensePagination(
     uiState: CashExpenseHistoryUiState,
     visibleCount: Int,
+    compact: Boolean,
     onPreviousPage: () -> Unit,
     onNextPage: () -> Unit
 ) {
@@ -328,7 +350,17 @@ private fun ExpensePagination(
     } else {
         "$visibleCount hasil pada halaman ini"
     }
-    Row(
+    val controls: @Composable () -> Unit = {
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
+            ExpensePageButton(onPreviousPage, uiState.page > 1, "‹")
+            Text("${uiState.page} / ${uiState.totalPages}", color = ExpenseText, fontWeight = FontWeight.Bold)
+            ExpensePageButton(onNextPage, uiState.page < uiState.totalPages, "›")
+        }
+    }
+    if (compact) Column(Modifier.fillMaxWidth().background(ExpenseSoft).padding(14.dp), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(10.dp)) {
+        Text("$visibleCount pengeluaran pada halaman ini", color = ExpenseMuted, fontSize = 12.sp)
+        controls()
+    } else Row(
         Modifier
             .fillMaxWidth()
             .background(ExpenseSoft)
@@ -350,19 +382,7 @@ private fun ExpensePagination(
                 modifier = Modifier.padding(top = 2.dp)
             )
         }
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
-            ExpensePageButton(onClick = onPreviousPage, enabled = uiState.page > 1, text = "<")
-            Box(
-                modifier = Modifier
-                    .size(34.dp)
-                    .background(ExpensePrimary, RoundedCornerShape(8.dp)),
-                contentAlignment = Alignment.Center
-            ) {
-                Text("${uiState.page}", color = Color.White, fontWeight = FontWeight.Bold)
-            }
-            Text("/ ${uiState.totalPages}", color = ExpenseMuted, fontWeight = FontWeight.SemiBold)
-            ExpensePageButton(onClick = onNextPage, enabled = uiState.page < uiState.totalPages, text = ">")
-        }
+        controls()
     }
 }
 
