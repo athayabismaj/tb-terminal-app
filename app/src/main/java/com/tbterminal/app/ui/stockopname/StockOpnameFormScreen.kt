@@ -3,6 +3,7 @@ package com.tbterminal.app.ui.stockopname
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
@@ -27,14 +28,9 @@ internal fun StockOpnameFormScreen(
     onSubmit: () -> Unit,
     onDismissMessage: () -> Unit
 ) {
-    Column(
-        modifier = modifier
-            .fillMaxSize()
-            .background(OpnameBackground)
-            .padding(32.dp),
-        verticalArrangement = Arrangement.spacedBy(20.dp)
-    ) {
-        StockOpnameHeader(title = "Form Penyesuaian Stok")
+    BoxWithConstraints(modifier.fillMaxSize().background(OpnameBackground)) {
+        val compact = maxWidth < 700.dp
+        Column(modifier = Modifier.fillMaxSize().padding(horizontal = if (compact) 16.dp else 32.dp, vertical = if (compact) 14.dp else 24.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
         StockOpnameMessage(uiState, onDismissMessage)
         Box(
             modifier = Modifier
@@ -54,6 +50,7 @@ internal fun StockOpnameFormScreen(
                 onSubmit = onSubmit,
                 onSelectProduct = onSelectProduct
             )
+        }
         }
     }
 }

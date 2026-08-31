@@ -3,6 +3,7 @@ package com.tbterminal.app.ui.stockopname
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
@@ -25,15 +26,12 @@ internal fun StockOpnameListScreen(
     onNextPage: () -> Unit,
     onDismissMessage: () -> Unit
 ) {
-    Column(
-        modifier = modifier
-            .fillMaxSize()
-            .background(OpnameSurface)
-            .verticalScroll(rememberScrollState())
-            .padding(40.dp),
-        verticalArrangement = Arrangement.spacedBy(28.dp)
-    ) {
-        StockOpnameListHeader(onOpenForm = onOpenForm)
+    BoxWithConstraints(modifier.fillMaxSize().background(OpnameSurface)) {
+        val compact = maxWidth < 700.dp
+        Column(modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState())
+            .padding(horizontal = if (compact) 16.dp else 32.dp, vertical = if (compact) 14.dp else 24.dp),
+            verticalArrangement = Arrangement.spacedBy(if (compact) 14.dp else 22.dp)) {
+        StockOpnameListHeader(onOpenForm = onOpenForm, compact = compact)
         StockOpnameMessage(uiState, onDismissMessage)
         StockOpnameTableCard(
             modifier = Modifier.fillMaxWidth(),
@@ -43,6 +41,8 @@ internal fun StockOpnameListScreen(
             onSelectProduct = onSelectProduct,
             onPreviousPage = onPreviousPage,
             onNextPage = onNextPage
+            ,compact = compact
         )
+        }
     }
 }

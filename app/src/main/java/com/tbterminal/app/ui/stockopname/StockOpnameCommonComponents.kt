@@ -30,22 +30,17 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 
 @Composable
-internal fun StockOpnameListHeader(onOpenForm: () -> Unit) {
+internal fun StockOpnameListHeader(onOpenForm: () -> Unit, compact: Boolean = false) {
     Row(
         modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.SpaceBetween,
+        horizontalArrangement = Arrangement.End,
         verticalAlignment = Alignment.Top
     ) {
-        Text(
-            text = "Stok Opname",
-            color = OpnameText,
-            fontSize = 28.sp,
-            fontWeight = FontWeight.Medium
-        )
         Button(
             onClick = onOpenForm,
             colors = ButtonDefaults.buttonColors(containerColor = OpnamePrimaryDark),
-            shape = RoundedCornerShape(8.dp),
+            shape = RoundedCornerShape(16.dp),
+            modifier = if (compact) Modifier.fillMaxWidth() else Modifier,
             contentPadding = PaddingValues(horizontal = 20.dp, vertical = 12.dp)
         ) {
             Icon(Icons.Default.Add, contentDescription = null, modifier = Modifier.size(18.dp))

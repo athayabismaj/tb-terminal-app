@@ -3,6 +3,7 @@ package com.tbterminal.app.ui.stockopname
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -37,34 +38,25 @@ import androidx.compose.ui.unit.dp
 internal fun StockTableToolbar(
     uiState: StockOpnameUiState,
     onSearchChanged: (String) -> Unit,
-    onCategoryFilterChanged: (String?) -> Unit
+    onCategoryFilterChanged: (String?) -> Unit,
+    compact: Boolean = false
 ) {
-    Row(
+    val search: @Composable (Modifier) -> Unit = { fieldModifier -> OutlinedTextField(
+        value = uiState.searchQuery, onValueChange = onSearchChanged,
+        placeholder = { Text("Cari produk atau SKU", color = OpnameMuted) }, trailingIcon = { Icon(Icons.Outlined.Search, "Cari produk", tint = OpnameMuted) }, singleLine = true,
+        modifier = fieldModifier.height(56.dp), shape = RoundedCornerShape(16.dp),
+        colors = OutlinedTextFieldDefaults.colors(focusedTextColor = OpnameText, unfocusedTextColor = OpnameText, cursorColor = OpnamePrimaryDark, focusedBorderColor = OpnamePrimaryDark, unfocusedBorderColor = OpnameLine, focusedContainerColor = OpnameSurface, unfocusedContainerColor = OpnameSurface)
+    ) }
+    if (compact) Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+        search(Modifier.fillMaxWidth())
+        CategoryFilterDropdown(uiState.categoryFilter, uiState.categoryOptions, onCategoryFilterChanged, Modifier.fillMaxWidth())
+    } else Row(
         modifier = Modifier.fillMaxWidth(),
         horizontalArrangement = Arrangement.spacedBy(16.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        OutlinedTextField(
-            value = uiState.searchQuery,
-            onValueChange = onSearchChanged,
-            placeholder = { Text("Cari produk atau SKU...", color = OpnameMuted) },
-            trailingIcon = { Icon(Icons.Outlined.Search, contentDescription = "Cari produk", tint = OpnameMuted) },
-            singleLine = true,
-            modifier = Modifier
-                .weight(1f)
-                .height(56.dp),
-            shape = RoundedCornerShape(8.dp),
-            colors = OutlinedTextFieldDefaults.colors(
-                focusedTextColor = OpnameText,
-                unfocusedTextColor = OpnameText,
-                cursorColor = OpnamePrimaryDark,
-                focusedBorderColor = OpnamePrimaryDark,
-                unfocusedBorderColor = OpnameLine,
-                focusedContainerColor = OpnameSurface,
-                unfocusedContainerColor = OpnameSurface
-            )
-        )
-        CategoryFilterDropdown(uiState.categoryFilter, uiState.categoryOptions, onCategoryFilterChanged)
+        search(Modifier.weight(1f))
+        CategoryFilterDropdown(uiState.categoryFilter, uiState.categoryOptions, onCategoryFilterChanged, Modifier.width(220.dp))
     }
 }
 
@@ -72,16 +64,15 @@ internal fun StockTableToolbar(
 private fun CategoryFilterDropdown(
     selectedCategory: String?,
     categories: List<String>,
-    onCategoryFilterChanged: (String?) -> Unit
+    onCategoryFilterChanged: (String?) -> Unit,
+    modifier: Modifier
 ) {
     var expanded by remember { mutableStateOf(false) }
     Box {
         OutlinedButton(
             onClick = { expanded = true },
-            modifier = Modifier
-                .width(220.dp)
-                .height(56.dp),
-            shape = RoundedCornerShape(8.dp),
+            modifier = modifier.height(56.dp),
+            shape = RoundedCornerShape(16.dp),
             border = BorderStroke(1.dp, OpnameLine),
             colors = ButtonDefaults.outlinedButtonColors(
                 containerColor = OpnameSurface,

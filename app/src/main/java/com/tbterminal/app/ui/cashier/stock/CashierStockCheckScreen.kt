@@ -9,6 +9,7 @@ import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -118,16 +119,11 @@ fun CashierStockCheckScreen(
         onSettingsClick = onSettingsClick,
         onLogout = onLogout
     ) { contentModifier ->
-        Column(
-            modifier = contentModifier
-                .fillMaxSize()
-                .background(Color.White)
-                .padding(32.dp)
-        ) {
+        BoxWithConstraints(contentModifier.fillMaxSize().background(Color.White)) {
+            val compact = maxWidth < 700.dp
+            Column(modifier = Modifier.fillMaxSize().padding(horizontal = if (compact) 16.dp else 32.dp, vertical = if (compact) 14.dp else 24.dp)) {
             // ── Header Judul ──
-            StockPageTitle()
-
-            Spacer(modifier = Modifier.height(24.dp))
+            if (!compact) { StockPageTitle(); Spacer(modifier = Modifier.height(24.dp)) }
 
             var selectedCategory by remember { mutableStateOf("Semua") }
             val filteredProducts = remember(uiState.products, selectedCategory) {
@@ -145,7 +141,8 @@ fun CashierStockCheckScreen(
                 products = uiState.products,
                 isLoading = uiState.isLoading,
                 selectedCategory = selectedCategory,
-                onCategorySelected = { selectedCategory = it }
+                onCategorySelected = { selectedCategory = it },
+                compact = compact
             )
 
             Spacer(modifier = Modifier.height(16.dp))
@@ -163,7 +160,7 @@ fun CashierStockCheckScreen(
                     // Konten Tabel
                     when {
                         uiState.isLoading -> {
-                            StockTableHeader()
+                            if (!compact) StockTableHeader()
                             HorizontalDivider(color = StockBorder)
                             LazyColumn(modifier = Modifier.weight(1f, fill = false)) {
                                 items(5) {
@@ -227,13 +224,13 @@ fun CashierStockCheckScreen(
                         }
                         else -> {
                             // Header Tabel
-                            StockTableHeader()
+                            if (!compact) StockTableHeader()
                             HorizontalDivider(color = StockBorder)
 
                             // Baris Data
                             LazyColumn(modifier = Modifier.weight(1f, fill = false)) {
                                 items(filteredProducts, key = { it.productId }) { product ->
-                                    StockTableRow(product)
+                                    if (compact) StockMobileRow(product) else StockTableRow(product)
                                     HorizontalDivider(color = StockBorderLight)
                                 }
                             }
@@ -245,9 +242,11 @@ fun CashierStockCheckScreen(
                     StockPagination(
                         uiState = uiState,
                         onPreviousPage = viewModel::previousPage,
-                        onNextPage = viewModel::nextPage
+                        onNextPage = viewModel::nextPage,
+                        compact = compact
                     )
                 }
+            }
             }
         }
     }
@@ -276,7 +275,8 @@ private fun StockToolbar(
     products: List<ProductStock>,
     isLoading: Boolean,
     selectedCategory: String,
-    onCategorySelected: (String) -> Unit
+    onCategorySelected: (String) -> Unit,
+    compact: Boolean
 ) {
     // Ambil daftar kategori unik dari produk
     val categories = remember(products) {
@@ -289,60 +289,29 @@ private fun StockToolbar(
     }
 
 
-    Row(
+    val search: @Composable (Modifier) -> Unit = { searchModifier -> Surface(shape = RoundedCornerShape(16.dp), color = StockSurface, border = BorderStroke(1.dp, StockBorder), modifier = searchModifier.height(52.dp)) {
+        Row(Modifier.fillMaxSize().padding(horizontal = 16.dp), verticalAlignment = Alignment.CenterVertically) {
+            Icon(Icons.Outlined.Search, null, tint = StockTextSecondary, modifier = Modifier.size(20.dp)); Spacer(Modifier.width(12.dp))
+            Box(Modifier.weight(1f), contentAlignment = Alignment.CenterStart) { if (query.isEmpty()) Text("Cari produk atau SKU", color = StockTextMuted, fontSize = 14.sp); BasicTextField(query, onQueryChange, singleLine = true, textStyle = androidx.compose.ui.text.TextStyle(fontSize = 14.sp, color = StockTextPrimary), modifier = Modifier.fillMaxWidth()) }
+        }
+    } }
+    if (compact) Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+        search(Modifier.fillMaxWidth())
+        StockCategoryDropdown(categories, selectedCategory, !isLoading && categories.size > 1, onCategorySelected, Modifier.fillMaxWidth())
+    } else Row(
         modifier = Modifier.fillMaxWidth(),
         horizontalArrangement = Arrangement.spacedBy(16.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
         // Search Bar Custom
-        Surface(
-            shape = RoundedCornerShape(12.dp),
-            color = StockSurface,
-            border = BorderStroke(1.dp, StockBorder),
-            modifier = Modifier
-                .weight(1f)
-                .height(48.dp)
-        ) {
-            Row(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(horizontal = 16.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Icon(
-                    Icons.Outlined.Search,
-                    contentDescription = null,
-                    tint = StockTextSecondary,
-                    modifier = Modifier.size(20.dp)
-                )
-                Spacer(modifier = Modifier.width(12.dp))
-                Box(modifier = Modifier.weight(1f), contentAlignment = Alignment.CenterStart) {
-                    if (query.isEmpty()) {
-                        Text(
-                            "Cari produk atau SKU...",
-                            color = StockTextMuted,
-                            fontSize = 14.sp
-                        )
-                    }
-                    BasicTextField(
-                        value = query,
-                        onValueChange = onQueryChange,
-                        singleLine = true,
-                        textStyle = androidx.compose.ui.text.TextStyle(
-                            fontSize = 14.sp,
-                            color = StockTextPrimary
-                        ),
-                        modifier = Modifier.fillMaxWidth()
-                    )
-                }
-            }
-        }
+        search(Modifier.weight(1f))
 
         StockCategoryDropdown(
             categories = categories,
             selectedCategory = selectedCategory,
             enabled = !isLoading && categories.size > 1,
-            onCategorySelected = onCategorySelected
+            onCategorySelected = onCategorySelected,
+            modifier = Modifier.width(220.dp)
         )
     }
 }
@@ -352,7 +321,8 @@ private fun StockCategoryDropdown(
     categories: List<String>,
     selectedCategory: String,
     enabled: Boolean,
-    onCategorySelected: (String) -> Unit
+    onCategorySelected: (String) -> Unit,
+    modifier: Modifier
 ) {
     var expanded by remember { mutableStateOf(false) }
 
@@ -363,9 +333,7 @@ private fun StockCategoryDropdown(
             shape = RoundedCornerShape(12.dp),
             color = StockSurface,
             border = BorderStroke(1.dp, StockBorder),
-            modifier = Modifier
-                .width(220.dp)
-                .height(48.dp)
+            modifier = modifier.height(52.dp)
         ) {
             Row(
                 modifier = Modifier
@@ -554,6 +522,27 @@ private fun StockTableRow(product: ProductStock) {
     }
 }
 
+@Composable
+private fun StockMobileRow(product: ProductStock) {
+    val isOut = product.quantity <= BigDecimal.ZERO
+    val isLow = !isOut && product.minStock > BigDecimal.ZERO && product.quantity <= product.minStock
+    Column(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 14.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+        Row(verticalAlignment = Alignment.Top) {
+            Column(Modifier.weight(1f)) {
+                Text(product.productName, color = StockTextPrimary, fontWeight = FontWeight.Bold, maxLines = 2, overflow = TextOverflow.Ellipsis)
+                Text("${product.sku} · ${product.categoryName}", color = StockTextSecondary, fontSize = 11.sp)
+            }
+            if (isOut || isLow) Surface(shape = RoundedCornerShape(999.dp), color = if (isOut) StockDanger.copy(alpha = 0.1f) else StockWarning.copy(alpha = 0.12f)) {
+                Text(if (isOut) "Habis" else "Menipis", color = if (isOut) StockDanger else StockWarningDark, fontSize = 10.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp))
+            }
+        }
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+            Column { Text("Stok sekarang", color = StockTextSecondary, fontSize = 10.sp); Text("${product.quantity.stockQuantity()} ${product.unitName}", color = if (isOut) StockDanger else StockTextPrimary, fontWeight = FontWeight.Bold) }
+            Column(horizontalAlignment = Alignment.End) { Text("Stok minimum", color = StockTextSecondary, fontSize = 10.sp); Text(product.minStock.stockQuantity(), color = StockTextPrimary, fontWeight = FontWeight.SemiBold) }
+        }
+    }
+}
+
 // ==========================================
 // SKELETON LOADING
 // ==========================================
@@ -618,9 +607,19 @@ private fun StockTableRowSkeleton() {
 private fun StockPagination(
     uiState: CashierStockCheckUiState,
     onPreviousPage: () -> Unit,
-    onNextPage: () -> Unit
+    onNextPage: () -> Unit,
+    compact: Boolean
 ) {
-    Row(
+    if (compact) {
+        Column(Modifier.fillMaxWidth().background(StockPaginationBg).padding(14.dp), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(10.dp)) {
+            Text("${uiState.total} produk", color = StockTextSecondary, fontSize = 12.sp)
+            Row(horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.CenterVertically) {
+                Surface(onClick = onPreviousPage, enabled = uiState.page > 1, shape = RoundedCornerShape(10.dp), color = StockSurface, border = BorderStroke(1.dp, StockBorder)) { Box(Modifier.size(40.dp), contentAlignment = Alignment.Center) { Icon(Icons.Default.ChevronLeft, null) } }
+                Text("${uiState.page} / ${uiState.totalPages}", color = StockTextPrimary, fontWeight = FontWeight.Bold)
+                Surface(onClick = onNextPage, enabled = uiState.page < uiState.totalPages, shape = RoundedCornerShape(10.dp), color = StockSurface, border = BorderStroke(1.dp, StockBorder)) { Box(Modifier.size(40.dp), contentAlignment = Alignment.Center) { Icon(Icons.Default.ChevronRight, null) } }
+            }
+        }
+    } else Row(
         modifier = Modifier
             .fillMaxWidth()
             .background(StockPaginationBg)

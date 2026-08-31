@@ -39,6 +39,7 @@ fun AdminStockReportScreen(
         userName = name,
         role = role,
         activeDestination = AdminDestination.StockReport,
+        pageTitle = "Stok",
         onDashboardClick = onDashboardClick,
         onProductsClick = onProductsClick,
         onAddProductClick = onAddProductClick,

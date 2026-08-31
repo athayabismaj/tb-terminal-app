@@ -38,18 +38,20 @@ internal fun StockOpnameTableCard(
     onCategoryFilterChanged: (String?) -> Unit,
     onSelectProduct: (ProductStock) -> Unit,
     onPreviousPage: () -> Unit,
-    onNextPage: () -> Unit
+    onNextPage: () -> Unit,
+    compact: Boolean = false
 ) {
     Column(modifier = modifier.fillMaxWidth()) {
-        StockTableToolbar(uiState, onSearchChanged, onCategoryFilterChanged)
-        Spacer(modifier = Modifier.height(28.dp))
-        StockTableHeader()
+        StockTableToolbar(uiState, onSearchChanged, onCategoryFilterChanged, compact)
+        Spacer(modifier = Modifier.height(if (compact) 12.dp else 28.dp))
+        if (!compact) StockTableHeader()
         StockTableRows(
             modifier = Modifier.fillMaxWidth(),
             uiState = uiState,
-            onSelectProduct = onSelectProduct
+            onSelectProduct = onSelectProduct,
+            compact = compact
         )
-        StockTableFooter(uiState, onPreviousPage, onNextPage)
+        StockTableFooter(uiState, compact, onPreviousPage, onNextPage)
     }
 }
 
@@ -74,10 +76,21 @@ private fun StockTableHeader() {
 @Composable
 private fun StockTableFooter(
     uiState: StockOpnameUiState,
+    compact: Boolean,
     onPreviousPage: () -> Unit,
     onNextPage: () -> Unit
 ) {
-    Row(
+    val controls: @Composable () -> Unit = {
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
+            TablePageButton(uiState.tablePage > 1 && !uiState.isLoading, onPreviousPage, Icons.Default.ChevronLeft)
+            Text("${uiState.tablePage} / ${uiState.totalTablePages}", color = OpnameText, fontWeight = FontWeight.Bold)
+            TablePageButton(uiState.tablePage < uiState.totalTablePages && !uiState.isLoading, onNextPage, Icons.Default.ChevronRight)
+        }
+    }
+    if (compact) Column(Modifier.fillMaxWidth().background(OpnameSoft).padding(14.dp), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(10.dp)) {
+        Text("${uiState.totalTableProducts} produk", color = OpnameMuted, fontSize = 12.sp)
+        controls()
+    } else Row(
         modifier = Modifier
             .fillMaxWidth()
             .background(OpnameSoft.copy(alpha = 0.7f))
@@ -99,28 +112,7 @@ private fun StockTableFooter(
                 modifier = Modifier.padding(top = 2.dp)
             )
         }
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
-            TablePageButton(
-                enabled = uiState.tablePage > 1 && !uiState.isLoading,
-                onClick = onPreviousPage,
-                icon = Icons.Default.ChevronLeft
-            )
-            Box(
-                modifier = Modifier
-                    .size(34.dp)
-                    .clip(RoundedCornerShape(8.dp))
-                    .background(OpnamePrimaryDark),
-                contentAlignment = Alignment.Center
-            ) {
-                Text("${uiState.tablePage}", color = OpnameSurface, fontWeight = FontWeight.Bold)
-            }
-            Text("/ ${uiState.totalTablePages}", color = OpnameMuted, fontWeight = FontWeight.SemiBold)
-            TablePageButton(
-                enabled = uiState.tablePage < uiState.totalTablePages && !uiState.isLoading,
-                onClick = onNextPage,
-                icon = Icons.Default.ChevronRight
-            )
-        }
+        controls()
     }
 }
 

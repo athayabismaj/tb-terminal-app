@@ -35,7 +35,8 @@ import java.math.BigDecimal
 internal fun StockTableRows(
     modifier: Modifier,
     uiState: StockOpnameUiState,
-    onSelectProduct: (ProductStock) -> Unit
+    onSelectProduct: (ProductStock) -> Unit,
+    compact: Boolean = false
 ) {
     Box(modifier = modifier.fillMaxWidth()) {
         when {
@@ -45,7 +46,7 @@ internal fun StockTableRows(
             }
             else -> Column(modifier = Modifier.fillMaxWidth()) {
                 uiState.tablePageProducts.forEachIndexed { index, product ->
-                    StockTableRow(
+                    if (compact) StockMobileRow(product, product.toRowState(uiState)) { onSelectProduct(product) } else StockTableRow(
                         product = product,
                         rowState = product.toRowState(uiState),
                         useAlternateBackground = index % 2 != 0,
@@ -55,6 +56,25 @@ internal fun StockTableRows(
                 }
             }
         }
+    }
+}
+
+@Composable
+private fun StockMobileRow(product: ProductStock, rowState: OpnameRowState, onClick: () -> Unit) {
+    Column(Modifier.fillMaxWidth().clickable(onClick = onClick).padding(horizontal = 16.dp, vertical = 14.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+        Row {
+            Column(Modifier.weight(1f)) {
+                Text(product.productName, color = OpnameText, fontWeight = FontWeight.Bold, maxLines = 2, overflow = TextOverflow.Ellipsis)
+                Text("${product.sku} · ${product.categoryName}", color = OpnameMuted, fontSize = 11.sp)
+            }
+            Text(rowState.statusLabel, color = rowState.statusColor, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+        }
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+            Text("Sistem ${product.quantity.qtyText()} ${product.unitName}", color = OpnameMuted, fontSize = 12.sp)
+            Text("Fisik ${rowState.physicalQty}", color = OpnameText, fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
+            Text("Selisih ${rowState.diffText}", color = rowState.statusColor, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+        }
+        if (rowState.reason != "-") Text(rowState.reason, color = OpnameMuted, fontSize = 11.sp)
     }
 }
 
