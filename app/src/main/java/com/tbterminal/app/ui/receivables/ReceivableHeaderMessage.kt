@@ -2,8 +2,10 @@ package com.tbterminal.app.ui.receivables
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -14,33 +16,39 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.Button
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 
 @Composable
 internal fun ReceivableHeader(
     canAdjust: Boolean,
     onAddOpeningBalance: () -> Unit,
-    onAddAdjustment: () -> Unit
+    onAddAdjustment: () -> Unit,
+    compact: Boolean = false
 ) {
-    Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-        Text(
-            text = "Piutang Pelanggan",
-            modifier = Modifier.weight(1f),
-            color = ReceivableText,
-            fontSize = 28.sp,
-            fontWeight = FontWeight.Medium
-        )
-        if (canAdjust) {
-            Button(onClick = onAddAdjustment) { Text("Adjustment") }
-            Spacer(modifier = Modifier.width(10.dp))
-            Button(onClick = onAddOpeningBalance) { Text("Tambah Saldo Awal") }
-        }
+    if (!canAdjust) return
+
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = if (compact) Arrangement.spacedBy(8.dp) else Arrangement.End,
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Button(
+            onClick = onAddOpeningBalance,
+            modifier = if (compact) Modifier.weight(1f).height(48.dp) else Modifier,
+            shape = RoundedCornerShape(14.dp)
+        ) { Text("Saldo awal", fontWeight = FontWeight.Bold) }
+        if (!compact) Spacer(modifier = Modifier.width(10.dp))
+        OutlinedButton(
+            onClick = onAddAdjustment,
+            modifier = if (compact) Modifier.weight(1f).height(48.dp) else Modifier,
+            shape = RoundedCornerShape(14.dp)
+        ) { Text("Sesuaikan", fontWeight = FontWeight.Bold) }
     }
 }
 

@@ -4,6 +4,7 @@ import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
@@ -97,20 +98,15 @@ internal fun ReceivablePaymentHistoryScreen(
     onPreviousPage: () -> Unit,
     onNextPage: () -> Unit
 ) {
-    Column(
-        modifier = modifier
-            .fillMaxSize()
-            .background(PaymentSurface)
-            .verticalScroll(rememberScrollState())
-            .padding(40.dp),
-        verticalArrangement = Arrangement.spacedBy(28.dp)
-    ) {
-        PaymentHistoryHeader()
+    BoxWithConstraints(modifier.fillMaxSize().background(PaymentSurface)) {
+        val compact = maxWidth < 700.dp
+        Column(modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(horizontal = if (compact) 16.dp else 32.dp, vertical = if (compact) 14.dp else 24.dp), verticalArrangement = Arrangement.spacedBy(if (compact) 14.dp else 22.dp)) {
         PaymentTable(
             uiState, onSearchChanged, onReceiverSearchChanged, onReceivableIdChanged, onDateFromChanged, onDateToChanged,
             onMethodFilterChanged, onStatusFilterChanged, onApplyFilters, onShowDetail,
-            onPreviousPage, onNextPage
+            onPreviousPage, onNextPage, compact
         )
+        }
     }
     uiState.selectedPayment?.let {
         PaymentDetailDialog(it, onDismissDetail, canReverse, onOpenReversal)
@@ -197,24 +193,25 @@ private fun PaymentTable(
     onApplyFilters: () -> Unit,
     onShowDetail: (ReceivablePaymentHistory) -> Unit,
     onPreviousPage: () -> Unit,
-    onNextPage: () -> Unit
+    onNextPage: () -> Unit,
+    compact: Boolean
 ) {
     Column(Modifier.fillMaxWidth()) {
         PaymentToolbar(
             uiState, onSearchChanged, onReceiverSearchChanged, onReceivableIdChanged, onDateFromChanged, onDateToChanged,
-            onMethodFilterChanged, onStatusFilterChanged, onApplyFilters
+            onMethodFilterChanged, onStatusFilterChanged, onApplyFilters, compact
         )
-        Spacer(Modifier.height(28.dp))
-        PaymentTableHeader()
+        Spacer(Modifier.height(if (compact) 12.dp else 28.dp))
+        if (!compact) PaymentTableHeader()
         when {
             uiState.isLoading -> LoadingBox()
             uiState.errorMessage != null -> PaymentError(uiState.errorMessage)
             uiState.filteredPayments.isEmpty() -> EmptyBox()
             else -> uiState.filteredPayments.forEachIndexed { index, payment ->
-                PaymentTableRow(payment, useAlternateBackground = index % 2 != 0, onShowDetail = onShowDetail)
+                if (compact) PaymentMobileRow(payment, onShowDetail) else PaymentTableRow(payment, useAlternateBackground = index % 2 != 0, onShowDetail = onShowDetail)
             }
         }
-        PaymentPagination(uiState, onPreviousPage, onNextPage)
+        PaymentPagination(uiState, compact, onPreviousPage, onNextPage)
     }
 }
 
@@ -228,16 +225,28 @@ private fun PaymentToolbar(
     onDateToChanged: (String) -> Unit,
     onMethodFilterChanged: (ReceivablePaymentMethodFilter) -> Unit,
     onStatusFilterChanged: (ReceivablePaymentStatusFilter) -> Unit,
-    onApplyFilters: () -> Unit
+    onApplyFilters: () -> Unit,
+    compact: Boolean
 ) {
     Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(16.dp), verticalAlignment = Alignment.CenterVertically) {
+        if (compact) Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+            PaymentFilterField(uiState.searchQuery, onSearchChanged, "Nama pelanggan", Modifier.fillMaxWidth())
+            PaymentFilterField(uiState.receiverSearch, onReceiverSearchChanged, "Kasir atau penerima", Modifier.fillMaxWidth())
+            PaymentMethodFilterDropdown(uiState.methodFilter, onMethodFilterChanged, Modifier.fillMaxWidth())
+            PaymentStatusFilterDropdown(uiState.statusFilter, onStatusFilterChanged, Modifier.fillMaxWidth())
+            PaymentFilterField(uiState.receivableIdFilter, onReceivableIdChanged, "ID piutang", Modifier.fillMaxWidth())
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                PaymentFilterField(uiState.dateFrom, onDateFromChanged, "Tanggal awal", Modifier.weight(1f))
+                PaymentFilterField(uiState.dateTo, onDateToChanged, "Tanggal akhir", Modifier.weight(1f))
+            }
+            Button(onClick = onApplyFilters, modifier = Modifier.fillMaxWidth().height(52.dp), shape = RoundedCornerShape(16.dp)) { Text("Terapkan") }
+        } else Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(16.dp), verticalAlignment = Alignment.CenterVertically) {
             PaymentFilterField(uiState.searchQuery, onSearchChanged, "Nama pelanggan", Modifier.weight(1f))
             PaymentFilterField(uiState.receiverSearch, onReceiverSearchChanged, "Nama kasir/penerima", Modifier.weight(1f))
-            PaymentMethodFilterDropdown(uiState.methodFilter, onMethodFilterChanged)
-            PaymentStatusFilterDropdown(uiState.statusFilter, onStatusFilterChanged)
+            PaymentMethodFilterDropdown(uiState.methodFilter, onMethodFilterChanged, Modifier.width(220.dp))
+            PaymentStatusFilterDropdown(uiState.statusFilter, onStatusFilterChanged, Modifier.width(190.dp))
         }
-        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(16.dp), verticalAlignment = Alignment.CenterVertically) {
+        if (!compact) Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(16.dp), verticalAlignment = Alignment.CenterVertically) {
             PaymentFilterField(uiState.receivableIdFilter, onReceivableIdChanged, "ID piutang", Modifier.weight(1f))
             PaymentFilterField(uiState.dateFrom, onDateFromChanged, "Dari (yyyy-MM-dd)", Modifier.weight(1f))
             PaymentFilterField(uiState.dateTo, onDateToChanged, "Sampai (yyyy-MM-dd)", Modifier.weight(1f))
@@ -260,7 +269,7 @@ private fun PaymentFilterField(
         trailingIcon = { Icon(Icons.Outlined.Search, null, tint = PaymentMuted) },
         singleLine = true,
         modifier = modifier.height(56.dp),
-        shape = RoundedCornerShape(8.dp),
+        shape = RoundedCornerShape(16.dp),
         colors = OutlinedTextFieldDefaults.colors(
             focusedBorderColor = PaymentPrimary,
             unfocusedBorderColor = PaymentBorder,
@@ -273,11 +282,12 @@ private fun PaymentFilterField(
 @Composable
 private fun PaymentStatusFilterDropdown(
     selected: ReceivablePaymentStatusFilter,
-    onSelect: (ReceivablePaymentStatusFilter) -> Unit
+    onSelect: (ReceivablePaymentStatusFilter) -> Unit,
+    modifier: Modifier
 ) {
     var expanded by remember { mutableStateOf(false) }
     Box {
-        OutlinedButton(onClick = { expanded = true }, modifier = Modifier.width(190.dp).height(56.dp)) {
+        OutlinedButton(onClick = { expanded = true }, modifier = modifier.height(56.dp), shape = RoundedCornerShape(16.dp)) {
             Text(selected.label, modifier = Modifier.weight(1f))
             Icon(Icons.Outlined.ExpandMore, null)
         }
@@ -295,14 +305,15 @@ private fun PaymentStatusFilterDropdown(
 @Composable
 private fun PaymentMethodFilterDropdown(
     selected: ReceivablePaymentMethodFilter,
-    onSelect: (ReceivablePaymentMethodFilter) -> Unit
+    onSelect: (ReceivablePaymentMethodFilter) -> Unit,
+    modifier: Modifier
 ) {
     var expanded by remember { mutableStateOf(false) }
     Box {
         OutlinedButton(
             onClick = { expanded = true },
-            modifier = Modifier.width(220.dp).height(56.dp),
-            shape = RoundedCornerShape(8.dp),
+            modifier = modifier.height(56.dp),
+            shape = RoundedCornerShape(16.dp),
             border = BorderStroke(1.dp, PaymentBorder)
         ) {
             Text(selected.label, modifier = Modifier.weight(1f), color = PaymentText, fontWeight = FontWeight.Medium)
@@ -371,6 +382,29 @@ private fun PaymentTableRow(
 }
 
 @Composable
+private fun PaymentMobileRow(payment: ReceivablePaymentHistory, onShowDetail: (ReceivablePaymentHistory) -> Unit) {
+    Column(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 14.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+        Row(verticalAlignment = Alignment.Top) {
+            Column(Modifier.weight(1f)) {
+                Text(payment.customerName, color = PaymentText, fontWeight = FontWeight.Bold, maxLines = 1)
+                Text(payment.paymentNumber, color = PaymentMuted, fontSize = 11.sp)
+            }
+            ReceivableStatusBadge(payment.receivableStatus)
+        }
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+            Column { Text("Tanggal", color = PaymentMuted, fontSize = 10.sp); Text(payment.paidAt.asDisplayDate(), color = PaymentText, fontSize = 12.sp) }
+            Column(horizontalAlignment = Alignment.CenterHorizontally) { Text("Metode", color = PaymentMuted, fontSize = 10.sp); Text(payment.method.paymentMethodLabel(), color = PaymentText, fontSize = 12.sp) }
+            Column(horizontalAlignment = Alignment.End) { Text("Nominal", color = PaymentMuted, fontSize = 10.sp); Text(payment.amount.asCurrency(), color = PaymentText, fontWeight = FontWeight.Bold) }
+        }
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+            Text("Piutang ${payment.receivableId.shortId()}", color = PaymentMuted, fontSize = 11.sp)
+            IconButton(onClick = { onShowDetail(payment) }) { Icon(Icons.Outlined.Visibility, "Lihat detail", tint = PaymentPrimary) }
+        }
+    }
+    HorizontalDivider(color = PaymentBorder)
+}
+
+@Composable
 private fun ReceivableStatusBadge(status: String) {
     val isPaid = status.equals("PAID", ignoreCase = true) || status.equals("lunas", ignoreCase = true)
     val tint = if (isPaid) PaymentPrimary else Color(0xFFF59E0B)
@@ -382,10 +416,19 @@ private fun ReceivableStatusBadge(status: String) {
 @Composable
 private fun PaymentPagination(
     uiState: ReceivablePaymentHistoryUiState,
+    compact: Boolean,
     onPreviousPage: () -> Unit,
     onNextPage: () -> Unit
 ) {
-    Row(Modifier.fillMaxWidth().background(PaymentSoft.copy(alpha = 0.7f)).padding(horizontal = 20.dp, vertical = 14.dp), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+    val controls: @Composable () -> Unit = { Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
+        PaymentPageButton(Icons.Default.ChevronLeft, uiState.page > 1, onPreviousPage)
+        Text("${uiState.page} / ${uiState.totalPages}", color = PaymentText, fontWeight = FontWeight.Bold)
+        PaymentPageButton(Icons.Default.ChevronRight, uiState.page < uiState.totalPages, onNextPage)
+    } }
+    if (compact) Column(Modifier.fillMaxWidth().background(PaymentSoft).padding(14.dp), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(10.dp)) {
+        Text("${uiState.totalPayments} pembayaran", color = PaymentMuted, fontSize = 12.sp)
+        controls()
+    } else Row(Modifier.fillMaxWidth().background(PaymentSoft.copy(alpha = 0.7f)).padding(horizontal = 20.dp, vertical = 14.dp), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
         Column {
             Text(
                 if (uiState.hasLocalFilter) {
@@ -399,14 +442,7 @@ private fun PaymentPagination(
             )
             Text("Maksimal ${uiState.pageSize} pembayaran per halaman", color = PaymentMuted, fontSize = 11.sp)
         }
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
-            PaymentPageButton(Icons.Default.ChevronLeft, enabled = uiState.page > 1, onClick = onPreviousPage)
-            Box(Modifier.size(34.dp).clip(RoundedCornerShape(8.dp)).background(PaymentPrimary), contentAlignment = Alignment.Center) {
-                Text(uiState.page.toString(), color = PaymentSurface, fontWeight = FontWeight.Bold)
-            }
-            Text("/ ${uiState.totalPages}", color = PaymentMuted, fontWeight = FontWeight.SemiBold)
-            PaymentPageButton(Icons.Default.ChevronRight, enabled = uiState.page < uiState.totalPages, onClick = onNextPage)
-        }
+        controls()
     }
 }
 

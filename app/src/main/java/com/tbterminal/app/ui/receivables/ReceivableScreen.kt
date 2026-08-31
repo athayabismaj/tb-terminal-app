@@ -3,6 +3,7 @@ package com.tbterminal.app.ui.receivables
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
@@ -28,26 +29,28 @@ internal fun ReceivableScreen(
     onNextPage: () -> Unit,
     onDismissMessage: () -> Unit
 ) {
-    Column(
-        modifier = modifier
-            .fillMaxSize()
-            .background(ReceivableSurface)
-            .verticalScroll(rememberScrollState())
-            .padding(40.dp),
-        verticalArrangement = Arrangement.spacedBy(28.dp)
-    ) {
-        ReceivableHeader(canAdjust, onAddOpeningBalance, onAddAdjustment)
-        ReceivableMessage(uiState, onDismissMessage)
-        ReceivableCustomerSummaries(uiState.customerSummaries)
-        ReceivableTableCard(
-            modifier = Modifier.fillMaxWidth(),
-            uiState = uiState,
-            onSearchChanged = onSearchChanged,
-            onStatusFilterChanged = onStatusFilterChanged,
-            onDueFilterChanged = onDueFilterChanged,
-            onPayClick = onPayClick,
-            onPreviousPage = onPreviousPage,
-            onNextPage = onNextPage
-        )
+    BoxWithConstraints(modifier = modifier.fillMaxSize().background(ReceivableSurface)) {
+        val compact = maxWidth < 720.dp
+        Column(
+            modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState())
+                .padding(if (compact) 16.dp else 32.dp),
+            verticalArrangement = Arrangement.spacedBy(if (compact) 16.dp else 28.dp)
+        ) {
+            ReceivableHeader(canAdjust, onAddOpeningBalance, onAddAdjustment, compact)
+            ReceivableMessage(uiState, onDismissMessage)
+            if (!compact) ReceivableCustomerSummaries(uiState.customerSummaries)
+            ReceivableTableCard(
+                modifier = Modifier.fillMaxWidth(),
+                uiState = uiState,
+                onSearchChanged = onSearchChanged,
+                onStatusFilterChanged = onStatusFilterChanged,
+                onDueFilterChanged = onDueFilterChanged,
+                onPayClick = onPayClick,
+                onPreviousPage = onPreviousPage,
+                onNextPage = onNextPage,
+                compact = compact
+            )
+            if (compact) ReceivableCustomerSummaries(uiState.customerSummaries, compact = true)
+        }
     }
 }

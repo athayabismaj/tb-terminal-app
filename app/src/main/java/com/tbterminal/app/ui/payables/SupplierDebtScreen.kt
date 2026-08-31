@@ -4,6 +4,7 @@ import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -25,6 +26,7 @@ import androidx.compose.material.icons.outlined.Warning
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Icon
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -50,38 +52,29 @@ internal fun SupplierDebtScreen(
     onNextPage: () -> Unit,
     onDismissMessage: () -> Unit
 ) {
-    Column(
-        modifier = modifier
-            .fillMaxSize()
-            .background(DebtBackground)
-            .verticalScroll(rememberScrollState())
-            .padding(40.dp),
-        verticalArrangement = Arrangement.spacedBy(28.dp)
-    ) {
-        SupplierDebtHeader()
-        SupplierDebtMessage(uiState, onDismissMessage)
-        SupplierDebtMetrics(uiState)
-        SupplierDebtTableCard(
-            modifier = Modifier.fillMaxWidth(),
-            uiState = uiState,
-            onSearchChanged = onSearchChanged,
-            onStatusFilterChanged = onStatusFilterChanged,
-            onRefresh = onRefresh,
-            onPayClick = onPayClick,
-            onPreviousPage = onPreviousPage,
-            onNextPage = onNextPage
-        )
-    }
-}
-
-@Composable
-private fun SupplierDebtHeader() {
-    Row(
-        modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.SpaceBetween,
-        verticalAlignment = Alignment.Top
-    ) {
-        Text("Utang Supplier", color = DebtText, fontSize = 28.sp, fontWeight = FontWeight.Medium)
+    BoxWithConstraints(modifier = modifier.fillMaxSize().background(DebtBackground)) {
+        val compact = maxWidth < 720.dp
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .verticalScroll(rememberScrollState())
+                .padding(if (compact) 16.dp else 40.dp),
+            verticalArrangement = Arrangement.spacedBy(if (compact) 16.dp else 28.dp)
+        ) {
+            SupplierDebtMessage(uiState, onDismissMessage)
+            SupplierDebtMetrics(uiState, compact)
+            SupplierDebtTableCard(
+                modifier = Modifier.fillMaxWidth(),
+                uiState = uiState,
+                onSearchChanged = onSearchChanged,
+                onStatusFilterChanged = onStatusFilterChanged,
+                onRefresh = onRefresh,
+                onPayClick = onPayClick,
+                onPreviousPage = onPreviousPage,
+                onNextPage = onNextPage,
+                compact = compact
+            )
+        }
     }
 }
 
@@ -111,7 +104,41 @@ private fun SupplierDebtMessage(
 }
 
 @Composable
-private fun SupplierDebtMetrics(uiState: SupplierDebtUiState) {
+private fun SupplierDebtMetrics(uiState: SupplierDebtUiState, compact: Boolean) {
+    if (compact) {
+        Card(
+            modifier = Modifier.fillMaxWidth(),
+            colors = CardDefaults.cardColors(containerColor = DebtSurface),
+            shape = RoundedCornerShape(20.dp),
+            border = BorderStroke(1.dp, DebtLine)
+        ) {
+            Column(modifier = Modifier.padding(20.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                    Box(
+                        modifier = Modifier.size(46.dp).clip(RoundedCornerShape(14.dp))
+                            .background(DebtPrimary.copy(alpha = 0.12f)),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(Icons.Outlined.AccountBalanceWallet, contentDescription = null, tint = DebtPrimaryDark)
+                    }
+                    Column {
+                        Text("Sisa hutang", color = DebtMuted, fontSize = 12.sp)
+                        Text(
+                            uiState.pageRemainingTotal.currencyText(),
+                            color = DebtText,
+                            fontSize = 22.sp,
+                            fontWeight = FontWeight.ExtraBold
+                        )
+                    }
+                }
+                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                    DebtSummaryValue("Total tagihan", uiState.total.toString(), Modifier.weight(1f))
+                    DebtSummaryValue("Belum lunas", uiState.unpaidCount.toString(), Modifier.weight(1f))
+                }
+            }
+        }
+        return
+    }
     Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
         DebtMetricCard(
             modifier = Modifier.weight(1f),
@@ -137,6 +164,17 @@ private fun SupplierDebtMetrics(uiState: SupplierDebtUiState) {
             icon = Icons.Outlined.Payments,
             tint = DebtWarning
         )
+    }
+}
+
+@Composable
+private fun DebtSummaryValue(label: String, value: String, modifier: Modifier = Modifier) {
+    Column(
+        modifier = modifier.clip(RoundedCornerShape(14.dp)).background(DebtSoft).padding(12.dp),
+        verticalArrangement = Arrangement.spacedBy(2.dp)
+    ) {
+        Text(label, color = DebtMuted, fontSize = 11.sp)
+        Text(value, color = DebtText, fontSize = 17.sp, fontWeight = FontWeight.Bold)
     }
 }
 

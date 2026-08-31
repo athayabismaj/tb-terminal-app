@@ -32,6 +32,7 @@ fun AdminSupplierDebtScreen(
     onOperationalAuditClick: () -> Unit = {},
     onProfileClick: () -> Unit = {},
     onSettingsClick: () -> Unit = {},
+     onBack: () -> Unit = {},
     onLogout: () -> Unit,
     viewModel: SupplierDebtViewModel = viewModel(
         factory = SupplierDebtViewModel.factory(purchasingRepository)
@@ -62,6 +63,8 @@ fun AdminSupplierDebtScreen(
         onOperationalAuditClick = onOperationalAuditClick,
         onProfileClick = onProfileClick,
         onSettingsClick = onSettingsClick,
+        pageTitle = "Hutang Supplier",
+        onBack = onBack,
         onLogout = onLogout
     ) { contentModifier ->
         SupplierDebtScreen(

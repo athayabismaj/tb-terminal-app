@@ -22,6 +22,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.tbterminal.app.data.model.SupplierPayable
@@ -52,7 +53,8 @@ internal fun DebtTableHeader() {
 internal fun SupplierDebtRows(
     modifier: Modifier,
     uiState: SupplierDebtUiState,
-    onPayClick: (SupplierPayable) -> Unit
+    onPayClick: (SupplierPayable) -> Unit,
+    compact: Boolean = false
 ) {
     Box(modifier = modifier.fillMaxWidth()) {
         when {
@@ -87,11 +89,93 @@ internal fun SupplierDebtRows(
 
             else -> Column(modifier = Modifier.fillMaxWidth()) {
                 uiState.filteredPayables.forEach { payable ->
-                    SupplierDebtRow(payable, onPayClick)
-                    HorizontalDivider(color = DebtLine.copy(alpha = 0.75f))
+                    if (compact) SupplierDebtCompactCard(payable, onPayClick)
+                    else {
+                        SupplierDebtRow(payable, onPayClick)
+                        HorizontalDivider(color = DebtLine.copy(alpha = 0.75f))
+                    }
                 }
             }
         }
+    }
+}
+
+@Composable
+private fun SupplierDebtCompactCard(
+    payable: SupplierPayable,
+    onPayClick: (SupplierPayable) -> Unit
+) {
+    androidx.compose.material3.Card(
+        modifier = Modifier.fillMaxWidth().padding(bottom = 10.dp),
+        colors = androidx.compose.material3.CardDefaults.cardColors(containerColor = DebtSurface),
+        shape = RoundedCornerShape(18.dp),
+        border = androidx.compose.foundation.BorderStroke(1.dp, DebtLine)
+    ) {
+        Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                SupplierInitial(payable.supplierName)
+                Spacer(Modifier.width(12.dp))
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        payable.supplierName,
+                        color = DebtText,
+                        fontWeight = FontWeight.Bold,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                    Text(payable.purchaseId.shortId(), color = DebtMuted, fontSize = 12.sp)
+                }
+                StatusBadge(payable.status)
+            }
+            Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                Text("Sisa hutang", color = DebtMuted, fontSize = 12.sp)
+                Text(
+                    payable.remainingAmount.currencyText(),
+                    color = DebtText,
+                    fontSize = 21.sp,
+                    fontWeight = FontWeight.ExtraBold
+                )
+            }
+            HorizontalDivider(color = DebtLine.copy(alpha = 0.7f))
+            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                SupplierCompactValue("Total", payable.amount.currencyText(), Modifier.weight(1f))
+                SupplierCompactValue("Dibayar", payable.paidAmount.currencyText(), Modifier.weight(1f))
+                SupplierCompactValue(
+                    "Jatuh tempo",
+                    payable.dueDate.simpleDate(),
+                    Modifier.weight(1f),
+                    payable.dueDate.dueColor()
+                )
+            }
+            if (payable.status != SupplierDebtStatusFilter.Paid.apiValue) {
+                Button(
+                    onClick = { onPayClick(payable) },
+                    modifier = Modifier.fillMaxWidth().height(48.dp),
+                    colors = ButtonDefaults.buttonColors(containerColor = DebtPrimaryDark),
+                    shape = RoundedCornerShape(14.dp)
+                ) { Text("Bayar hutang", fontWeight = FontWeight.Bold) }
+            }
+        }
+    }
+}
+
+@Composable
+private fun SupplierCompactValue(
+    label: String,
+    value: String,
+    modifier: Modifier = Modifier,
+    valueColor: androidx.compose.ui.graphics.Color = DebtText
+) {
+    Column(modifier = modifier, verticalArrangement = Arrangement.spacedBy(3.dp)) {
+        Text(label, color = DebtMuted, fontSize = 10.sp, maxLines = 1)
+        Text(
+            value,
+            color = valueColor,
+            fontSize = 12.sp,
+            fontWeight = FontWeight.SemiBold,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis
+        )
     }
 }
 

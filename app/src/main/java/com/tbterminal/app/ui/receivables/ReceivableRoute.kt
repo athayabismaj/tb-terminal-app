@@ -35,6 +35,7 @@ fun AdminReceivableScreen(
     onOperationalAuditClick: () -> Unit = {},
     onProfileClick: () -> Unit = {},
     onSettingsClick: () -> Unit = {},
+    onBack: () -> Unit = {},
     onLogout: () -> Unit,
     viewModel: ReceivableViewModel = viewModel(
         factory = ReceivableViewModel.factory(receivableRepository, customerRepository, role)
@@ -65,6 +66,8 @@ fun AdminReceivableScreen(
         onOperationalAuditClick = onOperationalAuditClick,
         onProfileClick = onProfileClick,
         onSettingsClick = onSettingsClick,
+        pageTitle = "Piutang Pelanggan",
+        onBack = onBack,
         onLogout = onLogout
     ) { contentModifier ->
         ReceivableScreen(

@@ -25,7 +25,8 @@ import androidx.compose.ui.unit.sp
 internal fun SupplierDebtFooter(
     uiState: SupplierDebtUiState,
     onPreviousPage: () -> Unit,
-    onNextPage: () -> Unit
+    onNextPage: () -> Unit,
+    compact: Boolean = false
 ) {
     Row(
         modifier = Modifier
@@ -36,7 +37,8 @@ internal fun SupplierDebtFooter(
         verticalAlignment = Alignment.CenterVertically
     ) {
         Text(
-            "Menampilkan ${uiState.currentStart}-${uiState.currentEnd} dari ${uiState.total} utang",
+            if (compact) "${uiState.currentStart}-${uiState.currentEnd} dari ${uiState.total}"
+            else "Menampilkan ${uiState.currentStart}-${uiState.currentEnd} dari ${uiState.total} utang",
             color = DebtMuted,
             fontSize = 13.sp,
             fontWeight = FontWeight.SemiBold

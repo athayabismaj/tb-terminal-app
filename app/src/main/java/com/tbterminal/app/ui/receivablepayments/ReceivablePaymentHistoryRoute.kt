@@ -33,6 +33,7 @@ fun AdminReceivablePaymentHistoryScreen(
         userName = name,
         role = role,
         activeDestination = AdminDestination.ReceivablePayments,
+        pageTitle = "Pembayaran Piutang",
         onDashboardClick = onDashboardClick,
         onProductsClick = onProductsClick,
         onStockOpnameClick = onStockOpnameClick,

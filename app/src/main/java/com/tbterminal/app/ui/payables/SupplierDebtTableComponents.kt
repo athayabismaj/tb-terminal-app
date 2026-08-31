@@ -18,17 +18,19 @@ internal fun SupplierDebtTableCard(
     onRefresh: () -> Unit,
     onPayClick: (SupplierPayable) -> Unit,
     onPreviousPage: () -> Unit,
-    onNextPage: () -> Unit
+    onNextPage: () -> Unit,
+    compact: Boolean = false
 ) {
     Column(modifier = modifier.fillMaxWidth()) {
-        SupplierDebtToolbar(uiState, onSearchChanged, onStatusFilterChanged)
-        Spacer(modifier = Modifier.height(28.dp))
-        DebtTableHeader()
+        SupplierDebtToolbar(uiState, onSearchChanged, onStatusFilterChanged, compact)
+        Spacer(modifier = Modifier.height(if (compact) 16.dp else 28.dp))
+        if (!compact) DebtTableHeader()
         SupplierDebtRows(
             modifier = Modifier.fillMaxWidth(),
             uiState = uiState,
-            onPayClick = onPayClick
+            onPayClick = onPayClick,
+            compact = compact
         )
-        SupplierDebtFooter(uiState, onPreviousPage, onNextPage)
+        SupplierDebtFooter(uiState, onPreviousPage, onNextPage, compact)
     }
 }
