@@ -158,16 +158,17 @@ private fun SecurityLogContent(
     onDismissLogDetail: () -> Unit,
     modifier: Modifier = Modifier
 ) {
+    val compact = androidx.compose.ui.platform.LocalConfiguration.current.screenWidthDp < 700
     Column(
         modifier = modifier
             .fillMaxSize()
             .background(SecuritySurface)
-            .padding(32.dp)
+            .padding(if (compact) 16.dp else 32.dp)
             .verticalScroll(rememberScrollState()),
-        verticalArrangement = Arrangement.spacedBy(28.dp)
+        verticalArrangement = Arrangement.spacedBy(if (compact) 16.dp else 28.dp)
     ) {
-        SecurityLogHeader()
-        SecurityMetricRow(uiState = uiState)
+        SecurityLogHeader(compact)
+        SecurityMetricRow(uiState = uiState, compact = compact)
         SecurityLogToolbar(
             searchQuery = uiState.searchQuery,
             dateFilter = uiState.dateFilter,
@@ -175,7 +176,8 @@ private fun SecurityLogContent(
             onSearchQueryChange = onSearchQueryChange,
             onDateFilterChange = onDateFilterChange,
             onActivityFilterChange = onActivityFilterChange,
-            onRefresh = onRefresh
+            onRefresh = onRefresh,
+            compact = compact
         )
         SecurityLogTable(
             logs = uiState.visibleLogs,
@@ -189,7 +191,8 @@ private fun SecurityLogContent(
             onPreviousPage = onPreviousPage,
             onNextPage = onNextPage,
             onPageClick = onPageClick,
-            onViewLogDetail = onViewLogDetail
+            onViewLogDetail = onViewLogDetail,
+            compact = compact
         )
     }
 
@@ -199,16 +202,16 @@ private fun SecurityLogContent(
 }
 
 @Composable
-private fun SecurityLogHeader() {
+private fun SecurityLogHeader(compact: Boolean) {
     Column {
         Text(
             text = "Log Keamanan",
             color = SecuritySlate900,
-            fontSize = 32.sp,
+            fontSize = if (compact) 24.sp else 32.sp,
             fontWeight = FontWeight.ExtraBold
         )
-        Spacer(modifier = Modifier.height(8.dp))
-        Text(
+        if (!compact) Spacer(modifier = Modifier.height(8.dp))
+        if (!compact) Text(
             text = "Pantau aktivitas akun dan riwayat akses sistem secara real-time.",
             color = SecuritySlate500,
             fontSize = 16.sp,
@@ -219,11 +222,12 @@ private fun SecurityLogHeader() {
 
 @Composable
 private fun SecurityMetricRow(
-    uiState: SecurityLogUiState
+    uiState: SecurityLogUiState,
+    compact: Boolean
 ) {
-    Row(horizontalArrangement = Arrangement.spacedBy(20.dp)) {
+    val cards: @Composable (Modifier, Modifier, Modifier) -> Unit = { firstModifier, secondModifier, thirdModifier ->
         SecurityMetricCard(
-            modifier = Modifier.weight(1f),
+            modifier = firstModifier,
             title = "TOTAL AKTIVITAS",
             value = uiState.totalLogs.toString(),
             badgeText = "Database",
@@ -235,7 +239,7 @@ private fun SecurityMetricRow(
             trendColor = SecurityPrimary
         )
         SecurityMetricCard(
-            modifier = Modifier.weight(1f),
+            modifier = secondModifier,
             title = "PERUBAHAN DATA",
             value = uiState.updateCount.toString(),
             badgeText = "Update",
@@ -247,7 +251,7 @@ private fun SecurityMetricRow(
             trendColor = SecurityError
         )
         SecurityMetricCard(
-            modifier = Modifier.weight(1f),
+            modifier = thirdModifier,
             title = "TERAKHIR DIPERBARUI",
             value = uiState.latestCompactRelativeTime,
             badgeText = "Realtime",
@@ -257,6 +261,11 @@ private fun SecurityMetricRow(
             trendText = "Sinkronisasi otomatis aktif",
             trendColor = SecuritySlate400
         )
+    }
+    if (compact) Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+        cards(Modifier.fillMaxWidth(), Modifier.fillMaxWidth(), Modifier.fillMaxWidth())
+    } else Row(horizontalArrangement = Arrangement.spacedBy(20.dp)) {
+        cards(Modifier.weight(1f), Modifier.weight(1f), Modifier.weight(1f))
     }
 }
 
@@ -358,12 +367,10 @@ private fun SecurityLogToolbar(
     onSearchQueryChange: (String) -> Unit,
     onDateFilterChange: (SecurityDateFilter) -> Unit,
     onActivityFilterChange: (SecurityActivityFilter) -> Unit,
-    onRefresh: () -> Unit
+    onRefresh: () -> Unit,
+    compact: Boolean
 ) {
-    Row(
-        horizontalArrangement = Arrangement.spacedBy(14.dp),
-        verticalAlignment = Alignment.CenterVertically
-    ) {
+    val searchField: @Composable (Modifier) -> Unit = { fieldModifier ->
         OutlinedTextField(
             value = searchQuery,
             onValueChange = onSearchQueryChange,
@@ -377,9 +384,7 @@ private fun SecurityLogToolbar(
                     tint = SecuritySlate400
                 )
             },
-            modifier = Modifier
-                .weight(1f)
-                .height(56.dp),
+            modifier = fieldModifier.height(56.dp),
             shape = RoundedCornerShape(14.dp),
             singleLine = true,
             colors = OutlinedTextFieldDefaults.colors(
@@ -389,37 +394,50 @@ private fun SecurityLogToolbar(
                 focusedBorderColor = SecurityPrimary
             )
         )
-
-        SecurityDateFilterButton(
-            selectedFilter = dateFilter,
-            onFilterSelected = onDateFilterChange
-        )
-        SecurityActivityFilterButton(
-            selectedFilter = activityFilter,
-            onFilterSelected = onActivityFilterChange
-        )
-
+    }
+    val refreshButton: @Composable (Modifier) -> Unit = { buttonModifier ->
         Button(
             onClick = onRefresh,
-            modifier = Modifier.height(56.dp),
+            modifier = buttonModifier.height(56.dp),
             shape = RoundedCornerShape(14.dp),
             colors = ButtonDefaults.buttonColors(containerColor = SecurityPrimary)
         ) {
             Icon(imageVector = Icons.Outlined.Refresh, contentDescription = null)
             Spacer(modifier = Modifier.width(8.dp))
-            Text(text = "Refresh Log", fontWeight = FontWeight.Bold, fontSize = 14.sp)
+            Text(text = "Muat Ulang", fontWeight = FontWeight.Bold, fontSize = 14.sp)
         }
+    }
+
+    if (compact) Column(
+        modifier = Modifier.fillMaxWidth(),
+        verticalArrangement = Arrangement.spacedBy(10.dp)
+    ) {
+        searchField(Modifier.fillMaxWidth())
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(10.dp)
+        ) {
+            SecurityDateFilterButton(dateFilter, onDateFilterChange, Modifier.weight(1f))
+            SecurityActivityFilterButton(activityFilter, onActivityFilterChange, Modifier.weight(1f))
+        }
+        refreshButton(Modifier.fillMaxWidth())
+    } else Row(horizontalArrangement = Arrangement.spacedBy(14.dp), verticalAlignment = Alignment.CenterVertically) {
+        searchField(Modifier.weight(1f))
+        SecurityDateFilterButton(dateFilter, onDateFilterChange)
+        SecurityActivityFilterButton(activityFilter, onActivityFilterChange)
+        refreshButton(Modifier)
     }
 }
 
 @Composable
 private fun SecurityDateFilterButton(
     selectedFilter: SecurityDateFilter,
-    onFilterSelected: (SecurityDateFilter) -> Unit
+    onFilterSelected: (SecurityDateFilter) -> Unit,
+    modifier: Modifier = Modifier
 ) {
     var expanded by remember { mutableStateOf(false) }
 
-    Box {
+    Box(modifier) {
         SecurityFilterButtonSurface(
             icon = Icons.Outlined.CalendarToday,
             text = selectedFilter.label,
@@ -446,11 +464,12 @@ private fun SecurityDateFilterButton(
 @Composable
 private fun SecurityActivityFilterButton(
     selectedFilter: SecurityActivityFilter,
-    onFilterSelected: (SecurityActivityFilter) -> Unit
+    onFilterSelected: (SecurityActivityFilter) -> Unit,
+    modifier: Modifier = Modifier
 ) {
     var expanded by remember { mutableStateOf(false) }
 
-    Box {
+    Box(modifier) {
         SecurityFilterButtonSurface(
             icon = Icons.Outlined.FilterList,
             text = selectedFilter.label,
@@ -518,7 +537,8 @@ private fun SecurityLogTable(
     onPreviousPage: () -> Unit,
     onNextPage: () -> Unit,
     onPageClick: (Int) -> Unit,
-    onViewLogDetail: (SecurityLogItem) -> Unit
+    onViewLogDetail: (SecurityLogItem) -> Unit,
+    compact: Boolean
 ) {
     Card(
         colors = CardDefaults.cardColors(containerColor = Color.White),
@@ -527,7 +547,7 @@ private fun SecurityLogTable(
         modifier = Modifier.fillMaxWidth()
     ) {
         Column {
-            Row(
+            if (!compact) Row(
                 modifier = Modifier
                     .fillMaxWidth()
                     .background(SecuritySlate50.copy(alpha = 0.45f))
@@ -554,7 +574,10 @@ private fun SecurityLogTable(
                 logs.isEmpty() -> SecurityTableFeedback(message = "Log tidak ditemukan.")
                 else -> {
                     logs.forEachIndexed { index, log ->
-                        SecurityLogTableRow(
+                        if (compact) SecurityLogMobileRow(
+                            log = log,
+                            onViewLogDetail = onViewLogDetail
+                        ) else SecurityLogTableRow(
                             log = log,
                             onViewLogDetail = onViewLogDetail
                         )
@@ -573,7 +596,8 @@ private fun SecurityLogTable(
                 totalPages = totalPages,
                 onPreviousPage = onPreviousPage,
                 onNextPage = onNextPage,
-                onPageClick = onPageClick
+                onPageClick = onPageClick,
+                compact = compact
             )
         }
     }
@@ -623,6 +647,42 @@ private fun SecurityTableHeaderText(
             fontSize = 11.sp,
             fontWeight = FontWeight.Bold
         )
+    }
+}
+
+@Composable
+private fun SecurityLogMobileRow(
+    log: SecurityLogItem,
+    onViewLogDetail: (SecurityLogItem) -> Unit
+) {
+    Column(
+        modifier = Modifier.fillMaxWidth().clickable { onViewLogDetail(log) }.padding(16.dp),
+        verticalArrangement = Arrangement.spacedBy(10.dp)
+    ) {
+        Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+            Box(
+                modifier = Modifier.size(40.dp).clip(CircleShape).background(SecuritySlate100).border(1.dp, SecuritySlate200, CircleShape),
+                contentAlignment = Alignment.Center
+            ) { Icon(Icons.Outlined.Person, contentDescription = null, tint = SecuritySlate400) }
+            Spacer(Modifier.width(12.dp))
+            Column(modifier = Modifier.weight(1f)) {
+                Text(log.userName, color = SecuritySlate900, fontSize = 14.sp, fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                Text("${log.userRole} · ${log.relativeTime}", color = SecuritySlate500, fontSize = 11.sp)
+            }
+            Icon(Icons.Outlined.ChevronRight, contentDescription = "Lihat detail", tint = SecuritySlate400)
+        }
+        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+            Row(
+                modifier = Modifier.clip(RoundedCornerShape(14.dp)).background(log.type.background).padding(horizontal = 10.dp, vertical = 5.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Box(Modifier.size(6.dp).clip(CircleShape).background(log.type.color))
+                Spacer(Modifier.width(7.dp))
+                Text(log.activityLabel, color = log.type.color, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+            }
+            Text(log.time, color = SecuritySlate500, fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
+        }
+        Text("${log.ipAddress} · ${log.deviceName}", color = SecuritySlate500, fontSize = 12.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
     }
 }
 
@@ -776,7 +836,8 @@ private fun SecurityPaginationFooter(
     totalPages: Int,
     onPreviousPage: () -> Unit,
     onNextPage: () -> Unit,
-    onPageClick: (Int) -> Unit
+    onPageClick: (Int) -> Unit,
+    compact: Boolean
 ) {
     val from = if (visibleCount == 0 || totalCount == 0L) {
         0
@@ -789,6 +850,22 @@ private fun SecurityPaginationFooter(
         (((page - 1).toLong() * limit) + visibleCount).coerceAtMost(totalCount)
     }
     val pages = visiblePageNumbers(page, totalPages)
+
+    if (compact) {
+        Column(
+            modifier = Modifier.fillMaxWidth().background(SecuritySlate50.copy(alpha = 0.5f)).padding(14.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(10.dp)
+        ) {
+            Text("$from-$to dari $totalCount aktivitas", color = SecuritySlate500, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+                SecurityPaginationButton(icon = Icons.Outlined.ChevronLeft, enabled = page > 1 && totalPages > 0, onClick = onPreviousPage)
+                Text("Halaman $page / ${totalPages.coerceAtLeast(1)}", color = SecuritySlate900, fontSize = 13.sp, fontWeight = FontWeight.Bold)
+                SecurityPaginationButton(icon = Icons.Outlined.ChevronRight, enabled = page < totalPages, onClick = onNextPage)
+            }
+        }
+        return
+    }
 
     Row(
         modifier = Modifier

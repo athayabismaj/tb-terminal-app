@@ -40,6 +40,7 @@ fun AdminOperationalAuditRoute(
         userName = name,
         role = role,
         activeDestination = AdminDestination.OperationalAudit,
+        pageTitle = "Riwayat Aktivitas",
         onDashboardClick = onDashboardClick,
         onProductsClick = onProductsClick,
         onAddProductClick = onAddProductClick,

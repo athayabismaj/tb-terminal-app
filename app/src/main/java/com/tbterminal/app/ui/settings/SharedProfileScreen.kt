@@ -4,12 +4,15 @@ import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -68,44 +71,34 @@ fun SharedProfileScreen(
         if (uiState.message != null) dialog = null
     }
 
-    Column(
-        modifier = modifier
-            .fillMaxSize()
-            .padding(24.dp)
-            .verticalScroll(rememberScrollState()),
-        verticalArrangement = Arrangement.spacedBy(20.dp)
-    ) {
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
+    BoxWithConstraints(modifier = modifier.fillMaxSize().background(Color(0xFFF7F9F8))) {
+        val compact = maxWidth < 720.dp
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(if (compact) 16.dp else 32.dp)
+                .verticalScroll(rememberScrollState()),
+            verticalArrangement = Arrangement.spacedBy(if (compact) 16.dp else 22.dp)
         ) {
-            Column {
-                Text("Profil Akun", color = ProfileText, fontSize = 28.sp, fontWeight = FontWeight.ExtraBold)
-                Text("Identitas akun berasal dari server dan tidak dapat diedit dari terminal.", color = ProfileMuted)
-            }
-            OutlinedButton(onClick = onReload, enabled = !uiState.isLoading) {
-                Icon(Icons.Default.Refresh, contentDescription = null)
-                Spacer(Modifier.width(8.dp))
-                Text("Muat Ulang")
-            }
-        }
+            ProfileScreenHeader(compact = compact, isLoading = uiState.isLoading, onReload = onReload)
 
-        uiState.error?.let { MessageCard(it, Color(0xFFB91C1C), onClearMessage) }
-        uiState.message?.let { MessageCard(it, ProfilePrimary, onClearMessage) }
+            uiState.error?.let { MessageCard(it, Color(0xFFB91C1C), onClearMessage) }
+            uiState.message?.let { MessageCard(it, ProfilePrimary, onClearMessage) }
 
-        when {
-            uiState.isLoading && uiState.profile == null -> Box(
-                modifier = Modifier.fillMaxWidth().height(220.dp),
-                contentAlignment = Alignment.Center
-            ) { CircularProgressIndicator(color = ProfilePrimary) }
-            uiState.profile != null -> ProfileContent(
-                profile = uiState.profile,
-                isSaving = uiState.isSaving,
-                onPassword = { dialog = CredentialDialog.PASSWORD },
-                onPin = { dialog = CredentialDialog.PIN }
-            )
-            else -> Text("Profil tidak tersedia.", color = ProfileMuted)
+            when {
+                uiState.isLoading && uiState.profile == null -> Box(
+                    modifier = Modifier.fillMaxWidth().height(220.dp),
+                    contentAlignment = Alignment.Center
+                ) { CircularProgressIndicator(color = ProfilePrimary) }
+                uiState.profile != null -> ProfileContent(
+                    profile = uiState.profile,
+                    isSaving = uiState.isSaving,
+                    compact = compact,
+                    onPassword = { dialog = CredentialDialog.PASSWORD },
+                    onPin = { dialog = CredentialDialog.PIN }
+                )
+                else -> Text("Profil tidak tersedia.", color = ProfileMuted)
+            }
         }
     }
 
@@ -126,64 +119,111 @@ fun SharedProfileScreen(
 }
 
 @Composable
+private fun ProfileScreenHeader(
+    compact: Boolean,
+    isLoading: Boolean,
+    onReload: () -> Unit
+) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
+        verticalAlignment = Alignment.Top
+    ) {
+        Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+            Text(
+                "Profil",
+                color = ProfileText,
+                fontSize = if (compact) 25.sp else 28.sp,
+                fontWeight = FontWeight.ExtraBold
+            )
+            Text(
+                if (compact) "Kelola identitas dan keamanan akun."
+                else "Identitas akun tersinkron dari server dan tidak dapat diedit dari terminal.",
+                color = ProfileMuted,
+                fontSize = 14.sp,
+                lineHeight = 20.sp
+            )
+        }
+        OutlinedButton(
+            onClick = onReload,
+            enabled = !isLoading,
+            modifier = Modifier.height(44.dp),
+            shape = RoundedCornerShape(14.dp),
+            contentPadding = PaddingValues(horizontal = if (compact) 12.dp else 16.dp)
+        ) {
+            Icon(Icons.Default.Refresh, contentDescription = "Muat ulang profil", modifier = Modifier.size(20.dp))
+            if (!compact) {
+                Spacer(Modifier.width(8.dp))
+                Text("Muat ulang")
+            }
+        }
+    }
+}
+
+@Composable
 private fun ProfileContent(
     profile: UserProfile,
     isSaving: Boolean,
+    compact: Boolean,
     onPassword: () -> Unit,
     onPin: () -> Unit
 ) {
+    if (compact) {
+        Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
+            ProfileIdentityCard(profile)
+            ProfileInformationCard(profile)
+            ProfileSecurityCard(isSaving, onPassword, onPin)
+        }
+    } else {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(20.dp),
+            verticalAlignment = Alignment.Top
+        ) {
+            Column(modifier = Modifier.weight(1.15f), verticalArrangement = Arrangement.spacedBy(20.dp)) {
+                ProfileIdentityCard(profile)
+                ProfileInformationCard(profile)
+            }
+            Box(modifier = Modifier.weight(0.85f)) {
+                ProfileSecurityCard(isSaving, onPassword, onPin)
+            }
+        }
+    }
+}
+
+@Composable
+private fun ProfileIdentityCard(profile: UserProfile) {
     Card(
+        modifier = Modifier.fillMaxWidth(),
         colors = CardDefaults.cardColors(containerColor = Color.White),
         shape = RoundedCornerShape(20.dp),
         border = BorderStroke(1.dp, Color(0xFFE2E8F0))
     ) {
         Row(
-            modifier = Modifier.fillMaxWidth().padding(28.dp),
-            horizontalArrangement = Arrangement.spacedBy(28.dp),
-            verticalAlignment = Alignment.Top
+            modifier = Modifier.fillMaxWidth().padding(20.dp),
+            horizontalArrangement = Arrangement.spacedBy(16.dp),
+            verticalAlignment = Alignment.CenterVertically
         ) {
             Box(
-                modifier = Modifier.size(88.dp).background(ProfilePrimary.copy(alpha = 0.12f), CircleShape),
+                modifier = Modifier.size(68.dp).background(ProfilePrimary.copy(alpha = 0.12f), CircleShape),
                 contentAlignment = Alignment.Center
             ) {
                 Text(
                     profile.name.take(1).uppercase(Locale.ROOT),
                     color = ProfilePrimary,
-                    fontSize = 34.sp,
+                    fontSize = 28.sp,
                     fontWeight = FontWeight.Black
                 )
             }
-            Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(14.dp)) {
-                ProfileValue("Nama", profile.name)
-                ProfileValue("Username", profile.username)
-                profile.email?.let { ProfileValue("Email", it) }
-                ProfileValue("Role", profile.role)
-                ProfileValue("Status", if (profile.isActive) "Aktif" else "Tidak aktif")
-                ProfileValue("Bergabung", formatDateTimeToDate(profile.joinedAt))
-                ProfileValue("Login terakhir", profile.lastLoginAt?.let(::formatDateTimeToTime) ?: "-")
-            }
-        }
-    }
-
-    Card(
-        colors = CardDefaults.cardColors(containerColor = Color.White),
-        shape = RoundedCornerShape(20.dp),
-        border = BorderStroke(1.dp, Color(0xFFE2E8F0))
-    ) {
-        Column(modifier = Modifier.fillMaxWidth().padding(28.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
-            Text("Keamanan Akun", color = ProfileText, fontSize = 19.sp, fontWeight = FontWeight.Bold)
-            Text("Perubahan hanya berlaku untuk akun yang sedang login dan dicatat oleh backend.", color = ProfileMuted)
-            HorizontalDivider()
-            Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                Button(onClick = onPassword, enabled = !isSaving) {
-                    Icon(Icons.Default.Lock, contentDescription = null)
-                    Spacer(Modifier.width(8.dp))
-                    Text("Ubah Password")
-                }
-                OutlinedButton(onClick = onPin, enabled = !isSaving) {
-                    Icon(Icons.Default.Pin, contentDescription = null)
-                    Spacer(Modifier.width(8.dp))
-                    Text("Ubah PIN")
+            Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                Text(profile.name, color = ProfileText, fontSize = 20.sp, fontWeight = FontWeight.ExtraBold)
+                Text("@${profile.username}", color = ProfileMuted, fontSize = 14.sp)
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
+                    ProfileBadge(profile.role.toProfileRoleLabel(), ProfilePrimary)
+                    ProfileBadge(
+                        if (profile.isActive) "Aktif" else "Tidak aktif",
+                        if (profile.isActive) ProfilePrimary else Color(0xFFB91C1C)
+                    )
                 }
             }
         }
@@ -191,11 +231,98 @@ private fun ProfileContent(
 }
 
 @Composable
-private fun ProfileValue(label: String, value: String) {
-    Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
-        Text(label.uppercase(Locale.ROOT), color = ProfileMuted, fontSize = 10.sp, fontWeight = FontWeight.Bold)
-        Text(value, color = ProfileText, fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
+private fun ProfileInformationCard(profile: UserProfile) {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        colors = CardDefaults.cardColors(containerColor = Color.White),
+        shape = RoundedCornerShape(20.dp),
+        border = BorderStroke(1.dp, Color(0xFFE2E8F0))
+    ) {
+        Column(modifier = Modifier.fillMaxWidth().padding(20.dp)) {
+            Text("Informasi akun", color = ProfileText, fontSize = 17.sp, fontWeight = FontWeight.Bold)
+            Spacer(Modifier.height(14.dp))
+            ProfileDetailRow("Email", profile.email?.takeIf(String::isNotBlank) ?: "-")
+            HorizontalDivider(color = Color(0xFFE8EEEB))
+            ProfileDetailRow("Bergabung", formatDateTimeToDate(profile.joinedAt))
+            HorizontalDivider(color = Color(0xFFE8EEEB))
+            ProfileDetailRow("Login terakhir", profile.lastLoginAt?.let(::formatDateTimeToTime) ?: "-")
+        }
     }
+}
+
+@Composable
+private fun ProfileSecurityCard(
+    isSaving: Boolean,
+    onPassword: () -> Unit,
+    onPin: () -> Unit
+) {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        colors = CardDefaults.cardColors(containerColor = Color.White),
+        shape = RoundedCornerShape(20.dp),
+        border = BorderStroke(1.dp, Color(0xFFE2E8F0))
+    ) {
+        Column(modifier = Modifier.fillMaxWidth().padding(20.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
+            Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                Text("Keamanan akun", color = ProfileText, fontSize = 17.sp, fontWeight = FontWeight.Bold)
+                Text("Perbarui akses untuk akun yang sedang digunakan.", color = ProfileMuted, fontSize = 13.sp)
+            }
+            Button(
+                onClick = onPassword,
+                enabled = !isSaving,
+                modifier = Modifier.fillMaxWidth().heightIn(min = 52.dp),
+                shape = RoundedCornerShape(14.dp)
+            ) {
+                Icon(Icons.Default.Lock, contentDescription = null)
+                Spacer(Modifier.width(8.dp))
+                Text("Ubah password", fontWeight = FontWeight.Bold)
+            }
+            OutlinedButton(
+                onClick = onPin,
+                enabled = !isSaving,
+                modifier = Modifier.fillMaxWidth().heightIn(min = 52.dp),
+                shape = RoundedCornerShape(14.dp)
+            ) {
+                Icon(Icons.Default.Pin, contentDescription = null)
+                Spacer(Modifier.width(8.dp))
+                Text("Ubah PIN", fontWeight = FontWeight.Bold)
+            }
+        }
+    }
+}
+
+@Composable
+private fun ProfileDetailRow(label: String, value: String) {
+    Column(
+        modifier = Modifier.fillMaxWidth().padding(vertical = 12.dp),
+        verticalArrangement = Arrangement.spacedBy(4.dp)
+    ) {
+        Text(label, color = ProfileMuted, fontSize = 12.sp)
+        Text(
+            value,
+            color = ProfileText,
+            fontSize = 14.sp,
+            fontWeight = FontWeight.SemiBold
+        )
+    }
+}
+
+@Composable
+private fun ProfileBadge(label: String, color: Color) {
+    Box(
+        modifier = Modifier
+            .background(color.copy(alpha = 0.1f), RoundedCornerShape(50))
+            .padding(horizontal = 10.dp, vertical = 5.dp)
+    ) {
+        Text(label, color = color, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+    }
+}
+
+private fun String.toProfileRoleLabel(): String = when (lowercase(Locale.ROOT)) {
+    "owner" -> "Pemilik"
+    "admin" -> "Admin"
+    "cashier", "kasir" -> "Kasir"
+    else -> replaceFirstChar { it.titlecase(Locale.ROOT) }
 }
 
 @Composable
@@ -243,7 +370,8 @@ private fun CredentialChangeDialog(
                 Text(if (isSaving) "Menyimpan..." else "Simpan")
             }
         },
-        dismissButton = { TextButton(onClick = onDismiss, enabled = !isSaving) { Text("Batal") } }
+        dismissButton = { TextButton(onClick = onDismiss, enabled = !isSaving) { Text("Batal") } },
+        shape = RoundedCornerShape(24.dp)
     )
 }
 
@@ -262,7 +390,9 @@ private fun CredentialField(
         visualTransformation = PasswordVisualTransformation(),
         keyboardOptions = KeyboardOptions(keyboardType = keyboardType),
         enabled = enabled,
-        singleLine = true
+        singleLine = true,
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(14.dp)
     )
 }
 

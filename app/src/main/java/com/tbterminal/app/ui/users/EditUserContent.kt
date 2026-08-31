@@ -94,11 +94,12 @@ fun EditUserContent(
     onCancel: () -> Unit,
     onSubmit: () -> Unit
 ) {
+    val compact = androidx.compose.ui.platform.LocalConfiguration.current.screenWidthDp < 700
     Column(
         modifier = modifier
             .fillMaxSize()
             .background(EditSurface)
-            .padding(horizontal = 32.dp, vertical = 28.dp)
+            .padding(horizontal = if (compact) 16.dp else 32.dp, vertical = if (compact) 16.dp else 28.dp)
             .verticalScroll(rememberScrollState())
     ) {
         Column(modifier = Modifier.padding(bottom = 28.dp)) {
@@ -121,10 +122,10 @@ fun EditUserContent(
             Text(
                 text = "Edit Akun Karyawan",
                 color = EditOnSurface,
-                fontSize = 32.sp,
+                fontSize = if (compact) 24.sp else 32.sp,
                 fontWeight = FontWeight.Bold
             )
-            Text(
+            if (!compact) Text(
                 text = "Perbarui data staf, status akun, kredensial opsional, dan hak akses karyawan.",
                 color = EditSlate500,
                 fontSize = 14.sp
@@ -137,30 +138,24 @@ fun EditUserContent(
                 EditErrorCard(message = uiState.errorMessage, onRetry = onRetry)
             }
             else -> {
-                Row(
+                val editContent: @Composable (Modifier, Modifier) -> Unit = { formModifier, panelModifier ->
+                    EditUserFormCard(
+                        uiState, onFullNameChange, onEmailChange, onUsernameChange, onRoleChange, onActiveChange,
+                        onCancel, onSubmit, formModifier, compact
+                    )
+                    EditUserAccessPanel(uiState.selectedRole, uiState.isLoadingRoles, uiState.isActive, onChangePasswordClick, onChangePinClick, panelModifier)
+                }
+                if (compact) Column(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalArrangement = Arrangement.spacedBy(16.dp)
+                ) {
+                    editContent(Modifier.fillMaxWidth(), Modifier.fillMaxWidth())
+                } else Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.spacedBy(28.dp),
                     verticalAlignment = Alignment.Top
                 ) {
-                    EditUserFormCard(
-                        uiState = uiState,
-                        onFullNameChange = onFullNameChange,
-                        onEmailChange = onEmailChange,
-                        onUsernameChange = onUsernameChange,
-                        onRoleChange = onRoleChange,
-                        onActiveChange = onActiveChange,
-                        onCancel = onCancel,
-                        onSubmit = onSubmit,
-                        modifier = Modifier.weight(1.2f)
-                    )
-                    EditUserAccessPanel(
-                        selectedRole = uiState.selectedRole,
-                        rolesAreLoading = uiState.isLoadingRoles,
-                        accountIsActive = uiState.isActive,
-                        onChangePasswordClick = onChangePasswordClick,
-                        onChangePinClick = onChangePinClick,
-                        modifier = Modifier.weight(0.8f)
-                    )
+                    editContent(Modifier.weight(1.2f), Modifier.weight(0.8f))
                 }
             }
         }
@@ -177,7 +172,8 @@ private fun EditUserFormCard(
     onActiveChange: (Boolean) -> Unit,
     onCancel: () -> Unit,
     onSubmit: () -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    compact: Boolean
 ) {
     Card(
         modifier = modifier,
@@ -186,14 +182,17 @@ private fun EditUserFormCard(
         border = BorderStroke(1.dp, EditSlate200)
     ) {
         Column(
-            modifier = Modifier.padding(28.dp),
+            modifier = Modifier.padding(if (compact) 16.dp else 28.dp),
             verticalArrangement = Arrangement.spacedBy(20.dp)
         ) {
             if (uiState.errorMessage != null) {
                 EditUserErrorBanner(message = uiState.errorMessage)
             }
 
-            Row(horizontalArrangement = Arrangement.spacedBy(20.dp)) {
+            if (compact) Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
+                EditUserInputField("NAMA LENGKAP", uiState.fullName, onFullNameChange, Icons.Outlined.Person, "Nama karyawan", Modifier.fillMaxWidth(), enabled = !uiState.isSubmitting)
+                EditUserInputField("ALAMAT EMAIL", uiState.email, onEmailChange, Icons.Outlined.Email, "contoh@email.com", Modifier.fillMaxWidth(), keyboardType = KeyboardType.Email, enabled = !uiState.isSubmitting)
+            } else Row(horizontalArrangement = Arrangement.spacedBy(20.dp)) {
                 EditUserInputField(
                     modifier = Modifier.weight(1f),
                     label = "NAMA LENGKAP",
@@ -215,7 +214,10 @@ private fun EditUserFormCard(
                 )
             }
 
-            Row(horizontalArrangement = Arrangement.spacedBy(20.dp)) {
+            if (compact) Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
+                EditUserInputField("USERNAME", uiState.username, onUsernameChange, Icons.Outlined.AlternateEmail, "username", Modifier.fillMaxWidth(), enabled = !uiState.isSubmitting)
+                EditUserStatusCard(uiState.isActive, !uiState.isSubmitting, onActiveChange, Modifier.fillMaxWidth())
+            } else Row(horizontalArrangement = Arrangement.spacedBy(20.dp)) {
                 EditUserInputField(
                     modifier = Modifier.weight(1f),
                     label = "USERNAME",
@@ -245,7 +247,8 @@ private fun EditUserFormCard(
                     selectedRoleId = uiState.selectedRoleId,
                     isLoading = uiState.isLoadingRoles,
                     enabled = !uiState.isSubmitting,
-                    onRoleChange = onRoleChange
+                    onRoleChange = onRoleChange,
+                    compact = compact
                 )
             }
 
@@ -402,7 +405,8 @@ private fun EditUserRoleSelector(
     selectedRoleId: String?,
     isLoading: Boolean,
     enabled: Boolean,
-    onRoleChange: (String) -> Unit
+    onRoleChange: (String) -> Unit,
+    compact: Boolean
 ) {
     when {
         isLoading -> Row(
@@ -429,7 +433,12 @@ private fun EditUserRoleSelector(
                 fontWeight = FontWeight.Medium
             )
         }
-        else -> Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+        else -> if (compact) Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+            roles.forEach { role ->
+                val visual = role.editRoleVisual()
+                EditUserRoleCard(role, selectedRoleId == role.id, enabled, visual.icon, visual.iconBackground, visual.iconTint, { onRoleChange(role.id) }, Modifier.fillMaxWidth())
+            }
+        } else Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
             roles.forEach { role ->
                 val visual = role.editRoleVisual()
                 EditUserRoleCard(

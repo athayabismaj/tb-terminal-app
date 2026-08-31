@@ -3,6 +3,7 @@ package com.tbterminal.app.ui.audit
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -58,15 +59,17 @@ fun AdminOperationalAuditScreen(
 ) {
     var showDatePicker by remember { mutableStateOf(false) }
 
-    Column(
-        modifier = modifier
-            .fillMaxSize()
-            .background(Color(0xFFF4FAFD))
-            .verticalScroll(rememberScrollState())
-            .padding(40.dp),
-        verticalArrangement = Arrangement.spacedBy(24.dp)
-    ) {
-        OperationalAuditHeader {
+    BoxWithConstraints(modifier.fillMaxSize().background(Color(0xFFF4FAFD))) {
+        val compact = maxWidth < 700.dp
+        Column(modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState())
+            .padding(horizontal = if (compact) 16.dp else 32.dp, vertical = if (compact) 14.dp else 24.dp),
+            verticalArrangement = Arrangement.spacedBy(if (compact) 14.dp else 20.dp)) {
+        if (compact) {
+            Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                HistoryDateFilter(selectedDate = uiState.endDate, onPreviousDate = onPreviousDate, onNextDate = onNextDate, onCalendarClick = { showDatePicker = true }, onClearDate = { onDateChanged(null) }, displayTextOverride = uiState.dateRangeLabel(), modifier = Modifier.fillMaxWidth())
+                OperationalAuditDatePresets(selectedPreset = uiState.selectedPreset, onSelected = onDatePresetSelected, modifier = Modifier.fillMaxWidth())
+            }
+        } else OperationalAuditHeader {
             Row(
                 horizontalArrangement = Arrangement.spacedBy(10.dp),
                 verticalAlignment = Alignment.CenterVertically
@@ -170,6 +173,7 @@ fun AdminOperationalAuditScreen(
                     }
                 }
             }
+        }
         }
     }
 

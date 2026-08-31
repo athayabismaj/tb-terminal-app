@@ -84,21 +84,28 @@ fun UserCredentialContent(
     onSubmit: () -> Unit,
     modifier: Modifier = Modifier
 ) {
+    val compact = androidx.compose.ui.platform.LocalConfiguration.current.screenWidthDp < 700
     Column(
         modifier = modifier
             .fillMaxSize()
             .background(CredentialSurface)
-            .padding(horizontal = 32.dp, vertical = 28.dp)
+            .padding(horizontal = if (compact) 16.dp else 32.dp, vertical = if (compact) 16.dp else 28.dp)
             .verticalScroll(rememberScrollState())
     ) {
-        CredentialHeader(mode = mode)
+        CredentialHeader(mode = mode, compact = compact)
 
         when {
             uiState.isLoadingUser -> CredentialLoadingCard(message = "Memuat data user...")
             uiState.errorMessage != null && uiState.targetUser == null -> {
                 CredentialErrorCard(message = uiState.errorMessage, onRetry = onRetry)
             }
-            else -> Row(
+            else -> if (compact) Column(
+                modifier = Modifier.fillMaxWidth(),
+                verticalArrangement = Arrangement.spacedBy(16.dp)
+            ) {
+                CredentialFormCard(mode, uiState, onCredentialChange, onConfirmationChange, onCancel, onSubmit, Modifier.fillMaxWidth(), compact)
+                CredentialInfoPanel(mode, uiState, Modifier.fillMaxWidth())
+            } else Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.spacedBy(28.dp),
                 verticalAlignment = Alignment.Top
@@ -110,7 +117,8 @@ fun UserCredentialContent(
                     onConfirmationChange = onConfirmationChange,
                     onCancel = onCancel,
                     onSubmit = onSubmit,
-                    modifier = Modifier.weight(1.1f)
+                    modifier = Modifier.weight(1.1f),
+                    compact = compact
                 )
                 CredentialInfoPanel(
                     mode = mode,
@@ -124,7 +132,8 @@ fun UserCredentialContent(
 
 @Composable
 private fun CredentialHeader(
-    mode: UserCredentialMode
+    mode: UserCredentialMode,
+    compact: Boolean
 ) {
     Column(modifier = Modifier.padding(bottom = 28.dp)) {
         Row(verticalAlignment = Alignment.CenterVertically) {
@@ -146,10 +155,10 @@ private fun CredentialHeader(
         Text(
             text = mode.pageTitle(),
             color = CredentialOnSurface,
-            fontSize = 32.sp,
+            fontSize = if (compact) 24.sp else 32.sp,
             fontWeight = FontWeight.Bold
         )
-        Text(
+        if (!compact) Text(
             text = mode.pageDescription(),
             color = CredentialSlate500,
             fontSize = 14.sp
@@ -165,7 +174,8 @@ private fun CredentialFormCard(
     onConfirmationChange: (String) -> Unit,
     onCancel: () -> Unit,
     onSubmit: () -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    compact: Boolean
 ) {
     var showCredential by remember(mode) { mutableStateOf(false) }
     val fieldIcon = if (mode == UserCredentialMode.Password) Icons.Default.Password else Icons.Default.CreditCard
@@ -177,7 +187,7 @@ private fun CredentialFormCard(
         border = BorderStroke(1.dp, CredentialSlate200)
     ) {
         Column(
-            modifier = Modifier.padding(28.dp),
+            modifier = Modifier.padding(if (compact) 16.dp else 28.dp),
             verticalArrangement = Arrangement.spacedBy(20.dp)
         ) {
             if (uiState.errorMessage != null) {

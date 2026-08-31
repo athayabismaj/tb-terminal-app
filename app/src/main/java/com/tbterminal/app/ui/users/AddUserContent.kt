@@ -89,11 +89,12 @@ fun AddUserContent(
     onCancel: () -> Unit = {},
     onSubmit: () -> Unit
 ) {
+    val compact = androidx.compose.ui.platform.LocalConfiguration.current.screenWidthDp < 700
     Column(
         modifier = modifier
             .fillMaxSize()
             .background(AddUserSurface)
-            .padding(horizontal = 32.dp, vertical = 28.dp)
+            .padding(horizontal = if (compact) 16.dp else 32.dp, vertical = if (compact) 16.dp else 28.dp)
             .verticalScroll(rememberScrollState())
     ) {
         Column(modifier = Modifier.padding(bottom = 28.dp)) {
@@ -116,10 +117,10 @@ fun AddUserContent(
             Text(
                 text = "Informasi Akun",
                 color = AddUserOnSurface,
-                fontSize = 32.sp,
+                fontSize = if (compact) 24.sp else 32.sp,
                 fontWeight = FontWeight.Bold
             )
-            Text(
+            if (!compact) Text(
                 text = "Lengkapi data di bawah ini untuk menambahkan akses baru ke sistem TB Terminal.",
                 color = AddUserSlate500,
                 fontSize = 14.sp
@@ -130,29 +131,26 @@ fun AddUserContent(
             role.id == uiState.selectedRoleId
         }
 
-        Row(
+        val screenContent: @Composable (Modifier, Modifier) -> Unit = { formModifier, infoModifier ->
+            AddUserFormCard(
+                uiState = uiState, onFullNameChange = onFullNameChange, onEmailChange = onEmailChange,
+                onUsernameChange = onUsernameChange, onPasswordChange = onPasswordChange, onPinChange = onPinChange,
+                onRoleChange = onRoleChange, onRetryRoles = onRetryRoles, onCancel = onCancel, onSubmit = onSubmit,
+                modifier = formModifier, compact = compact
+            )
+            AddUserAccessPanel(selectedRole = selectedRole, rolesAreLoading = uiState.isLoadingRoles, modifier = infoModifier)
+        }
+        if (compact) Column(
+            modifier = Modifier.fillMaxWidth(),
+            verticalArrangement = Arrangement.spacedBy(16.dp)
+        ) {
+            screenContent(Modifier.fillMaxWidth(), Modifier.fillMaxWidth())
+        } else Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.spacedBy(28.dp),
             verticalAlignment = Alignment.Top
         ) {
-            AddUserFormCard(
-                uiState = uiState,
-                onFullNameChange = onFullNameChange,
-                onEmailChange = onEmailChange,
-                onUsernameChange = onUsernameChange,
-                onPasswordChange = onPasswordChange,
-                onPinChange = onPinChange,
-                onRoleChange = onRoleChange,
-                onRetryRoles = onRetryRoles,
-                onCancel = onCancel,
-                onSubmit = onSubmit,
-                modifier = Modifier.weight(1.2f)
-            )
-            AddUserAccessPanel(
-                selectedRole = selectedRole,
-                rolesAreLoading = uiState.isLoadingRoles,
-                modifier = Modifier.weight(0.8f)
-            )
+            screenContent(Modifier.weight(1.2f), Modifier.weight(0.8f))
         }
     }
 }
@@ -169,7 +167,8 @@ private fun AddUserFormCard(
     onRetryRoles: () -> Unit,
     onCancel: () -> Unit,
     onSubmit: () -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    compact: Boolean
 ) {
     Card(
         modifier = modifier,
@@ -177,12 +176,15 @@ private fun AddUserFormCard(
         shape = RoundedCornerShape(12.dp),
         border = BorderStroke(1.dp, AddUserSlate200)
     ) {
-        Column(modifier = Modifier.padding(28.dp)) {
+        Column(modifier = Modifier.padding(if (compact) 16.dp else 28.dp)) {
             if (uiState.errorMessage != null) {
                 AddUserErrorBanner(message = uiState.errorMessage)
                 Spacer(modifier = Modifier.height(20.dp))
             }
-            Row(horizontalArrangement = Arrangement.spacedBy(20.dp)) {
+            if (compact) Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
+                AddUserInputField(label = "NAMA LENGKAP", value = uiState.fullName, onValueChange = onFullNameChange, icon = Icons.Outlined.Person, placeholder = "Contoh: Budi Santoso", modifier = Modifier.fillMaxWidth())
+                AddUserInputField(label = "ALAMAT EMAIL", value = uiState.email, onValueChange = onEmailChange, icon = Icons.Outlined.Email, placeholder = "contoh@email.com", modifier = Modifier.fillMaxWidth(), keyboardType = KeyboardType.Email)
+            } else Row(horizontalArrangement = Arrangement.spacedBy(20.dp)) {
                 AddUserInputField(
                     modifier = Modifier.weight(1f),
                     label = "NAMA LENGKAP",
@@ -202,7 +204,10 @@ private fun AddUserFormCard(
                 )
             }
             Spacer(modifier = Modifier.height(20.dp))
-            Row(horizontalArrangement = Arrangement.spacedBy(20.dp)) {
+            if (compact) Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
+                AddUserInputField(label = "USERNAME", value = uiState.username, onValueChange = onUsernameChange, icon = Icons.Outlined.AlternateEmail, placeholder = "budisan88", modifier = Modifier.fillMaxWidth())
+                AddUserInputField(label = "PASSWORD", value = uiState.password, onValueChange = onPasswordChange, icon = Icons.Outlined.Lock, placeholder = "Masukkan password", modifier = Modifier.fillMaxWidth(), isPassword = true)
+            } else Row(horizontalArrangement = Arrangement.spacedBy(20.dp)) {
                 AddUserInputField(
                     modifier = Modifier.weight(1f),
                     label = "USERNAME",
@@ -229,7 +234,10 @@ private fun AddUserFormCard(
                 }
             }
             Spacer(modifier = Modifier.height(20.dp))
-            Row(horizontalArrangement = Arrangement.spacedBy(20.dp)) {
+            if (compact) Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
+                AddUserInputField(label = "PIN AKSES", value = uiState.pin, onValueChange = onPinChange, icon = Icons.Outlined.Lock, placeholder = "6 digit PIN", modifier = Modifier.fillMaxWidth(), isPassword = true, keyboardType = KeyboardType.NumberPassword)
+                AccountSecurityNote(Modifier.fillMaxWidth())
+            } else Row(horizontalArrangement = Arrangement.spacedBy(20.dp)) {
                 AddUserInputField(
                     modifier = Modifier.weight(1f),
                     label = "PIN AKSES",
@@ -256,7 +264,8 @@ private fun AddUserFormCard(
                 selectedRoleId = uiState.selectedRoleId,
                 isLoading = uiState.isLoadingRoles,
                 onRoleChange = onRoleChange,
-                onRetry = onRetryRoles
+                onRetry = onRetryRoles,
+                compact = compact
             )
 
             Spacer(modifier = Modifier.height(28.dp))
@@ -362,7 +371,8 @@ private fun AddUserRoleSelector(
     selectedRoleId: String?,
     isLoading: Boolean,
     onRoleChange: (String) -> Unit,
-    onRetry: () -> Unit
+    onRetry: () -> Unit,
+    compact: Boolean
 ) {
     when {
         isLoading -> Row(
@@ -401,7 +411,12 @@ private fun AddUserRoleSelector(
                 Text(text = "Muat ulang role")
             }
         }
-        else -> Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+        else -> if (compact) Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+            roles.forEach { role ->
+                val visual = role.visual()
+                AddUserRoleCard(role, selectedRoleId == role.id, visual.icon, visual.iconBackground, visual.iconTint, { onRoleChange(role.id) }, Modifier.fillMaxWidth())
+            }
+        } else Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
             roles.forEach { role ->
                 val visual = role.visual()
                 AddUserRoleCard(

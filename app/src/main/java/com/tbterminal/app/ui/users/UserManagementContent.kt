@@ -88,84 +88,85 @@ fun UserManagementContent(
     onSecurityLogClick: () -> Unit = {},
     onDismissActionMessage: () -> Unit = {}
 ) {
+    val compact = androidx.compose.ui.platform.LocalConfiguration.current.screenWidthDp < 700
     Column(
         modifier = modifier
             .fillMaxSize()
             .background(UserSlate50)
-            .padding(32.dp)
+            .padding(if (compact) 16.dp else 32.dp)
             .verticalScroll(rememberScrollState())
     ) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(bottom = 32.dp),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.Bottom
-        ) {
+        val pageTitle: @Composable () -> Unit = {
             Column {
                 Text(
-                    text = "Manajemen Pengguna",
+                    text = "Pengguna",
                     color = UserOnSurface,
-                    fontSize = 28.sp,
+                    fontSize = if (compact) 24.sp else 28.sp,
                     fontWeight = FontWeight.ExtraBold
                 )
-                Text(
+                if (!compact) Text(
                     text = "Kelola akses staf dan izin untuk Terminal Toko.",
                     color = UserSlate500,
                     fontSize = 14.sp,
                     fontWeight = FontWeight.Medium
                 )
             }
+        }
+        val addButton: @Composable (Modifier) -> Unit = { buttonModifier ->
             Button(
                 onClick = onAddUserClick,
+                modifier = buttonModifier,
                 colors = ButtonDefaults.buttonColors(containerColor = UserPrimary),
                 shape = RoundedCornerShape(12.dp),
                 contentPadding = PaddingValues(horizontal = 24.dp, vertical = 12.dp)
             ) {
-                Icon(
-                    imageVector = Icons.Default.PersonAdd,
-                    contentDescription = null,
-                    modifier = Modifier.size(20.dp)
-                )
+                Icon(imageVector = Icons.Default.PersonAdd, contentDescription = null, modifier = Modifier.size(20.dp))
                 Spacer(modifier = Modifier.width(8.dp))
-                Text(text = "Tambah User", fontWeight = FontWeight.Bold)
+                Text(text = "Tambah Pengguna", fontWeight = FontWeight.Bold)
             }
         }
-
-        Row(
+        if (compact) Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(bottom = 32.dp),
-            horizontalArrangement = Arrangement.spacedBy(24.dp)
+                .padding(bottom = 20.dp),
+            verticalArrangement = Arrangement.spacedBy(14.dp)
         ) {
+            pageTitle()
+            addButton(Modifier.fillMaxWidth().height(48.dp))
+        } else Row(
+            modifier = Modifier.fillMaxWidth().padding(bottom = 32.dp),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.Bottom
+        ) {
+            pageTitle()
+            addButton(Modifier)
+        }
+
+        val statCards: @Composable () -> Unit = {
             UserStatCard(
-                modifier = Modifier.weight(1f),
-                icon = Icons.Default.Group,
-                title = "TOTAL STAF",
+                modifier = if (compact) Modifier.fillMaxWidth() else Modifier.weight(1f), icon = Icons.Default.Group, title = "TOTAL STAF",
                 value = if (uiState.isLoading) "Memuat" else "${uiState.totalStaff} Orang",
-                iconBackground = UserSlate50,
-                iconTint = UserSlate400,
-                valueColor = UserOnSurface
+                iconBackground = UserSlate50, iconTint = UserSlate400, valueColor = UserOnSurface
             )
             UserStatCard(
-                modifier = Modifier.weight(1f),
-                icon = Icons.Default.Verified,
-                title = "STAF AKTIF",
+                modifier = if (compact) Modifier.fillMaxWidth() else Modifier.weight(1f), icon = Icons.Default.Verified, title = "STAF AKTIF",
                 value = if (uiState.isLoading) "Memuat" else "${uiState.activeStaff} Orang",
-                iconBackground = UserPrimary.copy(alpha = 0.1f),
-                iconTint = UserPrimary,
-                valueColor = UserPrimaryDark
+                iconBackground = UserPrimary.copy(alpha = 0.1f), iconTint = UserPrimary, valueColor = UserPrimaryDark
             )
             UserStatCard(
-                modifier = Modifier.weight(1f),
-                icon = Icons.Default.Update,
-                title = "LOGIN TERAKHIR",
+                modifier = if (compact) Modifier.fillMaxWidth() else Modifier.weight(1f), icon = Icons.Default.Update, title = "LOGIN TERAKHIR",
                 value = if (uiState.isLoading) "Memuat" else uiState.latestLogin,
-                iconBackground = UserAmber500.copy(alpha = 0.1f),
-                iconTint = UserAmber500,
-                valueColor = UserOnSurface
+                iconBackground = UserAmber500.copy(alpha = 0.1f), iconTint = UserAmber500, valueColor = UserOnSurface
             )
         }
+        if (compact) Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(bottom = 20.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp)
+        ) {
+            statCards()
+        } else Row(modifier = Modifier.fillMaxWidth().padding(bottom = 32.dp), horizontalArrangement = Arrangement.spacedBy(24.dp)) { statCards() }
 
         if (uiState.actionErrorMessage != null) {
             UserActionBanner(
@@ -193,7 +194,8 @@ fun UserManagementContent(
             onChangePasswordClick = onChangePasswordClick,
             onChangePinClick = onChangePinClick,
             onDeactivateUserClick = onDeactivateUserClick,
-            onActivateUserClick = onActivateUserClick
+            onActivateUserClick = onActivateUserClick,
+            compact = compact
         )
         Spacer(modifier = Modifier.height(20.dp))
         UserSecurityNotice(onSecurityLogClick = onSecurityLogClick)
@@ -211,7 +213,8 @@ private fun UserTableCard(
     onChangePasswordClick: (StaffMember) -> Unit,
     onChangePinClick: (StaffMember) -> Unit,
     onDeactivateUserClick: (StaffMember) -> Unit,
-    onActivateUserClick: (StaffMember) -> Unit
+    onActivateUserClick: (StaffMember) -> Unit,
+    compact: Boolean
 ) {
     Card(
         modifier = Modifier.fillMaxWidth(),
@@ -220,7 +223,7 @@ private fun UserTableCard(
         border = BorderStroke(1.dp, UserSlate200)
     ) {
         Column {
-            Row(
+            if (!compact) Row(
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(horizontal = 24.dp, vertical = 20.dp),
@@ -285,7 +288,15 @@ private fun UserTableCard(
                 )
                 else -> {
                     staffMembers.forEachIndexed { index, staff ->
-                        StaffRow(
+                        if (compact) StaffMobileCard(
+                            staff = staff,
+                            actionsEnabled = !isMutating,
+                            onEditUserClick = onEditUserClick,
+                            onChangePasswordClick = onChangePasswordClick,
+                            onChangePinClick = onChangePinClick,
+                            onDeactivateUserClick = onDeactivateUserClick,
+                            onActivateUserClick = onActivateUserClick
+                        ) else StaffRow(
                             staff = staff,
                             actionsEnabled = !isMutating,
                             onEditUserClick = onEditUserClick,
@@ -490,6 +501,56 @@ private fun UserTableHeaderText(
             fontSize = 10.sp,
             fontWeight = FontWeight.ExtraBold
         )
+    }
+}
+
+@Composable
+private fun StaffMobileCard(
+    staff: StaffMember,
+    actionsEnabled: Boolean,
+    onEditUserClick: (StaffMember) -> Unit,
+    onChangePasswordClick: (StaffMember) -> Unit,
+    onChangePinClick: (StaffMember) -> Unit,
+    onDeactivateUserClick: (StaffMember) -> Unit,
+    onActivateUserClick: (StaffMember) -> Unit
+) {
+    val inactive = staff.status == StaffStatus.Inactive
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .background(if (inactive) UserError.copy(alpha = 0.04f) else Color.Transparent)
+            .padding(horizontal = 16.dp, vertical = 14.dp),
+        verticalArrangement = Arrangement.spacedBy(12.dp)
+    ) {
+        Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+            Box(
+                modifier = Modifier.size(42.dp).clip(RoundedCornerShape(12.dp))
+                    .background(if (inactive) UserSlate200 else UserPrimary.copy(alpha = 0.1f)),
+                contentAlignment = Alignment.Center
+            ) {
+                Text(staff.initials, color = if (inactive) UserSlate400 else UserPrimary, fontSize = 12.sp, fontWeight = FontWeight.Black)
+            }
+            Spacer(Modifier.width(12.dp))
+            Column(modifier = Modifier.weight(1f)) {
+                Text(staff.name, color = UserOnSurface, fontSize = 14.sp, fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                Text("@${staff.username} · ${staff.lastLogin}", color = UserSlate500, fontSize = 11.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            }
+            StaffRoleBadge(role = staff.role, inactive = inactive)
+        }
+        Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+            Box(modifier = Modifier.size(7.dp).clip(CircleShape).background(if (inactive) UserSlate400 else UserPrimary))
+            Spacer(Modifier.width(6.dp))
+            Text(if (inactive) "Nonaktif" else "Aktif", color = if (inactive) UserSlate500 else UserPrimaryDark, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+            Spacer(Modifier.weight(1f))
+            StaffActionIconButton(Icons.Default.Edit, "Edit pengguna", UserSlate500, actionsEnabled) { onEditUserClick(staff) }
+            if (inactive) {
+                StaffActionIconButton(Icons.Default.CheckCircle, "Aktifkan pengguna", UserPrimary, actionsEnabled) { onActivateUserClick(staff) }
+            } else {
+                StaffActionIconButton(Icons.Default.Password, "Ganti password", UserSlate500, actionsEnabled) { onChangePasswordClick(staff) }
+                StaffActionIconButton(Icons.Default.CreditCard, "Ganti PIN", UserSlate500, actionsEnabled) { onChangePinClick(staff) }
+                StaffActionIconButton(Icons.Default.Block, "Nonaktifkan pengguna", UserError, actionsEnabled) { onDeactivateUserClick(staff) }
+            }
+        }
     }
 }
 

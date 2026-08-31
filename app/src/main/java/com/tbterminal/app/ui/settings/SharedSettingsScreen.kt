@@ -5,6 +5,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -16,6 +17,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
@@ -110,22 +112,7 @@ fun SharedSettingsScreen(
         }
     }
 
-    Row(
-        modifier = modifier
-            .fillMaxSize()
-            .background(DashboardBackground)
-            .padding(32.dp),
-        horizontalArrangement = Arrangement.spacedBy(24.dp)
-    ) {
-        SettingsSideMenu(
-            tabs = tabs,
-            selectedTab = selectedTab,
-            onTabSelected = { selectedTab = it },
-            modifier = Modifier
-                .width(286.dp)
-                .fillMaxHeight()
-        )
-
+    val content: @Composable (Modifier) -> Unit = { contentModifier ->
         SettingsContentCard(
             title = if (isManagementRole) "Pengaturan Sistem" else "Pengaturan Kasir",
             subtitle = if (isManagementRole) {
@@ -136,7 +123,7 @@ fun SharedSettingsScreen(
             userName = userName,
             uiState = uiState,
             onReload = onReload,
-            modifier = Modifier.weight(1f)
+            modifier = contentModifier
         ) {
             when (selectedTab) {
                 "store" -> StoreSettingsContent(
@@ -173,6 +160,64 @@ fun SharedSettingsScreen(
                     uiState = uiState,
                     onSave = onSaveLocalPreferences
                 )
+            }
+        }
+    }
+
+    BoxWithConstraints(modifier = modifier.fillMaxSize().background(DashboardBackground)) {
+        val compact = maxWidth < 900.dp
+        if (compact) {
+            Column(
+                modifier = Modifier.fillMaxSize().padding(horizontal = 16.dp, vertical = 12.dp),
+                verticalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                SettingsCompactMenu(tabs, selectedTab) { selectedTab = it }
+                content(Modifier.weight(1f).fillMaxWidth())
+            }
+        } else {
+            Row(
+                modifier = Modifier.fillMaxSize().padding(32.dp),
+                horizontalArrangement = Arrangement.spacedBy(24.dp)
+            ) {
+                SettingsSideMenu(
+                    tabs = tabs,
+                    selectedTab = selectedTab,
+                    onTabSelected = { selectedTab = it },
+                    modifier = Modifier.width(286.dp).fillMaxHeight()
+                )
+                content(Modifier.weight(1f))
+            }
+        }
+    }
+}
+
+@Composable
+private fun SettingsCompactMenu(
+    tabs: List<SettingsTab>,
+    selectedTab: String,
+    onTabSelected: (String) -> Unit
+) {
+    Row(
+        modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
+        horizontalArrangement = Arrangement.spacedBy(8.dp)
+    ) {
+        tabs.forEach { tab ->
+            val selected = selectedTab == tab.key
+            Surface(
+                onClick = { onTabSelected(tab.key) },
+                color = if (selected) DashboardBrandGreenDark else Color.White,
+                contentColor = if (selected) Color.White else DashboardTextPrimary,
+                shape = RoundedCornerShape(50),
+                border = BorderStroke(1.dp, if (selected) DashboardBrandGreenDark else Color(0xFFE1E8EC))
+            ) {
+                Row(
+                    modifier = Modifier.padding(horizontal = 14.dp, vertical = 10.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Icon(tab.icon, contentDescription = null, modifier = Modifier.size(18.dp))
+                    Spacer(Modifier.width(8.dp))
+                    Text(tab.title, fontWeight = FontWeight.Bold, fontSize = 13.sp, maxLines = 1)
+                }
             }
         }
     }

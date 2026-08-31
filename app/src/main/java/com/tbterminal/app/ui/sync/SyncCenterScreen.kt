@@ -71,6 +71,7 @@ fun SyncCenterScreen(
     onDismissMessage: () -> Unit,
     modifier: Modifier = Modifier
 ) {
+    val compact = androidx.compose.ui.platform.LocalConfiguration.current.screenWidthDp < 700
     val conflictItems = uiState.queueItems.filter { it.syncStatus == SyncStatus.CONFLICT }
     val groupedNonConflictItems = uiState.groupedItems
         .mapValues { (_, items) -> items.filter { it.syncStatus != SyncStatus.CONFLICT } }
@@ -80,7 +81,7 @@ fun SyncCenterScreen(
         modifier = modifier
             .fillMaxSize()
             .background(PageBackground)
-            .padding(horizontal = 30.dp, vertical = 24.dp),
+            .padding(horizontal = if (compact) 16.dp else 30.dp, vertical = if (compact) 16.dp else 24.dp),
         verticalArrangement = Arrangement.spacedBy(18.dp)
     ) {
         item {
@@ -90,15 +91,22 @@ fun SyncCenterScreen(
                 canRetry = uiState.canRetry,
                 onRefresh = onRefresh,
                 onRetryAllPending = onRetryAllPending,
-                onRetryAllFailed = onRetryAllFailed
+                onRetryAllFailed = onRetryAllFailed,
+                compact = compact
             )
         }
 
         item {
-            Row(
+            if (compact) Column(
                 modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(14.dp)
+                verticalArrangement = Arrangement.spacedBy(10.dp)
             ) {
+                SummaryCard("Menunggu", uiState.totalPending.toString(), Color(0xFFFF9800), Modifier.fillMaxWidth())
+                SummaryCard("Sedang Diproses", uiState.totalSyncing.toString(), Color(0xFF2563EB), Modifier.fillMaxWidth())
+                SummaryCard("Gagal", uiState.totalFailed.toString(), Color(0xFFDC2626), Modifier.fillMaxWidth())
+                SummaryCard("Konflik", uiState.totalConflict.toString(), Color(0xFF7C3AED), Modifier.fillMaxWidth())
+                SummaryCard("Berhasil Hari Ini", uiState.totalSyncedToday.toString(), Teal, Modifier.fillMaxWidth())
+            } else Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(14.dp)) {
                 SummaryCard("Pending Sync", uiState.totalPending.toString(), Color(0xFFFF9800), Modifier.weight(1f))
                 SummaryCard("Sedang Sinkronisasi", uiState.totalSyncing.toString(), Color(0xFF2563EB), Modifier.weight(1f))
                 SummaryCard("Gagal Sinkronisasi", uiState.totalFailed.toString(), Color(0xFFDC2626), Modifier.weight(1f))
@@ -193,9 +201,24 @@ private fun SyncCenterHeader(
     canRetry: Boolean,
     onRefresh: () -> Unit,
     onRetryAllPending: () -> Unit,
-    onRetryAllFailed: () -> Unit
+    onRetryAllFailed: () -> Unit,
+    compact: Boolean
 ) {
-    Row(
+    if (compact) Column(
+        modifier = Modifier.fillMaxWidth(),
+        verticalArrangement = Arrangement.spacedBy(10.dp)
+    ) {
+        Text("Sinkronisasi", color = TextPrimary, fontSize = 24.sp, fontWeight = FontWeight.Bold)
+        OutlinedButton(enabled = !isRefreshing && !isRetrying, onClick = onRefresh, modifier = Modifier.fillMaxWidth().height(48.dp), shape = RoundedCornerShape(12.dp)) {
+            Icon(Icons.Outlined.Refresh, contentDescription = null, modifier = Modifier.size(18.dp)); Spacer(Modifier.width(8.dp)); Text("Muat Ulang")
+        }
+        if (canRetry) {
+            OutlinedButton(enabled = !isRefreshing && !isRetrying, onClick = onRetryAllFailed, modifier = Modifier.fillMaxWidth().height(48.dp), shape = RoundedCornerShape(12.dp)) { Text("Coba Lagi yang Gagal") }
+            Button(enabled = !isRefreshing && !isRetrying, onClick = onRetryAllPending, modifier = Modifier.fillMaxWidth().height(48.dp), shape = RoundedCornerShape(12.dp), colors = ButtonDefaults.buttonColors(containerColor = Teal)) {
+                Icon(Icons.Outlined.Sync, contentDescription = null, modifier = Modifier.size(18.dp)); Spacer(Modifier.width(8.dp)); Text("Sinkronkan Data")
+            }
+        }
+    } else Row(
         modifier = Modifier.fillMaxWidth(),
         verticalAlignment = Alignment.CenterVertically
     ) {
