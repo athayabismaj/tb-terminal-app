@@ -21,6 +21,22 @@ sealed interface AppRoute {
         override val route = "dashboard"
     }
 
+    data object BackofficeTransactions : AppRoute {
+        override val route = "backoffice/transactions"
+    }
+
+    data object BackofficeFinance : AppRoute {
+        override val route = "backoffice/finance"
+    }
+
+    data object BackofficeStock : AppRoute {
+        override val route = "backoffice/stock"
+    }
+
+    data object BackofficeMore : AppRoute {
+        override val route = "backoffice/more"
+    }
+
     data object CashReconciliation : AppRoute {
         override val route = "admin/cash-reconciliation"
     }

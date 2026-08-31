@@ -51,6 +51,7 @@ import com.tbterminal.app.ui.dashboard.DashboardTextSecondary
 import com.tbterminal.app.ui.dashboard.DashboardWarningOrange
 import com.tbterminal.app.ui.dashboard.offline.OfflineDashboardSection
 import com.tbterminal.app.ui.dashboard.offline.OfflineDashboardViewModel
+import com.tbterminal.app.ui.dashboard.BackofficeDashboardContent
 
 @Composable
 fun AdminDashboardScreen(
@@ -64,6 +65,7 @@ fun AdminDashboardScreen(
     onProductUnitsClick: () -> Unit,
     onCashReconciliationClick: () -> Unit,
     onSalesTransactionsClick: () -> Unit,
+    onNewTransactionClick: () -> Unit = onSalesTransactionsClick,
     onReportsClick: () -> Unit,
     onLocalReportsClick: () -> Unit = onReportsClick,
     onSyncCenterClick: () -> Unit = {},
@@ -130,11 +132,19 @@ fun AdminDashboardScreen(
         onSettingsClick = onSettingsClick,
         onLogout = onLogout
     ) { contentModifier ->
-        AdminDashboardContent(
-            uiState = uiState,
+        BackofficeDashboardContent(
+            metrics = uiState.metrics,
+            isLoading = uiState.isLoading,
+            error = uiState.error,
             offlineUiState = offlineUiState,
+            onNewTransactionClick = onNewTransactionClick,
+            onReceivablesClick = onReceivablesClick,
+            onSupplierDebtsClick = onSupplierDebtsClick,
+            onCashClick = onCashReconciliationClick,
+            onStockClick = onProductsClick,
+            onTransactionsClick = onSalesTransactionsClick,
             onSyncCenterClick = onSyncCenterClick,
-            modifier = contentModifier.padding(32.dp)
+            modifier = contentModifier
         )
     }
 }

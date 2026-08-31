@@ -33,6 +33,8 @@ import com.tbterminal.app.ui.customers.AdminCustomerFormScreen
 import com.tbterminal.app.ui.customers.AdminCustomerListScreen
 import com.tbterminal.app.ui.dashboard.admin.AdminDashboardScreen
 import com.tbterminal.app.ui.dashboard.admin.AdminDestination
+import com.tbterminal.app.ui.dashboard.BackofficeHubScreen
+import com.tbterminal.app.ui.dashboard.BackofficeSection
 import com.tbterminal.app.ui.dashboard.cashier.CashierDashboardScreen
 import com.tbterminal.app.ui.dashboard.owner.OwnerDashboardScreen
 import com.tbterminal.app.ui.incominggoods.AdminIncomingGoodsFormScreen
@@ -91,7 +93,17 @@ internal fun NavGraphBuilder.dashboardGraph(navController: NavHostController, se
                         OwnerDashboardScreen(
                             name = sessionUser.name,
                             role = sessionUser.role,
+                            analyticsRepository = appContainer.analyticsRepository,
                             offlineDashboardRepository = appContainer.offlineDashboardRepository,
+                            onSalesTransactionsClick = {
+                                navController.navigate(AppRoute.SalesTransactions.route) { launchSingleTop = true }
+                            },
+                            onNewTransactionClick = {
+                                navController.navigate(AppRoute.CashierPos.route) { launchSingleTop = true }
+                            },
+                            onProductsClick = {
+                                navController.navigate(AppRoute.Products.route) { launchSingleTop = true }
+                            },
                             onReportsClick = {
                                 navController.navigate(AppRoute.Reports.route) {
                                     launchSingleTop = true
@@ -189,6 +201,11 @@ internal fun NavGraphBuilder.dashboardGraph(navController: NavHostController, se
                             },
                             onSalesTransactionsClick = {
                                 navController.navigate(AppRoute.SalesTransactions.route) {
+                                    launchSingleTop = true
+                                }
+                            },
+                            onNewTransactionClick = {
+                                navController.navigate(AppRoute.CashierPos.route) {
                                     launchSingleTop = true
                                 }
                             },
@@ -350,6 +367,45 @@ internal fun NavGraphBuilder.dashboardGraph(navController: NavHostController, se
                             }
                         }
                     }
+                }
+            }
+        }
+
+        listOf(
+            AppRoute.BackofficeTransactions.route to BackofficeSection.TRANSACTIONS,
+            AppRoute.BackofficeFinance.route to BackofficeSection.FINANCE,
+            AppRoute.BackofficeStock.route to BackofficeSection.STOCK,
+            AppRoute.BackofficeMore.route to BackofficeSection.MORE
+        ).forEach { (route, section) ->
+            composable(route) {
+                val sessionUser = sessionManager.readSessionUser()
+                if (sessionUser == null) {
+                    LaunchedEffect(Unit) {
+                        sessionManager.logout()
+                        navController.navigate(AppRoute.Login.route) {
+                            popUpTo(0)
+                            launchSingleTop = true
+                        }
+                    }
+                } else {
+                    BackofficeHubScreen(
+                        name = sessionUser.name,
+                        role = sessionUser.role,
+                        section = section,
+                        onLogout = {
+                            sessionManager.logout()
+                            navController.navigate(AppRoute.Login.route) {
+                                popUpTo(0)
+                                launchSingleTop = true
+                            }
+                        },
+                        onUserManagementClick = {
+                            navController.navigate(AppRoute.UserManagement.route) { launchSingleTop = true }
+                        },
+                        onSecurityLogClick = {
+                            navController.navigate(AppRoute.SecurityLog.route) { launchSingleTop = true }
+                        }
+                    )
                 }
             }
         }

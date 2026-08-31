@@ -385,6 +385,11 @@ internal fun NavGraphBuilder.salesGraph(navController: NavHostController, sessio
                             launchSingleTop = true
                         }
                     },
+                    onBack = {
+                        if (!navController.popBackStack()) {
+                            navController.navigate(AppRoute.Dashboard.route) { launchSingleTop = true }
+                        }
+                    },
                     onLogout = logout
                 )
             }

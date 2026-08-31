@@ -50,6 +50,11 @@ fun AppNavGraph(
 private fun AdminDestination.adminRouteOrNull(): String? {
     return when (this) {
         AdminDestination.Dashboard -> AppRoute.Dashboard.route
+        AdminDestination.TransactionsHub -> AppRoute.BackofficeTransactions.route
+        AdminDestination.FinanceHub -> AppRoute.BackofficeFinance.route
+        AdminDestination.StockHub -> AppRoute.BackofficeStock.route
+        AdminDestination.MoreHub -> AppRoute.BackofficeMore.route
+        AdminDestination.NewTransaction -> AppRoute.CashierPos.route
         AdminDestination.Products -> AppRoute.Products.route
         AdminDestination.ProductCategories -> AppRoute.ProductCategories.route
         AdminDestination.ProductUnits -> AppRoute.ProductUnits.route

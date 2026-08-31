@@ -48,6 +48,9 @@ import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.tbterminal.app.data.repository.OfflineDashboardRepository
+import com.tbterminal.app.data.repository.AnalyticsRepository
+import com.tbterminal.app.ui.dashboard.BackofficeDashboardContent
+import com.tbterminal.app.ui.dashboard.admin.AdminDashboardViewModel
 import com.tbterminal.app.ui.dashboard.DashboardBrandGreenDark
 import com.tbterminal.app.ui.dashboard.DashboardDangerRed
 import com.tbterminal.app.ui.dashboard.DashboardInfoBlue
@@ -62,6 +65,7 @@ import com.tbterminal.app.ui.dashboard.offline.OfflineDashboardViewModel
 fun OwnerDashboardScreen(
     name: String,
     role: String,
+    analyticsRepository: AnalyticsRepository,
     offlineDashboardRepository: OfflineDashboardRepository,
     onLogout: () -> Unit,
     onReportsClick: () -> Unit = {},
@@ -70,16 +74,23 @@ fun OwnerDashboardScreen(
     onReceivablesClick: () -> Unit = {},
     onSupplierDebtsClick: () -> Unit = {},
     onCashReconciliationClick: () -> Unit = {},
+    onSalesTransactionsClick: () -> Unit = {},
+    onNewTransactionClick: () -> Unit = onSalesTransactionsClick,
+    onProductsClick: () -> Unit = onStockReportClick,
     onOperationalAuditClick: () -> Unit = {},
     onSyncCenterClick: () -> Unit = {},
     onBackupRestoreClick: () -> Unit = onSyncCenterClick,
     onUserManagementClick: () -> Unit,
     onSecurityLogClick: () -> Unit,
     onSettingsClick: () -> Unit = {},
+    dashboardViewModel: AdminDashboardViewModel = viewModel(
+        factory = AdminDashboardViewModel.factory(analyticsRepository)
+    ),
     offlineDashboardViewModel: OfflineDashboardViewModel = viewModel(
         factory = OfflineDashboardViewModel.factory(offlineDashboardRepository)
     )
 ) {
+    val dashboardUiState by dashboardViewModel.uiState.collectAsStateWithLifecycle()
     val offlineUiState by offlineDashboardViewModel.uiState.collectAsStateWithLifecycle()
 
     OwnerDashboardShell(
@@ -101,10 +112,21 @@ fun OwnerDashboardScreen(
         onSettingsClick = onSettingsClick,
         onLogout = onLogout
     ) { contentModifier ->
-        OwnerDashboardContent(
-            modifier = contentModifier,
+        BackofficeDashboardContent(
+            metrics = dashboardUiState.metrics,
+            isLoading = dashboardUiState.isLoading,
+            error = dashboardUiState.error,
             offlineUiState = offlineUiState,
-            onSyncCenterClick = onSyncCenterClick
+            onNewTransactionClick = onNewTransactionClick,
+            onReceivablesClick = onReceivablesClick,
+            onSupplierDebtsClick = onSupplierDebtsClick,
+            onCashClick = onCashReconciliationClick,
+            onStockClick = onProductsClick,
+            onTransactionsClick = onSalesTransactionsClick,
+            onSyncCenterClick = onSyncCenterClick,
+            showNewTransactionAction = false,
+            showOfflineDeviceSummary = false,
+            modifier = contentModifier
         )
     }
 }

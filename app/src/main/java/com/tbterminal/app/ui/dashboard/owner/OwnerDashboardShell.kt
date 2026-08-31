@@ -2,16 +2,27 @@ package com.tbterminal.app.ui.dashboard.owner
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
+import androidx.compose.material3.DrawerValue
+import androidx.compose.material3.ModalDrawerSheet
+import androidx.compose.material3.ModalNavigationDrawer
+import androidx.compose.material3.rememberDrawerState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import com.tbterminal.app.ui.dashboard.DashboardBackground
 import com.tbterminal.app.ui.dashboard.admin.AdminDestination
 import com.tbterminal.app.ui.dashboard.admin.LocalAdminDestinationNavigator
+import com.tbterminal.app.ui.components.TbCompactDashboardTopBar
+import com.tbterminal.app.ui.dashboard.BackofficeAdaptiveShell
+import com.tbterminal.app.ui.dashboard.BackofficeSection
+import kotlinx.coroutines.launch
 
 @Composable
 fun OwnerDashboardShell(
@@ -39,38 +50,32 @@ fun OwnerDashboardShell(
         destinationNavigator?.invoke(destination) ?: fallback()
     }
 
-    Row(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(DashboardBackground)
-    ) {
-        OwnerDashboardSidebar(
-            activeDestination = activeDestination,
-            onDashboardClick = onDashboardClick,
-            onReportsClick = onReportsClick,
-            onLocalReportsClick = onLocalReportsClick,
-            onSyncCenterClick = onSyncCenterClick,
-            onBackupRestoreClick = navigateOrFallback(AdminDestination.BackupRestore, onBackupRestoreClick),
-            onStockReportClick = onStockReportClick,
-            onReceivablesClick = onReceivablesClick,
-            onSupplierDebtsClick = onSupplierDebtsClick,
-            onCashReconciliationClick = onCashReconciliationClick,
-            onOperationalAuditClick = onOperationalAuditClick,
-            onUserManagementClick = onUserManagementClick,
-            onSecurityLogClick = onSecurityLogClick,
-            onSettingsClick = onSettingsClick,
-            onLogout = onLogout,
-            userName = userName,
-            role = role,
-            modifier = Modifier.width(260.dp)
-        )
-        Column(
-            modifier = Modifier
-                .weight(1f)
-            .fillMaxHeight()
-        ) {
-            OwnerDashboardHeader(userName = userName, role = role)
-            content(Modifier.weight(1f))
+    fun selectSection(section: BackofficeSection) {
+        when (section) {
+            BackofficeSection.HOME -> onDashboardClick()
+            BackofficeSection.TRANSACTIONS -> navigateOrFallback(AdminDestination.TransactionsHub, {})()
+            BackofficeSection.FINANCE -> navigateOrFallback(AdminDestination.FinanceHub, onReceivablesClick)()
+            BackofficeSection.STOCK -> navigateOrFallback(AdminDestination.StockHub, onStockReportClick)()
+            BackofficeSection.MORE -> navigateOrFallback(AdminDestination.MoreHub, onSettingsClick)()
         }
     }
+
+    BackofficeAdaptiveShell(
+        userName = userName,
+        role = role,
+        activeSection = activeDestination.backofficeSection(),
+        onSectionSelected = ::selectSection,
+        onProfileClick = navigateOrFallback(AdminDestination.Profile, onSettingsClick),
+        onLogout = onLogout
+    ) { contentModifier ->
+        content(contentModifier)
+    }
+}
+
+private fun OwnerDestination.backofficeSection(): BackofficeSection = when (this) {
+    OwnerDestination.Dashboard -> BackofficeSection.HOME
+    OwnerDestination.Receivables,
+    OwnerDestination.SupplierDebts,
+    OwnerDestination.CashReconciliation -> BackofficeSection.FINANCE
+    else -> BackofficeSection.MORE
 }

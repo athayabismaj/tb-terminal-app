@@ -25,4 +25,18 @@ class AppRouteAccessPolicyTest {
         assertTrue(AppRouteAccessPolicy.isAllowed(AppRoute.CashierPos.route, "owner"))
         assertFalse(AppRouteAccessPolicy.isAllowed(AppRoute.Dashboard.route, "guest"))
     }
+
+    @Test
+    fun backofficeWorkAreasAreSharedByOwnerAndAdminButHiddenFromCashier() {
+        listOf(
+            AppRoute.BackofficeTransactions.route,
+            AppRoute.BackofficeFinance.route,
+            AppRoute.BackofficeStock.route,
+            AppRoute.BackofficeMore.route
+        ).forEach { route ->
+            assertTrue(AppRouteAccessPolicy.isAllowed(route, "owner"))
+            assertTrue(AppRouteAccessPolicy.isAllowed(route, "admin"))
+            assertFalse(AppRouteAccessPolicy.isAllowed(route, "kasir"))
+        }
+    }
 }

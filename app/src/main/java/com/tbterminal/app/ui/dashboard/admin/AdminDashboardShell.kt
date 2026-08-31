@@ -2,17 +2,28 @@ package com.tbterminal.app.ui.dashboard.admin
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
+import androidx.compose.material3.DrawerValue
+import androidx.compose.material3.ModalDrawerSheet
+import androidx.compose.material3.ModalNavigationDrawer
+import androidx.compose.material3.rememberDrawerState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import com.tbterminal.app.ui.dashboard.DashboardBackground
 import com.tbterminal.app.ui.dashboard.owner.OwnerDashboardSidebar
 import com.tbterminal.app.ui.dashboard.owner.OwnerDestination
+import com.tbterminal.app.ui.components.TbCompactDashboardTopBar
+import com.tbterminal.app.ui.dashboard.BackofficeAdaptiveShell
+import com.tbterminal.app.ui.dashboard.BackofficeSection
+import kotlinx.coroutines.launch
 
 internal val LocalAdminDestinationNavigator = staticCompositionLocalOf<((AdminDestination) -> Unit)?> { null }
 
@@ -52,6 +63,8 @@ fun AdminDashboardShell(
     onSecurityLogClick: () -> Unit = {},
     onProfileClick: () -> Unit = {},
     onSettingsClick: () -> Unit = {},
+    pageTitle: String? = null,
+    onBack: (() -> Unit)? = null,
     onLogout: () -> Unit,
     content: @Composable (Modifier) -> Unit
 ) {
@@ -60,77 +73,37 @@ fun AdminDashboardShell(
         destinationNavigator?.invoke(destination) ?: fallback()
     }
 
-    Row(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(DashboardBackground)
-    ) {
-        if (role.equals("owner", ignoreCase = true)) {
-            OwnerDashboardSidebar(
-                activeDestination = activeDestination.toOwnerDestination(),
-                onDashboardClick = navigateOrFallback(AdminDestination.Dashboard, onDashboardClick),
-                onReportsClick = navigateOrFallback(AdminDestination.Reports, onReportsClick),
-                onLocalReportsClick = navigateOrFallback(AdminDestination.LocalReports, onLocalReportsClick),
-                onSyncCenterClick = navigateOrFallback(AdminDestination.SyncCenter, onSyncCenterClick),
-                onBackupRestoreClick = navigateOrFallback(AdminDestination.BackupRestore, onBackupRestoreClick),
-                onStockReportClick = navigateOrFallback(AdminDestination.StockReport, onStockReportClick),
-                onReceivablesClick = navigateOrFallback(AdminDestination.Receivables, onReceivablesClick),
-                onSupplierDebtsClick = navigateOrFallback(AdminDestination.SupplierDebts, onSupplierDebtsClick),
-                onCashReconciliationClick = navigateOrFallback(AdminDestination.CashReconciliation, onCashReconciliationClick),
-                onOperationalAuditClick = navigateOrFallback(AdminDestination.OperationalAudit, onOperationalAuditClick),
-                onUserManagementClick = onUserManagementClick,
-                onSecurityLogClick = onSecurityLogClick,
-                onSettingsClick = navigateOrFallback(AdminDestination.Settings, onSettingsClick),
-                onLogout = onLogout,
-                userName = userName,
-                role = role,
-                modifier = Modifier.width(260.dp)
-            )
-        } else {
-            TbTerminalSidebar(
-                userName = userName,
-                role = role,
-                activeDestination = activeDestination,
-                onDashboardClick = navigateOrFallback(AdminDestination.Dashboard, onDashboardClick),
-                onProductsClick = navigateOrFallback(AdminDestination.Products, onProductsClick),
-                onProductCategoriesClick = navigateOrFallback(AdminDestination.ProductCategories, onProductCategoriesClick),
-                onProductUnitsClick = navigateOrFallback(AdminDestination.ProductUnits, onProductUnitsClick),
-                onPriceManagementClick = navigateOrFallback(AdminDestination.PriceManagement, onPriceManagementClick),
-                onStockOpnameClick = navigateOrFallback(AdminDestination.StockOpname, onStockOpnameClick),
-                onStockReportClick = navigateOrFallback(AdminDestination.StockReport, onStockReportClick),
-                onSuppliersClick = navigateOrFallback(AdminDestination.Suppliers, onSuppliersClick),
-                onIncomingGoodsClick = navigateOrFallback(AdminDestination.IncomingGoods, onIncomingGoodsClick),
-                onPurchaseHistoryClick = navigateOrFallback(AdminDestination.PurchaseHistory, onPurchaseHistoryClick),
-                onCustomersClick = navigateOrFallback(AdminDestination.Customers, onCustomersClick),
-                onReceivablesClick = navigateOrFallback(AdminDestination.Receivables, onReceivablesClick),
-                onReceivablePaymentsClick = navigateOrFallback(AdminDestination.ReceivablePayments, onReceivablePaymentsClick),
-                onCashReconciliationClick = navigateOrFallback(AdminDestination.CashReconciliation, onCashReconciliationClick),
-                onCashSessionHistoryClick = navigateOrFallback(AdminDestination.CashSessionHistory, onCashSessionHistoryClick),
-                onCashExpensesClick = navigateOrFallback(AdminDestination.CashExpenses, onCashExpensesClick),
-                onSalesTransactionsClick = navigateOrFallback(AdminDestination.SalesTransactions, onSalesTransactionsClick),
-                onSupplierDebtsClick = navigateOrFallback(AdminDestination.SupplierDebts, onSupplierDebtsClick),
-                onReportsClick = navigateOrFallback(AdminDestination.Reports, onReportsClick),
-                onLocalReportsClick = navigateOrFallback(AdminDestination.LocalReports, onLocalReportsClick),
-                onSyncCenterClick = navigateOrFallback(AdminDestination.SyncCenter, onSyncCenterClick),
-                onBackupRestoreClick = navigateOrFallback(AdminDestination.BackupRestore, onBackupRestoreClick),
-                onOperationalAuditClick = navigateOrFallback(AdminDestination.OperationalAudit, onOperationalAuditClick),
-                onProfileClick = navigateOrFallback(AdminDestination.Profile, onProfileClick),
-                onLogout = onLogout,
-                modifier = Modifier.width(266.dp)
-            )
+    fun selectSection(section: BackofficeSection) {
+        when (section) {
+            BackofficeSection.HOME -> navigateOrFallback(AdminDestination.Dashboard, onDashboardClick)()
+            BackofficeSection.TRANSACTIONS -> navigateOrFallback(AdminDestination.TransactionsHub, onSalesTransactionsClick)()
+            BackofficeSection.FINANCE -> navigateOrFallback(AdminDestination.FinanceHub, onReceivablesClick)()
+            BackofficeSection.STOCK -> navigateOrFallback(AdminDestination.StockHub, onProductsClick)()
+            BackofficeSection.MORE -> navigateOrFallback(AdminDestination.MoreHub, onSettingsClick)()
         }
-        Column(
-            modifier = Modifier
-                .weight(1f)
-                .fillMaxHeight()
-        ) {
-            content(Modifier.weight(1f))
-        }
+    }
+
+    BackofficeAdaptiveShell(
+        userName = userName,
+        role = role,
+        activeSection = activeDestination.backofficeSection(),
+        onSectionSelected = ::selectSection,
+        onProfileClick = navigateOrFallback(AdminDestination.Profile, onProfileClick),
+        onLogout = onLogout,
+        pageTitle = pageTitle,
+        onBack = onBack
+    ) { contentModifier ->
+        content(contentModifier)
     }
 }
 
 enum class AdminDestination {
     Dashboard,
+    TransactionsHub,
+    FinanceHub,
+    StockHub,
+    MoreHub,
+    NewTransaction,
     CashReconciliation,
     SalesTransactions,
     Reports,
@@ -162,7 +135,40 @@ enum class AdminDestination {
     Settings
 }
 
+internal fun AdminDestination.backofficeSection(): BackofficeSection = when (this) {
+    AdminDestination.Dashboard -> BackofficeSection.HOME
+    AdminDestination.TransactionsHub,
+    AdminDestination.NewTransaction,
+    AdminDestination.SalesTransactions,
+    AdminDestination.PurchaseHistory -> BackofficeSection.TRANSACTIONS
+    AdminDestination.FinanceHub,
+    AdminDestination.Receivables,
+    AdminDestination.ReceivablePayments,
+    AdminDestination.SupplierDebts,
+    AdminDestination.CashReconciliation,
+    AdminDestination.CashSessionHistory,
+    AdminDestination.CashReconciliationDetail,
+    AdminDestination.CashExpenses -> BackofficeSection.FINANCE
+    AdminDestination.StockHub,
+    AdminDestination.Products,
+    AdminDestination.AddProduct,
+    AdminDestination.ProductCategories,
+    AdminDestination.ProductUnits,
+    AdminDestination.PriceManagement,
+    AdminDestination.StockOpname,
+    AdminDestination.StockOpnameForm,
+    AdminDestination.IncomingGoods,
+    AdminDestination.IncomingGoodsForm,
+    AdminDestination.StockReport -> BackofficeSection.STOCK
+    else -> BackofficeSection.MORE
+}
+
 private fun AdminDestination.toOwnerDestination(): OwnerDestination = when (this) {
+    AdminDestination.TransactionsHub -> OwnerDestination.Dashboard
+    AdminDestination.NewTransaction -> OwnerDestination.Dashboard
+    AdminDestination.FinanceHub -> OwnerDestination.CashReconciliation
+    AdminDestination.StockHub -> OwnerDestination.StockReport
+    AdminDestination.MoreHub -> OwnerDestination.Settings
     AdminDestination.Reports -> OwnerDestination.Reports
     AdminDestination.LocalReports -> OwnerDestination.LocalReports
     AdminDestination.StockReport -> OwnerDestination.StockReport

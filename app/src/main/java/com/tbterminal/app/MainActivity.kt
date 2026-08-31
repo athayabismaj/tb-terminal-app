@@ -4,12 +4,17 @@ import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.withFrameNanos
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
@@ -35,6 +40,19 @@ class MainActivity : ComponentActivity() {
                     modifier = Modifier.fillMaxSize(),
                     color = MaterialTheme.colorScheme.background
                 ) {
+                    val navigationReady = remember { mutableStateOf(false) }
+                    LaunchedEffect(Unit) {
+                        // Render a lightweight first frame before loading the full navigation graph.
+                        // This keeps cold startup responsive on devices experiencing high disk I/O.
+                        withFrameNanos { }
+                        navigationReady.value = true
+                    }
+
+                    if (!navigationReady.value) {
+                        Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                            CircularProgressIndicator()
+                        }
+                    } else {
                     val navController = rememberNavController()
                     val authViewModel: AuthViewModel = viewModel(
                         factory = AuthViewModel.factory(appContainer.authRepository)
@@ -114,6 +132,7 @@ class MainActivity : ComponentActivity() {
                         sessionManager = sessionManager,
                         appContainer = appContainer
                     )
+                    }
                 }
             }
         }

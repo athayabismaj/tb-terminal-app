@@ -164,7 +164,8 @@ internal fun NavGraphBuilder.purchasingGraph(navController: NavHostController, s
                         navController.navigate(AppRoute.AdminSettings.route) {
                             launchSingleTop = true
                         }
-                    },                                    onLogout = {
+                    },
+                    onLogout = {
                         sessionManager.logout()
                         navController.navigate(AppRoute.Login.route) {
                             popUpTo(0)
@@ -294,7 +295,8 @@ internal fun NavGraphBuilder.purchasingGraph(navController: NavHostController, s
                         navController.navigate(AppRoute.AdminSettings.route) {
                             launchSingleTop = true
                         }
-                    },                                    onLogout = {
+                    },
+                    onLogout = {
                         sessionManager.logout()
                         navController.navigate(AppRoute.Login.route) {
                             popUpTo(0)
@@ -410,7 +412,13 @@ internal fun NavGraphBuilder.purchasingGraph(navController: NavHostController, s
                         navController.navigate(AppRoute.AdminSettings.route) {
                             launchSingleTop = true
                         }
-                    },                                    onLogout = {
+                    },
+                    onBack = {
+                        if (!navController.popBackStack()) {
+                            navController.navigate(AppRoute.Dashboard.route) { launchSingleTop = true }
+                        }
+                    },
+                    onLogout = {
                         sessionManager.logout()
                         navController.navigate(AppRoute.Login.route) {
                             popUpTo(0)
