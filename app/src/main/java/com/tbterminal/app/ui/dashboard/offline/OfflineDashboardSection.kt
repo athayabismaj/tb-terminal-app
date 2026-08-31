@@ -4,6 +4,7 @@ import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -26,6 +27,7 @@ import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Icon
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -57,107 +59,122 @@ fun OfflineDashboardSection(
     onSyncCenterClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
-    Column(
-        modifier = modifier,
-        verticalArrangement = Arrangement.spacedBy(14.dp)
-    ) {
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Column(modifier = Modifier.weight(1f)) {
-                Text(
-                    text = "Dashboard Lokal",
-                    color = TextPrimary,
-                    fontSize = 20.sp,
-                    fontWeight = FontWeight.Bold
-                )
-                Text(
-                    text = "Ringkasan dari database lokal perangkat.",
-                    color = TextSecondary,
-                    fontSize = 13.sp,
-                    modifier = Modifier.padding(top = 2.dp)
-                )
-            }
-            Text(
-                text = "Update ${uiState.lastRefresh.formatRefreshTime()}",
-                color = TextSecondary,
-                fontSize = 12.sp
+    BoxWithConstraints(modifier = modifier.fillMaxWidth()) {
+        val compact = maxWidth < 600.dp
+        Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
+            OfflineDashboardHeader(
+                compact = compact,
+                lastRefresh = uiState.lastRefresh,
+                onSyncCenterClick = onSyncCenterClick
             )
-            Spacer(Modifier.width(10.dp))
-            Button(
-                onClick = onSyncCenterClick,
-                colors = ButtonDefaults.buttonColors(containerColor = Teal),
-                shape = RoundedCornerShape(12.dp)
-            ) {
-                Icon(Icons.Outlined.Sync, contentDescription = null, modifier = Modifier.size(18.dp))
-                Spacer(Modifier.width(8.dp))
-                Text("Lihat Sinkronisasi")
-            }
-        }
 
-        SyncWarningBanner(
-            pendingSyncCount = uiState.pendingSyncCount,
-            failedSyncCount = uiState.failedSyncCount
-        )
+            SyncWarningBanner(
+                pendingSyncCount = uiState.pendingSyncCount,
+                failedSyncCount = uiState.failedSyncCount
+            )
 
-        Row(horizontalArrangement = Arrangement.spacedBy(14.dp)) {
-            LocalKpiCard(
-                modifier = Modifier.weight(1f),
-                title = "Omzet Lokal",
-                value = uiState.localRevenueToday.asCurrency(),
-                subtitle = "Transaksi lokal hari ini",
-                icon = Icons.AutoMirrored.Outlined.TrendingUp,
-                tint = Teal
-            )
-            LocalKpiCard(
-                modifier = Modifier.weight(1f),
-                title = "Uang Diterima",
-                value = uiState.localCollectedToday.asCurrency(),
-                subtitle = "Pembayaran lokal hari ini",
-                icon = Icons.Outlined.Payments,
-                tint = Blue
-            )
-            LocalKpiCard(
-                modifier = Modifier.weight(1f),
-                title = "Piutang Lokal",
-                value = uiState.localReceivableOutstanding.asCurrency(),
-                subtitle = "Sisa piutang di Room",
-                icon = Icons.Outlined.AccountBalanceWallet,
-                tint = Orange
-            )
-            LocalKpiCard(
-                modifier = Modifier.weight(1f),
-                title = "Expense Hari Ini",
-                value = uiState.localExpenseToday.asCurrency(),
-                subtitle = "Pengeluaran lokal",
-                icon = Icons.AutoMirrored.Outlined.ReceiptLong,
-                tint = Red
-            )
-        }
-
-        Row(horizontalArrangement = Arrangement.spacedBy(14.dp)) {
-            LocalCompactCard(
-                modifier = Modifier.weight(1f),
-                title = "Transaksi Lokal",
-                value = uiState.localTransactionCount.toString(),
-                tint = Teal
-            )
-            LocalCompactCard(
-                modifier = Modifier.weight(1f),
-                title = "Pending Sync",
-                value = uiState.pendingSyncCount.toString(),
-                tint = Orange
-            )
-            LocalCompactCard(
-                modifier = Modifier.weight(1f),
-                title = "Failed Sync",
-                value = uiState.failedSyncCount.toString(),
-                tint = Red
-            )
+            OfflineKpiGrid(uiState = uiState, compact = compact)
+            OfflineSyncCountGrid(uiState = uiState, compact = compact)
         }
     }
 }
+
+@Composable
+private fun OfflineDashboardHeader(
+    compact: Boolean,
+    lastRefresh: Long,
+    onSyncCenterClick: () -> Unit
+) {
+    val title: @Composable () -> Unit = {
+        Column {
+            Text("Ringkasan Perangkat", color = TextPrimary, fontSize = 20.sp, fontWeight = FontWeight.Bold)
+            Text("Data yang tersimpan di perangkat ini.", color = TextSecondary, fontSize = 13.sp, modifier = Modifier.padding(top = 2.dp))
+        }
+    }
+    val action: @Composable () -> Unit = {
+        OutlinedButton(onClick = onSyncCenterClick, shape = RoundedCornerShape(12.dp)) {
+            Icon(Icons.Outlined.Sync, contentDescription = null, modifier = Modifier.size(18.dp))
+            Spacer(Modifier.width(8.dp))
+            Text("Lihat Sinkronisasi")
+        }
+    }
+
+    if (compact) {
+        Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+            title()
+            Text("Diperbarui ${lastRefresh.formatRefreshTime()}", color = TextSecondary, fontSize = 12.sp)
+            action()
+        }
+    } else {
+        Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+            Box(modifier = Modifier.weight(1f)) { title() }
+            Text("Diperbarui ${lastRefresh.formatRefreshTime()}", color = TextSecondary, fontSize = 12.sp)
+            Spacer(Modifier.width(10.dp))
+            action()
+        }
+    }
+}
+
+@Composable
+private fun OfflineKpiGrid(uiState: OfflineDashboardUiState, compact: Boolean) {
+    val items = listOf(
+        OfflineKpi("Omzet Lokal", uiState.localRevenueToday.asCurrency(), "Transaksi lokal hari ini", Icons.AutoMirrored.Outlined.TrendingUp, Teal),
+        OfflineKpi("Uang Diterima", uiState.localCollectedToday.asCurrency(), "Pembayaran lokal hari ini", Icons.Outlined.Payments, Blue),
+        OfflineKpi("Piutang Lokal", uiState.localReceivableOutstanding.asCurrency(), "Sisa piutang di perangkat", Icons.Outlined.AccountBalanceWallet, Orange),
+        OfflineKpi("Pengeluaran Hari Ini", uiState.localExpenseToday.asCurrency(), "Pengeluaran lokal", Icons.AutoMirrored.Outlined.ReceiptLong, Red)
+    )
+    val columns = if (compact) 2 else 4
+    Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
+        items.chunked(columns).forEach { rowItems ->
+            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(14.dp)) {
+                rowItems.forEach { item ->
+                    LocalKpiCard(
+                        title = item.title,
+                        value = item.value,
+                        subtitle = item.subtitle,
+                        icon = item.icon,
+                        tint = item.tint,
+                        modifier = Modifier.weight(1f)
+                    )
+                }
+                repeat(columns - rowItems.size) { Spacer(Modifier.weight(1f)) }
+            }
+        }
+    }
+}
+
+@Composable
+private fun OfflineSyncCountGrid(uiState: OfflineDashboardUiState, compact: Boolean) {
+    val items = listOf(
+        Triple("Transaksi Lokal", uiState.localTransactionCount.toString(), Teal),
+        Triple("Menunggu Sinkron", uiState.pendingSyncCount.toString(), Orange),
+        Triple("Gagal Sinkron", uiState.failedSyncCount.toString(), Red)
+    )
+    val columns = if (compact) 1 else 3
+    Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
+        items.chunked(columns).forEach { rowItems ->
+            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(14.dp)) {
+                rowItems.forEach { item ->
+                    LocalCompactCard(
+                        title = item.first,
+                        value = item.second,
+                        tint = item.third,
+                        modifier = Modifier.weight(1f)
+                    )
+                }
+                repeat(columns - rowItems.size) { Spacer(Modifier.weight(1f)) }
+            }
+        }
+    }
+}
+
+private data class OfflineKpi(
+    val title: String,
+    val value: String,
+    val subtitle: String,
+    val icon: ImageVector,
+    val tint: Color
+)
 
 @Composable
 private fun SyncWarningBanner(

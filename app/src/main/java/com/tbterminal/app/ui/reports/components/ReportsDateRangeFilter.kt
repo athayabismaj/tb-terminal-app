@@ -5,6 +5,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -13,6 +14,8 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.wrapContentWidth
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.CalendarToday
@@ -64,18 +67,9 @@ fun ReportsDateRangeFilter(
         selectedFilter = detectPreset(startDate, endDate)
     }
 
-    Surface(
-        modifier = modifier.wrapContentWidth(),
-        shape = RoundedCornerShape(12.dp),
-        color = ReportColors.Surface,
-        shadowElevation = 2.dp,
-        border = BorderStroke(1.dp, ReportColors.Slate200)
-    ) {
-        Row(
-            modifier = Modifier.padding(horizontal = 8.dp, vertical = 6.dp),
-            horizontalArrangement = Arrangement.spacedBy(12.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
+    BoxWithConstraints(modifier = modifier) {
+        val compact = maxWidth < 600.dp
+        val dateSelector: @Composable () -> Unit = {
             Row(
                 modifier = Modifier
                     .clip(RoundedCornerShape(8.dp))
@@ -92,13 +86,12 @@ fun ReportsDateRangeFilter(
                 )
                 DateText(text = dateRangeDisplay(startDate, endDate))
             }
-            Box(
-                modifier = Modifier
-                    .width(1.dp)
-                    .height(24.dp)
-                    .background(ReportColors.Slate200)
-            )
-            Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+        }
+        val presets: @Composable () -> Unit = {
+            Row(
+                modifier = if (compact) Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()) else Modifier,
+                horizontalArrangement = Arrangement.spacedBy(4.dp)
+            ) {
                 listOf("Hari ini", "7 hari", "30 hari").forEach { filter ->
                     DateFilterChip(
                         text = filter,
@@ -115,6 +108,34 @@ fun ReportsDateRangeFilter(
                         }
                     )
                 }
+            }
+        }
+        Surface(
+            modifier = if (compact) Modifier.fillMaxWidth() else Modifier.wrapContentWidth(),
+            shape = RoundedCornerShape(12.dp),
+            color = ReportColors.Surface,
+            shadowElevation = 2.dp,
+            border = BorderStroke(1.dp, ReportColors.Slate200)
+        ) {
+            if (compact) Column(
+                modifier = Modifier.padding(8.dp),
+                verticalArrangement = Arrangement.spacedBy(6.dp)
+            ) {
+                dateSelector()
+                presets()
+            } else Row(
+                modifier = Modifier.padding(horizontal = 8.dp, vertical = 6.dp),
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                dateSelector()
+            Box(
+                modifier = Modifier
+                    .width(1.dp)
+                    .height(24.dp)
+                    .background(ReportColors.Slate200)
+            )
+                presets()
             }
         }
     }

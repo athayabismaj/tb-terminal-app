@@ -3,6 +3,7 @@ package com.tbterminal.app.ui.reports.components
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -59,7 +60,7 @@ fun ReportsTransactionTable(
         ) {
             ReportSectionHeader(
                 title = "Detail Transaksi Terbaru",
-                subtitle = "Ringkasan transaksi tanpa request detail per transaksi."
+                subtitle = "Transaksi pada periode yang dipilih."
             )
         }
         ReportDivider()
@@ -69,10 +70,15 @@ fun ReportsTransactionTable(
             error != null && transactions.isEmpty() -> ReportsTransactionError(message = error, onRetry = onRetry)
             transactions.isEmpty() -> ReportsTransactionEmptyState()
             else -> {
-                ReportsTransactionHeader()
-                transactions.forEach { transaction ->
-                    ReportsTransactionRow(transaction = transaction)
-                    ReportDivider()
+                BoxWithConstraints {
+                    val compact = maxWidth < 680.dp
+                    Column {
+                        if (!compact) ReportsTransactionHeader()
+                        transactions.forEach { transaction ->
+                            if (compact) ReportsTransactionMobileRow(transaction) else ReportsTransactionRow(transaction)
+                            ReportDivider()
+                        }
+                    }
                 }
             }
         }
@@ -87,6 +93,35 @@ fun ReportsTransactionTable(
             onPreviousPage = onPreviousPage,
             onNextPage = onNextPage
         )
+    }
+}
+
+@Composable
+private fun ReportsTransactionMobileRow(transaction: CashTransaction) {
+    val remaining = transaction.remainingAmount
+        ?: transaction.total.subtract(transaction.paidAmount).coerceAtLeastZero()
+    val displayStatus = if (remaining.signum() == 0) "Lunas" else transaction.status.toDisplayStatus()
+    Column(modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 14.dp)) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Column(modifier = Modifier.weight(1f)) {
+                Text(transaction.receiptId, color = ReportColors.Primary, fontWeight = FontWeight.ExtraBold, style = MaterialTheme.typography.bodyMedium)
+                Text(transaction.createdAt.toCompactReportDate(), color = ReportColors.Outline, style = MaterialTheme.typography.bodySmall)
+            }
+            TransactionStatusBadge(displayStatus)
+        }
+        Spacer(Modifier.height(12.dp))
+        Text(transaction.customerName ?: "Pelanggan umum", color = ReportColors.OnSurface, fontWeight = FontWeight.SemiBold, style = MaterialTheme.typography.bodyMedium)
+        Spacer(Modifier.height(10.dp))
+        Row(horizontalArrangement = Arrangement.SpaceBetween, modifier = Modifier.fillMaxWidth()) {
+            Column {
+                Text("Total", color = ReportColors.Outline, style = MaterialTheme.typography.labelSmall)
+                Text(transaction.total.toReportCurrency(), color = ReportColors.OnSurface, fontWeight = FontWeight.Bold, style = MaterialTheme.typography.bodyMedium)
+            }
+            Column(horizontalAlignment = Alignment.End) {
+                Text("Sisa", color = ReportColors.Outline, style = MaterialTheme.typography.labelSmall)
+                Text(remaining.toReportCurrency(), color = if (remaining.signum() > 0) ReportColors.Error else ReportColors.Outline, fontWeight = FontWeight.Bold, style = MaterialTheme.typography.bodyMedium)
+            }
+        }
     }
 }
 

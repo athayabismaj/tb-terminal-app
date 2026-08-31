@@ -5,6 +5,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.IntrinsicSize
@@ -64,8 +65,12 @@ fun SalesReportAggregateSection(
         isLoading && report == null -> SalesReportLoadingCard()
         error != null && report == null -> SalesReportErrorCard(message = error, onRetry = onRetry)
         report == null -> SalesReportEmptyCard()
-        else -> Column(verticalArrangement = Arrangement.spacedBy(24.dp)) {
-            PrimaryKpiSection(report = report)
+        else -> BoxWithConstraints {
+            val compact = maxWidth < 720.dp
+            val stacked = maxWidth < 1040.dp
+            val medium = maxWidth < 1180.dp
+            Column(verticalArrangement = Arrangement.spacedBy(if (compact) 14.dp else 24.dp)) {
+            PrimaryKpiSection(report = report, compact = compact, medium = medium)
             if (report.voided.transactionCount > 0) {
                 BaseCard(title = "Transaksi VOID (tidak masuk total aktif)") {
                     StatusRow(
@@ -76,62 +81,48 @@ fun SalesReportAggregateSection(
                     )
                 }
             }
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(IntrinsicSize.Min),
-                horizontalArrangement = Arrangement.spacedBy(24.dp)
-            ) {
+            val overviewContent: @Composable () -> Unit = {
                 PaymentMethodsCard(
                     paymentMethods = report.paymentMethods,
-                    modifier = Modifier
-                        .weight(1f)
-                        .fillMaxHeight()
+                    modifier = Modifier.fillMaxWidth()
                 )
                 TransactionStatusCard(
                     statuses = report.transactionStatuses,
-                    modifier = Modifier
-                        .weight(1f)
-                        .fillMaxHeight()
+                    modifier = Modifier.fillMaxWidth()
                 )
                 ReceivablesSummaryCard(
                     receivables = report.receivables,
-                    modifier = Modifier
-                        .weight(1f)
-                        .fillMaxHeight()
+                    modifier = Modifier.fillMaxWidth()
                 )
             }
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(IntrinsicSize.Min),
-                horizontalArrangement = Arrangement.spacedBy(24.dp)
-            ) {
-                TopProductsCard(
-                    products = report.topProducts,
-                    modifier = Modifier
-                        .weight(1f)
-                        .fillMaxHeight()
-                )
-                CashierPerformanceCard(
-                    cashiers = report.cashiers,
-                    modifier = Modifier
-                        .weight(1f)
-                        .fillMaxHeight()
-                )
+            if (stacked) {
+                Column(verticalArrangement = Arrangement.spacedBy(if (compact) 14.dp else 18.dp)) { overviewContent() }
+            } else {
+                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(24.dp)) {
+                    Box(Modifier.weight(1f)) { PaymentMethodsCard(report.paymentMethods, Modifier.fillMaxWidth()) }
+                    Box(Modifier.weight(1f)) { TransactionStatusCard(report.transactionStatuses, Modifier.fillMaxWidth()) }
+                    Box(Modifier.weight(1f)) { ReceivablesSummaryCard(report.receivables, Modifier.fillMaxWidth()) }
+                }
+            }
+            if (stacked) {
+                Column(verticalArrangement = Arrangement.spacedBy(if (compact) 14.dp else 18.dp)) {
+                    TopProductsCard(report.topProducts, Modifier.fillMaxWidth())
+                    CashierPerformanceCard(report.cashiers, Modifier.fillMaxWidth())
+                }
+            } else {
+                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(24.dp)) {
+                    TopProductsCard(report.topProducts, Modifier.weight(1f))
+                    CashierPerformanceCard(report.cashiers, Modifier.weight(1f))
+                }
+            }
             }
         }
     }
 }
 
 @Composable
-private fun PrimaryKpiSection(report: SalesReportResponseDto) {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .height(IntrinsicSize.Min),
-        horizontalArrangement = Arrangement.spacedBy(24.dp)
-    ) {
+private fun PrimaryKpiSection(report: SalesReportResponseDto, compact: Boolean, medium: Boolean) {
+    val cards: @Composable ColumnScope.() -> Unit = {
         KpiCard(
             title = "TOTAL OMZET",
             value = report.totals.grossRevenue.toReportCurrency(),
@@ -140,9 +131,7 @@ private fun PrimaryKpiSection(report: SalesReportResponseDto) {
             icon = Icons.AutoMirrored.Outlined.ReceiptLong,
             color = ReportColors.Primary,
             background = ReportColors.PrimarySoft,
-            modifier = Modifier
-                .weight(1f)
-                .fillMaxHeight()
+            modifier = Modifier.fillMaxWidth()
         )
         KpiCard(
             title = "UANG DITERIMA",
@@ -152,9 +141,7 @@ private fun PrimaryKpiSection(report: SalesReportResponseDto) {
             icon = Icons.Outlined.AccountBalanceWallet,
             color = ReportColors.Secondary,
             background = ReportColors.BlueSoft,
-            modifier = Modifier
-                .weight(1f)
-                .fillMaxHeight()
+            modifier = Modifier.fillMaxWidth()
         )
         KpiCard(
             title = "SISA PIUTANG",
@@ -164,9 +151,7 @@ private fun PrimaryKpiSection(report: SalesReportResponseDto) {
             icon = Icons.Outlined.PendingActions,
             color = ReportColors.Error,
             background = ReportColors.ErrorSoft,
-            modifier = Modifier
-                .weight(1f)
-                .fillMaxHeight()
+            modifier = Modifier.fillMaxWidth()
         )
         KpiCard(
             title = "LABA KOTOR",
@@ -176,10 +161,29 @@ private fun PrimaryKpiSection(report: SalesReportResponseDto) {
             icon = Icons.Outlined.Savings,
             color = ReportColors.Purple,
             background = ReportColors.PurpleSoft,
-            modifier = Modifier
-                .weight(1f)
-                .fillMaxHeight()
+            modifier = Modifier.fillMaxWidth()
         )
+    }
+    if (compact) {
+        Column(verticalArrangement = Arrangement.spacedBy(12.dp), content = cards)
+    } else if (medium) {
+        Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+                KpiCard("TOTAL OMZET", report.totals.grossRevenue.toReportCurrency(), "Berdasarkan tanggal transaksi", "${report.totals.transactionCount} transaksi periode ini", Icons.AutoMirrored.Outlined.ReceiptLong, ReportColors.Primary, ReportColors.PrimarySoft, Modifier.weight(1f))
+                KpiCard("UANG DITERIMA", report.totals.paidAmount.toReportCurrency(), "Dari transaksi periode ini", "Tunai, Transfer, QRIS, DP", Icons.Outlined.AccountBalanceWallet, ReportColors.Secondary, ReportColors.BlueSoft, Modifier.weight(1f))
+            }
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+                KpiCard("SISA PIUTANG", report.totals.outstandingAmount.toReportCurrency(), "Dari penjualan periode ini", "Segera ditagih", Icons.Outlined.PendingActions, ReportColors.Error, ReportColors.ErrorSoft, Modifier.weight(1f))
+                KpiCard("LABA KOTOR", report.totals.grossProfit.toReportCurrency(), "Berdasarkan HPP saat transaksi", report.grossMarginText(), Icons.Outlined.Savings, ReportColors.Purple, ReportColors.PurpleSoft, Modifier.weight(1f))
+            }
+        }
+    } else {
+        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+            KpiCard("TOTAL OMZET", report.totals.grossRevenue.toReportCurrency(), "Berdasarkan tanggal transaksi", "${report.totals.transactionCount} transaksi periode ini", Icons.AutoMirrored.Outlined.ReceiptLong, ReportColors.Primary, ReportColors.PrimarySoft, Modifier.weight(1f))
+            KpiCard("UANG DITERIMA", report.totals.paidAmount.toReportCurrency(), "Dari transaksi periode ini", "Tunai, Transfer, QRIS, DP", Icons.Outlined.AccountBalanceWallet, ReportColors.Secondary, ReportColors.BlueSoft, Modifier.weight(1f))
+            KpiCard("SISA PIUTANG", report.totals.outstandingAmount.toReportCurrency(), "Dari penjualan periode ini", "Segera ditagih", Icons.Outlined.PendingActions, ReportColors.Error, ReportColors.ErrorSoft, Modifier.weight(1f))
+            KpiCard("LABA KOTOR", report.totals.grossProfit.toReportCurrency(), "Berdasarkan HPP saat transaksi", report.grossMarginText(), Icons.Outlined.Savings, ReportColors.Purple, ReportColors.PurpleSoft, Modifier.weight(1f))
+        }
     }
 }
 

@@ -2,6 +2,7 @@ package com.tbterminal.app.ui.reports
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
@@ -71,6 +72,7 @@ fun AdminReportsScreen(
         userName = name,
         role = role,
         activeDestination = AdminDestination.Reports,
+        pageTitle = "Penjualan & Keuangan",
         onDashboardClick = onDashboardClick,
         onProductsClick = onProductsClick,
         onAddProductClick = onAddProductClick,
@@ -122,43 +124,15 @@ fun AdminReportsContent(
     onExportCsv: (ReportCsvType) -> Unit,
     modifier: Modifier = Modifier
 ) {
-    LazyColumn(
-        modifier = modifier
-            .fillMaxSize()
-            .background(ReportColors.Background)
-            .padding(32.dp),
-        verticalArrangement = Arrangement.spacedBy(18.dp)
-    ) {
+    BoxWithConstraints(modifier = modifier.fillMaxSize().background(ReportColors.Background)) {
+        val compact = maxWidth < 720.dp
+        val stacked = maxWidth < 1100.dp
+        LazyColumn(
+            modifier = Modifier.fillMaxSize().padding(horizontal = if (compact) 16.dp else 32.dp, vertical = if (compact) 14.dp else 24.dp),
+            verticalArrangement = Arrangement.spacedBy(if (compact) 14.dp else 18.dp)
+        ) {
         item {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.Top
-            ) {
-                Column(modifier = Modifier.weight(1f)) {
-                    Text(
-                        text = "Laporan Analitik",
-                        style = MaterialTheme.typography.headlineLarge.copy(
-                            fontWeight = FontWeight.ExtraBold,
-                            color = ReportColors.OnSurface
-                        )
-                    )
-                    Text(
-                        text = "Ringkasan performa penjualan, cashflow, piutang, produk, dan stok.",
-                        style = MaterialTheme.typography.bodyMedium.copy(
-                            color = ReportColors.OnSurfaceVariant,
-                            fontWeight = FontWeight.Medium
-                        ),
-                        modifier = Modifier.padding(top = 6.dp)
-                    )
-                }
-                ReportsDateRangeFilter(
-                    startDate = uiState.startDate,
-                    endDate = uiState.endDate,
-                    onDateRangeChanged = onDateRangeChanged,
-                    onRefresh = onRefresh
-                )
-            }
+            ReportsDateRangeFilter(uiState.startDate, uiState.endDate, onDateRangeChanged, onRefresh)
         }
 
         item {
@@ -200,10 +174,7 @@ fun AdminReportsContent(
                     )
                 }
                 item {
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(24.dp)
-                    ) {
+                    val table: @Composable (Modifier) -> Unit = { tableModifier ->
                         ReportsTransactionTable(
                             transactions = uiState.transactions,
                             isLoading = uiState.isTransactionsLoading,
@@ -216,10 +187,12 @@ fun AdminReportsContent(
                             onRetry = onTransactionsRetry,
                             onPreviousPage = onPreviousTransactionPage,
                             onNextPage = onNextTransactionPage,
-                            modifier = Modifier.weight(2f)
+                            modifier = tableModifier
                         )
+                    }
+                    val insights: @Composable (Modifier) -> Unit = { insightModifier ->
                         Column(
-                            modifier = Modifier.weight(1f),
+                            modifier = insightModifier,
                             verticalArrangement = Arrangement.spacedBy(24.dp)
                         ) {
                             DailySalesReportCard(
@@ -234,8 +207,20 @@ fun AdminReportsContent(
                             )
                         }
                     }
+                    if (stacked) {
+                        Column(modifier = Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(18.dp)) {
+                            table(Modifier.fillMaxWidth())
+                            insights(Modifier.fillMaxWidth())
+                        }
+                    } else {
+                        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(24.dp)) {
+                            table(Modifier.weight(2f))
+                            insights(Modifier.weight(1f))
+                        }
+                    }
                 }
             }
+        }
         }
     }
 }

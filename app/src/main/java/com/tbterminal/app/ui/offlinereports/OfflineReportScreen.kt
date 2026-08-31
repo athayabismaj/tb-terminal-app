@@ -4,6 +4,7 @@ import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.Row
@@ -77,18 +78,18 @@ fun OfflineReportScreen(
     onRefresh: () -> Unit,
     modifier: Modifier = Modifier
 ) {
-    LazyColumn(
-        modifier = modifier
-            .fillMaxSize()
-            .background(PageBackground)
-            .padding(horizontal = 30.dp, vertical = 24.dp),
-        verticalArrangement = Arrangement.spacedBy(18.dp)
-    ) {
+    BoxWithConstraints(modifier = modifier.fillMaxSize().background(PageBackground)) {
+        val compact = maxWidth < 700.dp
+        LazyColumn(
+            modifier = Modifier.fillMaxSize().padding(horizontal = if (compact) 16.dp else 30.dp, vertical = if (compact) 14.dp else 24.dp),
+            verticalArrangement = Arrangement.spacedBy(if (compact) 14.dp else 18.dp)
+        ) {
         item {
             OfflineReportHeader(
                 isLoading = uiState.isLoading,
                 lastRefresh = uiState.lastRefresh,
-                onRefresh = onRefresh
+                onRefresh = onRefresh,
+                compact = compact
             )
         }
 
@@ -98,7 +99,8 @@ fun OfflineReportScreen(
                 onPresetSelected = onPresetSelected,
                 onCustomStartChanged = onCustomStartChanged,
                 onCustomEndChanged = onCustomEndChanged,
-                onApplyCustomRange = onApplyCustomRange
+                onApplyCustomRange = onApplyCustomRange,
+                compact = compact
             )
         }
 
@@ -115,59 +117,55 @@ fun OfflineReportScreen(
         }
 
         item {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(14.dp)
-            ) {
-                KpiCard(
-                    title = "Omzet Lokal",
-                    value = uiState.salesSummary.localRevenue.formatCurrency(),
-                    icon = Icons.Outlined.Assessment,
-                    accent = Teal,
-                    modifier = Modifier.weight(1f)
-                )
-                KpiCard(
-                    title = "Uang Diterima",
-                    value = uiState.salesSummary.collectedAmount.formatCurrency(),
-                    icon = Icons.Outlined.Payments,
-                    accent = Blue,
-                    modifier = Modifier.weight(1f)
-                )
-                KpiCard(
-                    title = "Sisa Piutang",
-                    value = uiState.salesSummary.outstandingAmount.formatCurrency(),
-                    icon = Icons.Outlined.CreditCard,
-                    accent = Red,
-                    modifier = Modifier.weight(1f)
-                )
-                KpiCard(
-                    title = "Transaksi",
-                    value = uiState.salesSummary.totalTransactions.toString(),
-                    icon = Icons.AutoMirrored.Outlined.ReceiptLong,
-                    accent = Orange,
-                    modifier = Modifier.weight(1f)
-                )
-            }
+            OfflineKpiGrid(uiState, compact)
         }
 
         item {
             OfflineSalesReportSection(
                 transactions = uiState.transactions,
                 startDate = uiState.startDate,
-                endDate = uiState.endDate
+                endDate = uiState.endDate,
+                compact = compact
             )
         }
 
         item {
-            OfflineCashReportSection(cashSessions = uiState.cashSessions)
+            OfflineCashReportSection(cashSessions = uiState.cashSessions, compact = compact)
         }
 
         item {
-            OfflineReceivableReportSection(receivables = uiState.receivables)
+            OfflineReceivableReportSection(receivables = uiState.receivables, compact = compact)
         }
 
         item {
-            OfflineExpenseReportSection(expenses = uiState.expenses)
+            OfflineExpenseReportSection(expenses = uiState.expenses, compact = compact)
+        }
+        }
+    }
+}
+
+@Composable
+private fun OfflineKpiGrid(uiState: OfflineReportUiState, compact: Boolean) {
+    val items = listOf(
+        Triple("Omzet lokal", uiState.salesSummary.localRevenue.formatCurrency(), Teal),
+        Triple("Uang diterima", uiState.salesSummary.collectedAmount.formatCurrency(), Blue),
+        Triple("Sisa piutang", uiState.salesSummary.outstandingAmount.formatCurrency(), Red),
+        Triple("Transaksi", uiState.salesSummary.totalTransactions.toString(), Orange)
+    )
+    val icons = listOf(Icons.Outlined.Assessment, Icons.Outlined.Payments, Icons.Outlined.CreditCard, Icons.AutoMirrored.Outlined.ReceiptLong)
+    if (compact) {
+        Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+            items.chunked(2).forEachIndexed { rowIndex, rowItems ->
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                    rowItems.forEachIndexed { itemIndex, item ->
+                        KpiCard(item.first, item.second, icons[rowIndex * 2 + itemIndex], item.third, Modifier.weight(1f), true)
+                    }
+                }
+            }
+        }
+    } else {
+        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(14.dp)) {
+            items.forEachIndexed { index, item -> KpiCard(item.first, item.second, icons[index], item.third, Modifier.weight(1f)) }
         }
     }
 }
@@ -176,25 +174,15 @@ fun OfflineReportScreen(
 private fun OfflineReportHeader(
     isLoading: Boolean,
     lastRefresh: Long?,
-    onRefresh: () -> Unit
+    onRefresh: () -> Unit,
+    compact: Boolean
 ) {
     Row(
         modifier = Modifier.fillMaxWidth(),
         verticalAlignment = Alignment.CenterVertically
     ) {
         Column(modifier = Modifier.weight(1f)) {
-            Text(
-                text = "Laporan Lokal",
-                color = TextPrimary,
-                fontSize = 31.sp,
-                fontWeight = FontWeight.Bold
-            )
-            Text(
-                text = "Laporan penjualan, kas, piutang, dan expense dari database lokal.",
-                color = TextSecondary,
-                fontSize = 15.sp,
-                modifier = Modifier.padding(top = 4.dp)
-            )
+            Text("Data tersimpan di perangkat", color = TextPrimary, fontSize = if (compact) 15.sp else 17.sp, fontWeight = FontWeight.Bold)
             if (lastRefresh != null) {
                 Text(
                     text = "Terakhir diperbarui ${lastRefresh.formatDateTime()}",
@@ -207,11 +195,14 @@ private fun OfflineReportHeader(
         OutlinedButton(
             enabled = !isLoading,
             onClick = onRefresh,
-            shape = RoundedCornerShape(12.dp)
+            shape = RoundedCornerShape(14.dp),
+            contentPadding = if (compact) androidx.compose.foundation.layout.PaddingValues(horizontal = 12.dp, vertical = 10.dp) else androidx.compose.foundation.layout.PaddingValues(horizontal = 16.dp, vertical = 12.dp)
         ) {
             Icon(Icons.Outlined.Refresh, contentDescription = null, modifier = Modifier.size(18.dp))
-            Spacer(Modifier.width(8.dp))
-            Text("Refresh")
+            if (!compact) {
+                Spacer(Modifier.width(8.dp))
+                Text("Perbarui")
+            }
         }
     }
 }
@@ -222,7 +213,8 @@ private fun OfflineReportFilter(
     onPresetSelected: (OfflineReportPreset) -> Unit,
     onCustomStartChanged: (String) -> Unit,
     onCustomEndChanged: (String) -> Unit,
-    onApplyCustomRange: () -> Unit
+    onApplyCustomRange: () -> Unit,
+    compact: Boolean
 ) {
     Card(
         modifier = Modifier.fillMaxWidth(),
@@ -248,7 +240,7 @@ private fun OfflineReportFilter(
                 )
             }
             Spacer(Modifier.height(14.dp))
-            Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 listOf(
                     OfflineReportPreset.Today,
                     OfflineReportPreset.Last7Days,
@@ -262,33 +254,39 @@ private fun OfflineReportFilter(
                 }
             }
             Spacer(Modifier.height(14.dp))
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(10.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
+            if (compact) Column(modifier = Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(10.dp)) {
                 OutlinedTextField(
                     value = uiState.customStartInput,
                     onValueChange = onCustomStartChanged,
                     label = { Text("Tanggal awal") },
                     singleLine = true,
-                    modifier = Modifier.weight(1f)
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(14.dp)
                 )
                 OutlinedTextField(
                     value = uiState.customEndInput,
                     onValueChange = onCustomEndChanged,
                     label = { Text("Tanggal akhir") },
                     singleLine = true,
-                    modifier = Modifier.weight(1f)
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(14.dp)
                 )
                 Button(
                     onClick = onApplyCustomRange,
                     colors = ButtonDefaults.buttonColors(containerColor = Teal),
                     shape = RoundedCornerShape(12.dp),
-                    modifier = Modifier.height(56.dp)
+                    modifier = Modifier.fillMaxWidth().height(52.dp)
                 ) {
                     Text("Terapkan")
                 }
+            } else Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(10.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                OutlinedTextField(uiState.customStartInput, onCustomStartChanged, label = { Text("Tanggal awal") }, singleLine = true, modifier = Modifier.weight(1f), shape = RoundedCornerShape(14.dp))
+                OutlinedTextField(uiState.customEndInput, onCustomEndChanged, label = { Text("Tanggal akhir") }, singleLine = true, modifier = Modifier.weight(1f), shape = RoundedCornerShape(14.dp))
+                Button(onClick = onApplyCustomRange, colors = ButtonDefaults.buttonColors(containerColor = Teal), shape = RoundedCornerShape(14.dp), modifier = Modifier.height(56.dp)) { Text("Terapkan") }
             }
         }
     }
@@ -318,16 +316,17 @@ private fun KpiCard(
     value: String,
     icon: ImageVector,
     accent: Color,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    compact: Boolean = false
 ) {
     Card(
-        modifier = modifier.height(124.dp),
-        shape = RoundedCornerShape(14.dp),
+        modifier = modifier.height(if (compact) 108.dp else 124.dp),
+        shape = RoundedCornerShape(if (compact) 18.dp else 14.dp),
         colors = CardDefaults.cardColors(containerColor = Color.White),
         border = BorderStroke(1.dp, CardBorder)
     ) {
         Column(
-            modifier = Modifier.padding(18.dp),
+            modifier = Modifier.padding(if (compact) 14.dp else 18.dp),
             verticalArrangement = Arrangement.SpaceBetween
         ) {
             Row(verticalAlignment = Alignment.CenterVertically) {
@@ -352,7 +351,7 @@ private fun KpiCard(
             Text(
                 text = value,
                 color = accent,
-                fontSize = 24.sp,
+                fontSize = if (compact) 18.sp else 24.sp,
                 fontWeight = FontWeight.Bold,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis
@@ -365,7 +364,8 @@ private fun KpiCard(
 fun OfflineSalesReportSection(
     transactions: List<OfflineSalesReportRow>,
     startDate: LocalDate,
-    endDate: LocalDate
+    endDate: LocalDate,
+    compact: Boolean = false
 ) {
     ReportCard(
         title = "Laporan Penjualan Lokal",
@@ -373,6 +373,15 @@ fun OfflineSalesReportSection(
     ) {
         if (transactions.isEmpty()) {
             EmptyRows("Belum ada transaksi lokal pada periode ini.")
+        } else if (compact) {
+            transactions.forEach { row ->
+                OfflineMobileRow(
+                    title = row.transactionCode,
+                    subtitle = "${row.customerName} · ${row.occurredAt.formatDateTime()}",
+                    values = listOf("Total" to row.total.formatCurrency(), "Dibayar" to row.paidAmount.formatCurrency(), "Sisa" to row.remainingAmount.formatCurrency()),
+                    status = row.syncStatus
+                )
+            }
         } else {
             HeaderRow(listOf("Transaksi", "Customer", "Total", "Dibayar", "Sisa", "Sync"))
             transactions.forEach { row ->
@@ -392,13 +401,22 @@ fun OfflineSalesReportSection(
 }
 
 @Composable
-fun OfflineCashReportSection(cashSessions: List<OfflineCashReportRow>) {
+fun OfflineCashReportSection(cashSessions: List<OfflineCashReportRow>, compact: Boolean = false) {
     ReportCard(
         title = "Laporan Kas Lokal",
         subtitle = "Sesi kas lokal dalam periode yang dipilih."
     ) {
         if (cashSessions.isEmpty()) {
             EmptyRows("Belum ada sesi kas lokal pada periode ini.")
+        } else if (compact) {
+            cashSessions.forEach { row ->
+                OfflineMobileRow(
+                    title = "Sesi ${row.status.lowercase().replaceFirstChar { it.uppercase() }}",
+                    subtitle = "Kasir ${row.cashierUserId} · ${row.openedAt.formatDateTime()}",
+                    values = listOf("Modal" to row.startingCash.formatCurrency(), "Penjualan" to row.totalCashSales.formatCurrency(), "Kas akhir" to row.endingCash.formatCurrency()),
+                    status = row.syncStatus
+                )
+            }
         } else {
             HeaderRow(listOf("Kasir", "Modal", "Tunai", "Expense", "Kas Akhir", "Sync"))
             cashSessions.forEach { row ->
@@ -418,13 +436,22 @@ fun OfflineCashReportSection(cashSessions: List<OfflineCashReportRow>) {
 }
 
 @Composable
-fun OfflineReceivableReportSection(receivables: List<OfflineReceivableReportRow>) {
+fun OfflineReceivableReportSection(receivables: List<OfflineReceivableReportRow>, compact: Boolean = false) {
     ReportCard(
         title = "Laporan Piutang Lokal",
         subtitle = "Piutang dari transaksi lokal/offline."
     ) {
         if (receivables.isEmpty()) {
             EmptyRows("Belum ada piutang lokal pada periode ini.")
+        } else if (compact) {
+            receivables.forEach { row ->
+                OfflineMobileRow(
+                    title = row.customerName,
+                    subtitle = "${row.transactionCode} · ${row.status}",
+                    values = listOf("Total" to row.totalAmount.formatCurrency(), "Dibayar" to row.paidAmount.formatCurrency(), "Sisa" to row.remainingAmount.formatCurrency()),
+                    status = row.syncStatus
+                )
+            }
         } else {
             HeaderRow(listOf("Customer", "Transaksi", "Total", "Dibayar", "Sisa", "Sync"))
             receivables.forEach { row ->
@@ -444,13 +471,22 @@ fun OfflineReceivableReportSection(receivables: List<OfflineReceivableReportRow>
 }
 
 @Composable
-fun OfflineExpenseReportSection(expenses: List<OfflineExpenseReportRow>) {
+fun OfflineExpenseReportSection(expenses: List<OfflineExpenseReportRow>, compact: Boolean = false) {
     ReportCard(
-        title = "Laporan Expense Lokal",
-        subtitle = "Pengeluaran kas yang tersimpan di database lokal."
+        title = "Laporan Pengeluaran Lokal",
+        subtitle = "Pengeluaran kas yang tersimpan di perangkat."
     ) {
         if (expenses.isEmpty()) {
             EmptyRows("Belum ada pengeluaran kas lokal pada periode ini.")
+        } else if (compact) {
+            expenses.forEach { row ->
+                OfflineMobileRow(
+                    title = row.category,
+                    subtitle = "${row.occurredAt.formatDateTime()} · ${row.description.orEmpty().ifBlank { "Tanpa catatan" }}",
+                    values = listOf("Nominal" to row.amount.formatCurrency()),
+                    status = row.syncStatus
+                )
+            }
         } else {
             HeaderRow(listOf("Tanggal", "Kategori", "Nominal", "Catatan", "Sync"))
             expenses.forEach { row ->
@@ -469,6 +505,34 @@ fun OfflineExpenseReportSection(expenses: List<OfflineExpenseReportRow>) {
 }
 
 @Composable
+private fun OfflineMobileRow(
+    title: String,
+    subtitle: String,
+    values: List<Pair<String, String>>,
+    status: SyncStatus
+) {
+    Column(Modifier.fillMaxWidth().padding(vertical = 13.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+        Row(verticalAlignment = Alignment.Top) {
+            Column(Modifier.weight(1f)) {
+                Text(title, color = TextPrimary, fontSize = 14.sp, fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                Text(subtitle, color = TextSecondary, fontSize = 11.sp, maxLines = 2, overflow = TextOverflow.Ellipsis)
+            }
+            Spacer(Modifier.width(8.dp))
+            SyncBadge(status)
+        }
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(14.dp)) {
+            values.forEach { (label, value) ->
+                Column(Modifier.weight(1f)) {
+                    Text(label, color = TextSecondary, fontSize = 10.sp)
+                    Text(value, color = TextPrimary, fontSize = 12.sp, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                }
+            }
+        }
+    }
+    HorizontalDivider(color = CardBorder)
+}
+
+@Composable
 private fun ReportCard(
     title: String,
     subtitle: String,
@@ -476,12 +540,12 @@ private fun ReportCard(
 ) {
     Card(
         modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(14.dp),
+        shape = RoundedCornerShape(18.dp),
         colors = CardDefaults.cardColors(containerColor = Color.White),
         border = BorderStroke(1.dp, CardBorder)
     ) {
-        Column(modifier = Modifier.padding(20.dp)) {
-            Text(title, color = TextPrimary, fontSize = 18.sp, fontWeight = FontWeight.Bold)
+        Column(modifier = Modifier.padding(16.dp)) {
+            Text(title, color = TextPrimary, fontSize = 16.sp, fontWeight = FontWeight.Bold)
             Text(subtitle, color = TextSecondary, fontSize = 13.sp, modifier = Modifier.padding(top = 4.dp))
             Spacer(Modifier.height(16.dp))
             content()

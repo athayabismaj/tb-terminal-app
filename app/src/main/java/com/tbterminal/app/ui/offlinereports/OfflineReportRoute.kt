@@ -47,6 +47,7 @@ fun OfflineReportRoute(
         userName = name,
         role = role,
         activeDestination = AdminDestination.LocalReports,
+        pageTitle = "Laporan Lokal",
         onDashboardClick = onDashboardClick,
         onProductsClick = onProductsClick,
         onAddProductClick = onAddProductClick,
