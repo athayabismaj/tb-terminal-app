@@ -135,38 +135,33 @@ fun CashierPosScreen(
             }
         }
     ) { paddingValues ->
-        Column(
-            modifier = Modifier
-                .padding(paddingValues)
-                .fillMaxSize()
-                .padding(24.dp)
-        ) {
+        BoxWithConstraints(modifier = Modifier.padding(paddingValues).fillMaxSize()) {
+            val compact = maxWidth < 600.dp
+            Column(
+                modifier = Modifier.fillMaxSize().padding(if (compact) 16.dp else 24.dp)
+            ) {
             // ── Page Header ──
             Row(
-                modifier = Modifier.fillMaxWidth().padding(bottom = 24.dp),
+                modifier = Modifier.fillMaxWidth().padding(bottom = if (compact) 16.dp else 24.dp),
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Text(
                     text = "Kasir POS",
                     color = OnSurface,
-                    fontSize = 28.sp,
+                    fontSize = if (compact) 24.sp else 28.sp,
                     fontWeight = FontWeight.ExtraBold
                 )
             }
 
             // 1. Search & Filter
-            Row(
-                modifier = Modifier.fillMaxWidth().padding(bottom = 16.dp),
-                horizontalArrangement = Arrangement.spacedBy(16.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
+            val searchField: @Composable (Modifier) -> Unit = { fieldModifier ->
                 OutlinedTextField(
                     value = state.searchQuery,
                     onValueChange = onSearchChanged,
                     placeholder = { Text("Cari produk, SKU, atau scan barcode...", color = Outline) },
                     leadingIcon = { Icon(Icons.Outlined.Search, contentDescription = null, tint = Outline) },
-                    modifier = Modifier.weight(1f).height(56.dp),
+                    modifier = fieldModifier.height(56.dp),
                     shape = RoundedCornerShape(12.dp),
                     colors = OutlinedTextFieldDefaults.colors(
                         unfocusedContainerColor = Color.White,
@@ -176,11 +171,34 @@ fun CashierPosScreen(
                     ),
                     singleLine = true
                 )
-                CashierCategoryDropdown(
-                    categories = categories,
-                    selectedCategory = selectedCategory,
-                    onCategorySelected = { selectedCategory = it }
-                )
+            }
+            if (compact) {
+                Column(
+                    modifier = Modifier.fillMaxWidth().padding(bottom = 14.dp),
+                    verticalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
+                    searchField(Modifier.fillMaxWidth())
+                    CashierCategoryDropdown(
+                        categories = categories,
+                        selectedCategory = selectedCategory,
+                        onCategorySelected = { selectedCategory = it },
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                }
+            } else {
+                Row(
+                    modifier = Modifier.fillMaxWidth().padding(bottom = 16.dp),
+                    horizontalArrangement = Arrangement.spacedBy(16.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    searchField(Modifier.weight(1f))
+                    CashierCategoryDropdown(
+                        categories = categories,
+                        selectedCategory = selectedCategory,
+                        onCategorySelected = { selectedCategory = it },
+                        modifier = Modifier.width(220.dp)
+                    )
+                }
             }
 
             // 2. Kartu Produk
@@ -219,6 +237,7 @@ fun CashierPosScreen(
                 onNext = { onProductPageChanged(state.productPage + 1) },
                 modifier = Modifier.padding(top = 12.dp)
             )
+            }
         }
     }
 }
@@ -227,7 +246,8 @@ fun CashierPosScreen(
 private fun CashierCategoryDropdown(
     categories: List<String>,
     selectedCategory: String,
-    onCategorySelected: (String) -> Unit
+    onCategorySelected: (String) -> Unit,
+    modifier: Modifier = Modifier
 ) {
     var expanded by remember { mutableStateOf(false) }
 
@@ -237,9 +257,7 @@ private fun CashierCategoryDropdown(
             shape = RoundedCornerShape(12.dp),
             color = Color.White,
             border = BorderStroke(1.dp, OutlineVariant),
-            modifier = Modifier
-                .width(220.dp)
-                .height(56.dp)
+            modifier = modifier.height(56.dp)
         ) {
             Row(
                 modifier = Modifier.padding(horizontal = 16.dp),

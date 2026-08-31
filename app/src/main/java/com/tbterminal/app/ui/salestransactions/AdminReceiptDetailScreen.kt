@@ -185,15 +185,16 @@ private fun ReceiptDetailContent(
     onSubmitVoid: () -> Unit,
     modifier: Modifier = Modifier
 ) {
+    val compact = androidx.compose.ui.platform.LocalConfiguration.current.screenWidthDp < 700
     Column(
         modifier = modifier
             .fillMaxSize()
             .background(DashboardBackground)
             .verticalScroll(rememberScrollState())
-            .padding(32.dp),
-        verticalArrangement = Arrangement.spacedBy(24.dp)
+            .padding(if (compact) 16.dp else 32.dp),
+        verticalArrangement = Arrangement.spacedBy(if (compact) 16.dp else 24.dp)
     ) {
-        ReceiptDetailHeader(onBackClick)
+        ReceiptDetailHeader(onBackClick, compact)
         when {
             state.isReceiptLoading -> ReceiptLoadingCard()
             state.errorMessage != null -> ReceiptMessageCard(state.errorMessage)
@@ -203,7 +204,8 @@ private fun ReceiptDetailContent(
                 message = state.receiptMessage.orEmpty(),
                 role = role,
                 onShowPayDebt = onShowPayDebt,
-                onShowVoid = onShowVoid
+                onShowVoid = onShowVoid,
+                compact = compact
             )
         }
     }
@@ -223,15 +225,15 @@ private fun ReceiptDetailContent(
 }
 
 @Composable
-private fun ReceiptDetailHeader(onBackClick: () -> Unit) {
+private fun ReceiptDetailHeader(onBackClick: () -> Unit, compact: Boolean) {
     Row(
         modifier = Modifier.fillMaxWidth(),
         horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.CenterVertically
     ) {
         Column {
-            Text("Detail Struk", color = DashboardTextPrimary, fontSize = 32.sp, fontWeight = FontWeight.ExtraBold)
-            Text(
+            Text("Detail Struk", color = DashboardTextPrimary, fontSize = if (compact) 24.sp else 32.sp, fontWeight = FontWeight.ExtraBold)
+            if (!compact) Text(
                 text = "Ringkasan transaksi kasir dan status pembayaran.",
                 color = DashboardTextSecondary,
                 fontSize = 14.sp,
@@ -243,9 +245,11 @@ private fun ReceiptDetailHeader(onBackClick: () -> Unit) {
             shape = RoundedCornerShape(12.dp),
             border = BorderStroke(1.dp, ReceiptLine)
         ) {
-            Icon(Icons.AutoMirrored.Outlined.ArrowBack, contentDescription = null, modifier = Modifier.size(18.dp))
-            Spacer(modifier = Modifier.width(8.dp))
-            Text("Kembali", fontWeight = FontWeight.Bold)
+            Icon(Icons.AutoMirrored.Outlined.ArrowBack, contentDescription = "Kembali", modifier = Modifier.size(18.dp))
+            if (!compact) {
+                Spacer(modifier = Modifier.width(8.dp))
+                Text("Kembali", fontWeight = FontWeight.Bold)
+            }
         }
     }
 }
@@ -256,7 +260,8 @@ private fun ReceiptSummaryCard(
     message: String,
     role: String,
     onShowPayDebt: () -> Unit,
-    onShowVoid: () -> Unit
+    onShowVoid: () -> Unit,
+    compact: Boolean
 ) {
     var showPrintDialog by remember { mutableStateOf(false) }
 
@@ -273,8 +278,8 @@ private fun ReceiptSummaryCard(
         shape = RoundedCornerShape(18.dp),
         border = BorderStroke(1.dp, ReceiptLine)
     ) {
-        Column(modifier = Modifier.padding(28.dp), verticalArrangement = Arrangement.spacedBy(22.dp)) {
-            ReceiptTopSection(transaction)
+        Column(modifier = Modifier.padding(if (compact) 16.dp else 28.dp), verticalArrangement = Arrangement.spacedBy(if (compact) 16.dp else 22.dp)) {
+            ReceiptTopSection(transaction, compact)
             HorizontalDivider(color = ReceiptLine)
             ReceiptTotalsSection(transaction)
             HorizontalDivider(color = ReceiptLine)
@@ -284,19 +289,20 @@ private fun ReceiptSummaryCard(
                 role = role,
                 onPrintClick = { showPrintDialog = true },
                 onShowPayDebt = onShowPayDebt,
-                onShowVoid = onShowVoid
+                onShowVoid = onShowVoid,
+                compact = compact
             )
         }
     }
 }
 
 @Composable
-private fun ReceiptTopSection(transaction: CashTransactionDetail) {
+private fun ReceiptTopSection(transaction: CashTransactionDetail, compact: Boolean) {
     Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Box(
                 modifier = Modifier
-                    .size(56.dp)
+                    .size(if (compact) 44.dp else 56.dp)
                     .clip(RoundedCornerShape(16.dp))
                     .background(DashboardBrandGreen.copy(alpha = 0.14f)),
                 contentAlignment = Alignment.Center
@@ -305,7 +311,7 @@ private fun ReceiptTopSection(transaction: CashTransactionDetail) {
             }
             Spacer(modifier = Modifier.width(16.dp))
             Column {
-                Text(transaction.receiptNumber(), color = DashboardTextPrimary, fontSize = 22.sp, fontWeight = FontWeight.ExtraBold)
+                Text(transaction.receiptNumber(), color = DashboardTextPrimary, fontSize = if (compact) 17.sp else 22.sp, fontWeight = FontWeight.ExtraBold)
                 Text(transaction.createdAt.displayDateTime(), color = DashboardTextSecondary, fontSize = 13.sp)
             }
         }
@@ -390,13 +396,15 @@ private fun ReceiptActions(
     role: String,
     onPrintClick: () -> Unit,
     onShowPayDebt: () -> Unit,
-    onShowVoid: () -> Unit
+    onShowVoid: () -> Unit,
+    compact: Boolean
 ) {
-    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
+    val actions: @Composable () -> Unit = {
         val canAcceptPayment = role.equals("KASIR", ignoreCase = true) || role.equals("OWNER", ignoreCase = true)
         if (!transaction.status.equals("voided", true) && transaction.remainingAmount() > BigDecimal.ZERO && canAcceptPayment) {
             androidx.compose.material3.Button(
                 onClick = onShowPayDebt,
+                modifier = if (compact) Modifier.fillMaxWidth() else Modifier,
                 shape = RoundedCornerShape(12.dp),
                 colors = androidx.compose.material3.ButtonDefaults.buttonColors(containerColor = DashboardBrandGreenDark)
             ) {
@@ -404,20 +412,22 @@ private fun ReceiptActions(
                 Spacer(modifier = Modifier.width(8.dp))
                 Text("Terima Pelunasan", fontWeight = FontWeight.Bold)
             }
-            Spacer(modifier = Modifier.width(12.dp))
+            Spacer(modifier = if (compact) Modifier.height(10.dp) else Modifier.width(12.dp))
         }
         val canVoid = role.equals("OWNER", true) || role.equals("ADMIN", true)
         if (canVoid && !transaction.status.equals("voided", true)) {
             Button(
                 onClick = onShowVoid,
+                modifier = if (compact) Modifier.fillMaxWidth() else Modifier,
                 colors = androidx.compose.material3.ButtonDefaults.buttonColors(containerColor = Color(0xFFB91C1C)),
                 shape = RoundedCornerShape(12.dp)
             ) { Text("Void transaksi", fontWeight = FontWeight.Bold) }
-            Spacer(modifier = Modifier.width(12.dp))
+            Spacer(modifier = if (compact) Modifier.height(10.dp) else Modifier.width(12.dp))
         }
-        
+
         OutlinedButton(
             onClick = onPrintClick,
+            modifier = if (compact) Modifier.fillMaxWidth() else Modifier,
             enabled = true,
             shape = RoundedCornerShape(12.dp),
             border = BorderStroke(1.dp, ReceiptLine)
@@ -427,6 +437,8 @@ private fun ReceiptActions(
             Text("Cetak struk")
         }
     }
+    if (compact) Column(modifier = Modifier.fillMaxWidth()) { actions() }
+    else Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) { actions() }
 }
 
 @Composable

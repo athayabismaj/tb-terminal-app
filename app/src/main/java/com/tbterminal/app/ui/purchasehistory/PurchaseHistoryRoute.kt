@@ -39,6 +39,7 @@ fun AdminPurchaseHistoryScreen(
         userName = name,
         role = role,
         activeDestination = AdminDestination.PurchaseHistory,
+        pageTitle = "Riwayat Pembelian",
         onDashboardClick = onDashboardClick,
         onProductsClick = onProductsClick,
         onAddProductClick = onAddProductClick,

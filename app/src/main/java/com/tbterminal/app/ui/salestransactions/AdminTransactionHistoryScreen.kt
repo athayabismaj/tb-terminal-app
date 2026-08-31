@@ -8,6 +8,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -146,6 +147,7 @@ fun AdminTransactionHistoryScreen(
         userName = name,
         role = role,
         activeDestination = AdminDestination.SalesTransactions,
+        pageTitle = "Riwayat Penjualan",
         onDashboardClick = onDashboardClick,
         onProductsClick = onProductsClick,
         onAddProductClick = onAddProductClick,
@@ -190,14 +192,9 @@ private fun CashierTransactionHistoryContent(
 ) {
     var showCalendarPicker by remember { mutableStateOf(false) }
 
-    Column(
-        modifier = modifier
-            .fillMaxSize()
-            .background(DashboardBackground)
-            .padding(40.dp)
-            .verticalScroll(rememberScrollState()),
-        verticalArrangement = Arrangement.spacedBy(28.dp)
-    ) {
+    BoxWithConstraints(modifier.fillMaxSize().background(DashboardBackground)) {
+        val compact = maxWidth < 700.dp
+        Column(modifier = Modifier.fillMaxSize().padding(horizontal = if (compact) 16.dp else 32.dp, vertical = if (compact) 14.dp else 24.dp).verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(if (compact) 14.dp else 22.dp)) {
         // ── Header ──
         CashierHistoryHeader(
             state = state,
@@ -205,22 +202,18 @@ private fun CashierTransactionHistoryContent(
             onNextDate = viewModel::nextDate,
             onCalendarClick = { showCalendarPicker = true },
             onClearDate = { viewModel.setDate(null) },
-            onDatePresetSelected = viewModel::setDatePreset
+            onDatePresetSelected = viewModel::setDatePreset,
+            compact = compact
         )
 
         // ── Period Info ──
         // ── Search + Date Navigator ──
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(16.dp)
-        ) {
-            // Search Bar
+        val searchField: @Composable (Modifier) -> Unit = { fieldModifier ->
             Surface(
-                shape = RoundedCornerShape(12.dp),
+                shape = RoundedCornerShape(16.dp),
                 color = Color.White,
                 border = BorderStroke(1.dp, CashierLine),
-                modifier = Modifier.weight(1.5f).height(48.dp)
+                modifier = fieldModifier.height(52.dp)
             ) {
                 Row(
                     modifier = Modifier.fillMaxSize().padding(horizontal = 16.dp),
@@ -230,7 +223,7 @@ private fun CashierTransactionHistoryContent(
                     Spacer(modifier = Modifier.width(12.dp))
                     Box(modifier = Modifier.weight(1f), contentAlignment = Alignment.CenterStart) {
                         if (state.query.isEmpty()) {
-                            Text("Cari no struk, pembeli, atau kasir...", color = DashboardTextSecondary.copy(alpha = 0.5f), fontSize = 14.sp)
+                            Text("Cari struk, pembeli, atau kasir", color = DashboardTextSecondary.copy(alpha = 0.5f), fontSize = 14.sp)
                         }
                         BasicTextField(
                             value = state.query,
@@ -242,18 +235,17 @@ private fun CashierTransactionHistoryContent(
                     }
                 }
             }
-
-            TransactionStatusDropdown(
-                selectedStatus = state.statusFilter,
-                onStatusChanged = viewModel::updateStatusFilter,
-                modifier = Modifier.width(220.dp)
-            )
-            TransactionFilterDropdown(
-                selected = state.paymentMethodFilter,
-                choices = listOf("Semua", "tunai", "transfer", "qris", "hutang", "dp"),
-                onChanged = viewModel::updatePaymentMethodFilter,
-                modifier = Modifier.width(180.dp)
-            )
+        }
+        if (compact) {
+            Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                searchField(Modifier.fillMaxWidth())
+                TransactionStatusDropdown(state.statusFilter, viewModel::updateStatusFilter, Modifier.fillMaxWidth())
+                TransactionFilterDropdown(state.paymentMethodFilter, listOf("Semua", "tunai", "transfer", "qris", "hutang", "dp"), viewModel::updatePaymentMethodFilter, Modifier.fillMaxWidth())
+            }
+        } else Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+            searchField(Modifier.weight(1.5f))
+            TransactionStatusDropdown(state.statusFilter, viewModel::updateStatusFilter, Modifier.width(220.dp))
+            TransactionFilterDropdown(state.paymentMethodFilter, listOf("Semua", "tunai", "transfer", "qris", "hutang", "dp"), viewModel::updatePaymentMethodFilter, Modifier.width(180.dp))
         }
 
 
@@ -278,7 +270,7 @@ private fun CashierTransactionHistoryContent(
             border = BorderStroke(1.dp, CashierLine)
         ) {
             Column {
-                CashierHistoryTableHeader()
+                if (!compact) CashierHistoryTableHeader()
                 HorizontalDivider(color = CashierLine)
 
                 when {
@@ -287,7 +279,7 @@ private fun CashierTransactionHistoryContent(
                     state.transactions.isEmpty() -> CashierHistoryMessage("Belum ada transaksi pada sesi ini.")
                     else -> {
                         state.transactions.forEachIndexed { index, transaction ->
-                            CashierHistoryRow(transaction = transaction, onReceiptClick = onReceiptClick)
+                            if (compact) CashierHistoryMobileRow(transaction, onReceiptClick) else CashierHistoryRow(transaction = transaction, onReceiptClick = onReceiptClick)
                             if (index < state.transactions.lastIndex) {
                                 HorizontalDivider(color = CashierLine.copy(alpha = 0.75f))
                             }
@@ -296,8 +288,9 @@ private fun CashierTransactionHistoryContent(
                 }
 
                 HorizontalDivider(color = CashierLine)
-                CashierHistoryPagination(state, onPreviousPage, onNextPage)
+                CashierHistoryPagination(state, compact, onPreviousPage, onNextPage)
             }
+        }
         }
     }
 
@@ -497,19 +490,17 @@ private fun CashierHistoryHeader(
     onNextDate: () -> Unit,
     onCalendarClick: () -> Unit,
     onClearDate: () -> Unit,
-    onDatePresetSelected: (String) -> Unit
+    onDatePresetSelected: (String) -> Unit,
+    compact: Boolean
 ) {
-    Row(
+    if (compact) Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+        HistoryDateFilter(selectedDate = state.endDate ?: state.selectedDate, onPreviousDate = onPreviousDate, onNextDate = onNextDate, onCalendarClick = onCalendarClick, onClearDate = onClearDate, displayTextOverride = state.dateRangeLabel(), modifier = Modifier.fillMaxWidth())
+        TransactionDatePresets(state.selectedPreset, onDatePresetSelected, Modifier.fillMaxWidth())
+    } else Row(
         modifier = Modifier.fillMaxWidth(),
         horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.Top
     ) {
-        Text(
-            "Riwayat Transaksi",
-            color = DashboardTextPrimary,
-            fontSize = 28.sp,
-            fontWeight = FontWeight.Medium
-        )
         Row(
             horizontalArrangement = Arrangement.spacedBy(10.dp),
             verticalAlignment = Alignment.CenterVertically
@@ -535,12 +526,12 @@ private fun CashierHistoryHeader(
 // TABLE HEADER, ROW, SKELETON, PAGINATION
 // ═══════════════════════════════════════════════
 @Composable
-private fun TransactionDatePresets(selectedPreset: String?, onSelected: (String) -> Unit) {
+private fun TransactionDatePresets(selectedPreset: String?, onSelected: (String) -> Unit, modifier: Modifier = Modifier) {
     Surface(
         shape = RoundedCornerShape(12.dp),
         color = Color.White,
         border = BorderStroke(1.dp, CashierLine),
-        modifier = Modifier.height(48.dp)
+        modifier = modifier.height(48.dp)
     ) {
         Row(
             modifier = Modifier.padding(horizontal = 6.dp, vertical = 6.dp),
@@ -738,6 +729,27 @@ private fun CashierHistoryRow(
 }
 
 @Composable
+private fun CashierHistoryMobileRow(transaction: CashTransaction, onReceiptClick: (String) -> Unit) {
+    Column(Modifier.fillMaxWidth().clickable { onReceiptClick(transaction.id) }.padding(horizontal = 16.dp, vertical = 14.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+        Row(verticalAlignment = Alignment.Top) {
+            Column(Modifier.weight(1f)) {
+                Text(transaction.receiptNumber(), color = DashboardTextPrimary, fontWeight = FontWeight.ExtraBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                Text("${transaction.createdAt.displayDate()} · ${transaction.createdAt.displayTime()}", color = DashboardTextSecondary, fontSize = 11.sp)
+            }
+            Box(Modifier.clip(RoundedCornerShape(999.dp)).background(transaction.status.statusColor().copy(alpha = 0.12f)).padding(horizontal = 10.dp, vertical = 5.dp)) {
+                Text(transaction.status.uppercase(), color = transaction.status.statusColor(), fontSize = 10.sp, fontWeight = FontWeight.Bold)
+            }
+        }
+        Text(transaction.customerName ?: "Pelanggan umum", color = DashboardTextPrimary, fontSize = 13.sp, fontWeight = FontWeight.Medium)
+        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+            Column(Modifier.weight(1f)) { Text("Total", color = DashboardTextSecondary, fontSize = 10.sp); Text(transaction.total.moneyText(), color = DashboardTextPrimary, fontWeight = FontWeight.Bold) }
+            Column(horizontalAlignment = Alignment.End) { Text("Dibayar", color = DashboardTextSecondary, fontSize = 10.sp); Text(transaction.paidAmount.moneyText(), color = DashboardTextSecondary, fontWeight = FontWeight.SemiBold) }
+            Spacer(Modifier.width(8.dp)); Icon(Icons.Outlined.Visibility, "Detail struk", tint = DashboardTextSecondary)
+        }
+    }
+}
+
+@Composable
 private fun CashierHeaderText(
     text: String,
     modifier: Modifier,
@@ -797,50 +809,23 @@ private fun CashierHistoryMessage(message: String) {
 @Composable
 private fun CashierHistoryPagination(
     state: AdminTransactionHistoryUiState,
+    compact: Boolean,
     onPreviousPage: () -> Unit,
     onNextPage: () -> Unit
 ) {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .background(CashierSurfaceSoft)
-            .padding(horizontal = 24.dp, vertical = 16.dp),
-        horizontalArrangement = Arrangement.SpaceBetween,
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        Text(
-            "Menampilkan ${state.currentStart}-${state.currentEnd} dari ${state.total} transaksi",
-            color = DashboardTextSecondary,
-            fontWeight = FontWeight.Bold
-        )
+    val controls: @Composable () -> Unit = {
         Row(horizontalArrangement = Arrangement.spacedBy(10.dp), verticalAlignment = Alignment.CenterVertically) {
-            OutlinedButton(
-                onClick = onPreviousPage,
-                enabled = state.page > 1,
-                shape = RoundedCornerShape(12.dp),
-                border = BorderStroke(1.dp, CashierLine)
-            ) {
-                Icon(Icons.Default.ChevronLeft, contentDescription = null)
-            }
-            Box(
-                modifier = Modifier
-                    .size(44.dp)
-                    .clip(RoundedCornerShape(12.dp))
-                    .background(DashboardBrandGreenDark),
-                contentAlignment = Alignment.Center
-            ) {
-                Text(state.page.toString(), color = Color.White, fontWeight = FontWeight.Bold)
-            }
-            Text("/ ${state.totalPages}", color = DashboardTextSecondary, fontWeight = FontWeight.Bold)
-            OutlinedButton(
-                onClick = onNextPage,
-                enabled = state.page < state.totalPages,
-                shape = RoundedCornerShape(12.dp),
-                border = BorderStroke(1.dp, CashierLine)
-            ) {
-                Icon(Icons.Default.ChevronRight, contentDescription = null)
-            }
+            OutlinedButton(onPreviousPage, enabled = state.page > 1, shape = RoundedCornerShape(12.dp), border = BorderStroke(1.dp, CashierLine)) { Icon(Icons.Default.ChevronLeft, null) }
+            Text("${state.page} / ${state.totalPages}", color = DashboardTextPrimary, fontWeight = FontWeight.Bold)
+            OutlinedButton(onNextPage, enabled = state.page < state.totalPages, shape = RoundedCornerShape(12.dp), border = BorderStroke(1.dp, CashierLine)) { Icon(Icons.Default.ChevronRight, null) }
         }
+    }
+    if (compact) Column(Modifier.fillMaxWidth().background(CashierSurfaceSoft).padding(14.dp), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(10.dp)) {
+        Text("${state.total} transaksi", color = DashboardTextSecondary, fontSize = 12.sp)
+        controls()
+    } else Row(Modifier.fillMaxWidth().background(CashierSurfaceSoft).padding(horizontal = 24.dp, vertical = 16.dp), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+        Text("Menampilkan ${state.currentStart}-${state.currentEnd} dari ${state.total} transaksi", color = DashboardTextSecondary, fontWeight = FontWeight.Bold)
+        controls()
     }
 }
 
