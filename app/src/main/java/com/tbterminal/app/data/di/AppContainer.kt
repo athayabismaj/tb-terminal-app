@@ -22,6 +22,7 @@ import com.tbterminal.app.data.repository.CheckoutRepository
 import com.tbterminal.app.data.repository.CustomerRepository
 import com.tbterminal.app.data.repository.InventoryRepository
 import com.tbterminal.app.data.repository.LocalBackupRepository
+import com.tbterminal.app.data.repository.ManagerApprovalRepository
 import com.tbterminal.app.data.repository.OfflineDashboardRepository
 import com.tbterminal.app.data.repository.OfflineReportRepository
 import com.tbterminal.app.data.repository.RemoteAuthRepository
@@ -29,6 +30,7 @@ import com.tbterminal.app.data.repository.RemoteCashReconciliationRepository
 import com.tbterminal.app.data.repository.RemoteCheckoutRepository
 import com.tbterminal.app.data.repository.RemoteCustomerRepository
 import com.tbterminal.app.data.repository.RemoteInventoryRepository
+import com.tbterminal.app.data.repository.RemoteManagerApprovalRepository
 import com.tbterminal.app.data.repository.RemotePurchasingRepository
 import com.tbterminal.app.data.repository.RemoteReceivableRepository
 import com.tbterminal.app.data.repository.RemoteSecurityLogRepository
@@ -88,6 +90,7 @@ interface AppContainer {
     val receivableRepository: ReceivableRepository
     val documentNumberGenerator: DocumentNumberGenerator
     val analyticsRepository: AnalyticsRepository
+    val managerApprovalRepository: ManagerApprovalRepository
     val systemRepository: com.tbterminal.app.data.repository.SystemRepository
 }
 
@@ -320,6 +323,10 @@ class DefaultAppContainer(
 
     override val analyticsRepository: AnalyticsRepository by lazy {
         RemoteAnalyticsRepository(networkModule.analyticsApi)
+    }
+
+    override val managerApprovalRepository: ManagerApprovalRepository by lazy {
+        RemoteManagerApprovalRepository(networkModule.managerApprovalApi)
     }
 
     override val systemRepository: com.tbterminal.app.data.repository.SystemRepository by lazy {

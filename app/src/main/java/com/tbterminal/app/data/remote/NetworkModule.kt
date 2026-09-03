@@ -147,6 +147,10 @@ class NetworkModule(
         retrofit.create(com.tbterminal.app.data.network.SystemApi::class.java)
     }
 
+    val managerApprovalApi: com.tbterminal.app.data.network.ManagerApprovalApi by lazy {
+        retrofit.create(com.tbterminal.app.data.network.ManagerApprovalApi::class.java)
+    }
+
     val healthApi: HealthApi by lazy {
         healthRetrofit.create(HealthApi::class.java)
     }
