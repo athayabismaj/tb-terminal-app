@@ -7,6 +7,8 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import com.tbterminal.app.data.repository.PurchasingRepository
 import com.tbterminal.app.ui.dashboard.admin.AdminDashboardShell
 import com.tbterminal.app.ui.dashboard.admin.AdminDestination
+import com.tbterminal.app.ui.components.RefreshableContent
+import androidx.compose.ui.Modifier
 
 @Composable
 fun AdminPurchaseHistoryScreen(
@@ -59,16 +61,22 @@ fun AdminPurchaseHistoryScreen(
         onOperationalAuditClick = onOperationalAuditClick,
         onLogout = onLogout
     ) { modifier ->
-        PurchaseHistoryScreen(
+        RefreshableContent(
+            isRefreshing = uiState.isLoading && uiState.purchases.isNotEmpty(),
+            onRefresh = viewModel::refresh,
             modifier = modifier,
+        ) {
+            PurchaseHistoryScreen(
+            modifier = Modifier,
             uiState = uiState,
             onSupplierSelected = viewModel::onSupplierSelected,
             onSearchChanged = viewModel::onSearchChanged,
-            onRefresh = { viewModel.loadPurchases() },
+            onRefresh = viewModel::refresh,
             onShowDetail = viewModel::showDetail,
             onDismissDetail = viewModel::dismissDetail,
             onPreviousPage = viewModel::previousPage,
             onNextPage = viewModel::nextPage
-        )
+            )
+        }
     }
 }

@@ -59,6 +59,8 @@ class ProductCategoryViewModel(
         }
     }
 
+    fun refresh() = loadCategories(_uiState.value.page)
+
     fun onNameChanged(name: String) {
         _uiState.update { state -> state.copy(nameInput = name, message = null) }
     }

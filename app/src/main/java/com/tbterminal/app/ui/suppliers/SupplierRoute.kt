@@ -7,6 +7,8 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import com.tbterminal.app.data.repository.PurchasingRepository
 import com.tbterminal.app.ui.dashboard.admin.AdminDashboardShell
 import com.tbterminal.app.ui.dashboard.admin.AdminDestination
+import com.tbterminal.app.ui.components.RefreshableContent
+import androidx.compose.ui.Modifier
 
 @Composable
 fun AdminSupplierScreen(
@@ -58,8 +60,13 @@ fun AdminSupplierScreen(
         onOperationalAuditClick = onOperationalAuditClick,
         onLogout = onLogout
     ) { modifier ->
-        SupplierScreen(
+        RefreshableContent(
+            isRefreshing = uiState.isLoading && uiState.suppliers.isNotEmpty(),
+            onRefresh = viewModel::refresh,
             modifier = modifier,
+        ) {
+            SupplierScreen(
+            modifier = Modifier,
             uiState = uiState,
             onNameChanged = viewModel::onNameChanged,
             onPhoneChanged = viewModel::onPhoneChanged,
@@ -70,10 +77,11 @@ fun AdminSupplierScreen(
             onEdit = viewModel::edit,
             onCancelEdit = viewModel::cancelEdit,
             onDelete = viewModel::delete,
-            onRefresh = viewModel::loadSuppliers,
+            onRefresh = viewModel::refresh,
             onPreviousPage = viewModel::previousPage,
             onNextPage = viewModel::nextPage,
             onDismissMessage = viewModel::clearMessage
-        )
+            )
+        }
     }
 }

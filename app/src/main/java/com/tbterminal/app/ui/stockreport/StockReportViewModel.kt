@@ -58,6 +58,8 @@ class StockReportViewModel(
         }
     }
 
+    fun refresh() = loadStocks(_uiState.value.page)
+
     fun onSearchChanged(query: String) {
         _uiState.update { it.copy(searchQuery = query, page = 1, errorMessage = null) }
         searchJob?.cancel()

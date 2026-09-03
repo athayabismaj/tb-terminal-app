@@ -13,8 +13,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -27,6 +25,8 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.tbterminal.app.data.model.Supplier
+import com.tbterminal.app.ui.components.AppConfirmationSpec
+import com.tbterminal.app.ui.components.AppConfirmDialog
 
 @Composable
 internal fun SupplierCardTitle(icon: ImageVector, title: String, bottomPadding: Dp = 24.dp) {
@@ -49,9 +49,10 @@ internal fun SupplierMessage(message: String, onDismiss: () -> Unit) {
 
 @Composable
 internal fun SupplierLoadingState() {
-    Box(Modifier.fillMaxWidth().height(SupplierListHeight), contentAlignment = Alignment.Center) {
-        CircularProgressIndicator(color = SupplierEmerald600)
-    }
+    com.tbterminal.app.ui.components.SkeletonList(
+        modifier = Modifier.fillMaxWidth().height(SupplierListHeight),
+        itemCount = 6,
+    )
 }
 
 @Composable
@@ -63,12 +64,15 @@ internal fun SupplierEmptyState() {
 
 @Composable
 internal fun SupplierDeactivateDialog(supplier: Supplier, onDismiss: () -> Unit, onConfirm: () -> Unit) {
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = { Text("Nonaktifkan supplier?") },
-        text = { Text("${supplier.name} tidak dapat dipakai pada restok baru setelah dinonaktifkan.") },
-        confirmButton = { TextButton(onClick = onConfirm) { Text("Nonaktifkan") } },
-        dismissButton = { TextButton(onClick = onDismiss) { Text("Batal") } }
+    AppConfirmDialog(
+        spec = AppConfirmationSpec(
+            title = "Nonaktifkan supplier",
+            target = supplier.name,
+            consequence = "Supplier tidak dapat dipakai pada restok baru setelah dinonaktifkan.",
+            confirmLabel = "Nonaktifkan",
+        ),
+        onDismiss = onDismiss,
+        onConfirm = onConfirm,
     )
 }
 

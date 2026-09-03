@@ -7,6 +7,7 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import com.tbterminal.app.data.repository.InventoryRepository
 import com.tbterminal.app.ui.dashboard.admin.AdminDashboardShell
 import com.tbterminal.app.ui.dashboard.admin.AdminDestination
+import com.tbterminal.app.ui.components.RefreshableContent
 
 @Composable
 fun AdminStockReportScreen(
@@ -59,14 +60,20 @@ fun AdminStockReportScreen(
         onOperationalAuditClick = onOperationalAuditClick,
         onLogout = onLogout
     ) { modifier ->
-        StockReportScreen(
+        RefreshableContent(
+            isRefreshing = uiState.isLoading && uiState.stocks.isNotEmpty(),
+            onRefresh = viewModel::refresh,
             modifier = modifier,
+        ) {
+            StockReportScreen(
+            modifier = androidx.compose.ui.Modifier,
             uiState = uiState,
             onSearchChanged = viewModel::onSearchChanged,
             onCategoryFilterChanged = viewModel::onCategoryFilterChanged,
             onProductSelected = viewModel::selectProduct,
             onPreviousPage = viewModel::previousPage,
             onNextPage = viewModel::nextPage
-        )
+            )
+        }
     }
 }

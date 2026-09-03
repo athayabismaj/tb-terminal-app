@@ -18,7 +18,6 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.ListAlt
 import androidx.compose.material.icons.outlined.Delete
 import androidx.compose.material.icons.outlined.Edit
-import androidx.compose.material.icons.outlined.Refresh
 import androidx.compose.material.icons.outlined.Search
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
@@ -119,17 +118,6 @@ private fun CategoryToolbar(
             colors = productCategoryTextFieldColors(),
             shape = RoundedCornerShape(8.dp)
         )
-        OutlinedButton(
-            onClick = onRetry,
-            modifier = Modifier.height(54.dp),
-            shape = RoundedCornerShape(8.dp),
-            border = BorderStroke(1.dp, CategorySlate200),
-            colors = ButtonDefaults.outlinedButtonColors(contentColor = CategorySlate600)
-        ) {
-            Icon(Icons.Outlined.Refresh, contentDescription = null, modifier = Modifier.size(18.dp))
-            Spacer(modifier = Modifier.width(6.dp))
-            Text("Muat Ulang", fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
-        }
     }
 }
 

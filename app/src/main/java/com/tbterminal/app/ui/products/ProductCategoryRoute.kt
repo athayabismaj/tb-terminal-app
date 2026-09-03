@@ -7,6 +7,7 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import com.tbterminal.app.data.repository.InventoryRepository
 import com.tbterminal.app.ui.dashboard.admin.AdminDashboardShell
 import com.tbterminal.app.ui.dashboard.admin.AdminDestination
+import com.tbterminal.app.ui.components.RefreshableContent
 
 @Composable
 fun AdminProductCategoriesScreen(
@@ -64,18 +65,24 @@ fun AdminProductCategoriesScreen(
         onSettingsClick = onSettingsClick,
         onLogout = onLogout
     ) { contentModifier ->
-        ProductCategoryContent(
+        RefreshableContent(
+            isRefreshing = uiState.isLoading && uiState.categories.isNotEmpty(),
+            onRefresh = viewModel::refresh,
             modifier = contentModifier,
+        ) {
+            ProductCategoryContent(
+            modifier = androidx.compose.ui.Modifier,
             uiState = uiState,
             onNameChanged = viewModel::onNameChanged,
             onSave = viewModel::save,
             onEdit = viewModel::edit,
             onCancelEdit = viewModel::cancelEdit,
             onDelete = viewModel::delete,
-            onRetry = { viewModel.loadCategories() },
+            onRetry = viewModel::refresh,
             onSearchChanged = viewModel::onSearchChanged,
             onPreviousPage = viewModel::previousPage,
             onNextPage = viewModel::nextPage
-        )
+            )
+        }
     }
 }

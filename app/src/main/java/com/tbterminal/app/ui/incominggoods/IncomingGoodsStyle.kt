@@ -48,9 +48,7 @@ internal fun HeaderText(
 
 @Composable
 internal fun LoadingState() {
-    Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-        CircularProgressIndicator(color = IncomingPrimary)
-    }
+    com.tbterminal.app.ui.components.SkeletonList(modifier = Modifier.fillMaxSize(), itemCount = 6)
 }
 
 @Composable

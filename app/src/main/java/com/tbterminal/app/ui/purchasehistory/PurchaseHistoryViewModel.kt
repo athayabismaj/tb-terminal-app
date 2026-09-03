@@ -53,6 +53,8 @@ class PurchaseHistoryViewModel(
         }
     }
 
+    fun refresh() = loadPurchases(_uiState.value.page)
+
     fun onSupplierSelected(supplierId: String?) {
         _uiState.update { it.copy(selectedSupplierId = supplierId, page = 1, errorMessage = null) }
         loadPurchases(page = 1)

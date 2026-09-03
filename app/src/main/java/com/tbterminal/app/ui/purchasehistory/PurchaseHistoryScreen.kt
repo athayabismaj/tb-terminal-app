@@ -148,7 +148,7 @@ private fun PurchaseTable(
     Column(Modifier.fillMaxWidth()) {
         if (!compact) PurchaseTableHeader()
         when {
-            uiState.isLoading -> LoadingBox()
+            uiState.isLoading && uiState.purchases.isEmpty() -> LoadingBox()
             uiState.errorMessage != null -> PurchaseError(uiState.errorMessage, onRefresh)
             uiState.visiblePurchases.isEmpty() -> EmptyBox(uiState.searchQuery)
             else -> uiState.visiblePurchases.forEachIndexed { index, purchase ->
@@ -384,7 +384,10 @@ private fun DetailInfo(label: String, value: String) {
 }
 
 @Composable
-private fun LoadingBox() = Box(Modifier.fillMaxWidth().height(180.dp), contentAlignment = Alignment.Center) { CircularProgressIndicator() }
+private fun LoadingBox() = com.tbterminal.app.ui.components.SkeletonList(
+    modifier = Modifier.fillMaxWidth().height(180.dp),
+    itemCount = 4,
+)
 
 @Composable
 private fun EmptyBox(searchQuery: String) = Box(Modifier.fillMaxWidth().height(180.dp), contentAlignment = Alignment.Center) {

@@ -361,14 +361,7 @@ private fun ProductPageIconButton(
 
 @Composable
 internal fun ProductLoadingState(modifier: Modifier = Modifier) {
-    Box(
-        modifier = modifier
-            .fillMaxWidth()
-            .padding(32.dp),
-        contentAlignment = Alignment.Center
-    ) {
-        CircularProgressIndicator(color = ProductPrimary)
-    }
+    com.tbterminal.app.ui.components.SkeletonList(modifier = modifier, itemCount = 6)
 }
 
 @Composable

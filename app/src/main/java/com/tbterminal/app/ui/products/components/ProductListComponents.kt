@@ -84,8 +84,8 @@ internal fun ProductTableCard(
         if (!compact) ProductTableHeader()
 
         when {
-            uiState.isLoading -> ProductTableSkeletonRows()
-            uiState.errorMessage != null -> ProductErrorState(message = uiState.errorMessage, onRetry = onRetry)
+            uiState.isLoading && products.isEmpty() -> ProductTableSkeletonRows()
+            uiState.errorMessage != null && products.isEmpty() -> ProductErrorState(message = uiState.errorMessage, onRetry = onRetry)
             products.isEmpty() -> ProductEmptyState()
             else -> {
                 products.forEachIndexed { index, product ->

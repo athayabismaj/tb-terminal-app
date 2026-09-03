@@ -232,7 +232,10 @@ private fun StockTableCard(
         Column {
             if (!compact) StockTableHeader()
             when {
-                uiState.isLoading -> Box(Modifier.fillMaxWidth().height(180.dp), contentAlignment = Alignment.Center) { CircularProgressIndicator() }
+                uiState.isLoading -> com.tbterminal.app.ui.components.SkeletonList(
+                    modifier = Modifier.fillMaxWidth().height(180.dp),
+                    itemCount = 4,
+                )
                 uiState.errorMessage != null -> StockError(uiState.errorMessage)
                 uiState.visibleStocks.isEmpty() -> Box(Modifier.fillMaxWidth().height(180.dp), contentAlignment = Alignment.Center) { Text("Belum ada data stok.", color = StockReportMuted) }
                 else -> uiState.visibleStocks.forEachIndexed { index, stock ->

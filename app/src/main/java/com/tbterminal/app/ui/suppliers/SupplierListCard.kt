@@ -6,23 +6,17 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.ListAlt
-import androidx.compose.material.icons.outlined.Refresh
 import androidx.compose.material.icons.outlined.Search
-import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -54,7 +48,7 @@ internal fun SupplierListCard(
         Column(modifier = Modifier.fillMaxWidth()) {
             SupplierListHeader(uiState.totalSuppliers)
             HorizontalDivider(color = SupplierSlate100)
-            SupplierToolbar(uiState.searchQuery, onSearchChanged, onRefresh)
+            SupplierToolbar(uiState.searchQuery, onSearchChanged)
             SupplierTableHeader()
             SupplierTableBody(uiState, onEdit, onDelete)
             MasterDataPagination("supplier", uiState.totalSuppliers, uiState.page, uiState.totalPages, uiState.pageSize, uiState.isLoading, onPreviousPage, onNextPage)
@@ -73,7 +67,7 @@ private fun SupplierListHeader(total: Long) {
 }
 
 @Composable
-private fun SupplierToolbar(searchQuery: String, onSearchChanged: (String) -> Unit, onRefresh: () -> Unit) {
+private fun SupplierToolbar(searchQuery: String, onSearchChanged: (String) -> Unit) {
     Row(Modifier.fillMaxWidth().padding(24.dp), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
         OutlinedTextField(
             value = searchQuery,
@@ -85,10 +79,5 @@ private fun SupplierToolbar(searchQuery: String, onSearchChanged: (String) -> Un
             shape = RoundedCornerShape(8.dp),
             singleLine = true
         )
-        OutlinedButton(onClick = onRefresh, modifier = Modifier.height(54.dp), colors = ButtonDefaults.outlinedButtonColors(contentColor = SupplierSlate600), shape = RoundedCornerShape(8.dp), border = BorderStroke(1.dp, SupplierSlate200)) {
-            Icon(Icons.Outlined.Refresh, contentDescription = null, modifier = Modifier.size(18.dp))
-            Spacer(modifier = Modifier.width(6.dp))
-            Text("Muat Ulang", fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
-        }
     }
 }

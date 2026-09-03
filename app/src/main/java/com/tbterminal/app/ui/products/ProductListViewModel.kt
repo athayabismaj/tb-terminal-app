@@ -127,6 +127,8 @@ class ProductListViewModel(
         }
     }
 
+    fun refresh() = loadProducts(_uiState.value.page)
+
     fun onCategorySelected(category: String) {
         _uiState.update { state ->
             state.copy(selectedCategory = category)

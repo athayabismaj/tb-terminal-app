@@ -59,6 +59,8 @@ class ProductUnitViewModel(
         }
     }
 
+    fun refresh() = loadUnits(_uiState.value.page)
+
     fun onNameChanged(name: String) {
         _uiState.update { state -> state.copy(nameInput = name, message = null) }
     }

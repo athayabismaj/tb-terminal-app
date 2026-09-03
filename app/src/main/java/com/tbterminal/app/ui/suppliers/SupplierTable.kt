@@ -38,7 +38,7 @@ internal fun SupplierTableHeader() {
 @Composable
 internal fun SupplierTableBody(uiState: SupplierUiState, onEdit: (Supplier) -> Unit, onDelete: (Supplier) -> Unit) {
     when {
-        uiState.isLoading -> SupplierLoadingState()
+        uiState.isLoading && uiState.suppliers.isEmpty() -> SupplierLoadingState()
         uiState.suppliers.isEmpty() -> SupplierEmptyState()
         else -> Column(modifier = Modifier.fillMaxWidth()) {
             uiState.suppliers.forEach { SupplierRow(it, onEdit, onDelete) }

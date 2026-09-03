@@ -56,6 +56,8 @@ class SupplierViewModel(
         }
     }
 
+    fun refresh() = loadSuppliers(_uiState.value.page)
+
     fun onSearchChanged(query: String) {
         _uiState.update { it.copy(searchQuery = query, page = 1, message = null) }
         searchJob?.cancel()

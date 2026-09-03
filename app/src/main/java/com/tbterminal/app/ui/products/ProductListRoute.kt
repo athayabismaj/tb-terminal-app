@@ -2,7 +2,6 @@ package com.tbterminal.app.ui.products
 
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -26,6 +25,9 @@ import com.tbterminal.app.data.model.ProductStock
 import com.tbterminal.app.data.repository.InventoryRepository
 import com.tbterminal.app.ui.dashboard.admin.AdminDashboardShell
 import com.tbterminal.app.ui.dashboard.admin.AdminDestination
+import com.tbterminal.app.ui.components.RefreshableContent
+import com.tbterminal.app.ui.components.AppConfirmationSpec
+import com.tbterminal.app.ui.components.AppConfirmDialog
 
 @Composable
 fun AdminProductListScreen(
@@ -95,12 +97,17 @@ fun AdminProductListScreen(
         onSettingsClick = onSettingsClick,
         onLogout = onLogout
     ) { contentModifier ->
-        ProductListContent(
+        RefreshableContent(
+            isRefreshing = uiState.isLoading && uiState.products.isNotEmpty(),
+            onRefresh = viewModel::refresh,
             modifier = contentModifier,
+        ) {
+            ProductListContent(
+            modifier = Modifier,
             uiState = uiState,
             onSearchChanged = viewModel::onSearchChanged,
             onCategorySelected = viewModel::onCategorySelected,
-            onRetry = { viewModel.loadProducts() },
+            onRetry = viewModel::refresh,
             onAddProductClick = onAddProductClick,
             onImportProductClick = { csvLauncher.launch(arrayOf("text/csv", "text/comma-separated-values", "text/plain")) },
             onEditProductClick = onEditProductClick,
@@ -111,7 +118,8 @@ fun AdminProductListScreen(
             onPreviousPage = viewModel::previousPage,
             onNextPage = viewModel::nextPage,
             onDismissMessage = viewModel::clearActionMessage
-        )
+            )
+        }
     }
 
     if (uiState.showImportDialog) {
@@ -148,36 +156,23 @@ fun AdminProductListScreen(
 
     productToToggle?.let { product ->
         val isActivating = !product.isActive
-        AlertDialog(
-            onDismissRequest = { productToToggle = null },
-            title = { Text(if (isActivating) "Aktifkan Produk" else "Nonaktifkan Produk") },
-            text = {
-                Text(
-                    if (isActivating) {
-                        "Produk ${product.productName} akan tersedia kembali untuk transaksi dan pengelolaan stok."
-                    } else {
-                        "Produk ${product.productName} akan dinonaktifkan dari katalog aktif, tetapi riwayat transaksinya tetap tersimpan."
-                    }
-                )
+        AppConfirmDialog(
+            spec = AppConfirmationSpec(
+                title = if (isActivating) "Aktifkan produk" else "Nonaktifkan produk",
+                target = product.productName,
+                consequence = if (isActivating) {
+                    "Produk akan tersedia kembali untuk transaksi dan pengelolaan stok."
+                } else {
+                    "Produk keluar dari katalog aktif, tetapi seluruh riwayat transaksi tetap tersimpan."
+                },
+                confirmLabel = if (isActivating) "Aktifkan" else "Nonaktifkan",
+            ),
+            onDismiss = { productToToggle = null },
+            onConfirm = {
+                productToToggle = null
+                viewModel.toggleProductStatus(product)
             },
-            confirmButton = {
-                Button(
-                    onClick = {
-                        productToToggle = null
-                        viewModel.toggleProductStatus(product)
-                    },
-                    colors = ButtonDefaults.buttonColors(
-                        containerColor = if (isActivating) ProductPrimary else ProductDanger
-                    )
-                ) {
-                    Text(if (isActivating) "Aktifkan" else "Nonaktifkan")
-                }
-            },
-            dismissButton = {
-                TextButton(onClick = { productToToggle = null }) {
-                    Text("Batal")
-                }
-            }
+            destructive = !isActivating,
         )
     }
 }
