@@ -7,6 +7,7 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import com.tbterminal.app.data.repository.CashReconciliationRepository
 import com.tbterminal.app.ui.dashboard.admin.AdminDashboardShell
 import com.tbterminal.app.ui.dashboard.admin.AdminDestination
+import com.tbterminal.app.ui.components.RefreshableContent
 
 @Composable
 fun AdminCashExpenseHistoryScreen(
@@ -46,11 +47,16 @@ fun AdminCashExpenseHistoryScreen(
         onOperationalAuditClick = onOperationalAuditClick,
         onLogout = onLogout
     ) { modifier ->
-        CashExpenseHistoryScreen(
+        RefreshableContent(
+            isRefreshing = uiState.isLoading && uiState.expenses.isNotEmpty(),
+            onRefresh = viewModel::refresh,
             modifier = modifier,
+        ) {
+            CashExpenseHistoryScreen(
+            modifier = androidx.compose.ui.Modifier,
             uiState = uiState,
             onSearchChanged = viewModel::setSearchQuery,
-            onRefresh = { viewModel.loadExpenses(uiState.page) },
+            onRefresh = viewModel::refresh,
             onDateChanged = viewModel::setDate,
             onDatePresetSelected = viewModel::setDatePreset,
             onPreviousDate = viewModel::previousDate,
@@ -58,6 +64,7 @@ fun AdminCashExpenseHistoryScreen(
             onShowSessionDetail = onShowSessionDetail,
             onPreviousPage = viewModel::previousPage,
             onNextPage = viewModel::nextPage
-        )
+            )
+        }
     }
 }

@@ -51,6 +51,8 @@ class CashSessionHistoryViewModel(
         }
     }
 
+    fun refresh() = loadSessions(_uiState.value.page)
+
     fun setStatusFilter(status: String) {
         _uiState.update { it.copy(statusFilter = status, page = 1) }
         loadSessions()

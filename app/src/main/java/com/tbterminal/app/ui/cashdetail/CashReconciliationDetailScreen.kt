@@ -15,13 +15,10 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.outlined.Refresh
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.HorizontalDivider
-import androidx.compose.material3.Icon
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -275,19 +272,18 @@ private fun SelectSessionPrompt(onOpenHistory: () -> Unit) {
 }
 
 @Composable
-private fun LoadingBox() = Box(Modifier.fillMaxWidth().height(240.dp), contentAlignment = Alignment.Center) { CircularProgressIndicator() }
+private fun LoadingBox() = com.tbterminal.app.ui.components.SkeletonList(
+    modifier = Modifier.fillMaxWidth().height(240.dp),
+    itemCount = 5,
+)
 
 @Composable
 private fun ErrorBox(message: String, onRetry: () -> Unit) {
-    Column(Modifier.fillMaxWidth().height(240.dp), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.Center) {
-        Text(message, color = Color(0xFFDC2626))
-        Spacer(Modifier.height(8.dp))
-        OutlinedButton(onClick = onRetry) {
-            Icon(Icons.Outlined.Refresh, null)
-            Spacer(Modifier.width(6.dp))
-            Text("Coba Lagi")
-        }
-    }
+    com.tbterminal.app.ui.components.AppErrorState(
+        message = message,
+        onRetry = onRetry,
+        modifier = Modifier.height(240.dp),
+    )
 }
 
 @Composable

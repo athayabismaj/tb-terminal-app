@@ -224,9 +224,8 @@ private fun ReceivableRows(
     compact: Boolean
 ) {
     when {
-        uiState.isLoading -> ReceivableCenteredContent(modifier) {
-            CircularProgressIndicator(color = ReceivablePrimaryDark)
-        }
+        uiState.isLoading && uiState.receivables.isEmpty() ->
+            com.tbterminal.app.ui.components.SkeletonList(modifier = modifier, itemCount = 6)
 
         uiState.errorMessage != null && uiState.receivables.isEmpty() -> ReceivableCenteredContent(modifier) {
             Text("Piutang pelanggan gagal dimuat.", color = ReceivableDanger, fontWeight = FontWeight.Bold)

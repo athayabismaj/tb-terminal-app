@@ -58,12 +58,11 @@ internal fun SupplierDebtRows(
 ) {
     Box(modifier = modifier.fillMaxWidth()) {
         when {
-            uiState.isLoading -> Box(
-                modifier = Modifier.fillMaxWidth().height(180.dp),
-                contentAlignment = Alignment.Center
-            ) {
-                CircularProgressIndicator(color = DebtPrimaryDark)
-            }
+            uiState.isLoading && uiState.payables.isEmpty() ->
+                com.tbterminal.app.ui.components.SkeletonList(
+                    modifier = Modifier.fillMaxWidth().height(180.dp),
+                    itemCount = 4,
+                )
 
             uiState.errorMessage != null && uiState.payables.isEmpty() -> Box(
                 modifier = Modifier.fillMaxWidth().height(180.dp),

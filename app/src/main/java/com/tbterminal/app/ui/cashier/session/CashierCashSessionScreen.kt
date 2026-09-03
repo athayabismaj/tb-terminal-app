@@ -55,14 +55,10 @@ fun CashierCashSessionScreen(
             LocalCashSessionBadges(uiState = uiState)
 
             if (uiState.isLoading && !uiState.isSubmitting) {
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(300.dp),
-                    contentAlignment = Alignment.Center
-                ) {
-                    CircularProgressIndicator(color = Primary)
-                }
+                com.tbterminal.app.ui.components.SkeletonList(
+                    modifier = Modifier.fillMaxWidth().height(300.dp),
+                    itemCount = 6,
+                )
             } else if (!uiState.hasActiveSession) {
                 OpenShiftForm(
                     modifier = Modifier.fillMaxWidth(),

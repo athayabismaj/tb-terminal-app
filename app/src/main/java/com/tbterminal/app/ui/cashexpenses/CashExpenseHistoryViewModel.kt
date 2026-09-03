@@ -50,6 +50,8 @@ class CashExpenseHistoryViewModel(
         }
     }
 
+    fun refresh() = loadExpenses(_uiState.value.page)
+
     fun previousPage() {
         if (_uiState.value.page > 1) loadExpenses(_uiState.value.page - 1)
     }

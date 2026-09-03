@@ -8,6 +8,7 @@ import com.tbterminal.app.data.local.database.CashSessionLocalDataSource
 import com.tbterminal.app.data.repository.CashReconciliationRepository
 import com.tbterminal.app.ui.dashboard.admin.AdminDashboardShell
 import com.tbterminal.app.ui.dashboard.admin.AdminDestination
+import com.tbterminal.app.ui.components.RefreshableContent
 
 @Composable
 fun CashReconciliationRoute(
@@ -69,8 +70,13 @@ fun CashReconciliationRoute(
         onSettingsClick = onSettingsClick,
         onLogout = onLogout
     ) { contentModifier ->
-        CashReconciliationScreen(
+        RefreshableContent(
+            isRefreshing = uiState.isLoading && uiState.transactions.isNotEmpty(),
+            onRefresh = viewModel::refresh,
             modifier = contentModifier,
+        ) {
+            CashReconciliationScreen(
+            modifier = androidx.compose.ui.Modifier,
             uiState = uiState,
             onDismissMessage = viewModel::clearMessage,
             onOpeningCashChanged = viewModel::onOpeningCashChanged,
@@ -78,7 +84,7 @@ fun CashReconciliationRoute(
             onClosingCashChanged = viewModel::onClosingCashChanged,
             onClosingNotesChanged = viewModel::onClosingNotesChanged,
             onCloseSession = viewModel::closeSession,
-            onRefresh = { viewModel.loadCash() },
+            onRefresh = viewModel::refresh,
             onPreviousPage = viewModel::previousPage,
             onNextPage = viewModel::nextPage,
             onShowExpenseDialog = viewModel::showExpenseDialog,
@@ -86,6 +92,7 @@ fun CashReconciliationRoute(
             onExpenseAmountChanged = viewModel::onExpenseAmountChanged,
             onExpenseDescriptionChanged = viewModel::onExpenseDescriptionChanged,
             onAddExpense = viewModel::addExpense
-        )
+            )
+        }
     }
 }

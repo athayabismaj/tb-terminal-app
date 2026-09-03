@@ -16,13 +16,11 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ChevronLeft
 import androidx.compose.material.icons.filled.ChevronRight
-import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -51,11 +49,11 @@ internal fun CashTransactionsTable(
         border = BorderStroke(1.dp, CashLine)
     ) {
         Column {
-            CashTableToolbar(onRefresh)
+            CashTableToolbar()
             HorizontalDivider(color = CashLine)
             CashTableHeader()
             when {
-                uiState.isLoading -> CashLoadingState()
+                uiState.isLoading && uiState.transactions.isEmpty() -> CashLoadingState()
                 !uiState.hasActiveSession -> CashEmptyState("Belum ada sesi aktif. Buka sesi kas untuk melihat transaksi.")
                 uiState.transactions.isEmpty() -> CashEmptyState("Belum ada transaksi pada sesi ini.")
                 else -> CashTransactionList(uiState.transactions)
@@ -66,7 +64,7 @@ internal fun CashTransactionsTable(
 }
 
 @Composable
-private fun CashTableToolbar(onRefresh: () -> Unit) {
+private fun CashTableToolbar() {
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -77,9 +75,6 @@ private fun CashTableToolbar(onRefresh: () -> Unit) {
         Column {
             Text("Transaksi Sesi", color = CashText, fontSize = 20.sp, fontWeight = FontWeight.ExtraBold)
             Text("Menampilkan transaksi pada sesi kas yang sedang aktif.", color = CashMuted, fontSize = 13.sp)
-        }
-        IconButton(onClick = onRefresh) {
-            Icon(Icons.Default.Refresh, contentDescription = "Muat ulang", tint = CashPrimary)
         }
     }
 }
@@ -173,9 +168,10 @@ private fun CashHeaderText(text: String, modifier: Modifier, align: Alignment.Ho
 
 @Composable
 private fun CashLoadingState() {
-    Box(modifier = Modifier.fillMaxWidth().height(220.dp), contentAlignment = Alignment.Center) {
-        CircularProgressIndicator(color = CashPrimary)
-    }
+    com.tbterminal.app.ui.components.SkeletonList(
+        modifier = Modifier.fillMaxWidth().height(220.dp),
+        itemCount = 5,
+    )
 }
 
 @Composable

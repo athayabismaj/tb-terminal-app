@@ -18,6 +18,8 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import com.tbterminal.app.navigation.AppAccessPolicy
+import com.tbterminal.app.navigation.AppCapability
 
 class ReceivableViewModel(
     private val receivableRepository: ReceivableRepository,
@@ -65,6 +67,8 @@ class ReceivableViewModel(
             }
         }
     }
+
+    fun refresh() = loadReceivables(_uiState.value.page)
 
     fun onSearchChanged(query: String) {
         _uiState.update { it.copy(searchQuery = query) }
@@ -396,4 +400,4 @@ private fun BigDecimal.toInputText(): String {
 }
 
 internal fun canManageReceivableAdjustment(role: String): Boolean =
-    role.trim().lowercase() in setOf("owner", "admin")
+    AppAccessPolicy.can(role, AppCapability.ADJUST_RECEIVABLES)

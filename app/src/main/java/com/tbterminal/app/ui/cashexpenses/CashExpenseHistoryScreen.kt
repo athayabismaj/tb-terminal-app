@@ -401,7 +401,10 @@ private fun ExpensePageButton(onClick: () -> Unit, enabled: Boolean, text: Strin
 }
 
 @Composable
-private fun LoadingBox() = Box(Modifier.fillMaxWidth().height(180.dp), contentAlignment = Alignment.Center) { CircularProgressIndicator() }
+private fun LoadingBox() = com.tbterminal.app.ui.components.SkeletonList(
+    modifier = Modifier.fillMaxWidth().height(180.dp),
+    itemCount = 4,
+)
 
 @Composable
 private fun EmptyBox(message: String = "Belum ada pengeluaran kas.") = Box(Modifier.fillMaxWidth().height(180.dp), contentAlignment = Alignment.Center) { Text(message, color = ExpenseMuted) }

@@ -60,6 +60,8 @@ class ReceivablePaymentHistoryViewModel(
         }
     }
 
+    fun refresh() = loadPayments(_uiState.value.page)
+
     fun showDetail(payment: ReceivablePaymentHistory) {
         viewModelScope.launch {
             when (val result = receivableRepository.getReceivablePaymentReceipt(payment.id)) {

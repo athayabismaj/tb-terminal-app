@@ -7,6 +7,7 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import com.tbterminal.app.data.repository.PurchasingRepository
 import com.tbterminal.app.ui.dashboard.admin.AdminDashboardShell
 import com.tbterminal.app.ui.dashboard.admin.AdminDestination
+import com.tbterminal.app.ui.components.RefreshableContent
 
 @Composable
 fun AdminSupplierDebtScreen(
@@ -67,17 +68,23 @@ fun AdminSupplierDebtScreen(
         onBack = onBack,
         onLogout = onLogout
     ) { contentModifier ->
-        SupplierDebtScreen(
+        RefreshableContent(
+            isRefreshing = uiState.isLoading && uiState.payables.isNotEmpty(),
+            onRefresh = viewModel::refresh,
             modifier = contentModifier,
+        ) {
+            SupplierDebtScreen(
+            modifier = androidx.compose.ui.Modifier,
             uiState = uiState,
             onSearchChanged = viewModel::onSearchChanged,
             onStatusFilterChanged = viewModel::onStatusFilterChanged,
-            onRefresh = { viewModel.loadPayables() },
+            onRefresh = viewModel::refresh,
             onPayClick = viewModel::openPayment,
             onPreviousPage = viewModel::previousPage,
             onNextPage = viewModel::nextPage,
             onDismissMessage = viewModel::clearMessage
-        )
+            )
+        }
     }
 
     uiState.selectedPayable?.let { payable ->

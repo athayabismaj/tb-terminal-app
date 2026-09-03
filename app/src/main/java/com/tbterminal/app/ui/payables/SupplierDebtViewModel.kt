@@ -56,6 +56,8 @@ class SupplierDebtViewModel(
         }
     }
 
+    fun refresh() = loadPayables(_uiState.value.page)
+
     fun onSearchChanged(query: String) {
         _uiState.update { it.copy(searchQuery = query) }
     }

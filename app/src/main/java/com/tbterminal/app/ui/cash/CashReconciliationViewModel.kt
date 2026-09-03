@@ -117,6 +117,8 @@ class CashReconciliationViewModel(
         }
     }
 
+    fun refresh() = loadCash(_uiState.value.page)
+
     fun previousPage() {
         val previous = (_uiState.value.page - 1).coerceAtLeast(1)
         if (previous != _uiState.value.page) loadCash(previous)

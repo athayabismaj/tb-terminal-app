@@ -9,6 +9,7 @@ import com.tbterminal.app.data.repository.CustomerRepository
 import com.tbterminal.app.ui.dashboard.admin.AdminDashboardShell
 import com.tbterminal.app.ui.dashboard.admin.AdminDestination
 import com.tbterminal.app.ui.receivablepayments.ReceivablePaymentReceiptDialog
+import com.tbterminal.app.ui.components.RefreshableContent
 
 @Composable
 fun AdminReceivableScreen(
@@ -70,8 +71,13 @@ fun AdminReceivableScreen(
         onBack = onBack,
         onLogout = onLogout
     ) { contentModifier ->
-        ReceivableScreen(
+        RefreshableContent(
+            isRefreshing = uiState.isLoading && uiState.receivables.isNotEmpty(),
+            onRefresh = viewModel::refresh,
             modifier = contentModifier,
+        ) {
+            ReceivableScreen(
+            modifier = androidx.compose.ui.Modifier,
             uiState = uiState,
             onSearchChanged = viewModel::onSearchChanged,
             onStatusFilterChanged = viewModel::onStatusFilterChanged,
@@ -83,7 +89,8 @@ fun AdminReceivableScreen(
             onPreviousPage = viewModel::previousPage,
             onNextPage = viewModel::nextPage,
             onDismissMessage = viewModel::clearMessage
-        )
+            )
+        }
     }
 
     uiState.selectedReceivable?.let { receivable ->
