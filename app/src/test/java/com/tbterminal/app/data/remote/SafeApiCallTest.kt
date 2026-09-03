@@ -29,7 +29,27 @@ class SafeApiCallTest {
         assertTrue(result is NetworkResult.Error)
         result as NetworkResult.Error
         assertEquals("PAYMENT_ALREADY_FINALIZED", result.code)
-        assertEquals("Payment cannot be changed.", result.message)
+        assertEquals("Data berubah atau sedang diproses. Muat ulang lalu coba lagi.", result.message)
+    }
+
+    @Test
+    fun returnsFriendlyMessageForForbiddenResponse() = runBlocking {
+        val result = safeApiCall<String> {
+            Response.error(
+                403,
+                """
+                {
+                  "code": "FORBIDDEN",
+                  "message": "internal permission detail"
+                }
+                """.trimIndent().toResponseBody("application/json".toMediaType())
+            )
+        }
+
+        assertTrue(result is NetworkResult.Error)
+        result as NetworkResult.Error
+        assertEquals("FORBIDDEN", result.code)
+        assertEquals("Anda tidak memiliki akses ke fitur ini.", result.message)
     }
 
     @Test
@@ -43,7 +63,7 @@ class SafeApiCallTest {
         assertTrue(result is NetworkResult.Error)
         result as NetworkResult.Error
         assertEquals("CONNECTION_INTERRUPTED", result.code)
-        assertEquals("Koneksi ke server terputus.", result.message)
+        assertEquals("Koneksi bermasalah. Periksa jaringan dan status server.", result.message)
     }
 
     @Test
@@ -55,7 +75,7 @@ class SafeApiCallTest {
         assertTrue(result is NetworkResult.Error)
         result as NetworkResult.Error
         assertEquals("NETWORK_TIMEOUT", result.code)
-        assertEquals("Server terlalu lama merespons. Silakan coba lagi.", result.message)
+        assertEquals("Request terlalu lama. Periksa koneksi lalu coba lagi.", result.message)
     }
 
     @Test
@@ -67,7 +87,7 @@ class SafeApiCallTest {
         assertTrue(result is NetworkResult.Error)
         result as NetworkResult.Error
         assertEquals("INVALID_RESPONSE", result.code)
-        assertEquals("Response server tidak sesuai format yang diharapkan.", result.message)
+        assertEquals("Respons server tidak dapat diproses. Silakan coba lagi.", result.message)
     }
 
     @Test
@@ -82,7 +102,7 @@ class SafeApiCallTest {
         assertTrue(result is NetworkResult.Error)
         result as NetworkResult.Error
         assertEquals("HTTP_502", result.code)
-        assertEquals("Format error server tidak sesuai kontrak.", result.message)
+        assertEquals("Server sedang mengalami gangguan. Silakan coba beberapa saat lagi.", result.message)
     }
 
     @Test
@@ -94,5 +114,6 @@ class SafeApiCallTest {
         assertTrue(result is NetworkResult.Error)
         result as NetworkResult.Error
         assertEquals("EMPTY_BODY", result.code)
+        assertEquals("Respons server tidak dapat diproses. Silakan coba lagi.", result.message)
     }
 }

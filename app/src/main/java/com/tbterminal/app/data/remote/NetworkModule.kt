@@ -48,6 +48,7 @@ class NetworkModule(
             .applyStandardTimeouts()
             .addInterceptor(AuthInterceptor(tokenStore))
             .authenticator(RefreshTokenAuthenticator(tokenStore, sessionManager, refreshApi))
+            .addInterceptor(UnauthorizedInterceptor(sessionManager))
             .build()
     }
 

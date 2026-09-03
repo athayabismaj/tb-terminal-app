@@ -19,7 +19,11 @@ suspend fun <T> safeApiCall(
             val apiError = response.toApiErrorResponse()
             return NetworkResult.Error(
                 code = apiError.code,
-                message = apiError.message
+                message = UserFacingErrorMapper.message(
+                    httpStatus = response.code(),
+                    code = apiError.code,
+                    backendMessage = apiError.message,
+                )
             )
         }
 
@@ -29,21 +33,21 @@ suspend fun <T> safeApiCall(
         } else {
             NetworkResult.Error(
                 code = "EMPTY_BODY",
-                message = "Response body is empty."
+                message = UserFacingErrorMapper.message(code = "EMPTY_BODY")
             )
         }
     } catch (cancellation: CancellationException) {
         throw cancellation
     } catch (timeout: SocketTimeoutException) {
-        NetworkResult.Error("NETWORK_TIMEOUT", "Server terlalu lama merespons. Silakan coba lagi.")
+        NetworkResult.Error("NETWORK_TIMEOUT", UserFacingErrorMapper.message(code = "NETWORK_TIMEOUT"))
     } catch (unknownHost: UnknownHostException) {
-        NetworkResult.Error("NETWORK_UNAVAILABLE", "Server tidak dapat ditemukan. Periksa koneksi dan alamat server.")
+        NetworkResult.Error("NETWORK_UNAVAILABLE", UserFacingErrorMapper.message(code = "NETWORK_UNAVAILABLE"))
     } catch (connect: ConnectException) {
-        NetworkResult.Error("CONNECTION_FAILED", "Tidak dapat terhubung ke server.")
+        NetworkResult.Error("CONNECTION_FAILED", UserFacingErrorMapper.message(code = "CONNECTION_FAILED"))
     } catch (serialization: SerializationException) {
-        NetworkResult.Error("INVALID_RESPONSE", "Response server tidak sesuai format yang diharapkan.")
+        NetworkResult.Error("INVALID_RESPONSE", UserFacingErrorMapper.message(code = "INVALID_RESPONSE"))
     } catch (io: IOException) {
-        NetworkResult.Error("CONNECTION_INTERRUPTED", "Koneksi ke server terputus.")
+        NetworkResult.Error("CONNECTION_INTERRUPTED", UserFacingErrorMapper.message(code = "CONNECTION_INTERRUPTED"))
     } catch (exception: Exception) {
         NetworkResult.Exception(exception)
     }
