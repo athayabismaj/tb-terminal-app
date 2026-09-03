@@ -24,7 +24,6 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.KeyboardArrowLeft
 import androidx.compose.material.icons.automirrored.outlined.KeyboardArrowRight
 import androidx.compose.material.icons.outlined.Add
-import androidx.compose.material.icons.outlined.Refresh
 import androidx.compose.material.icons.outlined.Remove
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -218,18 +217,11 @@ internal fun ProductErrorState(
     onRetry: () -> Unit,
     modifier: Modifier = Modifier
 ) {
-    Column(
+    com.tbterminal.app.ui.components.AppErrorState(
+        message = message,
+        onRetry = onRetry,
         modifier = modifier,
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.spacedBy(12.dp)
-    ) {
-        Text(message, color = Error, fontSize = 15.sp, fontWeight = FontWeight.Bold)
-        OutlinedButton(onClick = onRetry, shape = RoundedCornerShape(12.dp)) {
-            Icon(Icons.Outlined.Refresh, contentDescription = null)
-            Spacer(modifier = Modifier.width(8.dp))
-            Text("Muat ulang")
-        }
-    }
+    )
 }
 
 @Composable

@@ -13,6 +13,9 @@ import com.tbterminal.app.data.local.entity.LocalCashSessionEntity
 import com.tbterminal.app.data.local.model.AppDataMode
 import com.tbterminal.app.data.model.CheckoutSubmitCommand
 import com.tbterminal.app.data.model.CheckoutSubmitItem
+import com.tbterminal.app.data.model.CheckoutDiscount
+import com.tbterminal.app.data.model.CheckoutPreview
+import com.tbterminal.app.data.model.CheckoutPreviewCommand
 import com.tbterminal.app.data.model.CashSession
 import com.tbterminal.app.data.model.Customer
 import com.tbterminal.app.data.repository.CheckoutRepository
@@ -76,6 +79,7 @@ class CheckoutViewModel(
     private var customerSearchJob: Job? = null
     private var latestOfflineStatus: OfflineStatus = OfflineStatus()
     private var pendingOnlineCheckout: PendingOnlineCheckout? = null
+    private var ambiguousOnlineCheckout: CheckoutSubmitCommand? = null
 
     init {
         observeOfflineStatus()
@@ -400,6 +404,7 @@ class CheckoutViewModel(
     }
 
     fun replaceCart(items: List<CartItem>) {
+        if (!allowCheckoutIntentMutation()) return
         _uiState.update { state ->
             state.withCart(items)
         }
@@ -419,6 +424,7 @@ class CheckoutViewModel(
             return
         }
 
+        if (!allowCheckoutIntentMutation()) return
         _uiState.update { state ->
             val existingItem = state.cartItems.firstOrNull { item ->
                 item.productId == product.productId
@@ -458,6 +464,7 @@ class CheckoutViewModel(
             return
         }
 
+        if (!allowCheckoutIntentMutation()) return
         _uiState.update { state ->
             val updatedItems = if (quantity <= 0) {
                 state.cartItems.filterNot { item ->
@@ -475,6 +482,39 @@ class CheckoutViewModel(
 
             state.withCart(updatedItems)
         }
+    }
+
+    fun setItemDiscount(cartItemId: String, discount: CheckoutDiscount?) {
+        val item = _uiState.value.cartItems.firstOrNull { it.cartItemId == cartItemId }
+            ?: return
+        val lineGross = item.unitPrice.multiply(item.quantity.toBigDecimal())
+        validateCheckoutDiscount(lineGross, discount)?.let { message ->
+            setError(UiText.DynamicString(message))
+            return
+        }
+        if (!allowCheckoutIntentMutation()) return
+        _uiState.update { state ->
+            state.withCart(
+                state.cartItems.map { cartItem ->
+                    if (cartItem.cartItemId == cartItemId) {
+                        cartItem.copy(discountRequest = discount)
+                    } else {
+                        cartItem
+                    }
+                },
+            )
+        }
+    }
+
+    fun setTransactionDiscount(discount: CheckoutDiscount?) {
+        val itemTotals = estimateCheckoutTotals(_uiState.value.cartItems, null)
+        val afterItem = itemTotals.grossSubtotal.subtract(itemTotals.itemDiscountTotal)
+        validateCheckoutDiscount(afterItem, discount)?.let { message ->
+            setError(UiText.DynamicString(message))
+            return
+        }
+        if (!allowCheckoutIntentMutation()) return
+        _uiState.update { state -> state.withTransactionDiscount(discount) }
     }
 
     fun clearErrorEvent() {
@@ -504,103 +544,240 @@ class CheckoutViewModel(
         }
     }
 
-    fun submitCheckout(
-        paymentMethod: PaymentMethod,
-        amountPaid: BigDecimal
-    ) {
-        val cartSnapshot = _uiState.value.cartItems
-        if (cartSnapshot.isEmpty()) {
+    fun submitCheckout(paymentMethod: PaymentMethod, amountPaid: BigDecimal) {
+        prepareCheckout(paymentMethod, amountPaid)
+    }
+
+    fun prepareCheckout(paymentMethod: PaymentMethod, amountPaid: BigDecimal) {
+        val initialState = _uiState.value
+        if (initialState.cartItems.isEmpty()) {
             setError(UiText.DynamicString("Keranjang masih kosong."))
             return
         }
-
-        if (_uiState.value.isLoading) {
-            return
-        }
-
-        if (!_uiState.value.hasActiveCashSession) {
+        if (!initialState.canStartCheckout()) return
+        if (!initialState.hasActiveCashSession) {
             setError(UiText.DynamicString("Buka sesi kasir untuk akun ini terlebih dahulu sebelum bertransaksi."))
             return
         }
 
+        // Set before launching so two taps in the same frame cannot start two requests.
+        _uiState.update { it.copy(isLoading = true, isPreviewLoading = true, errorEvent = null) }
         viewModelScope.launch {
-            _uiState.update { state ->
-                state.copy(isLoading = true, errorEvent = null)
-            }
-
-            val customerId = resolveCustomerIdBeforeCheckout()
-            val typedCustomerName = _uiState.value.customerSearchQuery.trim()
-            if (customerId == null && paymentMethod.requiresRegisteredCustomer()) {
-                setError(
-                    UiText.DynamicString(
-                        "Transaksi hutang/DP wajib memakai pelanggan terdaftar."
-                    )
-                )
-                _uiState.update { state -> state.copy(isLoading = false) }
+            ambiguousOnlineCheckout?.let { command ->
+                _uiState.update { it.copy(isPreviewLoading = false) }
+                executeOnlineCheckout(command)
                 return@launch
             }
-
-            val effectiveAmountPaid = resolveAmountPaid(paymentMethod, amountPaid)
-                ?: run {
-                    _uiState.update { state -> state.copy(isLoading = false) }
-                    return@launch
-                }
-
             if (shouldUseLocalCheckout()) {
-                submitLocalCheckout()
+                if (_uiState.value.hasDiscountRequest()) {
+                    _uiState.update {
+                        it.copy(
+                            isLoading = false,
+                            isPreviewLoading = false,
+                            errorEvent = UiText.DynamicString(
+                                "Diskon memerlukan koneksi ke server dan tidak tersedia saat offline.",
+                            ),
+                        )
+                    }
+                } else {
+                    _uiState.update { it.copy(isPreviewLoading = false) }
+                    submitLocalCheckout()
+                }
                 return@launch
             }
 
-            val command = CheckoutSubmitCommand(
-                idempotencyKey = resolveIdempotencyKey(
-                    items = cartSnapshot,
-                    paymentMethod = paymentMethod,
-                    amountPaid = effectiveAmountPaid,
-                    customerId = customerId,
-                    notes = checkoutCustomerNote(typedCustomerName)
-                ),
+            val cartSnapshot = _uiState.value.cartItems
+            val previewCommand = CheckoutPreviewCommand(
                 items = cartSnapshot.map { item ->
                     CheckoutSubmitItem(
                         productId = item.productId,
-                        quantity = item.quantity
+                        quantity = item.quantity,
+                        discountRequest = item.discountRequest,
                     )
                 },
-                paymentMethod = paymentMethod.apiValue(),
-                amountPaid = effectiveAmountPaid.toPlainString(),
-                customerId = customerId,
-                notes = checkoutCustomerNote(typedCustomerName)
+                transactionDiscount = _uiState.value.transactionDiscount,
             )
-
-            when (val result = checkoutRepository.submitCheckout(command)) {
+            when (val result = checkoutRepository.previewCheckout(previewCommand)) {
                 is RepositoryResult.Success -> {
-                    pendingOnlineCheckout = null
-                    _checkoutEvents.tryEmit(CheckoutEvent.NavigateToReceipt(result.data.transactionId))
-                    _uiState.update { state ->
-                        CheckoutUiState(
-                            products = state.products,
-                            productPage = state.productPage,
-                            productLimit = state.productLimit,
-                            productTotal = state.productTotal,
-                            productTotalPages = state.productTotalPages,
-                            customers = state.customers,
-                            activeCashSession = state.activeCashSession,
-                            hasActiveCashSession = state.hasActiveCashSession
+                    applyAuthoritativePreview(result.data)
+                    if (result.data.nextStep() == CheckoutPreviewDecision.MANAGER_APPROVAL) {
+                        _uiState.update { it.copy(isLoading = false, isPreviewLoading = false) }
+                    } else {
+                        submitOnlineCheckout(
+                            paymentMethod = paymentMethod,
+                            fallbackAmount = amountPaid,
+                            preview = result.data,
+                            managerApprovalId = null,
                         )
                     }
                 }
                 is RepositoryResult.Error -> {
-                    if (!result.isAmbiguousCheckoutFailure()) pendingOnlineCheckout = null
-                    setError(result.toUiText())
+                    invalidatePendingCheckout()
+                    _uiState.update {
+                        it.copy(
+                            isLoading = false,
+                            isPreviewLoading = false,
+                            errorEvent = result.toUiText(),
+                        )
+                    }
                 }
-                is RepositoryResult.Exception -> setError(
-                    UiText.DynamicString("Koneksi ke server bermasalah. Coba lagi.")
-                )
-            }
-
-            _uiState.update { state ->
-                state.copy(isLoading = false)
+                is RepositoryResult.Exception -> {
+                    invalidatePendingCheckout()
+                    _uiState.update {
+                        it.copy(
+                            isLoading = false,
+                            isPreviewLoading = false,
+                            errorEvent = UiText.DynamicString(
+                                "Preview checkout gagal karena koneksi bermasalah. Coba lagi.",
+                            ),
+                        )
+                    }
+                }
             }
         }
+    }
+
+    fun continueCheckoutWithApproval(
+        approvalId: String,
+        checkoutAttemptId: String,
+    ) {
+        val state = _uiState.value
+        val preview = state.checkoutPreview
+        if (state.isLoading || state.isPreviewLoading) return
+        if (preview == null || !preview.approvalRequired ||
+            preview.checkoutAttemptId != checkoutAttemptId || approvalId.isBlank()
+        ) {
+            invalidatePendingCheckout()
+            _uiState.update {
+                it.copy(
+                    checkoutPreview = null,
+                    errorEvent = UiText.DynamicString(
+                        "Persetujuan tidak cocok dengan preview diskon. Buat preview ulang.",
+                    ),
+                )
+            }
+            return
+        }
+        _uiState.update { it.copy(isLoading = true, errorEvent = null) }
+        _uiState.update { it.copy(approvedManagerApprovalId = approvalId) }
+        viewModelScope.launch {
+            submitOnlineCheckout(
+                paymentMethod = _uiState.value.selectedPaymentMethod,
+                fallbackAmount = preview.netTotal,
+                preview = preview,
+                managerApprovalId = approvalId,
+            )
+        }
+    }
+
+    private suspend fun submitOnlineCheckout(
+        paymentMethod: PaymentMethod,
+        fallbackAmount: BigDecimal,
+        preview: CheckoutPreview,
+        managerApprovalId: String?,
+    ) {
+        val state = _uiState.value
+        if (state.checkoutPreview?.checkoutAttemptId != preview.checkoutAttemptId) {
+            _uiState.update {
+                it.copy(
+                    isLoading = false,
+                    isPreviewLoading = false,
+                    errorEvent = UiText.DynamicString("Keranjang berubah. Silakan lakukan checkout ulang."),
+                )
+            }
+            return
+        }
+        val customerId = resolveCustomerIdBeforeCheckout()
+        val typedCustomerName = _uiState.value.customerSearchQuery.trim()
+        if (customerId == null && paymentMethod.requiresRegisteredCustomer()) {
+            _uiState.update {
+                it.copy(
+                    isLoading = false,
+                    errorEvent = UiText.DynamicString(
+                        "Transaksi hutang/DP wajib memakai pelanggan terdaftar.",
+                    ),
+                )
+            }
+            return
+        }
+        val effectiveAmountPaid = resolveAmountPaid(paymentMethod, fallbackAmount) ?: run {
+            _uiState.update { it.copy(isLoading = false) }
+            return
+        }
+        val cartSnapshot = _uiState.value.cartItems
+        val notes = checkoutCustomerNote(typedCustomerName)
+        val approvalAttemptId = preview.checkoutAttemptId.takeIf { preview.approvalRequired }
+        val command = CheckoutSubmitCommand(
+            idempotencyKey = resolveIdempotencyKey(
+                items = cartSnapshot,
+                paymentMethod = paymentMethod,
+                amountPaid = effectiveAmountPaid,
+                customerId = customerId,
+                notes = notes,
+                transactionDiscount = state.transactionDiscount,
+                checkoutAttemptId = approvalAttemptId,
+                managerApprovalId = managerApprovalId,
+            ),
+            items = cartSnapshot.map { item ->
+                CheckoutSubmitItem(
+                    productId = item.productId,
+                    quantity = item.quantity,
+                    discountRequest = item.discountRequest,
+                )
+            },
+            paymentMethod = paymentMethod.apiValue(),
+            amountPaid = effectiveAmountPaid.toPlainString(),
+            customerId = customerId,
+            notes = notes,
+            transactionDiscount = state.transactionDiscount,
+            checkoutAttemptId = approvalAttemptId,
+            managerApprovalId = managerApprovalId,
+        )
+
+        ambiguousOnlineCheckout = command
+        executeOnlineCheckout(command)
+    }
+
+    private suspend fun executeOnlineCheckout(command: CheckoutSubmitCommand) {
+        when (val result = checkoutRepository.submitCheckout(command)) {
+            is RepositoryResult.Success -> {
+                pendingOnlineCheckout = null
+                ambiguousOnlineCheckout = null
+                _checkoutEvents.tryEmit(CheckoutEvent.NavigateToReceipt(result.data.transactionId))
+                _uiState.update { current -> current.resetAfterSuccessfulCheckout() }
+            }
+            is RepositoryResult.Error -> {
+                val ambiguous = result.isAmbiguousCheckoutFailure()
+                if (!ambiguous) {
+                    pendingOnlineCheckout = null
+                    ambiguousOnlineCheckout = null
+                }
+                val refreshRequired = result.requiresFreshDiscountPreview()
+                _uiState.update {
+                    it.copy(
+                        isLoading = false,
+                        isPreviewLoading = false,
+                        checkoutPreview = if (refreshRequired) null else it.checkoutPreview,
+                        approvedManagerApprovalId = if (refreshRequired) null else it.approvedManagerApprovalId,
+                        hasAmbiguousCheckout = ambiguous,
+                        errorEvent = result.toUiText(),
+                    )
+                }
+            }
+            is RepositoryResult.Exception -> {
+                _uiState.update {
+                    it.copy(
+                        isLoading = false,
+                        isPreviewLoading = false,
+                        hasAmbiguousCheckout = true,
+                        errorEvent = UiText.DynamicString(
+                            "Hasil checkout belum dapat dipastikan. Tekan checkout lagi untuk memeriksa transaksi yang sama.",
+                        ),
+                    )
+                }
+            }
+        }
+        _uiState.update { it.copy(isLoading = false, isPreviewLoading = false) }
     }
 
     private suspend fun submitLocalCheckout() {
@@ -730,14 +907,19 @@ class CheckoutViewModel(
         paymentMethod: PaymentMethod,
         amountPaid: BigDecimal,
         customerId: String?,
-        notes: String?
+        notes: String?,
+        transactionDiscount: CheckoutDiscount?,
+        checkoutAttemptId: String?,
+        managerApprovalId: String?,
     ): String {
         val fingerprint = buildString {
             append(paymentMethod.apiValue()).append('|').append(amountPaid.toPlainString()).append('|')
             append(customerId.orEmpty()).append('|').append(notes.orEmpty()).append('|')
+            append(checkoutAttemptId.orEmpty()).append('|').append(managerApprovalId.orEmpty()).append('|')
+            append(transactionDiscount.fingerprintPart()).append('|')
             items.sortedBy(CartItem::productId).forEach { item ->
                 append(item.productId).append(':').append(item.quantity).append(':')
-                    .append(item.discount.toPlainString()).append(';')
+                    .append(item.discountRequest.fingerprintPart()).append(';')
             }
         }
         val existing = pendingOnlineCheckout
@@ -753,9 +935,52 @@ class CheckoutViewModel(
         }
     }
 
+    private fun invalidatePendingCheckout() {
+        pendingOnlineCheckout = null
+        ambiguousOnlineCheckout = null
+    }
+
+    private fun allowCheckoutIntentMutation(): Boolean {
+        if (ambiguousOnlineCheckout != null) {
+            setError(
+                UiText.DynamicString(
+                    "Checkout sebelumnya belum pasti. Tekan checkout lagi atau periksa histori sebelum mengubah keranjang.",
+                ),
+            )
+            return false
+        }
+        pendingOnlineCheckout = null
+        return true
+    }
+
+    private fun applyAuthoritativePreview(preview: CheckoutPreview) {
+        _uiState.update { state -> state.withAuthoritativePreview(preview) }
+    }
+
+    private fun CheckoutUiState.resetAfterSuccessfulCheckout(): CheckoutUiState = CheckoutUiState(
+        products = products,
+        productPage = productPage,
+        productLimit = productLimit,
+        productTotal = productTotal,
+        productTotalPages = productTotalPages,
+        customers = customers,
+        activeCashSession = activeCashSession,
+        hasActiveCashSession = hasActiveCashSession,
+    )
+
     private fun RepositoryResult.Error.toUiText(): UiText {
         val message = when (code) {
             "CREDIT_LIMIT_EXCEEDED" -> "Limit kredit pelanggan terlampaui."
+            "INVALID_DISCOUNT" -> "Diskon tidak valid. Periksa jenis dan nilainya."
+            "DISCOUNT_EXCEEDS_AMOUNT" -> "Diskon melebihi nilai barang atau transaksi."
+            "DISCOUNT_OVERRIDE_REQUIRED", "MANAGER_APPROVAL_REQUIRED" -> {
+                "Diskon ini memerlukan persetujuan owner atau admin."
+            }
+            "DISCOUNT_APPROVAL_SCOPE_MISMATCH", "MANAGER_APPROVAL_SCOPE_MISMATCH" -> {
+                "Persetujuan tidak lagi cocok karena keranjang atau harga berubah. Buat preview ulang."
+            }
+            "MANAGER_APPROVAL_EXPIRED" -> "Persetujuan telah kedaluwarsa. Minta persetujuan baru."
+            "MANAGER_APPROVAL_ALREADY_USED" -> "Persetujuan sudah digunakan. Minta persetujuan baru."
             "FINANCIAL_CONSTRAINT_VIOLATION" -> {
                 "Checkout ditolak karena melanggar aturan finansial."
             }
@@ -764,6 +989,9 @@ class CheckoutViewModel(
 
         return UiText.DynamicString(message)
     }
+
+    private fun RepositoryResult.Error.requiresFreshDiscountPreview(): Boolean =
+        requiresFreshDiscountPreview(code)
 
     private fun RepositoryResult.Error.isCustomerLookupAccessDenied(): Boolean {
         val normalizedMessage = message.lowercase()
@@ -893,7 +1121,7 @@ class CheckoutViewModel(
             }
 
             val grossSubtotal = cartItem.unitPrice.multiply(cartItem.quantity.toBigDecimal())
-            val lineSubtotal = grossSubtotal.subtract(cartItem.discount).max(BigDecimal.ZERO)
+            val lineSubtotal = grossSubtotal
             items += LocalCheckoutItemCommand(
                 productLocalId = productLookup.localId,
                 productServerId = cartItem.productId,
@@ -903,7 +1131,7 @@ class CheckoutViewModel(
                 quantity = quantity,
                 priceAtTransaction = cartItem.unitPrice.toSafeDouble(),
                 cogsAtTransaction = productLookup.cogsAtTransaction,
-                discount = cartItem.discount.toSafeDouble(),
+                discount = 0.0,
                 subtotal = lineSubtotal.toSafeDouble()
             )
         }
@@ -970,34 +1198,11 @@ class CheckoutViewModel(
         private const val MAX_CASH_INPUT_LENGTH = 12
     }
 
-    private fun CheckoutUiState.withCart(items: List<CartItem>): CheckoutUiState {
-        val subtotal = items.sumAmounts { item ->
-            item.unitPrice.multiply(item.quantity.toBigDecimal())
-        }
-        val totalDiscount = items.sumAmounts { item ->
-            item.discount
-        }
-        val finalTotal = subtotal.subtract(totalDiscount).max(BigDecimal.ZERO)
+    private fun CheckoutUiState.withCart(items: List<CartItem>): CheckoutUiState =
+        recalculateCheckoutState(items, transactionDiscount)
 
-        return copy(
-            cartItems = items,
-            subtotal = subtotal,
-            totalDiscount = totalDiscount,
-            finalTotal = finalTotal,
-            amountPaidInput = when (selectedPaymentMethod) {
-                PaymentMethod.HUTANG -> "0"
-                PaymentMethod.DP -> amountPaidInput
-                else -> finalTotal.toPlainString()
-            },
-            errorEvent = null
-        )
-    }
-
-    private fun List<CartItem>.sumAmounts(selector: (CartItem) -> BigDecimal): BigDecimal {
-        return fold(BigDecimal.ZERO) { total, item ->
-            total.add(selector(item))
-        }
-    }
+    private fun CheckoutUiState.withTransactionDiscount(discount: CheckoutDiscount?): CheckoutUiState =
+        recalculateCheckoutState(cartItems, discount)
 
     private fun String.moneyInput(): String {
         return filter(Char::isDigit).trimStart('0').ifBlank { "0" }.take(MAX_CASH_INPUT_LENGTH)
@@ -1030,6 +1235,39 @@ private data class PendingOnlineCheckout(
     val idempotencyKey: String,
     val fingerprint: String
 )
+
+private fun CheckoutDiscount?.fingerprintPart(): String = this?.let { discount ->
+    "${discount.type.name}:${discount.value.stripTrailingZeros().toPlainString()}"
+}.orEmpty()
+
+private fun CheckoutUiState.hasDiscountRequest(): Boolean =
+    transactionDiscount != null || cartItems.any { it.discountRequest != null }
+
+internal fun CheckoutUiState.recalculateCheckoutState(
+    items: List<CartItem>,
+    discount: CheckoutDiscount?,
+): CheckoutUiState {
+    val totals = estimateCheckoutTotals(items, discount)
+    return copy(
+        cartItems = items,
+        subtotal = totals.grossSubtotal,
+        itemDiscountTotal = totals.itemDiscountTotal,
+        transactionDiscount = discount,
+        transactionDiscountAmount = totals.transactionDiscountAmount,
+        totalDiscount = totals.totalDiscountAmount,
+        finalTotal = totals.netTotal,
+        checkoutPreview = null,
+        approvedManagerApprovalId = null,
+        hasAmbiguousCheckout = false,
+        isPreviewLoading = false,
+        amountPaidInput = when (selectedPaymentMethod) {
+            PaymentMethod.HUTANG -> "0"
+            PaymentMethod.DP -> amountPaidInput
+            else -> totals.netTotal.toPlainString()
+        },
+        errorEvent = null,
+    )
+}
 
 private fun CashSession.toActiveCashSessionUi(localId: Long? = null): ActiveCashSessionUi {
     return ActiveCashSessionUi(

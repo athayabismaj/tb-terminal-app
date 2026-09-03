@@ -25,6 +25,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.tbterminal.app.data.model.Customer
+import com.tbterminal.app.data.model.CheckoutDiscount
 import com.tbterminal.app.ui.common.UiText
 import com.tbterminal.app.ui.checkout.components.CartCalculationRow
 import com.tbterminal.app.ui.checkout.components.CartEmptyState
@@ -74,6 +75,8 @@ fun CashierCartScreen(
     onSelectPayment: (PaymentMethod) -> Unit,
     onAmountPaidChanged: (String) -> Unit,
     onClearCart: () -> Unit,
+    onItemDiscountChanged: (String, CheckoutDiscount?) -> Unit,
+    onTransactionDiscountChanged: (CheckoutDiscount?) -> Unit,
     onCheckout: () -> Unit,
     onBackToPos: () -> Unit,
     onDashboardClick: () -> Unit = {},
@@ -85,6 +88,8 @@ fun CashierCartScreen(
     onSettingsClick: () -> Unit = {},
     onLogout: () -> Unit = {}
 ) {
+    var discountItemId by remember { mutableStateOf<String?>(null) }
+    var showTransactionDiscount by remember { mutableStateOf(false) }
     CashierDashboardShell(
         userName = name,
         role = role,
@@ -125,6 +130,8 @@ fun CashierCartScreen(
                     onSelectPayment = onSelectPayment,
                     onAmountPaidChanged = onAmountPaidChanged,
                     onClearCart = onClearCart,
+                    onEditItemDiscount = { discountItemId = it },
+                    onEditTransactionDiscount = { showTransactionDiscount = true },
                     onCheckout = onCheckout,
                     onBackToPos = onBackToPos,
                     modifier = Modifier
@@ -133,6 +140,35 @@ fun CashierCartScreen(
                 )
             }
         }
+    }
+
+    discountItemId?.let { cartItemId ->
+        val item = state.cartItems.firstOrNull { it.cartItemId == cartItemId }
+        if (item != null) {
+            DiscountInputDialog(
+                title = "Diskon ${item.productName}",
+                baseAmount = item.unitPrice.multiply(item.quantity.toBigDecimal()),
+                initialValue = item.discountRequest,
+                onDismiss = { discountItemId = null },
+                onApply = { discount ->
+                    onItemDiscountChanged(cartItemId, discount)
+                    discountItemId = null
+                },
+            )
+        }
+    }
+    if (showTransactionDiscount) {
+        val afterItemDiscount = state.subtotal.subtract(state.itemDiscountTotal)
+        DiscountInputDialog(
+            title = "Diskon transaksi",
+            baseAmount = afterItemDiscount,
+            initialValue = state.transactionDiscount,
+            onDismiss = { showTransactionDiscount = false },
+            onApply = { discount ->
+                onTransactionDiscountChanged(discount)
+                showTransactionDiscount = false
+            },
+        )
     }
 }
 
@@ -153,6 +189,8 @@ private fun CartContent(
     onSelectPayment: (PaymentMethod) -> Unit,
     onAmountPaidChanged: (String) -> Unit,
     onClearCart: () -> Unit,
+    onEditItemDiscount: (String) -> Unit,
+    onEditTransactionDiscount: () -> Unit,
     onCheckout: () -> Unit,
     onBackToPos: () -> Unit,
     modifier: Modifier = Modifier
@@ -264,7 +302,8 @@ private fun CartContent(
                         unitName = item.unitName.ifBlank { product?.unitName ?: "" },
                         onIncrease = { onIncrease(item.cartItemId) },
                         onDecrease = { onDecrease(item.cartItemId) },
-                        onRemove = { onRemove(item.cartItemId) }
+                        onRemove = { onRemove(item.cartItemId) },
+                        onDiscountClick = { onEditItemDiscount(item.cartItemId) },
                     )
                 }
             }
@@ -296,11 +335,51 @@ private fun CartContent(
                     "Subtotal",
                     formatRupiah(state.subtotal)
                 )
-                if (state.totalDiscount > BigDecimal.ZERO) {
+                if (state.itemDiscountTotal > BigDecimal.ZERO) {
                     CartCalculationRow(
-                        "Diskon",
-                        "-${formatRupiah(state.totalDiscount)}",
+                        "Diskon item",
+                        "-${formatRupiah(state.itemDiscountTotal)}",
                         isDiscount = true
+                    )
+                }
+                if (state.transactionDiscountAmount > BigDecimal.ZERO) {
+                    CartCalculationRow(
+                        "Diskon transaksi",
+                        "-${formatRupiah(state.transactionDiscountAmount)}",
+                        isDiscount = true
+                    )
+                }
+                TextButton(
+                    onClick = onEditTransactionDiscount,
+                    modifier = Modifier.align(Alignment.End),
+                ) {
+                    Text(
+                        if (state.transactionDiscount == null) "+ Diskon transaksi" else "Ubah diskon transaksi",
+                        color = CartPrimary,
+                    )
+                }
+
+                if (state.isPreviewLoading) {
+                    LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
+                    Text(
+                        "Memeriksa harga dan diskon ke server...",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = CartOnSurfaceVariant,
+                    )
+                } else if (state.checkoutPreview?.approvalRequired == true) {
+                    Text(
+                        "Diskon memerlukan persetujuan owner atau admin.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = CartSecondary,
+                        fontWeight = FontWeight.SemiBold,
+                    )
+                }
+                if (state.hasAmbiguousCheckout) {
+                    Text(
+                        "Status transaksi belum pasti. Tekan tombol di bawah untuk memeriksa ulang dengan request yang sama.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = CartError,
+                        fontWeight = FontWeight.SemiBold,
                     )
                 }
 
@@ -419,7 +498,7 @@ private fun CartContent(
 
                     Button(
                         onClick = onCheckout,
-                        enabled = !state.isLoading && state.cartItems.isNotEmpty() && paymentIsValid && creditCustomerIsValid,
+                        enabled = !state.isLoading && !state.isPreviewLoading && state.cartItems.isNotEmpty() && paymentIsValid && creditCustomerIsValid,
                         modifier = Modifier
                             .height(56.dp)
                             .weight(1f),
@@ -428,7 +507,7 @@ private fun CartContent(
                             containerColor = CartPrimary
                         )
                     ) {
-                        if (state.isLoading) {
+                        if (state.isLoading || state.isPreviewLoading) {
                             CircularProgressIndicator(
                                 modifier = Modifier.size(20.dp),
                                 color = CartOnPrimary,
@@ -442,7 +521,11 @@ private fun CartContent(
                             )
                             Spacer(modifier = Modifier.width(6.dp))
                             Text(
-                                "Bayar",
+                                when {
+                                    state.hasAmbiguousCheckout -> "Periksa Checkout"
+                                    state.checkoutPreview?.approvalRequired == true -> "Minta Persetujuan"
+                                    else -> "Bayar"
+                                },
                                 fontWeight = FontWeight.Bold,
                                 fontSize = 16.sp
                             )

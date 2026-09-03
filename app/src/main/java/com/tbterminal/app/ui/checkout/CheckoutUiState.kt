@@ -1,6 +1,8 @@
 package com.tbterminal.app.ui.checkout
 
 import com.tbterminal.app.data.model.Customer
+import com.tbterminal.app.data.model.CheckoutDiscount
+import com.tbterminal.app.data.model.CheckoutPreview
 import com.tbterminal.app.ui.common.UiText
 import java.math.BigDecimal
 
@@ -16,8 +18,15 @@ data class CheckoutUiState(
     val selectedCustomer: Customer? = null,
     val cartItems: List<CartItem> = emptyList(),
     val subtotal: BigDecimal = BigDecimal.ZERO,
+    val itemDiscountTotal: BigDecimal = BigDecimal.ZERO,
+    val transactionDiscount: CheckoutDiscount? = null,
+    val transactionDiscountAmount: BigDecimal = BigDecimal.ZERO,
     val totalDiscount: BigDecimal = BigDecimal.ZERO,
     val finalTotal: BigDecimal = BigDecimal.ZERO,
+    val checkoutPreview: CheckoutPreview? = null,
+    val approvedManagerApprovalId: String? = null,
+    val hasAmbiguousCheckout: Boolean = false,
+    val isPreviewLoading: Boolean = false,
     val selectedPaymentMethod: PaymentMethod = PaymentMethod.TUNAI,
     val amountPaidInput: String = "",
     val activeCashSession: ActiveCashSessionUi? = null,
@@ -60,7 +69,7 @@ data class CartItem(
     val quantity: Int,
     val sku: String = "",
     val unitName: String = "",
-    val discount: BigDecimal = BigDecimal.ZERO,
+    val discountRequest: CheckoutDiscount? = null,
     val cartItemId: String = productId
 )
 

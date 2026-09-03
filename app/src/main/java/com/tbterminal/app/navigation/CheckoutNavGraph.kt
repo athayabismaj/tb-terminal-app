@@ -2,12 +2,14 @@ package com.tbterminal.app.navigation
 
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavGraphBuilder
 import androidx.navigation.NavHostController
 import androidx.navigation.NavType
 import androidx.navigation.compose.composable
+import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.navArgument
 import com.tbterminal.app.data.di.AppContainer
 import com.tbterminal.app.data.session.SessionManager
@@ -88,6 +90,7 @@ internal fun NavGraphBuilder.checkoutGraph(navController: NavHostController, ses
                     inventoryRepository = appContainer.inventoryRepository,
                     customerRepository = appContainer.customerRepository,
                     cashReconciliationRepository = appContainer.cashReconciliationRepository,
+                    managerApprovalRepository = appContainer.managerApprovalRepository,
                     onDashboardClick = {
                         navController.navigate(AppRoute.Dashboard.route) {
                             launchSingleTop = true
@@ -162,6 +165,7 @@ internal fun NavGraphBuilder.checkoutGraph(navController: NavHostController, ses
                     inventoryRepository = appContainer.inventoryRepository,
                     customerRepository = appContainer.customerRepository,
                     cashReconciliationRepository = appContainer.cashReconciliationRepository,
+                    managerApprovalRepository = appContainer.managerApprovalRepository,
                     viewModel = cashierCheckoutViewModel(
                         navController = navController,
                         appContainer = appContainer
@@ -222,7 +226,8 @@ private fun cashierCheckoutViewModel(
     navController: NavHostController,
     appContainer: AppContainer
 ): CheckoutViewModel {
-    val cashierOwner = remember(navController) {
+    val currentBackStackEntry by navController.currentBackStackEntryAsState()
+    val cashierOwner = remember(currentBackStackEntry) {
         navController.getBackStackEntry(AppRoute.CashierPos.route)
     }
 

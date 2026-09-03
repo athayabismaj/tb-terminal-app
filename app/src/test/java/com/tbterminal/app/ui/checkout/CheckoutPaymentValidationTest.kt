@@ -38,4 +38,25 @@ class CheckoutPaymentValidationTest {
         assertEquals(total, validateCheckoutPaymentInput(PaymentMethod.QRIS, "invalid", total).amountPaid)
         assertEquals(BigDecimal.ZERO, validateCheckoutPaymentInput(PaymentMethod.HUTANG, "999", total).amountPaid)
     }
+
+    @Test
+    fun zeroTotalAllowsOnlyNonCreditPaymentWithZeroTendered() {
+        val zero = BigDecimal("0.00")
+
+        assertEquals(0, zero.compareTo(validateCheckoutPaymentInput(PaymentMethod.TUNAI, "0.00", zero).amountPaid!!))
+        assertEquals(0, zero.compareTo(validateCheckoutPaymentInput(PaymentMethod.TRANSFER, "", zero).amountPaid!!))
+        assertEquals(0, zero.compareTo(validateCheckoutPaymentInput(PaymentMethod.QRIS, "", zero).amountPaid!!))
+        assertNotNull(validateCheckoutPaymentInput(PaymentMethod.TUNAI, "1", zero).error)
+        assertNotNull(validateCheckoutPaymentInput(PaymentMethod.DP, "0", zero).error)
+        assertNotNull(validateCheckoutPaymentInput(PaymentMethod.HUTANG, "0", zero).error)
+    }
+
+    @Test
+    fun dpValidationUsesDiscountedNetTotal() {
+        val netTotal = BigDecimal("900000.00")
+        val dp = validateCheckoutPaymentInput(PaymentMethod.DP, "300000.00", netTotal)
+
+        assertNull(dp.error)
+        assertEquals(0, BigDecimal("600000.00").compareTo(netTotal.subtract(dp.amountPaid!!)))
+    }
 }

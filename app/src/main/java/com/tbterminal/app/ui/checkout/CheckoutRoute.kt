@@ -10,7 +10,9 @@ import androidx.compose.material3.SnackbarHostState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -19,6 +21,10 @@ import com.tbterminal.app.data.repository.CashReconciliationRepository
 import com.tbterminal.app.data.repository.CheckoutRepository
 import com.tbterminal.app.data.repository.CustomerRepository
 import com.tbterminal.app.data.repository.InventoryRepository
+import com.tbterminal.app.data.repository.ManagerApprovalRepository
+import com.tbterminal.app.data.model.ManagerApprovalAction
+import com.tbterminal.app.data.model.ManagerApprovalContext
+import com.tbterminal.app.ui.managerapproval.ManagerApprovalDialog
 import com.tbterminal.app.ui.common.UiText
 import com.tbterminal.app.ui.dashboard.cashier.CashierDashboardShell
 import com.tbterminal.app.ui.dashboard.cashier.CashierDestination
@@ -33,6 +39,7 @@ fun CashierPosRoute(
     inventoryRepository: InventoryRepository,
     customerRepository: CustomerRepository,
     cashReconciliationRepository: CashReconciliationRepository,
+    managerApprovalRepository: ManagerApprovalRepository,
     onDashboardClick: () -> Unit,
     onPosClick: () -> Unit,
     onCashSessionClick: () -> Unit = {},
@@ -54,6 +61,12 @@ fun CashierPosRoute(
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val snackbarHostState = remember { SnackbarHostState() }
+    var approvalAttemptId by remember { mutableStateOf<String?>(null) }
+
+    LaunchedEffect(uiState.checkoutPreview?.checkoutAttemptId, uiState.checkoutPreview?.approvalRequired) {
+        val preview = uiState.checkoutPreview
+        if (preview?.approvalRequired == true) approvalAttemptId = preview.checkoutAttemptId
+    }
 
     LaunchedEffect(viewModel.errorEvent, snackbarHostState) {
         viewModel.errorEvent
@@ -109,10 +122,22 @@ fun CashierPosRoute(
                 onOpenCashSession = viewModel::openCashSession,
                 onRefreshCashSession = viewModel::loadCashSession,
                 onCheckout = {
-                    viewModel.submitCheckout(
-                        paymentMethod = uiState.selectedPaymentMethod,
-                        amountPaid = uiState.finalTotal
-                    )
+                    val preview = uiState.checkoutPreview
+                    if (uiState.hasAmbiguousCheckout) {
+                        viewModel.prepareCheckout(uiState.selectedPaymentMethod, uiState.finalTotal)
+                    } else if (preview?.approvalRequired == true) {
+                        val approvalId = uiState.approvedManagerApprovalId
+                        if (approvalId != null) {
+                            viewModel.continueCheckoutWithApproval(approvalId, preview.checkoutAttemptId)
+                        } else {
+                            approvalAttemptId = preview.checkoutAttemptId
+                        }
+                    } else {
+                        viewModel.prepareCheckout(
+                            paymentMethod = uiState.selectedPaymentMethod,
+                            amountPaid = uiState.finalTotal,
+                        )
+                    }
                 },
                 onNavigateToCart = onNavigateToCart,
                 modifier = Modifier
@@ -120,6 +145,20 @@ fun CashierPosRoute(
                     .padding(contentPadding)
             )
         }
+    }
+    approvalAttemptId?.let { attemptId ->
+        ManagerApprovalDialog(
+            context = ManagerApprovalContext(
+                action = ManagerApprovalAction.DISCOUNT_OVERRIDE,
+                resourceId = attemptId,
+            ),
+            repository = managerApprovalRepository,
+            onDismiss = { approvalAttemptId = null },
+            onApproved = { grant ->
+                approvalAttemptId = null
+                viewModel.continueCheckoutWithApproval(grant.approvalId, grant.resourceId)
+            },
+        )
     }
 }
 
@@ -132,6 +171,7 @@ fun CashierCartRoute(
     inventoryRepository: InventoryRepository,
     customerRepository: CustomerRepository,
     cashReconciliationRepository: CashReconciliationRepository,
+    managerApprovalRepository: ManagerApprovalRepository,
     onBackToPos: () -> Unit,
     onDashboardClick: () -> Unit = {},
     onPosClick: () -> Unit = {},
@@ -153,6 +193,12 @@ fun CashierCartRoute(
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val snackbarHostState = remember { SnackbarHostState() }
+    var approvalAttemptId by remember { mutableStateOf<String?>(null) }
+
+    LaunchedEffect(uiState.checkoutPreview?.checkoutAttemptId, uiState.checkoutPreview?.approvalRequired) {
+        val preview = uiState.checkoutPreview
+        if (preview?.approvalRequired == true) approvalAttemptId = preview.checkoutAttemptId
+    }
 
     LaunchedEffect(viewModel.errorEvent, snackbarHostState) {
         viewModel.errorEvent
@@ -200,11 +246,25 @@ fun CashierCartRoute(
         onClearCart = {
             viewModel.replaceCart(emptyList())
         },
+        onItemDiscountChanged = viewModel::setItemDiscount,
+        onTransactionDiscountChanged = viewModel::setTransactionDiscount,
         onCheckout = {
-            viewModel.submitCheckout(
-                paymentMethod = uiState.selectedPaymentMethod,
-                amountPaid = uiState.finalTotal
-            )
+            val preview = uiState.checkoutPreview
+            if (uiState.hasAmbiguousCheckout) {
+                viewModel.prepareCheckout(uiState.selectedPaymentMethod, uiState.finalTotal)
+            } else if (preview?.approvalRequired == true) {
+                val approvalId = uiState.approvedManagerApprovalId
+                if (approvalId != null) {
+                    viewModel.continueCheckoutWithApproval(approvalId, preview.checkoutAttemptId)
+                } else {
+                    approvalAttemptId = preview.checkoutAttemptId
+                }
+            } else {
+                viewModel.prepareCheckout(
+                    paymentMethod = uiState.selectedPaymentMethod,
+                    amountPaid = uiState.finalTotal,
+                )
+            }
         },
         onBackToPos = onBackToPos,
         onDashboardClick = onDashboardClick,
@@ -216,6 +276,20 @@ fun CashierCartRoute(
         onSettingsClick = onSettingsClick,
         onLogout = onLogout
     )
+    approvalAttemptId?.let { attemptId ->
+        ManagerApprovalDialog(
+            context = ManagerApprovalContext(
+                action = ManagerApprovalAction.DISCOUNT_OVERRIDE,
+                resourceId = attemptId,
+            ),
+            repository = managerApprovalRepository,
+            onDismiss = { approvalAttemptId = null },
+            onApproved = { grant ->
+                approvalAttemptId = null
+                viewModel.continueCheckoutWithApproval(grant.approvalId, grant.resourceId)
+            },
+        )
+    }
 }
 
 private fun UiText.message(): String {

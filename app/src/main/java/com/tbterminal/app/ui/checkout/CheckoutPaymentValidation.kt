@@ -12,7 +12,7 @@ internal fun validateCheckoutPaymentInput(
     amountPaidInput: String,
     total: BigDecimal
 ): CheckoutPaymentInputResult {
-    if (total <= BigDecimal.ZERO) return CheckoutPaymentInputResult(error = "Total transaksi harus lebih dari nol.")
+    if (total < BigDecimal.ZERO) return CheckoutPaymentInputResult(error = "Total transaksi tidak boleh negatif.")
     val parsed = amountPaidInput.trim().replace(',', '.').toBigDecimalOrNull()
     val amount = when (paymentMethod) {
         PaymentMethod.HUTANG -> BigDecimal.ZERO
@@ -22,6 +22,17 @@ internal fun validateCheckoutPaymentInput(
     }
     if (amount < BigDecimal.ZERO) return CheckoutPaymentInputResult(error = "Jumlah bayar tidak boleh negatif.")
     if (amount.scale() > 2) return CheckoutPaymentInputResult(error = "Jumlah bayar maksimal 2 angka desimal.")
+    if (total.compareTo(BigDecimal.ZERO) == 0) {
+        return when (paymentMethod) {
+            PaymentMethod.HUTANG, PaymentMethod.DP -> CheckoutPaymentInputResult(
+                error = "Transaksi bernilai nol tidak dapat dibuat sebagai hutang atau DP.",
+            )
+            PaymentMethod.TUNAI -> if (amount.compareTo(BigDecimal.ZERO) != 0) {
+                CheckoutPaymentInputResult(error = "Nominal bayar harus nol untuk transaksi gratis.")
+            } else CheckoutPaymentInputResult(BigDecimal.ZERO)
+            PaymentMethod.TRANSFER, PaymentMethod.QRIS -> CheckoutPaymentInputResult(BigDecimal.ZERO)
+        }
+    }
     return when (paymentMethod) {
         PaymentMethod.TUNAI -> if (amount < total) {
             CheckoutPaymentInputResult(error = "Pembayaran tunai kurang dari total transaksi.")

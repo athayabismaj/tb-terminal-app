@@ -736,14 +736,14 @@ private fun CustomerPicker(
                     ) {
                         Text("Pakai nama ini", fontWeight = FontWeight.Bold, color = Primary)
                     }
-                    IconButton(
+                    TextButton(
                         onClick = onRefreshCustomers,
                         modifier = Modifier
-                            .size(46.dp)
+                            .heightIn(min = 48.dp)
                             .clip(RoundedCornerShape(12.dp))
                             .background(Color.White)
                     ) {
-                        Icon(Icons.Outlined.Refresh, contentDescription = "Muat ulang", tint = Primary)
+                        Text("Muat ulang", color = Primary, fontWeight = FontWeight.SemiBold)
                     }
                 }
             } else {
@@ -869,15 +869,15 @@ private fun CashSessionGate(
                     }
                 }
 
-                IconButton(
+                TextButton(
                     onClick = onRefresh,
                     enabled = !isCashSessionLoading,
-                    modifier = Modifier.size(36.dp).clip(RoundedCornerShape(10.dp)).background(Color.White)
+                    modifier = Modifier.heightIn(min = 48.dp).clip(RoundedCornerShape(10.dp)).background(Color.White)
                 ) {
                     if (isCashSessionLoading) {
                         CircularProgressIndicator(modifier = Modifier.size(16.dp), strokeWidth = 2.dp)
                     } else {
-                        Icon(Icons.Outlined.Refresh, contentDescription = "Cek sesi", tint = Primary)
+                        Text("Cek status", color = Primary, fontWeight = FontWeight.SemiBold)
                     }
                 }
             }

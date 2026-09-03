@@ -34,6 +34,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -46,6 +47,7 @@ import androidx.compose.ui.unit.sp
 import com.tbterminal.app.ui.checkout.CartItem
 import com.tbterminal.app.ui.checkout.PaymentMethod
 import com.tbterminal.app.ui.checkout.displayName
+import com.tbterminal.app.data.model.DiscountType
 import java.math.BigDecimal
 import java.text.NumberFormat
 import java.util.Locale
@@ -69,7 +71,8 @@ fun CartItemCard(
     unitName: String,
     onIncrease: () -> Unit,
     onDecrease: () -> Unit,
-    onRemove: () -> Unit
+    onRemove: () -> Unit,
+    onDiscountClick: () -> Unit,
 ) {
     val subtotal = item.unitPrice.multiply(item.quantity.toBigDecimal())
 
@@ -131,6 +134,26 @@ fun CartItemCard(
                             color = CartOnSurfaceVariant
                         )
                     }
+                }
+                TextButton(
+                    onClick = onDiscountClick,
+                    contentPadding = androidx.compose.foundation.layout.PaddingValues(0.dp),
+                    modifier = Modifier.height(32.dp),
+                ) {
+                    val request = item.discountRequest
+                    Text(
+                        text = if (request == null) {
+                            "+ Diskon item"
+                        } else {
+                            when (request.type) {
+                                DiscountType.PERCENTAGE -> "Diskon ${request.value.stripTrailingZeros().toPlainString()}%"
+                                DiscountType.FIXED_AMOUNT -> "Diskon ${formatRupiah(request.value)}"
+                            }
+                        },
+                        color = CartPrimary,
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.SemiBold,
+                    )
                 }
             }
 
