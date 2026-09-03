@@ -43,6 +43,8 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import com.tbterminal.app.navigation.AppAccessPolicy
+import com.tbterminal.app.navigation.AppCapability
 
 enum class BackofficeSection(val label: String) {
     HOME("Beranda"),
@@ -66,11 +68,7 @@ private val backofficeNavigationItems = listOf(
 )
 
 internal fun visibleBackofficeSections(role: String): List<BackofficeSection> =
-    if (role.equals("owner", ignoreCase = true)) {
-        listOf(BackofficeSection.HOME, BackofficeSection.FINANCE, BackofficeSection.MORE)
-    } else {
-        BackofficeSection.entries
-    }
+    if (AppAccessPolicy.can(role, AppCapability.BACKOFFICE)) BackofficeSection.entries else emptyList()
 
 @Composable
 fun BackofficeAdaptiveShell(

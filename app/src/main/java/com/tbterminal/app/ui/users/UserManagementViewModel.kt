@@ -72,6 +72,8 @@ class UserManagementViewModel(
         }
     }
 
+    fun refresh() = loadUsers()
+
     fun loadRoles() {
         viewModelScope.launch {
             _uiState.update { state ->

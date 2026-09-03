@@ -276,7 +276,7 @@ class BackupRestoreViewModel(
                 else -> Unit
             }
         }
-        _uiState.update { it.copy(isServerBusy = false, message = "Job masih berjalan. Gunakan Muat Ulang untuk melihat status terbaru.") }
+        _uiState.update { it.copy(isServerBusy = false, message = "Job masih berjalan. Tarik daftar ke bawah untuk melihat status terbaru.") }
     }
 
     private fun upsertServerJob(job: DatabaseBackupJobDto) = _uiState.update { state ->
@@ -324,7 +324,7 @@ data class ServerRestorePrompt(
 internal fun String.isTerminalBackupStatus(): Boolean = this in setOf("SUCCEEDED", "FAILED")
 
 internal fun canManageServerDatabaseBackup(role: String): Boolean =
-    role.trim().lowercase() in setOf("owner", "admin")
+    role.trim().equals("owner", ignoreCase = true)
 
 internal enum class RestoreAmbiguousRecovery { POLL_STATUS_ONLY }
 internal fun ambiguousRestoreRecovery(): RestoreAmbiguousRecovery = RestoreAmbiguousRecovery.POLL_STATUS_ONLY

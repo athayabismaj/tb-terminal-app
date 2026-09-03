@@ -15,12 +15,10 @@ class BackofficeNavigationTest {
     }
 
     @Test
-    fun `owner sees management sections without cashier and admin operation menus`() {
-        assertEquals(
-            listOf(BackofficeSection.HOME, BackofficeSection.FINANCE, BackofficeSection.MORE),
-            visibleBackofficeSections("OWNER")
-        )
+    fun `owner and admin share the five work sections`() {
+        assertEquals(BackofficeSection.entries, visibleBackofficeSections("OWNER"))
         assertEquals(BackofficeSection.entries, visibleBackofficeSections("ADMIN"))
+        assertEquals(emptyList<BackofficeSection>(), visibleBackofficeSections("KASIR"))
     }
 
     @Test

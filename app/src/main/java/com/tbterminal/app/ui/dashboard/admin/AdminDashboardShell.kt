@@ -23,7 +23,11 @@ import com.tbterminal.app.ui.dashboard.owner.OwnerDestination
 import com.tbterminal.app.ui.components.TbCompactDashboardTopBar
 import com.tbterminal.app.ui.dashboard.BackofficeAdaptiveShell
 import com.tbterminal.app.ui.dashboard.BackofficeSection
+import com.tbterminal.app.ui.dashboard.cashier.CashierDashboardShell
+import com.tbterminal.app.ui.dashboard.cashier.CashierDestination
 import kotlinx.coroutines.launch
+import com.tbterminal.app.navigation.AppAccessPolicy
+import com.tbterminal.app.navigation.AppCapability
 
 internal val LocalAdminDestinationNavigator = staticCompositionLocalOf<((AdminDestination) -> Unit)?> { null }
 
@@ -83,6 +87,34 @@ fun AdminDashboardShell(
         }
     }
 
+    if (!AppAccessPolicy.can(role, AppCapability.BACKOFFICE)) {
+        val cashierDestination = when (activeDestination) {
+            AdminDestination.Receivables,
+            AdminDestination.Receivables -> CashierDestination.Receivables
+            AdminDestination.ReceivablePayments -> CashierDestination.ReceivablePayments
+            AdminDestination.Customers,
+            AdminDestination.CustomerForm -> CashierDestination.Customers
+            else -> CashierDestination.Dashboard
+        }
+        CashierDashboardShell(
+            userName = userName,
+            role = role,
+            activeDestination = cashierDestination,
+            onDashboardClick = navigateOrFallback(AdminDestination.Dashboard, onDashboardClick),
+            onPosClick = navigateOrFallback(AdminDestination.NewTransaction, onSalesTransactionsClick),
+            onCashSessionClick = navigateOrFallback(AdminDestination.CashierCashSession, onCashReconciliationClick),
+            onTransactionHistoryClick = navigateOrFallback(AdminDestination.CashierTransactionHistory, onSalesTransactionsClick),
+            onReceivablesClick = navigateOrFallback(AdminDestination.Receivables, onReceivablesClick),
+            onCustomersClick = navigateOrFallback(AdminDestination.Customers, onCustomersClick),
+            onReceivablePaymentsClick = navigateOrFallback(AdminDestination.ReceivablePayments, onReceivablePaymentsClick),
+            onProfileClick = navigateOrFallback(AdminDestination.Profile, onProfileClick),
+            onSettingsClick = navigateOrFallback(AdminDestination.Settings, onSettingsClick),
+            onLogout = onLogout,
+            content = content,
+        )
+        return
+    }
+
     BackofficeAdaptiveShell(
         userName = userName,
         role = role,
@@ -104,6 +136,8 @@ enum class AdminDestination {
     StockHub,
     MoreHub,
     NewTransaction,
+    CashierCashSession,
+    CashierTransactionHistory,
     CashReconciliation,
     SalesTransactions,
     Reports,

@@ -17,7 +17,7 @@ class ServerBackupStatusTest {
     @Test
     fun serverRoleAndAmbiguousConfirmPolicyAreSafe() {
         assertTrue(canManageServerDatabaseBackup("owner"))
-        assertTrue(canManageServerDatabaseBackup("ADMIN"))
+        assertFalse(canManageServerDatabaseBackup("ADMIN"))
         assertFalse(canManageServerDatabaseBackup("kasir"))
         assertTrue(ambiguousRestoreRecovery() == RestoreAmbiguousRecovery.POLL_STATUS_ONLY)
     }

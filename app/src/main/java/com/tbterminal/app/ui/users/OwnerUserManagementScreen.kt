@@ -11,6 +11,7 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import com.tbterminal.app.data.repository.UserRepository
 import com.tbterminal.app.ui.dashboard.owner.OwnerDashboardShell
 import com.tbterminal.app.ui.dashboard.owner.OwnerDestination
+import com.tbterminal.app.ui.components.RefreshableContent
 
 @Composable
 fun OwnerUserManagementScreen(
@@ -56,11 +57,16 @@ fun OwnerUserManagementScreen(
         onSettingsClick = onSettingsClick,
         onLogout = onLogout
     ) { contentModifier ->
-        UserManagementContent(
+        RefreshableContent(
+            isRefreshing = uiState.isLoading && uiState.staffMembers.isNotEmpty(),
+            onRefresh = viewModel::refresh,
             modifier = contentModifier,
+        ) {
+            UserManagementContent(
+            modifier = Modifier,
             uiState = uiState,
             onAddUserClick = onAddUserClick,
-            onRetry = viewModel::loadUsers,
+            onRetry = viewModel::refresh,
             onEditUserClick = { staff ->
                 viewModel.clearActionMessages()
                 onEditUserClick(staff.id)
@@ -83,7 +89,8 @@ fun OwnerUserManagementScreen(
             },
             onSecurityLogClick = onSecurityLogClick,
             onDismissActionMessage = viewModel::clearActionMessages
-        )
+            )
+        }
     }
 
     deactivatingStaff?.let { staff ->

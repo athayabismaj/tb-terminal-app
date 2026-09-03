@@ -26,7 +26,7 @@ import androidx.compose.material.icons.outlined.ExpandLess
 import androidx.compose.material.icons.outlined.ExpandMore
 import androidx.compose.material.icons.outlined.History
 import androidx.compose.material.icons.outlined.Home
-import androidx.compose.material.icons.outlined.Inventory2
+import androidx.compose.material.icons.outlined.AccountBalanceWallet
 import androidx.compose.material.icons.outlined.Payments
 import androidx.compose.material.icons.outlined.Person
 import androidx.compose.material.icons.outlined.PointOfSale
@@ -53,6 +53,8 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.tbterminal.app.ui.offline.OfflineStatusIndicatorHost
+import com.tbterminal.app.ui.dashboard.admin.AdminDestination
+import com.tbterminal.app.ui.dashboard.admin.LocalAdminDestinationNavigator
 private val CashierShellBackground = Color.White
 private val CashierSidebarBackground = Color(0xFFF1F6F8)
 private val CashierSidebarTextPrimary = Color(0xFF111111)
@@ -70,6 +72,9 @@ enum class CashierDestination {
     Pos,
     CashSession,
     TransactionHistory,
+    Customers,
+    Receivables,
+    ReceivablePayments,
     StockCheck,
     Profile,
     Settings
@@ -85,12 +90,28 @@ fun CashierDashboardShell(
     onCashSessionClick: () -> Unit = {},
     onTransactionHistoryClick: () -> Unit = {},
     onStockCheckClick: () -> Unit = {},
+    onReceivablesClick: (() -> Unit)? = null,
+    onCustomersClick: (() -> Unit)? = null,
+    onReceivablePaymentsClick: (() -> Unit)? = null,
     onProfileClick: () -> Unit = {},
     onSettingsClick: () -> Unit = {},
     onLogout: () -> Unit,
     showHeader: Boolean = true,
     content: @Composable (Modifier) -> Unit
 ) {
+    val adminNavigator = LocalAdminDestinationNavigator.current
+    val openReceivables: () -> Unit = onReceivablesClick ?: {
+        adminNavigator?.invoke(AdminDestination.Receivables)
+        Unit
+    }
+    val openCustomers: () -> Unit = onCustomersClick ?: {
+        adminNavigator?.invoke(AdminDestination.Customers)
+        Unit
+    }
+    val openReceivablePayments: () -> Unit = onReceivablePaymentsClick ?: {
+        adminNavigator?.invoke(AdminDestination.ReceivablePayments)
+        Unit
+    }
     BoxWithConstraints(
         modifier = Modifier
             .fillMaxSize()
@@ -108,7 +129,9 @@ fun CashierDashboardShell(
                     onPosClick = onPosClick,
                     onCashSessionClick = onCashSessionClick,
                     onTransactionHistoryClick = onTransactionHistoryClick,
-                    onStockCheckClick = onStockCheckClick,
+                    onCustomersClick = openCustomers,
+                    onReceivablesClick = openReceivables,
+                    onReceivablePaymentsClick = openReceivablePayments,
                     onProfileClick = onProfileClick,
                     onSettingsClick = onSettingsClick,
                     onLogout = onLogout,
@@ -141,7 +164,7 @@ fun CashierDashboardShell(
                     onPosClick = onPosClick,
                     onCashSessionClick = onCashSessionClick,
                     onTransactionHistoryClick = onTransactionHistoryClick,
-                    onStockCheckClick = onStockCheckClick
+                    onReceivablesClick = openReceivables
                 )
             }
         }
@@ -267,7 +290,7 @@ private fun CashierBottomNavigation(
     onPosClick: () -> Unit,
     onCashSessionClick: () -> Unit,
     onTransactionHistoryClick: () -> Unit,
-    onStockCheckClick: () -> Unit
+    onReceivablesClick: () -> Unit
 ) {
     val items = listOf(
         CashierBottomNavItem(
@@ -295,10 +318,10 @@ private fun CashierBottomNavigation(
             onClick = onTransactionHistoryClick
         ),
         CashierBottomNavItem(
-            destination = CashierDestination.StockCheck,
-            label = "Stok",
-            icon = Icons.Outlined.Inventory2,
-            onClick = onStockCheckClick
+            destination = CashierDestination.Receivables,
+            label = "Piutang",
+            icon = Icons.Outlined.AccountBalanceWallet,
+            onClick = onReceivablesClick
         )
     )
 
@@ -307,7 +330,11 @@ private fun CashierBottomNavigation(
         tonalElevation = 0.dp
     ) {
         items.forEach { item ->
-            val selected = activeDestination == item.destination
+            val selected = activeDestination == item.destination ||
+                (item.destination == CashierDestination.Receivables && activeDestination in setOf(
+                    CashierDestination.Customers,
+                    CashierDestination.ReceivablePayments,
+                ))
             NavigationBarItem(
                 selected = selected,
                 onClick = item.onClick,
@@ -353,7 +380,9 @@ private fun CashierShellSidebar(
     onPosClick: () -> Unit,
     onCashSessionClick: () -> Unit,
     onTransactionHistoryClick: () -> Unit,
-    onStockCheckClick: () -> Unit,
+    onCustomersClick: () -> Unit,
+    onReceivablesClick: () -> Unit,
+    onReceivablePaymentsClick: () -> Unit,
     onProfileClick: () -> Unit = {},
     onSettingsClick: () -> Unit,
     onLogout: () -> Unit,
@@ -398,15 +427,27 @@ private fun CashierShellSidebar(
             )
             CashierShellSidebarItem(
                 icon = Icons.Outlined.History,
-                text = "Riwayat & Pelunasan",
+                text = "Transaksi Saya",
                 isActive = activeDestination == CashierDestination.TransactionHistory,
                 onClick = onTransactionHistoryClick
             )
             CashierShellSidebarItem(
-                icon = Icons.Outlined.Inventory2,
-                text = "Cek Stok",
-                isActive = activeDestination == CashierDestination.StockCheck,
-                onClick = onStockCheckClick
+                icon = Icons.Outlined.Person,
+                text = "Pelanggan",
+                isActive = activeDestination == CashierDestination.Customers,
+                onClick = onCustomersClick
+            )
+            CashierShellSidebarItem(
+                icon = Icons.Outlined.AccountBalanceWallet,
+                text = "Piutang Pelanggan",
+                isActive = activeDestination == CashierDestination.Receivables,
+                onClick = onReceivablesClick
+            )
+            CashierShellSidebarItem(
+                icon = Icons.Outlined.Payments,
+                text = "Pembayaran Piutang",
+                isActive = activeDestination == CashierDestination.ReceivablePayments,
+                onClick = onReceivablePaymentsClick
             )
         }
         OfflineStatusIndicatorHost(

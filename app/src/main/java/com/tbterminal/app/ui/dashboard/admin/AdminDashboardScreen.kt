@@ -52,6 +52,9 @@ import com.tbterminal.app.ui.dashboard.DashboardWarningOrange
 import com.tbterminal.app.ui.dashboard.offline.OfflineDashboardSection
 import com.tbterminal.app.ui.dashboard.offline.OfflineDashboardViewModel
 import com.tbterminal.app.ui.dashboard.BackofficeDashboardContent
+import com.tbterminal.app.ui.components.RefreshableContent
+import com.tbterminal.app.navigation.AppAccessPolicy
+import com.tbterminal.app.navigation.AppCapability
 
 @Composable
 fun AdminDashboardScreen(
@@ -132,7 +135,13 @@ fun AdminDashboardScreen(
         onSettingsClick = onSettingsClick,
         onLogout = onLogout
     ) { contentModifier ->
-        BackofficeDashboardContent(
+        RefreshableContent(
+            isRefreshing = uiState.isLoading && uiState.metrics != null,
+            onRefresh = viewModel::refresh,
+            modifier = contentModifier,
+        ) {
+            BackofficeDashboardContent(
+            role = role,
             metrics = uiState.metrics,
             isLoading = uiState.isLoading,
             error = uiState.error,
@@ -143,9 +152,12 @@ fun AdminDashboardScreen(
             onCashClick = onCashReconciliationClick,
             onStockClick = onProductsClick,
             onTransactionsClick = onSalesTransactionsClick,
+            onReportsClick = onReportsClick,
             onSyncCenterClick = onSyncCenterClick,
-            modifier = contentModifier
-        )
+            showNewTransactionAction = AppAccessPolicy.can(role, AppCapability.POS),
+            modifier = Modifier
+            )
+        }
     }
 }
 

@@ -390,7 +390,7 @@ private fun BackupRestoreNavRoute(
         return
     }
 
-    if (sessionUser.role.equals("kasir", ignoreCase = true)) {
+    if (!sessionUser.role.equals("owner", ignoreCase = true)) {
         LaunchedEffect(Unit) {
             navController.navigate(AppRoute.Dashboard.route) {
                 launchSingleTop = true

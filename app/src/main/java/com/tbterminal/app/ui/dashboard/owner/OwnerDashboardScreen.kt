@@ -60,6 +60,7 @@ import com.tbterminal.app.ui.dashboard.DashboardTextSecondary
 import com.tbterminal.app.ui.dashboard.DashboardWarningOrange
 import com.tbterminal.app.ui.dashboard.offline.OfflineDashboardSection
 import com.tbterminal.app.ui.dashboard.offline.OfflineDashboardViewModel
+import com.tbterminal.app.ui.components.RefreshableContent
 
 @Composable
 fun OwnerDashboardScreen(
@@ -84,7 +85,10 @@ fun OwnerDashboardScreen(
     onSecurityLogClick: () -> Unit,
     onSettingsClick: () -> Unit = {},
     dashboardViewModel: AdminDashboardViewModel = viewModel(
-        factory = AdminDashboardViewModel.factory(analyticsRepository)
+        factory = AdminDashboardViewModel.factory(
+            analyticsRepository = analyticsRepository,
+            includeFinancialSummary = true,
+        )
     ),
     offlineDashboardViewModel: OfflineDashboardViewModel = viewModel(
         factory = OfflineDashboardViewModel.factory(offlineDashboardRepository)
@@ -112,8 +116,15 @@ fun OwnerDashboardScreen(
         onSettingsClick = onSettingsClick,
         onLogout = onLogout
     ) { contentModifier ->
-        BackofficeDashboardContent(
+        RefreshableContent(
+            isRefreshing = dashboardUiState.isLoading && dashboardUiState.metrics != null,
+            onRefresh = dashboardViewModel::refresh,
+            modifier = contentModifier,
+        ) {
+            BackofficeDashboardContent(
+            role = role,
             metrics = dashboardUiState.metrics,
+            financialTotals = dashboardUiState.financialTotals,
             isLoading = dashboardUiState.isLoading,
             error = dashboardUiState.error,
             offlineUiState = offlineUiState,
@@ -123,11 +134,13 @@ fun OwnerDashboardScreen(
             onCashClick = onCashReconciliationClick,
             onStockClick = onProductsClick,
             onTransactionsClick = onSalesTransactionsClick,
+            onReportsClick = onReportsClick,
             onSyncCenterClick = onSyncCenterClick,
             showNewTransactionAction = false,
             showOfflineDeviceSummary = false,
-            modifier = contentModifier
-        )
+            modifier = Modifier
+            )
+        }
     }
 }
 

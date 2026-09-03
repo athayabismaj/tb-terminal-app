@@ -5,6 +5,7 @@ import androidx.compose.runtime.getValue
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.tbterminal.app.ui.dashboard.admin.AdminDashboardShell
 import com.tbterminal.app.ui.dashboard.admin.AdminDestination
+import com.tbterminal.app.ui.components.RefreshableContent
 
 @Composable
 fun AdminOperationalAuditRoute(
@@ -64,17 +65,23 @@ fun AdminOperationalAuditRoute(
         onSettingsClick = onSettingsClick,
         onLogout = onLogout
     ) { contentModifier ->
-        AdminOperationalAuditScreen(
+        RefreshableContent(
+            isRefreshing = uiState.isLoading && uiState.logs.isNotEmpty(),
+            onRefresh = viewModel::refresh,
             modifier = contentModifier,
+        ) {
+            AdminOperationalAuditScreen(
+            modifier = androidx.compose.ui.Modifier,
             uiState = uiState,
             onActionFilterChanged = viewModel::setActionFilter,
             onDateChanged = viewModel::setDate,
             onDatePresetSelected = viewModel::setDatePreset,
             onPreviousDate = viewModel::previousDate,
             onNextDate = viewModel::nextDate,
-            onRetry = { viewModel.loadLogs() },
+            onRetry = viewModel::refresh,
             onPreviousPage = { viewModel.loadLogs(page = uiState.currentPage - 1) },
             onNextPage = { viewModel.loadLogs(page = uiState.currentPage + 1) }
-        )
+            )
+        }
     }
 }

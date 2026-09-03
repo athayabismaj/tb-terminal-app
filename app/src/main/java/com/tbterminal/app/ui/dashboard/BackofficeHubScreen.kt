@@ -54,6 +54,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import com.tbterminal.app.navigation.AppAccessPolicy
+import com.tbterminal.app.navigation.AppCapability
 import com.tbterminal.app.ui.components.TbLayoutInfo
 import com.tbterminal.app.ui.components.TbPageSurface
 import com.tbterminal.app.ui.dashboard.admin.AdminDashboardShell
@@ -80,7 +82,6 @@ fun BackofficeHubScreen(
 ) {
     val globalNavigator = LocalAdminDestinationNavigator.current
     val navigate: (AdminDestination) -> Unit = onNavigate ?: { destination -> globalNavigator?.invoke(destination) }
-    val isOwner = role.equals("owner", ignoreCase = true)
     val activeDestination = when (section) {
         BackofficeSection.TRANSACTIONS -> AdminDestination.TransactionsHub
         BackofficeSection.FINANCE -> AdminDestination.FinanceHub
@@ -105,12 +106,16 @@ fun BackofficeHubScreen(
                 verticalArrangement = Arrangement.spacedBy(layout.verticalSpacing)
             ) {
                 when (section) {
-                    BackofficeSection.TRANSACTIONS -> TransactionsHub(layout, navigate, isOwner)
+                    BackofficeSection.TRANSACTIONS -> TransactionsHub(
+                        layout,
+                        navigate,
+                        AppAccessPolicy.can(role, AppCapability.POS)
+                    )
                     BackofficeSection.FINANCE -> FinanceHub(layout, navigate)
-                    BackofficeSection.STOCK -> StockHub(layout, navigate, isOwner)
+                    BackofficeSection.STOCK -> StockHub(layout, navigate)
                     BackofficeSection.MORE -> MoreHub(
                         layout = layout,
-                        isOwner = isOwner,
+                        role = role,
                         onNavigate = navigate,
                         onUserManagementClick = onUserManagementClick,
                         onSecurityLogClick = onSecurityLogClick,
@@ -128,14 +133,14 @@ fun BackofficeHubScreen(
 private fun TransactionsHub(
     layout: TbLayoutInfo,
     onNavigate: (AdminDestination) -> Unit,
-    isOwner: Boolean
+    canUsePos: Boolean
 ) {
     var selectedTab by remember { mutableIntStateOf(0) }
     HubHeader(
         title = "Transaksi",
-        subtitle = if (isOwner) "Pantau riwayat penjualan dan pembelian." else "Penjualan dan pembelian dalam satu tempat.",
-        actionLabel = if (isOwner) null else "+ Transaksi Baru",
-        onAction = if (isOwner) null else ({ onNavigate(AdminDestination.NewTransaction) }),
+        subtitle = "Penjualan dan pembelian dalam satu tempat.",
+        actionLabel = if (canUsePos) "+ Transaksi Baru" else null,
+        onAction = if (canUsePos) ({ onNavigate(AdminDestination.NewTransaction) }) else null,
         showTitle = false
     )
     TabRow(selectedTabIndex = selectedTab) {
@@ -146,12 +151,12 @@ private fun TransactionsHub(
     val actions = if (selectedTab == 0) {
         buildList {
             add(HubAction("Daftar Penjualan", "Cari nomor transaksi, kasir, pelanggan, metode, dan status.", Icons.AutoMirrored.Outlined.ReceiptLong, AdminDestination.SalesTransactions))
-            if (!isOwner) add(HubAction("Buat Penjualan", "Mulai transaksi POS baru.", Icons.Outlined.PointOfSale, AdminDestination.NewTransaction))
+            if (canUsePos) add(HubAction("Buat Penjualan", "Mulai transaksi POS baru.", Icons.Outlined.PointOfSale, AdminDestination.NewTransaction))
         }
     } else {
         buildList {
             add(HubAction("Daftar Pembelian", "Cari pembelian supplier dan status pembayarannya.", Icons.AutoMirrored.Outlined.ListAlt, AdminDestination.PurchaseHistory))
-            if (!isOwner) add(HubAction("Barang Masuk", "Catat pembelian atau penerimaan barang.", Icons.Outlined.LocalShipping, AdminDestination.IncomingGoods))
+            add(HubAction("Barang Masuk", "Catat pembelian atau penerimaan barang.", Icons.Outlined.LocalShipping, AdminDestination.IncomingGoods))
         }
     }
     HubActionGrid(layout, actions, onNavigate)
@@ -277,18 +282,8 @@ private fun FinanceCardGrid(
 @Composable
 private fun StockHub(
     layout: TbLayoutInfo,
-    onNavigate: (AdminDestination) -> Unit,
-    isOwner: Boolean
+    onNavigate: (AdminDestination) -> Unit
 ) {
-    if (isOwner) {
-        HubHeader("Laporan Stok", "Pantau saldo dan riwayat mutasi stok.")
-        HubActionGrid(
-            layout,
-            listOf(HubAction("Kartu Stok", "Lihat saldo dan riwayat mutasi setiap produk.", Icons.AutoMirrored.Outlined.ListAlt, AdminDestination.StockReport)),
-            onNavigate
-        )
-        return
-    }
     HubHeader(
         title = "Stok",
         subtitle = "Cek ketersediaan, harga, dan pergerakan barang.",
@@ -322,22 +317,12 @@ private fun StockHub(
 @Composable
 private fun MoreHub(
     layout: TbLayoutInfo,
-    isOwner: Boolean,
+    role: String,
     onNavigate: (AdminDestination) -> Unit,
     onUserManagementClick: () -> Unit,
     onSecurityLogClick: () -> Unit,
     onLogout: () -> Unit
 ) {
-    if (isOwner) {
-        OwnerMoreHub(
-            layout = layout,
-            onNavigate = onNavigate,
-            onUserManagementClick = onUserManagementClick,
-            onSecurityLogClick = onSecurityLogClick,
-            onLogout = onLogout
-        )
-        return
-    }
     HubHeader("Lainnya", "Master data, laporan, administrasi, perangkat, dan akun.", showTitle = false)
     HubGroup("Master Data", layout, listOf(
         HubAction("Produk", "Daftar dan konfigurasi produk.", Icons.Outlined.Inventory2, AdminDestination.Products),
@@ -353,45 +338,36 @@ private fun MoreHub(
     ), onNavigate)
 
     val administration = buildList {
-        add(HubAction("Riwayat Aktivitas", "Audit perubahan data dan aktivitas penting.", Icons.Outlined.Security, AdminDestination.OperationalAudit))
-        add(HubAction("Backup & Restore", "Kelola backup lokal dan database server.", Icons.Outlined.Backup, AdminDestination.BackupRestore))
+        if (AppAccessPolicy.can(role, AppCapability.USER_MANAGEMENT)) {
+            add(HubAction("Pengguna", "Kelola akun admin dan kasir.", Icons.Outlined.Person, onClick = onUserManagementClick))
+        }
+        if (AppAccessPolicy.can(role, AppCapability.AUDIT)) {
+            add(HubAction("Riwayat Aktivitas", "Audit perubahan data dan aktivitas penting.", Icons.Outlined.Security, AdminDestination.OperationalAudit))
+        }
+        if (AppAccessPolicy.can(role, AppCapability.SECURITY_SETTINGS)) {
+            add(HubAction("Log Keamanan", "Periksa login dan kejadian keamanan.", Icons.Outlined.Lock, onClick = onSecurityLogClick))
+        }
+        if (AppAccessPolicy.can(role, AppCapability.SERVER_BACKUP)) {
+            add(HubAction("Backup & Restore", "Kelola backup lokal dan database server.", Icons.Outlined.Backup, AdminDestination.BackupRestore))
+        }
     }
     HubGroup("Administrasi", layout, administration, onNavigate)
     HubGroup("Perangkat", layout, listOf(
         HubAction("Printer", "Pilih ukuran kertas dan cetak melalui Android.", Icons.Outlined.Print, AdminDestination.Settings),
         HubAction("Sinkronisasi", "Pantau antrean offline dan status koneksi.", Icons.Outlined.Sync, AdminDestination.SyncCenter),
-        HubAction("Pengaturan", "Atur perangkat dan keamanan otomatis.", Icons.Outlined.Settings, AdminDestination.Settings)
+        HubAction(
+            "Pengaturan",
+            if (AppAccessPolicy.can(role, AppCapability.SECURITY_SETTINGS)) {
+                "Atur operasional, keamanan, dan perangkat."
+            } else {
+                "Atur operasional dan perangkat."
+            },
+            Icons.Outlined.Settings,
+            AdminDestination.Settings
+        )
     ), onNavigate)
     HubGroup("Akun", layout, listOf(
         HubAction("Profil", "Lihat identitas akun yang sedang digunakan.", Icons.Outlined.Person, AdminDestination.Profile),
-        HubAction("Password / PIN", "Perbarui kredensial akun sendiri.", Icons.Outlined.Lock, AdminDestination.Profile),
-        HubAction("Logout", "Keluar dengan aman dari perangkat ini.", Icons.AutoMirrored.Outlined.Logout, onClick = onLogout)
-    ), onNavigate)
-}
-
-@Composable
-private fun OwnerMoreHub(
-    layout: TbLayoutInfo,
-    onNavigate: (AdminDestination) -> Unit,
-    onUserManagementClick: () -> Unit,
-    onSecurityLogClick: () -> Unit,
-    onLogout: () -> Unit
-) {
-    HubHeader("Lainnya", "Laporan, pengawasan, sistem, dan akun pemilik.", showTitle = false)
-    HubGroup("Laporan", layout, listOf(
-        HubAction("Penjualan & Keuangan", "Pantau laporan periode, pembayaran, dan status.", Icons.Outlined.GridView, AdminDestination.Reports),
-        HubAction("Stok", "Lihat laporan stok dan kartu stok.", Icons.Outlined.Inventory2, AdminDestination.StockReport),
-        HubAction("Laporan Lokal", "Ringkasan data yang tersimpan di perangkat.", Icons.AutoMirrored.Outlined.ListAlt, AdminDestination.LocalReports)
-    ), onNavigate)
-    HubGroup("Administrasi", layout, listOf(
-        HubAction("Pengguna", "Kelola akun admin dan kasir.", Icons.Outlined.Person, onClick = onUserManagementClick),
-        HubAction("Riwayat Aktivitas", "Audit perubahan data dan aktivitas penting.", Icons.Outlined.Security, AdminDestination.OperationalAudit),
-        HubAction("Log Keamanan", "Periksa login dan kejadian keamanan.", Icons.Outlined.Lock, onClick = onSecurityLogClick),
-        HubAction("Backup & Restore", "Kelola backup lokal dan database server.", Icons.Outlined.Backup, AdminDestination.BackupRestore),
-        HubAction("Pengaturan Sistem", "Atur keamanan akun dan perangkat utama.", Icons.Outlined.Settings, AdminDestination.Settings)
-    ), onNavigate)
-    HubGroup("Akun", layout, listOf(
-        HubAction("Profil", "Lihat identitas akun pemilik.", Icons.Outlined.Person, AdminDestination.Profile),
         HubAction("Password / PIN", "Perbarui kredensial akun sendiri.", Icons.Outlined.Lock, AdminDestination.Profile),
         HubAction("Logout", "Keluar dengan aman dari perangkat ini.", Icons.AutoMirrored.Outlined.Logout, onClick = onLogout)
     ), onNavigate)

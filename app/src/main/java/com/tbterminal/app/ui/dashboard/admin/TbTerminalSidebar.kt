@@ -224,7 +224,6 @@ internal fun TbTerminalSidebar(
                         SidebarEntry("Laporan Analitik", Icons.Outlined.GridView, activeDestination == AdminDestination.Reports, onReportsClick),
                         SidebarEntry("Laporan Lokal", Icons.Outlined.Assessment, activeDestination == AdminDestination.LocalReports, onLocalReportsClick),
                         SidebarEntry("Sinkronisasi & Konflik", Icons.Outlined.Sync, activeDestination == AdminDestination.SyncCenter, onSyncCenterClick),
-                        SidebarEntry("Backup & Restore", Icons.Outlined.Backup, activeDestination == AdminDestination.BackupRestore, onBackupRestoreClick),
                         SidebarEntry("Audit Operasional", Icons.Outlined.AssignmentTurnedIn, activeDestination == AdminDestination.OperationalAudit, onOperationalAuditClick)
                     )
                 )

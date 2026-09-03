@@ -134,9 +134,13 @@ data class SalesReportRangeDto(
 data class SalesReportTotalsDto(
     val transactionCount: Long,
     @Serializable(with = BigDecimalStringSerializer::class) val grossRevenue: BigDecimal,
+    @Serializable(with = BigDecimalStringSerializer::class) val discountAmount: BigDecimal = BigDecimal.ZERO,
     @Serializable(with = BigDecimalStringSerializer::class) val paidAmount: BigDecimal,
     @Serializable(with = BigDecimalStringSerializer::class) val outstandingAmount: BigDecimal,
-    @Serializable(with = BigDecimalStringSerializer::class) val grossProfit: BigDecimal
+    @Serializable(with = BigDecimalStringSerializer::class) val grossProfit: BigDecimal,
+    @Serializable(with = BigDecimalStringSerializer::class) val refundAmount: BigDecimal = BigDecimal.ZERO,
+    @Serializable(with = BigDecimalStringSerializer::class) val netRevenue: BigDecimal =
+        grossRevenue.subtract(discountAmount).subtract(refundAmount),
 )
 
 @Serializable

@@ -103,14 +103,12 @@ fun AdminOperationalAuditScreen(
         }
 
         if (uiState.isLoading && uiState.logs.isEmpty()) {
-            Box(
+            com.tbterminal.app.ui.components.SkeletonList(
                 modifier = Modifier
                     .fillMaxWidth()
                     .heightIn(min = 240.dp),
-                contentAlignment = Alignment.Center
-            ) {
-                CircularProgressIndicator()
-            }
+                itemCount = 6,
+            )
         } else if (uiState.error != null && uiState.logs.isEmpty()) {
             Box(
                 modifier = Modifier

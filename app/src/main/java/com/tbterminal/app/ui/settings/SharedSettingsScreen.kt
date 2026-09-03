@@ -24,7 +24,6 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Backup
 import androidx.compose.material.icons.outlined.Lock
-import androidx.compose.material.icons.outlined.Payments
 import androidx.compose.material.icons.outlined.Print
 import androidx.compose.material.icons.outlined.Save
 import androidx.compose.material.icons.outlined.Storefront
@@ -32,7 +31,6 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.OutlinedButton
@@ -60,6 +58,9 @@ import com.tbterminal.app.ui.dashboard.DashboardBrandGreen
 import com.tbterminal.app.ui.dashboard.DashboardBrandGreenDark
 import com.tbterminal.app.ui.dashboard.DashboardTextPrimary
 import com.tbterminal.app.ui.dashboard.DashboardTextSecondary
+import com.tbterminal.app.navigation.AppAccessPolicy
+import com.tbterminal.app.navigation.AppCapability
+import com.tbterminal.app.ui.components.SkeletonCard
 
 private data class SettingsTab(
     val key: String,
@@ -67,6 +68,15 @@ private data class SettingsTab(
     val subtitle: String,
     val icon: ImageVector
 )
+
+internal fun visibleSettingsTabKeys(role: String): List<String> = buildList {
+    if (AppAccessPolicy.can(role, AppCapability.STORE_SETTINGS)) {
+        add("store")
+    }
+    if (AppAccessPolicy.can(role, AppCapability.SECURITY_SETTINGS)) add("security")
+    if (AppAccessPolicy.can(role, AppCapability.DEVICE_SETTINGS)) add("device")
+    if (AppAccessPolicy.can(role, AppCapability.SYNC)) add("sync")
+}
 
 @Composable
 fun SharedSettingsScreen(
@@ -82,28 +92,20 @@ fun SharedSettingsScreen(
     onReceiptHeaderChanged: (String) -> Unit,
     onReceiptFooterChanged: (String) -> Unit,
     onPrinterSizeChanged: (String) -> Unit,
-    onDefaultCreditLimitChanged: (String) -> Unit,
-    onDefaultTermDaysChanged: (String) -> Unit,
     onCashToleranceChanged: (String) -> Unit,
     onAutoLockMinutesChanged: (String) -> Unit,
     onAutoPrintReceiptChanged: (Boolean) -> Unit,
-    onBarcodeScannerChanged: (Boolean) -> Unit,
-    onOfflineCacheChanged: (Boolean) -> Unit,
     onSelectPrinter: () -> Unit,
     modifier: Modifier = Modifier
 ) {
-    val isManagementRole = !role.equals("kasir", ignoreCase = true)
-    val tabs = buildList {
-        if (isManagementRole) {
-            add(SettingsTab("store", "Toko & Struk", "Header, footer, ukuran printer", Icons.Outlined.Storefront))
-            add(SettingsTab("operation", "Operasional", "Limit kredit, termin, kas", Icons.Outlined.Payments))
-        }
-        add(SettingsTab("security", "Keamanan", "Kebijakan akses akun", Icons.Outlined.Lock))
-        add(SettingsTab("device", "Perangkat", "Printer dan scanner kasir", Icons.Outlined.Print))
-        if (isManagementRole) {
-            add(SettingsTab("sync", "Backup & Sync", "Status sinkronisasi data", Icons.Outlined.Backup))
-        }
-    }
+    val canManageStore = AppAccessPolicy.can(role, AppCapability.STORE_SETTINGS)
+    val visibleTabKeys = visibleSettingsTabKeys(role)
+    val tabs = listOf(
+        SettingsTab("store", "Toko & Struk", "Identitas dan isi struk", Icons.Outlined.Storefront),
+        SettingsTab("security", "Keamanan", "Kebijakan akses akun", Icons.Outlined.Lock),
+        SettingsTab("device", "Perangkat", "Printer dan preferensi lokal", Icons.Outlined.Print),
+        SettingsTab("sync", "Sinkronisasi", "Status sinkronisasi data", Icons.Outlined.Backup),
+    ).filter { it.key in visibleTabKeys }
     var selectedTab by rememberSaveable(role) { mutableStateOf(tabs.first().key) }
 
     LaunchedEffect(role) {
@@ -114,8 +116,8 @@ fun SharedSettingsScreen(
 
     val content: @Composable (Modifier) -> Unit = { contentModifier ->
         SettingsContentCard(
-            title = if (isManagementRole) "Pengaturan Sistem" else "Pengaturan Kasir",
-            subtitle = if (isManagementRole) {
+            title = if (canManageStore) "Pengaturan Sistem" else "Pengaturan Perangkat",
+            subtitle = if (canManageStore) {
                 "Kelola identitas toko, struk, perangkat, dan preferensi operasional."
             } else {
                 "Kelola preferensi perangkat kasir yang dipakai pada terminal ini."
@@ -133,33 +135,19 @@ fun SharedSettingsScreen(
                     onPhoneChanged = onPhoneChanged,
                     onReceiptHeaderChanged = onReceiptHeaderChanged,
                     onReceiptFooterChanged = onReceiptFooterChanged,
-                    onPrinterSizeChanged = onPrinterSizeChanged,
                     onSave = onSaveStoreSettings
                 )
-                "operation" -> OperationalSettingsContent(
-                    uiState = uiState,
-                    onDefaultCreditLimitChanged = onDefaultCreditLimitChanged,
-                    onDefaultTermDaysChanged = onDefaultTermDaysChanged,
-                    onCashToleranceChanged = onCashToleranceChanged,
-                    onAutoLockMinutesChanged = onAutoLockMinutesChanged,
-                    onSave = onSaveLocalPreferences
-                )
-                "security" -> SecuritySettingsContent(
-                    isManagementRole = isManagementRole,
-                    onSave = onSaveLocalPreferences
-                )
+                "security" -> SecuritySettingsContent()
                 "device" -> DeviceSettingsContent(
                     uiState = uiState,
+                    onPrinterSizeChanged = onPrinterSizeChanged,
+                    onCashToleranceChanged = onCashToleranceChanged,
+                    onAutoLockMinutesChanged = onAutoLockMinutesChanged,
                     onAutoPrintReceiptChanged = onAutoPrintReceiptChanged,
-                    onBarcodeScannerChanged = onBarcodeScannerChanged,
-                    onOfflineCacheChanged = onOfflineCacheChanged,
                     onSelectPrinter = onSelectPrinter,
                     onSave = onSaveLocalPreferences
                 )
-                "sync" -> BackupSettingsContent(
-                    uiState = uiState,
-                    onSave = onSaveLocalPreferences
-                )
+                "sync" -> BackupSettingsContent(uiState = uiState)
             }
         }
     }
@@ -342,23 +330,21 @@ private fun SettingsContentCard(
                     Text(subtitle, color = DashboardTextSecondary, fontSize = 14.sp)
                     Text("Akun aktif: $userName", color = DashboardTextSecondary, fontSize = 12.sp, modifier = Modifier.padding(top = 8.dp))
                 }
-                OutlinedButton(onClick = onReload, enabled = !uiState.isLoading && !uiState.isSaving) {
-                    Text("Muat Ulang")
-                }
             }
 
             if (uiState.isLoading) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    CircularProgressIndicator(modifier = Modifier.size(18.dp), strokeWidth = 2.dp)
-                    Spacer(modifier = Modifier.width(10.dp))
-                    Text("Memuat pengaturan...", color = DashboardTextSecondary)
-                }
+                repeat(3) { SkeletonCard() }
             }
-            uiState.error?.let { SettingsMessage(text = it, error = true) }
+            uiState.error?.let {
+                SettingsMessage(text = it, error = true)
+                OutlinedButton(onClick = onReload, enabled = !uiState.isLoading) { Text("Coba Lagi") }
+            }
             uiState.message?.let { SettingsMessage(text = it, error = false) }
 
-            HorizontalDivider(color = Color(0xFFE8EEF2))
-            content()
+            if (!uiState.isLoading) {
+                HorizontalDivider(color = Color(0xFFE8EEF2))
+                content()
+            }
         }
     }
 }
@@ -388,7 +374,6 @@ private fun StoreSettingsContent(
     onPhoneChanged: (String) -> Unit,
     onReceiptHeaderChanged: (String) -> Unit,
     onReceiptFooterChanged: (String) -> Unit,
-    onPrinterSizeChanged: (String) -> Unit,
     onSave: () -> Unit
 ) {
     SettingsSection("Identitas Toko", "Data ini dipakai di header struk dan dokumen transaksi.") {
@@ -402,10 +387,6 @@ private fun StoreSettingsContent(
     SettingsSection("Format Struk", "Atur teks yang muncul saat struk dicetak.") {
         SettingsField("Header struk", uiState.receiptHeader, onReceiptHeaderChanged, Modifier.fillMaxWidth())
         SettingsField("Footer struk", uiState.receiptFooter, onReceiptFooterChanged, Modifier.fillMaxWidth(), minLines = 3)
-        Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-            PrinterSizeChip("58mm", uiState.printerSize == "58mm", onPrinterSizeChanged)
-            PrinterSizeChip("80mm", uiState.printerSize == "80mm", onPrinterSizeChanged)
-        }
     }
 
     PrimarySettingsButton(
@@ -416,48 +397,21 @@ private fun StoreSettingsContent(
 }
 
 @Composable
-private fun OperationalSettingsContent(
-    uiState: SettingsUiState,
-    onDefaultCreditLimitChanged: (String) -> Unit,
-    onDefaultTermDaysChanged: (String) -> Unit,
-    onCashToleranceChanged: (String) -> Unit,
-    onAutoLockMinutesChanged: (String) -> Unit,
-    onSave: () -> Unit
-) {
-    SettingsSection("Piutang & Termin", "Default untuk pelanggan baru dan transaksi non-tunai.") {
-        Row(horizontalArrangement = Arrangement.spacedBy(16.dp), modifier = Modifier.fillMaxWidth()) {
-            SettingsField("Limit kredit default", uiState.defaultCreditLimit, onDefaultCreditLimitChanged, Modifier.weight(1f), prefix = "Rp")
-            SettingsField("Termin default", uiState.defaultTermDays, onDefaultTermDaysChanged, Modifier.weight(1f), suffix = "hari")
-        }
-    }
-    SettingsSection("Kas & Keamanan Sesi", "Preferensi operasional terminal saat shift aktif.") {
-        Row(horizontalArrangement = Arrangement.spacedBy(16.dp), modifier = Modifier.fillMaxWidth()) {
-            SettingsField("Toleransi selisih kas", uiState.cashTolerance, onCashToleranceChanged, Modifier.weight(1f), prefix = "Rp")
-            SettingsField("Auto lock kasir", uiState.autoLockMinutes, onAutoLockMinutesChanged, Modifier.weight(1f), suffix = "menit")
-        }
-    }
-    PrimarySettingsButton("Simpan Preferensi Operasional", enabled = true, onClick = onSave)
-}
-
-@Composable
-private fun SecuritySettingsContent(
-    isManagementRole: Boolean,
-    onSave: () -> Unit
-) {
+private fun SecuritySettingsContent() {
     SettingsSection("Kebijakan Akses", "Aturan keamanan yang perlu dijaga saat terminal dipakai.") {
         SecurityPolicyItem("PIN kasir wajib 6 digit", "Dipakai untuk unlock terminal setelah sesi terkunci.")
         SecurityPolicyItem("Password minimal 6 karakter", "Perubahan password dan PIN tetap dilakukan dari Manajemen Pengguna agar tercatat di audit.")
-        SecurityPolicyItem("Role dibatasi per fungsi", if (isManagementRole) "Owner/admin bisa mengelola operasional sesuai hak akses." else "Kasir hanya mengakses POS, stok cek, riwayat, dan kas sendiri.")
+        SecurityPolicyItem("Role dibatasi per fungsi", "Owner, admin, dan kasir hanya mengakses fungsi yang diizinkan.")
     }
-    PrimarySettingsButton("Simpan Preferensi Keamanan", enabled = true, onClick = onSave)
 }
 
 @Composable
 private fun DeviceSettingsContent(
     uiState: SettingsUiState,
+    onPrinterSizeChanged: (String) -> Unit,
+    onCashToleranceChanged: (String) -> Unit,
+    onAutoLockMinutesChanged: (String) -> Unit,
     onAutoPrintReceiptChanged: (Boolean) -> Unit,
-    onBarcodeScannerChanged: (Boolean) -> Unit,
-    onOfflineCacheChanged: (Boolean) -> Unit,
     onSelectPrinter: () -> Unit,
     onSave: () -> Unit
 ) {
@@ -480,24 +434,28 @@ private fun DeviceSettingsContent(
                 Text("Uji / Pilih Printer")
             }
         }
+        Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+            PrinterSizeChip("58mm", uiState.printerSize == "58mm", onPrinterSizeChanged)
+            PrinterSizeChip("80mm", uiState.printerSize == "80mm", onPrinterSizeChanged)
+        }
         SettingsSwitchRow("Cetak struk otomatis", "Struk langsung dicetak setelah transaksi berhasil.", uiState.autoPrintReceipt, onAutoPrintReceiptChanged)
-        SettingsSwitchRow("Scanner barcode aktif", "Fitur barcode lanjutan belum termasuk pada Batch 8A.", uiState.barcodeScannerEnabled, onBarcodeScannerChanged)
-        SettingsSwitchRow("Cache offline terminal", "Offline sync hanya untuk transaksi, sesi kas, dan pengeluaran kas.", uiState.offlineCacheEnabled, onOfflineCacheChanged)
+    }
+    SettingsSection("Preferensi Terminal", "Berlaku hanya pada perangkat Android ini.") {
+        Row(horizontalArrangement = Arrangement.spacedBy(16.dp), modifier = Modifier.fillMaxWidth()) {
+            SettingsField("Toleransi selisih kas", uiState.cashTolerance, onCashToleranceChanged, Modifier.weight(1f), prefix = "Rp")
+            SettingsField("Auto lock kasir", uiState.autoLockMinutes, onAutoLockMinutesChanged, Modifier.weight(1f), suffix = "menit")
+        }
     }
     PrimarySettingsButton("Simpan Preferensi Perangkat", enabled = true, onClick = onSave)
 }
 
 @Composable
-private fun BackupSettingsContent(
-    uiState: SettingsUiState,
-    onSave: () -> Unit
-) {
+private fun BackupSettingsContent(uiState: SettingsUiState) {
     SettingsSection("Status Sinkronisasi", "Ringkasan kesiapan data operasional.") {
         InfoTile("Backend", "Terhubung melalui API utama", DashboardBrandGreenDark)
         InfoTile("Pengaturan toko", if (uiState.error == null) "Siap digunakan" else "Perlu dimuat ulang", if (uiState.error == null) DashboardBrandGreenDark else Color(0xFFB91C1C))
         InfoTile("Offline sync", "Transaksi, sesi kas, dan pengeluaran kas saja.", DashboardTextSecondary)
     }
-    PrimarySettingsButton("Tandai Sudah Dicek", enabled = true, onClick = onSave)
 }
 
 @Composable

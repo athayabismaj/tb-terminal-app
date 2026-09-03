@@ -344,6 +344,11 @@ internal fun NavGraphBuilder.dashboardGraph(navController: NavHostController, se
                                     launchSingleTop = true
                                 }
                             },
+                            onReceivablesClick = {
+                                navController.navigate(AppRoute.Receivables.route) {
+                                    launchSingleTop = true
+                                }
+                            },
                             onProfileClick = {
                         navController.navigate(AppRoute.CashierProfile.route) {
                             launchSingleTop = true

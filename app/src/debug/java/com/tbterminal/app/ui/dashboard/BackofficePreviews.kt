@@ -72,6 +72,7 @@ private fun BackofficePreview() {
         ) { modifier ->
             if (activeSection == BackofficeSection.HOME) {
                 BackofficeDashboardContent(
+                    role = "OWNER",
                     metrics = DashboardMetricsDto(
                         totalRevenueToday = 4_850_000.0,
                         totalRevenueThisMonth = 86_400_000.0,
@@ -101,6 +102,7 @@ private fun BackofficePreview() {
                     onCashClick = {},
                     onStockClick = {},
                     onTransactionsClick = {},
+                    onReportsClick = {},
                     onSyncCenterClick = {},
                     showNewTransactionAction = false,
                     showOfflineDeviceSummary = false,

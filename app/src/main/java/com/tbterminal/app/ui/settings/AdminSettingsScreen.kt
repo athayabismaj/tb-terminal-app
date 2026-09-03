@@ -90,7 +90,7 @@ fun AdminSettingsScreen(
             userName = name,
             role = role,
             uiState = uiState,
-            onReload = viewModel::loadSettings,
+            onReload = viewModel::reload,
             onSaveStoreSettings = viewModel::saveStoreSettings,
             onSaveLocalPreferences = viewModel::saveLocalPreferences,
             onStoreNameChanged = viewModel::onStoreNameChanged,
@@ -99,13 +99,9 @@ fun AdminSettingsScreen(
             onReceiptHeaderChanged = viewModel::onReceiptHeaderChanged,
             onReceiptFooterChanged = viewModel::onReceiptFooterChanged,
             onPrinterSizeChanged = viewModel::onPrinterSizeChanged,
-            onDefaultCreditLimitChanged = viewModel::onDefaultCreditLimitChanged,
-            onDefaultTermDaysChanged = viewModel::onDefaultTermDaysChanged,
             onCashToleranceChanged = viewModel::onCashToleranceChanged,
             onAutoLockMinutesChanged = viewModel::onAutoLockMinutesChanged,
             onAutoPrintReceiptChanged = viewModel::onAutoPrintReceiptChanged,
-            onBarcodeScannerChanged = viewModel::onBarcodeScannerChanged,
-            onOfflineCacheChanged = viewModel::onOfflineCacheChanged,
             onSelectPrinter = {
                 if (launchAndroidPrintDialog(context, uiState.printerSize)) {
                     viewModel.onPrinterFrameworkOpened()

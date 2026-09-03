@@ -88,6 +88,8 @@ class AdminOperationalAuditViewModel(
         }
     }
 
+    fun refresh() = loadLogs(_uiState.value.currentPage, _uiState.value.selectedAction)
+
     fun setActionFilter(action: String?) {
         loadLogs(page = 1, action = action)
     }

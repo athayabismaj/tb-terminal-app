@@ -28,26 +28,27 @@ data class SettingsUiState(
     val receiptHeader: String = "TB Terminal",
     val receiptFooter: String = "Terima kasih telah berbelanja.",
     val printerSize: String = "58mm",
-    val defaultCreditLimit: String = "1000000",
-    val defaultTermDays: String = "30",
     val cashTolerance: String = "0",
     val autoLockMinutes: String = "15",
     val autoPrintReceipt: Boolean = true,
-    val barcodeScannerEnabled: Boolean = true,
-    val offlineCacheEnabled: Boolean = false,
     val selectedPrinterName: String = "Android Print Framework"
 )
 
 class SettingsViewModel(
     private val systemRepository: SystemRepository,
-    private val localAppSettingsDataSource: LocalAppSettingsDataSource
+    private val localAppSettingsDataSource: LocalAppSettingsDataSource,
+    private val loadRemoteSettings: Boolean = true,
 ) : ViewModel() {
-    private val _uiState = MutableStateFlow(SettingsUiState(isLoading = true))
+    private val _uiState = MutableStateFlow(SettingsUiState(isLoading = loadRemoteSettings))
     val uiState: StateFlow<SettingsUiState> = _uiState.asStateFlow()
 
     init {
-        loadSettings()
+        if (loadRemoteSettings) loadSettings()
         loadLocalPreferences()
+    }
+
+    fun reload() {
+        if (loadRemoteSettings) loadSettings() else loadLocalPreferences()
     }
 
     fun loadSettings() {
@@ -169,6 +170,7 @@ class SettingsViewModel(
 
     private fun loadLocalPreferences() {
         viewModelScope.launch {
+            _uiState.update { it.copy(error = null) }
             runCatching { localAppSettingsDataSource.getDevicePreferences() }
                 .onSuccess { preferences ->
                     _uiState.update {
@@ -196,15 +198,11 @@ class SettingsViewModel(
     fun onReceiptHeaderChanged(value: String) = _uiState.update { it.copy(receiptHeader = value, error = null) }
     fun onReceiptFooterChanged(value: String) = _uiState.update { it.copy(receiptFooter = value, error = null) }
     fun onPrinterSizeChanged(value: String) = _uiState.update { it.copy(printerSize = value, error = null) }
-    fun onDefaultCreditLimitChanged(value: String) = _uiState.update { it.copy(defaultCreditLimit = value.filter(Char::isDigit), error = null) }
-    fun onDefaultTermDaysChanged(value: String) = _uiState.update { it.copy(defaultTermDays = value.filter(Char::isDigit), error = null) }
     fun onCashToleranceChanged(value: String) = _uiState.update {
         it.copy(cashTolerance = sanitizeMoneyInput(value), error = null)
     }
     fun onAutoLockMinutesChanged(value: String) = _uiState.update { it.copy(autoLockMinutes = value.filter(Char::isDigit), error = null) }
     fun onAutoPrintReceiptChanged(value: Boolean) = _uiState.update { it.copy(autoPrintReceipt = value, error = null) }
-    fun onBarcodeScannerChanged(value: Boolean) = _uiState.update { it.copy(barcodeScannerEnabled = value, error = null) }
-    fun onOfflineCacheChanged(value: Boolean) = _uiState.update { it.copy(offlineCacheEnabled = value, error = null) }
     fun onPrinterFrameworkOpened() = _uiState.update {
         it.copy(
             selectedPrinterName = "Android Print Framework",
@@ -237,10 +235,11 @@ class SettingsViewModel(
     companion object {
         fun factory(
             systemRepository: SystemRepository,
-            localAppSettingsDataSource: LocalAppSettingsDataSource
+            localAppSettingsDataSource: LocalAppSettingsDataSource,
+            loadRemoteSettings: Boolean = true,
         ): ViewModelProvider.Factory {
             return viewModelFactory {
-                SettingsViewModel(systemRepository, localAppSettingsDataSource)
+                SettingsViewModel(systemRepository, localAppSettingsDataSource, loadRemoteSettings)
             }
         }
     }

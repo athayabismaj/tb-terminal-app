@@ -24,7 +24,6 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.Pin
-import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
@@ -51,6 +50,7 @@ import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.tbterminal.app.data.model.UserProfile
+import com.tbterminal.app.ui.components.SkeletonCard
 import java.util.Locale
 
 private val ProfilePrimary = Color(0xFF00694C)
@@ -80,16 +80,16 @@ fun SharedProfileScreen(
                 .verticalScroll(rememberScrollState()),
             verticalArrangement = Arrangement.spacedBy(if (compact) 16.dp else 22.dp)
         ) {
-            ProfileScreenHeader(compact = compact, isLoading = uiState.isLoading, onReload = onReload)
+            ProfileScreenHeader(compact = compact)
 
-            uiState.error?.let { MessageCard(it, Color(0xFFB91C1C), onClearMessage) }
+            uiState.error?.let {
+                MessageCard(it, Color(0xFFB91C1C), onClearMessage)
+                OutlinedButton(onClick = onReload, enabled = !uiState.isLoading) { Text("Coba Lagi") }
+            }
             uiState.message?.let { MessageCard(it, ProfilePrimary, onClearMessage) }
 
             when {
-                uiState.isLoading && uiState.profile == null -> Box(
-                    modifier = Modifier.fillMaxWidth().height(220.dp),
-                    contentAlignment = Alignment.Center
-                ) { CircularProgressIndicator(color = ProfilePrimary) }
+                uiState.isLoading && uiState.profile == null -> SkeletonCard()
                 uiState.profile != null -> ProfileContent(
                     profile = uiState.profile,
                     isSaving = uiState.isSaving,
@@ -120,9 +120,7 @@ fun SharedProfileScreen(
 
 @Composable
 private fun ProfileScreenHeader(
-    compact: Boolean,
-    isLoading: Boolean,
-    onReload: () -> Unit
+    compact: Boolean
 ) {
     Row(
         modifier = Modifier.fillMaxWidth(),
@@ -143,19 +141,6 @@ private fun ProfileScreenHeader(
                 fontSize = 14.sp,
                 lineHeight = 20.sp
             )
-        }
-        OutlinedButton(
-            onClick = onReload,
-            enabled = !isLoading,
-            modifier = Modifier.height(44.dp),
-            shape = RoundedCornerShape(14.dp),
-            contentPadding = PaddingValues(horizontal = if (compact) 12.dp else 16.dp)
-        ) {
-            Icon(Icons.Default.Refresh, contentDescription = "Muat ulang profil", modifier = Modifier.size(20.dp))
-            if (!compact) {
-                Spacer(Modifier.width(8.dp))
-                Text("Muat ulang")
-            }
         }
     }
 }

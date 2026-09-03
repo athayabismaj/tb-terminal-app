@@ -33,7 +33,6 @@ import androidx.compose.material.icons.filled.Update
 import androidx.compose.material.icons.filled.Verified
 import androidx.compose.material.icons.filled.VerifiedUser
 import androidx.compose.material.icons.outlined.Security
-import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
@@ -274,10 +273,7 @@ private fun UserTableCard(
             HorizontalDivider(color = UserSlate100)
 
             when {
-                isLoading -> UserTableFeedback(
-                    message = "Memuat daftar pengguna...",
-                    showProgress = true
-                )
+                isLoading -> com.tbterminal.app.ui.components.SkeletonList(itemCount = 6)
                 errorMessage != null -> UserTableFeedback(
                     message = errorMessage,
                     actionLabel = "Muat ulang",
@@ -438,50 +434,16 @@ fun StaffDeactivateDialog(
     onDismiss: () -> Unit,
     onConfirm: () -> Unit
 ) {
-    AlertDialog(
-        onDismissRequest = { if (!isSaving) onDismiss() },
-        title = {
-            Text(
-                text = "Nonaktifkan pengguna?",
-                color = UserOnSurface,
-                fontWeight = FontWeight.Bold
-            )
-        },
-        text = {
-            Text(
-                text = "Akun ${staff.name} akan dinonaktifkan dan tidak bisa digunakan untuk login sampai diaktifkan kembali.",
-                color = UserSlate600,
-                fontSize = 14.sp
-            )
-        },
-        confirmButton = {
-            Button(
-                onClick = onConfirm,
-                enabled = !isSaving,
-                colors = ButtonDefaults.buttonColors(containerColor = UserError),
-                shape = RoundedCornerShape(10.dp)
-            ) {
-                if (isSaving) {
-                    CircularProgressIndicator(
-                        color = Color.White,
-                        strokeWidth = 2.dp,
-                        modifier = Modifier.size(18.dp)
-                    )
-                    Spacer(modifier = Modifier.width(10.dp))
-                }
-                Text(text = if (isSaving) "Memproses..." else "Nonaktifkan")
-            }
-        },
-        dismissButton = {
-            TextButton(
-                onClick = onDismiss,
-                enabled = !isSaving
-            ) {
-                Text(text = "Batal", color = UserSlate600, fontWeight = FontWeight.Bold)
-            }
-        },
-        containerColor = Color.White,
-        shape = RoundedCornerShape(18.dp)
+    com.tbterminal.app.ui.components.AppConfirmDialog(
+        spec = com.tbterminal.app.ui.components.AppConfirmationSpec(
+            title = "Nonaktifkan pengguna",
+            target = staff.name,
+            consequence = "Akun tidak dapat digunakan untuk login sampai diaktifkan kembali.",
+            confirmLabel = "Nonaktifkan",
+        ),
+        onDismiss = onDismiss,
+        onConfirm = onConfirm,
+        isLoading = isSaving,
     )
 }
 

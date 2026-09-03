@@ -11,6 +11,7 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -68,6 +69,8 @@ import com.tbterminal.app.ui.dashboard.DashboardSurface
 import com.tbterminal.app.ui.dashboard.DashboardTextPrimary
 import com.tbterminal.app.ui.dashboard.DashboardTextSecondary
 import com.tbterminal.app.ui.dashboard.DashboardWarningOrange
+import com.tbterminal.app.ui.components.RefreshableContent
+import com.tbterminal.app.ui.components.SkeletonCard
 
 @Composable
 fun CashierDashboardScreen(
@@ -79,6 +82,7 @@ fun CashierDashboardScreen(
     onCashSessionClick: () -> Unit = {},
     onTransactionHistoryClick: () -> Unit = {},
     onStockCheckClick: () -> Unit = {},
+    onReceivablesClick: () -> Unit = {},
     onProfileClick: () -> Unit = {},
     onSettingsClick: () -> Unit = {},
     onLogout: () -> Unit,
@@ -97,16 +101,25 @@ fun CashierDashboardScreen(
         onCashSessionClick = onCashSessionClick,
         onTransactionHistoryClick = onTransactionHistoryClick,
         onStockCheckClick = onStockCheckClick,
+        onReceivablesClick = onReceivablesClick,
         onProfileClick = onProfileClick,
         onSettingsClick = onSettingsClick,
         onLogout = onLogout
     ) { contentModifier ->
-        CashierDashboardContent(
-            uiState = uiState,
-            onPosClick = onPosClick,
-            onStockCheckClick = onStockCheckClick,
-            modifier = contentModifier.padding(32.dp)
-        )
+        RefreshableContent(
+            isRefreshing = uiState.isLoading && (uiState.activeSession != null || uiState.recentTransactions.isNotEmpty()),
+            onRefresh = viewModel::loadDashboardData,
+            modifier = contentModifier,
+        ) {
+            CashierDashboardContent(
+                uiState = uiState,
+                onPosClick = onPosClick,
+                onCashSessionClick = onCashSessionClick,
+                onTransactionHistoryClick = onTransactionHistoryClick,
+                onReceivablesClick = onReceivablesClick,
+                modifier = Modifier,
+            )
+        }
     }
 }
 
@@ -249,217 +262,177 @@ private fun CashierHeader(
 private fun CashierDashboardContent(
     uiState: CashierDashboardUiState,
     onPosClick: () -> Unit,
-    onStockCheckClick: () -> Unit,
+    onCashSessionClick: () -> Unit,
+    onTransactionHistoryClick: () -> Unit,
+    onReceivablesClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
-    Column(
-        modifier = modifier
-            .fillMaxHeight()
-            .verticalScroll(rememberScrollState()),
-        verticalArrangement = Arrangement.spacedBy(24.dp)
-    ) {
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
+    BoxWithConstraints(modifier = modifier.fillMaxSize()) {
+        val compact = maxWidth < 700.dp
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(horizontal = if (compact) 16.dp else 28.dp, vertical = if (compact) 16.dp else 24.dp)
+                .verticalScroll(rememberScrollState()),
+            verticalArrangement = Arrangement.spacedBy(if (compact) 14.dp else 20.dp),
         ) {
-            Column {
-                Text(
-                    text = "Dashboard Kasir",
-                    color = DashboardTextPrimary,
-                    fontSize = 30.sp,
-                    fontWeight = FontWeight.ExtraBold
-                )
-                Text(
-                    text = "Fokus pada transaksi, kas harian, dan pengecekan stok cepat.",
-                    color = DashboardTextSecondary,
-                    fontSize = 14.sp
-                )
-            }
-            Button(
-                onClick = onPosClick,
-                colors = ButtonDefaults.buttonColors(containerColor = DashboardBrandGreenDark),
-                shape = RoundedCornerShape(12.dp)
-            ) {
-                Icon(Icons.Outlined.PointOfSale, contentDescription = null)
-                Spacer(modifier = Modifier.width(8.dp))
-                Text("Buka POS", fontWeight = FontWeight.Bold)
-            }
-        }
-
-        Card(
-            modifier = Modifier.fillMaxWidth(),
-            colors = CardDefaults.cardColors(containerColor = DashboardSurface),
-            shape = RoundedCornerShape(10.dp),
-            border = BorderStroke(1.dp, Color.LightGray.copy(alpha = 0.28f))
-        ) {
-            Column(modifier = Modifier.padding(20.dp)) {
-                Row(
-                    modifier = Modifier.fillMaxWidth().padding(horizontal = 24.dp, vertical = 20.dp),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                        Text("Mulai Sesi", color = DashboardTextPrimary, fontSize = 20.sp, fontWeight = FontWeight.ExtraBold)
-                        Text(
-                            if (uiState.activeSession != null) "Sesi sedang berjalan" else "Klik untuk membuka sesi kasir", 
-                            color = DashboardTextSecondary, 
-                            fontSize = 12.sp
-                        )
-                    }
-                    Box(
-                        modifier = Modifier
-                            .size(56.dp)
-                            .clip(CircleShape)
-                            .background(DashboardBrandGreenDark.copy(alpha = 0.12f)),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Icon(Icons.Outlined.ReceiptLong, contentDescription = null, tint = DashboardBrandGreenDark, modifier = Modifier.size(28.dp))
-                    }
+            if (compact) {
+                Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    CashierDashboardTitle()
+                    Button(
+                        onClick = onPosClick,
+                        modifier = Modifier.fillMaxWidth().height(48.dp),
+                        colors = ButtonDefaults.buttonColors(containerColor = DashboardBrandGreenDark),
+                    ) { Text("Mulai POS", fontWeight = FontWeight.Bold) }
                 }
-            }
-        }
-
-        val moneyFormat = java.text.NumberFormat.getCurrencyInstance(java.util.Locale.forLanguageTag("id-ID"))
-        val systemCashStr = moneyFormat.format(uiState.systemCash)
-
-        Row(horizontalArrangement = Arrangement.spacedBy(24.dp)) {
-            CashierMetricCard(
-                title = "TRANSAKSI HARI INI",
-                value = "${uiState.todayTransactionsCount}",
-                subtitle = "Semua transaksi selesai",
-                icon = Icons.Outlined.ReceiptLong,
-                tint = DashboardBrandGreenDark,
-                modifier = Modifier.weight(1f)
-            )
-            CashierMetricCard(
-                title = "KAS SISTEM",
-                value = systemCashStr,
-                subtitle = "Total kas hari ini",
-                icon = Icons.Outlined.AccountBalanceWallet,
-                tint = DashboardInfoBlue,
-                modifier = Modifier.weight(1f)
-            )
-            CashierMetricCard(
-                title = "KERANJANG AKTIF",
-                value = "0",
-                subtitle = "Pesanan pending",
-                icon = Icons.Outlined.ShoppingCart,
-                tint = DashboardWarningOrange,
-                modifier = Modifier.weight(1f)
-            )
-        }
-
-        // Target Harian
-        Card(
-            modifier = Modifier.fillMaxWidth(),
-            colors = CardDefaults.cardColors(containerColor = DashboardSurface),
-            shape = RoundedCornerShape(10.dp),
-            border = BorderStroke(1.dp, Color.LightGray.copy(alpha = 0.28f))
-        ) {
-            Column(modifier = Modifier.padding(20.dp)) {
+            } else {
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
+                    verticalAlignment = Alignment.CenterVertically,
                 ) {
-                    Text("Target Penjualan Harian", color = DashboardTextPrimary, fontSize = 16.sp, fontWeight = FontWeight.Bold)
-                    Text("75%", color = DashboardBrandGreenDark, fontSize = 16.sp, fontWeight = FontWeight.ExtraBold)
+                    CashierDashboardTitle()
+                    Button(onClick = onPosClick, colors = ButtonDefaults.buttonColors(containerColor = DashboardBrandGreenDark)) {
+                        Icon(Icons.Outlined.PointOfSale, contentDescription = null)
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text("Mulai POS", fontWeight = FontWeight.Bold)
+                    }
                 }
-                Spacer(modifier = Modifier.height(12.dp))
-                androidx.compose.material3.LinearProgressIndicator(
-                    progress = { 0.75f },
-                    modifier = Modifier.fillMaxWidth().height(8.dp).clip(RoundedCornerShape(4.dp)),
-                    color = DashboardBrandGreenDark,
-                    trackColor = DashboardBackground
-                )
-                Spacer(modifier = Modifier.height(8.dp))
-                Text("Rp 7.500.000 / Rp 10.000.000", color = DashboardTextSecondary, fontSize = 12.sp)
             }
-        }
 
-        Row(horizontalArrangement = Arrangement.spacedBy(24.dp)) {
-            Card(
-                modifier = Modifier
-                    .weight(1.35f)
-                    .height(380.dp),
-                colors = CardDefaults.cardColors(containerColor = DashboardSurface),
-                shape = RoundedCornerShape(10.dp),
-                border = BorderStroke(1.dp, Color.LightGray.copy(alpha = 0.28f))
-            ) {
-                Column(
-                    modifier = Modifier.padding(24.dp),
-                    verticalArrangement = Arrangement.spacedBy(18.dp)
-                ) {
-                    Text("Aksi Cepat", color = DashboardTextPrimary, fontSize = 18.sp, fontWeight = FontWeight.Bold)
-                    CashierQuickAction(
-                        icon = Icons.Outlined.PointOfSale,
-                        title = "Mulai transaksi baru",
-                        description = "Buka layar POS untuk input pesanan.",
+            uiState.errorMessage?.let { message ->
+                Card(colors = CardDefaults.cardColors(containerColor = Color(0xFFFFF1F2))) {
+                    Text(message, modifier = Modifier.fillMaxWidth().padding(16.dp), color = Color(0xFFB42318))
+                }
+            }
+
+            if (uiState.isLoading && uiState.activeSession == null && uiState.recentTransactions.isEmpty()) {
+                repeat(if (compact) 3 else 2) { SkeletonCard() }
+            } else {
+                CashierSessionCard(uiState = uiState, onClick = onCashSessionClick)
+                if (compact) {
+                    CashierMetricCard(
+                        title = "TRANSAKSI SAYA HARI INI",
+                        value = uiState.todayTransactionsCount.toString(),
+                        subtitle = "Dalam sesi kas saat ini",
+                        icon = Icons.Outlined.ReceiptLong,
                         tint = DashboardBrandGreenDark,
-                        onClick = onPosClick
+                        modifier = Modifier.fillMaxWidth(),
                     )
-                    CashierQuickAction(
-                        icon = Icons.Outlined.Inventory2,
-                        title = "Cek stok cepat",
-                        description = "Lihat sisa stok tanpa membuka modul admin.",
-                        tint = DashboardWarningOrange,
-                        onClick = onStockCheckClick
-                    )
+                    CashierActionPanel(onPosClick, onCashSessionClick, onReceivablesClick, Modifier.fillMaxWidth())
+                    CashierRecentPanel(uiState, onTransactionHistoryClick, Modifier.fillMaxWidth())
+                } else {
+                    Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+                        CashierMetricCard(
+                            title = "TRANSAKSI SAYA HARI INI",
+                            value = uiState.todayTransactionsCount.toString(),
+                            subtitle = "Dalam sesi kas saat ini",
+                            icon = Icons.Outlined.ReceiptLong,
+                            tint = DashboardBrandGreenDark,
+                            modifier = Modifier.weight(1f),
+                        )
+                        CashierMetricCard(
+                            title = "STATUS SESI KAS",
+                            value = if (uiState.activeSession == null) "Tutup" else "Aktif",
+                            subtitle = "Buka halaman sesi untuk rincian",
+                            icon = Icons.Outlined.Payments,
+                            tint = DashboardInfoBlue,
+                            modifier = Modifier.weight(1f),
+                        )
+                    }
+                    Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+                        CashierActionPanel(onPosClick, onCashSessionClick, onReceivablesClick, Modifier.weight(1f))
+                        CashierRecentPanel(uiState, onTransactionHistoryClick, Modifier.weight(1f))
+                    }
                 }
             }
+            Spacer(modifier = Modifier.height(4.dp))
+        }
+    }
+}
 
-            Card(
-                modifier = Modifier
-                    .weight(1f)
-                    .height(380.dp),
-                colors = CardDefaults.cardColors(containerColor = DashboardSurface),
-                shape = RoundedCornerShape(10.dp),
-                border = BorderStroke(1.dp, Color.LightGray.copy(alpha = 0.28f))
-            ) {
-                Column(
-                    modifier = Modifier.padding(24.dp),
-                    verticalArrangement = Arrangement.spacedBy(16.dp)
-                ) {
-                    Text("Status Hardware & Sesi", color = DashboardTextPrimary, fontSize = 18.sp, fontWeight = FontWeight.Bold)
-                    CashierStatusRow("Shift", if (uiState.activeSession != null) "Aktif" else "Tutup", uiState.activeSession != null)
-                    CashierStatusRow("Printer Thermal", "Terhubung", true)
+@Composable
+private fun CashierDashboardTitle() {
+    Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+        Text("Beranda", color = DashboardTextPrimary, fontSize = 28.sp, fontWeight = FontWeight.ExtraBold)
+        Text("Sesi kas, transaksi saya, dan pembayaran pelanggan.", color = DashboardTextSecondary, fontSize = 14.sp)
+    }
+}
 
-                    val durasiStr = if (uiState.activeSession != null) {
-                        try {
-                            val openedAt = java.time.OffsetDateTime.parse(uiState.activeSession.openedAt)
-                            val now = java.time.OffsetDateTime.now()
-                            val durasi = java.time.Duration.between(openedAt, now)
-                            "${durasi.toHours()} jam ${durasi.toMinutesPart()} menit"
-                        } catch (e: Exception) { "-" }
-                    } else {
-                        "-"
-                    }
-                    CashierStatusRow("Durasi Shift", durasiStr, false)
-                    
-                    Spacer(modifier = Modifier.weight(1f))
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .clip(RoundedCornerShape(8.dp))
-                            .background(DashboardInfoBlue.copy(alpha = 0.1f))
-                            .padding(12.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Icon(Icons.Outlined.History, contentDescription = null, tint = DashboardInfoBlue, modifier = Modifier.size(24.dp))
-                        Spacer(modifier = Modifier.width(12.dp))
-                        Column {
-                            Text("Baru saja terjual", color = DashboardTextSecondary, fontSize = 10.sp, fontWeight = FontWeight.Bold)
-                            if (uiState.recentTransactions.isEmpty()) {
-                                Text("Belum ada transaksi", color = DashboardTextPrimary, fontSize = 12.sp, fontWeight = FontWeight.Medium)
-                            } else {
-                                uiState.recentTransactions.forEach { tx ->
-                                    val totalStr = java.text.NumberFormat.getCurrencyInstance(java.util.Locale.forLanguageTag("id-ID")).format(tx.total)
-                                    Text("${tx.receiptId} - $totalStr", color = DashboardTextPrimary, fontSize = 12.sp, fontWeight = FontWeight.Medium, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                                }
-                            }
-                        }
-                    }
+@Composable
+private fun CashierSessionCard(uiState: CashierDashboardUiState, onClick: () -> Unit) {
+    Card(
+        onClick = onClick,
+        modifier = Modifier.fillMaxWidth(),
+        colors = CardDefaults.cardColors(containerColor = DashboardSurface),
+        border = BorderStroke(1.dp, Color.LightGray.copy(alpha = 0.28f)),
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth().padding(18.dp),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                Text("Sesi kas", color = DashboardTextPrimary, fontSize = 18.sp, fontWeight = FontWeight.Bold)
+                Text(
+                    if (uiState.activeSession == null) "Belum ada sesi aktif. Ketuk untuk membuka sesi." else "Sesi aktif dan siap digunakan.",
+                    color = DashboardTextSecondary,
+                    fontSize = 13.sp,
+                )
+            }
+            Icon(Icons.Outlined.Payments, contentDescription = null, tint = DashboardBrandGreenDark)
+        }
+    }
+}
+
+@Composable
+private fun CashierActionPanel(
+    onPosClick: () -> Unit,
+    onCashSessionClick: () -> Unit,
+    onReceivablesClick: () -> Unit,
+    modifier: Modifier,
+) {
+    Card(
+        modifier = modifier,
+        colors = CardDefaults.cardColors(containerColor = DashboardSurface),
+        border = BorderStroke(1.dp, Color.LightGray.copy(alpha = 0.28f)),
+    ) {
+        Column(modifier = Modifier.padding(18.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            Text("Aksi kerja", color = DashboardTextPrimary, fontSize = 17.sp, fontWeight = FontWeight.Bold)
+            CashierQuickAction(Icons.Outlined.PointOfSale, "Mulai transaksi", "Buka POS dan buat penjualan baru.", DashboardBrandGreenDark, onPosClick)
+            CashierQuickAction(Icons.Outlined.Payments, "Sesi kas", "Buka, periksa, atau tutup sesi kas.", DashboardInfoBlue, onCashSessionClick)
+            CashierQuickAction(Icons.Outlined.AccountBalanceWallet, "Piutang & pembayaran", "Cari piutang dan catat pembayaran pelanggan.", DashboardWarningOrange, onReceivablesClick)
+        }
+    }
+}
+
+@Composable
+private fun CashierRecentPanel(
+    uiState: CashierDashboardUiState,
+    onClick: () -> Unit,
+    modifier: Modifier,
+) {
+    Card(
+        onClick = onClick,
+        modifier = modifier,
+        colors = CardDefaults.cardColors(containerColor = DashboardSurface),
+        border = BorderStroke(1.dp, Color.LightGray.copy(alpha = 0.28f)),
+    ) {
+        Column(modifier = Modifier.padding(18.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+            Text("Transaksi saya terbaru", color = DashboardTextPrimary, fontSize = 17.sp, fontWeight = FontWeight.Bold)
+            if (uiState.recentTransactions.isEmpty()) {
+                Text("Belum ada transaksi pada sesi ini.", color = DashboardTextSecondary, fontSize = 13.sp)
+            } else {
+                uiState.recentTransactions.forEach { transaction ->
+                    val total = java.text.NumberFormat.getCurrencyInstance(java.util.Locale.forLanguageTag("id-ID")).format(transaction.total)
+                    Text(
+                        "${transaction.receiptId} · $total",
+                        color = DashboardTextPrimary,
+                        fontSize = 13.sp,
+                        fontWeight = FontWeight.Medium,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
                 }
             }
         }

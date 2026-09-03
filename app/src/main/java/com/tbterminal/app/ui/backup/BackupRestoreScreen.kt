@@ -187,7 +187,6 @@ fun BackupRestoreScreen(
                         Text("Job PostgreSQL berjalan asinkron; status dipantau tanpa mengulang restore.", color = TextSecondary, fontSize = 13.sp)
                     }
                     Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                        OutlinedButton(enabled = !uiState.isServerBusy, onClick = onRefreshServerBackups) { Text("Muat Ulang") }
                         Button(enabled = !uiState.isServerBusy, onClick = onCreateServerBackup, colors = ButtonDefaults.buttonColors(containerColor = Teal)) { Text("Buat Backup Server") }
                         OutlinedButton(
                             enabled = !uiState.isServerBusy,
@@ -197,7 +196,12 @@ fun BackupRestoreScreen(
                 }
             }
             if (uiState.isServerLoading || uiState.isServerBusy) {
-                item { CircularProgressIndicator(modifier = Modifier.size(26.dp), color = Teal) }
+                item {
+                    com.tbterminal.app.ui.components.SkeletonList(
+                        modifier = Modifier.fillMaxWidth(),
+                        itemCount = 3,
+                    )
+                }
             }
             if (uiState.serverJobs.isEmpty() && !uiState.isServerLoading) {
                 item { Text("Belum ada metadata backup/restore server.", color = TextSecondary) }

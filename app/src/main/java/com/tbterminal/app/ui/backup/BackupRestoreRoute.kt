@@ -8,6 +8,7 @@ import com.tbterminal.app.data.repository.LocalBackupRepository
 import com.tbterminal.app.data.repository.ServerBackupRepository
 import com.tbterminal.app.ui.dashboard.admin.AdminDashboardShell
 import com.tbterminal.app.ui.dashboard.admin.AdminDestination
+import com.tbterminal.app.ui.components.RefreshableContent
 
 @Composable
 fun BackupRestoreRoute(
@@ -76,8 +77,16 @@ fun BackupRestoreRoute(
         onSettingsClick = onSettingsClick,
         onLogout = onLogout
     ) { contentModifier ->
-        BackupRestoreScreen(
+        RefreshableContent(
+            isRefreshing = uiState.isServerLoading && uiState.serverJobs.isNotEmpty(),
+            onRefresh = {
+                viewModel.refreshSummary()
+                viewModel.refreshServerBackups()
+            },
             modifier = contentModifier,
+        ) {
+            BackupRestoreScreen(
+            modifier = androidx.compose.ui.Modifier,
             uiState = uiState,
             onCreateBackup = viewModel::createBackup,
             onRestoreFileSelected = viewModel::inspectRestoreFile,
@@ -93,6 +102,7 @@ fun BackupRestoreRoute(
             onServerRestoreAcknowledgedChanged = viewModel::onServerRestoreAcknowledgedChanged,
             onConfirmServerRestore = viewModel::confirmServerRestore,
             onDismissServerRestore = viewModel::dismissServerRestore
-        )
+            )
+        }
     }
 }

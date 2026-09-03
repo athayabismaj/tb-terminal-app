@@ -33,10 +33,14 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.tbterminal.app.data.remote.DashboardMetricsDto
+import com.tbterminal.app.data.remote.SalesReportTotalsDto
+import com.tbterminal.app.navigation.AppAccessPolicy
+import com.tbterminal.app.navigation.AppCapability
 import com.tbterminal.app.ui.components.TbLayoutInfo
 import com.tbterminal.app.ui.components.TbPageSurface
 import com.tbterminal.app.ui.dashboard.offline.OfflineDashboardSection
 import com.tbterminal.app.ui.dashboard.offline.OfflineDashboardUiState
+import com.tbterminal.app.ui.components.SkeletonCard
 import java.text.NumberFormat
 import java.util.Locale
 
@@ -49,9 +53,38 @@ private data class DashboardSummary(
     val onClick: () -> Unit
 )
 
+internal enum class DashboardSummaryKey {
+    SALES,
+    NET_REVENUE,
+    REFUND,
+    DISCOUNT,
+    RECEIVABLES,
+    PAYABLES,
+    CASH,
+    STOCK,
+}
+
+internal fun dashboardSummaryKeys(role: String): List<DashboardSummaryKey> = buildList {
+    if (!AppAccessPolicy.can(role, AppCapability.BACKOFFICE)) return@buildList
+    add(DashboardSummaryKey.SALES)
+    if (AppAccessPolicy.can(role, AppCapability.FINANCIAL_ANALYTICS)) {
+        add(DashboardSummaryKey.NET_REVENUE)
+        add(DashboardSummaryKey.REFUND)
+        add(DashboardSummaryKey.DISCOUNT)
+    }
+    add(DashboardSummaryKey.RECEIVABLES)
+    add(DashboardSummaryKey.PAYABLES)
+    if (!AppAccessPolicy.can(role, AppCapability.FINANCIAL_ANALYTICS)) {
+        add(DashboardSummaryKey.CASH)
+    }
+    add(DashboardSummaryKey.STOCK)
+}
+
 @Composable
 fun BackofficeDashboardContent(
+    role: String,
     metrics: DashboardMetricsDto?,
+    financialTotals: SalesReportTotalsDto? = null,
     isLoading: Boolean,
     error: String?,
     offlineUiState: OfflineDashboardUiState,
@@ -61,6 +94,7 @@ fun BackofficeDashboardContent(
     onCashClick: () -> Unit,
     onStockClick: () -> Unit,
     onTransactionsClick: () -> Unit,
+    onReportsClick: () -> Unit,
     onSyncCenterClick: () -> Unit,
     showNewTransactionAction: Boolean = true,
     showOfflineDeviceSummary: Boolean = true,
@@ -85,49 +119,80 @@ fun BackofficeDashboardContent(
 
             val currency = NumberFormat.getCurrencyInstance(Locale.forLanguageTag("id-ID"))
             val loadingText = if (isLoading) "Memuat…" else "Rp0"
-            val summaries = listOf(
-                DashboardSummary(
-                    "Penjualan hari ini",
-                    metrics?.totalRevenueToday?.let(currency::format) ?: loadingText,
-                    "Transaksi aktif hari ini",
-                    Icons.Outlined.Payments,
-                    MaterialTheme.colorScheme.primary,
-                    onTransactionsClick
-                ),
-                DashboardSummary(
-                    "Piutang pelanggan",
-                    metrics?.totalActiveReceivables?.let(currency::format) ?: loadingText,
-                    "${metrics?.activeReceivableCount ?: 0} nota belum lunas",
-                    Icons.Outlined.AccountBalanceWallet,
-                    Color(0xFFB26A00),
-                    onReceivablesClick
-                ),
-                DashboardSummary(
-                    "Hutang supplier",
-                    "Lihat rincian",
-                    "Periksa sisa dan jatuh tempo",
-                    Icons.AutoMirrored.Outlined.ReceiptLong,
-                    Color(0xFF8B5CF6),
-                    onSupplierDebtsClick
-                ),
-                DashboardSummary(
-                    "Kas hari ini",
-                    "Cocokkan kas",
-                    "Saldo awal, masuk, keluar, dan saldo sistem",
-                    Icons.Outlined.Storefront,
-                    Color(0xFF047857),
-                    onCashClick
-                ),
-                DashboardSummary(
-                    "Stok menipis",
-                    "${metrics?.lowStockCount ?: 0} produk",
-                    "Stok sama atau di bawah batas minimum",
-                    Icons.Outlined.Inventory2,
-                    Color(0xFFC2410C),
-                    onStockClick
-                )
-            )
-            DashboardSummaryGrid(layout, summaries)
+            val financialLoadingText = if (isLoading) "Memuat…" else "Tidak tersedia"
+            val summaries = dashboardSummaryKeys(role).map { key ->
+                when (key) {
+                    DashboardSummaryKey.SALES -> DashboardSummary(
+                        "Penjualan hari ini",
+                        metrics?.totalRevenueToday?.let(currency::format) ?: loadingText,
+                        "Transaksi aktif hari ini",
+                        Icons.Outlined.Payments,
+                        MaterialTheme.colorScheme.primary,
+                        onTransactionsClick,
+                    )
+                    DashboardSummaryKey.NET_REVENUE -> DashboardSummary(
+                        "Pendapatan bersih",
+                        financialTotals?.netRevenue?.let(currency::format) ?: financialLoadingText,
+                        "Setelah diskon dan refund hari ini",
+                        Icons.Outlined.Storefront,
+                        Color(0xFF047857),
+                        onReportsClick,
+                    )
+                    DashboardSummaryKey.REFUND -> DashboardSummary(
+                        "Refund",
+                        financialTotals?.refundAmount?.let(currency::format) ?: financialLoadingText,
+                        "Nilai refund hari ini",
+                        Icons.AutoMirrored.Outlined.ReceiptLong,
+                        Color(0xFFB42318),
+                        onReportsClick,
+                    )
+                    DashboardSummaryKey.DISCOUNT -> DashboardSummary(
+                        "Diskon",
+                        financialTotals?.discountAmount?.let(currency::format) ?: financialLoadingText,
+                        "Diskon transaksi aktif hari ini",
+                        Icons.Outlined.Payments,
+                        Color(0xFF7C3AED),
+                        onReportsClick,
+                    )
+                    DashboardSummaryKey.RECEIVABLES -> DashboardSummary(
+                        "Piutang pelanggan",
+                        metrics?.totalActiveReceivables?.let(currency::format) ?: loadingText,
+                        "${metrics?.activeReceivableCount ?: 0} nota belum lunas",
+                        Icons.Outlined.AccountBalanceWallet,
+                        Color(0xFFB26A00),
+                        onReceivablesClick,
+                    )
+                    DashboardSummaryKey.PAYABLES -> DashboardSummary(
+                        "Hutang supplier",
+                        "Lihat rincian",
+                        "Periksa sisa dan jatuh tempo",
+                        Icons.AutoMirrored.Outlined.ReceiptLong,
+                        Color(0xFF8B5CF6),
+                        onSupplierDebtsClick,
+                    )
+                    DashboardSummaryKey.CASH -> DashboardSummary(
+                        "Sesi kas",
+                        "Pantau sesi",
+                        "Saldo awal, masuk, keluar, dan rekonsiliasi",
+                        Icons.Outlined.Storefront,
+                        Color(0xFF047857),
+                        onCashClick,
+                    )
+                    DashboardSummaryKey.STOCK -> DashboardSummary(
+                        "Stok menipis",
+                        "${metrics?.lowStockCount ?: 0} produk",
+                        "Stok sama atau di bawah batas minimum",
+                        Icons.Outlined.Inventory2,
+                        Color(0xFFC2410C),
+                        onStockClick,
+                    )
+                }
+            }
+            if (isLoading && metrics == null) {
+                repeat(if (layout.isCompact) 4 else 2) { SkeletonCard() }
+            } else {
+                DashboardSummaryGrid(layout, summaries)
+            }
 
             if (showOfflineDeviceSummary) {
                 OfflineDashboardSection(uiState = offlineUiState, onSyncCenterClick = onSyncCenterClick)

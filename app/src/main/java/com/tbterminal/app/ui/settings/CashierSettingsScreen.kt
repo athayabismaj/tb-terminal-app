@@ -27,7 +27,11 @@ fun CashierSettingsScreen(
     onSettingsClick: () -> Unit = {},
     onLogout: () -> Unit,
     viewModel: SettingsViewModel = viewModel(
-        factory = SettingsViewModel.factory(systemRepository, localAppSettingsDataSource)
+        factory = SettingsViewModel.factory(
+            systemRepository,
+            localAppSettingsDataSource,
+            loadRemoteSettings = false,
+        )
     )
 ) {
     val context = LocalContext.current
@@ -50,7 +54,7 @@ fun CashierSettingsScreen(
             userName = userName,
             role = role,
             uiState = uiState,
-            onReload = viewModel::loadSettings,
+            onReload = viewModel::reload,
             onSaveStoreSettings = viewModel::saveStoreSettings,
             onSaveLocalPreferences = viewModel::saveLocalPreferences,
             onStoreNameChanged = viewModel::onStoreNameChanged,
@@ -59,13 +63,9 @@ fun CashierSettingsScreen(
             onReceiptHeaderChanged = viewModel::onReceiptHeaderChanged,
             onReceiptFooterChanged = viewModel::onReceiptFooterChanged,
             onPrinterSizeChanged = viewModel::onPrinterSizeChanged,
-            onDefaultCreditLimitChanged = viewModel::onDefaultCreditLimitChanged,
-            onDefaultTermDaysChanged = viewModel::onDefaultTermDaysChanged,
             onCashToleranceChanged = viewModel::onCashToleranceChanged,
             onAutoLockMinutesChanged = viewModel::onAutoLockMinutesChanged,
             onAutoPrintReceiptChanged = viewModel::onAutoPrintReceiptChanged,
-            onBarcodeScannerChanged = viewModel::onBarcodeScannerChanged,
-            onOfflineCacheChanged = viewModel::onOfflineCacheChanged,
             onSelectPrinter = {
                 if (launchAndroidPrintDialog(context, uiState.printerSize)) {
                     viewModel.onPrinterFrameworkOpened()
