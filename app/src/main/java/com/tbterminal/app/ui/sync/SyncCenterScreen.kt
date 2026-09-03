@@ -21,7 +21,6 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.ErrorOutline
 import androidx.compose.material.icons.outlined.ExpandLess
 import androidx.compose.material.icons.outlined.ExpandMore
-import androidx.compose.material.icons.outlined.Refresh
 import androidx.compose.material.icons.outlined.Sync
 import androidx.compose.material3.AssistChip
 import androidx.compose.material3.Button
@@ -209,9 +208,6 @@ private fun SyncCenterHeader(
         verticalArrangement = Arrangement.spacedBy(10.dp)
     ) {
         Text("Sinkronisasi", color = TextPrimary, fontSize = 24.sp, fontWeight = FontWeight.Bold)
-        OutlinedButton(enabled = !isRefreshing && !isRetrying, onClick = onRefresh, modifier = Modifier.fillMaxWidth().height(48.dp), shape = RoundedCornerShape(12.dp)) {
-            Icon(Icons.Outlined.Refresh, contentDescription = null, modifier = Modifier.size(18.dp)); Spacer(Modifier.width(8.dp)); Text("Muat Ulang")
-        }
         if (canRetry) {
             OutlinedButton(enabled = !isRefreshing && !isRetrying, onClick = onRetryAllFailed, modifier = Modifier.fillMaxWidth().height(48.dp), shape = RoundedCornerShape(12.dp)) { Text("Coba Lagi yang Gagal") }
             Button(enabled = !isRefreshing && !isRetrying, onClick = onRetryAllPending, modifier = Modifier.fillMaxWidth().height(48.dp), shape = RoundedCornerShape(12.dp), colors = ButtonDefaults.buttonColors(containerColor = Teal)) {
@@ -235,15 +231,6 @@ private fun SyncCenterHeader(
                 fontSize = 15.sp,
                 modifier = Modifier.padding(top = 4.dp)
             )
-        }
-        OutlinedButton(
-            enabled = !isRefreshing && !isRetrying,
-            onClick = onRefresh,
-            shape = RoundedCornerShape(12.dp)
-        ) {
-            Icon(Icons.Outlined.Refresh, contentDescription = null, modifier = Modifier.size(18.dp))
-            Spacer(Modifier.width(8.dp))
-            Text("Refresh")
         }
         if (canRetry) {
             Spacer(Modifier.width(10.dp))

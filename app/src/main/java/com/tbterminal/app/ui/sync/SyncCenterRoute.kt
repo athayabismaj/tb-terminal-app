@@ -7,6 +7,9 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import com.tbterminal.app.data.repository.SyncMonitoringRepository
 import com.tbterminal.app.ui.dashboard.admin.AdminDashboardShell
 import com.tbterminal.app.ui.dashboard.admin.AdminDestination
+import com.tbterminal.app.ui.components.RefreshableContent
+import com.tbterminal.app.navigation.AppAccessPolicy
+import com.tbterminal.app.navigation.AppCapability
 
 @Composable
 fun SyncCenterRoute(
@@ -39,7 +42,7 @@ fun SyncCenterRoute(
     viewModel: SyncCenterViewModel = viewModel(
         factory = SyncCenterViewModel.factory(
             repository = syncMonitoringRepository,
-            canRetry = role.equals("admin", ignoreCase = true)
+            canRetry = AppAccessPolicy.can(role, AppCapability.RETRY_SYNC)
         )
     )
 ) {
@@ -73,8 +76,13 @@ fun SyncCenterRoute(
         onSettingsClick = onSettingsClick,
         onLogout = onLogout
     ) { contentModifier ->
-        SyncCenterScreen(
+        RefreshableContent(
+            isRefreshing = uiState.isRefreshing,
+            onRefresh = viewModel::refresh,
             modifier = contentModifier,
+        ) {
+            SyncCenterScreen(
+            modifier = androidx.compose.ui.Modifier,
             uiState = uiState,
             onRefresh = viewModel::refresh,
             onRetryItem = viewModel::retryItem,
@@ -82,6 +90,7 @@ fun SyncCenterRoute(
             onRetryAllPending = viewModel::retryAllPending,
             onRetryAllFailed = viewModel::retryAllFailed,
             onDismissMessage = viewModel::clearMessage
-        )
+            )
+        }
     }
 }

@@ -25,7 +25,6 @@ import androidx.compose.material.icons.outlined.Assessment
 import androidx.compose.material.icons.outlined.CalendarToday
 import androidx.compose.material.icons.outlined.CreditCard
 import androidx.compose.material.icons.outlined.Payments
-import androidx.compose.material.icons.outlined.Refresh
 import androidx.compose.material.icons.outlined.Sync
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -86,9 +85,7 @@ fun OfflineReportScreen(
         ) {
         item {
             OfflineReportHeader(
-                isLoading = uiState.isLoading,
                 lastRefresh = uiState.lastRefresh,
-                onRefresh = onRefresh,
                 compact = compact
             )
         }
@@ -172,9 +169,7 @@ private fun OfflineKpiGrid(uiState: OfflineReportUiState, compact: Boolean) {
 
 @Composable
 private fun OfflineReportHeader(
-    isLoading: Boolean,
     lastRefresh: Long?,
-    onRefresh: () -> Unit,
     compact: Boolean
 ) {
     Row(
@@ -190,18 +185,6 @@ private fun OfflineReportHeader(
                     fontSize = 12.sp,
                     modifier = Modifier.padding(top = 8.dp)
                 )
-            }
-        }
-        OutlinedButton(
-            enabled = !isLoading,
-            onClick = onRefresh,
-            shape = RoundedCornerShape(14.dp),
-            contentPadding = if (compact) androidx.compose.foundation.layout.PaddingValues(horizontal = 12.dp, vertical = 10.dp) else androidx.compose.foundation.layout.PaddingValues(horizontal = 16.dp, vertical = 12.dp)
-        ) {
-            Icon(Icons.Outlined.Refresh, contentDescription = null, modifier = Modifier.size(18.dp))
-            if (!compact) {
-                Spacer(Modifier.width(8.dp))
-                Text("Perbarui")
             }
         }
     }

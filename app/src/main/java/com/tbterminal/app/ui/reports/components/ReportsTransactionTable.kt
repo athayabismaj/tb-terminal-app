@@ -295,12 +295,10 @@ private fun TransactionStatusBadge(text: String) {
 
 @Composable
 private fun ReportsTransactionLoading() {
-    Box(
-        modifier = Modifier.fillMaxWidth().padding(vertical = 34.dp),
-        contentAlignment = Alignment.Center
-    ) {
-        CircularProgressIndicator(color = ReportColors.Primary)
-    }
+    com.tbterminal.app.ui.components.SkeletonList(
+        modifier = Modifier.fillMaxWidth(),
+        itemCount = 5,
+    )
 }
 
 @Composable

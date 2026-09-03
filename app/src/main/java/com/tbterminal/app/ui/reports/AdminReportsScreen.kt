@@ -30,6 +30,7 @@ import com.tbterminal.app.ui.reports.components.ReportsTransactionTable
 import com.tbterminal.app.ui.reports.components.ReportColors
 import com.tbterminal.app.ui.reports.components.SalesReportAggregateSection
 import com.tbterminal.app.data.repository.ReportCsvType
+import com.tbterminal.app.ui.components.RefreshableContent
 import java.time.LocalDate
 
 @Composable
@@ -96,7 +97,12 @@ fun AdminReportsScreen(
         onSettingsClick = onSettingsClick,
         onLogout = onLogout
     ) { contentModifier ->
-        AdminReportsContent(
+        RefreshableContent(
+            isRefreshing = uiState.isLoading && uiState.dashboardMetrics != null,
+            onRefresh = onRefresh,
+            modifier = contentModifier,
+        ) {
+            AdminReportsContent(
             uiState = uiState,
             onDateRangeChanged = onDateRangeChanged,
             onRefresh = onRefresh,
@@ -106,8 +112,9 @@ fun AdminReportsScreen(
             onPreviousTransactionPage = onPreviousTransactionPage,
             onNextTransactionPage = onNextTransactionPage,
             onExportCsv = onExportCsv,
-            modifier = contentModifier
-        )
+                modifier = Modifier
+            )
+        }
     }
 }
 

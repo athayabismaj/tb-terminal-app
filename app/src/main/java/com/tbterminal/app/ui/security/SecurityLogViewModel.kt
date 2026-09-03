@@ -103,6 +103,8 @@ class SecurityLogViewModel(
         loadLogs(page = current.page, dateFilter = current.dateFilter, activityFilter = current.activityFilter)
     }
 
+    fun refresh() = loadLogs()
+
     private fun loadLogs(
         page: Int,
         dateFilter: SecurityDateFilter,

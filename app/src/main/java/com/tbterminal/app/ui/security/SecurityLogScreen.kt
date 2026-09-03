@@ -32,7 +32,6 @@ import androidx.compose.material.icons.outlined.GppMaybe
 import androidx.compose.material.icons.outlined.LaptopMac
 import androidx.compose.material.icons.outlined.MoreVert
 import androidx.compose.material.icons.outlined.Person
-import androidx.compose.material.icons.outlined.Refresh
 import androidx.compose.material.icons.outlined.Search
 import androidx.compose.material.icons.outlined.TabletAndroid
 import androidx.compose.material.icons.outlined.Update
@@ -71,6 +70,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.tbterminal.app.ui.dashboard.owner.OwnerDashboardShell
 import com.tbterminal.app.ui.dashboard.owner.OwnerDestination
+import com.tbterminal.app.ui.components.RefreshableContent
 
 val SecuritySurface = Color(0xFFF8FAFB)
 val SecurityOnSurface = Color(0xFF0F172A)
@@ -128,19 +128,25 @@ fun OwnerSecurityLogScreen(
         onSettingsClick = onSettingsClick,
         onLogout = onLogout
     ) { contentModifier ->
-        SecurityLogContent(
+        RefreshableContent(
+            isRefreshing = uiState.isLoading && uiState.logs.isNotEmpty(),
+            onRefresh = viewModel::refresh,
             modifier = contentModifier,
+        ) {
+            SecurityLogContent(
+            modifier = Modifier,
             uiState = uiState,
             onSearchQueryChange = viewModel::updateSearchQuery,
             onDateFilterChange = viewModel::updateDateFilter,
             onActivityFilterChange = viewModel::updateActivityFilter,
-            onRefresh = viewModel::loadLogs,
+            onRefresh = viewModel::refresh,
             onPreviousPage = viewModel::previousPage,
             onNextPage = viewModel::nextPage,
             onPageClick = viewModel::goToPage,
             onViewLogDetail = viewModel::showLogDetail,
             onDismissLogDetail = viewModel::dismissLogDetail
-        )
+            )
+        }
     }
 }
 
@@ -395,19 +401,6 @@ private fun SecurityLogToolbar(
             )
         )
     }
-    val refreshButton: @Composable (Modifier) -> Unit = { buttonModifier ->
-        Button(
-            onClick = onRefresh,
-            modifier = buttonModifier.height(56.dp),
-            shape = RoundedCornerShape(14.dp),
-            colors = ButtonDefaults.buttonColors(containerColor = SecurityPrimary)
-        ) {
-            Icon(imageVector = Icons.Outlined.Refresh, contentDescription = null)
-            Spacer(modifier = Modifier.width(8.dp))
-            Text(text = "Muat Ulang", fontWeight = FontWeight.Bold, fontSize = 14.sp)
-        }
-    }
-
     if (compact) Column(
         modifier = Modifier.fillMaxWidth(),
         verticalArrangement = Arrangement.spacedBy(10.dp)
@@ -420,12 +413,10 @@ private fun SecurityLogToolbar(
             SecurityDateFilterButton(dateFilter, onDateFilterChange, Modifier.weight(1f))
             SecurityActivityFilterButton(activityFilter, onActivityFilterChange, Modifier.weight(1f))
         }
-        refreshButton(Modifier.fillMaxWidth())
     } else Row(horizontalArrangement = Arrangement.spacedBy(14.dp), verticalAlignment = Alignment.CenterVertically) {
         searchField(Modifier.weight(1f))
         SecurityDateFilterButton(dateFilter, onDateFilterChange)
         SecurityActivityFilterButton(activityFilter, onActivityFilterChange)
-        refreshButton(Modifier)
     }
 }
 
@@ -565,7 +556,7 @@ private fun SecurityLogTable(
             HorizontalDivider(color = SecuritySlate100)
 
             when {
-                isLoading -> SecurityTableFeedback(message = "Memuat log keamanan...")
+                isLoading -> com.tbterminal.app.ui.components.SkeletonList(itemCount = 6)
                 errorMessage != null -> SecurityTableFeedback(
                     message = errorMessage,
                     actionLabel = "Muat ulang",

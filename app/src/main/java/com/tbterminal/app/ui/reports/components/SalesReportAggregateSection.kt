@@ -646,12 +646,7 @@ private fun EmptyText(text: String) {
 @Composable
 private fun SalesReportLoadingCard() {
     ReportSurfaceCard {
-        Box(
-            modifier = Modifier.fillMaxWidth().padding(32.dp),
-            contentAlignment = Alignment.Center
-        ) {
-            CircularProgressIndicator(color = ReportColors.Primary)
-        }
+        com.tbterminal.app.ui.components.SkeletonCard(modifier = Modifier.fillMaxWidth())
     }
 }
 

@@ -9,10 +9,5 @@ import androidx.compose.ui.Modifier
 
 @Composable
 fun ReportsLoadingState(modifier: Modifier = Modifier) {
-    Box(
-        modifier = modifier.fillMaxSize(),
-        contentAlignment = Alignment.Center
-    ) {
-        CircularProgressIndicator()
-    }
+    com.tbterminal.app.ui.components.SkeletonList(modifier = modifier.fillMaxSize(), itemCount = 6)
 }
