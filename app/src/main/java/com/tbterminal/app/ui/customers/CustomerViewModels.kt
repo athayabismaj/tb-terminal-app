@@ -58,6 +58,8 @@ class CustomerListViewModel(
         }
     }
 
+    fun refresh() = loadCustomers(_uiState.value.page)
+
     fun onSearchChanged(query: String) {
         _uiState.update { it.copy(searchQuery = query) }
         searchJob?.cancel()
@@ -134,11 +136,16 @@ class CustomerFormViewModel(
     }
 
     fun onInputChanged(input: CustomerFormInput) {
-        _uiState.update { it.copy(input = input, errorMessage = null) }
+        _uiState.update { it.copy(input = input, fieldErrors = emptyMap(), errorMessage = null) }
     }
 
     fun save() {
         val state = _uiState.value
+        val fieldErrors = validateCustomerForm(state.input)
+        if (fieldErrors.isNotEmpty()) {
+            _uiState.update { it.copy(fieldErrors = fieldErrors, errorMessage = null) }
+            return
+        }
         val command = state.input.toCommandOrError { message ->
             _uiState.update { it.copy(errorMessage = message) }
         } ?: return
@@ -174,6 +181,7 @@ class CustomerFormViewModel(
                         it.copy(
                             input = result.data.toFormInput(),
                             isLoading = false,
+                            fieldErrors = emptyMap(),
                             errorMessage = null
                         )
                     }
@@ -279,6 +287,47 @@ private fun CustomerFormInput.toCommandOrError(onError: (String) -> Unit): Custo
         paymentTermDays = term
     )
 }
+
+internal fun validateCustomerForm(input: CustomerFormInput): Map<String, String> = buildMap {
+    val name = input.name.trim()
+    when {
+        name.isBlank() -> put(CUSTOMER_FIELD_NAME, "Nama pelanggan wajib diisi.")
+        name.length > 120 -> put(CUSTOMER_FIELD_NAME, "Nama maksimal 120 karakter.")
+    }
+
+    val phone = input.phone.trim()
+    when {
+        phone.length > 24 -> put(CUSTOMER_FIELD_PHONE, "Nomor HP maksimal 24 karakter.")
+        phone.isNotEmpty() && phone.any { !it.isDigit() && it !in setOf('+', '-', ' ', '(', ')') } ->
+            put(CUSTOMER_FIELD_PHONE, "Nomor HP hanya boleh berisi angka dan tanda telepon.")
+        phone.filter(Char::isDigit).let { it.isNotEmpty() && it.length < 8 } ->
+            put(CUSTOMER_FIELD_PHONE, "Nomor HP minimal 8 digit.")
+    }
+
+    if (input.address.trim().length > 500) {
+        put(CUSTOMER_FIELD_ADDRESS, "Alamat maksimal 500 karakter.")
+    }
+
+    val creditLimit = input.creditLimit.numericInput().toBigDecimalOrNull()
+    when {
+        creditLimit == null -> put(CUSTOMER_FIELD_CREDIT_LIMIT, "Limit kredit wajib berupa angka.")
+        creditLimit < BigDecimal.ZERO -> put(CUSTOMER_FIELD_CREDIT_LIMIT, "Limit kredit tidak boleh negatif.")
+        creditLimit.stripTrailingZeros().scale().coerceAtLeast(0) > 2 ->
+            put(CUSTOMER_FIELD_CREDIT_LIMIT, "Limit kredit maksimal dua angka desimal.")
+    }
+
+    val paymentTerm = input.paymentTermDays.toIntOrNull()
+    when {
+        paymentTerm == null -> put(CUSTOMER_FIELD_PAYMENT_TERM, "Termin bayar wajib berupa angka.")
+        paymentTerm !in 0..3650 -> put(CUSTOMER_FIELD_PAYMENT_TERM, "Termin bayar harus antara 0 dan 3650 hari.")
+    }
+}
+
+internal const val CUSTOMER_FIELD_NAME = "name"
+internal const val CUSTOMER_FIELD_PHONE = "phone"
+internal const val CUSTOMER_FIELD_ADDRESS = "address"
+internal const val CUSTOMER_FIELD_CREDIT_LIMIT = "creditLimit"
+internal const val CUSTOMER_FIELD_PAYMENT_TERM = "paymentTermDays"
 
 internal fun String.numericInput(): String {
     return filter { it.isDigit() || it == '.' || it == ',' }.replace(',', '.')

@@ -59,6 +59,7 @@ data class CustomerFormUiState(
     val isLoading: Boolean = false,
     val isSaving: Boolean = false,
     val isSaved: Boolean = false,
+    val fieldErrors: Map<String, String> = emptyMap(),
     val errorMessage: String? = null
 )
 

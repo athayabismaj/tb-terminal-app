@@ -14,6 +14,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -21,6 +22,8 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.CheckCircle
@@ -37,7 +40,6 @@ import androidx.compose.material.icons.outlined.Person
 import androidx.compose.material.icons.outlined.Phone
 import androidx.compose.material.icons.outlined.Search
 import androidx.compose.material.icons.outlined.Warning
-import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
@@ -66,7 +68,13 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.focus.FocusDirection
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -76,6 +84,14 @@ import com.tbterminal.app.data.model.Customer
 import com.tbterminal.app.data.repository.CustomerRepository
 import com.tbterminal.app.ui.dashboard.admin.AdminDashboardShell
 import com.tbterminal.app.ui.dashboard.admin.AdminDestination
+import com.tbterminal.app.ui.components.RefreshableContent
+import com.tbterminal.app.ui.components.AppConfirmationSpec
+import com.tbterminal.app.ui.components.AppConfirmDialog
+import com.tbterminal.app.ui.components.AppEmptyState
+import com.tbterminal.app.ui.components.AppErrorState
+import com.tbterminal.app.ui.components.AppSnackbar
+import com.tbterminal.app.navigation.AppAccessPolicy
+import com.tbterminal.app.navigation.AppCapability
 import java.math.BigDecimal
 import java.text.NumberFormat
 import java.util.Locale
@@ -141,9 +157,15 @@ fun AdminCustomerListScreen(
         onSettingsClick = onSettingsClick,
         onLogout = onLogout
     ) { contentModifier ->
-        CustomerListContent(
+        RefreshableContent(
+            isRefreshing = uiState.isLoading && uiState.customers.isNotEmpty(),
+            onRefresh = viewModel::refresh,
             modifier = contentModifier,
+        ) {
+            CustomerListContent(
+            modifier = Modifier,
             uiState = uiState,
+            canManage = AppAccessPolicy.can(role, AppCapability.MANAGE_CUSTOMERS),
             onSearchChanged = viewModel::onSearchChanged,
             onCategoryFilterChanged = viewModel::onCategoryFilterChanged,
             onAddCustomerClick = onAddCustomerClick,
@@ -153,28 +175,24 @@ fun AdminCustomerListScreen(
             onPreviousPage = viewModel::previousPage,
             onNextPage = viewModel::nextPage,
             onDismissMessage = viewModel::clearMessage
-        )
+            )
+        }
     }
 
     customerToDeactivate?.let { customer ->
-        AlertDialog(
-            onDismissRequest = { customerToDeactivate = null },
-            title = { Text("Nonaktifkan Pelanggan") },
-            text = { Text("Pelanggan ${customer.name} tidak akan tampil pada daftar aktif dan pilihan transaksi kredit.") },
-            confirmButton = {
-                Button(
-                    onClick = {
-                        customerToDeactivate = null
-                        viewModel.deactivate(customer)
-                    },
-                    colors = ButtonDefaults.buttonColors(containerColor = CustomerDanger)
-                ) {
-                    Text("Nonaktifkan")
-                }
+        AppConfirmDialog(
+            spec = AppConfirmationSpec(
+                title = "Nonaktifkan pelanggan",
+                target = customer.name,
+                consequence = "Pelanggan tidak lagi tampil pada daftar aktif atau pilihan transaksi kredit.",
+                confirmLabel = "Nonaktifkan",
+            ),
+            onDismiss = { customerToDeactivate = null },
+            onConfirm = {
+                viewModel.deactivate(customer)
+                customerToDeactivate = null
             },
-            dismissButton = {
-                TextButton(onClick = { customerToDeactivate = null }) { Text("Batal") }
-            }
+            isLoading = uiState.isMutating,
         )
     }
 }
@@ -321,7 +339,9 @@ fun AdminCustomerDetailScreen(
             uiState = uiState,
             onRetry = viewModel::loadDetail,
             onBack = onCustomersClick,
-            onEdit = onEditCustomerClick
+            onEdit = onEditCustomerClick.takeIf {
+                AppAccessPolicy.can(role, AppCapability.MANAGE_CUSTOMERS)
+            }
         )
     }
 }
@@ -330,6 +350,7 @@ fun AdminCustomerDetailScreen(
 private fun CustomerListContent(
     modifier: Modifier,
     uiState: CustomerListUiState,
+    canManage: Boolean,
     onSearchChanged: (String) -> Unit,
     onCategoryFilterChanged: (CustomerCategoryFilter) -> Unit,
     onAddCustomerClick: () -> Unit,
@@ -347,21 +368,27 @@ private fun CustomerListContent(
                 .padding(horizontal = if (compact) 16.dp else 32.dp, vertical = if (compact) 14.dp else 24.dp),
             verticalArrangement = Arrangement.spacedBy(if (compact) 14.dp else 22.dp)
         ) {
-        CustomerListHeader(onAddCustomerClick = onAddCustomerClick, compact = compact)
-        CustomerMessage(uiState.message ?: uiState.errorMessage, uiState.errorMessage != null, onDismissMessage)
+        if (canManage) CustomerListHeader(onAddCustomerClick = onAddCustomerClick, compact = compact)
+        CustomerMessage(uiState.errorMessage, isError = true, onDismissMessage)
         CustomerTableCard(
             modifier = Modifier.fillMaxWidth(),
             uiState = uiState,
             onSearchChanged = onSearchChanged,
             onCategoryFilterChanged = onCategoryFilterChanged,
+            canManage = canManage,
             onEditCustomerClick = onEditCustomerClick,
             onCustomerDetailClick = onCustomerDetailClick,
             onDeactivateClick = onDeactivateClick,
             onPreviousPage = onPreviousPage,
             onNextPage = onNextPage,
             compact = compact
-        )
+            )
         }
+        AppSnackbar(
+            message = uiState.message,
+            onDismiss = onDismissMessage,
+            modifier = Modifier.align(Alignment.BottomCenter).padding(16.dp),
+        )
     }
 }
 
@@ -397,7 +424,14 @@ private fun CustomerFormContent(
     val input = uiState.input
     BoxWithConstraints(modifier.fillMaxSize().background(CustomerBackground)) {
         val compact = maxWidth < 700.dp
-        Column(modifier = Modifier.fillMaxSize().padding(horizontal = if (compact) 16.dp else 32.dp, vertical = if (compact) 14.dp else 24.dp).verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(14.dp)) {
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(horizontal = if (compact) 16.dp else 32.dp, vertical = if (compact) 14.dp else 24.dp)
+                .verticalScroll(rememberScrollState())
+                .imePadding(),
+            verticalArrangement = Arrangement.spacedBy(14.dp),
+        ) {
         CustomerMessage(uiState.errorMessage, isError = true, onDismiss = {})
         Card(
             colors = CardDefaults.cardColors(containerColor = CustomerSurface),
@@ -412,17 +446,32 @@ private fun CustomerFormContent(
                 if (uiState.isLoading) {
                     CustomerLoading()
                 } else {
-                    CustomerField("NAMA PELANGGAN", input.name, { onInputChanged(input.copy(name = it)) }, "Contoh: CV Perkasa Mulia")
+                    CustomerField(
+                        label = "NAMA PELANGGAN",
+                        value = input.name,
+                        onValueChange = { onInputChanged(input.copy(name = it)) },
+                        placeholder = "Contoh: CV Perkasa Mulia",
+                        error = uiState.fieldErrors[CUSTOMER_FIELD_NAME],
+                        initialFocus = true,
+                    )
                     if (compact) Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
-                        CustomerField("NOMOR HP", input.phone, { onInputChanged(input.copy(phone = it)) }, "08xxxxxxxxxx")
-                        CustomerField("LIMIT KREDIT", input.creditLimit, { onInputChanged(input.copy(creditLimit = it.numericInput())) }, "0")
-                        CustomerField("TERMIN HARI", input.paymentTermDays, { onInputChanged(input.copy(paymentTermDays = it.filter(Char::isDigit))) }, "0")
+                        CustomerField("NOMOR HP", input.phone, { onInputChanged(input.copy(phone = it)) }, "08xxxxxxxxxx", error = uiState.fieldErrors[CUSTOMER_FIELD_PHONE], keyboardType = KeyboardType.Phone)
+                        CustomerField("LIMIT KREDIT", input.creditLimit, { onInputChanged(input.copy(creditLimit = it.numericInput())) }, "0", error = uiState.fieldErrors[CUSTOMER_FIELD_CREDIT_LIMIT], keyboardType = KeyboardType.Decimal)
+                        CustomerField("TERMIN HARI", input.paymentTermDays, { onInputChanged(input.copy(paymentTermDays = it.filter(Char::isDigit))) }, "0", error = uiState.fieldErrors[CUSTOMER_FIELD_PAYMENT_TERM], keyboardType = KeyboardType.Number)
                     } else Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
-                        CustomerField("NOMOR HP", input.phone, { onInputChanged(input.copy(phone = it)) }, "08xxxxxxxxxx", Modifier.weight(1f))
-                        CustomerField("LIMIT KREDIT", input.creditLimit, { onInputChanged(input.copy(creditLimit = it.numericInput())) }, "0", Modifier.weight(1f))
-                        CustomerField("TERMIN HARI", input.paymentTermDays, { onInputChanged(input.copy(paymentTermDays = it.filter(Char::isDigit))) }, "0", Modifier.weight(1f))
+                        CustomerField("NOMOR HP", input.phone, { onInputChanged(input.copy(phone = it)) }, "08xxxxxxxxxx", Modifier.weight(1f), error = uiState.fieldErrors[CUSTOMER_FIELD_PHONE], keyboardType = KeyboardType.Phone)
+                        CustomerField("LIMIT KREDIT", input.creditLimit, { onInputChanged(input.copy(creditLimit = it.numericInput())) }, "0", Modifier.weight(1f), error = uiState.fieldErrors[CUSTOMER_FIELD_CREDIT_LIMIT], keyboardType = KeyboardType.Decimal)
+                        CustomerField("TERMIN HARI", input.paymentTermDays, { onInputChanged(input.copy(paymentTermDays = it.filter(Char::isDigit))) }, "0", Modifier.weight(1f), error = uiState.fieldErrors[CUSTOMER_FIELD_PAYMENT_TERM], keyboardType = KeyboardType.Number)
                     }
-                    CustomerField("ALAMAT", input.address, { onInputChanged(input.copy(address = it)) }, "Alamat pelanggan", minLines = 3)
+                    CustomerField(
+                        label = "ALAMAT",
+                        value = input.address,
+                        onValueChange = { onInputChanged(input.copy(address = it)) },
+                        placeholder = "Alamat pelanggan",
+                        minLines = 3,
+                        error = uiState.fieldErrors[CUSTOMER_FIELD_ADDRESS],
+                        imeAction = ImeAction.Done,
+                    )
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
@@ -451,7 +500,15 @@ private fun CustomerFormContent(
                             colors = ButtonDefaults.buttonColors(containerColor = CustomerPrimary),
                             shape = RoundedCornerShape(12.dp)
                         ) {
-                            Icon(Icons.Default.Save, contentDescription = null, modifier = Modifier.size(18.dp))
+                            if (uiState.isSaving) {
+                                CircularProgressIndicator(
+                                    modifier = Modifier.size(18.dp),
+                                    strokeWidth = 2.dp,
+                                    color = Color.White,
+                                )
+                            } else {
+                                Icon(Icons.Default.Save, contentDescription = null, modifier = Modifier.size(18.dp))
+                            }
                             Spacer(modifier = Modifier.width(8.dp))
                             Text(if (uiState.isSaving) "Menyimpan..." else "Simpan Pelanggan", fontWeight = FontWeight.Bold)
                         }
@@ -469,7 +526,7 @@ private fun CustomerDetailContent(
     uiState: CustomerDetailUiState,
     onRetry: () -> Unit,
     onBack: () -> Unit,
-    onEdit: (String) -> Unit
+    onEdit: ((String) -> Unit)?
 ) {
     BoxWithConstraints(modifier.fillMaxSize().background(CustomerBackground)) {
         val compact = maxWidth < 700.dp
@@ -489,6 +546,7 @@ private fun CustomerTableCard(
     uiState: CustomerListUiState,
     onSearchChanged: (String) -> Unit,
     onCategoryFilterChanged: (CustomerCategoryFilter) -> Unit,
+    canManage: Boolean,
     onEditCustomerClick: (String) -> Unit,
     onCustomerDetailClick: (String) -> Unit,
     onDeactivateClick: (Customer) -> Unit,
@@ -507,13 +565,13 @@ private fun CustomerTableCard(
         if (!compact) CustomerTableHeader()
         HorizontalDivider(color = CustomerLine)
         when {
-            uiState.isLoading -> CustomerLoading()
-            uiState.errorMessage != null -> CustomerEmpty("Pelanggan gagal dimuat.")
+            uiState.isLoading && uiState.customers.isEmpty() -> CustomerLoading()
+            uiState.errorMessage != null && uiState.customers.isEmpty() -> CustomerEmpty("Pelanggan gagal dimuat.")
             uiState.visibleCustomers.isEmpty() -> CustomerEmpty()
             else -> Column(modifier = Modifier.fillMaxWidth()) {
                 uiState.visibleCustomers.forEach { customer ->
-                    if (compact) CustomerMobileRow(customer, onCustomerDetailClick, onEditCustomerClick, onDeactivateClick)
-                    else CustomerTableRow(customer, onCustomerDetailClick, onEditCustomerClick, onDeactivateClick)
+                    if (compact) CustomerMobileRow(customer, onCustomerDetailClick, onEditCustomerClick, onDeactivateClick, canManage)
+                    else CustomerTableRow(customer, onCustomerDetailClick, onEditCustomerClick, onDeactivateClick, canManage)
                     HorizontalDivider(color = CustomerLine.copy(alpha = 0.7f))
                 }
             }
@@ -618,7 +676,8 @@ private fun CustomerTableRow(
     customer: Customer,
     onDetail: (String) -> Unit,
     onEdit: (String) -> Unit,
-    onDeactivate: (Customer) -> Unit
+    onDeactivate: (Customer) -> Unit,
+    canManage: Boolean,
 ) {
     Row(
         modifier = Modifier
@@ -648,8 +707,10 @@ private fun CustomerTableRow(
         Text(customer.creditLimit.currencyText(), modifier = Modifier.weight(1.6f), color = CustomerText, fontWeight = FontWeight.Bold, maxLines = 1)
         Text("${customer.paymentTermDays} hari", modifier = Modifier.weight(1f), color = CustomerMuted, fontWeight = FontWeight.SemiBold)
         Row(modifier = Modifier.weight(1.2f), horizontalArrangement = Arrangement.End) {
-            IconButton(onClick = { onEdit(customer.id) }) { Icon(Icons.Default.Edit, contentDescription = "Edit", tint = CustomerMuted) }
-            IconButton(onClick = { onDeactivate(customer) }) { Icon(Icons.Default.Delete, contentDescription = "Nonaktifkan", tint = CustomerDanger.copy(alpha = 0.8f)) }
+            if (canManage) {
+                IconButton(onClick = { onEdit(customer.id) }) { Icon(Icons.Default.Edit, contentDescription = "Edit", tint = CustomerMuted) }
+                IconButton(onClick = { onDeactivate(customer) }) { Icon(Icons.Default.Delete, contentDescription = "Nonaktifkan", tint = CustomerDanger.copy(alpha = 0.8f)) }
+            }
         }
     }
 }
@@ -692,7 +753,7 @@ private fun CustomerMetric(title: String, value: String, subtitle: String, icon:
 }
 
 @Composable
-private fun CustomerDetailCard(customer: Customer, onEdit: (String) -> Unit) {
+private fun CustomerDetailCard(customer: Customer, onEdit: ((String) -> Unit)?) {
     Card(colors = CardDefaults.cardColors(containerColor = CustomerSurface), shape = RoundedCornerShape(18.dp), border = BorderStroke(1.dp, CustomerLine)) {
         Column(modifier = Modifier.padding(28.dp), verticalArrangement = Arrangement.spacedBy(18.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
@@ -704,10 +765,12 @@ private fun CustomerDetailCard(customer: Customer, onEdit: (String) -> Unit) {
                     Text(customer.name, color = CustomerText, fontSize = 24.sp, fontWeight = FontWeight.ExtraBold)
                     Text(if (customer.isContractor) "Pelanggan kontraktor" else "Pelanggan umum", color = CustomerMuted)
                 }
-                Button(onClick = { onEdit(customer.id) }, colors = ButtonDefaults.buttonColors(containerColor = CustomerPrimary), shape = RoundedCornerShape(12.dp)) {
-                    Icon(Icons.Default.Edit, contentDescription = null, modifier = Modifier.size(18.dp))
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Text("Edit")
+                if (onEdit != null) {
+                    Button(onClick = { onEdit(customer.id) }, colors = ButtonDefaults.buttonColors(containerColor = CustomerPrimary), shape = RoundedCornerShape(12.dp)) {
+                        Icon(Icons.Default.Edit, contentDescription = null, modifier = Modifier.size(18.dp))
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text("Edit")
+                    }
                 }
             }
             HorizontalDivider(color = CustomerLine)
@@ -727,8 +790,17 @@ private fun CustomerField(
     onValueChange: (String) -> Unit,
     placeholder: String,
     modifier: Modifier = Modifier,
-    minLines: Int = 1
+    minLines: Int = 1,
+    error: String? = null,
+    keyboardType: KeyboardType = KeyboardType.Text,
+    imeAction: ImeAction = ImeAction.Next,
+    initialFocus: Boolean = false,
 ) {
+    val focusManager = LocalFocusManager.current
+    val focusRequester = remember { FocusRequester() }
+    LaunchedEffect(initialFocus) {
+        if (initialFocus) focusRequester.requestFocus()
+    }
     Column(modifier = modifier) {
         Text(label, color = CustomerMuted, fontSize = 11.sp, fontWeight = FontWeight.ExtraBold)
         Spacer(modifier = Modifier.height(6.dp))
@@ -738,7 +810,14 @@ private fun CustomerField(
             placeholder = { Text(placeholder, color = CustomerMuted.copy(alpha = 0.65f)) },
             minLines = minLines,
             singleLine = minLines == 1,
-            modifier = Modifier.fillMaxWidth(),
+            isError = error != null,
+            supportingText = error?.let { message -> { Text(message) } },
+            keyboardOptions = KeyboardOptions(keyboardType = keyboardType, imeAction = imeAction),
+            keyboardActions = KeyboardActions(
+                onNext = { focusManager.moveFocus(FocusDirection.Down) },
+                onDone = { focusManager.clearFocus() },
+            ),
+            modifier = Modifier.fillMaxWidth().focusRequester(focusRequester),
             shape = RoundedCornerShape(12.dp),
             colors = customerTextFieldColors()
         )
@@ -806,7 +885,8 @@ private fun CustomerMobileRow(
     customer: Customer,
     onDetail: (String) -> Unit,
     onEdit: (String) -> Unit,
-    onDeactivate: (Customer) -> Unit
+    onDeactivate: (Customer) -> Unit,
+    canManage: Boolean,
 ) {
     Column(Modifier.fillMaxWidth().clickable { onDetail(customer.id) }.padding(horizontal = 16.dp, vertical = 14.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
         Row(verticalAlignment = Alignment.CenterVertically) {
@@ -827,8 +907,10 @@ private fun CustomerMobileRow(
                 Text(customer.creditLimit.currencyText(), color = CustomerText, fontWeight = FontWeight.Bold, fontSize = 13.sp)
             }
             Text("${customer.paymentTermDays} hari", color = CustomerMuted, fontSize = 12.sp)
-            IconButton(onClick = { onEdit(customer.id) }) { Icon(Icons.Default.Edit, "Edit", tint = CustomerMuted) }
-            IconButton(onClick = { onDeactivate(customer) }) { Icon(Icons.Default.Delete, "Nonaktifkan", tint = CustomerDanger) }
+            if (canManage) {
+                IconButton(onClick = { onEdit(customer.id) }) { Icon(Icons.Default.Edit, "Edit", tint = CustomerMuted) }
+                IconButton(onClick = { onDeactivate(customer) }) { Icon(Icons.Default.Delete, "Nonaktifkan", tint = CustomerDanger) }
+            }
         }
     }
 }
@@ -857,27 +939,20 @@ private fun DetailRow(label: String, value: String) {
 
 @Composable
 private fun CustomerLoading() {
-    Box(modifier = Modifier.fillMaxWidth().height(180.dp), contentAlignment = Alignment.Center) {
-        CircularProgressIndicator(color = CustomerPrimary)
-    }
+    com.tbterminal.app.ui.components.SkeletonList(
+        modifier = Modifier.fillMaxWidth().height(180.dp),
+        itemCount = 4,
+    )
 }
 
 @Composable
 private fun CustomerCenteredError(message: String, onRetry: () -> Unit) {
-    Box(modifier = Modifier.fillMaxWidth().height(220.dp), contentAlignment = Alignment.Center) {
-        Column(horizontalAlignment = Alignment.CenterHorizontally) {
-            Text(message, color = CustomerDanger, fontWeight = FontWeight.Bold)
-            Spacer(modifier = Modifier.height(12.dp))
-            OutlinedButton(onClick = onRetry) { Text("Muat Ulang") }
-        }
-    }
+    AppErrorState(message = message, onRetry = onRetry, modifier = Modifier.height(220.dp))
 }
 
 @Composable
 private fun CustomerEmpty(message: String = "Belum ada pelanggan yang cocok.") {
-    Box(modifier = Modifier.fillMaxWidth().height(220.dp), contentAlignment = Alignment.Center) {
-        Text(message, color = CustomerMuted, fontSize = 16.sp)
-    }
+    AppEmptyState(message = message, modifier = Modifier.height(220.dp))
 }
 
 @Composable
