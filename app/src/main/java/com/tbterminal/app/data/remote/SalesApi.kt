@@ -98,6 +98,12 @@ interface SalesApi {
         @Body request: VoidTransactionRequestDto
     ): Response<ApiResponse<VoidTransactionResponseDto>>
 
+    @POST("/api/sales/transactions/{id}/refund")
+    suspend fun refundTransaction(
+        @Path("id") id: String,
+        @Body request: RefundTransactionRequestDto,
+    ): Response<ApiResponse<RefundTransactionResponseDto>>
+
     @POST("/api/sales/checkout/sync")
     suspend fun syncOfflineCheckout(
         @Body request: OfflineCheckoutSyncRequestDto
@@ -220,7 +226,11 @@ data class TransactionDetailDto(
 )
 
 @Serializable
-data class VoidTransactionRequestDto(val idempotencyKey: String, val reason: String)
+data class VoidTransactionRequestDto(
+    val idempotencyKey: String,
+    val reason: String,
+    val managerApprovalId: String? = null,
+)
 
 @Serializable
 data class VoidTransactionResponseDto(
@@ -232,7 +242,32 @@ data class VoidTransactionResponseDto(
     val voidedBy: String,
     val voidedByName: String? = null,
     val voidedAt: String,
+    val managerApprovalId: String? = null,
     val idempotentReplay: Boolean = false
+)
+
+@Serializable
+data class RefundTransactionRequestDto(
+    val idempotencyKey: String,
+    val reason: String,
+    val returnDisposition: String,
+    val managerApprovalId: String? = null,
+)
+
+@Serializable
+data class RefundTransactionResponseDto(
+    val refundId: String,
+    val refundNumber: String,
+    val transactionId: String,
+    val status: String,
+    @Serializable(with = BigDecimalStringSerializer::class) val transactionAmount: BigDecimal,
+    @Serializable(with = BigDecimalStringSerializer::class) val refundedAmount: BigDecimal,
+    val returnDisposition: String,
+    val reason: String,
+    val requestedByUserId: String,
+    val createdAt: String,
+    val managerApprovalId: String? = null,
+    val idempotentReplay: Boolean = false,
 )
 
 @Serializable

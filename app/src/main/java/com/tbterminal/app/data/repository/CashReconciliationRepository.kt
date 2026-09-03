@@ -9,6 +9,8 @@ import com.tbterminal.app.data.model.CashTransactionDetail
 import com.tbterminal.app.data.model.CashTransactionItem
 import com.tbterminal.app.data.model.CashTransactionPage
 import com.tbterminal.app.data.model.TransactionVoidResult
+import com.tbterminal.app.data.model.TransactionRefundResult
+import com.tbterminal.app.data.model.RefundDisposition
 import com.tbterminal.app.data.remote.CashSessionResponseDto
 import com.tbterminal.app.data.remote.CloseSessionRequestDto
 import com.tbterminal.app.data.remote.OpenSessionRequestDto
@@ -47,7 +49,19 @@ interface CashReconciliationRepository {
         endDate: String? = null
     ): RepositoryResult<CashTransactionPage>
     suspend fun getTransactionById(id: String): RepositoryResult<CashTransactionDetail>
-    suspend fun voidTransaction(id: String, reason: String, idempotencyKey: String): RepositoryResult<TransactionVoidResult>
+    suspend fun voidTransaction(
+        id: String,
+        reason: String,
+        idempotencyKey: String,
+        managerApprovalId: String? = null,
+    ): RepositoryResult<TransactionVoidResult>
+    suspend fun refundTransaction(
+        id: String,
+        reason: String,
+        disposition: RefundDisposition,
+        idempotencyKey: String,
+        managerApprovalId: String? = null,
+    ): RepositoryResult<TransactionRefundResult>
     suspend fun addExpense(amount: BigDecimal, description: String): RepositoryResult<CashExpense>
     suspend fun getExpenses(sessionId: String): RepositoryResult<List<CashExpense>>
     suspend fun getExpenseHistory(
@@ -196,9 +210,10 @@ class RemoteCashReconciliationRepository(
     override suspend fun voidTransaction(
         id: String,
         reason: String,
-        idempotencyKey: String
+        idempotencyKey: String,
+        managerApprovalId: String?,
     ): RepositoryResult<TransactionVoidResult> {
-        val request = com.tbterminal.app.data.remote.VoidTransactionRequestDto(idempotencyKey, reason.trim())
+        val request = buildVoidTransactionRequest(idempotencyKey, reason, managerApprovalId)
         return safeApiCall { salesApi.voidTransaction(id, request) }.toRepositoryResult { response ->
             val result = response.data
             if (!response.success || result == null) {
@@ -212,6 +227,55 @@ class RemoteCashReconciliationRepository(
                     result.reason, result.voidedAt, result.idempotentReplay
                 )
             )
+        }
+    }
+
+    override suspend fun refundTransaction(
+        id: String,
+        reason: String,
+        disposition: RefundDisposition,
+        idempotencyKey: String,
+        managerApprovalId: String?,
+    ): RepositoryResult<TransactionRefundResult> {
+        val request = buildRefundTransactionRequest(
+            idempotencyKey,
+            reason,
+            disposition,
+            managerApprovalId,
+        )
+        return safeApiCall { salesApi.refundTransaction(id, request) }.toRepositoryResult { response ->
+            val result = response.data
+            if (!response.success || result == null) {
+                RepositoryResult.Error(
+                    response.code ?: "REFUND_TRANSACTION_FAILED",
+                    response.message ?: response.error ?: "Transaksi gagal direfund.",
+                )
+            } else {
+                val parsedDisposition = RefundDisposition.entries.firstOrNull {
+                    it.apiValue.equals(result.returnDisposition, ignoreCase = true)
+                }
+                if (parsedDisposition == null) {
+                    RepositoryResult.Error(
+                        code = "INVALID_RESPONSE",
+                        message = "Disposisi refund dari server tidak valid.",
+                    )
+                } else {
+                    RepositoryResult.Success(
+                        TransactionRefundResult(
+                            refundId = result.refundId,
+                            refundNumber = result.refundNumber,
+                            transactionId = result.transactionId,
+                            status = result.status,
+                            transactionAmount = result.transactionAmount,
+                            refundedAmount = result.refundedAmount,
+                            returnDisposition = parsedDisposition,
+                            reason = result.reason,
+                            createdAt = result.createdAt,
+                            idempotentReplay = result.idempotentReplay,
+                        ),
+                    )
+                }
+            }
         }
     }
 
@@ -308,6 +372,28 @@ class RemoteCashReconciliationRepository(
             }
     }
 }
+
+internal fun buildVoidTransactionRequest(
+    idempotencyKey: String,
+    reason: String,
+    managerApprovalId: String?,
+) = com.tbterminal.app.data.remote.VoidTransactionRequestDto(
+    idempotencyKey = idempotencyKey,
+    reason = reason.trim(),
+    managerApprovalId = managerApprovalId,
+)
+
+internal fun buildRefundTransactionRequest(
+    idempotencyKey: String,
+    reason: String,
+    disposition: RefundDisposition,
+    managerApprovalId: String?,
+) = com.tbterminal.app.data.remote.RefundTransactionRequestDto(
+    idempotencyKey = idempotencyKey,
+    reason = reason.trim(),
+    returnDisposition = disposition.apiValue,
+    managerApprovalId = managerApprovalId,
+)
 
 private fun com.tbterminal.app.data.remote.CashExpenseResponseDto.toCashExpense(): CashExpense {
     return CashExpense(

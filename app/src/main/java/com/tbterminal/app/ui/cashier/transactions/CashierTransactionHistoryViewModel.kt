@@ -7,6 +7,9 @@ import com.tbterminal.app.data.local.dao.TransactionDao
 import com.tbterminal.app.data.local.model.SyncEntityType
 import com.tbterminal.app.data.local.model.SyncStatus
 import com.tbterminal.app.data.model.CashTransaction
+import com.tbterminal.app.data.model.ManagerApprovalAction
+import com.tbterminal.app.data.model.ManagerApprovalGrant
+import com.tbterminal.app.data.model.RefundDisposition
 import com.tbterminal.app.data.repository.CashReconciliationRepository
 import com.tbterminal.app.data.repository.RepositoryResult
 import com.tbterminal.app.data.sync.OfflineCheckoutSyncResult
@@ -33,7 +36,8 @@ import java.util.UUID
 class CashierTransactionHistoryViewModel(
     private val repository: CashReconciliationRepository,
     private val transactionDao: TransactionDao? = null,
-    private val offlineCheckoutSyncService: OfflineCheckoutSyncService? = null
+    private val offlineCheckoutSyncService: OfflineCheckoutSyncService? = null,
+    private val actorRole: String = "KASIR",
 ) : ViewModel() {
     private val _uiState = MutableStateFlow(CashierTransactionHistoryUiState(isLoading = true))
     val uiState: StateFlow<CashierTransactionHistoryUiState> = _uiState.asStateFlow()
@@ -104,6 +108,8 @@ class CashierTransactionHistoryViewModel(
             }
         }
     }
+
+    fun refresh() = loadTransactions(_uiState.value.page)
 
     fun syncLocalTransaction(localId: Long) {
         if (_uiState.value.isBulkSyncing) return
@@ -290,10 +296,14 @@ class CashierTransactionHistoryViewModel(
         }
     }
 
-    fun loadReceipt(transactionId: String) {
+    fun loadReceipt(transactionId: String, preserveMessage: Boolean = false) {
         viewModelScope.launch {
             _uiState.update { state ->
-                state.copy(isReceiptLoading = true, errorMessage = null, receiptMessage = null)
+                state.copy(
+                    isReceiptLoading = true,
+                    errorMessage = null,
+                    receiptMessage = if (preserveMessage) state.receiptMessage else null,
+                )
             }
 
             when (val result = repository.getTransactionById(transactionId)) {
@@ -302,7 +312,7 @@ class CashierTransactionHistoryViewModel(
                         state.copy(
                             selectedTransaction = result.data,
                             isReceiptLoading = false,
-                            receiptMessage = null
+                            receiptMessage = if (preserveMessage) state.receiptMessage else null,
                         )
                     }
                 }
@@ -314,13 +324,15 @@ class CashierTransactionHistoryViewModel(
 
     fun showVoidDialog() {
         val transaction = _uiState.value.selectedTransaction ?: return
-        if (transaction.status.equals("voided", true)) return
+        if (!transactionActionAccess(actorRole, transaction.status, transaction.type).canVoid) return
         _uiState.update {
             it.copy(
                 isVoidDialogOpen = true,
-                voidReasonInput = "",
-                voidIdempotencyKey = "void-mobile-${UUID.randomUUID()}",
-                voidErrorMessage = null
+                voidReasonInput = if (it.isVoidOutcomeAmbiguous) it.voidReasonInput else "",
+                voidIdempotencyKey = it.voidIdempotencyKey
+                    ?.takeIf { _ -> it.isVoidOutcomeAmbiguous }
+                    ?: "void-mobile-${UUID.randomUUID()}",
+                voidErrorMessage = null,
             )
         }
     }
@@ -328,45 +340,329 @@ class CashierTransactionHistoryViewModel(
     fun hideVoidDialog() {
         if (_uiState.value.isSubmittingVoid) return
         _uiState.update {
-            it.copy(isVoidDialogOpen = false, voidReasonInput = "", voidIdempotencyKey = null, voidErrorMessage = null)
+            it.copy(
+                isVoidDialogOpen = false,
+                voidReasonInput = if (it.isVoidOutcomeAmbiguous) it.voidReasonInput else "",
+                voidIdempotencyKey = if (it.isVoidOutcomeAmbiguous) it.voidIdempotencyKey else null,
+                voidErrorMessage = null,
+            )
         }
     }
 
     fun onVoidReasonChanged(value: String) {
-        if (value.length <= 1000) _uiState.update { it.copy(voidReasonInput = value, voidErrorMessage = null) }
+        if (_uiState.value.isVoidOutcomeAmbiguous) return
+        if (value.length <= 1000) {
+            _uiState.update {
+                it.copy(
+                    voidReasonInput = value,
+                    voidIdempotencyKey = "void-mobile-${UUID.randomUUID()}",
+                    voidErrorMessage = null,
+                )
+            }
+        }
     }
 
     fun submitVoid() {
         val state = _uiState.value
         if (state.isSubmittingVoid) return
         val transaction = state.selectedTransaction ?: return
+        if (!transactionActionAccess(actorRole, transaction.status, transaction.type).canVoid) {
+            _uiState.update { it.copy(voidErrorMessage = "Status transaksi ini tidak dapat dibatalkan.") }
+            return
+        }
         val reason = state.voidReasonInput.trim()
         val validationError = validateTransactionVoidReason(reason)
         if (validationError != null) {
             _uiState.update { it.copy(voidErrorMessage = validationError) }
             return
         }
+        val access = transactionActionAccess(actorRole, transaction.status, transaction.type)
+        if (access.requiresManagerApproval && state.voidManagerApprovalId == null) {
+            _uiState.update {
+                it.copy(
+                    isVoidDialogOpen = false,
+                    pendingManagerApprovalAction = ManagerApprovalAction.VOID_TRANSACTION,
+                )
+            }
+            return
+        }
         val key = state.voidIdempotencyKey ?: "void-mobile-${UUID.randomUUID()}"
+        executeVoid(transaction.id, reason, key, state.voidManagerApprovalId)
+    }
+
+    private fun executeVoid(
+        transactionId: String,
+        reason: String,
+        idempotencyKey: String,
+        managerApprovalId: String?,
+    ) {
+        if (_uiState.value.isSubmittingVoid) return
+        _uiState.update {
+            it.copy(
+                isSubmittingVoid = true,
+                voidErrorMessage = null,
+                voidIdempotencyKey = idempotencyKey,
+                pendingManagerApprovalAction = null,
+            )
+        }
         viewModelScope.launch {
-            _uiState.update { it.copy(isSubmittingVoid = true, voidErrorMessage = null, voidIdempotencyKey = key) }
-            when (val result = repository.voidTransaction(transaction.id, reason, key)) {
+            when (
+                val result = repository.voidTransaction(
+                    transactionId,
+                    reason,
+                    idempotencyKey,
+                    managerApprovalId,
+                )
+            ) {
                 is RepositoryResult.Success -> {
                     _uiState.update {
                         it.copy(
                             isSubmittingVoid = false,
                             isVoidDialogOpen = false,
-                            receiptMessage = if (result.data.idempotentReplay) "Void sebelumnya sudah berhasil." else "Transaksi berhasil dibatalkan."
+                            voidIdempotencyKey = null,
+                            voidManagerApprovalId = null,
+                            isVoidOutcomeAmbiguous = false,
+                            receiptMessage = if (result.data.idempotentReplay) {
+                                "Void sebelumnya sudah berhasil."
+                            } else {
+                                "Transaksi berhasil dibatalkan."
+                            },
                         )
                     }
-                    loadReceipt(transaction.id)
+                    loadReceipt(transactionId, preserveMessage = true)
                 }
-                is RepositoryResult.Error -> _uiState.update {
-                    it.copy(isSubmittingVoid = false, voidErrorMessage = result.message)
+                is RepositoryResult.Error -> {
+                    val approvalInvalid = requiresNewActionApproval(result.code)
+                    val ambiguous = isAmbiguousTransactionActionError(result.code)
+                    _uiState.update {
+                        it.copy(
+                            isSubmittingVoid = false,
+                            isVoidDialogOpen = true,
+                            voidManagerApprovalId = if (approvalInvalid) null else it.voidManagerApprovalId,
+                            isVoidOutcomeAmbiguous = ambiguous,
+                            voidErrorMessage = transactionActionErrorMessage(result.code, result.message),
+                        )
+                    }
                 }
                 is RepositoryResult.Exception -> _uiState.update {
-                    it.copy(isSubmittingVoid = false, voidErrorMessage = "Status void belum dapat dipastikan. Periksa riwayat sebelum mencoba lagi.")
+                    it.copy(
+                        isSubmittingVoid = false,
+                        isVoidDialogOpen = true,
+                        isVoidOutcomeAmbiguous = true,
+                        voidErrorMessage = "Status void belum dapat dipastikan. Tekan konfirmasi lagi untuk memeriksa request yang sama.",
+                    )
                 }
             }
+        }
+    }
+
+    fun showRefundDialog() {
+        val transaction = _uiState.value.selectedTransaction ?: return
+        if (!transactionActionAccess(actorRole, transaction.status, transaction.type).canRefund) return
+        _uiState.update {
+            it.copy(
+                isRefundDialogOpen = true,
+                refundReasonInput = if (it.isRefundOutcomeAmbiguous) it.refundReasonInput else "",
+                refundDisposition = if (it.isRefundOutcomeAmbiguous) {
+                    it.refundDisposition
+                } else {
+                    RefundDisposition.RETURN_TO_STOCK
+                },
+                refundIdempotencyKey = it.refundIdempotencyKey
+                    ?.takeIf { _ -> it.isRefundOutcomeAmbiguous }
+                    ?: "refund-mobile-${UUID.randomUUID()}",
+                refundErrorMessage = null,
+            )
+        }
+    }
+
+    fun hideRefundDialog() {
+        if (_uiState.value.isSubmittingRefund) return
+        _uiState.update {
+            it.copy(
+                isRefundDialogOpen = false,
+                refundReasonInput = if (it.isRefundOutcomeAmbiguous) it.refundReasonInput else "",
+                refundIdempotencyKey = if (it.isRefundOutcomeAmbiguous) it.refundIdempotencyKey else null,
+                refundErrorMessage = null,
+            )
+        }
+    }
+
+    fun onRefundReasonChanged(value: String) {
+        if (_uiState.value.isRefundOutcomeAmbiguous) return
+        if (value.length <= 1000) {
+            _uiState.update {
+                it.copy(
+                    refundReasonInput = value,
+                    refundIdempotencyKey = "refund-mobile-${UUID.randomUUID()}",
+                    refundErrorMessage = null,
+                )
+            }
+        }
+    }
+
+    fun onRefundDispositionChanged(disposition: RefundDisposition) {
+        if (_uiState.value.isRefundOutcomeAmbiguous) return
+        _uiState.update {
+            it.copy(
+                refundDisposition = disposition,
+                refundIdempotencyKey = "refund-mobile-${UUID.randomUUID()}",
+                refundErrorMessage = null,
+            )
+        }
+    }
+
+    fun submitRefund() {
+        val state = _uiState.value
+        if (state.isSubmittingRefund) return
+        val transaction = state.selectedTransaction ?: return
+        if (!transactionActionAccess(actorRole, transaction.status, transaction.type).canRefund) {
+            _uiState.update { it.copy(refundErrorMessage = "Status transaksi ini tidak dapat direfund.") }
+            return
+        }
+        val reason = state.refundReasonInput.trim()
+        val validationError = validateTransactionRefundReason(reason)
+        if (validationError != null) {
+            _uiState.update { it.copy(refundErrorMessage = validationError) }
+            return
+        }
+        val access = transactionActionAccess(actorRole, transaction.status, transaction.type)
+        if (access.requiresManagerApproval && state.refundManagerApprovalId == null) {
+            _uiState.update {
+                it.copy(
+                    isRefundDialogOpen = false,
+                    pendingManagerApprovalAction = ManagerApprovalAction.REFUND_TRANSACTION,
+                )
+            }
+            return
+        }
+        executeRefund(
+            transactionId = transaction.id,
+            reason = reason,
+            disposition = state.refundDisposition,
+            idempotencyKey = state.refundIdempotencyKey ?: "refund-mobile-${UUID.randomUUID()}",
+            managerApprovalId = state.refundManagerApprovalId,
+        )
+    }
+
+    private fun executeRefund(
+        transactionId: String,
+        reason: String,
+        disposition: RefundDisposition,
+        idempotencyKey: String,
+        managerApprovalId: String?,
+    ) {
+        if (_uiState.value.isSubmittingRefund) return
+        _uiState.update {
+            it.copy(
+                isSubmittingRefund = true,
+                refundErrorMessage = null,
+                refundIdempotencyKey = idempotencyKey,
+                pendingManagerApprovalAction = null,
+            )
+        }
+        viewModelScope.launch {
+            when (
+                val result = repository.refundTransaction(
+                    id = transactionId,
+                    reason = reason,
+                    disposition = disposition,
+                    idempotencyKey = idempotencyKey,
+                    managerApprovalId = managerApprovalId,
+                )
+            ) {
+                is RepositoryResult.Success -> {
+                    _uiState.update {
+                        it.copy(
+                            isSubmittingRefund = false,
+                            isRefundDialogOpen = false,
+                            refundIdempotencyKey = null,
+                            refundManagerApprovalId = null,
+                            isRefundOutcomeAmbiguous = false,
+                            refundResult = result.data,
+                            receiptMessage = if (result.data.idempotentReplay) {
+                                "Refund sebelumnya sudah berhasil."
+                            } else {
+                                "Refund transaksi berhasil."
+                            },
+                        )
+                    }
+                    loadReceipt(transactionId, preserveMessage = true)
+                }
+                is RepositoryResult.Error -> {
+                    val approvalInvalid = requiresNewActionApproval(result.code)
+                    val ambiguous = isAmbiguousTransactionActionError(result.code)
+                    _uiState.update {
+                        it.copy(
+                            isSubmittingRefund = false,
+                            isRefundDialogOpen = true,
+                            refundManagerApprovalId = if (approvalInvalid) null else it.refundManagerApprovalId,
+                            isRefundOutcomeAmbiguous = ambiguous,
+                            refundErrorMessage = transactionActionErrorMessage(result.code, result.message),
+                        )
+                    }
+                }
+                is RepositoryResult.Exception -> _uiState.update {
+                    it.copy(
+                        isSubmittingRefund = false,
+                        isRefundDialogOpen = true,
+                        isRefundOutcomeAmbiguous = true,
+                        refundErrorMessage = "Status refund belum dapat dipastikan. Tekan konfirmasi lagi untuk memeriksa request yang sama.",
+                    )
+                }
+            }
+        }
+    }
+
+    fun onManagerApprovalGranted(grant: ManagerApprovalGrant) {
+        val state = _uiState.value
+        val transaction = state.selectedTransaction ?: return
+        val expectedAction = state.pendingManagerApprovalAction ?: return
+        val error = validateActionApproval(expectedAction, transaction, grant)
+        if (error != null) {
+            _uiState.update {
+                it.copy(
+                    pendingManagerApprovalAction = null,
+                    isVoidDialogOpen = expectedAction == ManagerApprovalAction.VOID_TRANSACTION,
+                    isRefundDialogOpen = expectedAction == ManagerApprovalAction.REFUND_TRANSACTION,
+                    voidErrorMessage = error.takeIf { expectedAction == ManagerApprovalAction.VOID_TRANSACTION },
+                    refundErrorMessage = error.takeIf { expectedAction == ManagerApprovalAction.REFUND_TRANSACTION },
+                )
+            }
+            return
+        }
+        when (expectedAction) {
+            ManagerApprovalAction.VOID_TRANSACTION -> {
+                _uiState.update {
+                    it.copy(voidManagerApprovalId = grant.approvalId, pendingManagerApprovalAction = null)
+                }
+                submitVoid()
+            }
+            ManagerApprovalAction.REFUND_TRANSACTION -> {
+                _uiState.update {
+                    it.copy(refundManagerApprovalId = grant.approvalId, pendingManagerApprovalAction = null)
+                }
+                submitRefund()
+            }
+            ManagerApprovalAction.DISCOUNT_OVERRIDE -> {
+                _uiState.update {
+                    it.copy(
+                        pendingManagerApprovalAction = null,
+                        errorMessage = "Persetujuan diskon tidak dapat digunakan untuk Void atau Refund.",
+                    )
+                }
+            }
+        }
+    }
+
+    fun cancelManagerApproval() {
+        val action = _uiState.value.pendingManagerApprovalAction ?: return
+        _uiState.update {
+            it.copy(
+                pendingManagerApprovalAction = null,
+                isVoidDialogOpen = action == ManagerApprovalAction.VOID_TRANSACTION,
+                isRefundDialogOpen = action == ManagerApprovalAction.REFUND_TRANSACTION,
+            )
         }
     }
 
@@ -489,10 +785,16 @@ class CashierTransactionHistoryViewModel(
         fun factory(
             repository: CashReconciliationRepository,
             transactionDao: TransactionDao? = null,
-            offlineCheckoutSyncService: OfflineCheckoutSyncService? = null
+            offlineCheckoutSyncService: OfflineCheckoutSyncService? = null,
+            actorRole: String = "KASIR",
         ): ViewModelProvider.Factory {
             return viewModelFactory {
-                CashierTransactionHistoryViewModel(repository, transactionDao, offlineCheckoutSyncService)
+                CashierTransactionHistoryViewModel(
+                    repository,
+                    transactionDao,
+                    offlineCheckoutSyncService,
+                    actorRole,
+                )
             }
         }
     }

@@ -77,6 +77,7 @@ import com.tbterminal.app.data.repository.CashReconciliationRepository
 import com.tbterminal.app.data.sync.OfflineCheckoutSyncService
 import com.tbterminal.app.ui.components.HistoryDateFilter
 import com.tbterminal.app.ui.components.HistoryDatePickerDialog
+import com.tbterminal.app.ui.components.RefreshableContent
 import com.tbterminal.app.ui.dashboard.DashboardBackground
 import com.tbterminal.app.ui.dashboard.DashboardBrandGreen
 import com.tbterminal.app.ui.dashboard.DashboardBrandGreenDark
@@ -169,14 +170,20 @@ fun AdminTransactionHistoryScreen(
         onSettingsClick = onSettingsClick,
         onLogout = onLogout
     ) { contentModifier ->
-        CashierTransactionHistoryContent(
+        RefreshableContent(
+            isRefreshing = uiState.isLoading && uiState.transactions.isNotEmpty(),
+            onRefresh = viewModel::refresh,
+            modifier = contentModifier,
+        ) {
+            CashierTransactionHistoryContent(
             state = uiState,
             viewModel = viewModel,
             onPreviousPage = viewModel::previousPage,
             onNextPage = viewModel::nextPage,
             onReceiptClick = onReceiptClick,
-            modifier = contentModifier
-        )
+            modifier = Modifier
+            )
+        }
     }
 }
 

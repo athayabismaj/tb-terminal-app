@@ -72,6 +72,10 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import com.tbterminal.app.data.model.CashTransactionDetail
 import com.tbterminal.app.data.model.CashTransactionItem
 import com.tbterminal.app.data.repository.CashReconciliationRepository
+import com.tbterminal.app.data.repository.ManagerApprovalRepository
+import com.tbterminal.app.data.model.TransactionRefundResult
+import com.tbterminal.app.ui.cashier.transactions.TransactionActionDialogs
+import com.tbterminal.app.ui.cashier.transactions.transactionActionAccess
 import com.tbterminal.app.ui.dashboard.DashboardBackground
 import com.tbterminal.app.ui.dashboard.DashboardBrandGreen
 import com.tbterminal.app.ui.dashboard.DashboardBrandGreenDark
@@ -80,6 +84,7 @@ import com.tbterminal.app.ui.dashboard.DashboardTextPrimary
 import com.tbterminal.app.ui.dashboard.DashboardTextSecondary
 import com.tbterminal.app.ui.dashboard.admin.AdminDashboardShell
 import com.tbterminal.app.ui.dashboard.admin.AdminDestination
+import com.tbterminal.app.ui.components.AppStatusChip
 
 import java.math.BigDecimal
 import java.io.FileOutputStream
@@ -93,6 +98,7 @@ fun AdminReceiptDetailScreen(
     role: String,
     transactionId: String,
     cashReconciliationRepository: CashReconciliationRepository,
+    managerApprovalRepository: ManagerApprovalRepository,
     onBackClick: () -> Unit,
     onDashboardClick: () -> Unit,
     onProductsClick: () -> Unit,
@@ -115,7 +121,10 @@ fun AdminReceiptDetailScreen(
     onSettingsClick: () -> Unit = {},
     onLogout: () -> Unit,
     viewModel: CashierTransactionHistoryViewModel = viewModel(
-        factory = CashierTransactionHistoryViewModel.factory(cashReconciliationRepository)
+        factory = CashierTransactionHistoryViewModel.factory(
+            repository = cashReconciliationRepository,
+            actorRole = role,
+        )
     )
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
@@ -160,12 +169,23 @@ fun AdminReceiptDetailScreen(
             onPayDebtMethodChanged = viewModel::onPayDebtMethodChanged,
             onPayDebt = viewModel::payDebt,
             onShowVoid = viewModel::showVoidDialog,
-            onHideVoid = viewModel::hideVoidDialog,
-            onVoidReasonChanged = viewModel::onVoidReasonChanged,
-            onSubmitVoid = viewModel::submitVoid,
+            onShowRefund = viewModel::showRefundDialog,
             modifier = contentModifier
         )
     }
+    TransactionActionDialogs(
+        state = uiState,
+        managerApprovalRepository = managerApprovalRepository,
+        onDismissVoid = viewModel::hideVoidDialog,
+        onVoidReasonChanged = viewModel::onVoidReasonChanged,
+        onConfirmVoid = viewModel::submitVoid,
+        onDismissRefund = viewModel::hideRefundDialog,
+        onRefundReasonChanged = viewModel::onRefundReasonChanged,
+        onRefundDispositionChanged = viewModel::onRefundDispositionChanged,
+        onConfirmRefund = viewModel::submitRefund,
+        onApprovalGranted = viewModel::onManagerApprovalGranted,
+        onApprovalDismissed = viewModel::cancelManagerApproval,
+    )
 }
 
 @Composable
@@ -180,9 +200,7 @@ private fun ReceiptDetailContent(
     onPayDebtMethodChanged: (String) -> Unit,
     onPayDebt: () -> Unit,
     onShowVoid: () -> Unit,
-    onHideVoid: () -> Unit,
-    onVoidReasonChanged: (String) -> Unit,
-    onSubmitVoid: () -> Unit,
+    onShowRefund: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     val compact = androidx.compose.ui.platform.LocalConfiguration.current.screenWidthDp < 700
@@ -202,9 +220,11 @@ private fun ReceiptDetailContent(
             else -> ReceiptSummaryCard(
                 transaction = state.selectedTransaction,
                 message = state.receiptMessage.orEmpty(),
+                refundResult = state.refundResult,
                 role = role,
                 onShowPayDebt = onShowPayDebt,
                 onShowVoid = onShowVoid,
+                onShowRefund = onShowRefund,
                 compact = compact
             )
         }
@@ -218,9 +238,6 @@ private fun ReceiptDetailContent(
             onMethodChanged = onPayDebtMethodChanged,
             onConfirm = onPayDebt
         )
-    }
-    if (state.isVoidDialogOpen) {
-        VoidTransactionDialog(state, onHideVoid, onVoidReasonChanged, onSubmitVoid)
     }
 }
 
@@ -258,9 +275,11 @@ private fun ReceiptDetailHeader(onBackClick: () -> Unit, compact: Boolean) {
 private fun ReceiptSummaryCard(
     transaction: CashTransactionDetail,
     message: String,
+    refundResult: TransactionRefundResult?,
     role: String,
     onShowPayDebt: () -> Unit,
     onShowVoid: () -> Unit,
+    onShowRefund: () -> Unit,
     compact: Boolean
 ) {
     var showPrintDialog by remember { mutableStateOf(false) }
@@ -284,12 +303,16 @@ private fun ReceiptSummaryCard(
             ReceiptTotalsSection(transaction)
             HorizontalDivider(color = ReceiptLine)
             ReceiptItemsList(transaction.items)
+            refundResult?.takeIf { it.transactionId == transaction.id }?.let { refund ->
+                RefundInformation(refund)
+            }
             ReceiptActions(
                 transaction = transaction,
                 role = role,
                 onPrintClick = { showPrintDialog = true },
                 onShowPayDebt = onShowPayDebt,
                 onShowVoid = onShowVoid,
+                onShowRefund = onShowRefund,
                 compact = compact
             )
         }
@@ -315,14 +338,7 @@ private fun ReceiptTopSection(transaction: CashTransactionDetail, compact: Boole
                 Text(transaction.createdAt.displayDateTime(), color = DashboardTextSecondary, fontSize = 13.sp)
             }
         }
-        Box(
-            modifier = Modifier
-                .clip(RoundedCornerShape(16.dp))
-                .background(transaction.status.statusColor().copy(alpha = 0.12f))
-                .padding(horizontal = 14.dp, vertical = 8.dp)
-        ) {
-            Text(transaction.status.uppercase(), color = transaction.status.statusColor(), fontSize = 12.sp, fontWeight = FontWeight.Bold)
-        }
+        AppStatusChip(transaction.status)
     }
 }
 
@@ -397,6 +413,7 @@ private fun ReceiptActions(
     onPrintClick: () -> Unit,
     onShowPayDebt: () -> Unit,
     onShowVoid: () -> Unit,
+    onShowRefund: () -> Unit,
     compact: Boolean
 ) {
     val actions: @Composable () -> Unit = {
@@ -414,14 +431,23 @@ private fun ReceiptActions(
             }
             Spacer(modifier = if (compact) Modifier.height(10.dp) else Modifier.width(12.dp))
         }
-        val canVoid = role.equals("OWNER", true) || role.equals("ADMIN", true)
-        if (canVoid && !transaction.status.equals("voided", true)) {
+        val access = transactionActionAccess(role, transaction.status, transaction.type)
+        if (access.canVoid) {
             Button(
                 onClick = onShowVoid,
                 modifier = if (compact) Modifier.fillMaxWidth() else Modifier,
                 colors = androidx.compose.material3.ButtonDefaults.buttonColors(containerColor = Color(0xFFB91C1C)),
                 shape = RoundedCornerShape(12.dp)
             ) { Text("Void transaksi", fontWeight = FontWeight.Bold) }
+            Spacer(modifier = if (compact) Modifier.height(10.dp) else Modifier.width(12.dp))
+        }
+        if (access.canRefund) {
+            OutlinedButton(
+                onClick = onShowRefund,
+                modifier = if (compact) Modifier.fillMaxWidth() else Modifier,
+                shape = RoundedCornerShape(12.dp),
+                border = BorderStroke(1.dp, Color(0xFFB91C1C)),
+            ) { Text("Refund transaksi", color = Color(0xFFB91C1C), fontWeight = FontWeight.Bold) }
             Spacer(modifier = if (compact) Modifier.height(10.dp) else Modifier.width(12.dp))
         }
 
@@ -442,44 +468,23 @@ private fun ReceiptActions(
 }
 
 @Composable
-private fun VoidTransactionDialog(
-    state: CashierTransactionHistoryUiState,
-    onDismiss: () -> Unit,
-    onReasonChanged: (String) -> Unit,
-    onConfirm: () -> Unit
-) {
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = { Text("Void transaksi") },
-        text = {
-            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                Text("Transaksi tidak dihapus. Stok, piutang, pembayaran, dan kas akan dikompensasi secara atomik.")
-                OutlinedTextField(
-                    value = state.voidReasonInput,
-                    onValueChange = onReasonChanged,
-                    label = { Text("Alasan wajib") },
-                    minLines = 3,
-                    enabled = !state.isSubmittingVoid,
-                    supportingText = { state.voidErrorMessage?.let { Text(it, color = Color(0xFFB91C1C)) } }
-                )
-            }
-        },
-        confirmButton = {
-            Button(
-                onClick = onConfirm,
-                enabled = !state.isSubmittingVoid && state.voidReasonInput.trim().length >= 5,
-                colors = androidx.compose.material3.ButtonDefaults.buttonColors(containerColor = Color(0xFFB91C1C))
-            ) { Text(if (state.isSubmittingVoid) "Memproses..." else "Konfirmasi void") }
-        },
-        dismissButton = { TextButton(onClick = onDismiss, enabled = !state.isSubmittingVoid) { Text("Batal") } }
-    )
+private fun RefundInformation(refund: TransactionRefundResult) {
+    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        HorizontalDivider(color = ReceiptLine)
+        Text("Informasi Refund", color = DashboardTextPrimary, fontWeight = FontWeight.Bold)
+        ReceiptInfoRow("Nomor refund", refund.refundNumber)
+        ReceiptInfoRow("Nominal", refund.refundedAmount.moneyText(), emphasized = true)
+        ReceiptInfoRow("Kondisi barang", refund.returnDisposition.displayName)
+        ReceiptInfoRow("Alasan", refund.reason)
+        ReceiptInfoRow("Tanggal", refund.createdAt.displayDateTime())
+    }
 }
 
 @Composable
 private fun ReceiptLoadingCard() {
-    Box(modifier = Modifier.fillMaxWidth().height(320.dp), contentAlignment = Alignment.Center) {
-        CircularProgressIndicator(color = DashboardBrandGreenDark)
-    }
+    com.tbterminal.app.ui.components.SkeletonCard(
+        modifier = Modifier.fillMaxWidth().height(320.dp),
+    )
 }
 
 @Composable

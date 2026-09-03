@@ -93,6 +93,25 @@ data class TransactionVoidResult(
     val idempotentReplay: Boolean
 )
 
+enum class RefundDisposition(val apiValue: String, val displayName: String) {
+    RETURN_TO_STOCK("RETURN_TO_STOCK", "Kembali ke stok"),
+    NOT_RETURNED("NOT_RETURNED", "Barang tidak kembali"),
+    DAMAGED("DAMAGED", "Barang rusak"),
+}
+
+data class TransactionRefundResult(
+    val refundId: String,
+    val refundNumber: String,
+    val transactionId: String,
+    val status: String,
+    val transactionAmount: BigDecimal,
+    val refundedAmount: BigDecimal,
+    val returnDisposition: RefundDisposition,
+    val reason: String,
+    val createdAt: String,
+    val idempotentReplay: Boolean,
+)
+
 data class CashTransactionItem(
     val productId: String,
     val productName: String,

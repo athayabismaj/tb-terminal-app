@@ -157,6 +157,8 @@ class AdminTransactionHistoryViewModel(
         loadTransactions(page = 1)
     }
 
+    fun refresh() = loadTransactions(_uiState.value.page)
+
     fun updatePaymentMethodFilter(method: String) {
         _uiState.update { it.copy(paymentMethodFilter = method, page = 1) }
         loadTransactions(page = 1)

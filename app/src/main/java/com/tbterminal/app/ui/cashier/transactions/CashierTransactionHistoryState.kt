@@ -5,6 +5,9 @@ import com.tbterminal.app.data.model.CashTransaction
 import com.tbterminal.app.data.model.CashTransactionDetail
 import com.tbterminal.app.ui.offline.LocalPendingTransactionUi
 import java.time.LocalDate
+import com.tbterminal.app.data.model.ManagerApprovalAction
+import com.tbterminal.app.data.model.RefundDisposition
+import com.tbterminal.app.data.model.TransactionRefundResult
 
 data class CashierTransactionHistoryUiState(
     val activeSession: CashSession? = null,
@@ -36,7 +39,19 @@ data class CashierTransactionHistoryUiState(
     val voidReasonInput: String = "",
     val voidIdempotencyKey: String? = null,
     val isSubmittingVoid: Boolean = false,
-    val voidErrorMessage: String? = null
+    val voidErrorMessage: String? = null,
+    val voidManagerApprovalId: String? = null,
+    val isVoidOutcomeAmbiguous: Boolean = false,
+    val isRefundDialogOpen: Boolean = false,
+    val refundReasonInput: String = "",
+    val refundDisposition: RefundDisposition = RefundDisposition.RETURN_TO_STOCK,
+    val refundIdempotencyKey: String? = null,
+    val isSubmittingRefund: Boolean = false,
+    val refundErrorMessage: String? = null,
+    val refundManagerApprovalId: String? = null,
+    val isRefundOutcomeAmbiguous: Boolean = false,
+    val refundResult: TransactionRefundResult? = null,
+    val pendingManagerApprovalAction: ManagerApprovalAction? = null,
 ) {
     val hasActiveSession: Boolean
         get() = activeSession?.status.equals("OPEN", ignoreCase = true)

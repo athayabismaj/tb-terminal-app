@@ -224,6 +224,7 @@ internal fun NavGraphBuilder.salesGraph(navController: NavHostController, sessio
                     role = sessionUser.role,
                     transactionId = transactionId,
                     cashReconciliationRepository = appContainer.cashReconciliationRepository,
+                    managerApprovalRepository = appContainer.managerApprovalRepository,
                     onBackClick = { navController.popBackStack() },
                     onDashboardClick = {
                         navController.navigate(AppRoute.Dashboard.route) {
@@ -537,6 +538,7 @@ internal fun NavGraphBuilder.salesGraph(navController: NavHostController, sessio
                     role = sessionUser.role,
                     transactionId = transactionId,
                     cashReconciliationRepository = appContainer.cashReconciliationRepository,
+                    managerApprovalRepository = appContainer.managerApprovalRepository,
                     onBackClick = { navController.popBackStack() },
                     onDashboardClick = {
                         navController.navigate(AppRoute.Dashboard.route) {

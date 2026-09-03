@@ -66,6 +66,7 @@ import com.tbterminal.app.ui.dashboard.DashboardTextSecondary
 import com.tbterminal.app.ui.dashboard.DashboardWarningOrange
 import com.tbterminal.app.ui.components.HistoryDateFilter
 import com.tbterminal.app.ui.components.HistoryDatePickerDialog
+import com.tbterminal.app.ui.components.RefreshableContent
 import com.tbterminal.app.ui.dashboard.cashier.CashierDashboardShell
 import com.tbterminal.app.ui.dashboard.cashier.CashierDestination
 import com.tbterminal.app.ui.offline.LocalPendingTransactionsCard
@@ -122,14 +123,20 @@ fun CashierTransactionHistoryScreen(
         onSettingsClick = onSettingsClick,
         onLogout = onLogout
     ) { contentModifier ->
-        CashierTransactionHistoryContent(
+        RefreshableContent(
+            isRefreshing = uiState.isLoading && uiState.transactions.isNotEmpty(),
+            onRefresh = viewModel::refresh,
+            modifier = contentModifier,
+        ) {
+            CashierTransactionHistoryContent(
             state = uiState,
             viewModel = viewModel,
             onPreviousPage = viewModel::previousPage,
             onNextPage = viewModel::nextPage,
             onReceiptClick = onReceiptClick,
-            modifier = contentModifier
-        )
+            modifier = Modifier
+            )
+        }
     }
 }
 
