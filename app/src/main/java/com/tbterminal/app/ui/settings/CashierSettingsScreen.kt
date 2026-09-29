@@ -1,10 +1,8 @@
 package com.tbterminal.app.ui.settings
 
-import androidx.compose.foundation.layout.padding
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.tbterminal.app.data.repository.SystemRepository
@@ -51,8 +49,10 @@ fun CashierSettingsScreen(
         onLogout = onLogout
     ) { contentModifier ->
         SharedSettingsScreen(
-            userName = userName,
             role = role,
+            selectedPage = SettingsPage.DEVICE,
+            onPageSelected = {},
+            onPageBack = {},
             uiState = uiState,
             onReload = viewModel::reload,
             onSaveStoreSettings = viewModel::saveStoreSettings,
@@ -73,7 +73,7 @@ fun CashierSettingsScreen(
                     viewModel.onPrinterFrameworkFailed()
                 }
             },
-            modifier = contentModifier.padding(32.dp)
+            modifier = contentModifier
         )
     }
 }

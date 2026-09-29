@@ -14,6 +14,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -21,7 +22,6 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.CheckCircle
-import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material.icons.filled.CreditCard
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.Password
@@ -59,18 +59,29 @@ import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.tbterminal.app.ui.components.TbMobileControlSheet
+import com.tbterminal.app.ui.components.TbMobileSheetDoneButton
+import com.tbterminal.app.ui.theme.TbBackground
+import com.tbterminal.app.ui.theme.TbError
+import com.tbterminal.app.ui.theme.TbGreen
+import com.tbterminal.app.ui.theme.TbGreenDark
+import com.tbterminal.app.ui.theme.TbGreenLight
+import com.tbterminal.app.ui.theme.TbOutline
+import com.tbterminal.app.ui.theme.TbSurfaceMuted
+import com.tbterminal.app.ui.theme.TbText
+import com.tbterminal.app.ui.theme.TbTextMuted
 
-private val CredentialSurface = Color(0xFFF4FAFD)
-private val CredentialSurfaceLow = Color(0xFFEEF5F7)
-private val CredentialOnSurface = Color(0xFF161D1F)
-private val CredentialPrimary = Color(0xFF1D9E75)
-private val CredentialPrimaryDark = Color(0xFF059669)
-private val CredentialEmerald50 = Color(0xFFECFDF5)
-private val CredentialSlate200 = Color(0xFFE2E8F0)
+private val CredentialSurface = TbBackground
+private val CredentialSurfaceLow = TbSurfaceMuted
+private val CredentialOnSurface = TbText
+private val CredentialPrimary = TbGreen
+private val CredentialPrimaryDark = TbGreenDark
+private val CredentialEmerald50 = TbGreenLight
+private val CredentialSlate200 = TbOutline
 private val CredentialSlate400 = Color(0xFF94A3B8)
-private val CredentialSlate500 = Color(0xFF64748B)
-private val CredentialSlate600 = Color(0xFF475569)
-private val CredentialError = Color(0xFFB91C1C)
+private val CredentialSlate500 = TbTextMuted
+private val CredentialSlate600 = TbTextMuted
+private val CredentialError = TbError
 private val CredentialErrorContainer = Color(0xFFFEE2E2)
 
 @Composable
@@ -85,6 +96,7 @@ fun UserCredentialContent(
     modifier: Modifier = Modifier
 ) {
     val compact = androidx.compose.ui.platform.LocalConfiguration.current.screenWidthDp < 700
+    var showPolicy by remember(mode) { mutableStateOf(false) }
     Column(
         modifier = modifier
             .fillMaxSize()
@@ -92,23 +104,14 @@ fun UserCredentialContent(
             .padding(horizontal = if (compact) 16.dp else 32.dp, vertical = if (compact) 16.dp else 28.dp)
             .verticalScroll(rememberScrollState())
     ) {
-        CredentialHeader(mode = mode, compact = compact)
-
         when {
             uiState.isLoadingUser -> CredentialLoadingCard(message = "Memuat data user...")
             uiState.errorMessage != null && uiState.targetUser == null -> {
                 CredentialErrorCard(message = uiState.errorMessage, onRetry = onRetry)
             }
-            else -> if (compact) Column(
+            else -> Box(
                 modifier = Modifier.fillMaxWidth(),
-                verticalArrangement = Arrangement.spacedBy(16.dp)
-            ) {
-                CredentialFormCard(mode, uiState, onCredentialChange, onConfirmationChange, onCancel, onSubmit, Modifier.fillMaxWidth(), compact)
-                CredentialInfoPanel(mode, uiState, Modifier.fillMaxWidth())
-            } else Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(28.dp),
-                verticalAlignment = Alignment.Top
+                contentAlignment = Alignment.TopCenter,
             ) {
                 CredentialFormCard(
                     mode = mode,
@@ -117,51 +120,19 @@ fun UserCredentialContent(
                     onConfirmationChange = onConfirmationChange,
                     onCancel = onCancel,
                     onSubmit = onSubmit,
-                    modifier = Modifier.weight(1.1f),
-                    compact = compact
-                )
-                CredentialInfoPanel(
-                    mode = mode,
-                    uiState = uiState,
-                    modifier = Modifier.weight(0.9f)
+                    onShowPolicy = { showPolicy = true },
+                    modifier = Modifier.fillMaxWidth().widthIn(max = 720.dp),
+                    compact = compact,
                 )
             }
         }
     }
-}
 
-@Composable
-private fun CredentialHeader(
-    mode: UserCredentialMode,
-    compact: Boolean
-) {
-    Column(modifier = Modifier.padding(bottom = 28.dp)) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Text(text = "Manajemen Pengguna", color = CredentialSlate500, fontSize = 14.sp)
-            Icon(
-                imageVector = Icons.Default.ChevronRight,
-                contentDescription = null,
-                tint = CredentialSlate500,
-                modifier = Modifier.size(16.dp)
-            )
-            Text(
-                text = mode.pageTitle(),
-                color = CredentialPrimary,
-                fontSize = 14.sp,
-                fontWeight = FontWeight.Bold
-            )
-        }
-        Spacer(modifier = Modifier.height(8.dp))
-        Text(
-            text = mode.pageTitle(),
-            color = CredentialOnSurface,
-            fontSize = if (compact) 24.sp else 32.sp,
-            fontWeight = FontWeight.Bold
-        )
-        if (!compact) Text(
-            text = mode.pageDescription(),
-            color = CredentialSlate500,
-            fontSize = 14.sp
+    if (showPolicy) {
+        CredentialPolicySheet(
+            mode = mode,
+            uiState = uiState,
+            onDismiss = { showPolicy = false },
         )
     }
 }
@@ -174,6 +145,7 @@ private fun CredentialFormCard(
     onConfirmationChange: (String) -> Unit,
     onCancel: () -> Unit,
     onSubmit: () -> Unit,
+    onShowPolicy: () -> Unit,
     modifier: Modifier = Modifier,
     compact: Boolean
 ) {
@@ -183,7 +155,7 @@ private fun CredentialFormCard(
     Card(
         modifier = modifier,
         colors = CardDefaults.cardColors(containerColor = Color.White),
-        shape = RoundedCornerShape(12.dp),
+        shape = RoundedCornerShape(20.dp),
         border = BorderStroke(1.dp, CredentialSlate200)
     ) {
         Column(
@@ -222,12 +194,24 @@ private fun CredentialFormCard(
                 enabled = !uiState.isSubmitting
             )
 
-            Text(
-                text = mode.formHint(),
-                color = CredentialSlate500,
-                fontSize = 12.sp,
-                lineHeight = 17.sp
-            )
+            TextButton(
+                onClick = onShowPolicy,
+                enabled = !uiState.isSubmitting,
+                contentPadding = PaddingValues(horizontal = 4.dp, vertical = 8.dp),
+            ) {
+                Icon(
+                    imageVector = Icons.Outlined.Security,
+                    contentDescription = null,
+                    modifier = Modifier.size(18.dp),
+                    tint = CredentialPrimaryDark,
+                )
+                Spacer(Modifier.width(7.dp))
+                Text(
+                    text = mode.policyButtonLabel(),
+                    color = CredentialPrimaryDark,
+                    fontWeight = FontWeight.SemiBold,
+                )
+            }
 
             HorizontalDivider(color = CredentialSlate200)
 
@@ -247,7 +231,7 @@ private fun CredentialFormCard(
                     onClick = onSubmit,
                     enabled = !uiState.isSubmitting && uiState.targetUser != null,
                     colors = ButtonDefaults.buttonColors(containerColor = CredentialPrimary),
-                    shape = RoundedCornerShape(8.dp),
+                    shape = RoundedCornerShape(14.dp),
                     contentPadding = PaddingValues(horizontal = 32.dp, vertical = 16.dp)
                 ) {
                     if (uiState.isSubmitting) {
@@ -371,7 +355,7 @@ private fun CredentialInputField(
             visualTransformation = if (showValue) VisualTransformation.None else PasswordVisualTransformation(),
             keyboardOptions = KeyboardOptions(keyboardType = keyboardType),
             modifier = Modifier.fillMaxWidth(),
-            shape = RoundedCornerShape(8.dp),
+            shape = RoundedCornerShape(14.dp),
             colors = OutlinedTextFieldDefaults.colors(
                 unfocusedContainerColor = CredentialSurfaceLow,
                 focusedContainerColor = CredentialSurfaceLow,
@@ -385,69 +369,61 @@ private fun CredentialInputField(
 }
 
 @Composable
-private fun CredentialInfoPanel(
+private fun CredentialPolicySheet(
     mode: UserCredentialMode,
     uiState: UserCredentialUiState,
-    modifier: Modifier = Modifier
+    onDismiss: () -> Unit,
 ) {
-    Card(
-        modifier = modifier,
-        colors = CardDefaults.cardColors(containerColor = Color.White),
-        shape = RoundedCornerShape(12.dp),
-        border = BorderStroke(1.dp, CredentialSlate200)
+    TbMobileControlSheet(
+        title = mode.policyTitle(),
+        subtitle = "Periksa ketentuan sebelum menyimpan perubahan",
+        onDismiss = onDismiss,
+        testTag = "credential-policy-sheet",
     ) {
-        Column(
-            modifier = Modifier.padding(28.dp),
-            verticalArrangement = Arrangement.spacedBy(20.dp)
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(14.dp))
+                .background(CredentialEmerald50)
+                .padding(14.dp),
+            horizontalArrangement = Arrangement.spacedBy(10.dp),
+            verticalAlignment = Alignment.CenterVertically,
         ) {
-            Row(
-                horizontalArrangement = Arrangement.spacedBy(14.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Box(
-                    modifier = Modifier
-                        .size(44.dp)
-                        .clip(RoundedCornerShape(10.dp))
-                        .background(CredentialEmerald50),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Icon(
-                        imageVector = Icons.Outlined.Security,
-                        contentDescription = null,
-                        tint = CredentialPrimary,
-                        modifier = Modifier.size(22.dp)
-                    )
-                }
-                Column {
-                    Text(
-                        text = mode.policyTitle(),
-                        color = CredentialOnSurface,
-                        fontSize = 18.sp,
-                        fontWeight = FontWeight.Bold
-                    )
-                    Text(
-                        text = "Perubahan berlaku saat login atau unlock berikutnya.",
-                        color = CredentialSlate500,
-                        fontSize = 12.sp
-                    )
-                }
-            }
-
-            CredentialPolicyItem(
-                title = mode.policyPrimaryTitle(),
-                description = mode.policyPrimaryDescription()
+            Icon(
+                imageVector = Icons.Outlined.Security,
+                contentDescription = null,
+                tint = CredentialPrimaryDark,
+                modifier = Modifier.size(20.dp),
             )
-            CredentialPolicyItem(
-                title = "Konfirmasi wajib sama",
-                description = "Field konfirmasi dipakai untuk mengurangi risiko salah input."
-            )
-            CredentialPolicyItem(
-                title = "Target akun",
-                description = uiState.targetUser?.let { user ->
-                    "${user.name} (${user.username})"
-                } ?: "User belum dimuat."
+            Text(
+                text = "Perubahan berlaku saat login atau membuka terminal berikutnya.",
+                modifier = Modifier.weight(1f),
+                color = CredentialPrimaryDark,
+                fontSize = 12.sp,
+                lineHeight = 17.sp,
+                fontWeight = FontWeight.Medium,
             )
         }
+
+        CredentialPolicyItem(
+            title = mode.policyPrimaryTitle(),
+            description = mode.policyPrimaryDescription(),
+        )
+        CredentialPolicyItem(
+            title = "Konfirmasi harus sama",
+            description = "Isi kedua kolom dengan nilai yang sama untuk mencegah kesalahan input.",
+        )
+        CredentialPolicyItem(
+            title = "Akun yang diubah",
+            description = uiState.targetUser?.let { user ->
+                "${user.name} · ${user.username}"
+            } ?: "Pengguna belum dimuat.",
+        )
+        TbMobileSheetDoneButton(
+            onClick = onDismiss,
+            label = "Mengerti",
+            testTag = "credential-policy-done",
+        )
     }
 }
 
@@ -495,7 +471,7 @@ private fun CredentialLoadingCard(
     Card(
         modifier = Modifier.fillMaxWidth(),
         colors = CardDefaults.cardColors(containerColor = Color.White),
-        shape = RoundedCornerShape(12.dp),
+        shape = RoundedCornerShape(20.dp),
         border = BorderStroke(1.dp, CredentialSlate200)
     ) {
         Row(
@@ -517,7 +493,7 @@ private fun CredentialErrorCard(
     Card(
         modifier = Modifier.fillMaxWidth(),
         colors = CardDefaults.cardColors(containerColor = Color.White),
-        shape = RoundedCornerShape(12.dp),
+        shape = RoundedCornerShape(20.dp),
         border = BorderStroke(1.dp, CredentialSlate200)
     ) {
         Column(
@@ -552,17 +528,10 @@ private fun CredentialErrorBanner(
     }
 }
 
-private fun UserCredentialMode.pageTitle(): String {
+internal fun UserCredentialMode.pageTitle(): String {
     return when (this) {
         UserCredentialMode.Password -> "Ubah Password"
         UserCredentialMode.Pin -> "Ubah PIN"
-    }
-}
-
-private fun UserCredentialMode.pageDescription(): String {
-    return when (this) {
-        UserCredentialMode.Password -> "Ganti password login karyawan tanpa mengubah profil dan role akun."
-        UserCredentialMode.Pin -> "Ganti PIN 6 digit yang dipakai karyawan untuk membuka kembali terminal."
     }
 }
 
@@ -601,10 +570,10 @@ private fun UserCredentialMode.submitLabel(): String {
     }
 }
 
-private fun UserCredentialMode.formHint(): String {
+private fun UserCredentialMode.policyButtonLabel(): String {
     return when (this) {
-        UserCredentialMode.Password -> "Gunakan minimal 6 karakter. Password ini dipakai saat karyawan login."
-        UserCredentialMode.Pin -> "PIN harus 6 digit angka. PIN ini dipakai untuk membuka terminal setelah sesi terkunci."
+        UserCredentialMode.Password -> "Lihat ketentuan password"
+        UserCredentialMode.Pin -> "Lihat ketentuan PIN"
     }
 }
 

@@ -12,9 +12,11 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -23,10 +25,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.CheckCircle
-import androidx.compose.material.icons.filled.ChevronRight
-import androidx.compose.material.icons.filled.CreditCard
 import androidx.compose.material.icons.filled.Lock
-import androidx.compose.material.icons.filled.Password
 import androidx.compose.material.icons.outlined.AdminPanelSettings
 import androidx.compose.material.icons.outlined.AlternateEmail
 import androidx.compose.material.icons.outlined.Badge
@@ -34,6 +33,7 @@ import androidx.compose.material.icons.outlined.Email
 import androidx.compose.material.icons.outlined.Lock
 import androidx.compose.material.icons.outlined.Person
 import androidx.compose.material.icons.outlined.PointOfSale
+import androidx.compose.material.icons.outlined.Security
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
@@ -48,6 +48,10 @@ import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -61,22 +65,33 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.tbterminal.app.data.model.UserRole
+import com.tbterminal.app.ui.components.TbMobileControlSheet
+import com.tbterminal.app.ui.components.TbMobileSheetDoneButton
+import com.tbterminal.app.ui.theme.TbBackground
+import com.tbterminal.app.ui.theme.TbError
+import com.tbterminal.app.ui.theme.TbGreen
+import com.tbterminal.app.ui.theme.TbGreenDark
+import com.tbterminal.app.ui.theme.TbGreenLight
+import com.tbterminal.app.ui.theme.TbOutline
+import com.tbterminal.app.ui.theme.TbSurfaceMuted
+import com.tbterminal.app.ui.theme.TbText
+import com.tbterminal.app.ui.theme.TbTextMuted
 
-private val EditSurface = Color(0xFFF4FAFD)
-private val EditSurfaceLow = Color(0xFFEEF5F7)
-private val EditOnSurface = Color(0xFF161D1F)
-private val EditPrimary = Color(0xFF1D9E75)
-private val EditPrimaryDark = Color(0xFF059669)
-private val EditEmerald50 = Color(0xFFECFDF5)
-private val EditSlate200 = Color(0xFFE2E8F0)
+private val EditSurface = TbBackground
+private val EditSurfaceLow = TbSurfaceMuted
+private val EditOnSurface = TbText
+private val EditPrimary = TbGreen
+private val EditPrimaryDark = TbGreenDark
+private val EditEmerald50 = TbGreenLight
+private val EditSlate200 = TbOutline
 private val EditSlate400 = Color(0xFF94A3B8)
-private val EditSlate500 = Color(0xFF64748B)
-private val EditSlate600 = Color(0xFF475569)
+private val EditSlate500 = TbTextMuted
+private val EditSlate600 = TbTextMuted
 private val EditBlue100 = Color(0xFFDBEAFE)
 private val EditBlue600 = Color(0xFF2563EB)
 private val EditPurple100 = Color(0xFFF3E8FF)
 private val EditPurple600 = Color(0xFF9333EA)
-private val EditError = Color(0xFFB91C1C)
+private val EditError = TbError
 private val EditErrorContainer = Color(0xFFFEE2E2)
 
 @Composable
@@ -88,13 +103,12 @@ fun EditUserContent(
     onUsernameChange: (String) -> Unit,
     onRoleChange: (String) -> Unit,
     onActiveChange: (Boolean) -> Unit,
-    onChangePasswordClick: () -> Unit,
-    onChangePinClick: () -> Unit,
     onRetry: () -> Unit,
     onCancel: () -> Unit,
     onSubmit: () -> Unit
 ) {
     val compact = androidx.compose.ui.platform.LocalConfiguration.current.screenWidthDp < 700
+    var showAccessDetails by remember { mutableStateOf(false) }
     Column(
         modifier = modifier
             .fillMaxSize()
@@ -102,63 +116,39 @@ fun EditUserContent(
             .padding(horizontal = if (compact) 16.dp else 32.dp, vertical = if (compact) 16.dp else 28.dp)
             .verticalScroll(rememberScrollState())
     ) {
-        Column(modifier = Modifier.padding(bottom = 28.dp)) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Text(text = "Manajemen Pengguna", color = EditSlate500, fontSize = 14.sp)
-                Icon(
-                    imageVector = Icons.Default.ChevronRight,
-                    contentDescription = null,
-                    tint = EditSlate500,
-                    modifier = Modifier.size(16.dp)
-                )
-                Text(
-                    text = "Edit User",
-                    color = EditPrimary,
-                    fontSize = 14.sp,
-                    fontWeight = FontWeight.Bold
-                )
-            }
-            Spacer(modifier = Modifier.height(8.dp))
-            Text(
-                text = "Edit Akun Karyawan",
-                color = EditOnSurface,
-                fontSize = if (compact) 24.sp else 32.sp,
-                fontWeight = FontWeight.Bold
-            )
-            if (!compact) Text(
-                text = "Perbarui data staf, status akun, kredensial opsional, dan hak akses karyawan.",
-                color = EditSlate500,
-                fontSize = 14.sp
-            )
-        }
-
         when {
             uiState.isLoadingUser -> EditLoadingCard(message = "Memuat data user...")
             uiState.errorMessage != null && uiState.fullName.isBlank() -> {
                 EditErrorCard(message = uiState.errorMessage, onRetry = onRetry)
             }
-            else -> {
-                val editContent: @Composable (Modifier, Modifier) -> Unit = { formModifier, panelModifier ->
-                    EditUserFormCard(
-                        uiState, onFullNameChange, onEmailChange, onUsernameChange, onRoleChange, onActiveChange,
-                        onCancel, onSubmit, formModifier, compact
-                    )
-                    EditUserAccessPanel(uiState.selectedRole, uiState.isLoadingRoles, uiState.isActive, onChangePasswordClick, onChangePinClick, panelModifier)
-                }
-                if (compact) Column(
-                    modifier = Modifier.fillMaxWidth(),
-                    verticalArrangement = Arrangement.spacedBy(16.dp)
-                ) {
-                    editContent(Modifier.fillMaxWidth(), Modifier.fillMaxWidth())
-                } else Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(28.dp),
-                    verticalAlignment = Alignment.Top
-                ) {
-                    editContent(Modifier.weight(1.2f), Modifier.weight(0.8f))
-                }
+            else -> Box(
+                modifier = Modifier.fillMaxWidth(),
+                contentAlignment = Alignment.TopCenter,
+            ) {
+                EditUserFormCard(
+                    uiState = uiState,
+                    onFullNameChange = onFullNameChange,
+                    onEmailChange = onEmailChange,
+                    onUsernameChange = onUsernameChange,
+                    onRoleChange = onRoleChange,
+                    onActiveChange = onActiveChange,
+                    onShowAccessDetails = { showAccessDetails = true },
+                    onCancel = onCancel,
+                    onSubmit = onSubmit,
+                    modifier = Modifier.fillMaxWidth().widthIn(max = 860.dp),
+                    compact = compact,
+                )
             }
         }
+    }
+
+    if (showAccessDetails) {
+        EditUserAccessSheet(
+            selectedRole = uiState.selectedRole,
+            rolesAreLoading = uiState.isLoadingRoles,
+            accountIsActive = uiState.isActive,
+            onDismiss = { showAccessDetails = false },
+        )
     }
 }
 
@@ -170,6 +160,7 @@ private fun EditUserFormCard(
     onUsernameChange: (String) -> Unit,
     onRoleChange: (String) -> Unit,
     onActiveChange: (Boolean) -> Unit,
+    onShowAccessDetails: () -> Unit,
     onCancel: () -> Unit,
     onSubmit: () -> Unit,
     modifier: Modifier = Modifier,
@@ -178,7 +169,7 @@ private fun EditUserFormCard(
     Card(
         modifier = modifier,
         colors = CardDefaults.cardColors(containerColor = Color.White),
-        shape = RoundedCornerShape(12.dp),
+        shape = RoundedCornerShape(20.dp),
         border = BorderStroke(1.dp, EditSlate200)
     ) {
         Column(
@@ -189,13 +180,14 @@ private fun EditUserFormCard(
                 EditUserErrorBanner(message = uiState.errorMessage)
             }
 
+            EditUserSectionTitle("Informasi pengguna")
             if (compact) Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
-                EditUserInputField("NAMA LENGKAP", uiState.fullName, onFullNameChange, Icons.Outlined.Person, "Nama karyawan", Modifier.fillMaxWidth(), enabled = !uiState.isSubmitting)
-                EditUserInputField("ALAMAT EMAIL", uiState.email, onEmailChange, Icons.Outlined.Email, "contoh@email.com", Modifier.fillMaxWidth(), keyboardType = KeyboardType.Email, enabled = !uiState.isSubmitting)
+                EditUserInputField("Nama lengkap", uiState.fullName, onFullNameChange, Icons.Outlined.Person, "Nama karyawan", Modifier.fillMaxWidth(), enabled = !uiState.isSubmitting)
+                EditUserInputField("Alamat email", uiState.email, onEmailChange, Icons.Outlined.Email, "contoh@email.com", Modifier.fillMaxWidth(), keyboardType = KeyboardType.Email, enabled = !uiState.isSubmitting)
             } else Row(horizontalArrangement = Arrangement.spacedBy(20.dp)) {
                 EditUserInputField(
                     modifier = Modifier.weight(1f),
-                    label = "NAMA LENGKAP",
+                    label = "Nama lengkap",
                     value = uiState.fullName,
                     onValueChange = onFullNameChange,
                     icon = Icons.Outlined.Person,
@@ -204,7 +196,7 @@ private fun EditUserFormCard(
                 )
                 EditUserInputField(
                     modifier = Modifier.weight(1f),
-                    label = "ALAMAT EMAIL",
+                    label = "Alamat email",
                     value = uiState.email,
                     onValueChange = onEmailChange,
                     icon = Icons.Outlined.Email,
@@ -214,13 +206,14 @@ private fun EditUserFormCard(
                 )
             }
 
+            EditUserSectionTitle("Akun")
             if (compact) Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
-                EditUserInputField("USERNAME", uiState.username, onUsernameChange, Icons.Outlined.AlternateEmail, "username", Modifier.fillMaxWidth(), enabled = !uiState.isSubmitting)
+                EditUserInputField("Username", uiState.username, onUsernameChange, Icons.Outlined.AlternateEmail, "username", Modifier.fillMaxWidth(), enabled = !uiState.isSubmitting)
                 EditUserStatusCard(uiState.isActive, !uiState.isSubmitting, onActiveChange, Modifier.fillMaxWidth())
             } else Row(horizontalArrangement = Arrangement.spacedBy(20.dp)) {
                 EditUserInputField(
                     modifier = Modifier.weight(1f),
-                    label = "USERNAME",
+                    label = "Username",
                     value = uiState.username,
                     onValueChange = onUsernameChange,
                     icon = Icons.Outlined.AlternateEmail,
@@ -236,12 +229,7 @@ private fun EditUserFormCard(
             }
 
             Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
-                Text(
-                    text = "ROLE / HAK AKSES",
-                    color = EditSlate600,
-                    fontSize = 12.sp,
-                    fontWeight = FontWeight.Bold
-                )
+                EditUserSectionTitle("Role dan hak akses")
                 EditUserRoleSelector(
                     roles = uiState.roles,
                     selectedRoleId = uiState.selectedRoleId,
@@ -250,6 +238,15 @@ private fun EditUserFormCard(
                     onRoleChange = onRoleChange,
                     compact = compact
                 )
+                TextButton(
+                    onClick = onShowAccessDetails,
+                    enabled = !uiState.isLoadingRoles,
+                    contentPadding = PaddingValues(horizontal = 4.dp, vertical = 8.dp),
+                ) {
+                    Icon(Icons.Outlined.Security, contentDescription = null, modifier = Modifier.size(18.dp), tint = EditPrimaryDark)
+                    Spacer(Modifier.width(7.dp))
+                    Text("Lihat rincian hak akses", color = EditPrimaryDark, fontWeight = FontWeight.SemiBold)
+                }
             }
 
             HorizontalDivider(color = EditSlate200)
@@ -259,19 +256,23 @@ private fun EditUserFormCard(
                 horizontalArrangement = Arrangement.End,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                TextButton(
+                OutlinedButton(
                     onClick = onCancel,
-                    enabled = !uiState.isSubmitting
+                    enabled = !uiState.isSubmitting,
+                    modifier = if (compact) Modifier.weight(1f).height(52.dp) else Modifier.height(52.dp),
+                    shape = RoundedCornerShape(14.dp),
+                    border = BorderStroke(1.dp, EditSlate200),
                 ) {
                     Text(text = "Batal", color = EditSlate600, fontWeight = FontWeight.SemiBold)
                 }
-                Spacer(modifier = Modifier.width(16.dp))
+                Spacer(modifier = Modifier.width(12.dp))
                 Button(
                     onClick = onSubmit,
                     enabled = !uiState.isSubmitting && !uiState.isLoadingUser && !uiState.isLoadingRoles,
+                    modifier = if (compact) Modifier.weight(1f).height(52.dp) else Modifier.height(52.dp),
                     colors = ButtonDefaults.buttonColors(containerColor = EditPrimary),
-                    shape = RoundedCornerShape(8.dp),
-                    contentPadding = PaddingValues(horizontal = 32.dp, vertical = 16.dp)
+                    shape = RoundedCornerShape(14.dp),
+                    contentPadding = PaddingValues(horizontal = 28.dp)
                 ) {
                     if (uiState.isSubmitting) {
                         CircularProgressIndicator(
@@ -282,13 +283,23 @@ private fun EditUserFormCard(
                         Spacer(modifier = Modifier.width(10.dp))
                     }
                     Text(
-                        text = if (uiState.isSubmitting) "Menyimpan..." else "Simpan Perubahan",
+                        text = if (uiState.isSubmitting) "Menyimpan..." else if (compact) "Simpan" else "Simpan perubahan",
                         fontWeight = FontWeight.Bold
                     )
                 }
             }
         }
     }
+}
+
+@Composable
+private fun EditUserSectionTitle(title: String) {
+    Text(
+        text = title,
+        color = EditOnSurface,
+        fontSize = 15.sp,
+        fontWeight = FontWeight.Bold,
+    )
 }
 
 @Composable
@@ -320,7 +331,7 @@ private fun EditUserInputField(
             visualTransformation = if (isPassword) PasswordVisualTransformation() else VisualTransformation.None,
             keyboardOptions = KeyboardOptions(keyboardType = keyboardType),
             modifier = Modifier.fillMaxWidth(),
-            shape = RoundedCornerShape(8.dp),
+            shape = RoundedCornerShape(14.dp),
             colors = OutlinedTextFieldDefaults.colors(
                 unfocusedContainerColor = EditSurfaceLow,
                 focusedContainerColor = EditSurfaceLow,
@@ -342,7 +353,7 @@ private fun EditUserStatusCard(
 ) {
     Column(modifier = modifier) {
         Text(
-            text = "STATUS AKUN",
+            text = "Status akun",
             color = EditSlate600,
             fontSize = 12.sp,
             fontWeight = FontWeight.Bold
@@ -352,7 +363,7 @@ private fun EditUserStatusCard(
             modifier = Modifier
                 .fillMaxWidth()
                 .height(64.dp)
-                .clip(RoundedCornerShape(8.dp))
+                .clip(RoundedCornerShape(14.dp))
                 .background(EditSurfaceLow)
                 .padding(horizontal = 16.dp),
             horizontalArrangement = Arrangement.SpaceBetween,
@@ -470,8 +481,8 @@ private fun EditUserRoleCard(
     Card(
         modifier = modifier.clickable(enabled = enabled, onClick = onClick),
         colors = CardDefaults.cardColors(containerColor = if (selected) EditEmerald50 else Color.White),
-        border = BorderStroke(2.dp, if (selected) EditPrimary else EditSlate200),
-        shape = RoundedCornerShape(12.dp)
+        border = BorderStroke(1.dp, if (selected) EditPrimary else EditSlate200),
+        shape = RoundedCornerShape(16.dp)
     ) {
         Box(modifier = Modifier.padding(16.dp)) {
             Column {
@@ -513,46 +524,23 @@ private fun EditUserRoleCard(
 }
 
 @Composable
-private fun EditUserAccessPanel(
+private fun EditUserAccessSheet(
     selectedRole: UserRole?,
     rolesAreLoading: Boolean,
     accountIsActive: Boolean,
-    onChangePasswordClick: () -> Unit,
-    onChangePinClick: () -> Unit,
-    modifier: Modifier = Modifier
+    onDismiss: () -> Unit,
 ) {
-    Card(
-        modifier = modifier,
-        colors = CardDefaults.cardColors(containerColor = Color.White),
-        shape = RoundedCornerShape(12.dp),
-        border = BorderStroke(1.dp, EditSlate200)
+    TbMobileControlSheet(
+        title = "Rincian hak akses",
+        subtitle = "Status akun dan akses berdasarkan role",
+        onDismiss = onDismiss,
+        testTag = "edit-user-access-sheet",
     ) {
+        AccountStatusSummary(isActive = accountIsActive)
         Column(
-            modifier = Modifier.padding(28.dp),
-            verticalArrangement = Arrangement.spacedBy(20.dp)
+            modifier = Modifier.fillMaxWidth().heightIn(max = 440.dp).verticalScroll(rememberScrollState()),
+            verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
-            Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                Text(
-                    text = "Ringkasan Hak Akses",
-                    color = EditOnSurface,
-                    fontSize = 20.sp,
-                    fontWeight = FontWeight.Bold
-                )
-                Text(
-                    text = "Role Owner sengaja tidak ditampilkan karena halaman ini khusus akun karyawan.",
-                    color = EditSlate500,
-                    fontSize = 13.sp,
-                    lineHeight = 18.sp
-                )
-            }
-
-            AccountStatusSummary(isActive = accountIsActive)
-
-            CredentialActionSummary(
-                onChangePasswordClick = onChangePasswordClick,
-                onChangePinClick = onChangePinClick
-            )
-
             when {
                 rolesAreLoading -> EditAccessPanelFeedback(
                     message = "Menyiapkan role dari server...",
@@ -564,92 +552,10 @@ private fun EditUserAccessPanel(
                 else -> EditSelectedRoleAccessSummary(role = selectedRole)
             }
         }
-    }
-}
-
-@Composable
-private fun CredentialActionSummary(
-    onChangePasswordClick: () -> Unit,
-    onChangePinClick: () -> Unit
-) {
-    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-        Text(
-            text = "Kredensial Akses",
-            color = EditOnSurface,
-            fontSize = 16.sp,
-            fontWeight = FontWeight.Bold
-        )
-        Text(
-            text = "Password dan PIN dikelola di halaman terpisah agar audit perubahan lebih jelas.",
-            color = EditSlate500,
-            fontSize = 12.sp,
-            lineHeight = 17.sp
-        )
-        CredentialActionButton(
-            title = "Ubah Password",
-            description = "Ganti kredensial login akun karyawan.",
-            icon = Icons.Default.Password,
-            onClick = onChangePasswordClick
-        )
-        CredentialActionButton(
-            title = "Ubah PIN",
-            description = "Ganti PIN 6 digit untuk membuka terminal.",
-            icon = Icons.Default.CreditCard,
-            onClick = onChangePinClick
-        )
-    }
-}
-
-@Composable
-private fun CredentialActionButton(
-    title: String,
-    description: String,
-    icon: ImageVector,
-    onClick: () -> Unit
-) {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clip(RoundedCornerShape(12.dp))
-            .background(EditSurfaceLow)
-            .clickable(onClick = onClick)
-            .padding(14.dp),
-        horizontalArrangement = Arrangement.spacedBy(12.dp),
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        Box(
-            modifier = Modifier
-                .size(38.dp)
-                .clip(CircleShape)
-                .background(EditEmerald50),
-            contentAlignment = Alignment.Center
-        ) {
-            Icon(
-                imageVector = icon,
-                contentDescription = null,
-                tint = EditPrimary,
-                modifier = Modifier.size(19.dp)
-            )
-        }
-        Column(modifier = Modifier.weight(1f)) {
-            Text(
-                text = title,
-                color = EditOnSurface,
-                fontSize = 13.sp,
-                fontWeight = FontWeight.Bold
-            )
-            Text(
-                text = description,
-                color = EditSlate500,
-                fontSize = 11.sp,
-                lineHeight = 15.sp
-            )
-        }
-        Icon(
-            imageVector = Icons.Default.ChevronRight,
-            contentDescription = null,
-            tint = EditSlate400,
-            modifier = Modifier.size(18.dp)
+        TbMobileSheetDoneButton(
+            onClick = onDismiss,
+            label = "Tutup",
+            testTag = "edit-user-access-done",
         )
     }
 }
@@ -844,7 +750,7 @@ private fun EditLoadingCard(
     Card(
         modifier = Modifier.fillMaxWidth(),
         colors = CardDefaults.cardColors(containerColor = Color.White),
-        shape = RoundedCornerShape(12.dp),
+        shape = RoundedCornerShape(20.dp),
         border = BorderStroke(1.dp, EditSlate200)
     ) {
         Row(
@@ -866,7 +772,7 @@ private fun EditErrorCard(
     Card(
         modifier = Modifier.fillMaxWidth(),
         colors = CardDefaults.cardColors(containerColor = Color.White),
-        shape = RoundedCornerShape(12.dp),
+        shape = RoundedCornerShape(20.dp),
         border = BorderStroke(1.dp, EditSlate200)
     ) {
         Column(

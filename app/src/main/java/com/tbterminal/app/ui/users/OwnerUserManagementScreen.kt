@@ -9,8 +9,8 @@ import androidx.compose.ui.Modifier
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.tbterminal.app.data.repository.UserRepository
-import com.tbterminal.app.ui.dashboard.owner.OwnerDashboardShell
-import com.tbterminal.app.ui.dashboard.owner.OwnerDestination
+import com.tbterminal.app.ui.dashboard.admin.AdminDashboardShell
+import com.tbterminal.app.ui.dashboard.admin.AdminDestination
 import com.tbterminal.app.ui.components.RefreshableContent
 
 @Composable
@@ -22,6 +22,7 @@ fun OwnerUserManagementScreen(
     onEditUserClick: (String) -> Unit,
     onChangePasswordClick: (String) -> Unit,
     onChangePinClick: (String) -> Unit,
+    onBackClick: () -> Unit,
     onReportsClick: () -> Unit = {},
     onSyncCenterClick: () -> Unit = {},
     onStockReportClick: () -> Unit = {},
@@ -40,10 +41,12 @@ fun OwnerUserManagementScreen(
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     var deactivatingStaff by remember { mutableStateOf<StaffMember?>(null) }
 
-    OwnerDashboardShell(
+    AdminDashboardShell(
+        onProductsClick = {},
+
         userName = name,
         role = role,
-        activeDestination = OwnerDestination.UserManagement,
+        activeDestination = AdminDestination.UserManagement,
         onDashboardClick = onDashboardClick,
         onReportsClick = onReportsClick,
         onSyncCenterClick = onSyncCenterClick,
@@ -55,6 +58,9 @@ fun OwnerUserManagementScreen(
         onUserManagementClick = {},
         onSecurityLogClick = onSecurityLogClick,
         onSettingsClick = onSettingsClick,
+        pageTitle = "Pengguna & akses",
+        onBack = onBackClick,
+        showPageHeader = true,
         onLogout = onLogout
     ) { contentModifier ->
         RefreshableContent(
@@ -87,7 +93,6 @@ fun OwnerUserManagementScreen(
                 viewModel.clearActionMessages()
                 viewModel.activateUser(staff)
             },
-            onSecurityLogClick = onSecurityLogClick,
             onDismissActionMessage = viewModel::clearActionMessages
             )
         }

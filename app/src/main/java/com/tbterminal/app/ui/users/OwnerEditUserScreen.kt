@@ -6,8 +6,8 @@ import androidx.compose.runtime.getValue
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.tbterminal.app.data.repository.UserRepository
-import com.tbterminal.app.ui.dashboard.owner.OwnerDashboardShell
-import com.tbterminal.app.ui.dashboard.owner.OwnerDestination
+import com.tbterminal.app.ui.dashboard.admin.AdminDashboardShell
+import com.tbterminal.app.ui.dashboard.admin.AdminDestination
 
 @Composable
 fun OwnerEditUserScreen(
@@ -25,8 +25,6 @@ fun OwnerEditUserScreen(
     onOperationalAuditClick: () -> Unit = {},
     onSecurityLogClick: () -> Unit,
     onSettingsClick: () -> Unit = {},
-    onChangePasswordClick: (String) -> Unit,
-    onChangePinClick: (String) -> Unit,
     onLogout: () -> Unit,
     userRepository: UserRepository,
     viewModel: EditUserViewModel = viewModel(
@@ -47,10 +45,12 @@ fun OwnerEditUserScreen(
         }
     }
 
-    OwnerDashboardShell(
+    AdminDashboardShell(
+        onProductsClick = {},
+
         userName = name,
         role = role,
-        activeDestination = OwnerDestination.UserManagement,
+        activeDestination = AdminDestination.UserManagement,
         onDashboardClick = onDashboardClick,
         onReportsClick = onReportsClick,
         onSyncCenterClick = onSyncCenterClick,
@@ -62,6 +62,9 @@ fun OwnerEditUserScreen(
         onUserManagementClick = onUserManagementClick,
         onSecurityLogClick = onSecurityLogClick,
         onSettingsClick = onSettingsClick,
+        pageTitle = "Edit pengguna",
+        onBack = onUserManagementClick,
+        showPageHeader = true,
         onLogout = onLogout
     ) { contentModifier ->
         EditUserContent(
@@ -72,8 +75,6 @@ fun OwnerEditUserScreen(
             onUsernameChange = viewModel::updateUsername,
             onRoleChange = viewModel::selectRole,
             onActiveChange = viewModel::updateActive,
-            onChangePasswordClick = { onChangePasswordClick(userId) },
-            onChangePinClick = { onChangePinClick(userId) },
             onRetry = { viewModel.loadUser(userId) },
             onCancel = onUserManagementClick,
             onSubmit = viewModel::submit

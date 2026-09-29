@@ -6,8 +6,8 @@ import androidx.compose.runtime.getValue
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.tbterminal.app.data.repository.UserRepository
-import com.tbterminal.app.ui.dashboard.owner.OwnerDashboardShell
-import com.tbterminal.app.ui.dashboard.owner.OwnerDestination
+import com.tbterminal.app.ui.dashboard.admin.AdminDashboardShell
+import com.tbterminal.app.ui.dashboard.admin.AdminDestination
 
 @Composable
 fun OwnerAddUserScreen(
@@ -40,10 +40,12 @@ fun OwnerAddUserScreen(
         }
     }
 
-    OwnerDashboardShell(
+    AdminDashboardShell(
+        onProductsClick = {},
+
         userName = name,
         role = role,
-        activeDestination = OwnerDestination.UserManagement,
+        activeDestination = AdminDestination.UserManagement,
         onDashboardClick = onDashboardClick,
         onReportsClick = onReportsClick,
         onSyncCenterClick = onSyncCenterClick,
@@ -55,6 +57,9 @@ fun OwnerAddUserScreen(
         onUserManagementClick = onUserManagementClick,
         onSecurityLogClick = onSecurityLogClick,
         onSettingsClick = onSettingsClick,
+        pageTitle = "Tambah pengguna",
+        onBack = onUserManagementClick,
+        showPageHeader = true,
         onLogout = onLogout
     ) { contentModifier ->
         AddUserContent(

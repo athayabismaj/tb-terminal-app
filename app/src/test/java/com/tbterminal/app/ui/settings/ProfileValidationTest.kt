@@ -22,4 +22,13 @@ class ProfileValidationTest {
         assertNotNull(validatePinChange("1234", "5678", "9999"))
         assertNull(validatePinChange("1234", "5678", "5678"))
     }
+
+    @Test
+    fun profileRequiresValidNameAndOptionalValidEmail() {
+        assertNotNull(validateProfileForm("P", null))
+        assertNotNull(validateProfileForm("Pemilik Toko", "email-tidak-valid"))
+        assertNotNull(validateProfileForm("Pemilik Toko", "a".repeat(151)))
+        assertNull(validateProfileForm("Pemilik Toko", null))
+        assertNull(validateProfileForm("Pemilik Toko", "pemilik@tbterminal.id"))
+    }
 }

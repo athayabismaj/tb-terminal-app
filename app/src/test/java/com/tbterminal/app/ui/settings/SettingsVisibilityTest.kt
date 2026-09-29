@@ -5,23 +5,23 @@ import org.junit.Test
 
 class SettingsVisibilityTest {
     @Test
-    fun ownerSeesStoreSecurityAndDeviceSettings() {
+    fun ownerSeesStoreReceiptAndDeviceSettings() {
         assertEquals(
-            listOf("store", "security", "device", "sync"),
-            visibleSettingsTabKeys("OWNER"),
+            listOf(SettingsPage.STORE, SettingsPage.RECEIPT, SettingsPage.DEVICE),
+            visibleSettingsPages("OWNER"),
         )
     }
 
     @Test
-    fun adminCannotSeeOwnerSecuritySettings() {
+    fun adminSeesStoreReceiptAndDeviceSettings() {
         assertEquals(
-            listOf("store", "device", "sync"),
-            visibleSettingsTabKeys("admin"),
+            listOf(SettingsPage.STORE, SettingsPage.RECEIPT, SettingsPage.DEVICE),
+            visibleSettingsPages("admin"),
         )
     }
 
     @Test
     fun cashierOnlySeesLocalDeviceSettings() {
-        assertEquals(listOf("device"), visibleSettingsTabKeys("kasir"))
+        assertEquals(listOf(SettingsPage.DEVICE), visibleSettingsPages("kasir"))
     }
 }

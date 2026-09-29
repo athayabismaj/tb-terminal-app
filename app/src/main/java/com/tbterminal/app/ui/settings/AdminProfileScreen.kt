@@ -7,6 +7,7 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import com.tbterminal.app.data.repository.AuthRepository
 import com.tbterminal.app.ui.dashboard.admin.AdminDashboardShell
 import com.tbterminal.app.ui.dashboard.admin.AdminDestination
+import com.tbterminal.app.ui.dashboard.isOwnerPersona
 
 @Composable
 fun AdminProfileScreen(
@@ -32,6 +33,10 @@ fun AdminProfileScreen(
     onOperationalAuditClick: () -> Unit = {},
     onProfileClick: () -> Unit = {},
     onSettingsClick: () -> Unit = {},
+    onBackToPrevious: (() -> Unit)? = null,
+    onEditProfile: (() -> Unit)? = null,
+    editMode: Boolean = false,
+    onProfileSaved: () -> Unit = {},
     onLogout: () -> Unit = {},
     profileViewModel: ProfileViewModel = viewModel(factory = ProfileViewModel.factory(authRepository))
 ) {
@@ -40,6 +45,8 @@ fun AdminProfileScreen(
         userName = name,
         role = role,
         activeDestination = AdminDestination.Profile,
+        pageTitle = if (editMode) "Edit profil" else "Detail profil",
+        onBack = onBackToPrevious,
         onDashboardClick = onDashboardClick,
         onProductsClick = onProductsClick,
         onAddProductClick = onAddProductClick,
@@ -61,13 +68,31 @@ fun AdminProfileScreen(
         onSettingsClick = onSettingsClick,
         onLogout = onLogout
     ) { contentModifier ->
-        SharedProfileScreen(
-            uiState = uiState,
-            onReload = profileViewModel::loadProfile,
-            onChangePassword = profileViewModel::changePassword,
-            onChangePin = profileViewModel::changePin,
-            onClearMessage = profileViewModel::clearMessage,
-            modifier = contentModifier
-        )
+        if (editMode) {
+            SharedEditProfileScreen(
+                uiState = uiState,
+                onSave = profileViewModel::updateProfile,
+                onBack = onBackToPrevious ?: onProfileClick,
+                onSaved = {
+                    profileViewModel.consumeProfileUpdated()
+                    onProfileSaved()
+                },
+                onClearMessage = profileViewModel::clearMessage,
+                showHeader = false,
+                modifier = contentModifier,
+            )
+        } else {
+            SharedProfileScreen(
+                uiState = uiState,
+                onReload = profileViewModel::loadProfile,
+                onChangePassword = profileViewModel::changePassword,
+                onChangePin = profileViewModel::changePin,
+                onClearMessage = profileViewModel::clearMessage,
+                showHeader = false,
+                onLogout = if (isOwnerPersona(role)) onLogout else null,
+                onEditProfile = onEditProfile,
+                modifier = contentModifier
+            )
+        }
     }
 }

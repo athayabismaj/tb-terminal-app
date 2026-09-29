@@ -3,85 +3,78 @@ package com.tbterminal.app.ui.settings
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.outlined.Backup
-import androidx.compose.material.icons.outlined.Lock
+import androidx.compose.material.icons.outlined.CheckCircle
+import androidx.compose.material.icons.automirrored.outlined.KeyboardArrowRight
 import androidx.compose.material.icons.outlined.Print
 import androidx.compose.material.icons.outlined.Save
 import androidx.compose.material.icons.outlined.Storefront
 import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.FilledTonalButton
+import androidx.compose.material3.FilterChip
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
-import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextField
+import androidx.compose.material3.TextFieldDefaults
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.saveable.rememberSaveable
-import androidx.compose.runtime.setValue
+import androidx.activity.compose.BackHandler
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
-import com.tbterminal.app.ui.dashboard.DashboardBackground
-import com.tbterminal.app.ui.dashboard.DashboardBrandGreen
-import com.tbterminal.app.ui.dashboard.DashboardBrandGreenDark
-import com.tbterminal.app.ui.dashboard.DashboardTextPrimary
-import com.tbterminal.app.ui.dashboard.DashboardTextSecondary
 import com.tbterminal.app.navigation.AppAccessPolicy
 import com.tbterminal.app.navigation.AppCapability
 import com.tbterminal.app.ui.components.SkeletonCard
+import com.tbterminal.app.ui.theme.TbterminalappTheme
 
-private data class SettingsTab(
-    val key: String,
-    val title: String,
-    val subtitle: String,
-    val icon: ImageVector
-)
+enum class SettingsPage(val key: String, val title: String, val subtitle: String) {
+    STORE("store", "Identitas toko", "Nama dan informasi kontak toko"),
+    RECEIPT("receipt", "Tampilan struk", "Teks pembuka dan penutup struk"),
+    DEVICE("device", "Perangkat", "Printer dan preferensi terminal"),
+}
 
-internal fun visibleSettingsTabKeys(role: String): List<String> = buildList {
+internal fun visibleSettingsPages(role: String): List<SettingsPage> = buildList {
     if (AppAccessPolicy.can(role, AppCapability.STORE_SETTINGS)) {
-        add("store")
+        add(SettingsPage.STORE)
+        add(SettingsPage.RECEIPT)
     }
-    if (AppAccessPolicy.can(role, AppCapability.SECURITY_SETTINGS)) add("security")
-    if (AppAccessPolicy.can(role, AppCapability.DEVICE_SETTINGS)) add("device")
-    if (AppAccessPolicy.can(role, AppCapability.SYNC)) add("sync")
+    if (AppAccessPolicy.can(role, AppCapability.DEVICE_SETTINGS)) add(SettingsPage.DEVICE)
 }
 
 @Composable
 fun SharedSettingsScreen(
-    userName: String,
     role: String,
+    selectedPage: SettingsPage?,
+    onPageSelected: (SettingsPage) -> Unit,
+    onPageBack: () -> Unit,
     uiState: SettingsUiState,
     onReload: () -> Unit,
     onSaveStoreSettings: () -> Unit,
@@ -96,380 +89,407 @@ fun SharedSettingsScreen(
     onAutoLockMinutesChanged: (String) -> Unit,
     onAutoPrintReceiptChanged: (Boolean) -> Unit,
     onSelectPrinter: () -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
 ) {
-    val canManageStore = AppAccessPolicy.can(role, AppCapability.STORE_SETTINGS)
-    val visibleTabKeys = visibleSettingsTabKeys(role)
-    val tabs = listOf(
-        SettingsTab("store", "Toko & Struk", "Identitas dan isi struk", Icons.Outlined.Storefront),
-        SettingsTab("security", "Keamanan", "Kebijakan akses akun", Icons.Outlined.Lock),
-        SettingsTab("device", "Perangkat", "Printer dan preferensi lokal", Icons.Outlined.Print),
-        SettingsTab("sync", "Sinkronisasi", "Status sinkronisasi data", Icons.Outlined.Backup),
-    ).filter { it.key in visibleTabKeys }
-    var selectedTab by rememberSaveable(role) { mutableStateOf(tabs.first().key) }
+    val pages = visibleSettingsPages(role)
+    val currentPage = selectedPage?.takeIf { it in pages }
+    BackHandler(enabled = currentPage != null && pages.size > 1, onBack = onPageBack)
 
-    LaunchedEffect(role) {
-        if (tabs.none { it.key == selectedTab }) {
-            selectedTab = tabs.first().key
-        }
-    }
-
-    val content: @Composable (Modifier) -> Unit = { contentModifier ->
-        SettingsContentCard(
-            title = if (canManageStore) "Pengaturan Sistem" else "Pengaturan Perangkat",
-            subtitle = if (canManageStore) {
-                "Kelola identitas toko, struk, perangkat, dan preferensi operasional."
-            } else {
-                "Kelola preferensi perangkat kasir yang dipakai pada terminal ini."
-            },
-            userName = userName,
-            uiState = uiState,
-            onReload = onReload,
-            modifier = contentModifier
-        ) {
-            when (selectedTab) {
-                "store" -> StoreSettingsContent(
-                    uiState = uiState,
-                    onStoreNameChanged = onStoreNameChanged,
-                    onAddressChanged = onAddressChanged,
-                    onPhoneChanged = onPhoneChanged,
-                    onReceiptHeaderChanged = onReceiptHeaderChanged,
-                    onReceiptFooterChanged = onReceiptFooterChanged,
-                    onSave = onSaveStoreSettings
-                )
-                "security" -> SecuritySettingsContent()
-                "device" -> DeviceSettingsContent(
-                    uiState = uiState,
-                    onPrinterSizeChanged = onPrinterSizeChanged,
-                    onCashToleranceChanged = onCashToleranceChanged,
-                    onAutoLockMinutesChanged = onAutoLockMinutesChanged,
-                    onAutoPrintReceiptChanged = onAutoPrintReceiptChanged,
-                    onSelectPrinter = onSelectPrinter,
-                    onSave = onSaveLocalPreferences
-                )
-                "sync" -> BackupSettingsContent(uiState = uiState)
-            }
-        }
-    }
-
-    BoxWithConstraints(modifier = modifier.fillMaxSize().background(DashboardBackground)) {
-        val compact = maxWidth < 900.dp
-        if (compact) {
-            Column(
-                modifier = Modifier.fillMaxSize().padding(horizontal = 16.dp, vertical = 12.dp),
-                verticalArrangement = Arrangement.spacedBy(12.dp)
-            ) {
-                SettingsCompactMenu(tabs, selectedTab) { selectedTab = it }
-                content(Modifier.weight(1f).fillMaxWidth())
-            }
-        } else {
-            Row(
-                modifier = Modifier.fillMaxSize().padding(32.dp),
-                horizontalArrangement = Arrangement.spacedBy(24.dp)
-            ) {
-                SettingsSideMenu(
-                    tabs = tabs,
-                    selectedTab = selectedTab,
-                    onTabSelected = { selectedTab = it },
-                    modifier = Modifier.width(286.dp).fillMaxHeight()
-                )
-                content(Modifier.weight(1f))
-            }
-        }
-    }
-}
-
-@Composable
-private fun SettingsCompactMenu(
-    tabs: List<SettingsTab>,
-    selectedTab: String,
-    onTabSelected: (String) -> Unit
-) {
-    Row(
-        modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
-        horizontalArrangement = Arrangement.spacedBy(8.dp)
+    BoxWithConstraints(
+        modifier = modifier
+            .fillMaxSize()
+            .background(MaterialTheme.colorScheme.background)
+            .testTag("settings-screen"),
     ) {
-        tabs.forEach { tab ->
-            val selected = selectedTab == tab.key
-            Surface(
-                onClick = { onTabSelected(tab.key) },
-                color = if (selected) DashboardBrandGreenDark else Color.White,
-                contentColor = if (selected) Color.White else DashboardTextPrimary,
-                shape = RoundedCornerShape(50),
-                border = BorderStroke(1.dp, if (selected) DashboardBrandGreenDark else Color(0xFFE1E8EC))
-            ) {
-                Row(
-                    modifier = Modifier.padding(horizontal = 14.dp, vertical = 10.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Icon(tab.icon, contentDescription = null, modifier = Modifier.size(18.dp))
-                    Spacer(Modifier.width(8.dp))
-                    Text(tab.title, fontWeight = FontWeight.Bold, fontSize = 13.sp, maxLines = 1)
+        val wide = maxWidth >= 840.dp
+        val pagePadding = if (wide) 28.dp else 16.dp
+
+        Column(
+            modifier = Modifier
+                .align(Alignment.TopCenter)
+                .fillMaxWidth()
+                .widthIn(max = 1180.dp)
+                .verticalScroll(rememberScrollState())
+                .padding(horizontal = pagePadding, vertical = 16.dp),
+            verticalArrangement = Arrangement.spacedBy(16.dp),
+        ) {
+            uiState.error?.let {
+                SettingsMessage(text = it, error = true)
+                OutlinedButton(onClick = onReload, enabled = !uiState.isLoading) { Text("Coba lagi") }
+            }
+            uiState.message?.let { SettingsMessage(text = it, error = false) }
+
+            if (uiState.isLoading) {
+                SettingsLoading(wide)
+            } else if (currentPage == null) {
+                SettingsMenu(pages = pages, wide = wide, onPageSelected = onPageSelected)
+            } else {
+                Box(modifier = Modifier.fillMaxWidth(), contentAlignment = Alignment.TopCenter) {
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .widthIn(max = if (wide) 980.dp else 720.dp),
+                        verticalArrangement = Arrangement.spacedBy(16.dp),
+                    ) {
+                        when (currentPage) {
+                            SettingsPage.STORE -> StoreIdentityPanel(
+                                uiState, wide, onStoreNameChanged, onAddressChanged, onPhoneChanged,
+                                onSaveStoreSettings,
+                            )
+                            SettingsPage.RECEIPT -> ReceiptPanel(
+                                uiState, wide, onReceiptHeaderChanged, onReceiptFooterChanged,
+                                onSaveStoreSettings,
+                            )
+                            SettingsPage.DEVICE -> DevicePanel(
+                                uiState, wide, onPrinterSizeChanged, onCashToleranceChanged,
+                                onAutoLockMinutesChanged, onAutoPrintReceiptChanged,
+                                onSelectPrinter, onSaveLocalPreferences,
+                            )
+                        }
+                    }
                 }
             }
+            Spacer(Modifier.height(8.dp))
         }
     }
 }
 
 @Composable
-private fun SettingsSideMenu(
-    tabs: List<SettingsTab>,
-    selectedTab: String,
-    onTabSelected: (String) -> Unit,
-    modifier: Modifier = Modifier
+private fun SettingsMenu(
+    pages: List<SettingsPage>,
+    wide: Boolean,
+    onPageSelected: (SettingsPage) -> Unit,
 ) {
-    Card(
-        modifier = modifier,
-        colors = CardDefaults.cardColors(containerColor = Color.White),
-        shape = RoundedCornerShape(18.dp),
-        border = BorderStroke(1.dp, Color(0xFFE1E8EC))
+    Column(
+        modifier = Modifier.fillMaxWidth().testTag("settings-menu"),
+        verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
-        Column(modifier = Modifier.padding(18.dp)) {
-            Text(
-                text = "Menu Pengaturan",
-                fontSize = 19.sp,
-                fontWeight = FontWeight.ExtraBold,
-                color = DashboardTextPrimary,
-                modifier = Modifier.padding(start = 6.dp, bottom = 18.dp)
-            )
-            tabs.forEach { tab ->
-                SettingsMenuItem(
-                    tab = tab,
-                    selected = selectedTab == tab.key,
-                    onClick = { onTabSelected(tab.key) }
-                )
+        Text(
+            "Pilih pengaturan yang ingin diubah.",
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        if (wide) {
+            pages.chunked(2).forEach { rowPages ->
+                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                    rowPages.forEach { page ->
+                        SettingsMenuItem(page, onPageSelected, Modifier.weight(1f))
+                    }
+                    if (rowPages.size == 1) Spacer(Modifier.weight(1f))
+                }
             }
+        } else {
+            pages.forEach { page -> SettingsMenuItem(page, onPageSelected, Modifier.fillMaxWidth()) }
         }
     }
 }
 
 @Composable
 private fun SettingsMenuItem(
-    tab: SettingsTab,
-    selected: Boolean,
-    onClick: () -> Unit
+    page: SettingsPage,
+    onPageSelected: (SettingsPage) -> Unit,
+    modifier: Modifier,
 ) {
-    val bgColor = if (selected) DashboardBrandGreen.copy(alpha = 0.14f) else Color.Transparent
-    val iconBg = if (selected) DashboardBrandGreenDark else Color(0xFFF0F5F6)
-    val textColor = if (selected) DashboardBrandGreenDark else DashboardTextPrimary
-
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clip(RoundedCornerShape(14.dp))
-            .background(bgColor)
-            .clickable(onClick = onClick)
-            .padding(horizontal = 14.dp, vertical = 13.dp),
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        Box(
-            modifier = Modifier
-                .size(38.dp)
-                .clip(CircleShape)
-                .background(iconBg),
-            contentAlignment = Alignment.Center
-        ) {
-            Icon(
-                imageVector = tab.icon,
-                contentDescription = null,
-                tint = if (selected) Color.White else DashboardTextSecondary,
-                modifier = Modifier.size(20.dp)
-            )
-        }
-        Spacer(modifier = Modifier.width(13.dp))
-        Column(modifier = Modifier.weight(1f)) {
-            Text(
-                text = tab.title,
-                color = textColor,
-                fontWeight = FontWeight.Bold,
-                fontSize = 14.sp,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis
-            )
-            Text(
-                text = tab.subtitle,
-                color = DashboardTextSecondary,
-                fontSize = 11.sp,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis
-            )
-        }
-    }
-}
-
-@Composable
-private fun SettingsContentCard(
-    title: String,
-    subtitle: String,
-    userName: String,
-    uiState: SettingsUiState,
-    onReload: () -> Unit,
-    modifier: Modifier = Modifier,
-    content: @Composable () -> Unit
-) {
-    Card(
-        modifier = modifier.fillMaxHeight(),
-        colors = CardDefaults.cardColors(containerColor = Color.White),
-        shape = RoundedCornerShape(18.dp),
-        border = BorderStroke(1.dp, Color(0xFFE1E8EC))
-    ) {
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .verticalScroll(rememberScrollState())
-                .padding(28.dp),
-            verticalArrangement = Arrangement.spacedBy(18.dp)
-        ) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.Top
-            ) {
-                Column(modifier = Modifier.weight(1f)) {
-                    Text(title, fontSize = 28.sp, fontWeight = FontWeight.ExtraBold, color = DashboardTextPrimary)
-                    Text(subtitle, color = DashboardTextSecondary, fontSize = 14.sp)
-                    Text("Akun aktif: $userName", color = DashboardTextSecondary, fontSize = 12.sp, modifier = Modifier.padding(top = 8.dp))
-                }
-            }
-
-            if (uiState.isLoading) {
-                repeat(3) { SkeletonCard() }
-            }
-            uiState.error?.let {
-                SettingsMessage(text = it, error = true)
-                OutlinedButton(onClick = onReload, enabled = !uiState.isLoading) { Text("Coba Lagi") }
-            }
-            uiState.message?.let { SettingsMessage(text = it, error = false) }
-
-            if (!uiState.isLoading) {
-                HorizontalDivider(color = Color(0xFFE8EEF2))
-                content()
-            }
-        }
-    }
-}
-
-@Composable
-private fun SettingsMessage(text: String, error: Boolean) {
     Surface(
-        color = if (error) Color(0xFFFFE4E6) else Color(0xFFDFF7ED),
-        shape = RoundedCornerShape(12.dp),
-        modifier = Modifier.fillMaxWidth()
+        modifier = modifier.testTag("settings-menu-${page.key}").clickable { onPageSelected(page) },
+        color = settingsCardColor(),
+        shape = RoundedCornerShape(18.dp),
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.7f)),
+        tonalElevation = 0.dp,
     ) {
-        Text(
-            text = text,
-            color = if (error) Color(0xFFB91C1C) else DashboardBrandGreenDark,
-            fontWeight = FontWeight.SemiBold,
-            fontSize = 13.sp,
-            modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp)
+        Row(
+            modifier = Modifier.padding(horizontal = 16.dp, vertical = 15.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Box(
+                modifier = Modifier.size(40.dp).clip(CircleShape)
+                    .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.72f)),
+                contentAlignment = Alignment.Center,
+            ) {
+                Icon(
+                    imageVector = page.icon(), contentDescription = null,
+                    tint = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.size(21.dp),
+                )
+            }
+            Spacer(Modifier.width(12.dp))
+            Column(modifier = Modifier.weight(1f)) {
+                Text(page.title, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold)
+                Text(
+                    page.subtitle, style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+            Icon(
+                Icons.AutoMirrored.Outlined.KeyboardArrowRight,
+                contentDescription = "Buka ${page.title}",
+                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+    }
+}
+
+private fun SettingsPage.icon(): ImageVector = when (this) {
+    SettingsPage.STORE -> Icons.Outlined.Storefront
+    SettingsPage.RECEIPT, SettingsPage.DEVICE -> Icons.Outlined.Print
+}
+
+@Composable
+private fun StoreIdentityPanel(
+    uiState: SettingsUiState,
+    wide: Boolean,
+    onStoreNameChanged: (String) -> Unit,
+    onAddressChanged: (String) -> Unit,
+    onPhoneChanged: (String) -> Unit,
+    onSave: () -> Unit,
+) {
+    SettingsPanel(
+        title = "Informasi toko",
+        subtitle = "Digunakan pada struk dan dokumen toko.",
+        icon = Icons.Outlined.Storefront,
+        tag = "settings-section-store",
+    ) {
+        if (wide) {
+            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                SettingsField("Nama toko", uiState.storeName, onStoreNameChanged, Modifier.weight(1f))
+                SettingsField("Nomor telepon", uiState.phone, onPhoneChanged, Modifier.weight(1f))
+            }
+        } else {
+            SettingsField("Nama toko", uiState.storeName, onStoreNameChanged)
+            SettingsField("Nomor telepon", uiState.phone, onPhoneChanged)
+        }
+        SettingsField("Alamat toko", uiState.address, onAddressChanged, minLines = 2)
+        SettingsSaveButton(
+            text = if (uiState.isSaving) "Menyimpan..." else "Simpan identitas toko",
+            enabled = !uiState.isSaving,
+            fullWidth = !wide,
+            onClick = onSave,
         )
     }
 }
 
 @Composable
-private fun StoreSettingsContent(
+private fun ReceiptPanel(
     uiState: SettingsUiState,
-    onStoreNameChanged: (String) -> Unit,
-    onAddressChanged: (String) -> Unit,
-    onPhoneChanged: (String) -> Unit,
+    wide: Boolean,
     onReceiptHeaderChanged: (String) -> Unit,
     onReceiptFooterChanged: (String) -> Unit,
-    onSave: () -> Unit
+    onSave: () -> Unit,
 ) {
-    SettingsSection("Identitas Toko", "Data ini dipakai di header struk dan dokumen transaksi.") {
-        Row(horizontalArrangement = Arrangement.spacedBy(16.dp), modifier = Modifier.fillMaxWidth()) {
-            SettingsField("Nama toko", uiState.storeName, onStoreNameChanged, Modifier.weight(1f))
-            SettingsField("Nomor telepon", uiState.phone, onPhoneChanged, Modifier.weight(1f))
+    SettingsPanel(
+        title = "Teks struk",
+        subtitle = "Sesuaikan pesan yang tercetak pada struk.",
+        icon = Icons.Outlined.Print,
+        tag = "settings-section-receipt",
+    ) {
+        if (wide) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(18.dp),
+                verticalAlignment = Alignment.Top,
+            ) {
+                ReceiptEditor(
+                    uiState = uiState,
+                    onReceiptHeaderChanged = onReceiptHeaderChanged,
+                    onReceiptFooterChanged = onReceiptFooterChanged,
+                    modifier = Modifier.weight(1.15f),
+                )
+                ReceiptPreview(uiState = uiState, modifier = Modifier.weight(0.85f))
+            }
+        } else {
+            ReceiptEditor(uiState, onReceiptHeaderChanged, onReceiptFooterChanged)
+            ReceiptPreview(uiState = uiState)
         }
-        SettingsField("Alamat toko", uiState.address, onAddressChanged, Modifier.fillMaxWidth())
-    }
-
-    SettingsSection("Format Struk", "Atur teks yang muncul saat struk dicetak.") {
-        SettingsField("Header struk", uiState.receiptHeader, onReceiptHeaderChanged, Modifier.fillMaxWidth())
-        SettingsField("Footer struk", uiState.receiptFooter, onReceiptFooterChanged, Modifier.fillMaxWidth(), minLines = 3)
-    }
-
-    PrimarySettingsButton(
-        text = if (uiState.isSaving) "Menyimpan..." else "Simpan Pengaturan Toko",
-        enabled = !uiState.isSaving && !uiState.isLoading,
-        onClick = onSave
-    )
-}
-
-@Composable
-private fun SecuritySettingsContent() {
-    SettingsSection("Kebijakan Akses", "Aturan keamanan yang perlu dijaga saat terminal dipakai.") {
-        SecurityPolicyItem("PIN kasir wajib 6 digit", "Dipakai untuk unlock terminal setelah sesi terkunci.")
-        SecurityPolicyItem("Password minimal 6 karakter", "Perubahan password dan PIN tetap dilakukan dari Manajemen Pengguna agar tercatat di audit.")
-        SecurityPolicyItem("Role dibatasi per fungsi", "Owner, admin, dan kasir hanya mengakses fungsi yang diizinkan.")
+        SettingsSaveButton(
+            text = if (uiState.isSaving) "Menyimpan..." else "Simpan tampilan struk",
+            enabled = !uiState.isSaving,
+            fullWidth = !wide,
+            onClick = onSave,
+        )
     }
 }
 
 @Composable
-private fun DeviceSettingsContent(
+private fun ReceiptEditor(
     uiState: SettingsUiState,
+    onReceiptHeaderChanged: (String) -> Unit,
+    onReceiptFooterChanged: (String) -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Column(modifier = modifier, verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        SettingsField("Teks atas", uiState.receiptHeader, onReceiptHeaderChanged)
+        SettingsField("Teks bawah", uiState.receiptFooter, onReceiptFooterChanged, minLines = 3)
+    }
+}
+
+@Composable
+private fun ReceiptPreview(uiState: SettingsUiState, modifier: Modifier = Modifier) {
+    Column(modifier = modifier.testTag("settings-receipt-preview"), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        Text(
+            "Pratinjau",
+            style = MaterialTheme.typography.labelLarge,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        Surface(
+            color = MaterialTheme.colorScheme.background,
+            shape = RoundedCornerShape(16.dp),
+            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.7f)),
+        ) {
+            Column(
+                modifier = Modifier.fillMaxWidth().padding(16.dp),
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                Text(
+                    uiState.storeName.ifBlank { "Nama toko" },
+                    style = MaterialTheme.typography.titleSmall,
+                    fontWeight = FontWeight.Bold,
+                )
+                if (uiState.receiptHeader.isNotBlank()) {
+                    Text(
+                        uiState.receiptHeader,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+                HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+                ReceiptPreviewRow("Contoh transaksi", "Rp100.000")
+                HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+                Text(
+                    uiState.receiptFooter.ifBlank { "Terima kasih" },
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun ReceiptPreviewRow(label: String, value: String) {
+    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+        Text(label, style = MaterialTheme.typography.bodySmall)
+        Text(value, style = MaterialTheme.typography.bodySmall, fontWeight = FontWeight.SemiBold)
+    }
+}
+
+@Composable
+private fun DevicePanel(
+    uiState: SettingsUiState,
+    wide: Boolean,
     onPrinterSizeChanged: (String) -> Unit,
     onCashToleranceChanged: (String) -> Unit,
     onAutoLockMinutesChanged: (String) -> Unit,
     onAutoPrintReceiptChanged: (Boolean) -> Unit,
     onSelectPrinter: () -> Unit,
-    onSave: () -> Unit
+    onSave: () -> Unit,
 ) {
-    SettingsSection("Printer Struk", "Preferensi perangkat kasir pada terminal ini.") {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .background(Color(0xFFF4F8FA), RoundedCornerShape(14.dp))
-                .padding(16.dp),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Column {
-                Text(uiState.selectedPrinterName, fontWeight = FontWeight.Bold, color = DashboardTextPrimary)
-                Text("Ukuran struk aktif ${uiState.printerSize}", color = DashboardTextSecondary, fontSize = 12.sp)
+    SettingsPanel(
+        title = "Perangkat",
+        subtitle = "Preferensi yang berlaku pada terminal ini.",
+        icon = Icons.Outlined.Print,
+        tag = "settings-section-device",
+    ) {
+        PrinterSelector(uiState.selectedPrinterName, uiState.printerSize, onSelectPrinter)
+        HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+        Text("Ukuran kertas", style = MaterialTheme.typography.labelLarge)
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            PaperSizeChip("58 mm", uiState.printerSize == "58mm") { onPrinterSizeChanged("58mm") }
+            PaperSizeChip("80 mm", uiState.printerSize == "80mm") { onPrinterSizeChanged("80mm") }
+        }
+        SettingsSwitchRow(
+            "Cetak struk otomatis",
+            "Buka layanan cetak setelah transaksi berhasil.",
+            uiState.autoPrintReceipt,
+            onAutoPrintReceiptChanged,
+        )
+        if (wide) {
+            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                SettingsField(
+                    "Toleransi selisih kas", uiState.cashTolerance, onCashToleranceChanged,
+                    Modifier.weight(1f), prefix = "Rp",
+                )
+                SettingsField(
+                    "Kunci otomatis", uiState.autoLockMinutes, onAutoLockMinutesChanged,
+                    Modifier.weight(1f), suffix = "menit",
+                )
             }
-            OutlinedButton(onClick = onSelectPrinter) {
-                Icon(Icons.Outlined.Print, contentDescription = null, modifier = Modifier.size(18.dp))
-                Spacer(modifier = Modifier.width(8.dp))
-                Text("Uji / Pilih Printer")
-            }
+        } else {
+            SettingsField("Toleransi selisih kas", uiState.cashTolerance, onCashToleranceChanged, prefix = "Rp")
+            SettingsField("Kunci otomatis", uiState.autoLockMinutes, onAutoLockMinutesChanged, suffix = "menit")
         }
-        Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-            PrinterSizeChip("58mm", uiState.printerSize == "58mm", onPrinterSizeChanged)
-            PrinterSizeChip("80mm", uiState.printerSize == "80mm", onPrinterSizeChanged)
-        }
-        SettingsSwitchRow("Cetak struk otomatis", "Struk langsung dicetak setelah transaksi berhasil.", uiState.autoPrintReceipt, onAutoPrintReceiptChanged)
+        SettingsSaveButton(
+            text = if (uiState.isSaving) "Menyimpan..." else "Simpan pengaturan perangkat",
+            enabled = !uiState.isSaving,
+            fullWidth = !wide,
+            onClick = onSave,
+        )
     }
-    SettingsSection("Preferensi Terminal", "Berlaku hanya pada perangkat Android ini.") {
-        Row(horizontalArrangement = Arrangement.spacedBy(16.dp), modifier = Modifier.fillMaxWidth()) {
-            SettingsField("Toleransi selisih kas", uiState.cashTolerance, onCashToleranceChanged, Modifier.weight(1f), prefix = "Rp")
-            SettingsField("Auto lock kasir", uiState.autoLockMinutes, onAutoLockMinutesChanged, Modifier.weight(1f), suffix = "menit")
-        }
-    }
-    PrimarySettingsButton("Simpan Preferensi Perangkat", enabled = true, onClick = onSave)
 }
 
 @Composable
-private fun BackupSettingsContent(uiState: SettingsUiState) {
-    SettingsSection("Status Sinkronisasi", "Ringkasan kesiapan data operasional.") {
-        InfoTile("Backend", "Terhubung melalui API utama", DashboardBrandGreenDark)
-        InfoTile("Pengaturan toko", if (uiState.error == null) "Siap digunakan" else "Perlu dimuat ulang", if (uiState.error == null) DashboardBrandGreenDark else Color(0xFFB91C1C))
-        InfoTile("Offline sync", "Transaksi, sesi kas, dan pengeluaran kas saja.", DashboardTextSecondary)
-    }
-}
-
-@Composable
-private fun SettingsSection(
+private fun SettingsPanel(
     title: String,
     subtitle: String,
-    content: @Composable () -> Unit
+    icon: ImageVector,
+    tag: String,
+    content: @Composable () -> Unit,
 ) {
-    Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
-        Column {
-            Text(title, color = DashboardTextPrimary, fontSize = 18.sp, fontWeight = FontWeight.ExtraBold)
-            Text(subtitle, color = DashboardTextSecondary, fontSize = 13.sp)
+    Surface(
+        modifier = Modifier.fillMaxWidth().testTag(tag),
+        color = settingsCardColor(),
+        shape = RoundedCornerShape(20.dp),
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.7f)),
+        tonalElevation = 0.dp,
+    ) {
+        Column(modifier = Modifier.padding(18.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Box(
+                    modifier = Modifier.size(40.dp).clip(CircleShape)
+                        .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.72f)),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Icon(
+                        icon, null, tint = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.size(21.dp),
+                    )
+                }
+                Spacer(Modifier.width(12.dp))
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        title, style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.SemiBold,
+                    )
+                    Text(
+                        subtitle, style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+            }
+            content()
         }
-        content()
+    }
+}
+
+@Composable
+private fun PrinterSelector(printerName: String, paperSize: String, onSelectPrinter: () -> Unit) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Column(modifier = Modifier.weight(1f)) {
+            Text(printerName, style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.Medium)
+            Text(
+                "Kertas $paperSize", style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+        FilledTonalButton(onClick = onSelectPrinter) {
+            Icon(Icons.Outlined.Print, null, modifier = Modifier.size(18.dp))
+            Spacer(Modifier.width(8.dp))
+            Text("Pilih")
+        }
     }
 }
 
@@ -481,40 +501,38 @@ private fun SettingsField(
     modifier: Modifier = Modifier,
     prefix: String? = null,
     suffix: String? = null,
-    minLines: Int = 1
+    minLines: Int = 1,
 ) {
-    OutlinedTextField(
+    TextField(
         value = value,
         onValueChange = onValueChange,
         label = { Text(label) },
-        leadingIcon = prefix?.let { { Text(it, fontWeight = FontWeight.Bold, color = DashboardBrandGreenDark) } },
-        trailingIcon = suffix?.let { { Text(it, color = DashboardTextSecondary, fontSize = 12.sp) } },
+        leadingIcon = prefix?.let { { Text(it, fontWeight = FontWeight.SemiBold) } },
+        trailingIcon = suffix?.let { { Text(it, style = MaterialTheme.typography.labelMedium) } },
         minLines = minLines,
-        modifier = modifier,
-        shape = RoundedCornerShape(14.dp)
+        modifier = modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(14.dp),
+        colors = TextFieldDefaults.colors(
+            focusedContainerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+            unfocusedContainerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+            disabledContainerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.35f),
+            focusedIndicatorColor = Color.Transparent,
+            unfocusedIndicatorColor = Color.Transparent,
+            disabledIndicatorColor = Color.Transparent,
+        ),
     )
 }
 
 @Composable
-private fun PrinterSizeChip(
-    label: String,
-    selected: Boolean,
-    onClick: (String) -> Unit
-) {
-    Surface(
-        color = if (selected) DashboardBrandGreenDark else Color.White,
-        contentColor = if (selected) Color.White else DashboardTextPrimary,
-        shape = RoundedCornerShape(999.dp),
-        border = BorderStroke(1.dp, if (selected) DashboardBrandGreenDark else Color(0xFFDCE5EA)),
-        modifier = Modifier.clickable { onClick(label) }
-    ) {
-        Text(
-            text = label,
-            fontWeight = FontWeight.Bold,
-            fontSize = 13.sp,
-            modifier = Modifier.padding(horizontal = 18.dp, vertical = 10.dp)
-        )
-    }
+private fun PaperSizeChip(label: String, selected: Boolean, onClick: () -> Unit) {
+    FilterChip(
+        selected = selected,
+        onClick = onClick,
+        label = { Text(label) },
+        leadingIcon = if (selected) {
+            { Icon(Icons.Outlined.CheckCircle, null, modifier = Modifier.size(18.dp)) }
+        } else null,
+    )
 }
 
 @Composable
@@ -522,88 +540,97 @@ private fun SettingsSwitchRow(
     title: String,
     subtitle: String,
     checked: Boolean,
-    onCheckedChange: (Boolean) -> Unit
+    onCheckedChange: (Boolean) -> Unit,
 ) {
     Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .background(Color(0xFFF8FAFB), RoundedCornerShape(14.dp))
-            .padding(horizontal = 16.dp, vertical = 13.dp),
-        horizontalArrangement = Arrangement.SpaceBetween,
-        verticalAlignment = Alignment.CenterVertically
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
+        verticalAlignment = Alignment.CenterVertically,
     ) {
         Column(modifier = Modifier.weight(1f)) {
-            Text(title, color = DashboardTextPrimary, fontWeight = FontWeight.Bold)
-            Text(subtitle, color = DashboardTextSecondary, fontSize = 12.sp)
+            Text(title, style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.Medium)
+            Text(subtitle, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
         Switch(checked = checked, onCheckedChange = onCheckedChange)
     }
 }
 
 @Composable
-private fun SecurityPolicyItem(title: String, subtitle: String) {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .background(Color(0xFFF8FAFB), RoundedCornerShape(14.dp))
-            .padding(16.dp),
-        verticalAlignment = Alignment.Top
-    ) {
-        Box(
-            modifier = Modifier
-                .size(28.dp)
-                .clip(CircleShape)
-                .background(DashboardBrandGreen.copy(alpha = 0.15f)),
-            contentAlignment = Alignment.Center
-        ) {
-            Icon(Icons.Outlined.Lock, contentDescription = null, tint = DashboardBrandGreenDark, modifier = Modifier.size(16.dp))
-        }
-        Spacer(modifier = Modifier.width(12.dp))
-        Column {
-            Text(title, color = DashboardTextPrimary, fontWeight = FontWeight.Bold)
-            Text(subtitle, color = DashboardTextSecondary, fontSize = 12.sp)
-        }
-    }
-}
-
-@Composable
-private fun InfoTile(title: String, subtitle: String, color: Color) {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .background(Color(0xFFF8FAFB), RoundedCornerShape(14.dp))
-            .padding(16.dp),
-        horizontalArrangement = Arrangement.SpaceBetween,
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        Column(modifier = Modifier.weight(1f)) {
-            Text(title, color = DashboardTextPrimary, fontWeight = FontWeight.Bold)
-            Text(subtitle, color = DashboardTextSecondary, fontSize = 12.sp)
-        }
-        Box(
-            modifier = Modifier
-                .size(10.dp)
-                .clip(CircleShape)
-                .background(color)
-        )
-    }
-}
-
-@Composable
-private fun PrimarySettingsButton(
+private fun SettingsSaveButton(
     text: String,
     enabled: Boolean,
-    onClick: () -> Unit
+    fullWidth: Boolean,
+    onClick: () -> Unit,
 ) {
-    Button(
-        onClick = onClick,
-        enabled = enabled,
-        colors = ButtonDefaults.buttonColors(containerColor = DashboardBrandGreenDark),
+    Box(modifier = Modifier.fillMaxWidth()) {
+        Button(
+            onClick = onClick,
+            enabled = enabled,
+            modifier = Modifier
+                .align(Alignment.CenterEnd)
+                .then(if (fullWidth) Modifier.fillMaxWidth() else Modifier)
+                .height(48.dp),
+        ) {
+            Icon(Icons.Outlined.Save, null, modifier = Modifier.size(18.dp))
+            Spacer(Modifier.width(8.dp))
+            Text(text)
+        }
+    }
+}
+
+@Composable
+private fun settingsCardColor(): Color =
+    if (isSystemInDarkTheme()) MaterialTheme.colorScheme.surface else Color.White
+
+@Composable
+private fun SettingsMessage(text: String, error: Boolean) {
+    Surface(
+        color = if (error) MaterialTheme.colorScheme.errorContainer else MaterialTheme.colorScheme.primaryContainer,
+        contentColor = if (error) MaterialTheme.colorScheme.onErrorContainer else MaterialTheme.colorScheme.onPrimaryContainer,
         shape = RoundedCornerShape(14.dp),
-        modifier = Modifier.height(52.dp)
+        modifier = Modifier.fillMaxWidth(),
     ) {
-        Icon(Icons.Outlined.Save, contentDescription = null, modifier = Modifier.size(18.dp))
-        Spacer(modifier = Modifier.width(8.dp))
-        Text(text, fontWeight = FontWeight.Bold)
+        Text(text, style = MaterialTheme.typography.bodyMedium, modifier = Modifier.padding(16.dp))
+    }
+}
+
+@Composable
+private fun SettingsLoading(wide: Boolean) {
+    val skeleton: @Composable (Modifier) -> Unit = { skeletonModifier ->
+        Column(
+            modifier = skeletonModifier.testTag("settings-skeleton"),
+            verticalArrangement = Arrangement.spacedBy(16.dp),
+        ) {
+            SkeletonCard()
+            SkeletonCard()
+        }
+    }
+    if (wide) {
+        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+            skeleton(Modifier.weight(1f))
+            skeleton(Modifier.weight(1f))
+        }
+    } else {
+        skeleton(Modifier.fillMaxWidth())
+    }
+}
+
+@Preview(name = "Pengaturan - Phone", widthDp = 390, heightDp = 844, showBackground = true)
+@Preview(name = "Pengaturan - Tablet", widthDp = 1180, heightDp = 800, showBackground = true)
+@Composable
+private fun SharedSettingsScreenPreview() {
+    TbterminalappTheme {
+        SharedSettingsScreen(
+            role = "OWNER",
+            selectedPage = null,
+            onPageSelected = {},
+            onPageBack = {},
+            uiState = SettingsUiState(storeName = "Toko Berkah", phone = "0812 3456 7890"),
+            onReload = {}, onSaveStoreSettings = {}, onSaveLocalPreferences = {},
+            onStoreNameChanged = {}, onAddressChanged = {}, onPhoneChanged = {},
+            onReceiptHeaderChanged = {}, onReceiptFooterChanged = {}, onPrinterSizeChanged = {},
+            onCashToleranceChanged = {}, onAutoLockMinutesChanged = {},
+            onAutoPrintReceiptChanged = {}, onSelectPrinter = {},
+        )
     }
 }

@@ -12,9 +12,11 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -23,7 +25,6 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.CheckCircle
-import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.outlined.AdminPanelSettings
 import androidx.compose.material.icons.outlined.AlternateEmail
@@ -31,6 +32,7 @@ import androidx.compose.material.icons.outlined.Email
 import androidx.compose.material.icons.outlined.Lock
 import androidx.compose.material.icons.outlined.Person
 import androidx.compose.material.icons.outlined.PointOfSale
+import androidx.compose.material.icons.outlined.Security
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
@@ -44,6 +46,10 @@ import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -56,23 +62,34 @@ import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.tbterminal.app.data.model.UserRole
+import com.tbterminal.app.ui.components.TbMobileControlSheet
+import com.tbterminal.app.ui.components.TbMobileSheetDoneButton
+import com.tbterminal.app.ui.theme.TbBackground
+import com.tbterminal.app.ui.theme.TbError
+import com.tbterminal.app.ui.theme.TbGreen
+import com.tbterminal.app.ui.theme.TbGreenDark
+import com.tbterminal.app.ui.theme.TbGreenLight
+import com.tbterminal.app.ui.theme.TbOutline
+import com.tbterminal.app.ui.theme.TbSurfaceMuted
+import com.tbterminal.app.ui.theme.TbText
+import com.tbterminal.app.ui.theme.TbTextMuted
 
-private val AddUserSurface = Color(0xFFF4FAFD)
-private val AddUserSurfaceContainerLow = Color(0xFFEEF5F7)
-private val AddUserOnSurface = Color(0xFF161D1F)
-private val AddUserPrimary = Color(0xFF1D9E75)
-private val AddUserEmerald50 = Color(0xFFECFDF5)
-private val AddUserEmerald100 = Color(0xFFD1FAE5)
-private val AddUserEmerald900 = Color(0xFF064E3B)
-private val AddUserSlate200 = Color(0xFFE2E8F0)
+private val AddUserSurface = TbBackground
+private val AddUserSurfaceContainerLow = TbSurfaceMuted
+private val AddUserOnSurface = TbText
+private val AddUserPrimary = TbGreen
+private val AddUserEmerald50 = TbGreenLight
+private val AddUserEmerald100 = TbGreenLight
+private val AddUserEmerald900 = TbGreenDark
+private val AddUserSlate200 = TbOutline
 private val AddUserSlate400 = Color(0xFF94A3B8)
-private val AddUserSlate500 = Color(0xFF64748B)
-private val AddUserSlate600 = Color(0xFF475569)
+private val AddUserSlate500 = TbTextMuted
+private val AddUserSlate600 = TbTextMuted
 private val AddUserBlue100 = Color(0xFFDBEAFE)
 private val AddUserBlue600 = Color(0xFF2563EB)
 private val AddUserPurple100 = Color(0xFFF3E8FF)
 private val AddUserPurple600 = Color(0xFF9333EA)
-private val AddUserError = Color(0xFFB91C1C)
+private val AddUserError = TbError
 private val AddUserErrorContainer = Color(0xFFFEE2E2)
 
 @Composable
@@ -90,6 +107,8 @@ fun AddUserContent(
     onSubmit: () -> Unit
 ) {
     val compact = androidx.compose.ui.platform.LocalConfiguration.current.screenWidthDp < 700
+    var showAccessDetails by remember { mutableStateOf(false) }
+    val selectedRole = uiState.roles.firstOrNull { role -> role.id == uiState.selectedRoleId }
     Column(
         modifier = modifier
             .fillMaxSize()
@@ -97,61 +116,24 @@ fun AddUserContent(
             .padding(horizontal = if (compact) 16.dp else 32.dp, vertical = if (compact) 16.dp else 28.dp)
             .verticalScroll(rememberScrollState())
     ) {
-        Column(modifier = Modifier.padding(bottom = 28.dp)) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Text(text = "Manajemen Pengguna", color = AddUserSlate500, fontSize = 14.sp)
-                Icon(
-                    imageVector = Icons.Default.ChevronRight,
-                    contentDescription = null,
-                    tint = AddUserSlate500,
-                    modifier = Modifier.size(16.dp)
-                )
-                Text(
-                    text = "Tambah User Baru",
-                    color = AddUserPrimary,
-                    fontSize = 14.sp,
-                    fontWeight = FontWeight.Bold
-                )
-            }
-            Spacer(modifier = Modifier.height(8.dp))
-            Text(
-                text = "Informasi Akun",
-                color = AddUserOnSurface,
-                fontSize = if (compact) 24.sp else 32.sp,
-                fontWeight = FontWeight.Bold
-            )
-            if (!compact) Text(
-                text = "Lengkapi data di bawah ini untuk menambahkan akses baru ke sistem TB Terminal.",
-                color = AddUserSlate500,
-                fontSize = 14.sp
-            )
-        }
-
-        val selectedRole = uiState.roles.firstOrNull { role ->
-            role.id == uiState.selectedRoleId
-        }
-
-        val screenContent: @Composable (Modifier, Modifier) -> Unit = { formModifier, infoModifier ->
+        Box(modifier = Modifier.fillMaxWidth(), contentAlignment = Alignment.TopCenter) {
             AddUserFormCard(
                 uiState = uiState, onFullNameChange = onFullNameChange, onEmailChange = onEmailChange,
                 onUsernameChange = onUsernameChange, onPasswordChange = onPasswordChange, onPinChange = onPinChange,
                 onRoleChange = onRoleChange, onRetryRoles = onRetryRoles, onCancel = onCancel, onSubmit = onSubmit,
-                modifier = formModifier, compact = compact
+                onShowAccessDetails = { showAccessDetails = true },
+                modifier = Modifier.fillMaxWidth().widthIn(max = 860.dp),
+                compact = compact,
             )
-            AddUserAccessPanel(selectedRole = selectedRole, rolesAreLoading = uiState.isLoadingRoles, modifier = infoModifier)
         }
-        if (compact) Column(
-            modifier = Modifier.fillMaxWidth(),
-            verticalArrangement = Arrangement.spacedBy(16.dp)
-        ) {
-            screenContent(Modifier.fillMaxWidth(), Modifier.fillMaxWidth())
-        } else Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(28.dp),
-            verticalAlignment = Alignment.Top
-        ) {
-            screenContent(Modifier.weight(1.2f), Modifier.weight(0.8f))
-        }
+    }
+
+    if (showAccessDetails) {
+        AddUserAccessSheet(
+            selectedRole = selectedRole,
+            rolesAreLoading = uiState.isLoadingRoles,
+            onDismiss = { showAccessDetails = false },
+        )
     }
 }
 
@@ -167,13 +149,14 @@ private fun AddUserFormCard(
     onRetryRoles: () -> Unit,
     onCancel: () -> Unit,
     onSubmit: () -> Unit,
+    onShowAccessDetails: () -> Unit,
     modifier: Modifier = Modifier,
     compact: Boolean
 ) {
     Card(
         modifier = modifier,
         colors = CardDefaults.cardColors(containerColor = Color.White),
-        shape = RoundedCornerShape(12.dp),
+        shape = RoundedCornerShape(20.dp),
         border = BorderStroke(1.dp, AddUserSlate200)
     ) {
         Column(modifier = Modifier.padding(if (compact) 16.dp else 28.dp)) {
@@ -181,13 +164,15 @@ private fun AddUserFormCard(
                 AddUserErrorBanner(message = uiState.errorMessage)
                 Spacer(modifier = Modifier.height(20.dp))
             }
+            AddUserSectionTitle("Informasi pengguna")
+            Spacer(modifier = Modifier.height(14.dp))
             if (compact) Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
-                AddUserInputField(label = "NAMA LENGKAP", value = uiState.fullName, onValueChange = onFullNameChange, icon = Icons.Outlined.Person, placeholder = "Contoh: Budi Santoso", modifier = Modifier.fillMaxWidth())
-                AddUserInputField(label = "ALAMAT EMAIL", value = uiState.email, onValueChange = onEmailChange, icon = Icons.Outlined.Email, placeholder = "contoh@email.com", modifier = Modifier.fillMaxWidth(), keyboardType = KeyboardType.Email)
+                AddUserInputField(label = "Nama lengkap", value = uiState.fullName, onValueChange = onFullNameChange, icon = Icons.Outlined.Person, placeholder = "Contoh: Budi Santoso", modifier = Modifier.fillMaxWidth())
+                AddUserInputField(label = "Alamat email", value = uiState.email, onValueChange = onEmailChange, icon = Icons.Outlined.Email, placeholder = "contoh@email.com", modifier = Modifier.fillMaxWidth(), keyboardType = KeyboardType.Email)
             } else Row(horizontalArrangement = Arrangement.spacedBy(20.dp)) {
                 AddUserInputField(
                     modifier = Modifier.weight(1f),
-                    label = "NAMA LENGKAP",
+                    label = "Nama lengkap",
                     value = uiState.fullName,
                     onValueChange = onFullNameChange,
                     icon = Icons.Outlined.Person,
@@ -195,7 +180,7 @@ private fun AddUserFormCard(
                 )
                 AddUserInputField(
                     modifier = Modifier.weight(1f),
-                    label = "ALAMAT EMAIL",
+                    label = "Alamat email",
                     value = uiState.email,
                     onValueChange = onEmailChange,
                     icon = Icons.Outlined.Email,
@@ -203,62 +188,49 @@ private fun AddUserFormCard(
                     keyboardType = KeyboardType.Email
                 )
             }
-            Spacer(modifier = Modifier.height(20.dp))
+            Spacer(modifier = Modifier.height(26.dp))
+            AddUserSectionTitle("Akses masuk")
+            Spacer(modifier = Modifier.height(14.dp))
             if (compact) Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
-                AddUserInputField(label = "USERNAME", value = uiState.username, onValueChange = onUsernameChange, icon = Icons.Outlined.AlternateEmail, placeholder = "budisan88", modifier = Modifier.fillMaxWidth())
-                AddUserInputField(label = "PASSWORD", value = uiState.password, onValueChange = onPasswordChange, icon = Icons.Outlined.Lock, placeholder = "Masukkan password", modifier = Modifier.fillMaxWidth(), isPassword = true)
+                AddUserInputField(label = "Username", value = uiState.username, onValueChange = onUsernameChange, icon = Icons.Outlined.AlternateEmail, placeholder = "budisan88", modifier = Modifier.fillMaxWidth())
+                AddUserInputField(label = "Password", value = uiState.password, onValueChange = onPasswordChange, icon = Icons.Outlined.Lock, placeholder = "Minimal 6 karakter", modifier = Modifier.fillMaxWidth(), isPassword = true)
+                AddUserInputField(label = "PIN akses", value = uiState.pin, onValueChange = onPinChange, icon = Icons.Outlined.Lock, placeholder = "6 digit PIN", modifier = Modifier.fillMaxWidth(), isPassword = true, keyboardType = KeyboardType.NumberPassword)
             } else Row(horizontalArrangement = Arrangement.spacedBy(20.dp)) {
                 AddUserInputField(
                     modifier = Modifier.weight(1f),
-                    label = "USERNAME",
+                    label = "Username",
                     value = uiState.username,
                     onValueChange = onUsernameChange,
                     icon = Icons.Outlined.AlternateEmail,
                     placeholder = "budisan88"
                 )
-                Column(modifier = Modifier.weight(1f)) {
-                    AddUserInputField(
-                        label = "PASSWORD",
-                        value = uiState.password,
-                        onValueChange = onPasswordChange,
-                        icon = Icons.Outlined.Lock,
-                        placeholder = "Masukkan password",
-                        isPassword = true
-                    )
-                    Text(
-                        text = "Minimal 6 karakter angka atau huruf.",
-                        color = AddUserSlate400,
-                        fontSize = 11.sp,
-                        modifier = Modifier.padding(top = 4.dp)
-                    )
-                }
-            }
-            Spacer(modifier = Modifier.height(20.dp))
-            if (compact) Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
-                AddUserInputField(label = "PIN AKSES", value = uiState.pin, onValueChange = onPinChange, icon = Icons.Outlined.Lock, placeholder = "6 digit PIN", modifier = Modifier.fillMaxWidth(), isPassword = true, keyboardType = KeyboardType.NumberPassword)
-                AccountSecurityNote(Modifier.fillMaxWidth())
-            } else Row(horizontalArrangement = Arrangement.spacedBy(20.dp)) {
                 AddUserInputField(
                     modifier = Modifier.weight(1f),
-                    label = "PIN AKSES",
+                    label = "Password",
+                    value = uiState.password,
+                    onValueChange = onPasswordChange,
+                    icon = Icons.Outlined.Lock,
+                    placeholder = "Minimal 6 karakter",
+                    isPassword = true,
+                )
+            }
+            if (!compact) {
+                Spacer(modifier = Modifier.height(16.dp))
+                AddUserInputField(
+                    modifier = Modifier.fillMaxWidth(0.5f),
+                    label = "PIN akses",
                     value = uiState.pin,
                     onValueChange = onPinChange,
                     icon = Icons.Outlined.Lock,
                     placeholder = "6 digit PIN",
                     isPassword = true,
-                    keyboardType = KeyboardType.NumberPassword
+                    keyboardType = KeyboardType.NumberPassword,
                 )
-                AccountSecurityNote(modifier = Modifier.weight(1f))
             }
 
-            Spacer(modifier = Modifier.height(28.dp))
-            Text(
-                text = "ROLE / HAK AKSES",
-                color = AddUserSlate600,
-                fontSize = 12.sp,
-                fontWeight = FontWeight.Bold
-            )
-            Spacer(modifier = Modifier.height(16.dp))
+            Spacer(modifier = Modifier.height(26.dp))
+            AddUserSectionTitle("Role dan hak akses")
+            Spacer(modifier = Modifier.height(14.dp))
             AddUserRoleSelector(
                 roles = uiState.roles,
                 selectedRoleId = uiState.selectedRoleId,
@@ -267,6 +239,15 @@ private fun AddUserFormCard(
                 onRetry = onRetryRoles,
                 compact = compact
             )
+            TextButton(
+                onClick = onShowAccessDetails,
+                enabled = !uiState.isLoadingRoles,
+                contentPadding = PaddingValues(horizontal = 4.dp, vertical = 8.dp),
+            ) {
+                Icon(Icons.Outlined.Security, contentDescription = null, modifier = Modifier.size(18.dp), tint = AddUserEmerald900)
+                Spacer(Modifier.width(7.dp))
+                Text("Lihat rincian hak akses", color = AddUserEmerald900, fontWeight = FontWeight.SemiBold)
+            }
 
             Spacer(modifier = Modifier.height(28.dp))
             HorizontalDivider(color = AddUserSlate200)
@@ -277,16 +258,22 @@ private fun AddUserFormCard(
                 horizontalArrangement = Arrangement.End,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                TextButton(onClick = onCancel) {
+                OutlinedButton(
+                    onClick = onCancel,
+                    modifier = if (compact) Modifier.weight(1f).height(52.dp) else Modifier.height(52.dp),
+                    shape = RoundedCornerShape(14.dp),
+                    border = BorderStroke(1.dp, AddUserSlate200),
+                ) {
                     Text(text = "Batal", color = AddUserSlate600, fontWeight = FontWeight.SemiBold)
                 }
-                Spacer(modifier = Modifier.width(16.dp))
+                Spacer(modifier = Modifier.width(12.dp))
                 Button(
                     onClick = onSubmit,
                     enabled = !uiState.isSubmitting && !uiState.isLoadingRoles,
+                    modifier = if (compact) Modifier.weight(1f).height(52.dp) else Modifier.height(52.dp),
                     colors = ButtonDefaults.buttonColors(containerColor = AddUserPrimary),
-                    shape = RoundedCornerShape(8.dp),
-                    contentPadding = PaddingValues(horizontal = 32.dp, vertical = 16.dp)
+                    shape = RoundedCornerShape(14.dp),
+                    contentPadding = PaddingValues(horizontal = 28.dp)
                 ) {
                     if (uiState.isSubmitting) {
                         CircularProgressIndicator(
@@ -297,13 +284,23 @@ private fun AddUserFormCard(
                         Spacer(modifier = Modifier.width(10.dp))
                     }
                     Text(
-                        text = if (uiState.isSubmitting) "Menyimpan..." else "Simpan User",
+                        text = if (uiState.isSubmitting) "Menyimpan..." else if (compact) "Simpan" else "Simpan pengguna",
                         fontWeight = FontWeight.Bold
                     )
                 }
             }
         }
     }
+}
+
+@Composable
+private fun AddUserSectionTitle(title: String) {
+    Text(
+        text = title,
+        color = AddUserOnSurface,
+        fontSize = 15.sp,
+        fontWeight = FontWeight.Bold,
+    )
 }
 
 @Composable
@@ -333,7 +330,7 @@ private fun AddUserInputField(
             visualTransformation = if (isPassword) PasswordVisualTransformation() else VisualTransformation.None,
             keyboardOptions = KeyboardOptions(keyboardType = keyboardType),
             modifier = Modifier.fillMaxWidth(),
-            shape = RoundedCornerShape(8.dp),
+            shape = RoundedCornerShape(14.dp),
             colors = OutlinedTextFieldDefaults.colors(
                 unfocusedContainerColor = AddUserSurfaceContainerLow,
                 focusedContainerColor = AddUserSurfaceContainerLow,
@@ -445,11 +442,11 @@ private fun AddUserRoleCard(
 ) {
     Card(
         modifier = modifier.clickable(onClick = onClick),
-        shape = RoundedCornerShape(12.dp),
+        shape = RoundedCornerShape(16.dp),
         colors = CardDefaults.cardColors(
             containerColor = if (isSelected) AddUserEmerald50 else Color.White
         ),
-        border = BorderStroke(2.dp, if (isSelected) AddUserPrimary else AddUserSlate200)
+        border = BorderStroke(1.dp, if (isSelected) AddUserPrimary else AddUserSlate200)
     ) {
         Box(modifier = Modifier.padding(16.dp)) {
             Column {
@@ -524,90 +521,21 @@ private fun UserRole.displayDescription(): String {
 }
 
 @Composable
-private fun AccountSecurityNote(
-    modifier: Modifier = Modifier
-) {
-    Column(modifier = modifier) {
-        Text(
-            text = "KEAMANAN SESI",
-            color = AddUserSlate600,
-            fontSize = 12.sp,
-            fontWeight = FontWeight.Bold
-        )
-        Spacer(modifier = Modifier.height(8.dp))
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(64.dp)
-                .clip(RoundedCornerShape(8.dp))
-                .background(AddUserSurfaceContainerLow)
-                .padding(horizontal = 16.dp),
-            horizontalArrangement = Arrangement.spacedBy(12.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Box(
-                modifier = Modifier
-                    .size(28.dp)
-                    .clip(CircleShape)
-                    .background(AddUserEmerald50),
-                contentAlignment = Alignment.Center
-            ) {
-                Icon(
-                    imageVector = Icons.Outlined.Lock,
-                    contentDescription = null,
-                    tint = AddUserPrimary,
-                    modifier = Modifier.size(16.dp)
-                )
-            }
-            Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                Text(
-                    text = "Kredensial sesi",
-                    color = AddUserOnSurface,
-                    fontSize = 12.sp,
-                    fontWeight = FontWeight.Bold
-                )
-                Text(
-                    text = "PIN diminta saat terminal dibuka kembali.",
-                    color = AddUserSlate500,
-                    fontSize = 11.sp,
-                    lineHeight = 14.sp
-                )
-            }
-        }
-    }
-}
-
-@Composable
-private fun AddUserAccessPanel(
+private fun AddUserAccessSheet(
     selectedRole: UserRole?,
     rolesAreLoading: Boolean,
-    modifier: Modifier = Modifier
+    onDismiss: () -> Unit,
 ) {
-    Card(
-        modifier = modifier,
-        colors = CardDefaults.cardColors(containerColor = Color.White),
-        shape = RoundedCornerShape(12.dp),
-        border = BorderStroke(1.dp, AddUserSlate200)
+    TbMobileControlSheet(
+        title = "Rincian hak akses",
+        subtitle = "Akses mengikuti role yang dipilih",
+        onDismiss = onDismiss,
+        testTag = "add-user-access-sheet",
     ) {
         Column(
-            modifier = Modifier.padding(28.dp),
-            verticalArrangement = Arrangement.spacedBy(20.dp)
+            modifier = Modifier.fillMaxWidth().heightIn(max = 480.dp).verticalScroll(rememberScrollState()),
+            verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
-            Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                Text(
-                    text = "Ringkasan Hak Akses",
-                    color = AddUserOnSurface,
-                    fontSize = 20.sp,
-                    fontWeight = FontWeight.Bold
-                )
-                Text(
-                    text = "Akses akan mengikuti role yang dipilih untuk akun ini.",
-                    color = AddUserSlate500,
-                    fontSize = 13.sp,
-                    lineHeight = 18.sp
-                )
-            }
-
             when {
                 rolesAreLoading -> AccessPanelFeedback(
                     message = "Menyiapkan role dari server...",
@@ -619,6 +547,11 @@ private fun AddUserAccessPanel(
                 else -> SelectedRoleAccessSummary(role = selectedRole)
             }
         }
+        TbMobileSheetDoneButton(
+            onClick = onDismiss,
+            label = "Tutup",
+            testTag = "add-user-access-done",
+        )
     }
 }
 

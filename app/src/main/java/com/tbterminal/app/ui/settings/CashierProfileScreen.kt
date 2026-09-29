@@ -19,6 +19,10 @@ fun CashierProfileScreen(
     onStockCheckClick: () -> Unit = {},
     onProfileClick: () -> Unit = {},
     onSettingsClick: () -> Unit = {},
+    onEditProfile: (() -> Unit)? = null,
+    editMode: Boolean = false,
+    onBack: () -> Unit = {},
+    onProfileSaved: () -> Unit = {},
     onLogout: () -> Unit,
     profileViewModel: ProfileViewModel = viewModel(factory = ProfileViewModel.factory(authRepository))
 ) {
@@ -36,13 +40,28 @@ fun CashierProfileScreen(
         onSettingsClick = onSettingsClick,
         onLogout = onLogout
     ) { contentModifier ->
-        SharedProfileScreen(
-            uiState = uiState,
-            onReload = profileViewModel::loadProfile,
-            onChangePassword = profileViewModel::changePassword,
-            onChangePin = profileViewModel::changePin,
-            onClearMessage = profileViewModel::clearMessage,
-            modifier = contentModifier
-        )
+        if (editMode) {
+            SharedEditProfileScreen(
+                uiState = uiState,
+                onSave = profileViewModel::updateProfile,
+                onBack = onBack,
+                onSaved = {
+                    profileViewModel.consumeProfileUpdated()
+                    onProfileSaved()
+                },
+                onClearMessage = profileViewModel::clearMessage,
+                modifier = contentModifier,
+            )
+        } else {
+            SharedProfileScreen(
+                uiState = uiState,
+                onReload = profileViewModel::loadProfile,
+                onChangePassword = profileViewModel::changePassword,
+                onChangePin = profileViewModel::changePin,
+                onClearMessage = profileViewModel::clearMessage,
+                onEditProfile = onEditProfile,
+                modifier = contentModifier
+            )
+        }
     }
 }

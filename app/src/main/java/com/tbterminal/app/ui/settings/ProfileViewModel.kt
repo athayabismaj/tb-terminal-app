@@ -18,7 +18,8 @@ data class ProfileUiState(
     val isSaving: Boolean = false,
     val profile: UserProfile? = null,
     val error: String? = null,
-    val message: String? = null
+    val message: String? = null,
+    val profileUpdated: Boolean = false
 )
 
 class ProfileViewModel(
@@ -66,6 +67,37 @@ class ProfileViewModel(
         submitCredentialChange {
             authRepository.changeMyPin(oldPin, newPin)
         }
+    }
+
+    fun updateProfile(name: String, email: String?) {
+        validateProfileForm(name, email)?.let { validationError ->
+            _uiState.update { it.copy(error = validationError, message = null) }
+            return
+        }
+        if (_uiState.value.isSaving) return
+        viewModelScope.launch {
+            _uiState.update { it.copy(isSaving = true, error = null, message = null, profileUpdated = false) }
+            when (val result = authRepository.updateMyProfile(name, email)) {
+                is RepositoryResult.Success -> _uiState.update {
+                    it.copy(
+                        isSaving = false,
+                        profile = result.data,
+                        message = "Profil berhasil diperbarui.",
+                        profileUpdated = true
+                    )
+                }
+                is RepositoryResult.Error -> _uiState.update {
+                    it.copy(isSaving = false, error = result.message)
+                }
+                is RepositoryResult.Exception -> _uiState.update {
+                    it.copy(isSaving = false, error = "Profil gagal diperbarui karena koneksi bermasalah.")
+                }
+            }
+        }
+    }
+
+    fun consumeProfileUpdated() {
+        _uiState.update { it.copy(profileUpdated = false) }
     }
 
     fun clearMessage() {
@@ -118,4 +150,12 @@ internal fun validatePinChange(oldPin: String, newPin: String, confirmation: Str
         newPin != confirmation -> "Konfirmasi PIN tidak sama."
         else -> null
     }
+}
+
+internal fun validateProfileForm(name: String, email: String?): String? = when {
+    name.trim().length !in 2..100 -> "Nama harus terdiri dari 2 sampai 100 karakter."
+    email != null && email.trim().length > 150 -> "Email maksimal 150 karakter."
+    email != null && email.isNotBlank() && !email.trim().matches(Regex("^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$")) ->
+        "Format email tidak valid."
+    else -> null
 }

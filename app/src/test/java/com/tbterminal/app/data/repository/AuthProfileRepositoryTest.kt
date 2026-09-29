@@ -8,19 +8,19 @@ import com.tbterminal.app.data.remote.CurrentUserDto
 import com.tbterminal.app.data.remote.LoginRequest
 import com.tbterminal.app.data.remote.LoginResponse
 import com.tbterminal.app.data.remote.UnlockRequest
+import com.tbterminal.app.data.remote.UpdateMyProfileRequestDto
 import com.tbterminal.app.data.session.SessionManager
 import com.tbterminal.app.data.session.SessionUser
 import com.tbterminal.app.data.session.TokenStore
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
-import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import retrofit2.Response
 
 class AuthProfileRepositoryTest {
     @Test
-    fun profileUsesServerUsernameAndRoleWithoutFabricatedEmail() = runBlocking {
+    fun profileUsesAuthoritativeServerDataAndRefreshesSession() = runBlocking {
         val api = FakeProfileAuthApi()
         val store = ProfileTokenStore().apply {
             saveTokens("access", "refresh")
@@ -41,8 +41,24 @@ class AuthProfileRepositoryTest {
 
         assertEquals("siti", result.data.username)
         assertEquals("KASIR", result.data.role)
-        assertEquals("Siti Aminah", result.data.name)
-        assertNull(result.data.email)
+        assertEquals("Siti Aminah Baru", result.data.name)
+        assertEquals("siti@example.com", result.data.email)
+        assertEquals("Siti Aminah Baru", store.readSessionUser()?.name)
+        assertEquals("siti@example.com", store.readSessionUser()?.email)
+    }
+
+    @Test
+    fun updateProfileUsesDedicatedEndpointAndRefreshesSession() = runBlocking {
+        val api = FakeProfileAuthApi()
+        val store = ProfileTokenStore()
+        val repository = RemoteAuthRepository(api, SessionManager(store))
+
+        val result = repository.updateMyProfile("Siti Aminah Baru", "siti@example.com")
+
+        assertTrue(result is RepositoryResult.Success)
+        assertEquals(UpdateMyProfileRequestDto("Siti Aminah Baru", "siti@example.com"), api.profileRequest)
+        assertEquals("Siti Aminah Baru", store.readSessionUser()?.name)
+        assertEquals("siti@example.com", store.readSessionUser()?.email)
     }
 
     @Test
@@ -60,12 +76,17 @@ class AuthProfileRepositoryTest {
 private class FakeProfileAuthApi : AuthApi {
     var passwordRequest: ChangePasswordRequestDto? = null
     var pinRequest: ChangePinRequestDto? = null
+    var profileRequest: UpdateMyProfileRequestDto? = null
 
     override suspend fun login(request: LoginRequest): Response<ApiResponse<LoginResponse>> = error("not used")
     override suspend fun unlock(request: UnlockRequest): Response<ApiResponse<Unit>> = error("not used")
     override suspend fun getMe(): Response<ApiResponse<CurrentUserDto>> = Response.success(
-        ApiResponse(success = true, data = CurrentUserDto(username = "siti", role = "KASIR"))
+        ApiResponse(success = true, data = profileResponse())
     )
+    override suspend fun updateMe(request: UpdateMyProfileRequestDto): Response<ApiResponse<CurrentUserDto>> {
+        profileRequest = request
+        return Response.success(ApiResponse(success = true, data = profileResponse()))
+    }
     override suspend fun changeMyPassword(request: ChangePasswordRequestDto): Response<ApiResponse<Unit>> {
         passwordRequest = request
         return Response.success(ApiResponse(success = true, data = Unit))
@@ -74,6 +95,17 @@ private class FakeProfileAuthApi : AuthApi {
         pinRequest = request
         return Response.success(ApiResponse(success = true, data = Unit))
     }
+
+    private fun profileResponse() = CurrentUserDto(
+        id = "user-1",
+        username = "siti",
+        name = "Siti Aminah Baru",
+        role = "KASIR",
+        isActive = true,
+        email = "siti@example.com",
+        joinedAt = "2026-01-02T10:00:00+07:00",
+        lastLoginAt = null,
+    )
 }
 
 private class ProfileTokenStore : TokenStore {

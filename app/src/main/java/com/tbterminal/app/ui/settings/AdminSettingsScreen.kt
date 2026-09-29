@@ -1,10 +1,16 @@
 package com.tbterminal.app.ui.settings
 
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
+import com.tbterminal.app.R
 import com.tbterminal.app.data.local.database.LocalAppSettingsDataSource
 import com.tbterminal.app.data.repository.SystemRepository
 import com.tbterminal.app.ui.dashboard.admin.AdminDashboardShell
@@ -51,11 +57,14 @@ fun AdminSettingsScreen(
 ) {
     val context = LocalContext.current
     val uiState = viewModel.uiState.collectAsStateWithLifecycle().value
+    var selectedPage by rememberSaveable { mutableStateOf<SettingsPage?>(null) }
 
     AdminDashboardShell(
         userName = name,
         role = role,
         activeDestination = AdminDestination.Settings,
+        pageTitle = selectedPage?.title ?: stringResource(R.string.owner_menu_settings),
+        onBack = selectedPage?.let { { selectedPage = null } },
         onDashboardClick = onDashboardClick,
         onProductsClick = onProductsClick,
         onAddProductClick = onAddProductClick,
@@ -87,8 +96,10 @@ fun AdminSettingsScreen(
         onLogout = onLogout
     ) { contentModifier ->
         SharedSettingsScreen(
-            userName = name,
             role = role,
+            selectedPage = selectedPage,
+            onPageSelected = { selectedPage = it },
+            onPageBack = { selectedPage = null },
             uiState = uiState,
             onReload = viewModel::reload,
             onSaveStoreSettings = viewModel::saveStoreSettings,
