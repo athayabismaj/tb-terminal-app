@@ -6,38 +6,21 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.tbterminal.app.data.model.Supplier
 import com.tbterminal.app.ui.components.AppConfirmationSpec
 import com.tbterminal.app.ui.components.AppConfirmDialog
-
-@Composable
-internal fun SupplierCardTitle(icon: ImageVector, title: String, bottomPadding: Dp = 24.dp) {
-    Row(modifier = Modifier.padding(bottom = bottomPadding), verticalAlignment = Alignment.CenterVertically) {
-        Box(modifier = Modifier.size(32.dp).background(SupplierEmerald50, RoundedCornerShape(8.dp)), contentAlignment = Alignment.Center) {
-            Icon(icon, contentDescription = null, tint = SupplierEmerald600, modifier = Modifier.size(20.dp))
-        }
-        Spacer(modifier = Modifier.width(12.dp))
-        Text(title, color = SupplierSlate900, fontSize = 18.sp, fontWeight = FontWeight.Bold)
-    }
-}
 
 @Composable
 internal fun SupplierMessage(message: String, onDismiss: () -> Unit) {

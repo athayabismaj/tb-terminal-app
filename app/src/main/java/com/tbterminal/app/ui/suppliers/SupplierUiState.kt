@@ -16,5 +16,6 @@ data class SupplierUiState(
     val editingSupplier: Supplier? = null,
     val isLoading: Boolean = true,
     val isSaving: Boolean = false,
+    val isSaved: Boolean = false,
     val message: String? = null
 )

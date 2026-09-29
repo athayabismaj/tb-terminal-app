@@ -87,6 +87,8 @@ class SupplierViewModel(
 
     fun cancelEdit() = _uiState.update { it.clearedForm(message = null) }
 
+    fun resetSavedState() = _uiState.update { it.copy(isSaved = false) }
+
     fun save() {
         val state = _uiState.value
         val name = state.nameInput.trim()
@@ -139,7 +141,7 @@ class SupplierViewModel(
     private fun handleSavedResult(result: RepositoryResult<Supplier>) {
         when (result) {
             is RepositoryResult.Success -> {
-                _uiState.update { it.clearedForm(message = "Supplier berhasil disimpan.") }
+                _uiState.update { it.clearedForm(message = "Supplier berhasil disimpan.").copy(isSaved = true) }
                 loadSuppliers()
             }
             is RepositoryResult.Error -> setMessage(result.message)
@@ -163,6 +165,7 @@ class SupplierViewModel(
             addressInput = "",
             paymentTermInput = "30",
             isSaving = false,
+            isSaved = false,
             message = message
         )
     }
