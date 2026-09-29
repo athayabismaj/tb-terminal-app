@@ -1,5 +1,6 @@
 package com.tbterminal.app.ui.products
 
+import androidx.activity.compose.BackHandler
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -16,6 +17,7 @@ fun AdminProductUnitsScreen(
     inventoryRepository: InventoryRepository,
     onDashboardClick: () -> Unit,
     onProductsClick: () -> Unit,
+    onStockClick: () -> Unit,
     onAddProductClick: () -> Unit,
     onProductCategoriesClick: () -> Unit,
     onProductUnitsClick: () -> Unit,
@@ -39,6 +41,7 @@ fun AdminProductUnitsScreen(
     )
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+    BackHandler(enabled = uiState.isFormVisible) { viewModel.cancelEdit() }
 
     AdminDashboardShell(
         userName = name,
@@ -63,27 +66,52 @@ fun AdminProductUnitsScreen(
         onOperationalAuditClick = onOperationalAuditClick,
         onProfileClick = onProfileClick,
         onSettingsClick = onSettingsClick,
+        pageTitle = when {
+            !uiState.isFormVisible -> "Satuan produk"
+            uiState.editingUnit == null -> "Tambah satuan"
+            else -> "Edit satuan"
+        },
+        onBack = if (uiState.isFormVisible) viewModel::cancelEdit else onStockClick,
         onLogout = onLogout
     ) { contentModifier ->
-        RefreshableContent(
-            isRefreshing = uiState.isLoading && uiState.units.isNotEmpty(),
-            onRefresh = viewModel::refresh,
-            modifier = contentModifier,
-        ) {
+        if (uiState.isFormVisible) {
             ProductUnitContent(
-            modifier = androidx.compose.ui.Modifier,
-            uiState = uiState,
-            onNameChanged = viewModel::onNameChanged,
-            onSymbolChanged = viewModel::onSymbolChanged,
-            onSearchChanged = viewModel::onSearchChanged,
-            onSave = viewModel::save,
-            onEdit = viewModel::edit,
-            onCancelEdit = viewModel::cancelEdit,
-            onDelete = viewModel::delete,
-            onRetry = viewModel::refresh,
-            onPreviousPage = viewModel::previousPage,
-            onNextPage = viewModel::nextPage
+                modifier = contentModifier,
+                uiState = uiState,
+                onNameChanged = viewModel::onNameChanged,
+                onSymbolChanged = viewModel::onSymbolChanged,
+                onSearchChanged = viewModel::onSearchChanged,
+                onSave = viewModel::save,
+                onAdd = viewModel::openAddForm,
+                onEdit = viewModel::edit,
+                onCancelEdit = viewModel::cancelEdit,
+                onDelete = viewModel::delete,
+                onRetry = viewModel::refresh,
+                onPreviousPage = viewModel::previousPage,
+                onNextPage = viewModel::nextPage
             )
+        } else {
+            RefreshableContent(
+                isRefreshing = uiState.isLoading && uiState.units.isNotEmpty(),
+                onRefresh = viewModel::refresh,
+                modifier = contentModifier,
+            ) {
+                ProductUnitContent(
+                    modifier = androidx.compose.ui.Modifier,
+                    uiState = uiState,
+                    onNameChanged = viewModel::onNameChanged,
+                    onSymbolChanged = viewModel::onSymbolChanged,
+                    onSearchChanged = viewModel::onSearchChanged,
+                    onSave = viewModel::save,
+                    onAdd = viewModel::openAddForm,
+                    onEdit = viewModel::edit,
+                    onCancelEdit = viewModel::cancelEdit,
+                    onDelete = viewModel::delete,
+                    onRetry = viewModel::refresh,
+                    onPreviousPage = viewModel::previousPage,
+                    onNextPage = viewModel::nextPage
+                )
+            }
         }
     }
 }

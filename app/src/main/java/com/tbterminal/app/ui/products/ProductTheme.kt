@@ -1,20 +1,30 @@
 ﻿package com.tbterminal.app.ui.products
 
 import androidx.compose.ui.graphics.Color
+import com.tbterminal.app.ui.theme.TbAmber
+import com.tbterminal.app.ui.theme.TbBackground
+import com.tbterminal.app.ui.theme.TbError
+import com.tbterminal.app.ui.theme.TbGreen
+import com.tbterminal.app.ui.theme.TbGreenDark
+import com.tbterminal.app.ui.theme.TbOutline
+import com.tbterminal.app.ui.theme.TbSurface
+import com.tbterminal.app.ui.theme.TbSurfaceMuted
+import com.tbterminal.app.ui.theme.TbText
+import com.tbterminal.app.ui.theme.TbTextMuted
 import java.math.BigDecimal
 import java.text.NumberFormat
 import java.util.Locale
 
-internal val ProductBackground = Color(0xFFF8FAFC)
-internal val ProductSurface = Color.White
-internal val ProductPrimary = Color(0xFF10B981)
-internal val ProductPrimaryDark = Color(0xFF059669)
-internal val ProductText = Color(0xFF0F172A)
-internal val ProductMuted = Color(0xFF64748B)
-internal val ProductLine = Color(0xFFE2E8F0)
-internal val ProductSoft = Color(0xFFF1F5F9)
-internal val ProductDanger = Color(0xFFEF4444)
-internal val ProductWarning = Color(0xFFF59E0B)
+internal val ProductBackground = TbBackground
+internal val ProductSurface = TbSurface
+internal val ProductPrimary = TbGreen
+internal val ProductPrimaryDark = TbGreenDark
+internal val ProductText = TbText
+internal val ProductMuted = TbTextMuted
+internal val ProductLine = TbOutline
+internal val ProductSoft = TbSurfaceMuted
+internal val ProductDanger = TbError
+internal val ProductWarning = TbAmber
 internal val ProductInfo = Color(0xFF2563EB)
 
 internal fun String.numericInput(): String {

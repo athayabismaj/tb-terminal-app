@@ -75,6 +75,8 @@ fun AdminProductFormScreen(
         onOperationalAuditClick = onOperationalAuditClick,
         onProfileClick = onProfileClick,
         onSettingsClick = onSettingsClick,
+        pageTitle = if (productId == null) "Tambah produk" else "Edit produk",
+        onBack = onBackToProducts,
         onLogout = onLogout
     ) { contentModifier ->
         ProductFormContent(

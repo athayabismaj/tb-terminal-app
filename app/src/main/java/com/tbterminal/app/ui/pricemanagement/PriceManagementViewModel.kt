@@ -53,7 +53,7 @@ data class PriceManagementUiState(
             .sorted()
 }
 
-internal const val ALL_PRICE_CATEGORIES = "Semua Kategori"
+internal const val ALL_PRICE_CATEGORIES = "Semua kategori"
 
 class PriceManagementViewModel(
     private val inventoryRepository: InventoryRepository

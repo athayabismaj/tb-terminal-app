@@ -24,17 +24,53 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.dp
 import com.tbterminal.app.ui.products.ProductLine
 import com.tbterminal.app.ui.products.ProductSoft
 import com.tbterminal.app.ui.products.ProductSurface
 
 @Composable
-internal fun ProductTableSkeletonRows(rowCount: Int = 5) {
-    Column {
+internal fun ProductTableSkeletonRows(rowCount: Int = 5, compact: Boolean = false) {
+    Column(
+        modifier = Modifier.fillMaxWidth().testTag("product-list-skeleton"),
+    ) {
         repeat(rowCount) { index ->
-            ProductTableSkeletonRow(useAlternateBackground = index % 2 != 0)
-            HorizontalDivider(color = ProductLine.copy(alpha = 0.72f))
+            if (compact) {
+                ProductCardSkeleton()
+            } else {
+                ProductTableSkeletonRow(useAlternateBackground = index % 2 != 0)
+            }
+            if (index < rowCount - 1) {
+                HorizontalDivider(
+                    modifier = if (compact) Modifier.padding(horizontal = 16.dp) else Modifier,
+                    color = ProductLine.copy(alpha = 0.58f),
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun ProductCardSkeleton() {
+    Column(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 14.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(7.dp)) {
+                ProductShimmerBox(Modifier.fillMaxWidth(0.62f).height(16.dp))
+                ProductShimmerBox(Modifier.fillMaxWidth(0.42f).height(12.dp))
+            }
+            ProductShimmerBox(Modifier.size(20.dp))
+            Spacer(Modifier.width(16.dp))
+            ProductShimmerBox(Modifier.size(20.dp))
+        }
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+            SkeletonTextPair(Modifier.weight(1.15f), primaryWidth = 0.55f, secondaryWidth = 0.88f)
+            SkeletonTextPair(Modifier.weight(0.95f), primaryWidth = 0.45f, secondaryWidth = 0.68f)
+            Column(Modifier.weight(0.9f), horizontalAlignment = Alignment.End) {
+                ProductShimmerBox(Modifier.size(30.dp, 12.dp))
+                Spacer(Modifier.height(6.dp))
+                ProductShimmerBox(Modifier.size(50.dp, 30.dp))
+            }
         }
     }
 }

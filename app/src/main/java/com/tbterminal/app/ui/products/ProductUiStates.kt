@@ -106,6 +106,7 @@ data class ProductCategoryUiState(
     val pageSize: Int = 10,
     val nameInput: String = "",
     val editingCategory: ProductCategory? = null,
+    val isFormVisible: Boolean = false,
     val isLoading: Boolean = true,
     val isSaving: Boolean = false,
     val message: String? = null
@@ -121,6 +122,7 @@ data class ProductUnitUiState(
     val nameInput: String = "",
     val symbolInput: String = "",
     val editingUnit: ProductUnit? = null,
+    val isFormVisible: Boolean = false,
     val isLoading: Boolean = true,
     val isSaving: Boolean = false,
     val message: String? = null

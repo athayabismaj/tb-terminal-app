@@ -1,6 +1,7 @@
 ﻿package com.tbterminal.app.ui.products
 
 import androidx.compose.foundation.BorderStroke
+import com.tbterminal.app.ui.components.TbPagination
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -62,6 +63,7 @@ import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -281,82 +283,22 @@ internal fun ProductPagination(
     pageSize: Int,
     visibleCount: Int,
     onPreviousPage: () -> Unit,
-    onNextPage: () -> Unit
+    onNextPage: () -> Unit,
+    compact: Boolean = false,
 ) {
     val safePage = page.coerceAtLeast(1)
-    val safeTotalPages = totalPages.coerceAtLeast(1)
     val startItem = if (total == 0L) 0L else ((safePage - 1) * pageSize + 1L)
     val endItem = if (total == 0L) 0L else (startItem + visibleCount - 1L).coerceAtMost(total)
-
-    HorizontalDivider(color = ProductLine)
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .background(ProductSoft.copy(alpha = 0.72f))
-            .padding(horizontal = 20.dp, vertical = 14.dp),
-        horizontalArrangement = Arrangement.SpaceBetween,
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        Column {
-            Text(
-                text = "Menampilkan $startItem-$endItem dari $total produk",
-                color = ProductText,
-                fontSize = 13.sp,
-                fontWeight = FontWeight.Medium
-            )
-            Text(
-                text = "Maksimal $pageSize produk per halaman",
-                color = ProductMuted,
-                fontSize = 11.sp,
-                modifier = Modifier.padding(top = 2.dp)
-            )
-        }
-
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
-            ProductPageIconButton(
-                icon = Icons.Default.ChevronLeft,
-                enabled = page > 1,
-                onClick = onPreviousPage
-            )
-            Box(
-                modifier = Modifier
-                    .size(34.dp)
-                    .clip(RoundedCornerShape(8.dp))
-                    .background(ProductPrimaryDark),
-                contentAlignment = Alignment.Center
-            ) {
-                Text(safePage.toString(), color = Color.White, fontSize = 13.sp, fontWeight = FontWeight.Bold)
-            }
-            Text("/ $safeTotalPages", color = ProductMuted, fontSize = 13.sp, fontWeight = FontWeight.Medium)
-            ProductPageIconButton(
-                icon = Icons.Default.ChevronRight,
-                enabled = page < safeTotalPages,
-                onClick = onNextPage
-            )
-        }
-    }
-}
-
-@Composable
-private fun ProductPageIconButton(
-    icon: ImageVector,
-    enabled: Boolean,
-    onClick: () -> Unit
-) {
-    OutlinedButton(
-        onClick = onClick,
-        enabled = enabled,
-        shape = RoundedCornerShape(12.dp),
-        border = BorderStroke(1.dp, ProductLine),
-        contentPadding = PaddingValues(0.dp),
-        modifier = Modifier.size(34.dp)
-    ) {
-        Icon(
-            icon,
-            contentDescription = null,
-            tint = if (enabled) ProductText else ProductMuted.copy(alpha = 0.35f)
-        )
-    }
+    TbPagination(
+        currentPage = safePage,
+        totalPages = totalPages,
+        onPreviousPage = onPreviousPage,
+        onNextPage = onNextPage,
+        modifier = Modifier.padding(horizontal = if (compact) 0.dp else 20.dp, vertical = 8.dp),
+        supportingText = if (compact) "$startItem-$endItem dari $total produk"
+        else "Menampilkan $startItem-$endItem dari $total produk",
+        testTag = "product-pagination",
+    )
 }
 
 @Composable

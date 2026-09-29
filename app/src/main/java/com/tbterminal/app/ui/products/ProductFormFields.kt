@@ -17,14 +17,14 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.outlined.ExpandMore
 import androidx.compose.material.icons.outlined.Save
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Surface
@@ -38,6 +38,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextOverflow
@@ -54,7 +55,7 @@ internal fun SkuField(
     onInputChanged: (ProductFormInput) -> Unit
 ) {
     Column(modifier = modifier) {
-        ProductFormLabel("SKU / KODE BARANG")
+        ProductFormLabel("SKU / kode barang")
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             ProductFormInputFieldBox(
                 modifier = Modifier.weight(1f),
@@ -67,13 +68,14 @@ internal fun SkuField(
                 onClick = { onInputChanged(input.copy(sku = generateSku(input.name))) },
                 enabled = !isEditMode,
                 modifier = Modifier.height(56.dp),
-                shape = RoundedCornerShape(8.dp),
+                shape = RoundedCornerShape(14.dp),
                 colors = ButtonDefaults.buttonColors(
-                    containerColor = ProductLine,
+                    containerColor = ProductSoft,
                     contentColor = ProductText
-                )
+                ),
+                contentPadding = PaddingValues(horizontal = 14.dp),
             ) {
-                Text("Generate", fontWeight = FontWeight.Bold)
+                Text("Buat SKU", fontWeight = FontWeight.SemiBold, maxLines = 1)
             }
         }
     }
@@ -87,26 +89,14 @@ internal fun CategoryField(
     onSelect: (ProductCategory) -> Unit
 ) {
     Column(modifier = modifier) {
-        ProductFormLabel("KATEGORI *")
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            ProductFormSelectField(
-                modifier = Modifier.weight(1f),
-                label = null,
-                selectedText = categories.firstOrNull { it.id == selectedCategoryId }?.name ?: "Pilih kategori",
-                options = categories,
-                optionText = ProductCategory::name,
-                onSelect = onSelect
-            )
-            IconButton(
-                onClick = { },
-                modifier = Modifier
-                    .size(56.dp)
-                    .clip(RoundedCornerShape(8.dp))
-                    .background(ProductLine)
-            ) {
-                Icon(Icons.Default.Add, contentDescription = "Tambah kategori", tint = ProductText)
-            }
-        }
+        ProductFormSelectField(
+            modifier = Modifier.fillMaxWidth(),
+            label = "Kategori *",
+            selectedText = categories.firstOrNull { it.id == selectedCategoryId }?.name ?: "Pilih kategori",
+            options = categories,
+            optionText = ProductCategory::name,
+            onSelect = onSelect,
+        )
     }
 }
 
@@ -115,24 +105,25 @@ internal fun ConversionFields(
     modifier: Modifier,
     units: List<ProductUnit>,
     input: ProductFormInput,
-    onInputChanged: (ProductFormInput) -> Unit
+    onInputChanged: (ProductFormInput) -> Unit,
+    compact: Boolean,
 ) {
     val availableUnits = units.filterNot { it.id == input.baseUnitId }
     val baseSymbol = units.firstOrNull { it.id == input.baseUnitId }?.symbol ?: "satuan utama"
     val secondarySymbol = units.firstOrNull { it.id == input.secondaryUnitId }?.symbol ?: "satuan kedua"
 
-    Row(modifier = modifier, horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+    val fields: @Composable (Modifier, Modifier) -> Unit = { unitModifier, factorModifier ->
         ProductFormSelectField(
-            modifier = Modifier.weight(1f),
-            label = "SATUAN KEDUA *",
+            modifier = unitModifier,
+            label = "Satuan kedua *",
             selectedText = availableUnits.selectedUnitLabel(input.secondaryUnitId),
             options = availableUnits,
             optionText = { unit -> "${unit.name} (${unit.symbol})" },
             onSelect = { unit -> onInputChanged(input.copy(secondaryUnitId = unit.id)) }
         )
         ProductFormInputField(
-            modifier = Modifier.weight(1f),
-            label = "FAKTOR KONVERSI *",
+            modifier = factorModifier,
+            label = "Faktor konversi *",
             value = input.secondaryUnitFactor,
             placeholder = "Contoh: 12",
             isNumber = true,
@@ -140,6 +131,15 @@ internal fun ConversionFields(
                 onInputChanged(input.copy(secondaryUnitFactor = value.numericInput()))
             }
         )
+    }
+    if (compact) {
+        Column(modifier = modifier, verticalArrangement = Arrangement.spacedBy(16.dp)) {
+            fields(Modifier.fillMaxWidth(), Modifier.fillMaxWidth())
+        }
+    } else {
+        Row(modifier = modifier, horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+            fields(Modifier.weight(1f), Modifier.weight(1f))
+        }
     }
     Text(
         text = "1 $secondarySymbol = ${input.secondaryUnitFactor.ifBlank { "..." }} $baseSymbol. Stok tetap dicatat dalam satuan utama.",
@@ -153,31 +153,44 @@ internal fun ConversionFields(
 internal fun ProductFormBottomBar(
     isSaving: Boolean,
     isLoading: Boolean,
+    compact: Boolean,
     onCancel: () -> Unit,
     onSave: () -> Unit
 ) {
-    Surface(color = ProductSurface, shadowElevation = 8.dp, border = BorderStroke(1.dp, ProductLine)) {
+    Surface(color = ProductSurface, shadowElevation = 3.dp) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 40.dp, vertical = 16.dp),
+                .padding(horizontal = if (compact) 16.dp else 32.dp, vertical = 12.dp),
             horizontalArrangement = Arrangement.End,
             verticalAlignment = Alignment.CenterVertically
         ) {
-            TextButton(onClick = onCancel) {
-                Text("Batal", color = ProductText, fontWeight = FontWeight.Bold)
+            TextButton(
+                onClick = onCancel,
+                modifier = if (compact) Modifier.weight(0.45f).height(52.dp) else Modifier.height(52.dp),
+            ) {
+                Text("Batal", color = ProductText, fontWeight = FontWeight.SemiBold)
             }
-            Spacer(modifier = Modifier.width(16.dp))
+            Spacer(modifier = Modifier.width(if (compact) 8.dp else 12.dp))
             Button(
                 onClick = onSave,
                 enabled = !isSaving && !isLoading,
+                modifier = (if (compact) Modifier.weight(1f) else Modifier).height(52.dp).testTag("product-form-save"),
                 colors = ButtonDefaults.buttonColors(containerColor = ProductPrimaryDark),
-                shape = RoundedCornerShape(8.dp),
-                contentPadding = PaddingValues(horizontal = 24.dp, vertical = 12.dp)
+                shape = RoundedCornerShape(14.dp),
+                contentPadding = PaddingValues(horizontal = 22.dp),
             ) {
-                Icon(Icons.Outlined.Save, contentDescription = null, modifier = Modifier.size(18.dp))
+                if (isSaving) {
+                    CircularProgressIndicator(
+                        modifier = Modifier.size(18.dp),
+                        color = ProductSurface,
+                        strokeWidth = 2.dp,
+                    )
+                } else {
+                    Icon(Icons.Outlined.Save, contentDescription = null, modifier = Modifier.size(18.dp))
+                }
                 Spacer(modifier = Modifier.width(8.dp))
-                Text(if (isSaving) "Menyimpan..." else "Simpan Produk", fontWeight = FontWeight.Bold)
+                Text(if (isSaving) "Menyimpan…" else "Simpan produk", fontWeight = FontWeight.SemiBold)
             }
         }
     }
@@ -227,8 +240,8 @@ internal fun ProductFormInputFieldBox(
             keyboardType = if (isNumber) KeyboardType.Number else KeyboardType.Text
         ),
         singleLine = true,
-        modifier = modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(8.dp),
+        modifier = modifier.fillMaxWidth().testTag("product-form-field"),
+        shape = RoundedCornerShape(14.dp),
         colors = productFormTextFieldColors()
     )
 }
@@ -253,7 +266,7 @@ internal fun PriceInputWithMargin(
                     .background(ProductPrimary.copy(alpha = 0.12f))
                     .padding(horizontal = 8.dp, vertical = 2.dp)
             ) {
-                Text("MARGIN: $margin", color = ProductPrimaryDark, fontSize = 10.sp, fontWeight = FontWeight.Bold)
+                Text("Margin $margin", color = ProductPrimaryDark, fontSize = 10.sp, fontWeight = FontWeight.SemiBold)
             }
         }
         ProductFormInputFieldBox(
@@ -279,27 +292,42 @@ internal fun <T> ProductFormSelectField(
 
     Column(modifier = modifier) {
         if (label != null) ProductFormLabel(label)
-        Box {
-            Button(
+        Box(modifier = Modifier.fillMaxWidth()) {
+            Surface(
                 onClick = { expanded = true },
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(56.dp),
-                shape = RoundedCornerShape(8.dp),
-                colors = ButtonDefaults.buttonColors(
-                    containerColor = ProductSoft,
-                    contentColor = ProductText
-                ),
-                contentPadding = PaddingValues(horizontal = 16.dp)
+                    .height(56.dp)
+                    .testTag("product-form-select"),
+                shape = RoundedCornerShape(14.dp),
+                color = ProductSoft,
+                contentColor = ProductText,
+                border = BorderStroke(1.dp, ProductLine.copy(alpha = 0.7f)),
             ) {
-                Text(
-                    selectedText,
-                    modifier = Modifier.weight(1f),
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
-                )
+                Row(
+                    modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Text(
+                        selectedText,
+                        modifier = Modifier.weight(1f),
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                    Icon(
+                        Icons.Outlined.ExpandMore,
+                        contentDescription = "Buka pilihan",
+                        modifier = Modifier.size(20.dp),
+                        tint = ProductMuted,
+                    )
+                }
             }
-            DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
+            DropdownMenu(
+                expanded = expanded,
+                onDismissRequest = { expanded = false },
+                shape = RoundedCornerShape(14.dp),
+                containerColor = ProductSurface,
+            ) {
                 options.forEach { option ->
                     DropdownMenuItem(
                         text = { Text(optionText(option)) },
@@ -327,9 +355,9 @@ internal fun ReadOnlyInfoField(
             modifier = Modifier
                 .fillMaxWidth()
                 .height(56.dp)
-                .clip(RoundedCornerShape(8.dp))
+                .clip(RoundedCornerShape(14.dp))
                 .background(ProductSoft)
-                .border(BorderStroke(1.dp, ProductLine), RoundedCornerShape(8.dp))
+                .border(BorderStroke(1.dp, ProductLine.copy(alpha = 0.7f)), RoundedCornerShape(14.dp))
                 .padding(horizontal = 16.dp),
             contentAlignment = Alignment.CenterStart
         ) {
@@ -344,7 +372,7 @@ internal fun ProductFormError(message: String) {
     Box(
         modifier = Modifier
             .fillMaxWidth()
-            .clip(RoundedCornerShape(12.dp))
+            .clip(RoundedCornerShape(14.dp))
             .background(ProductDanger.copy(alpha = 0.12f))
             .padding(horizontal = 18.dp, vertical = 14.dp)
     ) {
@@ -356,18 +384,18 @@ internal fun ProductFormError(message: String) {
 internal fun ProductFormLabel(label: String, modifier: Modifier = Modifier) {
     Text(
         text = label,
-        modifier = modifier.padding(bottom = 4.dp),
+        modifier = modifier.padding(bottom = 6.dp),
         color = ProductMuted,
-        fontSize = 11.sp,
-        fontWeight = FontWeight.Bold
+        fontSize = 12.sp,
+        fontWeight = FontWeight.Medium,
     )
 }
 
 @Composable
 private fun productFormTextFieldColors() = OutlinedTextFieldDefaults.colors(
-    focusedBorderColor = ProductPrimary,
-    unfocusedBorderColor = ProductLine,
-    disabledBorderColor = ProductLine,
+    focusedBorderColor = ProductPrimaryDark,
+    unfocusedBorderColor = ProductLine.copy(alpha = 0.7f),
+    disabledBorderColor = ProductLine.copy(alpha = 0.55f),
     focusedContainerColor = ProductSoft,
     unfocusedContainerColor = ProductSoft,
     disabledContainerColor = ProductSoft

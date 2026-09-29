@@ -78,6 +78,18 @@ class ProductUnitViewModel(
         }
     }
 
+    fun openAddForm() {
+        _uiState.update { state ->
+            state.copy(
+                editingUnit = null,
+                nameInput = "",
+                symbolInput = "",
+                message = null,
+                isFormVisible = true
+            )
+        }
+    }
+
     fun nextPage() {
         val state = _uiState.value
         if (state.page < state.totalPages && !state.isLoading) {
@@ -98,14 +110,21 @@ class ProductUnitViewModel(
                 editingUnit = unit,
                 nameInput = unit.name,
                 symbolInput = unit.symbol,
-                message = null
+                message = null,
+                isFormVisible = true
             )
         }
     }
 
     fun cancelEdit() {
         _uiState.update { state ->
-            state.copy(editingUnit = null, nameInput = "", symbolInput = "", message = null)
+            state.copy(
+                editingUnit = null,
+                nameInput = "",
+                symbolInput = "",
+                message = null,
+                isFormVisible = false
+            )
         }
     }
 
@@ -155,6 +174,7 @@ class ProductUnitViewModel(
                         editingUnit = null,
                         nameInput = "",
                         symbolInput = "",
+                        isFormVisible = false,
                         message = "Satuan berhasil disimpan."
                     )
                 }

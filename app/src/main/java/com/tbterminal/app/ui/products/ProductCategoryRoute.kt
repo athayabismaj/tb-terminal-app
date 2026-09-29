@@ -1,5 +1,6 @@
 package com.tbterminal.app.ui.products
 
+import androidx.activity.compose.BackHandler
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -16,6 +17,7 @@ fun AdminProductCategoriesScreen(
     inventoryRepository: InventoryRepository,
     onDashboardClick: () -> Unit,
     onProductsClick: () -> Unit,
+    onStockClick: () -> Unit,
     onAddProductClick: () -> Unit,
     onProductCategoriesClick: () -> Unit,
     onProductUnitsClick: () -> Unit,
@@ -39,6 +41,7 @@ fun AdminProductCategoriesScreen(
     )
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+    BackHandler(enabled = uiState.isFormVisible) { viewModel.cancelEdit() }
 
     AdminDashboardShell(
         userName = name,
@@ -63,26 +66,50 @@ fun AdminProductCategoriesScreen(
         onOperationalAuditClick = onOperationalAuditClick,
         onProfileClick = onProfileClick,
         onSettingsClick = onSettingsClick,
+        pageTitle = when {
+            !uiState.isFormVisible -> "Kategori produk"
+            uiState.editingCategory == null -> "Tambah kategori"
+            else -> "Edit kategori"
+        },
+        onBack = if (uiState.isFormVisible) viewModel::cancelEdit else onStockClick,
         onLogout = onLogout
     ) { contentModifier ->
-        RefreshableContent(
-            isRefreshing = uiState.isLoading && uiState.categories.isNotEmpty(),
-            onRefresh = viewModel::refresh,
-            modifier = contentModifier,
-        ) {
+        if (uiState.isFormVisible) {
             ProductCategoryContent(
-            modifier = androidx.compose.ui.Modifier,
-            uiState = uiState,
-            onNameChanged = viewModel::onNameChanged,
-            onSave = viewModel::save,
-            onEdit = viewModel::edit,
-            onCancelEdit = viewModel::cancelEdit,
-            onDelete = viewModel::delete,
-            onRetry = viewModel::refresh,
-            onSearchChanged = viewModel::onSearchChanged,
-            onPreviousPage = viewModel::previousPage,
-            onNextPage = viewModel::nextPage
+                modifier = contentModifier,
+                uiState = uiState,
+                onNameChanged = viewModel::onNameChanged,
+                onSave = viewModel::save,
+                onAdd = viewModel::openAddForm,
+                onEdit = viewModel::edit,
+                onCancelEdit = viewModel::cancelEdit,
+                onDelete = viewModel::delete,
+                onRetry = viewModel::refresh,
+                onSearchChanged = viewModel::onSearchChanged,
+                onPreviousPage = viewModel::previousPage,
+                onNextPage = viewModel::nextPage
             )
+        } else {
+            RefreshableContent(
+                isRefreshing = uiState.isLoading && uiState.categories.isNotEmpty(),
+                onRefresh = viewModel::refresh,
+                modifier = contentModifier,
+            ) {
+                ProductCategoryContent(
+                    modifier = androidx.compose.ui.Modifier,
+                    uiState = uiState,
+                    onNameChanged = viewModel::onNameChanged,
+                    onSave = viewModel::save,
+                    onAdd = viewModel::openAddForm,
+                    onEdit = viewModel::edit,
+                    onCancelEdit = viewModel::cancelEdit,
+                    onDelete = viewModel::delete,
+                    onRetry = viewModel::refresh,
+                    onSearchChanged = viewModel::onSearchChanged,
+                    onPreviousPage = viewModel::previousPage,
+                    onNextPage = viewModel::nextPage
+                )
+            }
         }
     }
 }

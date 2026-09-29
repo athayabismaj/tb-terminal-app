@@ -49,6 +49,8 @@ fun AdminProductDetailScreen(
         userName = name,
         role = role,
         activeDestination = AdminDestination.Products,
+        pageTitle = "Detail produk",
+        onBack = onBackToProducts,
         onDashboardClick = onDashboardClick,
         onProductsClick = onProductsClick,
         onAddProductClick = onAddProductClick,
@@ -74,7 +76,6 @@ fun AdminProductDetailScreen(
             modifier = contentModifier,
             uiState = uiState,
             onRetry = viewModel::loadDetail,
-            onBack = onBackToProducts,
             onEditProductClick = onEditProductClick
         )
     }

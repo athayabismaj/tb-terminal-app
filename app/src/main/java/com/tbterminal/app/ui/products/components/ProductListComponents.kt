@@ -11,6 +11,7 @@ import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
@@ -18,10 +19,18 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.outlined.KeyboardArrowRight
+import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.outlined.ExpandMore
 import androidx.compose.material.icons.outlined.Search
+import androidx.compose.material.icons.outlined.Tune
+import androidx.compose.material.icons.outlined.UploadFile
+import androidx.compose.material.icons.outlined.UploadFile
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.DropdownMenu
@@ -29,9 +38,11 @@ import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.IconButtonDefaults
+import androidx.compose.material3.FilledIconButton
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
-import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.OutlinedTextFieldDefaults
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
 import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
@@ -44,11 +55,15 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.tbterminal.app.data.model.ProductStock
+import com.tbterminal.app.ui.components.TbMobileControlSheet
+import com.tbterminal.app.ui.components.TbMobileFilterButton
+import com.tbterminal.app.ui.components.TbMobileSheetDoneButton
 import com.tbterminal.app.ui.products.ProductDanger
 import com.tbterminal.app.ui.products.ProductEmptyState
 import com.tbterminal.app.ui.products.ProductErrorState
@@ -80,44 +95,64 @@ internal fun ProductTableCard(
     onNextPage: () -> Unit,
     compact: Boolean = false
 ) {
-    Column(modifier = modifier.fillMaxWidth()) {
-        if (!compact) ProductTableHeader()
-
-        when {
-            uiState.isLoading && products.isEmpty() -> ProductTableSkeletonRows()
-            uiState.errorMessage != null && products.isEmpty() -> ProductErrorState(message = uiState.errorMessage, onRetry = onRetry)
-            products.isEmpty() -> ProductEmptyState()
-            else -> {
-                products.forEachIndexed { index, product ->
-                    if (compact) {
-                        ProductCompactCard(
-                            product = product,
-                            onDetail = { onProductDetailClick(product.productId) },
-                            onEdit = { onEditProductClick(product.productId) },
-                            onToggleStatus = { onToggleProductClick(product) }
-                        )
-                    } else {
-                        ProductTableRow(
-                            product = product,
-                            useAlternateBackground = index % 2 != 0,
-                            onDetail = { onProductDetailClick(product.productId) },
-                            onEdit = { onEditProductClick(product.productId) },
-                            onToggleStatus = { onToggleProductClick(product) }
-                        )
+    Column(modifier = modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        Text(
+            "Daftar produk",
+            color = ProductText,
+            style = MaterialTheme.typography.titleMedium,
+            fontWeight = FontWeight.SemiBold,
+        )
+        Card(
+            modifier = Modifier.fillMaxWidth().testTag("product-list-card"),
+            colors = CardDefaults.cardColors(containerColor = Color.White),
+            shape = RoundedCornerShape(20.dp),
+            border = BorderStroke(1.dp, ProductLine.copy(alpha = 0.72f)),
+        ) {
+            Column {
+                if (!compact) ProductTableHeader()
+                when {
+                    uiState.isLoading && products.isEmpty() -> ProductTableSkeletonRows(compact = compact)
+                    uiState.errorMessage != null && products.isEmpty() -> ProductErrorState(message = uiState.errorMessage, onRetry = onRetry)
+                    products.isEmpty() -> ProductEmptyState()
+                    else -> products.forEachIndexed { index, product ->
+                        if (compact) {
+                            ProductCompactRow(
+                                product = product,
+                                onDetail = { onProductDetailClick(product.productId) },
+                                onEdit = { onEditProductClick(product.productId) },
+                                onToggleStatus = { onToggleProductClick(product) },
+                            )
+                        } else {
+                            ProductTableRow(
+                                product = product,
+                                useAlternateBackground = index % 2 != 0,
+                                onDetail = { onProductDetailClick(product.productId) },
+                                onEdit = { onEditProductClick(product.productId) },
+                                onToggleStatus = { onToggleProductClick(product) },
+                            )
+                        }
+                        if (index < products.lastIndex) {
+                            HorizontalDivider(
+                                modifier = if (compact) Modifier.padding(horizontal = 16.dp) else Modifier,
+                                color = ProductLine.copy(alpha = 0.58f),
+                            )
+                        }
                     }
                 }
             }
         }
-
-        ProductPagination(
-            page = uiState.page,
-            totalPages = uiState.totalPages,
-            total = uiState.totalProducts,
-            pageSize = uiState.pageSize,
-            visibleCount = products.size,
-            onPreviousPage = onPreviousPage,
-            onNextPage = onNextPage
-        )
+        if (!uiState.isLoading && uiState.errorMessage == null && uiState.totalProducts > 0) {
+            ProductPagination(
+                page = uiState.page,
+                totalPages = uiState.totalPages,
+                total = uiState.totalProducts,
+                pageSize = uiState.pageSize,
+                visibleCount = products.size,
+                onPreviousPage = onPreviousPage,
+                onNextPage = onNextPage,
+                compact = compact,
+            )
+        }
     }
 }
 
@@ -128,33 +163,55 @@ internal fun ProductListToolbar(
     selectedCategory: String,
     onSearchChanged: (String) -> Unit,
     onCategorySelected: (String) -> Unit,
+    onAddProductClick: (() -> Unit)? = null,
+    onImportProductClick: (() -> Unit)? = null,
     compact: Boolean = false
 ) {
     var categoriesExpanded by remember { mutableStateOf(false) }
+    var showMobileFilters by remember { mutableStateOf(false) }
 
-    val filter: @Composable () -> Unit = {
-        Box {
-            OutlinedButton(
+    val filter: @Composable (Modifier) -> Unit = { filterModifier ->
+        Box(modifier = filterModifier) {
+            Surface(
                 onClick = { categoriesExpanded = true },
-                modifier = Modifier.fillMaxWidth().height(56.dp),
-                shape = RoundedCornerShape(12.dp),
-                border = BorderStroke(1.dp, ProductLine),
-                colors = androidx.compose.material3.ButtonDefaults.outlinedButtonColors(
-                    containerColor = ProductSurface,
-                    contentColor = ProductText
-                )
+                modifier = Modifier.fillMaxWidth().height(50.dp).testTag("product-category-filter"),
+                shape = RoundedCornerShape(14.dp),
+                border = BorderStroke(1.dp, ProductLine.copy(alpha = 0.62f)),
+                color = ProductSurface,
+                contentColor = ProductText,
             ) {
-                Text(selectedCategory, Modifier.weight(1f), maxLines = 1, overflow = TextOverflow.Ellipsis)
-                Icon(Icons.Outlined.ExpandMore, "Pilih kategori", tint = ProductMuted)
+                Row(
+                    modifier = Modifier.fillMaxWidth().padding(horizontal = 14.dp),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Text(
+                        text = selectedCategory,
+                        modifier = Modifier.weight(1f),
+                        color = ProductText,
+                        style = androidx.compose.material3.MaterialTheme.typography.labelLarge,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                    Icon(
+                        imageVector = Icons.Outlined.ExpandMore,
+                        contentDescription = "Pilih kategori",
+                        modifier = Modifier.size(20.dp),
+                        tint = ProductMuted,
+                    )
+                }
             }
             DropdownMenu(
                 expanded = categoriesExpanded,
                 onDismissRequest = { categoriesExpanded = false },
-                modifier = Modifier.width(260.dp).heightIn(max = 320.dp).background(ProductSurface)
+                modifier = Modifier.width(260.dp).heightIn(max = 320.dp),
+                shape = RoundedCornerShape(14.dp),
+                containerColor = ProductSurface,
             ) {
                 categories.forEach { category ->
                     DropdownMenuItem(
                         text = { Text(category, fontWeight = if (category == selectedCategory) FontWeight.SemiBold else FontWeight.Normal) },
+                        modifier = Modifier.testTag("product-category-option-$category"),
                         onClick = { categoriesExpanded = false; onCategorySelected(category) }
                     )
                 }
@@ -162,88 +219,247 @@ internal fun ProductListToolbar(
         }
     }
     val search: @Composable (Modifier) -> Unit = { fieldModifier ->
-        OutlinedTextField(
-            value = searchQuery,
-            onValueChange = onSearchChanged,
-            placeholder = { Text("Cari SKU atau nama produk...", color = ProductMuted, fontSize = 14.sp) },
-            trailingIcon = { Icon(Icons.Outlined.Search, contentDescription = "Cari produk", tint = ProductMuted) },
-            singleLine = true,
-            modifier = fieldModifier.height(56.dp),
-            shape = RoundedCornerShape(12.dp),
-            colors = OutlinedTextFieldDefaults.colors(
-                focusedTextColor = ProductText, unfocusedTextColor = ProductText,
-                cursorColor = ProductPrimaryDark, focusedBorderColor = ProductPrimaryDark,
-                unfocusedBorderColor = ProductLine, focusedContainerColor = ProductSurface,
-                unfocusedContainerColor = ProductSurface
-            )
-        )
+        Surface(
+            modifier = fieldModifier.height(52.dp).testTag("product-search"),
+            color = ProductSoft.copy(alpha = 0.58f),
+            shape = RoundedCornerShape(16.dp),
+            border = BorderStroke(1.dp, ProductLine.copy(alpha = 0.42f)),
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Icon(
+                    imageVector = Icons.Outlined.Search,
+                    contentDescription = "Cari produk",
+                    modifier = Modifier.size(20.dp),
+                    tint = ProductMuted,
+                )
+                BasicTextField(
+                    value = searchQuery,
+                    onValueChange = onSearchChanged,
+                    modifier = Modifier.weight(1f).fillMaxHeight().padding(start = 12.dp),
+                    singleLine = true,
+                    textStyle = androidx.compose.material3.MaterialTheme.typography.bodyMedium.copy(color = ProductText),
+                    decorationBox = { innerTextField ->
+                        Box(contentAlignment = Alignment.CenterStart) {
+                            if (searchQuery.isBlank()) {
+                                Text(
+                                    text = "Cari nama atau SKU",
+                                    color = ProductMuted,
+                                    style = androidx.compose.material3.MaterialTheme.typography.bodyMedium,
+                                    maxLines = 1,
+                                )
+                            }
+                            innerTextField()
+                        }
+                    },
+                )
+            }
+        }
     }
 
-    if (compact) Column(
-        modifier = Modifier.fillMaxWidth(),
-        verticalArrangement = Arrangement.spacedBy(10.dp)
-    ) {
-        search(Modifier.fillMaxWidth())
-        filter()
+    if (compact) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(10.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            search(Modifier.weight(1f))
+            Surface(
+                onClick = { showMobileFilters = true },
+                modifier = Modifier.size(48.dp).testTag("product-open-filters"),
+                shape = RoundedCornerShape(14.dp),
+                color = com.tbterminal.app.ui.theme.TbGreenLight,
+                contentColor = com.tbterminal.app.ui.theme.TbGreenDark,
+                border = BorderStroke(1.dp, ProductLine.copy(alpha = 0.5f))
+            ) {
+                Box(contentAlignment = Alignment.Center) {
+                    Icon(
+                        imageVector = Icons.Outlined.Tune,
+                        contentDescription = "Filter",
+                        modifier = Modifier.size(20.dp)
+                    )
+                }
+            }
+            onAddProductClick?.let { onAdd ->
+                Surface(
+                    onClick = onAdd,
+                    modifier = Modifier.size(48.dp).testTag("product-add"),
+                    shape = RoundedCornerShape(14.dp),
+                    color = Color.White,
+                    contentColor = com.tbterminal.app.ui.theme.TbText,
+                    border = BorderStroke(1.dp, ProductLine.copy(alpha = 0.7f)),
+                    shadowElevation = 1.dp
+                ) {
+                    Box(contentAlignment = Alignment.Center) {
+                        Icon(Icons.Default.Add, contentDescription = "Tambah produk", modifier = Modifier.size(24.dp))
+                    }
+                }
+            }
+        }
+        if (showMobileFilters) {
+            TbMobileControlSheet(
+                title = "Filter produk",
+                subtitle = if (onImportProductClick != null) {
+                    "Pilih kategori atau impor data produk"
+                } else {
+                    "Pilih kategori produk yang ingin ditampilkan"
+                },
+                onDismiss = { showMobileFilters = false },
+                testTag = "product-filter-sheet",
+            ) {
+                Text(
+                    "Kategori",
+                    color = ProductText,
+                    style = androidx.compose.material3.MaterialTheme.typography.labelLarge,
+                    fontWeight = FontWeight.SemiBold,
+                )
+                filter(Modifier.fillMaxWidth())
+                onImportProductClick?.let { onImport ->
+                    OutlinedButton(
+                        onClick = {
+                            showMobileFilters = false
+                            onImport()
+                        },
+                        modifier = Modifier.fillMaxWidth().height(50.dp).testTag("product-import"),
+                        shape = RoundedCornerShape(14.dp),
+                        border = BorderStroke(1.dp, ProductLine.copy(alpha = 0.7f)),
+                        contentPadding = PaddingValues(horizontal = 14.dp),
+                    ) {
+                        Icon(Icons.Outlined.UploadFile, contentDescription = null, modifier = Modifier.size(19.dp))
+                        Spacer(Modifier.width(7.dp))
+                        Text("Impor CSV", maxLines = 1)
+                    }
+                }
+                TbMobileSheetDoneButton(
+                    onClick = { showMobileFilters = false },
+                    testTag = "product-filter-done",
+                )
+            }
+        }
     } else Row(
         modifier = Modifier.fillMaxWidth(),
         horizontalArrangement = Arrangement.spacedBy(16.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
         search(Modifier.weight(1f))
-        Box(modifier = Modifier.width(220.dp)) { filter() }
+        filter(Modifier.width(220.dp))
+        onImportProductClick?.let { onImport ->
+            OutlinedButton(
+                onClick = onImport,
+                modifier = Modifier.height(52.dp).testTag("product-import"),
+                shape = RoundedCornerShape(14.dp),
+                border = BorderStroke(1.dp, ProductLine.copy(alpha = 0.7f)),
+                contentPadding = PaddingValues(horizontal = 16.dp),
+            ) {
+                Icon(Icons.Outlined.UploadFile, contentDescription = null, modifier = Modifier.size(19.dp))
+                Spacer(Modifier.width(7.dp))
+                Text("Impor CSV", maxLines = 1)
+            }
+        }
+        onAddProductClick?.let { onAdd ->
+            Button(
+                onClick = onAdd,
+                modifier = Modifier.height(52.dp).testTag("product-add"),
+                shape = RoundedCornerShape(14.dp),
+                colors = ButtonDefaults.buttonColors(containerColor = ProductPrimaryDark),
+                contentPadding = PaddingValues(horizontal = 18.dp),
+            ) {
+                Icon(
+                    imageVector = Icons.Default.Add,
+                    contentDescription = "Tambah produk",
+                    modifier = Modifier.size(20.dp),
+                )
+                Spacer(Modifier.width(7.dp))
+                Text("Tambah", maxLines = 1)
+            }
+        }
     }
 }
 
 @Composable
-private fun ProductCompactCard(
+private fun ProductCompactRow(
     product: ProductStock,
     onDetail: () -> Unit,
     onEdit: () -> Unit,
     onToggleStatus: () -> Unit
 ) {
     val lowStock = product.quantity <= product.minStock
-    Card(
-        modifier = Modifier.fillMaxWidth().padding(bottom = 10.dp).clickable(onClick = onDetail),
-        colors = CardDefaults.cardColors(containerColor = ProductSurface),
-        shape = RoundedCornerShape(16.dp),
-        border = BorderStroke(1.dp, ProductLine)
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(onClick = onDetail)
+            .padding(horizontal = 16.dp, vertical = 14.dp)
+            .testTag("product-list-row-${product.productId}"),
+        verticalArrangement = Arrangement.spacedBy(10.dp),
     ) {
-        Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-            Row(verticalAlignment = Alignment.Top) {
-                Column(modifier = Modifier.weight(1f)) {
-                    Text(product.productName, color = ProductText, fontWeight = FontWeight.Bold, maxLines = 2)
-                    Text("${product.sku} · ${product.categoryName}", color = ProductMuted, fontSize = 12.sp)
-                }
-                ProductStatusPill(product.isActive)
+        Row(verticalAlignment = Alignment.Top, horizontalArrangement = Arrangement.SpaceBetween) {
+            Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                Text(
+                    product.productName,
+                    color = ProductText,
+                    fontWeight = FontWeight.SemiBold,
+                    fontSize = 15.sp,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis,
+                )
+                Text(
+                    "${product.sku} · ${product.categoryName}",
+                    color = ProductMuted,
+                    fontSize = 12.sp,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
             }
-            Row(horizontalArrangement = Arrangement.SpaceBetween, modifier = Modifier.fillMaxWidth()) {
-                Column {
-                    Text("Harga retail", color = ProductMuted, fontSize = 11.sp)
-                    Text(product.priceRetail.moneyText(), color = ProductText, fontWeight = FontWeight.SemiBold)
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(14.dp), modifier = Modifier.padding(top = 2.dp)) {
+                IconButton(
+                    onClick = onEdit,
+                    modifier = Modifier.size(24.dp).testTag("product-edit-${product.productId}"),
+                ) {
+                    Icon(Icons.Default.Edit, contentDescription = "Edit ${product.productName}", tint = ProductMuted, modifier = Modifier.size(18.dp))
                 }
-                Column(horizontalAlignment = Alignment.End) {
-                    Text("Stok", color = ProductMuted, fontSize = 11.sp)
-                    Text(
-                        "${product.quantity.quantityText()} ${product.unitName}",
-                        color = if (lowStock) ProductDanger else ProductText,
-                        fontWeight = FontWeight.Bold
-                    )
-                }
-            }
-            HorizontalDivider(color = ProductLine)
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                OutlinedButton(onClick = onEdit, shape = RoundedCornerShape(10.dp)) {
-                    Icon(Icons.Default.Edit, null, modifier = Modifier.size(18.dp))
-                    Spacer(Modifier.width(8.dp))
-                    Text("Edit")
-                }
-                Spacer(Modifier.weight(1f))
-                Text(if (product.isActive) "Aktif" else "Nonaktif", color = ProductMuted, fontSize = 12.sp)
-                Spacer(Modifier.width(8.dp))
-                Switch(checked = product.isActive, onCheckedChange = { onToggleStatus() })
+                Icon(
+                    Icons.AutoMirrored.Outlined.KeyboardArrowRight,
+                    contentDescription = "Lihat detail ${product.productName}",
+                    tint = ProductMuted,
+                    modifier = Modifier.size(20.dp),
+                )
             }
         }
+        Row(Modifier.fillMaxWidth().padding(top = 4.dp), horizontalArrangement = Arrangement.spacedBy(10.dp), verticalAlignment = Alignment.Bottom) {
+            ProductCompactMetric("Harga retail", product.priceRetail.moneyText(), Modifier.weight(5f))
+            ProductCompactMetric(
+                "Stok",
+                "${product.quantity.quantityText()} ${product.unitName}",
+                Modifier.weight(4f),
+                if (lowStock) ProductDanger else ProductText,
+            )
+            Column(Modifier.weight(3f), horizontalAlignment = Alignment.End, verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                Text("Aktif", color = ProductMuted, fontSize = 11.sp, fontWeight = FontWeight.Medium)
+                Switch(
+                    checked = product.isActive,
+                    onCheckedChange = { onToggleStatus() },
+                    modifier = Modifier.testTag("product-status-${product.productId}").height(24.dp),
+                    colors = SwitchDefaults.colors(
+                        checkedThumbColor = Color.White,
+                        checkedTrackColor = com.tbterminal.app.ui.theme.TbGreen,
+                        checkedBorderColor = Color.Transparent,
+                        uncheckedThumbColor = Color.White,
+                        uncheckedTrackColor = Color(0xFFE4E4E7),
+                        uncheckedBorderColor = Color(0xFFD4D4D8)
+                    )
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun ProductCompactMetric(label: String, value: String, modifier: Modifier, valueColor: Color = ProductText) {
+    Column(modifier, verticalArrangement = Arrangement.spacedBy(2.dp)) {
+        Text(label, color = ProductMuted, fontSize = 11.sp, maxLines = 1)
+        Text(value, color = valueColor, fontSize = 13.sp, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
     }
 }
 

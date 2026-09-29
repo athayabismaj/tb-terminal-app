@@ -74,6 +74,17 @@ class ProductCategoryViewModel(
         }
     }
 
+    fun openAddForm() {
+        _uiState.update { state ->
+            state.copy(
+                editingCategory = null,
+                nameInput = "",
+                message = null,
+                isFormVisible = true
+            )
+        }
+    }
+
     fun nextPage() {
         val state = _uiState.value
         if (state.page < state.totalPages && !state.isLoading) {
@@ -90,13 +101,23 @@ class ProductCategoryViewModel(
 
     fun edit(category: ProductCategory) {
         _uiState.update { state ->
-            state.copy(editingCategory = category, nameInput = category.name, message = null)
+            state.copy(
+                editingCategory = category,
+                nameInput = category.name,
+                message = null,
+                isFormVisible = true
+            )
         }
     }
 
     fun cancelEdit() {
         _uiState.update { state ->
-            state.copy(editingCategory = null, nameInput = "", message = null)
+            state.copy(
+                editingCategory = null,
+                nameInput = "",
+                message = null,
+                isFormVisible = false
+            )
         }
     }
 
@@ -135,6 +156,7 @@ class ProductCategoryViewModel(
                         isSaving = false,
                         editingCategory = null,
                         nameInput = "",
+                        isFormVisible = false,
                         message = successMessage
                     )
                 }

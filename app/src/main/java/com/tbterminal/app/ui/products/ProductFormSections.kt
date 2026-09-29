@@ -13,7 +13,6 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Info
@@ -22,7 +21,6 @@ import androidx.compose.material.icons.outlined.Payments
 import androidx.compose.material.icons.outlined.Straighten
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Switch
 import androidx.compose.material3.SwitchDefaults
@@ -33,6 +31,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -40,59 +39,79 @@ import androidx.compose.ui.unit.sp
 @Composable
 internal fun ProductFormBody(
     uiState: ProductFormUiState,
-    onInputChanged: (ProductFormInput) -> Unit
+    onInputChanged: (ProductFormInput) -> Unit,
+    compact: Boolean,
 ) {
     when {
         uiState.isLoading -> ProductLoadingState(modifier = Modifier.height(260.dp))
-        else -> ProductLoadedForm(uiState = uiState, onInputChanged = onInputChanged)
+        else -> ProductLoadedForm(uiState = uiState, onInputChanged = onInputChanged, compact = compact)
     }
 }
 
 @Composable
 private fun ProductLoadedForm(
     uiState: ProductFormUiState,
-    onInputChanged: (ProductFormInput) -> Unit
+    onInputChanged: (ProductFormInput) -> Unit,
+    compact: Boolean,
 ) {
     val input = uiState.input
 
-    if (uiState.errorMessage != null) {
-        ProductFormError(message = uiState.errorMessage)
-    }
+    Column(verticalArrangement = Arrangement.spacedBy(if (compact) 12.dp else 16.dp)) {
+        if (uiState.errorMessage != null) {
+            ProductFormError(message = uiState.errorMessage)
+        }
 
-    BasicInfoSection(uiState = uiState, input = input, onInputChanged = onInputChanged)
-    UnitSection(uiState = uiState, input = input, onInputChanged = onInputChanged)
-    PriceSection(input = input, onInputChanged = onInputChanged)
-    StockSection(input = input, onInputChanged = onInputChanged)
+        if (compact) {
+            BasicInfoSection(uiState = uiState, input = input, onInputChanged = onInputChanged, compact = true)
+            UnitSection(uiState = uiState, input = input, onInputChanged = onInputChanged, compact = true)
+            PriceSection(input = input, onInputChanged = onInputChanged, compact = true)
+            StockSection(input = input, onInputChanged = onInputChanged, compact = true)
+        } else {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(16.dp),
+                verticalAlignment = Alignment.Top,
+            ) {
+                Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(16.dp)) {
+                    BasicInfoSection(uiState, input, onInputChanged, compact = false)
+                    UnitSection(uiState, input, onInputChanged, compact = false)
+                }
+                Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(16.dp)) {
+                    PriceSection(input, onInputChanged, compact = false)
+                    StockSection(input, onInputChanged, compact = false)
+                }
+            }
+        }
+    }
 }
 
 @Composable
 private fun BasicInfoSection(
     uiState: ProductFormUiState,
     input: ProductFormInput,
-    onInputChanged: (ProductFormInput) -> Unit
+    onInputChanged: (ProductFormInput) -> Unit,
+    compact: Boolean,
 ) {
-    ProductFormSection(title = "Informasi Dasar", icon = Icons.Outlined.Info) {
+    ProductFormSection(title = "Informasi dasar", sectionTag = "basic", icon = Icons.Outlined.Info, compact = compact) {
         ProductFormInputField(
-            label = "NAMA PRODUK *",
+            label = "Nama produk *",
             value = input.name,
             placeholder = "Contoh: Semen Tiga Roda 50kg",
             onValueChange = { value -> onInputChanged(input.copy(name = value)) }
         )
 
-        Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
-            SkuField(
-                modifier = Modifier.weight(1f),
-                input = input,
-                isEditMode = uiState.isEditMode,
-                onInputChanged = onInputChanged
-            )
-            CategoryField(
-                modifier = Modifier.weight(1f),
-                categories = uiState.categories,
-                selectedCategoryId = input.categoryId,
-                onSelect = { category -> onInputChanged(input.copy(categoryId = category.id)) }
-            )
-        }
+        SkuField(
+            modifier = Modifier.fillMaxWidth(),
+            input = input,
+            isEditMode = uiState.isEditMode,
+            onInputChanged = onInputChanged,
+        )
+        CategoryField(
+            modifier = Modifier.fillMaxWidth(),
+            categories = uiState.categories,
+            selectedCategoryId = input.categoryId,
+            onSelect = { category -> onInputChanged(input.copy(categoryId = category.id)) },
+        )
     }
 }
 
@@ -100,15 +119,18 @@ private fun BasicInfoSection(
 private fun UnitSection(
     uiState: ProductFormUiState,
     input: ProductFormInput,
-    onInputChanged: (ProductFormInput) -> Unit
+    onInputChanged: (ProductFormInput) -> Unit,
+    compact: Boolean,
 ) {
     ProductFormSection(
-        title = "Satuan & Konversi",
+        title = "Satuan & konversi",
+        sectionTag = "units",
         icon = Icons.Outlined.Straighten,
+        compact = compact,
         headerAction = {
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Text("Satuan Kedua", color = ProductMuted, fontSize = 13.sp)
-                Spacer(modifier = Modifier.width(12.dp))
+                Text("Satuan kedua", color = ProductMuted, fontSize = 13.sp)
+                Spacer(modifier = Modifier.width(8.dp))
                 Switch(
                     checked = input.usesSecondaryUnit,
                     onCheckedChange = { enabled ->
@@ -130,7 +152,7 @@ private fun UnitSection(
     ) {
         ProductFormSelectField(
             modifier = Modifier.fillMaxWidth(),
-            label = "SATUAN UTAMA *",
+            label = "Satuan utama *",
             selectedText = uiState.units.selectedUnitLabel(input.baseUnitId),
             options = uiState.units,
             optionText = { unit -> "${unit.name} (${unit.symbol})" },
@@ -149,7 +171,8 @@ private fun UnitSection(
                 modifier = Modifier.fillMaxWidth(),
                 units = uiState.units,
                 input = input,
-                onInputChanged = onInputChanged
+                onInputChanged = onInputChanged,
+                compact = compact,
             )
         }
     }
@@ -158,79 +181,81 @@ private fun UnitSection(
 @Composable
 private fun PriceSection(
     input: ProductFormInput,
-    onInputChanged: (ProductFormInput) -> Unit
+    onInputChanged: (ProductFormInput) -> Unit,
+    compact: Boolean,
 ) {
-    ProductFormSection(title = "Harga & Margin", icon = Icons.Outlined.Payments) {
-        Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
-            ProductFormInputField(
-                modifier = Modifier.weight(1f),
-                label = "HARGA BELI (MODAL)",
-                value = input.priceBuy,
-                placeholder = "0",
-                prefix = "Rp",
-                isNumber = true,
-                onValueChange = { value -> onInputChanged(input.copy(priceBuy = value.numericInput())) }
-            )
-            Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(16.dp)) {
-                PriceInputWithMargin(
-                    label = "HARGA JUAL (RETAIL)",
-                    value = input.priceRetail,
-                    margin = input.priceRetail.marginText(input.priceBuy),
-                    onValueChange = { value -> onInputChanged(input.copy(priceRetail = value.numericInput())) }
-                )
-                PriceInputWithMargin(
-                    label = "HARGA JUAL (KONTRAKTOR)",
-                    value = input.priceContractor,
-                    margin = input.priceContractor.marginText(input.priceBuy),
-                    onValueChange = { value -> onInputChanged(input.copy(priceContractor = value.numericInput())) }
-                )
-            }
-        }
+    ProductFormSection(title = "Harga & margin", sectionTag = "prices", icon = Icons.Outlined.Payments, compact = compact) {
+        ProductFormInputField(
+            modifier = Modifier.fillMaxWidth(),
+            label = "Harga beli (modal)",
+            value = input.priceBuy,
+            placeholder = "0",
+            prefix = "Rp",
+            isNumber = true,
+            onValueChange = { value -> onInputChanged(input.copy(priceBuy = value.numericInput())) },
+        )
+        PriceInputWithMargin(
+            label = "Harga jual retail",
+            value = input.priceRetail,
+            margin = input.priceRetail.marginText(input.priceBuy),
+            onValueChange = { value -> onInputChanged(input.copy(priceRetail = value.numericInput())) },
+        )
+        PriceInputWithMargin(
+            label = "Harga jual kontraktor",
+            value = input.priceContractor,
+            margin = input.priceContractor.marginText(input.priceBuy),
+            onValueChange = { value -> onInputChanged(input.copy(priceContractor = value.numericInput())) },
+        )
     }
 }
 
 @Composable
 private fun StockSection(
     input: ProductFormInput,
-    onInputChanged: (ProductFormInput) -> Unit
+    onInputChanged: (ProductFormInput) -> Unit,
+    compact: Boolean,
 ) {
-    ProductFormSection(title = "Stok", icon = Icons.Outlined.Inventory2) {
-        Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
-            ReadOnlyInfoField(
-                modifier = Modifier.weight(1f),
-                label = "STOK AWAL",
-                value = "0",
-                helper = "Stok awal masuk lewat Barang Masuk atau Stok Opname."
-            )
-            ProductFormInputField(
-                modifier = Modifier.weight(1f),
-                label = "STOK MINIMUM (ALERT)",
-                value = input.minStock,
-                placeholder = "0",
-                isNumber = true,
-                onValueChange = { value -> onInputChanged(input.copy(minStock = value.numericInput())) }
-            )
-        }
+    ProductFormSection(title = "Stok", sectionTag = "stock", icon = Icons.Outlined.Inventory2, compact = compact) {
+        ReadOnlyInfoField(
+            modifier = Modifier.fillMaxWidth(),
+            label = "Stok awal",
+            value = "0",
+            helper = "Dicatat melalui Barang Masuk atau Stok Opname.",
+        )
+        ProductFormInputField(
+            modifier = Modifier.fillMaxWidth(),
+            label = "Stok minimum",
+            value = input.minStock,
+            placeholder = "0",
+            isNumber = true,
+            onValueChange = { value -> onInputChanged(input.copy(minStock = value.numericInput())) },
+        )
     }
 }
 
 @Composable
 internal fun ProductFormSection(
     title: String,
+    sectionTag: String,
     icon: ImageVector,
+    compact: Boolean,
     headerAction: @Composable (() -> Unit)? = null,
     content: @Composable ColumnScope.() -> Unit
 ) {
     Card(
-        modifier = Modifier.fillMaxWidth(),
+        modifier = Modifier.fillMaxWidth().testTag("product-form-section-$sectionTag"),
         colors = CardDefaults.cardColors(containerColor = ProductSurface),
-        shape = RoundedCornerShape(8.dp),
-        border = BorderStroke(1.dp, ProductLine)
+        shape = RoundedCornerShape(18.dp),
+        border = BorderStroke(1.dp, ProductLine.copy(alpha = 0.72f)),
+        elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
     ) {
-        Column(modifier = Modifier.padding(24.dp)) {
-            ProductFormSectionHeader(title = title, icon = icon, headerAction = headerAction)
-            HorizontalDivider(color = ProductLine, modifier = Modifier.padding(bottom = 16.dp))
-            Column(verticalArrangement = Arrangement.spacedBy(16.dp), content = content)
+        Column(modifier = Modifier.padding(if (compact) 16.dp else 20.dp)) {
+            ProductFormSectionHeader(title = title, icon = icon, headerAction = headerAction, compact = compact)
+            Column(
+                modifier = Modifier.padding(top = 18.dp),
+                verticalArrangement = Arrangement.spacedBy(16.dp),
+                content = content,
+            )
         }
     }
 }
@@ -239,28 +264,40 @@ internal fun ProductFormSection(
 private fun ProductFormSectionHeader(
     title: String,
     icon: ImageVector,
-    headerAction: @Composable (() -> Unit)?
+    headerAction: @Composable (() -> Unit)?,
+    compact: Boolean,
 ) {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(bottom = 16.dp),
-        horizontalArrangement = Arrangement.SpaceBetween,
-        verticalAlignment = Alignment.CenterVertically
-    ) {
+    val titleContent: @Composable () -> Unit = {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Box(
                 modifier = Modifier
-                    .size(32.dp)
-                    .clip(CircleShape)
-                    .background(ProductPrimary.copy(alpha = 0.14f)),
+                    .size(36.dp)
+                    .clip(RoundedCornerShape(11.dp))
+                    .background(ProductPrimary.copy(alpha = 0.10f)),
                 contentAlignment = Alignment.Center
             ) {
-                Icon(icon, contentDescription = null, tint = ProductPrimaryDark, modifier = Modifier.size(18.dp))
+                Icon(icon, contentDescription = null, tint = ProductPrimaryDark, modifier = Modifier.size(20.dp))
             }
-            Spacer(modifier = Modifier.width(12.dp))
-            Text(title, color = ProductText, fontSize = 16.sp, fontWeight = FontWeight.Bold)
+            Spacer(modifier = Modifier.width(10.dp))
+            Text(title, color = ProductText, fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
         }
-        headerAction?.invoke()
+    }
+
+    if (compact && headerAction != null) {
+        Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+            titleContent()
+            Box(modifier = Modifier.fillMaxWidth(), contentAlignment = Alignment.CenterEnd) {
+                headerAction()
+            }
+        }
+    } else {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            titleContent()
+            headerAction?.invoke()
+        }
     }
 }

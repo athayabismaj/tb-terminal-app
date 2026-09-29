@@ -13,20 +13,18 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.ChevronLeft
-import androidx.compose.material.icons.filled.ChevronRight
+import androidx.compose.material.icons.automirrored.outlined.KeyboardArrowRight
 import androidx.compose.material.icons.outlined.Edit
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
@@ -41,20 +39,23 @@ import com.tbterminal.app.ui.products.ProductSurface
 import com.tbterminal.app.ui.products.ProductText
 import com.tbterminal.app.ui.products.components.ProductListToolbar
 import com.tbterminal.app.ui.products.moneyText
+import com.tbterminal.app.ui.components.TbPagination
 import java.math.BigDecimal
 
 @Composable
 internal fun PriceManagementToolbar(
     state: PriceManagementUiState,
     onSearchChanged: (String) -> Unit,
-    onCategorySelected: (String) -> Unit
+    onCategorySelected: (String) -> Unit,
+    compact: Boolean,
 ) {
     ProductListToolbar(
         searchQuery = state.searchQuery,
         categories = state.availableCategories,
         selectedCategory = state.selectedCategory,
         onSearchChanged = onSearchChanged,
-        onCategorySelected = onCategorySelected
+        onCategorySelected = onCategorySelected,
+        compact = compact,
     )
 }
 
@@ -64,41 +65,101 @@ internal fun PriceManagementTable(
     onEdit: (ProductStock) -> Unit,
     compact: Boolean = false
 ) {
-    Column(modifier = Modifier.fillMaxWidth()) {
-        if (!compact) PriceTableHeader()
-        products.forEachIndexed { index, product ->
-            if (compact) PriceMobileRow(product) { onEdit(product) } else PriceTableRow(
-                product = product,
-                useAlternateBackground = index % 2 != 0,
-                onEdit = { onEdit(product) }
-            )
+    Surface(
+        modifier = Modifier.fillMaxWidth().testTag("price-product-list-card"),
+        color = Color.White,
+        shape = RoundedCornerShape(20.dp),
+        border = BorderStroke(1.dp, ProductLine.copy(alpha = 0.72f)),
+    ) {
+        Column {
+            if (!compact) PriceTableHeader()
+            products.forEachIndexed { index, product ->
+                if (compact) PriceMobileRow(product) { onEdit(product) } else PriceTableRow(
+                    product = product,
+                    useAlternateBackground = index % 2 != 0,
+                    onEdit = { onEdit(product) }
+                )
+                if (index < products.lastIndex) {
+                    HorizontalDivider(
+                        modifier = if (compact) Modifier.padding(horizontal = 16.dp) else Modifier,
+                        color = ProductLine.copy(alpha = 0.58f),
+                    )
+                }
+            }
         }
     }
 }
 
 @Composable
 private fun PriceMobileRow(product: ProductStock, onEdit: () -> Unit) {
-    Column(Modifier.fillMaxWidth().clickable(onClick = onEdit).padding(horizontal = 16.dp, vertical = 14.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-        Row(verticalAlignment = Alignment.Top) {
-            Column(Modifier.weight(1f)) {
-                Text(product.productName, color = ProductText, fontWeight = FontWeight.Bold, maxLines = 2, overflow = TextOverflow.Ellipsis)
-                Text("${product.sku} · ${product.categoryName}", color = ProductMuted, fontSize = 11.sp)
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(onClick = onEdit)
+            .padding(horizontal = 16.dp, vertical = 14.dp)
+            .testTag("price-product-card-${product.productId}"),
+        verticalArrangement = Arrangement.spacedBy(10.dp),
+    ) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                Text(
+                    product.productName,
+                    color = ProductText,
+                    fontWeight = FontWeight.SemiBold,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis,
+                )
+                Text(
+                    "${product.sku} · ${product.categoryName.ifBlank { "Tanpa kategori" }}",
+                    modifier = Modifier.testTag("price-product-category"),
+                    color = ProductMuted,
+                    fontSize = 12.sp,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
             }
-            Icon(Icons.Outlined.Edit, "Edit harga", tint = ProductMuted)
+            Icon(
+                Icons.AutoMirrored.Outlined.KeyboardArrowRight,
+                contentDescription = "Edit harga ${product.productName}",
+                tint = ProductMuted,
+                modifier = Modifier.padding(start = 6.dp).size(22.dp),
+            )
         }
-        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-            PriceMobileValue("Beli", product.priceBuy.moneyText())
-            PriceMobileValue("Jual", product.priceRetail.moneyText(), Alignment.CenterHorizontally)
-            PriceMobileValue("Kontraktor", product.priceContractor.moneyText(), Alignment.End)
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+            PriceMobileValue("Harga beli", product.priceBuy.moneyText(), Modifier.weight(1f))
+            PriceMobileValue("Harga jual", product.priceRetail.moneyText(), Modifier.weight(1f), Alignment.CenterHorizontally, true)
+            PriceMobileValue("Kontraktor", product.priceContractor.moneyText(), Modifier.weight(1f), Alignment.End)
         }
-        if (product.discount > BigDecimal.ZERO) Text("Diskon ${product.discount.moneyText()}", color = Color(0xFFEF4444), fontSize = 12.sp, fontWeight = FontWeight.Bold)
+        if (product.discount > BigDecimal.ZERO) {
+            Text(
+                "Diskon ${product.discount.moneyText()}",
+                color = androidx.compose.material3.MaterialTheme.colorScheme.error,
+                fontSize = 11.sp,
+                fontWeight = FontWeight.SemiBold,
+            )
+        }
     }
-    HorizontalDivider(color = ProductLine)
 }
 
 @Composable
-private fun PriceMobileValue(label: String, value: String, alignment: Alignment.Horizontal = Alignment.Start) {
-    Column(horizontalAlignment = alignment) { Text(label, color = ProductMuted, fontSize = 10.sp); Text(value, color = ProductText, fontSize = 12.sp, fontWeight = FontWeight.SemiBold) }
+private fun PriceMobileValue(
+    label: String,
+    value: String,
+    modifier: Modifier,
+    alignment: Alignment.Horizontal = Alignment.Start,
+    emphasized: Boolean = false,
+) {
+    Column(modifier = modifier, horizontalAlignment = alignment, verticalArrangement = Arrangement.spacedBy(2.dp)) {
+        Text(label, color = ProductMuted, fontSize = 11.sp, maxLines = 1)
+        Text(
+            value,
+            color = if (emphasized) ProductPrimaryDark else ProductText,
+            fontSize = 13.sp,
+            fontWeight = if (emphasized) FontWeight.Bold else FontWeight.SemiBold,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+        )
+    }
 }
 
 @Composable
@@ -110,8 +171,7 @@ private fun PriceTableHeader() {
             .padding(horizontal = 24.dp, vertical = 16.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        PriceHeader("INFORMASI PRODUK", Modifier.weight(2.3f))
-        PriceHeader("SKU & KATEGORI", Modifier.weight(1.8f))
+        PriceHeader("PRODUK", Modifier.weight(3.1f))
         PriceHeader("HARGA BELI", Modifier.weight(1.35f), Alignment.End)
         PriceHeader("HARGA RETAIL", Modifier.weight(1.35f), Alignment.End)
         PriceHeader("KONTRAKTOR", Modifier.weight(1.35f), Alignment.End)
@@ -134,18 +194,23 @@ private fun PriceTableRow(
             .padding(horizontal = 24.dp, vertical = 18.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        Text(
-            text = product.productName,
-            modifier = Modifier.weight(2.3f),
-            color = ProductText,
-            fontSize = 14.sp,
-            fontWeight = FontWeight.Medium,
-            maxLines = 2,
-            overflow = TextOverflow.Ellipsis
-        )
-        Column(modifier = Modifier.weight(1.8f)) {
-            Text(product.sku, color = ProductText, fontSize = 14.sp)
-            Text(product.categoryName, color = ProductMuted, fontSize = 14.sp, modifier = Modifier.padding(top = 2.dp))
+        Column(modifier = Modifier.weight(3.1f).padding(end = 16.dp)) {
+            Text(
+                text = product.productName,
+                color = ProductText,
+                fontSize = 14.sp,
+                fontWeight = FontWeight.SemiBold,
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis,
+            )
+            Text(
+                "${product.sku} · ${product.categoryName}",
+                color = ProductMuted,
+                fontSize = 12.sp,
+                modifier = Modifier.padding(top = 3.dp),
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
         }
         PriceValue(product.priceBuy.moneyText(), Modifier.weight(1.35f))
         PriceValue(product.priceRetail.moneyText(), Modifier.weight(1.35f), FontWeight.SemiBold)
@@ -157,7 +222,6 @@ private fun PriceTableRow(
             }
         }
     }
-    HorizontalDivider(color = ProductLine)
 }
 
 @Composable
@@ -228,49 +292,13 @@ internal fun PriceManagementPagination(
         "Menampilkan $visibleCount produk kategori pada halaman ini"
     }
 
-    val controls: @Composable () -> Unit = { Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
-        PricePageButton(Icons.Default.ChevronLeft, safePage > 1, onPreviousPage)
-        Text("$safePage / $safeTotalPages", color = ProductText, fontWeight = FontWeight.Bold)
-        PricePageButton(Icons.Default.ChevronRight, safePage < safeTotalPages, onNextPage)
-    } }
-    if (compact) Column(Modifier.fillMaxWidth().background(ProductSoft).padding(14.dp), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(10.dp)) {
-        Text("${state.totalProducts} produk", color = ProductMuted, fontSize = 12.sp)
-        controls()
-    } else Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .background(ProductSoft.copy(alpha = 0.72f))
-            .padding(horizontal = 20.dp, vertical = 14.dp),
-        horizontalArrangement = Arrangement.SpaceBetween,
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        Column {
-            Text(rangeText, color = ProductText, fontSize = 13.sp, fontWeight = FontWeight.Medium)
-            Text(
-                text = "Maksimal ${state.pageSize} produk per halaman",
-                color = ProductMuted,
-                fontSize = 11.sp,
-                modifier = Modifier.padding(top = 2.dp)
-            )
-        }
-        controls()
-    }
-}
-
-@Composable
-private fun PricePageButton(
-    icon: ImageVector,
-    enabled: Boolean,
-    onClick: () -> Unit
-) {
-    OutlinedButton(
-        onClick = onClick,
-        enabled = enabled,
-        shape = RoundedCornerShape(12.dp),
-        border = BorderStroke(1.dp, ProductLine),
-        contentPadding = PaddingValues(0.dp),
-        modifier = Modifier.size(34.dp)
-    ) {
-        Icon(icon, contentDescription = null, tint = if (enabled) ProductText else ProductMuted.copy(alpha = 0.35f))
-    }
+    TbPagination(
+        currentPage = safePage,
+        totalPages = safeTotalPages,
+        onPreviousPage = onPreviousPage,
+        onNextPage = onNextPage,
+        supportingText = if (compact) "${state.totalProducts} produk" else rangeText,
+        isLoading = state.isLoading,
+        testTag = "price-management-pagination",
+    )
 }
