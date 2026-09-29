@@ -26,6 +26,8 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Close
+import androidx.compose.material3.Button
 
 import androidx.compose.material.icons.filled.ChevronLeft
 import androidx.compose.material.icons.filled.ChevronRight
@@ -529,40 +531,241 @@ private fun PurchasePageButton(enabled: Boolean, onClick: () -> Unit, icon: Imag
 }
 
 @Composable
+@OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class)
 private fun PurchaseDetailDialog(detail: PurchaseDetail, onDismiss: () -> Unit) {
-    Dialog(onDismissRequest = onDismiss) {
-        Card(Modifier.widthIn(max = 760.dp).heightIn(max = 680.dp), colors = CardDefaults.cardColors(Color.White), shape = RoundedCornerShape(12.dp)) {
-            Column(Modifier.verticalScroll(rememberScrollState()).padding(24.dp)) {
-                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                    Column {
-                        Text("Detail Nota Pembelian", fontSize = 20.sp, fontWeight = FontWeight.Bold, color = PurchaseText)
-                        Text(detail.invoiceNo ?: "Tanpa nomor nota", color = PurchasePrimary, fontSize = 13.sp)
+    androidx.compose.material3.ModalBottomSheet(
+        onDismissRequest = onDismiss,
+        containerColor = Color.White,
+        dragHandle = {
+            Column(
+                modifier = Modifier.fillMaxWidth().padding(top = 12.dp, bottom = 4.dp),
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                Box(
+                    modifier = Modifier.width(48.dp).height(6.dp).background(Color(0xFFE2E8F0), RoundedCornerShape(50))
+                )
+            }
+        },
+        shape = RoundedCornerShape(topStart = 32.dp, topEnd = 32.dp)
+    ) {
+        Column(
+            modifier = Modifier.fillMaxWidth().padding(bottom = 24.dp)
+        ) {
+            // Header
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 24.dp)
+                    .padding(bottom = 16.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Column {
+                    Text(
+                        text = "Detail Nota Pembelian",
+                        fontSize = 18.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = Color(0xFF0F172A),
+                        letterSpacing = (-0.5).sp
+                    )
+                    Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(top = 2.dp)) {
+                        Box(modifier = Modifier.size(6.dp).background(Color(0xFF256B57), RoundedCornerShape(50)))
+                        Spacer(Modifier.width(6.dp))
+                        Text(
+                            text = detail.invoiceNo ?: "Tanpa nomor nota",
+                            color = Color(0xFF64748B),
+                            fontSize = 12.sp,
+                            fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace,
+                            fontWeight = FontWeight.Medium,
+                            letterSpacing = 0.5.sp
+                        )
                     }
-                    TextButton(onClick = onDismiss) { Text("Tutup") }
                 }
-                Spacer(Modifier.height(16.dp))
-                DetailInfo("Supplier", detail.supplierName)
-                DetailInfo("Tanggal masuk", detail.receivedAt.asDisplayDate())
-                DetailInfo("Catatan", detail.notes ?: "-")
-                Spacer(Modifier.height(16.dp))
-                Text("Item Pembelian", color = PurchaseText, fontWeight = FontWeight.Bold)
-                Spacer(Modifier.height(8.dp))
-                detail.items.forEach { item ->
-                    Row(Modifier.fillMaxWidth().padding(vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
-                        Icon(Icons.Outlined.Inventory2, null, tint = PurchasePrimary, modifier = Modifier.size(18.dp))
-                        Spacer(Modifier.width(8.dp))
-                        Column(Modifier.weight(1f)) {
-                            Text(item.productName, color = PurchaseText, fontWeight = FontWeight.SemiBold)
-                            Text("${item.quantity.stripTrailingZeros().toPlainString()} x ${item.priceAtTransaction.asCurrency()}", color = PurchaseMuted, fontSize = 12.sp)
+                Box(
+                    modifier = Modifier
+                        .size(36.dp)
+                        .background(Color(0xFFF1F5F9), RoundedCornerShape(50))
+                        .clickable(onClick = onDismiss),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(
+                        Icons.Default.Close,
+                        contentDescription = "Tutup",
+                        tint = Color(0xFF64748B),
+                        modifier = Modifier.size(20.dp)
+                    )
+                }
+            }
+
+            HorizontalDivider(color = Color(0xFFF1F5F9))
+
+            // Content Scroll
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .weight(1f, fill = false)
+                    .verticalScroll(rememberScrollState())
+                    .padding(horizontal = 24.dp, vertical = 16.dp),
+                verticalArrangement = Arrangement.spacedBy(16.dp)
+            ) {
+                // Metadata section
+                Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    DetailInfoMobile("Supplier", detail.supplierName, false)
+                    DetailInfoMobile("Tanggal Masuk", detail.receivedAt.asDisplayDate(), false)
+                    DetailInfoMobile("Catatan", detail.notes ?: "Tidak ada catatan", true)
+                }
+
+                HorizontalDivider(color = Color(0xFFF1F5F9))
+
+                // Item Pembelian
+                Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth().padding(bottom = 4.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            text = "ITEM PEMBELIAN",
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = Color(0xFF94A3B8),
+                            letterSpacing = 1.sp
+                        )
+                        Box(
+                            modifier = Modifier.background(Color(0xFFF1F5F9), RoundedCornerShape(50)).padding(horizontal = 8.dp, vertical = 2.dp)
+                        ) {
+                            Text(
+                                text = "${detail.items.size} Macam",
+                                color = Color(0xFF64748B),
+                                fontSize = 11.sp,
+                                fontWeight = FontWeight.SemiBold
+                            )
                         }
-                        Text(item.subtotal.asCurrency(), color = PurchaseText, fontWeight = FontWeight.Bold)
                     }
-                    HorizontalDivider(color = PurchaseBorder)
+
+                    detail.items.forEach { item ->
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .background(Color(0xFFF8FAFC), RoundedCornerShape(16.dp))
+                                .border(1.dp, Color(0xFFF1F5F9), RoundedCornerShape(16.dp))
+                                .padding(14.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Box(
+                                modifier = Modifier
+                                    .size(44.dp)
+                                    .background(Color(0xFFEBF3F0), RoundedCornerShape(12.dp)),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Icon(
+                                    Icons.Outlined.Inventory2,
+                                    contentDescription = null,
+                                    tint = Color(0xFF256B57),
+                                    modifier = Modifier.size(20.dp)
+                                )
+                            }
+                            Spacer(Modifier.width(14.dp))
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text(
+                                    text = item.productName,
+                                    color = Color(0xFF0F172A),
+                                    fontSize = 14.sp,
+                                    fontWeight = FontWeight.SemiBold
+                                )
+                                Row(
+                                    modifier = Modifier.padding(top = 4.dp),
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Text(
+                                        text = "${item.quantity.stripTrailingZeros().toPlainString()} sak",
+                                        color = Color(0xFF334155),
+                                        fontSize = 12.sp,
+                                        fontWeight = FontWeight.Medium
+                                    )
+                                    Text(
+                                        text = " x ",
+                                        color = Color(0xFFCBD5E1),
+                                        fontSize = 12.sp
+                                    )
+                                    Text(
+                                        text = item.priceAtTransaction.asCurrency(),
+                                        color = Color(0xFF64748B),
+                                        fontSize = 12.sp
+                                    )
+                                }
+                            }
+                            Text(
+                                text = item.subtotal.asCurrency(),
+                                color = Color(0xFF0F172A),
+                                fontSize = 14.sp,
+                                fontWeight = FontWeight.Bold
+                            )
+                        }
+                    }
                 }
-                Spacer(Modifier.height(12.dp))
-                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                    Text("TOTAL", color = PurchaseMuted, fontWeight = FontWeight.Bold)
-                    Text(detail.total.asCurrency(), color = PurchasePrimary, fontSize = 18.sp, fontWeight = FontWeight.ExtraBold)
+
+                // Payment Summary
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(top = 4.dp)
+                        .background(Color(0xFFF9FBFA), RoundedCornerShape(16.dp))
+                        .border(1.dp, Color(0xFF256B57).copy(alpha = 0.1f), RoundedCornerShape(16.dp))
+                        .padding(16.dp)
+                ) {
+                    Row(modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp), horizontalArrangement = Arrangement.SpaceBetween) {
+                        Text("Subtotal Produk", color = Color(0xFF64748B), fontSize = 12.sp)
+                        Text(detail.total.asCurrency(), color = Color(0xFF334155), fontSize = 13.sp, fontWeight = FontWeight.Medium)
+                    }
+                    Row(modifier = Modifier.fillMaxWidth().padding(bottom = 12.dp), horizontalArrangement = Arrangement.SpaceBetween) {
+                        Text("Pajak & Biaya Lain", color = Color(0xFF64748B), fontSize = 12.sp)
+                        Text("Rp0,00", color = Color(0xFF94A3B8), fontSize = 13.sp, fontWeight = FontWeight.Medium)
+                    }
+                    
+                    HorizontalDivider(
+                        modifier = Modifier.padding(bottom = 12.dp).drawBehind {
+                            drawLine(
+                                color = Color(0xFFE2E8F0),
+                                start = androidx.compose.ui.geometry.Offset(0f, 0f),
+                                end = androidx.compose.ui.geometry.Offset(size.width, 0f),
+                                strokeWidth = 1.dp.toPx(),
+                                pathEffect = androidx.compose.ui.graphics.PathEffect.dashPathEffect(floatArrayOf(5f, 5f), 0f)
+                            )
+                        },
+                        color = Color.Transparent
+                    )
+
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Column {
+                            Text("TOTAL PEMBELIAN", color = Color(0xFF475569), fontSize = 11.sp, fontWeight = FontWeight.Bold, letterSpacing = 0.5.sp)
+                            Text("Lunas via Kasir", color = Color(0xFF94A3B8), fontSize = 11.sp, modifier = Modifier.padding(top = 2.dp))
+                        }
+                        Text(
+                            text = detail.total.asCurrency(),
+                            color = Color(0xFF256B57),
+                            fontSize = 20.sp,
+                            fontWeight = FontWeight.ExtraBold,
+                            letterSpacing = (-0.5).sp
+                        )
+                    }
+                }
+            }
+
+            // Footer Button
+            HorizontalDivider(color = Color(0xFFF1F5F9))
+            Box(modifier = Modifier.fillMaxWidth().padding(24.dp)) {
+                Button(
+                    onClick = onDismiss,
+                    modifier = Modifier.fillMaxWidth().height(52.dp),
+                    shape = RoundedCornerShape(12.dp),
+                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF256B57))
+                ) {
+                    Text("Selesai", fontSize = 15.sp, fontWeight = FontWeight.SemiBold)
                 }
             }
         }
@@ -570,10 +773,39 @@ private fun PurchaseDetailDialog(detail: PurchaseDetail, onDismiss: () -> Unit) 
 }
 
 @Composable
-private fun DetailInfo(label: String, value: String) {
-    Row(Modifier.fillMaxWidth().padding(vertical = 4.dp), horizontalArrangement = Arrangement.SpaceBetween) {
-        Text(label, color = PurchaseMuted)
-        Text(value, color = PurchaseText, fontWeight = FontWeight.SemiBold)
+private fun DetailInfoMobile(label: String, value: String, isNote: Boolean) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Text(
+            text = label,
+            color = Color(0xFF64748B),
+            fontSize = 14.sp
+        )
+        if (isNote && (value == "Tidak ada catatan" || value == "-")) {
+            Box(
+                modifier = Modifier
+                    .background(Color(0xFFF8FAFC), RoundedCornerShape(6.dp))
+                    .border(1.dp, Color(0xFFF1F5F9), RoundedCornerShape(6.dp))
+                    .padding(horizontal = 8.dp, vertical = 2.dp)
+            ) {
+                Text(
+                    text = "Tidak ada catatan",
+                    color = Color(0xFF94A3B8),
+                    fontSize = 12.sp,
+                    fontStyle = androidx.compose.ui.text.font.FontStyle.Italic
+                )
+            }
+        } else {
+            Text(
+                text = value,
+                color = Color(0xFF0F172A),
+                fontSize = 14.sp,
+                fontWeight = FontWeight.Medium
+            )
+        }
     }
 }
 
