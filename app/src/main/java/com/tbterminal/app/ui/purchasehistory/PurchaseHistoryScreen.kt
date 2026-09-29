@@ -1,6 +1,11 @@
 package com.tbterminal.app.ui.purchasehistory
 
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
+
+import androidx.compose.material.icons.outlined.SignalCellularAlt
+
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -21,14 +26,16 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.outlined.ReceiptLong
+
 import androidx.compose.material.icons.filled.ChevronLeft
 import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material.icons.outlined.Business
 import androidx.compose.material.icons.outlined.ExpandMore
 import androidx.compose.material.icons.outlined.Inventory2
 import androidx.compose.material.icons.outlined.MonetizationOn
-import androidx.compose.material.icons.outlined.Search
+
+
+
 import androidx.compose.material.icons.outlined.Visibility
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
@@ -51,6 +58,8 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
@@ -89,12 +98,40 @@ internal fun PurchaseHistoryScreen(
     BoxWithConstraints(modifier.fillMaxSize().background(PurchaseBackground)) {
         val compact = maxWidth < 700.dp
         Column(
-            modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState())
-                .padding(horizontal = if (compact) 16.dp else 32.dp, vertical = if (compact) 14.dp else 24.dp),
-            verticalArrangement = Arrangement.spacedBy(if (compact) 14.dp else 22.dp)
+            modifier = Modifier
+                .align(Alignment.TopCenter)
+                .fillMaxSize()
+                .verticalScroll(rememberScrollState())
+                .padding(
+                    horizontal = if (compact) 16.dp else 28.dp,
+                    vertical = if (compact) 14.dp else 20.dp,
+                )
+                .testTag("purchase-history-content"),
+            verticalArrangement = Arrangement.spacedBy(if (compact) 16.dp else 16.dp),
         ) {
-            PurchaseSummaryCards(uiState, compact)
-            PurchaseToolbar(uiState, compact, onSupplierSelected, onSearchChanged)
+            if (compact) {
+                Row(
+                    modifier = Modifier.fillMaxWidth().padding(bottom = 4.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    IconButton(
+                        onClick = onBack,
+                        modifier = Modifier.size(40.dp).background(Color(0xFFF1F5F9), CircleShape)
+                    ) {
+                        Icon(Icons.Default.ChevronLeft, contentDescription = "Kembali", tint = Color(0xFF0F172A), modifier = Modifier.size(24.dp))
+                    }
+                    Text("Riwayat Pembelian", color = Color(0xFF0F172A), fontSize = 20.sp, fontWeight = FontWeight.Bold, letterSpacing = (-0.5).sp)
+                }
+            }
+
+            PurchaseToolbar(
+                uiState = uiState,
+                compact = compact,
+                onSupplierSelected = onSupplierSelected,
+                onSearchChanged = onSearchChanged,
+                onOpenMobileFilters = { showMobileFilters = true },
+            )
             PurchaseTable(uiState, compact, onRefresh, onShowDetail, onPreviousPage, onNextPage)
         }
     }
@@ -110,12 +147,12 @@ private fun PurchaseHeader() {
 private fun PurchaseSummaryCards(uiState: PurchaseHistoryUiState, compact: Boolean) {
     if (compact) Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-            PurchaseMetric("Total nota", uiState.totalPurchases.toString(), "Sesuai filter", Icons.AutoMirrored.Outlined.ReceiptLong, PurchasePrimary, Modifier.weight(1f), true)
+            PurchaseMetric("Total nota", uiState.totalPurchases.toString(), "Sesuai filter", Icons.Outlined.ReceiptLong, PurchasePrimary, Modifier.weight(1f), true)
             PurchaseMetric("Nilai halaman", uiState.pageTotal.asCurrency(), "Halaman ini", Icons.Outlined.MonetizationOn, Color(0xFF2563EB), Modifier.weight(1f), true)
         }
         PurchaseMetric("Supplier aktif", uiState.suppliers.size.toString(), "Tersedia pada filter", Icons.Outlined.Business, Color(0xFFF59E0B), Modifier.fillMaxWidth(), true)
     } else Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(16.dp)) {
-        PurchaseMetric("TOTAL NOTA", uiState.totalPurchases.toString(), "Sesuai filter aktif", Icons.AutoMirrored.Outlined.ReceiptLong, PurchasePrimary, Modifier.weight(1f))
+        PurchaseMetric("TOTAL NOTA", uiState.totalPurchases.toString(), "Sesuai filter aktif", Icons.Outlined.ReceiptLong, PurchasePrimary, Modifier.weight(1f))
         PurchaseMetric("NILAI HALAMAN INI", uiState.pageTotal.asCurrency(), "Maksimal ${uiState.pageSize} nota", Icons.Outlined.MonetizationOn, Color(0xFF2563EB), Modifier.weight(1f))
         PurchaseMetric("SUPPLIER AKTIF", uiState.suppliers.size.toString(), "Tersedia pada filter", Icons.Outlined.Business, Color(0xFFF59E0B), Modifier.weight(1f))
     }
@@ -124,54 +161,41 @@ private fun PurchaseSummaryCards(uiState: PurchaseHistoryUiState, compact: Boole
 @Composable
 private fun PurchaseMetric(title: String, value: String, note: String, icon: ImageVector, tint: Color, modifier: Modifier, compact: Boolean = false) {
     Card(modifier, colors = CardDefaults.cardColors(Color.White), border = BorderStroke(1.dp, PurchaseBorder), shape = RoundedCornerShape(if (compact) 18.dp else 12.dp)) {
-        Column(Modifier.padding(if (compact) 14.dp else 18.dp)) {
-            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                Text(title, fontSize = 10.sp, color = Color(0xFF94A3B8), fontWeight = FontWeight.Bold)
-                Icon(icon, null, tint = tint, modifier = Modifier.size(20.dp))
-            }
-            Spacer(Modifier.height(10.dp))
-            Text(value, fontSize = if (compact) 18.sp else 22.sp, color = PurchaseText, fontWeight = FontWeight.ExtraBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
-            Text(note, fontSize = 11.sp, color = PurchaseMuted)
-        }
-    }
-}
-
-@Composable
-private fun PurchaseTable(
-    uiState: PurchaseHistoryUiState,
-    compact: Boolean,
-    onRefresh: () -> Unit,
-    onShowDetail: (String) -> Unit,
-    onPreviousPage: () -> Unit,
-    onNextPage: () -> Unit
-) {
-    Column(Modifier.fillMaxWidth()) {
-        if (!compact) PurchaseTableHeader()
-        when {
-            uiState.isLoading && uiState.purchases.isEmpty() -> LoadingBox()
-            uiState.errorMessage != null -> PurchaseError(uiState.errorMessage, onRefresh)
-            uiState.visiblePurchases.isEmpty() -> androidx.compose.material3.Surface(
-                    modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(24.dp),
-                    color = Color.White,
-                    border = BorderStroke(1.dp, Color(0xFFDFE5E1)),
-                    shadowElevation = 2.dp
+        Column(
+            modifier = Modifier
+                .align(Alignment.TopCenter)
+                .fillMaxSize()
+                .verticalScroll(rememberScrollState())
+                .padding(
+                    horizontal = if (compact) 16.dp else 28.dp,
+                    vertical = if (compact) 14.dp else 20.dp,
+                )
+                .testTag("purchase-history-content"),
+            verticalArrangement = Arrangement.spacedBy(if (compact) 16.dp else 16.dp),
+        ) {
+            if (compact) {
+                Row(
+                    modifier = Modifier.fillMaxWidth().padding(bottom = 4.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
-                    EmptyBox(uiState.searchQuery)
+                    IconButton(
+                        onClick = onBack,
+                        modifier = Modifier.size(40.dp).background(Color(0xFFF1F5F9), CircleShape)
+                    ) {
+                        Icon(Icons.Default.ChevronLeft, contentDescription = "Kembali", tint = Color(0xFF0F172A), modifier = Modifier.size(24.dp))
+                    }
+                    Text("Riwayat Pembelian", color = Color(0xFF0F172A), fontSize = 20.sp, fontWeight = FontWeight.Bold, letterSpacing = (-0.5).sp)
                 }
-            else -> uiState.visiblePurchases.forEachIndexed { index, purchase ->
-                if (compact) PurchaseMobileRow(purchase, onShowDetail) else PurchaseRow(purchase, index, onShowDetail)
             }
-        }
-        PurchasePagination(uiState, compact, onPreviousPage, onNextPage)
-    }
-}
 
-@Composable
-private fun PurchaseToolbar(
-    uiState: PurchaseHistoryUiState,
-    compact: Boolean,
-    onSupplierSelected: (String?) -> Unit,
+            PurchaseToolbar(
+                uiState = uiState,
+                compact = compact,
+                onSupplierSelected = onSupplierSelected,
+                onSearchChanged = onSearchChanged,
+                onOpenMobileFilters = { showMobileFilters = true },
+            ) -> Unit,
     onSearchChanged: (String) -> Unit
 ) {
     val search: @Composable (Modifier) -> Unit = { fieldModifier ->
@@ -422,4 +446,161 @@ private fun String.asDisplayDate(): String {
     return runCatching {
         OffsetDateTime.parse(this).format(DateTimeFormatter.ofPattern("dd MMM yyyy HH:mm", Locale.forLanguageTag("id-ID")))
     }.getOrDefault(this)
+}
+
+@Composable
+private fun PurchaseSummarySheetMetric(
+    title: String,
+    value: String,
+    note: String,
+    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    iconColor: androidx.compose.ui.graphics.Color,
+    iconBgColor: androidx.compose.ui.graphics.Color,
+    isHighlighted: Boolean = false
+) {
+    val bgColor = if (isHighlighted) androidx.compose.ui.graphics.Color(0xFFF2F8F5) else androidx.compose.ui.graphics.Color.White
+    val borderColor = if (isHighlighted) androidx.compose.ui.graphics.Color(0xFFC3DFD5) else androidx.compose.ui.graphics.Color(0xFFE2E8F0)
+    val titleColor = if (isHighlighted) androidx.compose.ui.graphics.Color(0xFF1E5847) else androidx.compose.ui.graphics.Color(0xFF94A3B8)
+    val valueColor = if (isHighlighted) androidx.compose.ui.graphics.Color(0xFF256B57) else androidx.compose.ui.graphics.Color(0xFF0F172A)
+
+    androidx.compose.material3.Surface(
+        modifier = Modifier.fillMaxWidth(),
+        color = bgColor,
+        border = androidx.compose.foundation.BorderStroke(1.dp, borderColor),
+        shape = androidx.compose.foundation.shape.RoundedCornerShape(16.dp),
+        shadowElevation = if (isHighlighted) 2.dp else 1.dp
+    ) {
+        androidx.compose.foundation.layout.Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(16.dp),
+            verticalAlignment = androidx.compose.ui.Alignment.CenterVertically,
+            horizontalArrangement = androidx.compose.foundation.layout.Arrangement.SpaceBetween
+        ) {
+            androidx.compose.foundation.layout.Row(
+                verticalAlignment = androidx.compose.ui.Alignment.CenterVertically,
+                horizontalArrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(16.dp)
+            ) {
+                androidx.compose.foundation.layout.Box(
+                    modifier = Modifier
+                        .size(48.dp)
+                        .clip(androidx.compose.foundation.shape.RoundedCornerShape(12.dp))
+                        .background(iconBgColor),
+                    contentAlignment = androidx.compose.ui.Alignment.Center
+                ) {
+                    androidx.compose.material3.Icon(
+                        icon,
+                        contentDescription = null,
+                        tint = iconColor,
+                        modifier = Modifier.size(24.dp)
+                    )
+                }
+                androidx.compose.foundation.layout.Column {
+                    androidx.compose.material3.Text(
+                        title,
+                        color = titleColor,
+                        fontSize = 11.sp,
+                        fontWeight = androidx.compose.ui.text.font.FontWeight.Bold,
+                        letterSpacing = 0.5.sp
+                    )
+                    androidx.compose.material3.Text(
+                        value,
+                        color = valueColor,
+                        fontSize = 18.sp,
+                        fontWeight = androidx.compose.ui.text.font.FontWeight.ExtraBold,
+                        modifier = Modifier.padding(top = 2.dp)
+                    )
+                }
+            }
+            androidx.compose.material3.Text(
+                note,
+                color = androidx.compose.ui.graphics.Color(0xFF64748B),
+                fontSize = 12.sp,
+                fontWeight = androidx.compose.ui.text.font.FontWeight.Medium,
+                textAlign = androidx.compose.ui.text.style.TextAlign.Right
+            )
+        }
+    }
+}
+
+
+@Composable
+private fun PurchaseCardMobile(purchase: PurchaseSummary, onShowDetail: (String) -> Unit) {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable { onShowDetail(purchase.id) }
+            .padding(16.dp)
+    ) {
+        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.Top) {
+            Box(
+                modifier = Modifier.size(40.dp).background(Color(0xFFE1EFEA), RoundedCornerShape(12.dp)),
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(Icons.Outlined.ReceiptLong, contentDescription = null, tint = Color(0xFF1B4D3E), modifier = Modifier.size(20.dp))
+            }
+            Column(modifier = Modifier.weight(1f)) {
+                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+                    if (purchase.invoiceNo != null) {
+                        Text(
+                            text = purchase.invoiceNo,
+                            color = Color(0xFF0F172A),
+                            fontSize = 14.5.sp,
+                            fontWeight = FontWeight.Bold,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                            modifier = Modifier.weight(1f, fill = false)
+                        )
+                    } else {
+                        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.weight(1f, fill = false)) {
+                            Text(
+                                text = "Tanpa nomor nota",
+                                color = Color(0xFF1E293B),
+                                fontSize = 14.5.sp,
+                                fontWeight = FontWeight.Bold,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                            )
+                            Spacer(Modifier.width(6.dp))
+                            Box(modifier = Modifier.background(Color(0xFFF1F5F9), RoundedCornerShape(4.dp)).padding(horizontal = 6.dp, vertical = 2.dp)) {
+                                Text("Nota Manual", color = Color(0xFF64748B), fontSize = 10.sp, fontWeight = FontWeight.SemiBold)
+                            }
+                        }
+                    }
+                    Icon(Icons.Default.ChevronRight, contentDescription = null, tint = Color(0xFF94A3B8), modifier = Modifier.size(16.dp).padding(top = 2.dp))
+                }
+                Text(
+                    text = purchase.supplierName,
+                    color = Color(0xFF64748B),
+                    fontSize = 13.sp,
+                    fontWeight = FontWeight.Medium,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.padding(top = 2.dp)
+                )
+            }
+        }
+        
+        Row(
+            modifier = Modifier.fillMaxWidth().padding(top = 14.dp).drawBehind {
+                drawLine(
+                    color = Color(0xFFF1F5F9),
+                    start = Offset(0f, 0f),
+                    end = Offset(size.width, 0f),
+                    strokeWidth = 1.dp.toPx()
+                )
+            }.padding(top = 12.dp),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Column {
+                Text("TANGGAL MASUK", color = Color(0xFF94A3B8), fontSize = 11.sp, fontWeight = FontWeight.Medium, letterSpacing = 0.5.sp)
+                Text(purchase.receivedAt.asDisplayDate(), color = Color(0xFF334155), fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
+            }
+            Column(horizontalAlignment = Alignment.End) {
+                Text("TOTAL", color = Color(0xFF94A3B8), fontSize = 11.sp, fontWeight = FontWeight.Medium, letterSpacing = 0.5.sp)
+                Text(purchase.total.asCurrency(), color = Color(0xFF1B4D3E), fontSize = 15.sp, fontWeight = FontWeight.Bold)
+            }
+        }
+    }
 }
