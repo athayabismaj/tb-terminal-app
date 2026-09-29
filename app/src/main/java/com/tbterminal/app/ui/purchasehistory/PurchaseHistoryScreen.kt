@@ -27,6 +27,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.ArrowDropDown
 import androidx.compose.material3.Button
 
 import androidx.compose.material.icons.filled.ChevronLeft
@@ -36,6 +37,9 @@ import androidx.compose.material.icons.outlined.ExpandMore
 import androidx.compose.material.icons.outlined.Inventory2
 import androidx.compose.material.icons.outlined.MonetizationOn
 import androidx.compose.material.icons.outlined.Search
+import androidx.compose.material.icons.outlined.DateRange
+import androidx.compose.material.icons.outlined.EditCalendar
+import androidx.compose.material.icons.filled.ArrowDropDown
 import androidx.compose.material.icons.outlined.Paid
 import androidx.compose.material.icons.outlined.Store
 import androidx.compose.material.icons.outlined.Tune
@@ -100,6 +104,7 @@ internal fun PurchaseHistoryScreen(
     onPreviousPage: () -> Unit,
     onNextPage: () -> Unit
 ) {
+    var showFilterPopup by remember { mutableStateOf(false) }
     BoxWithConstraints(modifier.fillMaxSize().background(PurchaseBackground)) {
         val compact = maxWidth < 700.dp
         Column(
@@ -108,7 +113,7 @@ internal fun PurchaseHistoryScreen(
             verticalArrangement = Arrangement.spacedBy(if (compact) 14.dp else 22.dp)
         ) {
             // PurchaseSummaryCards moved
-            PurchaseToolbar(uiState, compact, onSupplierSelected, onSearchChanged)
+            PurchaseToolbar(uiState, compact, { showFilterPopup = true }, onSearchChanged)
             PurchaseTable(uiState, compact, onRefresh, onShowDetail, onPreviousPage, onNextPage)
         }
     }
@@ -337,7 +342,7 @@ private fun PurchaseTable(
 private fun PurchaseToolbar(
     uiState: PurchaseHistoryUiState,
     compact: Boolean,
-    onSupplierSelected: (String?) -> Unit,
+    onFilterClick: () -> Unit,
     onSearchChanged: (String) -> Unit
 ) {
     Row(
@@ -353,51 +358,181 @@ private fun PurchaseToolbar(
             modifier = Modifier.weight(1f).height(48.dp), shape = RoundedCornerShape(24.dp),
             colors = OutlinedTextFieldDefaults.colors(focusedTextColor = PurchaseText, unfocusedTextColor = PurchaseText, cursorColor = PurchasePrimary, focusedBorderColor = PurchaseBorder, unfocusedBorderColor = PurchaseBorder, focusedContainerColor = Color.White, unfocusedContainerColor = Color.White)
         )
-        SupplierFilterDropdown(uiState, onSupplierSelected)
-    }
-}
-
-@Composable
-private fun SupplierFilterDropdown(uiState: PurchaseHistoryUiState, onSupplierSelected: (String?) -> Unit) {
-    var expanded by remember { mutableStateOf(false) }
-    
-    Box {
         Box(
             modifier = Modifier
                 .size(48.dp)
                 .clip(RoundedCornerShape(16.dp))
                 .border(1.dp, Color(0xFFC3DFD5), RoundedCornerShape(16.dp))
                 .background(Color.White)
-                .clickable { expanded = true },
+                .clickable { onFilterClick() },
             contentAlignment = Alignment.Center
         ) {
             Icon(Icons.Outlined.Tune, contentDescription = "Filter", tint = PurchasePrimary, modifier = Modifier.size(20.dp))
-            
             if (uiState.selectedSupplierId != null) {
                 Box(modifier = Modifier.align(Alignment.TopEnd).padding(8.dp).size(8.dp).background(Color(0xFFF59E0B), RoundedCornerShape(50)))
             }
         }
-        
-        DropdownMenu(
-            expanded = expanded,
-            onDismissRequest = { expanded = false },
-            modifier = Modifier
-                .width(220.dp)
-                .heightIn(max = 320.dp)
-                .background(PurchaseBackground)
+    }
+}
+
+@OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class)
+@Composable
+private fun PurchaseFilterBottomSheet(
+    uiState: PurchaseHistoryUiState,
+    onDismiss: () -> Unit,
+    onApplyFilter: (String?, String?) -> Unit // supplierId, period
+) {
+    var selectedSupplierId by remember { mutableStateOf(uiState.selectedSupplierId) }
+    var selectedPeriod by remember { mutableStateOf("Harian") }
+    var supplierExpanded by remember { mutableStateOf(false) }
+
+    androidx.compose.material3.ModalBottomSheet(
+        onDismissRequest = onDismiss,
+        containerColor = Color.White,
+        dragHandle = {
+            Column(
+                modifier = Modifier.fillMaxWidth().padding(top = 12.dp, bottom = 4.dp),
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                Box(modifier = Modifier.width(48.dp).height(6.dp).background(Color(0xFFE2E8F0), RoundedCornerShape(50)))
+            }
+        },
+        shape = RoundedCornerShape(topStart = 32.dp, topEnd = 32.dp)
+    ) {
+        Column(
+            modifier = Modifier.fillMaxWidth().padding(bottom = 24.dp)
         ) {
-            DropdownMenuItem(text = { Text("Semua supplier") }, onClick = {
-                onSupplierSelected(null)
-                expanded = false
-            })
-            uiState.suppliers.forEach { supplier ->
-                DropdownMenuItem(
-                    text = { Text(supplier.name, fontWeight = if (uiState.selectedSupplierId == supplier.id) FontWeight.Bold else FontWeight.Normal) }, 
-                    onClick = {
-                        onSupplierSelected(supplier.id)
-                        expanded = false
+            // Header
+            Row(
+                modifier = Modifier.fillMaxWidth().padding(horizontal = 24.dp, vertical = 8.dp).padding(bottom = 8.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text("Filter Riwayat", fontSize = 18.sp, fontWeight = FontWeight.Bold, color = Color(0xFF0F172A))
+                Box(
+                    modifier = Modifier.size(36.dp).background(Color(0xFFF1F5F9), RoundedCornerShape(50)).clickable(onClick = onDismiss),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(Icons.Default.Close, contentDescription = "Tutup", tint = Color(0xFF64748B), modifier = Modifier.size(20.dp))
+                }
+            }
+            HorizontalDivider(color = Color(0xFFF1F5F9))
+
+            Column(
+                modifier = Modifier.fillMaxWidth().padding(24.dp),
+                verticalArrangement = Arrangement.spacedBy(24.dp)
+            ) {
+                // Periode
+                Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    Text("Periode Waktu", fontSize = 13.sp, fontWeight = FontWeight.Bold, color = Color(0xFF64748B))
+                    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        listOf("Harian", "Mingguan", "Bulanan").forEach { period ->
+                            val isSelected = selectedPeriod == period
+                            Box(
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .clip(RoundedCornerShape(12.dp))
+                                    .background(if (isSelected) Color(0xFFEBF3F0) else Color.White)
+                                    .border(1.dp, if (isSelected) Color(0xFF256B57) else Color(0xFFE2E8F0), RoundedCornerShape(12.dp))
+                                    .clickable { selectedPeriod = period }
+                                    .padding(vertical = 10.dp),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Text(
+                                    text = period,
+                                    fontSize = 13.sp,
+                                    fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
+                                    color = if (isSelected) Color(0xFF256B57) else Color(0xFF64748B)
+                                )
+                            }
+                        }
                     }
-                )
+                }
+
+                // Pilih Tanggal
+                Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    Text("Pilih Tanggal", fontSize = 13.sp, fontWeight = FontWeight.Bold, color = Color(0xFF64748B))
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clip(RoundedCornerShape(12.dp))
+                            .border(1.dp, Color(0xFFE2E8F0), RoundedCornerShape(12.dp))
+                            .clickable { /* TODO: Open Date Picker */ }
+                            .padding(14.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Icon(Icons.Outlined.DateRange, contentDescription = null, tint = Color(0xFF64748B), modifier = Modifier.size(20.dp))
+                        Spacer(Modifier.width(12.dp))
+                        Text(
+                            text = "28 Mei 2026", // Mockup date
+                            fontSize = 14.sp,
+                            fontWeight = FontWeight.Medium,
+                            color = Color(0xFF0F172A),
+                            modifier = Modifier.weight(1f)
+                        )
+                        Icon(Icons.Outlined.EditCalendar, contentDescription = null, tint = Color(0xFF256B57), modifier = Modifier.size(20.dp))
+                    }
+                }
+
+                // Supplier
+                Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    Text("Supplier", fontSize = 13.sp, fontWeight = FontWeight.Bold, color = Color(0xFF64748B))
+                    Box {
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clip(RoundedCornerShape(12.dp))
+                                .border(1.dp, Color(0xFFE2E8F0), RoundedCornerShape(12.dp))
+                                .clickable { supplierExpanded = true }
+                                .padding(14.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Icon(Icons.Outlined.Store, contentDescription = null, tint = Color(0xFF64748B), modifier = Modifier.size(20.dp))
+                            Spacer(Modifier.width(12.dp))
+                            Text(
+                                text = uiState.suppliers.firstOrNull { it.id == selectedSupplierId }?.name ?: "Semua Supplier",
+                                fontSize = 14.sp,
+                                fontWeight = FontWeight.Medium,
+                                color = Color(0xFF0F172A),
+                                modifier = Modifier.weight(1f)
+                            )
+                            Icon(Icons.Default.ArrowDropDown, contentDescription = null, tint = Color(0xFF64748B))
+                        }
+
+                        androidx.compose.material3.DropdownMenu(
+                            expanded = supplierExpanded,
+                            onDismissRequest = { supplierExpanded = false },
+                            modifier = Modifier.fillMaxWidth(0.9f).background(Color.White)
+                        ) {
+                            androidx.compose.material3.DropdownMenuItem(
+                                text = { Text("Semua Supplier", fontWeight = if (selectedSupplierId == null) FontWeight.Bold else FontWeight.Normal) },
+                                onClick = { selectedSupplierId = null; supplierExpanded = false }
+                            )
+                            uiState.suppliers.forEach { supplier ->
+                                androidx.compose.material3.DropdownMenuItem(
+                                    text = { Text(supplier.name, fontWeight = if (selectedSupplierId == supplier.id) FontWeight.Bold else FontWeight.Normal) },
+                                    onClick = { selectedSupplierId = supplier.id; supplierExpanded = false }
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+
+            HorizontalDivider(color = Color(0xFFF1F5F9))
+            
+            Box(modifier = Modifier.fillMaxWidth().padding(24.dp).padding(bottom = 8.dp)) {
+                Button(
+                    onClick = { 
+                        onApplyFilter(selectedSupplierId, selectedPeriod)
+                        onDismiss()
+                    },
+                    modifier = Modifier.fillMaxWidth().height(52.dp),
+                    shape = RoundedCornerShape(12.dp),
+                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF256B57))
+                ) {
+                    Text("Terapkan Filter", fontSize = 15.sp, fontWeight = FontWeight.SemiBold)
+                }
             }
         }
     }
