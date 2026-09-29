@@ -38,6 +38,7 @@ fun SyncCenterRoute(
     onSecurityLogClick: () -> Unit = {},
     onProfileClick: () -> Unit = {},
     onSettingsClick: () -> Unit = {},
+    onBackToPrevious: (() -> Unit)? = null,
     onLogout: () -> Unit,
     viewModel: SyncCenterViewModel = viewModel(
         factory = SyncCenterViewModel.factory(
@@ -52,6 +53,7 @@ fun SyncCenterRoute(
         userName = name,
         role = role,
         activeDestination = AdminDestination.SyncCenter,
+        onBack = onBackToPrevious,
         onDashboardClick = onDashboardClick,
         onProductsClick = onProductsClick,
         onAddProductClick = onAddProductClick,
@@ -82,14 +84,12 @@ fun SyncCenterRoute(
             modifier = contentModifier,
         ) {
             SyncCenterScreen(
-            modifier = androidx.compose.ui.Modifier,
-            uiState = uiState,
-            onRefresh = viewModel::refresh,
-            onRetryItem = viewModel::retryItem,
-            onMarkConflictReviewed = viewModel::markConflictReviewed,
-            onRetryAllPending = viewModel::retryAllPending,
-            onRetryAllFailed = viewModel::retryAllFailed,
-            onDismissMessage = viewModel::clearMessage
+                uiState = uiState,
+                onRetryItem = viewModel::retryItem,
+                onMarkConflictReviewed = viewModel::markConflictReviewed,
+                onRetryAllPending = viewModel::retryAllPending,
+                onRetryAllFailed = viewModel::retryAllFailed,
+                onDismissMessage = viewModel::clearMessage,
             )
         }
     }

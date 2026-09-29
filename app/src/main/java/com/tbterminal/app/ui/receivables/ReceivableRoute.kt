@@ -48,6 +48,7 @@ fun AdminReceivableScreen(
         userName = name,
         role = role,
         activeDestination = AdminDestination.Receivables,
+        showPageHeader = true,
         onDashboardClick = onDashboardClick,
         onProductsClick = onProductsClick,
         onAddProductClick = onAddProductClick,
@@ -141,3 +142,7 @@ fun AdminReceivableScreen(
         )
     }
 }
+
+
+
+

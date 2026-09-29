@@ -10,20 +10,23 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.IntrinsicSize
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.ReceiptLong
-import androidx.compose.material.icons.automirrored.outlined.TrendingUp
 import androidx.compose.material.icons.outlined.AccountBalance
 import androidx.compose.material.icons.outlined.AccountBalanceWallet
 import androidx.compose.material.icons.outlined.AssignmentTurnedIn
+import androidx.compose.material.icons.outlined.ExpandLess
+import androidx.compose.material.icons.outlined.ExpandMore
 import androidx.compose.material.icons.outlined.Payments
 import androidx.compose.material.icons.outlined.PendingActions
 import androidx.compose.material.icons.outlined.Savings
@@ -32,8 +35,10 @@ import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
@@ -41,6 +46,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
@@ -59,7 +65,10 @@ fun SalesReportAggregateSection(
     report: SalesReportResponseDto?,
     isLoading: Boolean,
     error: String?,
-    onRetry: () -> Unit
+    detailsExpanded: Boolean,
+    onDetailsExpandedChange: (Boolean) -> Unit,
+    onRetry: () -> Unit,
+    showPrimaryKpis: Boolean = true,
 ) {
     when {
         isLoading && report == null -> SalesReportLoadingCard()
@@ -70,119 +79,136 @@ fun SalesReportAggregateSection(
             val stacked = maxWidth < 1040.dp
             val medium = maxWidth < 1180.dp
             Column(verticalArrangement = Arrangement.spacedBy(if (compact) 14.dp else 24.dp)) {
-            PrimaryKpiSection(report = report, compact = compact, medium = medium)
-            if (report.voided.transactionCount > 0) {
-                BaseCard(title = "Transaksi VOID (tidak masuk total aktif)") {
-                    StatusRow(
-                        label = "VOIDED",
-                        qty = "${report.voided.transactionCount} Trx",
-                        amount = report.voided.amount.toShortCurrency(),
-                        color = ReportColors.Error
-                    )
+                if (showPrimaryKpis) {
+                    PrimaryKpiSection(report = report, useGrid = compact || medium)
                 }
-            }
-            val overviewContent: @Composable () -> Unit = {
-                PaymentMethodsCard(
-                    paymentMethods = report.paymentMethods,
-                    modifier = Modifier.fillMaxWidth()
+                ReportDetailsDisclosure(
+                    expanded = detailsExpanded,
+                    onClick = { onDetailsExpandedChange(!detailsExpanded) },
                 )
-                TransactionStatusCard(
-                    statuses = report.transactionStatuses,
-                    modifier = Modifier.fillMaxWidth()
-                )
-                ReceivablesSummaryCard(
-                    receivables = report.receivables,
-                    modifier = Modifier.fillMaxWidth()
-                )
-            }
-            if (stacked) {
-                Column(verticalArrangement = Arrangement.spacedBy(if (compact) 14.dp else 18.dp)) { overviewContent() }
-            } else {
-                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(24.dp)) {
-                    Box(Modifier.weight(1f)) { PaymentMethodsCard(report.paymentMethods, Modifier.fillMaxWidth()) }
-                    Box(Modifier.weight(1f)) { TransactionStatusCard(report.transactionStatuses, Modifier.fillMaxWidth()) }
-                    Box(Modifier.weight(1f)) { ReceivablesSummaryCard(report.receivables, Modifier.fillMaxWidth()) }
+                if (detailsExpanded) {
+                    if (report.voided.transactionCount > 0) {
+                        BaseCard(title = "Transaksi void") {
+                            StatusRow(
+                                label = "VOIDED",
+                                qty = "${report.voided.transactionCount} Trx",
+                                amount = report.voided.amount.toShortCurrency(),
+                                color = ReportColors.Error
+                            )
+                        }
+                    }
+                    if (stacked) {
+                        Column(verticalArrangement = Arrangement.spacedBy(if (compact) 14.dp else 18.dp)) {
+                            PaymentMethodsCard(report.paymentMethods, Modifier.fillMaxWidth())
+                            TransactionStatusCard(report.transactionStatuses, Modifier.fillMaxWidth())
+                            ReceivablesSummaryCard(report.receivables, Modifier.fillMaxWidth())
+                            TopProductsCard(report.topProducts, Modifier.fillMaxWidth())
+                            CashierPerformanceCard(report.cashiers, Modifier.fillMaxWidth())
+                        }
+                    } else {
+                        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(24.dp)) {
+                            Box(Modifier.weight(1f)) { PaymentMethodsCard(report.paymentMethods, Modifier.fillMaxWidth()) }
+                            Box(Modifier.weight(1f)) { TransactionStatusCard(report.transactionStatuses, Modifier.fillMaxWidth()) }
+                            Box(Modifier.weight(1f)) { ReceivablesSummaryCard(report.receivables, Modifier.fillMaxWidth()) }
+                        }
+                        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(24.dp)) {
+                            TopProductsCard(report.topProducts, Modifier.weight(1f))
+                            CashierPerformanceCard(report.cashiers, Modifier.weight(1f))
+                        }
+                    }
                 }
-            }
-            if (stacked) {
-                Column(verticalArrangement = Arrangement.spacedBy(if (compact) 14.dp else 18.dp)) {
-                    TopProductsCard(report.topProducts, Modifier.fillMaxWidth())
-                    CashierPerformanceCard(report.cashiers, Modifier.fillMaxWidth())
-                }
-            } else {
-                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(24.dp)) {
-                    TopProductsCard(report.topProducts, Modifier.weight(1f))
-                    CashierPerformanceCard(report.cashiers, Modifier.weight(1f))
-                }
-            }
             }
         }
     }
 }
 
 @Composable
-private fun PrimaryKpiSection(report: SalesReportResponseDto, compact: Boolean, medium: Boolean) {
-    val cards: @Composable ColumnScope.() -> Unit = {
-        KpiCard(
-            title = "TOTAL OMZET",
-            value = report.totals.grossRevenue.toReportCurrency(),
-            subtitle = "Berdasarkan tanggal transaksi",
-            trend = "${report.totals.transactionCount} transaksi periode ini",
-            icon = Icons.AutoMirrored.Outlined.ReceiptLong,
-            color = ReportColors.Primary,
-            background = ReportColors.PrimarySoft,
-            modifier = Modifier.fillMaxWidth()
-        )
-        KpiCard(
-            title = "UANG DITERIMA",
-            value = report.totals.paidAmount.toReportCurrency(),
-            subtitle = "Dari transaksi periode ini",
-            trend = "Tunai, Transfer, QRIS, DP",
-            icon = Icons.Outlined.AccountBalanceWallet,
-            color = ReportColors.Secondary,
-            background = ReportColors.BlueSoft,
-            modifier = Modifier.fillMaxWidth()
-        )
-        KpiCard(
-            title = "SISA PIUTANG",
-            value = report.totals.outstandingAmount.toReportCurrency(),
-            subtitle = "Dari penjualan periode ini",
-            trend = "Segera ditagih",
-            icon = Icons.Outlined.PendingActions,
-            color = ReportColors.Error,
-            background = ReportColors.ErrorSoft,
-            modifier = Modifier.fillMaxWidth()
-        )
-        KpiCard(
-            title = "LABA KOTOR",
-            value = report.totals.grossProfit.toReportCurrency(),
-            subtitle = "Berdasarkan HPP saat transaksi",
-            trend = report.grossMarginText(),
-            icon = Icons.Outlined.Savings,
-            color = ReportColors.Purple,
-            background = ReportColors.PurpleSoft,
-            modifier = Modifier.fillMaxWidth()
-        )
-    }
-    if (compact) {
-        Column(verticalArrangement = Arrangement.spacedBy(12.dp), content = cards)
-    } else if (medium) {
-        Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
-            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(16.dp)) {
-                KpiCard("TOTAL OMZET", report.totals.grossRevenue.toReportCurrency(), "Berdasarkan tanggal transaksi", "${report.totals.transactionCount} transaksi periode ini", Icons.AutoMirrored.Outlined.ReceiptLong, ReportColors.Primary, ReportColors.PrimarySoft, Modifier.weight(1f))
-                KpiCard("UANG DITERIMA", report.totals.paidAmount.toReportCurrency(), "Dari transaksi periode ini", "Tunai, Transfer, QRIS, DP", Icons.Outlined.AccountBalanceWallet, ReportColors.Secondary, ReportColors.BlueSoft, Modifier.weight(1f))
-            }
-            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(16.dp)) {
-                KpiCard("SISA PIUTANG", report.totals.outstandingAmount.toReportCurrency(), "Dari penjualan periode ini", "Segera ditagih", Icons.Outlined.PendingActions, ReportColors.Error, ReportColors.ErrorSoft, Modifier.weight(1f))
-                KpiCard("LABA KOTOR", report.totals.grossProfit.toReportCurrency(), "Berdasarkan HPP saat transaksi", report.grossMarginText(), Icons.Outlined.Savings, ReportColors.Purple, ReportColors.PurpleSoft, Modifier.weight(1f))
+fun CompactBusinessSummary(
+    report: SalesReportResponseDto?,
+    isLoading: Boolean,
+    error: String?,
+    onRetry: () -> Unit,
+) {
+    when {
+        isLoading && report == null -> SalesReportLoadingCard()
+        error != null && report == null -> SalesReportErrorCard(message = error, onRetry = onRetry)
+        report == null -> SalesReportEmptyCard()
+        else -> Surface(
+            modifier = Modifier.fillMaxWidth(),
+            color = ReportColors.Surface,
+            shape = RoundedCornerShape(18.dp),
+            border = BorderStroke(1.dp, ReportColors.OutlineSoft),
+        ) {
+            Column(Modifier.padding(horizontal = 16.dp, vertical = 14.dp)) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
+                        Text("Omzet", style = MaterialTheme.typography.labelMedium, color = ReportColors.Outline)
+                        Text(
+                            report.totals.grossRevenue.toReportCurrency(),
+                            style = MaterialTheme.typography.titleLarge,
+                            color = ReportColors.PrimaryDark,
+                            fontWeight = FontWeight.Bold,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                        )
+                    }
+                    Surface(color = ReportColors.PrimarySoft, shape = RoundedCornerShape(999.dp)) {
+                        Text(
+                            "${report.totals.transactionCount} transaksi",
+                            modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
+                            style = MaterialTheme.typography.labelMedium,
+                            color = ReportColors.PrimaryDark,
+                            fontWeight = FontWeight.SemiBold,
+                        )
+                    }
+                }
+                HorizontalDivider(Modifier.padding(vertical = 12.dp), color = ReportColors.OutlineSoft)
+                CompactSummaryRow("Diterima", report.totals.paidAmount.toReportCurrency(), ReportColors.Primary)
+                CompactSummaryRow("Piutang", report.totals.outstandingAmount.toReportCurrency(), ReportColors.Error)
+                CompactSummaryRow("Laba kotor", report.totals.grossProfit.toReportCurrency(), ReportColors.OnSurface)
             }
         }
+    }
+}
+
+@Composable
+private fun CompactSummaryRow(label: String, value: String, valueColor: Color) {
+    Row(
+        modifier = Modifier.fillMaxWidth().heightIn(min = 42.dp),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Text(label, style = MaterialTheme.typography.bodyMedium, color = ReportColors.Outline)
+        Text(
+            value,
+            style = MaterialTheme.typography.bodyMedium,
+            color = valueColor,
+            fontWeight = FontWeight.SemiBold,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+        )
+    }
+}
+
+@Composable
+private fun PrimaryKpiSection(report: SalesReportResponseDto, useGrid: Boolean) {
+    val firstRow: @Composable RowScope.() -> Unit = {
+        KpiCard("Omzet", report.totals.grossRevenue.toReportCurrency(), "${report.totals.transactionCount} transaksi", Icons.AutoMirrored.Outlined.ReceiptLong, ReportColors.Primary, ReportColors.PrimarySoft, Modifier.weight(1f))
+        KpiCard("Diterima", report.totals.paidAmount.toReportCurrency(), "Pembayaran masuk", Icons.Outlined.AccountBalanceWallet, ReportColors.Secondary, ReportColors.BlueSoft, Modifier.weight(1f))
+    }
+    val secondRow: @Composable RowScope.() -> Unit = {
+        KpiCard("Piutang", report.totals.outstandingAmount.toReportCurrency(), "Belum diterima", Icons.Outlined.PendingActions, ReportColors.Error, ReportColors.ErrorSoft, Modifier.weight(1f))
+        KpiCard("Laba kotor", report.totals.grossProfit.toReportCurrency(), report.grossMarginText(), Icons.Outlined.Savings, ReportColors.Purple, ReportColors.PurpleSoft, Modifier.weight(1f))
+    }
+    if (useGrid) {
+        Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) { firstRow() }
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) { secondRow() }
+        }
     } else {
-        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(16.dp)) {
-            KpiCard("TOTAL OMZET", report.totals.grossRevenue.toReportCurrency(), "Berdasarkan tanggal transaksi", "${report.totals.transactionCount} transaksi periode ini", Icons.AutoMirrored.Outlined.ReceiptLong, ReportColors.Primary, ReportColors.PrimarySoft, Modifier.weight(1f))
-            KpiCard("UANG DITERIMA", report.totals.paidAmount.toReportCurrency(), "Dari transaksi periode ini", "Tunai, Transfer, QRIS, DP", Icons.Outlined.AccountBalanceWallet, ReportColors.Secondary, ReportColors.BlueSoft, Modifier.weight(1f))
-            KpiCard("SISA PIUTANG", report.totals.outstandingAmount.toReportCurrency(), "Dari penjualan periode ini", "Segera ditagih", Icons.Outlined.PendingActions, ReportColors.Error, ReportColors.ErrorSoft, Modifier.weight(1f))
-            KpiCard("LABA KOTOR", report.totals.grossProfit.toReportCurrency(), "Berdasarkan HPP saat transaksi", report.grossMarginText(), Icons.Outlined.Savings, ReportColors.Purple, ReportColors.PurpleSoft, Modifier.weight(1f))
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+            firstRow()
+            secondRow()
         }
     }
 }
@@ -191,8 +217,7 @@ private fun PrimaryKpiSection(report: SalesReportResponseDto, compact: Boolean, 
 private fun KpiCard(
     title: String,
     value: String,
-    subtitle: String,
-    trend: String,
+    supporting: String,
     icon: ImageVector,
     color: Color,
     background: Color,
@@ -204,70 +229,76 @@ private fun KpiCard(
         shape = RoundedCornerShape(16.dp),
         border = BorderStroke(1.dp, ReportColors.Slate100)
     ) {
-        Column(modifier = Modifier.padding(20.dp)) {
+        Column(modifier = Modifier.heightIn(min = 112.dp).padding(14.dp)) {
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.Top
+                verticalAlignment = Alignment.CenterVertically,
             ) {
                 Text(
                     text = title,
-                    style = MaterialTheme.typography.labelSmall.copy(
-                        color = ReportColors.Slate400,
-                        fontWeight = FontWeight.ExtraBold
-                    ),
+                    style = MaterialTheme.typography.labelMedium,
+                    color = ReportColors.Outline,
+                    fontWeight = FontWeight.SemiBold,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis
                 )
                 Box(
                     modifier = Modifier
-                        .size(36.dp)
-                        .background(background, RoundedCornerShape(8.dp)),
+                        .size(30.dp)
+                        .background(background, RoundedCornerShape(9.dp)),
                     contentAlignment = Alignment.Center
                 ) {
                     Icon(
                         imageVector = icon,
                         contentDescription = null,
                         tint = color,
-                        modifier = Modifier.size(20.dp)
+                        modifier = Modifier.size(18.dp)
                     )
                 }
             }
             Text(
                 text = value,
-                style = MaterialTheme.typography.headlineSmall.copy(
+                style = MaterialTheme.typography.titleMedium.copy(
                     color = color,
                     fontWeight = FontWeight.ExtraBold
                 ),
-                modifier = Modifier.padding(vertical = 8.dp),
+                modifier = Modifier.padding(top = 10.dp, bottom = 3.dp),
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis
             )
             Text(
-                text = subtitle,
-                style = MaterialTheme.typography.bodySmall.copy(color = ReportColors.Slate400),
-                maxLines = 2,
-                overflow = TextOverflow.Ellipsis
+                text = supporting,
+                style = MaterialTheme.typography.labelSmall,
+                color = ReportColors.Slate400,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
             )
-            Spacer(modifier = Modifier.height(16.dp))
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Icon(
-                    imageVector = Icons.AutoMirrored.Outlined.TrendingUp,
-                    contentDescription = null,
-                    tint = color,
-                    modifier = Modifier.size(16.dp)
-                )
-                Spacer(modifier = Modifier.size(4.dp))
-                Text(
-                    text = trend,
-                    style = MaterialTheme.typography.bodySmall.copy(
-                        color = color,
-                        fontWeight = FontWeight.Bold
-                    ),
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
-                )
-            }
+        }
+    }
+}
+
+@Composable
+private fun ReportDetailsDisclosure(expanded: Boolean, onClick: () -> Unit) {
+    Surface(
+        onClick = onClick,
+        modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp).testTag("report-details-toggle"),
+        color = ReportColors.Surface,
+        shape = RoundedCornerShape(14.dp),
+        border = BorderStroke(1.dp, ReportColors.OutlineSoft),
+    ) {
+        Row(
+            modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Text("Rincian lainnya", color = ReportColors.OnSurface, fontWeight = FontWeight.SemiBold)
+            Icon(
+                imageVector = if (expanded) Icons.Outlined.ExpandLess else Icons.Outlined.ExpandMore,
+                contentDescription = if (expanded) "Sembunyikan rincian" else "Tampilkan rincian",
+                tint = ReportColors.Outline,
+                modifier = Modifier.size(20.dp),
+            )
         }
     }
 }
@@ -279,7 +310,7 @@ private fun PaymentMethodsCard(
 ) {
     val total = paymentMethods.fold(BigDecimal.ZERO) { acc, item -> acc + item.amount }
     BaseCard(
-        title = "Uang Diterima Per Metode",
+        title = "Metode pembayaran",
         icon = Icons.Outlined.Payments,
         modifier = modifier
     ) {
@@ -305,7 +336,7 @@ private fun TransactionStatusCard(
     modifier: Modifier = Modifier
 ) {
     BaseCard(
-        title = "Status Transaksi",
+        title = "Status transaksi",
         icon = Icons.Outlined.AssignmentTurnedIn,
         modifier = modifier
     ) {
@@ -331,7 +362,7 @@ private fun ReceivablesSummaryCard(
     modifier: Modifier = Modifier
 ) {
     BaseCard(
-        title = "Ringkasan Piutang",
+        title = "Piutang",
         icon = Icons.Outlined.AccountBalance,
         modifier = modifier
     ) {
@@ -371,7 +402,7 @@ private fun TopProductsCard(
     products: List<TopProductSalesDto>,
     modifier: Modifier = Modifier
 ) {
-    BaseCard(title = "Produk Terlaris", badgeText = "Top ${products.size.coerceAtMost(5)}", modifier = modifier) {
+    BaseCard(title = "Produk terlaris", badgeText = "Top ${products.size.coerceAtMost(5)}", modifier = modifier) {
         TableHeaderRow("NAMA PRODUK", "QTY", "OMZET")
         if (products.isEmpty()) {
             EmptyText("Belum ada produk terjual pada rentang tanggal ini.")
@@ -388,7 +419,7 @@ private fun CashierPerformanceCard(
     cashiers: List<CashierSalesSummaryDto>,
     modifier: Modifier = Modifier
 ) {
-    BaseCard(title = "Performa Kasir", badgeText = "Aktif", modifier = modifier) {
+    BaseCard(title = "Performa kasir", badgeText = "Aktif", modifier = modifier) {
         TableHeaderRow("KASIR", "TRX", "OMZET")
         if (cashiers.isEmpty()) {
             EmptyText("Belum ada transaksi kasir pada rentang tanggal ini.")

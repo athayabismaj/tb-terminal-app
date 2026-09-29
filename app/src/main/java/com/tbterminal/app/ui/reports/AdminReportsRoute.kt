@@ -41,6 +41,7 @@ fun AdminReportsRoute(
     onSecurityLogClick: () -> Unit,
     onProfileClick: () -> Unit,
     onSettingsClick: () -> Unit,
+    onBackToPrevious: (() -> Unit)? = null,
     onLogout: () -> Unit
 ) {
     val viewModel: AdminReportsViewModel = viewModel(
@@ -99,6 +100,7 @@ fun AdminReportsRoute(
         onSecurityLogClick = onSecurityLogClick,
         onProfileClick = onProfileClick,
         onSettingsClick = onSettingsClick,
+        onBackToPrevious = onBackToPrevious,
         onLogout = onLogout
     )
 }

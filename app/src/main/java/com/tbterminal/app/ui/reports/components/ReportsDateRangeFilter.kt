@@ -1,29 +1,21 @@
 package com.tbterminal.app.ui.reports.components
 
-import androidx.compose.foundation.BorderStroke
-import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.wrapContentWidth
-import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.horizontalScroll
-import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.outlined.CalendarToday
 import androidx.compose.material.icons.outlined.Close
 import androidx.compose.material3.DatePicker
 import androidx.compose.material3.DatePickerDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -36,20 +28,18 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.tbterminal.app.ui.components.TbPeriodFilterRow
 import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneOffset
 import java.time.format.DateTimeFormatter
 import java.time.format.DateTimeParseException
-import java.util.Locale
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -57,7 +47,6 @@ fun ReportsDateRangeFilter(
     startDate: String,
     endDate: String,
     onDateRangeChanged: (LocalDate, LocalDate) -> Unit,
-    onRefresh: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     var selectedFilter by remember { mutableStateOf(detectPreset(startDate, endDate)) }
@@ -67,78 +56,30 @@ fun ReportsDateRangeFilter(
         selectedFilter = detectPreset(startDate, endDate)
     }
 
-    BoxWithConstraints(modifier = modifier) {
-        val compact = maxWidth < 600.dp
-        val dateSelector: @Composable () -> Unit = {
-            Row(
-                modifier = Modifier
-                    .clip(RoundedCornerShape(8.dp))
-                    .clickable { showDatePicker = true }
-                    .padding(horizontal = 8.dp, vertical = 6.dp),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                Icon(
-                    imageVector = Icons.Outlined.CalendarToday,
-                    contentDescription = "Filter tanggal",
-                    tint = ReportColors.Outline,
-                    modifier = Modifier.size(16.dp)
-                )
-                DateText(text = dateRangeDisplay(startDate, endDate))
+    TbPeriodFilterRow(
+        selectedValue = selectedFilter,
+        presets = listOf(
+            "Hari ini" to "Hari",
+            "7 hari" to "Minggu",
+            "30 hari" to "Bulan",
+        ),
+        dateLabel = endDate.toCompactDateLabel(),
+        dateSelected = selectedFilter.isBlank(),
+        onPresetSelected = { filter ->
+            selectedFilter = filter
+            val today = LocalDate.now()
+            val range = when (filter) {
+                "Hari ini" -> today to today
+                "7 hari" -> today.minusDays(6) to today
+                else -> today.minusDays(29) to today
             }
-        }
-        val presets: @Composable () -> Unit = {
-            Row(
-                modifier = if (compact) Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()) else Modifier,
-                horizontalArrangement = Arrangement.spacedBy(4.dp)
-            ) {
-                listOf("Hari ini", "7 hari", "30 hari").forEach { filter ->
-                    DateFilterChip(
-                        text = filter,
-                        selected = selectedFilter == filter,
-                        onClick = {
-                            selectedFilter = filter
-                            val today = LocalDate.now()
-                            val range = when (filter) {
-                                "Hari ini" -> today to today
-                                "7 hari" -> today.minusDays(6) to today
-                                else -> today.minusDays(29) to today
-                            }
-                            onDateRangeChanged(range.first, range.second)
-                        }
-                    )
-                }
-            }
-        }
-        Surface(
-            modifier = if (compact) Modifier.fillMaxWidth() else Modifier.wrapContentWidth(),
-            shape = RoundedCornerShape(12.dp),
-            color = ReportColors.Surface,
-            shadowElevation = 2.dp,
-            border = BorderStroke(1.dp, ReportColors.Slate200)
-        ) {
-            if (compact) Column(
-                modifier = Modifier.padding(8.dp),
-                verticalArrangement = Arrangement.spacedBy(6.dp)
-            ) {
-                dateSelector()
-                presets()
-            } else Row(
-                modifier = Modifier.padding(horizontal = 8.dp, vertical = 6.dp),
-                horizontalArrangement = Arrangement.spacedBy(12.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                dateSelector()
-            Box(
-                modifier = Modifier
-                    .width(1.dp)
-                    .height(24.dp)
-                    .background(ReportColors.Slate200)
-            )
-                presets()
-            }
-        }
-    }
+            onDateRangeChanged(range.first, range.second)
+        },
+        onDateClick = { showDatePicker = true },
+        modifier = modifier,
+        testTag = "report-period-filter",
+        dateTestTag = "report-custom-date-toggle",
+    )
 
     if (showDatePicker) {
         ReportsSingleDatePickerDialog(
@@ -148,49 +89,6 @@ fun ReportsDateRangeFilter(
                 showDatePicker = false
                 onDateRangeChanged(date, date)
             }
-        )
-    }
-}
-
-@Composable
-private fun DateText(
-    text: String,
-    modifier: Modifier = Modifier
-) {
-    Text(
-        text = text,
-        modifier = modifier,
-        fontSize = 13.sp,
-        fontWeight = FontWeight.Medium,
-        color = ReportColors.OnSurface,
-        maxLines = 1,
-        overflow = TextOverflow.Ellipsis
-    )
-}
-
-@Composable
-private fun DateFilterChip(
-    text: String,
-    selected: Boolean,
-    modifier: Modifier = Modifier,
-    onClick: () -> Unit
-) {
-    val background = if (selected) Color(0xFF86F8C9) else Color.Transparent
-    val textColor = if (selected) Color(0xFF00513A) else ReportColors.Slate500
-
-    Box(
-        modifier = modifier
-            .clip(RoundedCornerShape(8.dp))
-            .background(background)
-            .clickable { onClick() }
-            .padding(horizontal = 12.dp, vertical = 6.dp),
-        contentAlignment = Alignment.Center
-    ) {
-        Text(
-            text = text,
-            fontSize = 12.sp,
-            fontWeight = if (selected) FontWeight.Bold else FontWeight.Medium,
-            color = textColor
         )
     }
 }
@@ -293,23 +191,8 @@ private fun ReportsSingleDatePickerDialog(
     }
 }
 
-private fun String.toDisplayDate(): String {
-    return try {
-        LocalDate.parse(trim(), DateTimeFormatter.ISO_LOCAL_DATE).toDisplayDate()
-    } catch (_: DateTimeParseException) {
-        this
-    }
-}
-
-private fun dateRangeDisplay(startDate: String, endDate: String): String {
-    val start = startDate.toLocalDateOrNull() ?: return startDate.toDisplayDate()
-    val end = endDate.toLocalDateOrNull() ?: return endDate.toDisplayDate()
-    return if (start == end) {
-        start.toDisplayDate()
-    } else {
-        "${start.toDisplayDate()} - ${end.toDisplayDate()}"
-    }
-}
+private fun String.toCompactDateLabel(): String =
+    toLocalDateOrNull()?.format(DateTimeFormatter.ofPattern("dd/MM")) ?: this
 
 private fun String.toLocalDateOrNull(): LocalDate? {
     return try {
@@ -317,10 +200,6 @@ private fun String.toLocalDateOrNull(): LocalDate? {
     } catch (_: DateTimeParseException) {
         null
     }
-}
-
-private fun LocalDate.toDisplayDate(): String {
-    return format(DateTimeFormatter.ofPattern("dd MMM yyyy", Locale.forLanguageTag("id-ID")))
 }
 
 private fun LocalDate.toEpochMillis(): Long {

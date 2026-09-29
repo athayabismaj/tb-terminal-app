@@ -1,6 +1,7 @@
 package com.tbterminal.app.ui.reports.components
 
 import androidx.compose.foundation.background
+import com.tbterminal.app.ui.components.TbPagination
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -9,10 +10,13 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.outlined.ReceiptLong
 import androidx.compose.material.icons.outlined.ChevronLeft
 import androidx.compose.material.icons.outlined.ChevronRight
 import androidx.compose.material3.Button
@@ -41,54 +45,54 @@ fun ReportsTransactionTable(
     transactions: List<CashTransaction>,
     isLoading: Boolean,
     error: String?,
-    currentStart: Int,
-    currentEnd: Int,
-    total: Long,
     page: Int,
     totalPages: Int,
+    totalItems: Long,
     onRetry: () -> Unit,
     onPreviousPage: () -> Unit,
     onNextPage: () -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    showHeader: Boolean = true,
 ) {
-    ReportSurfaceCard(modifier = modifier, contentPadding = 0.dp) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 18.dp, vertical = 16.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            ReportSectionHeader(
-                title = "Detail Transaksi Terbaru",
-                subtitle = "Transaksi pada periode yang dipilih."
-            )
-        }
-        ReportDivider()
+    Column(
+        modifier = modifier,
+        verticalArrangement = Arrangement.spacedBy(10.dp),
+    ) {
+        ReportSurfaceCard(contentPadding = 0.dp) {
+            if (showHeader) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 18.dp, vertical = 16.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    ReportSectionHeader(title = "Transaksi")
+                }
+                ReportDivider()
+            }
 
-        when {
-            isLoading && transactions.isEmpty() -> ReportsTransactionLoading()
-            error != null && transactions.isEmpty() -> ReportsTransactionError(message = error, onRetry = onRetry)
-            transactions.isEmpty() -> ReportsTransactionEmptyState()
-            else -> {
-                BoxWithConstraints {
-                    val compact = maxWidth < 680.dp
-                    Column {
-                        if (!compact) ReportsTransactionHeader()
-                        transactions.forEach { transaction ->
-                            if (compact) ReportsTransactionMobileRow(transaction) else ReportsTransactionRow(transaction)
-                            ReportDivider()
+            when {
+                isLoading && transactions.isEmpty() -> ReportsTransactionLoading()
+                error != null && transactions.isEmpty() -> ReportsTransactionError(message = error, onRetry = onRetry)
+                transactions.isEmpty() -> ReportsTransactionEmptyState()
+                else -> {
+                    BoxWithConstraints {
+                        val compact = maxWidth < 680.dp
+                        Column {
+                            if (!compact) ReportsTransactionHeader()
+                            transactions.forEach { transaction ->
+                                if (compact) ReportsTransactionMobileRow(transaction) else ReportsTransactionRow(transaction)
+                                ReportDivider()
+                            }
                         }
                     }
                 }
             }
         }
-
         ReportsTransactionPagination(
-            currentStart = currentStart,
-            currentEnd = currentEnd,
-            total = total,
             page = page,
             totalPages = totalPages,
+            totalItems = totalItems,
             isLoading = isLoading,
             onPreviousPage = onPreviousPage,
             onNextPage = onNextPage
@@ -181,92 +185,22 @@ private fun ReportsTransactionRow(transaction: CashTransaction) {
 
 @Composable
 private fun ReportsTransactionPagination(
-    currentStart: Int,
-    currentEnd: Int,
-    total: Long,
     page: Int,
     totalPages: Int,
+    totalItems: Long,
     isLoading: Boolean,
     onPreviousPage: () -> Unit,
     onNextPage: () -> Unit
 ) {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .background(ReportColors.SurfaceSoft)
-            .padding(horizontal = 18.dp, vertical = 12.dp),
-        horizontalArrangement = Arrangement.SpaceBetween,
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        Text(
-            text = "$currentStart-$currentEnd dari $total transaksi",
-            style = MaterialTheme.typography.labelMedium.copy(
-                color = ReportColors.Outline,
-                fontWeight = FontWeight.Bold
-            )
-        )
-        Row(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
-            PageIconButton(
-                onClick = onPreviousPage,
-                enabled = page > 1 && !isLoading,
-                icon = Icons.Outlined.ChevronLeft,
-                contentDescription = "Halaman sebelumnya"
-            )
-            Surface(
-                shape = RoundedCornerShape(10.dp),
-                color = ReportColors.Primary
-            ) {
-                Text(
-                    text = page.toString(),
-                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 7.dp),
-                    style = MaterialTheme.typography.labelMedium.copy(
-                        color = Color.White,
-                        fontWeight = FontWeight.ExtraBold
-                    )
-                )
-            }
-            Text(
-                text = "/ $totalPages",
-                style = MaterialTheme.typography.labelMedium.copy(
-                    color = ReportColors.Outline,
-                    fontWeight = FontWeight.Bold
-                )
-            )
-            PageIconButton(
-                onClick = onNextPage,
-                enabled = page < totalPages && !isLoading,
-                icon = Icons.Outlined.ChevronRight,
-                contentDescription = "Halaman berikutnya"
-            )
-        }
-    }
-}
-
-@Composable
-private fun PageIconButton(
-    onClick: () -> Unit,
-    enabled: Boolean,
-    icon: androidx.compose.ui.graphics.vector.ImageVector,
-    contentDescription: String
-) {
-    Surface(
-        shape = RoundedCornerShape(10.dp),
-        color = if (enabled) ReportColors.Surface else ReportColors.SurfaceSoft,
-        border = androidx.compose.foundation.BorderStroke(1.dp, ReportColors.OutlineSoft)
-    ) {
-        IconButton(
-            onClick = onClick,
-            enabled = enabled,
-            modifier = Modifier.size(36.dp)
-        ) {
-            Icon(
-                imageVector = icon,
-                contentDescription = contentDescription,
-                tint = if (enabled) ReportColors.OnSurface else ReportColors.Slate400,
-                modifier = Modifier.size(18.dp)
-            )
-        }
-    }
+    TbPagination(
+        currentPage = page,
+        totalPages = totalPages,
+        onPreviousPage = onPreviousPage,
+        onNextPage = onNextPage,
+        supportingText = "$totalItems data",
+        isLoading = isLoading,
+        testTag = "report-transactions-pagination",
+    )
 }
 
 @Composable
@@ -322,12 +256,44 @@ private fun ReportsTransactionError(message: String, onRetry: () -> Unit) {
 
 @Composable
 private fun ReportsTransactionEmptyState() {
-    Text(
-        text = "Belum ada transaksi pada rentang tanggal ini.",
-        color = ReportColors.Outline,
-        modifier = Modifier.fillMaxWidth().padding(vertical = 28.dp),
-        textAlign = TextAlign.Center
-    )
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .heightIn(min = 196.dp)
+            .padding(horizontal = 24.dp, vertical = 28.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.Center,
+    ) {
+        Surface(
+            modifier = Modifier.size(52.dp),
+            color = ReportColors.PrimarySoft,
+            shape = CircleShape,
+        ) {
+            Box(contentAlignment = Alignment.Center) {
+                Icon(
+                    imageVector = Icons.AutoMirrored.Outlined.ReceiptLong,
+                    contentDescription = null,
+                    modifier = Modifier.size(24.dp),
+                    tint = ReportColors.Primary,
+                )
+            }
+        }
+        Spacer(modifier = Modifier.height(14.dp))
+        Text(
+            text = "Belum ada transaksi",
+            color = ReportColors.OnSurface,
+            style = MaterialTheme.typography.titleSmall,
+            fontWeight = FontWeight.SemiBold,
+            textAlign = TextAlign.Center,
+        )
+        Spacer(modifier = Modifier.height(5.dp))
+        Text(
+            text = "Data pada periode yang dipilih akan tampil di sini.",
+            color = ReportColors.Outline,
+            style = MaterialTheme.typography.bodySmall,
+            textAlign = TextAlign.Center,
+        )
+    }
 }
 
 @Composable

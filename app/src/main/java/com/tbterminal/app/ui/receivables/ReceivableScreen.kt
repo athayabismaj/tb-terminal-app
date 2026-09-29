@@ -29,17 +29,21 @@ internal fun ReceivableScreen(
     onNextPage: () -> Unit,
     onDismissMessage: () -> Unit
 ) {
-    BoxWithConstraints(modifier = modifier.fillMaxSize().background(ReceivableSurface)) {
+    BoxWithConstraints(modifier = modifier.fillMaxSize().background(ReceivableBackground)) {
         val compact = maxWidth < 720.dp
+        val showMetrics = uiState.receivables.isNotEmpty() ||
+            (!uiState.isLoading && uiState.errorMessage == null)
         Column(
             modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState())
-                .padding(if (compact) 16.dp else 32.dp),
-            verticalArrangement = Arrangement.spacedBy(if (compact) 16.dp else 28.dp)
+                .padding(horizontal = if (compact) 16.dp else 28.dp, vertical = if (compact) 14.dp else 20.dp),
+            verticalArrangement = Arrangement.spacedBy(if (compact) 12.dp else 16.dp)
         ) {
-            ReceivableHeader(canAdjust, onAddOpeningBalance, onAddAdjustment, compact)
+            if (!compact) ReceivableHeader(canAdjust, onAddOpeningBalance, onAddAdjustment, compact)
             ReceivableMessage(uiState, onDismissMessage)
-            if (!compact) ReceivableCustomerSummaries(uiState.customerSummaries)
+            if (showMetrics && !compact) ReceivableMetrics(uiState, compact = false)
             ReceivableTableCard(
+                onAddOpeningBalance = onAddOpeningBalance,
+                onAddAdjustment = onAddAdjustment,
                 modifier = Modifier.fillMaxWidth(),
                 uiState = uiState,
                 onSearchChanged = onSearchChanged,
@@ -50,7 +54,7 @@ internal fun ReceivableScreen(
                 onNextPage = onNextPage,
                 compact = compact
             )
-            if (compact) ReceivableCustomerSummaries(uiState.customerSummaries, compact = true)
         }
     }
 }
+

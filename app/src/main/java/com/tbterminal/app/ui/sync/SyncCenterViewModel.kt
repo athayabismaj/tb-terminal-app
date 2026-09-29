@@ -33,7 +33,8 @@ class SyncCenterViewModel(
                         totalConflict = snapshot.totalConflict,
                         totalSyncedToday = snapshot.totalSyncedToday,
                         queueItems = snapshot.queueItems,
-                        groupedItems = snapshot.queueItems.groupBy { item -> item.entityType }
+                        groupedItems = snapshot.queueItems.groupBy { item -> item.entityType },
+                        isInitialLoading = false,
                     )
                 }
             }
@@ -54,7 +55,8 @@ class SyncCenterViewModel(
                             totalSyncedToday = snapshot.totalSyncedToday,
                             queueItems = snapshot.queueItems,
                             groupedItems = snapshot.queueItems.groupBy { item -> item.entityType },
-                            isRefreshing = false
+                            isRefreshing = false,
+                            isInitialLoading = false,
                         )
                     }
                 }
@@ -62,6 +64,7 @@ class SyncCenterViewModel(
                     _uiState.update {
                         it.copy(
                             isRefreshing = false,
+                            isInitialLoading = false,
                             errorMessage = error.message ?: "Gagal memuat status sinkronisasi."
                         )
                     }
@@ -169,6 +172,7 @@ data class SyncCenterUiState(
     val totalSyncedToday: Int = 0,
     val queueItems: List<SyncQueueUiModel> = emptyList(),
     val groupedItems: Map<SyncEntityType, List<SyncQueueUiModel>> = emptyMap(),
+    val isInitialLoading: Boolean = true,
     val isRefreshing: Boolean = false,
     val isRetrying: Boolean = false,
     val canRetry: Boolean = false,

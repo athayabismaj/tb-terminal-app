@@ -20,24 +20,34 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.tbterminal.app.ui.theme.TbAmber
+import com.tbterminal.app.ui.theme.TbBackground
+import com.tbterminal.app.ui.theme.TbError
+import com.tbterminal.app.ui.theme.TbGreen
+import com.tbterminal.app.ui.theme.TbGreenDark
+import com.tbterminal.app.ui.theme.TbOutline
+import com.tbterminal.app.ui.theme.TbSurface
+import com.tbterminal.app.ui.theme.TbSurfaceMuted
+import com.tbterminal.app.ui.theme.TbText
+import com.tbterminal.app.ui.theme.TbTextMuted
 import java.math.BigDecimal
 import java.text.NumberFormat
 import java.time.LocalDate
 import java.time.temporal.ChronoUnit
 import java.util.Locale
 
-internal val ReceivableBackground = Color(0xFFF4FAFD)
-internal val ReceivableSurface = Color.White
-internal val ReceivableSoft = Color(0xFFF1F5F9)
-internal val ReceivableLine = Color(0xFFE2E8F0)
-internal val ReceivableText = Color(0xFF0F172A)
-internal val ReceivableMuted = Color(0xFF64748B)
-internal val ReceivablePrimary = Color(0xFF10B981)
-internal val ReceivablePrimaryDark = Color(0xFF059669)
-internal val ReceivableAccentText = Color(0xFF42588F)
-internal val ReceivableDanger = Color(0xFFEF4444)
-internal val ReceivableWarning = Color(0xFFF59E0B)
-internal val ReceivableInfo = Color(0xFF3B82F6)
+internal val ReceivableBackground = TbBackground
+internal val ReceivableSurface = TbSurface
+internal val ReceivableSoft = TbSurfaceMuted
+internal val ReceivableLine = TbOutline
+internal val ReceivableText = TbText
+internal val ReceivableMuted = TbTextMuted
+internal val ReceivablePrimary = TbGreen
+internal val ReceivablePrimaryDark = TbGreenDark
+internal val ReceivableAccentText = TbGreenDark
+internal val ReceivableDanger = TbError
+internal val ReceivableWarning = TbAmber
+internal val ReceivableInfo = TbGreen
 
 @Composable
 internal fun ReceivableTextFieldColors() = OutlinedTextFieldDefaults.colors(
@@ -107,7 +117,7 @@ internal fun ReceivablePageIconButton(icon: ImageVector, enabled: Boolean, onCli
         modifier = Modifier
             .size(34.dp)
             .clip(RoundedCornerShape(12.dp))
-            .background(if (enabled) Color.White else ReceivableSoft)
+            .background(if (enabled) ReceivableSurface else ReceivableSoft)
     ) {
         Icon(icon, contentDescription = null, tint = if (enabled) ReceivableMuted else ReceivableMuted.copy(alpha = 0.35f))
     }
