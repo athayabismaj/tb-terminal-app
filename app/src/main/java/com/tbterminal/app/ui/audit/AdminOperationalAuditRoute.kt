@@ -32,6 +32,7 @@ fun AdminOperationalAuditRoute(
     onSecurityLogClick: () -> Unit,
     onProfileClick: () -> Unit,
     onSettingsClick: () -> Unit,
+    onBackToPrevious: (() -> Unit)? = null,
     onLogout: () -> Unit,
     viewModel: AdminOperationalAuditViewModel
 ) {
@@ -41,7 +42,8 @@ fun AdminOperationalAuditRoute(
         userName = name,
         role = role,
         activeDestination = AdminDestination.OperationalAudit,
-        pageTitle = "Riwayat Aktivitas",
+        pageTitle = "Riwayat aktivitas",
+        onBack = onBackToPrevious,
         onDashboardClick = onDashboardClick,
         onProductsClick = onProductsClick,
         onAddProductClick = onAddProductClick,
@@ -71,16 +73,13 @@ fun AdminOperationalAuditRoute(
             modifier = contentModifier,
         ) {
             AdminOperationalAuditScreen(
-            modifier = androidx.compose.ui.Modifier,
-            uiState = uiState,
-            onActionFilterChanged = viewModel::setActionFilter,
-            onDateChanged = viewModel::setDate,
-            onDatePresetSelected = viewModel::setDatePreset,
-            onPreviousDate = viewModel::previousDate,
-            onNextDate = viewModel::nextDate,
-            onRetry = viewModel::refresh,
-            onPreviousPage = { viewModel.loadLogs(page = uiState.currentPage - 1) },
-            onNextPage = { viewModel.loadLogs(page = uiState.currentPage + 1) }
+                uiState = uiState,
+                onActionFilterChanged = viewModel::setActionFilter,
+                onDateChanged = viewModel::setDate,
+                onDatePresetSelected = viewModel::setDatePreset,
+                onRetry = viewModel::refresh,
+                onPreviousPage = { viewModel.loadLogs(page = uiState.currentPage - 1) },
+                onNextPage = { viewModel.loadLogs(page = uiState.currentPage + 1) },
             )
         }
     }

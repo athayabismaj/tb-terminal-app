@@ -3,7 +3,6 @@ package com.tbterminal.app.ui.security
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.DesktopWindows
 import androidx.compose.material.icons.outlined.TabletAndroid
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
@@ -14,6 +13,8 @@ import com.tbterminal.app.data.repository.SecurityLogRepository
 import com.tbterminal.app.ui.common.viewModelFactory
 import java.time.Duration
 import java.time.Instant
+import java.time.format.DateTimeFormatter
+import java.util.Locale
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -44,34 +45,30 @@ data class SecurityLogUiState(
         get() = logs.firstOrNull()?.compactRelativeTime ?: "Belum ada"
 }
 
-enum class SecurityLogType(
-    val label: String,
-    val color: Color,
-    val background: Color
-) {
-    Insert("Tambah Data", SecurityPrimary, SecurityPrimaryLight),
-    Update("Ubah Data", SecurityInfo, SecurityInfoLight),
-    Delete("Nonaktifkan Data", SecuritySlate500, SecuritySlate100)
+enum class SecurityLogType(val label: String) {
+    Insert("Tambah data"),
+    Update("Ubah data"),
+    Delete("Nonaktifkan data")
 }
 
 enum class SecurityDateFilter(
     val label: String,
     val queryValue: String?
 ) {
-    All("Semua Tanggal", null),
-    Today("Hari Ini", "today"),
-    Last7Days("7 Hari Terakhir", "7d"),
-    Last30Days("30 Hari Terakhir", "30d")
+    All("Semua tanggal", null),
+    Today("Hari ini", "today"),
+    Last7Days("7 hari terakhir", "7d"),
+    Last30Days("30 hari terakhir", "30d")
 }
 
 enum class SecurityActivityFilter(
     val label: String,
     val actionQuery: String?
 ) {
-    All("Semua Aktivitas", null),
-    Insert("Tambah Data", "INSERT"),
-    Update("Ubah Data", "UPDATE"),
-    Delete("Nonaktifkan Data", "DELETE")
+    All("Semua aktivitas", null),
+    Insert("Tambah data", "INSERT"),
+    Update("Ubah data", "UPDATE"),
+    Delete("Nonaktifkan data", "DELETE")
 }
 
 data class SecurityLogItem(
@@ -84,6 +81,7 @@ data class SecurityLogItem(
     val deviceIcon: ImageVector,
     val deviceName: String,
     val time: String,
+    val dateLabel: String = "-",
     val relativeTime: String,
     val compactRelativeTime: String
 )
@@ -240,6 +238,7 @@ private fun AuditLogItem.toSecurityLogItem(): SecurityLogItem {
         deviceIcon = if (ipAddress.isNullOrBlank()) Icons.Outlined.DesktopWindows else Icons.Outlined.TabletAndroid,
         deviceName = if (ipAddress.isNullOrBlank()) "Server" else "Client POS",
         time = createdAtInstant?.toClockText() ?: createdAt,
+        dateLabel = createdAtInstant?.toDateText() ?: "-",
         relativeTime = createdAtInstant?.toRelativeText() ?: "-",
         compactRelativeTime = createdAtInstant?.toCompactRelativeText() ?: "-"
     )
@@ -260,6 +259,10 @@ private fun String.toServerInstantOrNull(): Instant? {
 private fun Instant.toClockText(): String {
     val localTime = atZone(java.time.ZoneId.systemDefault()).toLocalTime()
     return "%02d:%02d".format(localTime.hour, localTime.minute)
+}
+
+private fun Instant.toDateText(): String {
+    return atZone(java.time.ZoneId.systemDefault()).format(SECURITY_DATE_FORMATTER)
 }
 
 private fun Instant.toRelativeText(now: Instant = Instant.now()): String {
@@ -302,7 +305,11 @@ private fun Instant.toCompactRelativeText(now: Instant = Instant.now()): String 
     return "${duration.toDays()}h lalu"
 }
 
-private const val DEFAULT_LIMIT = 50
+private val SECURITY_DATE_FORMATTER = DateTimeFormatter.ofPattern(
+    "dd MMM yyyy",
+    Locale.forLanguageTag("id-ID"),
+)
+private const val DEFAULT_LIMIT = 10
 private const val MINUTE_SECONDS = 60
 private const val HOUR_MINUTES = 60
 private const val DAY_HOURS = 24

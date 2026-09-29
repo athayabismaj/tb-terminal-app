@@ -1,6 +1,8 @@
 package com.tbterminal.app.ui.backup
 
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.res.stringResource
+import com.tbterminal.app.R
 import androidx.compose.runtime.getValue
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
@@ -40,6 +42,7 @@ fun BackupRestoreRoute(
     onSecurityLogClick: () -> Unit = {},
     onProfileClick: () -> Unit = {},
     onSettingsClick: () -> Unit = {},
+    onBackToPrevious: (() -> Unit)? = null,
     onLogout: () -> Unit,
     viewModel: BackupRestoreViewModel = viewModel(
         factory = BackupRestoreViewModel.factory(localBackupRepository, serverBackupRepository, role)
@@ -51,6 +54,8 @@ fun BackupRestoreRoute(
         userName = name,
         role = role,
         activeDestination = AdminDestination.BackupRestore,
+        pageTitle = stringResource(R.string.owner_menu_backup),
+        onBack = onBackToPrevious,
         onDashboardClick = onDashboardClick,
         onProductsClick = onProductsClick,
         onAddProductClick = onAddProductClick,
@@ -86,22 +91,21 @@ fun BackupRestoreRoute(
             modifier = contentModifier,
         ) {
             BackupRestoreScreen(
-            modifier = androidx.compose.ui.Modifier,
-            uiState = uiState,
-            onCreateBackup = viewModel::createBackup,
-            onRestoreFileSelected = viewModel::inspectRestoreFile,
-            onConfirmRestore = viewModel::confirmRestore,
-            onDismissRestore = viewModel::dismissRestoreDialog,
-            onDismissMessage = viewModel::clearMessage,
-            canManageServerBackup = canManageServerDatabaseBackup(role),
-            onRefreshServerBackups = viewModel::refreshServerBackups,
-            onCreateServerBackup = viewModel::createServerBackup,
-            onDownloadServerBackup = viewModel::downloadServerBackup,
-            onServerRestoreFileSelected = viewModel::validateServerRestore,
-            onServerRestorePhraseChanged = viewModel::onServerRestorePhraseChanged,
-            onServerRestoreAcknowledgedChanged = viewModel::onServerRestoreAcknowledgedChanged,
-            onConfirmServerRestore = viewModel::confirmServerRestore,
-            onDismissServerRestore = viewModel::dismissServerRestore
+                modifier = androidx.compose.ui.Modifier,
+                uiState = uiState,
+                onCreateBackup = viewModel::createBackup,
+                onRestoreFileSelected = viewModel::inspectRestoreFile,
+                onConfirmRestore = viewModel::confirmRestore,
+                onDismissRestore = viewModel::dismissRestoreDialog,
+                onDismissMessage = viewModel::clearMessage,
+                canManageServerBackup = canManageServerDatabaseBackup(role),
+                onCreateServerBackup = viewModel::createServerBackup,
+                onDownloadServerBackup = viewModel::downloadServerBackup,
+                onServerRestoreFileSelected = viewModel::validateServerRestore,
+                onServerRestorePhraseChanged = viewModel::onServerRestorePhraseChanged,
+                onServerRestoreAcknowledgedChanged = viewModel::onServerRestoreAcknowledgedChanged,
+                onConfirmServerRestore = viewModel::confirmServerRestore,
+                onDismissServerRestore = viewModel::dismissServerRestore
             )
         }
     }

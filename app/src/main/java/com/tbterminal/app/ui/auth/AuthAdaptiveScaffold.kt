@@ -21,6 +21,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import com.tbterminal.app.BuildConfig
 
 internal fun usesWideAuthLayout(widthDp: Int): Boolean = widthDp >= 720
@@ -35,7 +36,7 @@ internal fun AuthAdaptiveScaffold(
     BoxWithConstraints(
         modifier = modifier
             .fillMaxSize()
-            .background(MaterialTheme.colorScheme.surfaceContainerLowest)
+            .background(androidx.compose.ui.graphics.Color(0xFFF8FAF9))
             .systemBarsPadding()
     ) {
         AuthFormArea(
@@ -111,11 +112,13 @@ private fun AuthFormArea(
 
 @Composable
 private fun AuthVersionText() {
-    Text(
-        text = "TB Terminal · v${BuildConfig.VERSION_NAME}",
+    androidx.compose.foundation.layout.Row(
         modifier = Modifier.fillMaxWidth(),
-        style = MaterialTheme.typography.labelMedium,
-        color = MaterialTheme.colorScheme.onSurfaceVariant,
-        textAlign = TextAlign.Center
-    )
+        horizontalArrangement = androidx.compose.foundation.layout.Arrangement.Center,
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Text("Terminal Barokah Jaya", style = androidx.compose.ui.text.TextStyle(fontSize = 12.sp, fontWeight = androidx.compose.ui.text.font.FontWeight.SemiBold, color = androidx.compose.ui.graphics.Color(0xFF64748B)))
+        Text(" • ", style = androidx.compose.ui.text.TextStyle(fontSize = 12.sp, fontWeight = androidx.compose.ui.text.font.FontWeight.Bold, color = androidx.compose.ui.graphics.Color(0xFFCBD5E1)), modifier = Modifier.padding(horizontal = 4.dp))
+        Text("v${BuildConfig.VERSION_NAME}", style = androidx.compose.ui.text.TextStyle(fontSize = 12.sp, fontWeight = androidx.compose.ui.text.font.FontWeight.Medium, color = androidx.compose.ui.graphics.Color(0xFF94A3B8)))
+    }
 }

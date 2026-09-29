@@ -13,6 +13,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -36,12 +37,19 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import com.tbterminal.app.ui.theme.TbGreen
+import com.tbterminal.app.ui.theme.TbGreenDark
+import com.tbterminal.app.ui.theme.TbGreenLight
+import com.tbterminal.app.ui.theme.TbText
+import com.tbterminal.app.ui.theme.TbTextMuted
 
 internal const val MaxPinLength = 6
 
@@ -115,39 +123,78 @@ internal fun PinContent(
         compactContentAlignment = Alignment.TopStart,
         compactFooter = { AccountSwitchButton(enabled = !isVerifying, onClick = onBackToLogin) }
     ) { compact ->
-        Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(12.dp)) {
-            Box(
-                modifier = Modifier.size(44.dp).background(MaterialTheme.colorScheme.primaryContainer, RoundedCornerShape(14.dp)),
-                contentAlignment = Alignment.Center
+        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+            
+            Spacer(modifier = Modifier.height(16.dp))
+
+            Surface(
+                modifier = Modifier.size(56.dp).padding(bottom = 12.dp),
+                shape = RoundedCornerShape(16.dp),
+                color = TbGreenLight.copy(alpha = 0.6f),
+                border = BorderStroke(1.dp, Color(0xFFC2D9CC))
             ) {
-                Icon(
-                    Icons.Outlined.Lock,
-                    contentDescription = null,
-                    tint = MaterialTheme.colorScheme.onPrimaryContainer,
-                    modifier = Modifier.size(27.dp)
-                )
+                Box(contentAlignment = Alignment.Center) {
+                    Icon(
+                        Icons.Outlined.Lock,
+                        contentDescription = null,
+                        tint = TbGreen,
+                        modifier = Modifier.size(28.dp)
+                    )
+                }
             }
 
-            Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                Text(
-                    text = "Masukkan PIN",
-                    style = MaterialTheme.typography.headlineMedium,
-                    fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.onSurface
-                )
-                Text(
-                    text = "6 digit PIN $userName",
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    textAlign = TextAlign.Center
-                )
+            val initials = userName.split(" ").mapNotNull { it.firstOrNull()?.uppercase() }.take(2).joinToString("")
+            Surface(
+                modifier = Modifier.padding(bottom = 16.dp),
+                shape = RoundedCornerShape(999.dp),
+                color = Color.White,
+                border = BorderStroke(1.dp, Color(0xFFE2E8F0)),
+                shadowElevation = 1.dp
+            ) {
+                Row(
+                    modifier = Modifier.padding(start = 4.dp, end = 12.dp, top = 4.dp, bottom = 4.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Box(
+                        modifier = Modifier.size(24.dp).background(TbGreen, CircleShape),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text(initials, color = Color.White, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                    }
+                    Spacer(Modifier.width(8.dp))
+                    Text(userName, color = TbText, fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
+                    
+                    Box(modifier = Modifier.padding(horizontal = 8.dp).width(1.dp).height(12.dp).background(Color(0xFFE2E8F0)))
+                    
+                    Surface(
+                        color = TbGreenLight.copy(alpha = 0.4f),
+                        shape = RoundedCornerShape(999.dp)
+                    ) {
+                        Text("Pemilik Toko", color = TbGreen, fontSize = 10.sp, modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp), fontWeight = FontWeight.Medium)
+                    }
+                }
             }
+
+            Text(
+                text = "Masukkan PIN",
+                fontSize = 24.sp,
+                fontWeight = FontWeight.Bold,
+                color = Color(0xFF0F172A),
+                modifier = Modifier.padding(bottom = 4.dp)
+            )
+            Text(
+                text = "Masukkan 6 digit PIN untuk otentikasi kasir",
+                fontSize = 12.sp,
+                color = Color(0xFF64748B),
+                textAlign = TextAlign.Center,
+                modifier = Modifier.padding(bottom = 24.dp)
+            )
 
             PinDots(pinLength = pin.length)
 
             if (errorMessage != null) {
                 Surface(
-                    modifier = Modifier.fillMaxWidth(),
+                    modifier = Modifier.fillMaxWidth().padding(top = 16.dp),
                     color = MaterialTheme.colorScheme.errorContainer,
                     contentColor = MaterialTheme.colorScheme.onErrorContainer,
                     shape = RoundedCornerShape(14.dp)
@@ -163,7 +210,7 @@ internal fun PinContent(
                 }
             }
 
-            Spacer(Modifier.height(if (compact) 96.dp else 36.dp))
+            Spacer(Modifier.height(if (compact) 48.dp else 36.dp))
 
             PinKeypad(
                 onDigitClick = onDigitClick,
@@ -173,7 +220,10 @@ internal fun PinContent(
                 isVerifying = isVerifying
             )
 
-            if (!compact) AccountSwitchButton(enabled = !isVerifying, onClick = onBackToLogin)
+            if (!compact) {
+                Spacer(Modifier.height(24.dp))
+                AccountSwitchButton(enabled = !isVerifying, onClick = onBackToLogin)
+            }
         }
     }
 }
@@ -181,9 +231,9 @@ internal fun PinContent(
 @Composable
 private fun AccountSwitchButton(enabled: Boolean, onClick: () -> Unit) {
     TextButton(onClick = onClick, enabled = enabled, modifier = Modifier.height(48.dp)) {
-        Icon(Icons.Outlined.Person, contentDescription = null, modifier = Modifier.size(19.dp))
-        Spacer(Modifier.size(8.dp))
-        Text("Gunakan akun lain")
+        Icon(Icons.Outlined.Person, contentDescription = null, modifier = Modifier.size(18.dp), tint = TbGreenDark)
+        Spacer(Modifier.size(6.dp))
+        Text("Gunakan akun lain", color = TbGreenDark, fontSize = 12.sp, fontWeight = FontWeight.Medium)
     }
 }
 
@@ -196,14 +246,16 @@ private fun PinDots(pinLength: Int) {
     ) {
         repeat(MaxPinLength) { index ->
             val filled = index < pinLength
-            val color by animateColorAsState(
-                targetValue = if (filled) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surfaceContainerHighest,
-                label = "warna digit PIN"
-            )
-            val size by animateDpAsState(targetValue = if (filled) 13.dp else 11.dp, label = "ukuran digit PIN")
-            Box(modifier = Modifier.size(16.dp), contentAlignment = Alignment.Center) {
-                Box(modifier = Modifier.size(size).background(color, CircleShape))
-            }
+            val dotColor by animateColorAsState(targetValue = if (filled) TbGreen else Color.White, label = "warna digit PIN")
+            val borderColor by animateColorAsState(targetValue = if (filled) TbGreenLight else Color(0xFFCBD5E1), label = "warna border PIN")
+            val borderWidth by animateDpAsState(targetValue = if (filled) 4.dp else 2.dp, label = "lebar border PIN")
+            
+            Surface(
+                modifier = Modifier.size(14.dp),
+                shape = CircleShape,
+                color = dotColor,
+                border = BorderStroke(borderWidth, borderColor)
+            ) {}
         }
     }
 }
@@ -217,7 +269,7 @@ private fun PinKeypad(
     isVerifying: Boolean
 ) {
     Column(
-        modifier = Modifier.fillMaxWidth(),
+        modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp),
         verticalArrangement = Arrangement.spacedBy(10.dp)
     ) {
         listOf(
@@ -239,6 +291,7 @@ private fun PinKeypad(
                 icon = Icons.AutoMirrored.Outlined.Backspace,
                 contentDescription = "Hapus digit terakhir",
                 enabled = pin.isNotEmpty() && !isVerifying,
+                isBackspace = true,
                 modifier = Modifier.weight(1f),
                 onClick = onBackspaceClick
             )
@@ -247,7 +300,7 @@ private fun PinKeypad(
                 icon = Icons.Outlined.Check,
                 contentDescription = "Verifikasi PIN",
                 enabled = canSubmitPin(pin, isVerifying),
-                primary = true,
+                isBackspace = false,
                 loading = isVerifying,
                 modifier = Modifier.weight(1f),
                 onClick = onSubmitClick
@@ -266,15 +319,15 @@ private fun PinNumberButton(
     Surface(
         onClick = onClick,
         enabled = enabled,
-        modifier = modifier.height(56.dp),
-        shape = RoundedCornerShape(18.dp),
-        color = MaterialTheme.colorScheme.surface,
-        contentColor = MaterialTheme.colorScheme.onSurface,
-        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.65f)),
-        tonalElevation = 0.dp
+        modifier = modifier.height(64.dp),
+        shape = RoundedCornerShape(16.dp),
+        color = Color.White,
+        contentColor = Color(0xFF1E293B),
+        border = BorderStroke(1.dp, Color(0xFFF1F5F9)),
+        shadowElevation = 1.dp
     ) {
         Box(contentAlignment = Alignment.Center) {
-            Text(number, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
+            Text(number, fontSize = 24.sp, fontWeight = FontWeight.Bold)
         }
     }
 }
@@ -285,37 +338,28 @@ private fun PinActionButton(
     contentDescription: String,
     enabled: Boolean,
     modifier: Modifier = Modifier,
-    primary: Boolean = false,
+    isBackspace: Boolean,
     loading: Boolean = false,
     onClick: () -> Unit
 ) {
-    val emphasized = primary && (enabled || loading)
-    val containerColor = when {
-        emphasized -> MaterialTheme.colorScheme.primary
-        primary -> MaterialTheme.colorScheme.primaryContainer
-        else -> MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.72f)
-    }
-    val iconColor = when {
-        emphasized -> MaterialTheme.colorScheme.onPrimary
-        primary -> MaterialTheme.colorScheme.onPrimaryContainer
-        else -> MaterialTheme.colorScheme.onSecondaryContainer
-    }
+    val containerColor = if (isBackspace) Color(0xFFF1F5F9) else TbGreen
+    val iconColor = if (isBackspace) Color(0xFF475569) else Color.White
+    
     Surface(
         onClick = onClick,
         enabled = enabled,
-        modifier = modifier.height(56.dp),
-        shape = RoundedCornerShape(18.dp),
+        modifier = modifier.height(64.dp),
+        shape = RoundedCornerShape(16.dp),
         color = containerColor,
         contentColor = iconColor,
-        border = if (emphasized) null else {
-            BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.65f))
-        }
+        border = if (isBackspace) BorderStroke(1.dp, Color(0xFFE2E8F0)) else null,
+        shadowElevation = if (isBackspace) 0.dp else 1.dp
     ) {
         Box(contentAlignment = Alignment.Center) {
             if (loading) {
-                CircularProgressIndicator(modifier = Modifier.size(24.dp), color = MaterialTheme.colorScheme.onPrimary, strokeWidth = 2.dp)
+                CircularProgressIndicator(modifier = Modifier.size(24.dp), color = Color.White, strokeWidth = 2.dp)
             } else {
-                Icon(icon, contentDescription = contentDescription, modifier = Modifier.size(25.dp))
+                Icon(icon, contentDescription = contentDescription, modifier = Modifier.size(28.dp))
             }
         }
     }
