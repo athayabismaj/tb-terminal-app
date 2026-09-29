@@ -4,29 +4,30 @@ import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
+
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
+
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.outlined.ArrowBack
 import androidx.compose.material.icons.filled.CheckCircle
-import androidx.compose.material.icons.outlined.LocalShipping
 import androidx.compose.material.icons.outlined.Warning
-import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Icon
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -36,7 +37,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.tbterminal.app.data.model.ProductStock
@@ -187,12 +187,12 @@ fun AdminIncomingGoodsFormScreen(
         onOperationalAuditClick = onOperationalAuditClick,
         onProfileClick = onProfileClick,
         onSettingsClick = onSettingsClick,
+        onBack = onIncomingGoodsClick,
         onLogout = onLogout
     ) { contentModifier ->
         IncomingGoodsFormContent(
             modifier = contentModifier,
             uiState = uiState,
-            onBackToList = onIncomingGoodsClick,
             onSelectProduct = viewModel::selectProduct,
             onSelectSupplier = viewModel::selectSupplier,
             onSupplierNameChanged = viewModel::onSupplierNameChanged,
@@ -223,25 +223,30 @@ private fun IncomingGoodsListContent(
     onNextPage: () -> Unit,
     onDismissMessage: () -> Unit
 ) {
-    Column(
-        modifier = modifier
-            .fillMaxSize()
-            .background(IncomingSurface)
-            .verticalScroll(rememberScrollState())
-            .padding(40.dp),
-        verticalArrangement = Arrangement.spacedBy(28.dp)
-    ) {
-        IncomingGoodsHeader(onOpenForm = onOpenForm, compact = true)
-        IncomingGoodsMessage(uiState, onDismissMessage)
-        ProductSelectorCard(
-            modifier = Modifier.fillMaxWidth(),
-            uiState = uiState,
-            onSearchChanged = onSearchChanged,
-            onCategoryFilterChanged = onCategoryFilterChanged,
-            onSelectProduct = onSelectProduct,
-            onPreviousPage = onPreviousPage,
-            onNextPage = onNextPage
-        )
+    BoxWithConstraints(modifier.fillMaxSize().background(androidx.compose.ui.graphics.Color(0xFFF8FAFC))) {
+        val compact = maxWidth < 720.dp
+        Box(
+            modifier = Modifier.fillMaxSize().padding(horizontal = if (compact) 16.dp else 28.dp, vertical = if (compact) 14.dp else 24.dp),
+            contentAlignment = Alignment.TopCenter,
+        ) {
+            Column(
+                modifier = Modifier.widthIn(max = 1180.dp).fillMaxWidth().verticalScroll(rememberScrollState()),
+                verticalArrangement = Arrangement.spacedBy(if (compact) 12.dp else 16.dp),
+            ) {
+                IncomingGoodsAlert(uiState, onDismissMessage)
+                ProductSelectorCard(
+                    modifier = Modifier.fillMaxWidth(),
+                    uiState = uiState,
+                    compact = compact,
+                    onSearchChanged = onSearchChanged,
+                    onCategoryFilterChanged = onCategoryFilterChanged,
+                    onOpenForm = onOpenForm,
+                    onSelectProduct = onSelectProduct,
+                    onPreviousPage = onPreviousPage,
+                    onNextPage = onNextPage
+                )
+            }
+        }
     }
 }
 
@@ -249,7 +254,6 @@ private fun IncomingGoodsListContent(
 private fun IncomingGoodsFormContent(
     modifier: Modifier,
     uiState: IncomingGoodsUiState,
-    onBackToList: () -> Unit,
     onSelectProduct: (ProductStock) -> Unit,
     onSelectSupplier: (Supplier) -> Unit,
     onSupplierNameChanged: (String) -> Unit,
@@ -265,26 +269,31 @@ private fun IncomingGoodsFormContent(
     onSubmit: () -> Unit,
     onDismissMessage: () -> Unit
 ) {
-    Column(
-        modifier = modifier
-            .fillMaxSize()
-            .background(IncomingBackground)
-            .padding(40.dp),
-        verticalArrangement = Arrangement.spacedBy(28.dp)
-    ) {
-        IncomingGoodsHeader(onBackClick = onBackToList)
-        IncomingGoodsMessage(uiState, onDismissMessage)
-        Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .weight(1f),
-            contentAlignment = Alignment.TopCenter
-        ) {
+    var showPaymentSheet by remember { mutableStateOf(false) }
+
+    BoxWithConstraints(modifier.fillMaxSize().background(androidx.compose.ui.graphics.Color(0xFFF8FAFC))) {
+        val compact = maxWidth < 720.dp
+        androidx.compose.material3.Scaffold(
+            containerColor = androidx.compose.ui.graphics.Color(0xFFF8FAFC),
+            bottomBar = {
+                androidx.compose.material3.Surface(color = IncomingSurface, shadowElevation = 3.dp) {
+                    Box(
+                        modifier = Modifier.fillMaxWidth().padding(horizontal = if (compact) 16.dp else 32.dp, vertical = 12.dp),
+                        contentAlignment = if (compact) Alignment.Center else Alignment.CenterEnd,
+                    ) {
+                        IncomingGoodsSubmitButton(
+                            uiState = uiState,
+                            onSubmit = { showPaymentSheet = true },
+                            modifier = if (compact) Modifier.fillMaxWidth() else Modifier.widthIn(max = 280.dp),
+                        )
+                    }
+                }
+            }
+        ) { innerPadding ->
             IncomingGoodsFormCard(
-                modifier = Modifier
-                    .widthIn(max = 760.dp)
-                    .fillMaxSize(),
+                modifier = Modifier.padding(innerPadding).fillMaxSize(),
                 uiState = uiState,
+                compact = compact,
                 onSelectProduct = onSelectProduct,
                 onSelectSupplier = onSelectSupplier,
                 onSupplierNameChanged = onSupplierNameChanged,
@@ -297,71 +306,36 @@ private fun IncomingGoodsFormContent(
                 onDueDaysChanged = onDueDaysChanged,
                 onNotesChanged = onNotesChanged,
                 onPaymentMethodChanged = onPaymentMethodChanged,
-                onSubmit = onSubmit
+                onSubmit = onSubmit // Not used inside anymore
+            )
+            IncomingGoodsAlert(uiState, onDismissMessage)
+        }
+
+        if (showPaymentSheet) {
+            IncomingPaymentBottomSheet(
+                uiState = uiState,
+                onPaymentMethodChanged = onPaymentMethodChanged,
+                onAmountPaidChanged = onAmountPaidChanged,
+                onDueDaysChanged = onDueDaysChanged,
+                onSubmit = {
+                    showPaymentSheet = false
+                    onSubmit()
+                },
+                onDismiss = { showPaymentSheet = false }
             )
         }
     }
 }
 
 @Composable
-private fun IncomingGoodsHeader(
-    onOpenForm: (() -> Unit)? = null,
-    onBackClick: (() -> Unit)? = null,
-    compact: Boolean = false
-) {
-    Row(
-        modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.SpaceBetween,
-        verticalAlignment = if (compact) Alignment.Top else Alignment.Bottom
-    ) {
-        Column {
-            Text(
-                if (compact) "Restok Barang" else "Barang Masuk",
-                color = IncomingText,
-                fontSize = 28.sp,
-                fontWeight = FontWeight.Medium
-            )
-        }
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            onBackClick?.let {
-                OutlinedButton(
-                    onClick = it,
-                    shape = RoundedCornerShape(10.dp),
-                    border = BorderStroke(1.dp, IncomingLine),
-                    colors = ButtonDefaults.outlinedButtonColors(
-                        containerColor = IncomingSurface,
-                        contentColor = IncomingText
-                    )
-                ) {
-                    Icon(Icons.AutoMirrored.Outlined.ArrowBack, contentDescription = null, modifier = Modifier.size(18.dp))
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Text("Kembali ke Restok", fontWeight = FontWeight.Bold)
-                }
-            }
-            onOpenForm?.let {
-                Button(
-                    onClick = it,
-                    colors = ButtonDefaults.buttonColors(containerColor = IncomingPrimary),
-                    shape = RoundedCornerShape(10.dp)
-                ) {
-                    Icon(Icons.Outlined.LocalShipping, contentDescription = null, modifier = Modifier.size(18.dp))
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Text("Catat Barang Masuk", fontWeight = FontWeight.Bold)
-                }
-            }
-        }
-    }
-}
-
-@Composable
-private fun IncomingGoodsMessage(
+private fun IncomingGoodsAlert(
     uiState: IncomingGoodsUiState,
     onDismiss: () -> Unit
 ) {
     val message = uiState.errorMessage ?: uiState.message ?: return
     val isError = uiState.errorMessage != null
-    val tint = if (isError) IncomingDanger else IncomingPrimaryDark
-    val background = if (isError) IncomingDanger.copy(alpha = 0.1f) else IncomingPrimary.copy(alpha = 0.1f)
+    val tint = if (isError) androidx.compose.ui.graphics.Color(0xFFEF4444) else androidx.compose.ui.graphics.Color(0xFF059669)
+    val background = if (isError) androidx.compose.ui.graphics.Color(0xFFEF4444).copy(alpha = 0.1f) else androidx.compose.ui.graphics.Color(0xFF10B981).copy(alpha = 0.1f)
 
     Row(
         modifier = Modifier
@@ -382,6 +356,7 @@ private fun IncomingGoodsMessage(
 private fun IncomingGoodsFormCard(
     modifier: Modifier,
     uiState: IncomingGoodsUiState,
+    compact: Boolean,
     onSelectProduct: (ProductStock) -> Unit,
     onSelectSupplier: (Supplier) -> Unit,
     onSupplierNameChanged: (String) -> Unit,
@@ -396,14 +371,10 @@ private fun IncomingGoodsFormCard(
     onPaymentMethodChanged: (IncomingPaymentMethod) -> Unit,
     onSubmit: () -> Unit
 ) {
-    Card(
-        modifier = modifier,
-        colors = CardDefaults.cardColors(containerColor = IncomingSurface),
-        shape = RoundedCornerShape(16.dp),
-        border = BorderStroke(1.dp, IncomingLine)
-    ) {
+    Box(modifier = modifier) {
         IncomingGoodsFormBody(
             uiState = uiState,
+            compact = compact,
             onSelectProduct = onSelectProduct,
             onSelectSupplier = onSelectSupplier,
             onSupplierNameChanged = onSupplierNameChanged,
@@ -415,8 +386,8 @@ private fun IncomingGoodsFormCard(
             onAmountPaidChanged = onAmountPaidChanged,
             onDueDaysChanged = onDueDaysChanged,
             onNotesChanged = onNotesChanged,
-            onPaymentMethodChanged = onPaymentMethodChanged,
-            onSubmit = onSubmit
-        )
+            
+            )
     }
 }
+
