@@ -26,7 +26,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.outlined.ReceiptLong
+
 import androidx.compose.material.icons.filled.ChevronLeft
 import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material.icons.outlined.Business
@@ -38,6 +38,7 @@ import androidx.compose.material.icons.outlined.Tune
 import androidx.compose.material.icons.outlined.ReceiptLong
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.draw.clip
 import androidx.compose.material.icons.outlined.Visibility
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
@@ -439,6 +440,17 @@ private fun PurchaseMobileRow(purchase: PurchaseSummary, onShowDetail: (String) 
 }
 
 @Composable
+private fun PurchaseTableHeader() {
+    Row(Modifier.fillMaxWidth().background(PurchaseSoft).padding(horizontal = 20.dp, vertical = 14.dp)) {
+        TableLabel("NO. NOTA", Modifier.weight(1.6f))
+        TableLabel("SUPPLIER", Modifier.weight(1.8f))
+        TableLabel("TANGGAL MASUK", Modifier.weight(1.4f))
+        TableLabel("TOTAL", Modifier.weight(1.2f))
+        TableLabel("AKSI", Modifier.weight(0.5f))
+    }
+}
+
+@Composable
 private fun PurchaseRow(purchase: PurchaseSummary, index: Int, onShowDetail: (String) -> Unit) {
     Row(
         Modifier
@@ -507,6 +519,61 @@ private fun PurchasePagination(
                 IconButton(onClick = onPreviousPage, enabled = uiState.page > 1) { Icon(Icons.Default.ChevronLeft, "Sebelumnya") }
                 Text("${uiState.page} / ${uiState.totalPages.coerceAtLeast(1)}", fontWeight = FontWeight.Bold)
                 IconButton(onClick = onNextPage, enabled = uiState.page < uiState.totalPages) { Icon(Icons.Default.ChevronRight, "Berikutnya") }
+            }
+        }
+    }
+}
+
+@Composable
+private fun PurchasePageButton(enabled: Boolean, onClick: () -> Unit, icon: ImageVector) {
+    OutlinedButton(
+        onClick = onClick,
+        enabled = enabled,
+        shape = RoundedCornerShape(12.dp),
+        contentPadding = PaddingValues(0.dp),
+        modifier = Modifier.size(34.dp),
+        colors = ButtonDefaults.outlinedButtonColors(contentColor = PurchaseText)
+    ) {
+        Icon(icon, contentDescription = null)
+    }
+}
+
+@Composable
+private fun PurchaseDetailDialog(detail: PurchaseDetail, onDismiss: () -> Unit) {
+    Dialog(onDismissRequest = onDismiss) {
+        Card(Modifier.widthIn(max = 760.dp).heightIn(max = 680.dp), colors = CardDefaults.cardColors(Color.White), shape = RoundedCornerShape(12.dp)) {
+            Column(Modifier.verticalScroll(rememberScrollState()).padding(24.dp)) {
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                    Column {
+                        Text("Detail Nota Pembelian", fontSize = 20.sp, fontWeight = FontWeight.Bold, color = PurchaseText)
+                        Text(detail.invoiceNo ?: "Tanpa nomor nota", color = PurchasePrimary, fontSize = 13.sp)
+                    }
+                    TextButton(onClick = onDismiss) { Text("Tutup") }
+                }
+                Spacer(Modifier.height(16.dp))
+                DetailInfo("Supplier", detail.supplierName)
+                DetailInfo("Tanggal masuk", detail.receivedAt.asDisplayDate())
+                DetailInfo("Catatan", detail.notes ?: "-")
+                Spacer(Modifier.height(16.dp))
+                Text("Item Pembelian", color = PurchaseText, fontWeight = FontWeight.Bold)
+                Spacer(Modifier.height(8.dp))
+                detail.items.forEach { item ->
+                    Row(Modifier.fillMaxWidth().padding(vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
+                        Icon(Icons.Outlined.Inventory2, null, tint = PurchasePrimary, modifier = Modifier.size(18.dp))
+                        Spacer(Modifier.width(8.dp))
+                        Column(Modifier.weight(1f)) {
+                            Text(item.productName, color = PurchaseText, fontWeight = FontWeight.SemiBold)
+                            Text("${item.quantity.stripTrailingZeros().toPlainString()} x ${item.priceAtTransaction.asCurrency()}", color = PurchaseMuted, fontSize = 12.sp)
+                        }
+                        Text(item.subtotal.asCurrency(), color = PurchaseText, fontWeight = FontWeight.Bold)
+                    }
+                    HorizontalDivider(color = PurchaseBorder)
+                }
+                Spacer(Modifier.height(12.dp))
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                    Text("TOTAL", color = PurchaseMuted, fontWeight = FontWeight.Bold)
+                    Text(detail.total.asCurrency(), color = PurchasePrimary, fontSize = 18.sp, fontWeight = FontWeight.ExtraBold)
+                }
             }
         }
     }
