@@ -37,6 +37,8 @@ import com.tbterminal.app.ui.dashboard.BackofficeHubScreen
 import com.tbterminal.app.ui.dashboard.BackofficeSection
 import com.tbterminal.app.ui.dashboard.cashier.CashierDashboardScreen
 import com.tbterminal.app.ui.dashboard.owner.OwnerDashboardScreen
+import com.tbterminal.app.ui.dashboard.owner.OwnerMenuScreen
+import com.tbterminal.app.ui.dashboard.isOwnerPersona
 import com.tbterminal.app.ui.incominggoods.AdminIncomingGoodsFormScreen
 import com.tbterminal.app.ui.incominggoods.AdminIncomingGoodsScreen
 import com.tbterminal.app.ui.payables.AdminSupplierDebtScreen
@@ -61,7 +63,9 @@ import com.tbterminal.app.ui.settings.AdminSettingsScreen
 import com.tbterminal.app.ui.stockopname.AdminStockOpnameFormScreen
 import com.tbterminal.app.ui.stockopname.AdminStockOpnameScreen
 import com.tbterminal.app.ui.stockreport.AdminStockReportScreen
+import com.tbterminal.app.ui.suppliers.AdminSupplierFormScreen
 import com.tbterminal.app.ui.suppliers.AdminSupplierScreen
+import com.tbterminal.app.ui.suppliers.SupplierViewModel
 import com.tbterminal.app.ui.users.OwnerAddUserScreen
 import com.tbterminal.app.ui.users.OwnerEditUserScreen
 import com.tbterminal.app.ui.users.OwnerUserCredentialScreen
@@ -393,24 +397,37 @@ internal fun NavGraphBuilder.dashboardGraph(navController: NavHostController, se
                         }
                     }
                 } else {
-                    BackofficeHubScreen(
-                        name = sessionUser.name,
-                        role = sessionUser.role,
-                        section = section,
-                        onLogout = {
+                    val logout: () -> Unit = {
                             sessionManager.logout()
                             navController.navigate(AppRoute.Login.route) {
                                 popUpTo(0)
                                 launchSingleTop = true
                             }
-                        },
-                        onUserManagementClick = {
-                            navController.navigate(AppRoute.UserManagement.route) { launchSingleTop = true }
-                        },
-                        onSecurityLogClick = {
-                            navController.navigate(AppRoute.SecurityLog.route) { launchSingleTop = true }
                         }
-                    )
+                    if (section == BackofficeSection.MORE && isOwnerPersona(sessionUser.role)) {
+                        OwnerMenuScreen(
+                            name = sessionUser.name,
+                            role = sessionUser.role,
+                            authRepository = appContainer.authRepository,
+                            onDashboardClick = {
+                                navController.navigateBackofficePage(AppRoute.Dashboard.route, sessionUser.role)
+                            },
+                            onLogout = logout,
+                        )
+                    } else {
+                        BackofficeHubScreen(
+                            name = sessionUser.name,
+                            role = sessionUser.role,
+                            section = section,
+                            onLogout = logout,
+                            onUserManagementClick = {
+                                navController.navigate(AppRoute.UserManagement.route) { launchSingleTop = true }
+                            },
+                            onSecurityLogClick = {
+                                navController.navigate(AppRoute.SecurityLog.route) { launchSingleTop = true }
+                            }
+                        )
+                    }
                 }
             }
         }
@@ -461,6 +478,11 @@ internal fun NavGraphBuilder.dashboardGraph(navController: NavHostController, se
                             launchSingleTop = true
                         }
                     },
+                    onEditProfile = {
+                        navController.navigate(AppRoute.CashierEditProfile.route) {
+                            launchSingleTop = true
+                        }
+                    },
                     onSettingsClick = {
                         navController.navigate(AppRoute.CashierSettings.route) {
                             launchSingleTop = true
@@ -473,6 +495,38 @@ internal fun NavGraphBuilder.dashboardGraph(navController: NavHostController, se
                             launchSingleTop = true
                         }
                     }
+                )
+            }
+        }
+
+        composable(AppRoute.CashierEditProfile.route) {
+            val sessionUser = sessionManager.readSessionUser()
+            if (sessionUser == null) {
+                LaunchedEffect(Unit) { logout(sessionManager, navController) }
+            } else {
+                fun navigate(route: String) {
+                    navController.navigate(route) { launchSingleTop = true }
+                }
+                CashierProfileScreen(
+                    userName = sessionUser.name,
+                    role = sessionUser.role,
+                    authRepository = appContainer.authRepository,
+                    onDashboardClick = { navigate(AppRoute.Dashboard.route) },
+                    onPosClick = { navigate(AppRoute.CashierPos.route) },
+                    onCashSessionClick = { navigate(AppRoute.CashierCashSession.route) },
+                    onTransactionHistoryClick = { navigate(AppRoute.CashierTransactionHistory.route) },
+                    onStockCheckClick = { navigate(AppRoute.CashierStockCheck.route) },
+                    onProfileClick = { navigate(AppRoute.CashierProfile.route) },
+                    onSettingsClick = { navigate(AppRoute.CashierSettings.route) },
+                    editMode = true,
+                    onBack = { navController.popBackStack() },
+                    onProfileSaved = {
+                        navController.navigate(AppRoute.CashierProfile.route) {
+                            popUpTo(AppRoute.CashierProfile.route) { inclusive = true }
+                            launchSingleTop = true
+                        }
+                    },
+                    onLogout = { logout(sessionManager, navController) },
                 )
             }
         }
@@ -570,8 +624,52 @@ internal fun NavGraphBuilder.dashboardGraph(navController: NavHostController, se
                     onCustomersClick = { navigate(AppRoute.Customers.route) },
                     onOperationalAuditClick = { navigate(AppRoute.OperationalAudit.route) },
                     onProfileClick = { navigate(AppRoute.AdminProfile.route) },
+                    onEditProfile = { navigate(AppRoute.AdminEditProfile.route) },
                     onSettingsClick = { navigate(AppRoute.AdminSettings.route) },
+                    onBackToPrevious = {
+                        if (isOwnerPersona(sessionUser.role)) {
+                            navController.returnToBackofficePage(AppRoute.BackofficeMore.route, sessionUser.role)
+                        } else if (!navController.popBackStack()) {
+                            navController.navigateBackofficePage(AppRoute.Dashboard.route, sessionUser.role)
+                        }
+                    },
                     onLogout = { logout(sessionManager, navController) }
+                )
+            }
+        }
+
+        composable(AppRoute.AdminEditProfile.route) {
+            val sessionUser = sessionManager.readSessionUser()
+            if (sessionUser == null) {
+                LaunchedEffect(Unit) { logout(sessionManager, navController) }
+            } else {
+                fun navigate(route: String) {
+                    navController.navigate(route) { launchSingleTop = true }
+                }
+                AdminProfileScreen(
+                    name = sessionUser.name,
+                    role = sessionUser.role,
+                    authRepository = appContainer.authRepository,
+                    onDashboardClick = { navigate(AppRoute.Dashboard.route) },
+                    onProductsClick = { navigate(AppRoute.Products.route) },
+                    onCashReconciliationClick = { navigate(AppRoute.CashReconciliation.route) },
+                    onSalesTransactionsClick = { navigate(AppRoute.SalesTransactions.route) },
+                    onReportsClick = { navigate(AppRoute.Reports.route) },
+                    onSupplierDebtsClick = { navigate(AppRoute.SupplierDebts.route) },
+                    onReceivablesClick = { navigate(AppRoute.Receivables.route) },
+                    onCustomersClick = { navigate(AppRoute.Customers.route) },
+                    onOperationalAuditClick = { navigate(AppRoute.OperationalAudit.route) },
+                    onProfileClick = { navigate(AppRoute.AdminProfile.route) },
+                    onSettingsClick = { navigate(AppRoute.AdminSettings.route) },
+                    onBackToPrevious = { navController.popBackStack() },
+                    editMode = true,
+                    onProfileSaved = {
+                        navController.navigate(AppRoute.AdminProfile.route) {
+                            popUpTo(AppRoute.AdminProfile.route) { inclusive = true }
+                            launchSingleTop = true
+                        }
+                    },
+                    onLogout = { logout(sessionManager, navController) },
                 )
             }
         }
@@ -643,6 +741,14 @@ internal fun NavGraphBuilder.dashboardGraph(navController: NavHostController, se
                 sessionManager = sessionManager,
                 navController = navController,
                 appContainer = appContainer
+            )
+        }
+
+        composable(AppRoute.SupplierForm.route) {
+            AdminSupplierFormRoute(
+                sessionManager = sessionManager,
+                navController = navController,
+                appContainer = appContainer,
             )
         }
 
@@ -719,6 +825,9 @@ private fun AdminSupplierRoute(
         return
     }
     fun navigate(route: String) = navController.navigate(route) { launchSingleTop = true }
+    val supplierViewModel: SupplierViewModel = viewModel(
+        factory = SupplierViewModel.factory(appContainer.purchasingRepository),
+    )
     AdminSupplierScreen(
         name = sessionUser.name,
         role = sessionUser.role,
@@ -740,7 +849,54 @@ private fun AdminSupplierRoute(
         onCustomersClick = { navigate(AppRoute.Customers.route) },
         onReportsClick = { navigate(AppRoute.Reports.route) },
         onOperationalAuditClick = { navigate(AppRoute.OperationalAudit.route) },
-        onLogout = { logout(sessionManager, navController) }
+        onAddSupplierClick = { navigate(AppRoute.SupplierForm.route) },
+        onEditSupplierClick = { navigate(AppRoute.SupplierForm.route) },
+        onBackToPrevious = {
+            if (isOwnerPersona(sessionUser.role)) {
+                navController.returnToBackofficePage(AppRoute.BackofficeMore.route, sessionUser.role)
+            } else if (!navController.popBackStack()) {
+                navController.navigateBackofficePage(AppRoute.Dashboard.route, sessionUser.role)
+            }
+        },
+        onLogout = { logout(sessionManager, navController) },
+        viewModel = supplierViewModel,
+    )
+}
+
+@Composable
+private fun AdminSupplierFormRoute(
+    sessionManager: SessionManager,
+    navController: NavHostController,
+    appContainer: AppContainer,
+) {
+    val sessionUser = sessionManager.readSessionUser()
+    if (sessionUser == null) {
+        RedirectToLogin(sessionManager, navController)
+        return
+    }
+    val supplierListEntry = remember(navController.currentBackStackEntry) {
+        navController.getBackStackEntry(AppRoute.Suppliers.route)
+    }
+    val supplierViewModel: SupplierViewModel = viewModel(
+        viewModelStoreOwner = supplierListEntry,
+        factory = SupplierViewModel.factory(appContainer.purchasingRepository),
+    )
+    fun navigate(route: String) = navController.navigate(route) { launchSingleTop = true }
+    fun returnToSuppliers() {
+        if (!navController.popBackStack(AppRoute.Suppliers.route, false)) {
+            navController.navigateBackofficePage(AppRoute.Suppliers.route, sessionUser.role)
+        }
+    }
+
+    AdminSupplierFormScreen(
+        name = sessionUser.name,
+        role = sessionUser.role,
+        viewModel = supplierViewModel,
+        onDashboardClick = { navigate(AppRoute.Dashboard.route) },
+        onProductsClick = { navigate(AppRoute.Products.route) },
+        onSuppliersClick = ::returnToSuppliers,
+        onBackToSuppliers = ::returnToSuppliers,
+        onLogout = { logout(sessionManager, navController) },
     )
 }
 
@@ -798,6 +954,7 @@ private fun AdminPurchaseHistoryRoute(
         role = sessionUser.role,
         purchasingRepository = appContainer.purchasingRepository,
         onDashboardClick = { navigate(AppRoute.Dashboard.route) },
+        onTransactionsClick = { navigate(AppRoute.BackofficeTransactions.route) },
         onProductsClick = { navigate(AppRoute.Products.route) },
         onAddProductClick = { navigate(AppRoute.AddProduct.route) },
         onProductCategoriesClick = { navigate(AppRoute.ProductCategories.route) },

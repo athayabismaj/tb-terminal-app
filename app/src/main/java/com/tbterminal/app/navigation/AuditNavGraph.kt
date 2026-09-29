@@ -33,6 +33,7 @@ import com.tbterminal.app.ui.dashboard.admin.AdminDashboardScreen
 import com.tbterminal.app.ui.dashboard.admin.AdminDestination
 import com.tbterminal.app.ui.dashboard.cashier.CashierDashboardScreen
 import com.tbterminal.app.ui.dashboard.owner.OwnerDashboardScreen
+import com.tbterminal.app.ui.dashboard.isOwnerPersona
 import com.tbterminal.app.ui.incominggoods.AdminIncomingGoodsFormScreen
 import com.tbterminal.app.ui.incominggoods.AdminIncomingGoodsScreen
 import com.tbterminal.app.ui.offlinereports.OfflineReportRoute
@@ -242,6 +243,13 @@ private fun OfflineReportsNavRoute(
         onSecurityLogClick = { navController.navigateAdminSingleTop(AppRoute.SecurityLog.route) },
         onProfileClick = { navController.navigateAdminSingleTop(AppRoute.AdminProfile.route) },
         onSettingsClick = { navController.navigateAdminSingleTop(AppRoute.AdminSettings.route) },
+        onBackToPrevious = {
+            if (isOwnerPersona(sessionUser.role)) {
+                navController.returnToBackofficePage(AppRoute.BackofficeMore.route, sessionUser.role)
+            } else if (!navController.popBackStack()) {
+                navController.navigateBackofficePage(AppRoute.Dashboard.route, sessionUser.role)
+            }
+        },
         onLogout = {
             sessionManager.logout()
             navController.navigate(AppRoute.Login.route) {
@@ -297,6 +305,13 @@ private fun AdminReportsNavRoute(
         onSecurityLogClick = { navController.navigateAdminSingleTop(AppRoute.SecurityLog.route) },
         onProfileClick = { navController.navigateAdminSingleTop(AppRoute.AdminProfile.route) },
         onSettingsClick = { navController.navigateAdminSingleTop(AppRoute.AdminSettings.route) },
+        onBackToPrevious = {
+            if (isOwnerPersona(sessionUser.role)) {
+                navController.returnToBackofficePage(AppRoute.BackofficeMore.route, sessionUser.role)
+            } else if (!navController.popBackStack()) {
+                navController.navigateBackofficePage(AppRoute.Dashboard.route, sessionUser.role)
+            }
+        },
         onLogout = {
             sessionManager.logout()
             navController.navigate(AppRoute.Login.route) {
@@ -355,6 +370,13 @@ private fun AdminOperationalAuditNavRoute(
         onSecurityLogClick = { navController.navigateAdminSingleTop(AppRoute.SecurityLog.route) },
         onProfileClick = { navController.navigateAdminSingleTop(AppRoute.AdminProfile.route) },
         onSettingsClick = { navController.navigateAdminSingleTop(AppRoute.AdminSettings.route) },
+        onBackToPrevious = {
+            if (isOwnerPersona(sessionUser.role)) {
+                navController.returnToBackofficePage(AppRoute.BackofficeMore.route, sessionUser.role)
+            } else if (!navController.popBackStack()) {
+                navController.navigateBackofficePage(AppRoute.Dashboard.route, sessionUser.role)
+            }
+        },
         onLogout = {
             sessionManager.logout()
             navController.navigate(AppRoute.Login.route) {
@@ -428,6 +450,9 @@ private fun BackupRestoreNavRoute(
         onSecurityLogClick = { navController.navigateAdminSingleTop(AppRoute.SecurityLog.route) },
         onProfileClick = { navController.navigateAdminSingleTop(AppRoute.AdminProfile.route) },
         onSettingsClick = { navController.navigateAdminSingleTop(AppRoute.AdminSettings.route) },
+        onBackToPrevious = {
+            navController.returnToBackofficePage(AppRoute.BackofficeMore.route, sessionUser.role)
+        },
         onLogout = {
             sessionManager.logout()
             navController.navigate(AppRoute.Login.route) {
@@ -492,6 +517,9 @@ private fun SyncCenterNavRoute(
         onSecurityLogClick = { navController.navigateAdminSingleTop(AppRoute.SecurityLog.route) },
         onProfileClick = { navController.navigateAdminSingleTop(AppRoute.AdminProfile.route) },
         onSettingsClick = { navController.navigateAdminSingleTop(AppRoute.AdminSettings.route) },
+        onBackToPrevious = {
+            navController.returnToBackofficePage(AppRoute.BackofficeMore.route, sessionUser.role)
+        },
         onLogout = {
             sessionManager.logout()
             navController.navigate(AppRoute.Login.route) {

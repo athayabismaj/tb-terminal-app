@@ -669,6 +669,11 @@ internal fun NavGraphBuilder.inventoryGraph(navController: NavHostController, se
                     name = sessionUser.name,
                     role = sessionUser.role,
                     inventoryRepository = appContainer.inventoryRepository,
+                    onStockClick = {
+                        navController.navigate(AppRoute.BackofficeStock.route) {
+                            launchSingleTop = true
+                        }
+                    },
                     onDashboardClick = {
                         navController.navigate(AppRoute.Dashboard.route) {
                             launchSingleTop = true
@@ -790,6 +795,11 @@ internal fun NavGraphBuilder.inventoryGraph(navController: NavHostController, se
                     name = sessionUser.name,
                     role = sessionUser.role,
                     inventoryRepository = appContainer.inventoryRepository,
+                    onStockClick = {
+                        navController.navigate(AppRoute.BackofficeStock.route) {
+                            launchSingleTop = true
+                        }
+                    },
                     onDashboardClick = {
                         navController.navigate(AppRoute.Dashboard.route) {
                             launchSingleTop = true
@@ -911,6 +921,11 @@ internal fun NavGraphBuilder.inventoryGraph(navController: NavHostController, se
                     name = sessionUser.name,
                     role = sessionUser.role,
                     inventoryRepository = appContainer.inventoryRepository,
+                    onStockClick = {
+                        navController.navigate(AppRoute.BackofficeStock.route) {
+                            launchSingleTop = true
+                        }
+                    },
                     onDashboardClick = {
                         navController.navigate(AppRoute.Dashboard.route) {
                             launchSingleTop = true

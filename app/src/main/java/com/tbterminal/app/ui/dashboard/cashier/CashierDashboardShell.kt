@@ -55,13 +55,17 @@ import androidx.compose.ui.unit.sp
 import com.tbterminal.app.ui.offline.OfflineStatusIndicatorHost
 import com.tbterminal.app.ui.dashboard.admin.AdminDestination
 import com.tbterminal.app.ui.dashboard.admin.LocalAdminDestinationNavigator
-private val CashierShellBackground = Color.White
-private val CashierSidebarBackground = Color(0xFFF1F6F8)
+import com.tbterminal.app.ui.theme.TbBackground
+import com.tbterminal.app.ui.theme.TbGreen
+import com.tbterminal.app.ui.theme.TbGreenLight
+import com.tbterminal.app.ui.theme.TbSurface
+private val CashierShellBackground = TbBackground
+private val CashierSidebarBackground = TbSurface
 private val CashierSidebarTextPrimary = Color(0xFF111111)
 private val CashierSidebarTextSecondary = Color(0xFF6B7378)
 private val CashierSidebarLine = Color(0xFFD8E0E4)
-private val CashierSidebarTeal = Color(0xFF008C86)
-private val CashierSidebarSelected = Color(0xFFE8F3F2)
+private val CashierSidebarTeal = TbGreen
+private val CashierSidebarSelected = TbGreenLight
 private val CashierSidebarDanger = Color(0xFFDC2626)
 private val CashierSidebarDangerSoft = Color(0xFFFFF1F2)
 private val CashierSidebarActionIconBg = Color(0xFFEAF1F3)

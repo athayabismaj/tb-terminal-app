@@ -68,7 +68,8 @@ private fun BackofficePreview() {
             activeSection = activeSection,
             onSectionSelected = { activeSection = it },
             onProfileClick = {},
-            onLogout = {}
+            onLogout = {},
+            showPageHeader = false,
         ) { modifier ->
             if (activeSection == BackofficeSection.HOME) {
                 BackofficeDashboardContent(
@@ -122,9 +123,10 @@ private fun PreviewSectionContent(section: BackofficeSection, modifier: Modifier
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center
     ) {
-        Text(section.label, style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold)
+        val label = androidx.compose.ui.res.stringResource(section.labelRes)
+        Text(label, style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold)
         Text(
-            "Navbar aktif. Pada aplikasi normal, halaman ${section.label.lowercase()} akan dibuka.",
+            "Navbar aktif. Pada aplikasi normal, halaman ${label.lowercase()} akan dibuka.",
             color = MaterialTheme.colorScheme.onSurfaceVariant
         )
     }

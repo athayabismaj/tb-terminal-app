@@ -58,13 +58,16 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.tbterminal.app.ui.offline.OfflineStatusIndicatorHost
+import com.tbterminal.app.ui.theme.TbGreen
+import com.tbterminal.app.ui.theme.TbGreenLight
+import com.tbterminal.app.ui.theme.TbSurface
 
-private val SidebarBackground = Color(0xFFF4F8FA)
+private val SidebarBackground = TbSurface
 private val SidebarTextPrimary = Color(0xFF111111)
 private val SidebarTextSecondary = Color(0xFF6B7378)
 private val SidebarLine = Color(0xFFD8E0E4)
-private val SidebarTeal = Color(0xFF008C86)
-private val SidebarSelected = Color(0xFFE8F3F2)
+private val SidebarTeal = TbGreen
+private val SidebarSelected = TbGreenLight
 
 @Composable
 internal fun TbTerminalSidebar(
@@ -256,6 +259,7 @@ private val stockDestinations = setOf(
     AdminDestination.IncomingGoods,
     AdminDestination.IncomingGoodsForm,
     AdminDestination.Suppliers,
+    AdminDestination.SupplierForm,
     AdminDestination.PurchaseHistory,
     AdminDestination.StockReport
 )

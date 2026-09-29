@@ -1,3 +1,65 @@
 <resources>
     <string name="app_name">tb-terminal-app</string>
+
+    <!-- Primary backoffice navigation -->
+    <string name="nav_home">Beranda</string>
+    <string name="nav_transactions">Transaksi</string>
+    <string name="nav_finance">Keuangan</string>
+    <string name="nav_stock">Stok</string>
+    <string name="nav_more">Lainnya</string>
+    <string name="nav_menu">Menu</string>
+
+    <!-- Owner menu -->
+    <string name="owner_menu_title">Menu</string>
+    <string name="owner_menu_group_store">Kelola toko</string>
+    <string name="owner_menu_group_reports">Laporan &amp; data</string>
+    <string name="owner_menu_group_app">Aplikasi &amp; keamanan</string>
+    <string name="owner_menu_customers">Pelanggan</string>
+    <string name="owner_menu_suppliers">Supplier</string>
+    <string name="owner_menu_users">Pengguna &amp; akses</string>
+    <string name="owner_menu_reports">Laporan bisnis</string>
+    <string name="owner_menu_device_reports">Laporan perangkat</string>
+    <string name="owner_menu_backup">Cadangan data</string>
+    <string name="owner_menu_settings">Pengaturan aplikasi</string>
+    <string name="owner_menu_sync">Sinkronisasi</string>
+    <string name="owner_menu_activity">Riwayat aktivitas</string>
+    <string name="owner_menu_security_log">Log keamanan</string>
+
+    <!-- Account -->
+    <string name="profile_title">Profil</string>
+    <string name="profile_change_password">Ubah kata sandi</string>
+    <string name="profile_change_pin">Ubah PIN</string>
+    <string name="profile_logout">Keluar</string>
+    <string name="profile_security">Keamanan akun</string>
+
+    <!-- Backoffice work hubs -->
+    <string name="hub_tab_sales">Penjualan</string>
+    <string name="hub_tab_purchases">Pembelian</string>
+    <string name="hub_group_sales">Aktivitas penjualan</string>
+    <string name="dashboard_today_summary">Ringkasan hari ini</string>
+    <string name="dashboard_new_transaction">+ Transaksi baru</string>
+    <string name="hub_group_purchases">Aktivitas pembelian</string>
+    <string name="hub_group_finance">Kelola keuangan</string>
+    <string name="hub_group_stock">Operasional stok</string>
+    <string name="hub_group_product_settings">Data produk</string>
+    <string name="hub_sales_history">Riwayat penjualan</string>
+    <string name="hub_new_sale">Transaksi baru</string>
+    <string name="hub_purchase_history">Riwayat pembelian</string>
+    <string name="hub_incoming_goods">Barang masuk</string>
+    <string name="hub_sales_history_description">Cari dan periksa transaksi penjualan</string>
+    <string name="hub_new_sale_description">Mulai transaksi penjualan baru</string>
+    <string name="hub_purchase_history_description">Cari dan periksa transaksi pembelian</string>
+    <string name="hub_incoming_goods_description">Catat produk yang diterima dari supplier</string>
+    <string name="hub_receivables">Piutang pelanggan</string>
+    <string name="hub_supplier_debts">Hutang supplier</string>
+    <string name="hub_daily_cash">Kas harian</string>
+    <string name="hub_receivables_description">Tagihan dan pembayaran pelanggan</string>
+    <string name="hub_supplier_debts_description">Kewajiban dan pembayaran supplier</string>
+    <string name="hub_daily_cash_description">Sesi kas dan rekonsiliasi harian</string>
+    <string name="hub_products_stock">Daftar produk</string>
+    <string name="hub_adjust_stock">Sesuaikan stok</string>
+    <string name="hub_stock_card">Kartu stok</string>
+    <string name="hub_product_prices">Harga produk</string>
+    <string name="hub_categories">Kategori produk</string>
+    <string name="hub_units">Satuan produk</string>
 </resources>

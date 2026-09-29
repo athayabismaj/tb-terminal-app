@@ -18,11 +18,13 @@ class AppRouteAccessPolicyTest {
         assertTrue(AppRouteAccessPolicy.isAllowed(AppRoute.Receivables.route, "kasir"))
         assertTrue(AppRouteAccessPolicy.isAllowed(AppRoute.ReceivablePayments.route, "kasir"))
         assertFalse(AppRouteAccessPolicy.isAllowed(AppRoute.CashierStockCheck.route, "kasir"))
+        assertFalse(AppRouteAccessPolicy.isAllowed(AppRoute.SupplierForm.route, "kasir"))
     }
 
     @Test
     fun adminCannotOpenOwnerOnlyRoutes() {
         assertTrue(AppRouteAccessPolicy.isAllowed(AppRoute.Products.route, "admin"))
+        assertTrue(AppRouteAccessPolicy.isAllowed(AppRoute.SupplierForm.route, "admin"))
         assertFalse(AppRouteAccessPolicy.isAllowed(AppRoute.UserManagement.route, "admin"))
         assertFalse(AppRouteAccessPolicy.isAllowed(AppRoute.SecurityLog.route, "admin"))
         assertFalse(AppRouteAccessPolicy.isAllowed(AppRoute.BackupRestore.route, "admin"))
@@ -31,6 +33,7 @@ class AppRouteAccessPolicyTest {
     @Test
     fun ownerHasOwnerCapabilitiesButCannotEnterCashierPos() {
         assertTrue(AppRouteAccessPolicy.isAllowed(AppRoute.UserManagement.route, "owner"))
+        assertTrue(AppRouteAccessPolicy.isAllowed(AppRoute.SupplierForm.route, "owner"))
         assertTrue(AppRouteAccessPolicy.isAllowed(AppRoute.BackupRestore.route, "owner"))
         assertFalse(AppRouteAccessPolicy.isAllowed(AppRoute.CashierPos.route, "owner"))
         assertFalse(AppRouteAccessPolicy.isAllowed(AppRoute.Dashboard.route, "guest"))
@@ -121,5 +124,16 @@ class AppRouteAccessPolicyTest {
         assertFalse(AppAccessPolicy.can("KASIR", AppCapability.REVERSE_RECEIVABLE_PAYMENTS))
         assertTrue(AppAccessPolicy.can("OWNER", AppCapability.MANAGE_INVENTORY))
         assertTrue(AppAccessPolicy.can("ADMIN", AppCapability.MANAGE_INVENTORY))
+    }
+
+    @Test
+    fun profileDetailAndEditRoutesUseAccountCapabilityForEveryAuthenticatedRole() {
+        listOf("OWNER", "ADMIN").forEach { role ->
+            assertTrue(AppRouteAccessPolicy.isAllowed(AppRoute.AdminProfile.route, role))
+            assertTrue(AppRouteAccessPolicy.isAllowed(AppRoute.AdminEditProfile.route, role))
+        }
+        assertTrue(AppRouteAccessPolicy.isAllowed(AppRoute.CashierProfile.route, "KASIR"))
+        assertTrue(AppRouteAccessPolicy.isAllowed(AppRoute.CashierEditProfile.route, "KASIR"))
+        assertFalse(AppRouteAccessPolicy.isAllowed(AppRoute.AdminEditProfile.route, "guest"))
     }
 }

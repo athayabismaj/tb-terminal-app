@@ -74,9 +74,11 @@ sealed interface AppRoute {
     }
 
     data object CashierProfile : AppRoute { override val route = "cashier_profile" }
+    data object CashierEditProfile : AppRoute { override val route = "cashier_profile/edit" }
     data object CashierSettings : AppRoute { override val route = "cashier_settings" }
     
     data object AdminProfile : AppRoute { override val route = "admin/profile" }
+    data object AdminEditProfile : AppRoute { override val route = "admin/profile/edit" }
     data object AdminSettings : AppRoute {
         override val route = "admin/settings"
     }
@@ -175,6 +177,10 @@ sealed interface AppRoute {
 
     data object Suppliers : AppRoute {
         override val route = "admin/suppliers"
+    }
+
+    data object SupplierForm : AppRoute {
+        override val route = "admin/suppliers/form"
     }
 
     data object PurchaseHistory : AppRoute {

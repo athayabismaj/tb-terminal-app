@@ -2,10 +2,13 @@ package com.tbterminal.app.ui.dashboard
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.IntrinsicSize
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
@@ -29,6 +32,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -38,6 +43,7 @@ import com.tbterminal.app.navigation.AppAccessPolicy
 import com.tbterminal.app.navigation.AppCapability
 import com.tbterminal.app.ui.components.TbLayoutInfo
 import com.tbterminal.app.ui.components.TbPageSurface
+import com.tbterminal.app.ui.components.TbWindowWidthClass
 import com.tbterminal.app.ui.dashboard.offline.OfflineDashboardSection
 import com.tbterminal.app.ui.dashboard.offline.OfflineDashboardUiState
 import com.tbterminal.app.ui.components.SkeletonCard
@@ -135,7 +141,7 @@ fun BackofficeDashboardContent(
                         financialTotals?.netRevenue?.let(currency::format) ?: financialLoadingText,
                         "Setelah diskon dan refund hari ini",
                         Icons.Outlined.Storefront,
-                        Color(0xFF047857),
+                        MaterialTheme.colorScheme.primary,
                         onReportsClick,
                     )
                     DashboardSummaryKey.REFUND -> DashboardSummary(
@@ -143,7 +149,7 @@ fun BackofficeDashboardContent(
                         financialTotals?.refundAmount?.let(currency::format) ?: financialLoadingText,
                         "Nilai refund hari ini",
                         Icons.AutoMirrored.Outlined.ReceiptLong,
-                        Color(0xFFB42318),
+                        MaterialTheme.colorScheme.error,
                         onReportsClick,
                     )
                     DashboardSummaryKey.DISCOUNT -> DashboardSummary(
@@ -151,7 +157,7 @@ fun BackofficeDashboardContent(
                         financialTotals?.discountAmount?.let(currency::format) ?: financialLoadingText,
                         "Diskon transaksi aktif hari ini",
                         Icons.Outlined.Payments,
-                        Color(0xFF7C3AED),
+                        MaterialTheme.colorScheme.tertiary,
                         onReportsClick,
                     )
                     DashboardSummaryKey.RECEIVABLES -> DashboardSummary(
@@ -159,7 +165,7 @@ fun BackofficeDashboardContent(
                         metrics?.totalActiveReceivables?.let(currency::format) ?: loadingText,
                         "${metrics?.activeReceivableCount ?: 0} nota belum lunas",
                         Icons.Outlined.AccountBalanceWallet,
-                        Color(0xFFB26A00),
+                        MaterialTheme.colorScheme.secondary,
                         onReceivablesClick,
                     )
                     DashboardSummaryKey.PAYABLES -> DashboardSummary(
@@ -167,7 +173,7 @@ fun BackofficeDashboardContent(
                         "Lihat rincian",
                         "Periksa sisa dan jatuh tempo",
                         Icons.AutoMirrored.Outlined.ReceiptLong,
-                        Color(0xFF8B5CF6),
+                        MaterialTheme.colorScheme.tertiary,
                         onSupplierDebtsClick,
                     )
                     DashboardSummaryKey.CASH -> DashboardSummary(
@@ -175,7 +181,7 @@ fun BackofficeDashboardContent(
                         "Pantau sesi",
                         "Saldo awal, masuk, keluar, dan rekonsiliasi",
                         Icons.Outlined.Storefront,
-                        Color(0xFF047857),
+                        MaterialTheme.colorScheme.primary,
                         onCashClick,
                     )
                     DashboardSummaryKey.STOCK -> DashboardSummary(
@@ -183,7 +189,7 @@ fun BackofficeDashboardContent(
                         "${metrics?.lowStockCount ?: 0} produk",
                         "Stok sama atau di bawah batas minimum",
                         Icons.Outlined.Inventory2,
-                        Color(0xFFC2410C),
+                        MaterialTheme.colorScheme.error,
                         onStockClick,
                     )
                 }
@@ -242,61 +248,92 @@ private fun DashboardHeader(
     showNewTransactionAction: Boolean
 ) {
     if (layout.isCompact) {
-        Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
-            DashboardTitle()
+        Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            DashboardSectionTitle()
             if (showNewTransactionAction) {
                 Button(onClick = onNewTransactionClick, modifier = Modifier.fillMaxWidth().height(48.dp)) {
-                    Text("+ Transaksi Baru")
+                    Text(stringResource(com.tbterminal.app.R.string.dashboard_new_transaction))
                 }
             }
         }
     } else {
         Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
-            DashboardTitle()
+            DashboardSectionTitle()
             if (showNewTransactionAction) {
-                Button(onClick = onNewTransactionClick, modifier = Modifier.height(48.dp)) { Text("+ Transaksi Baru") }
+                Button(onClick = onNewTransactionClick, modifier = Modifier.height(48.dp)) {
+                    Text(stringResource(com.tbterminal.app.R.string.dashboard_new_transaction))
+                }
             }
         }
     }
 }
 
 @Composable
-private fun DashboardTitle() {
-    Column {
-        Text("Beranda", style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold)
-        Text("Ringkasan pekerjaan toko hari ini.", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
-    }
+private fun DashboardSectionTitle() {
+    Text(
+        stringResource(com.tbterminal.app.R.string.dashboard_today_summary),
+        modifier = Modifier.padding(horizontal = 4.dp),
+        style = MaterialTheme.typography.titleMedium,
+        fontWeight = FontWeight.SemiBold,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+    )
 }
 
 @Composable
 private fun DashboardSummaryGrid(layout: TbLayoutInfo, items: List<DashboardSummary>) {
-    val columns = when {
-        layout.isCompact -> 1
-        layout.isExpanded -> 3
-        else -> 2
-    }
+    val columns = dashboardSummaryColumnCount(layout.widthClass, LocalDensity.current.fontScale)
     Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
         items.chunked(columns).forEach { rowItems ->
-            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                rowItems.forEach { summary ->
-                    Card(
-                        onClick = summary.onClick,
-                        modifier = Modifier.weight(1f).height(144.dp),
-                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-                        border = CardDefaults.outlinedCardBorder()
-                    ) {
-                        Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                            Icon(summary.icon, contentDescription = null, tint = summary.tint, modifier = Modifier.size(24.dp))
-                            Text(summary.title, style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                            Text(summary.value, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                            Text(summary.supportingText, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 2)
-                        }
+            if (layout.isCompact && rowItems.size == 1) {
+                DashboardSummaryCard(rowItems.single(), Modifier.fillMaxWidth())
+            } else {
+                Row(
+                    modifier = Modifier.fillMaxWidth().height(IntrinsicSize.Min),
+                    horizontalArrangement = Arrangement.spacedBy(12.dp),
+                ) {
+                    rowItems.forEach { summary ->
+                        DashboardSummaryCard(summary, Modifier.weight(1f).fillMaxHeight())
                     }
+                    repeat(columns - rowItems.size) { Spacer(Modifier.weight(1f)) }
                 }
-                repeat(columns - rowItems.size) { Spacer(Modifier.weight(1f)) }
             }
         }
     }
+}
+
+@Composable
+private fun DashboardSummaryCard(summary: DashboardSummary, modifier: Modifier) {
+    Card(
+        onClick = summary.onClick,
+        modifier = modifier.heightIn(min = 136.dp),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+        border = CardDefaults.outlinedCardBorder(),
+    ) {
+        Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Icon(summary.icon, contentDescription = null, tint = summary.tint, modifier = Modifier.size(24.dp))
+            Text(summary.title, style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Text(
+                summary.value,
+                style = MaterialTheme.typography.titleLarge,
+                fontWeight = FontWeight.Bold,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+            Text(
+                summary.supportingText,
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                maxLines = 2,
+            )
+        }
+    }
+}
+
+internal fun dashboardSummaryColumnCount(widthClass: TbWindowWidthClass, fontScale: Float): Int = when {
+    widthClass == TbWindowWidthClass.Compact && fontScale >= 1.3f -> 1
+    widthClass == TbWindowWidthClass.Compact -> 2
+    widthClass == TbWindowWidthClass.Expanded -> 3
+    else -> 2
 }
 
 @Composable

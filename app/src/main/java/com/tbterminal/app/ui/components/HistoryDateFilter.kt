@@ -22,6 +22,8 @@ import androidx.compose.material.icons.outlined.CalendarMonth
 import androidx.compose.material.icons.outlined.Close
 import androidx.compose.material3.DatePicker
 import androidx.compose.material3.DatePickerDefaults
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -41,10 +43,10 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
-import java.text.SimpleDateFormat
+import java.time.Instant
 import java.time.LocalDate
+import java.time.ZoneOffset
 import java.time.format.DateTimeFormatter
-import java.util.Date
 import java.util.Locale
 
 private val HistoryBorder = Color(0xFFE2E8F0)
@@ -162,11 +164,10 @@ fun HistoryDatePickerDialog(
     onDismiss: () -> Unit,
     onConfirm: (String) -> Unit
 ) {
-    val initialMillis = currentDate?.let {
-        runCatching { LocalDate.parse(it).toEpochDay() * 86_400_000L }.getOrNull()
-    }
+    val initialDate = currentDate?.let { runCatching { LocalDate.parse(it) }.getOrNull() }
+        ?: LocalDate.now()
+    val initialMillis = initialDate.toEpochDay() * 86_400_000L
     val datePickerState = rememberDatePickerState(initialSelectedDateMillis = initialMillis)
-    val dateFormat = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault())
 
     Dialog(
         onDismissRequest = onDismiss,
@@ -210,18 +211,19 @@ fun HistoryDatePickerDialog(
                         Text("Batal", color = HistoryMuted)
                     }
                     Spacer(Modifier.width(12.dp))
-                    Surface(
-                        shape = RoundedCornerShape(12.dp),
-                        color = HistoryPrimary,
+                    Button(
                         onClick = {
-                            datePickerState.selectedDateMillis?.let { onConfirm(dateFormat.format(Date(it))) }
-                        }
+                            val selectedMillis = datePickerState.selectedDateMillis ?: initialMillis
+                            onConfirm(Instant.ofEpochMilli(selectedMillis).atOffset(ZoneOffset.UTC).toLocalDate().toString())
+                        },
+                        modifier = Modifier.height(48.dp),
+                        shape = RoundedCornerShape(12.dp),
+                        colors = ButtonDefaults.buttonColors(containerColor = HistoryPrimary),
                     ) {
                         Text(
                             "Terapkan",
                             color = Color.White,
                             fontWeight = FontWeight.Bold,
-                            modifier = Modifier.padding(horizontal = 24.dp, vertical = 12.dp)
                         )
                     }
                 }

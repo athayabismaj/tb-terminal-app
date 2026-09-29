@@ -32,6 +32,7 @@ import com.tbterminal.app.ui.dashboard.admin.AdminDashboardScreen
 import com.tbterminal.app.ui.dashboard.admin.AdminDestination
 import com.tbterminal.app.ui.dashboard.cashier.CashierDashboardScreen
 import com.tbterminal.app.ui.dashboard.owner.OwnerDashboardScreen
+import com.tbterminal.app.ui.dashboard.isOwnerPersona
 import com.tbterminal.app.ui.incominggoods.AdminIncomingGoodsFormScreen
 import com.tbterminal.app.ui.incominggoods.AdminIncomingGoodsScreen
 import com.tbterminal.app.ui.payables.AdminSupplierDebtScreen
@@ -77,6 +78,13 @@ internal fun NavGraphBuilder.userGraph(navController: NavHostController, session
                         navController.navigate(AppRoute.Dashboard.route) {
                             popUpTo(AppRoute.Dashboard.route) { inclusive = true }
                             launchSingleTop = true
+                        }
+                    },
+                    onBackClick = {
+                        if (!navController.popBackStack()) {
+                            navController.navigate(AppRoute.BackofficeMore.route) {
+                                launchSingleTop = true
+                            }
                         }
                     },
                     onAddUserClick = {
@@ -173,16 +181,6 @@ internal fun NavGraphBuilder.userGraph(navController: NavHostController, session
                     onCashReconciliationClick = { navController.navigateOwnerModule(AppRoute.CashReconciliation.route) },
                     onOperationalAuditClick = { navController.navigateOwnerModule(AppRoute.OperationalAudit.route) },
                     onSettingsClick = { navController.navigateOwnerModule(AppRoute.AdminSettings.route) },
-                    onChangePasswordClick = { targetUserId ->
-                        navController.navigate(AppRoute.ChangeUserPassword.createRoute(targetUserId)) {
-                            launchSingleTop = true
-                        }
-                    },
-                    onChangePinClick = { targetUserId ->
-                        navController.navigate(AppRoute.ChangeUserPin.createRoute(targetUserId)) {
-                            launchSingleTop = true
-                        }
-                    },
                     onLogout = {
                         sessionManager.logout()
                         navController.navigate(AppRoute.Login.route) {
@@ -346,6 +344,13 @@ internal fun NavGraphBuilder.userGraph(navController: NavHostController, session
                     name = sessionUser.name,
                     role = sessionUser.role,
                     securityLogRepository = appContainer.securityLogRepository,
+                    onBackToPrevious = {
+                        if (isOwnerPersona(sessionUser.role)) {
+                            navController.returnToBackofficePage(AppRoute.BackofficeMore.route, sessionUser.role)
+                        } else if (!navController.popBackStack()) {
+                            navController.navigateBackofficePage(AppRoute.Dashboard.route, sessionUser.role)
+                        }
+                    },
                     onDashboardClick = {
                         navController.navigate(AppRoute.Dashboard.route) {
                             popUpTo(AppRoute.Dashboard.route) { inclusive = true }

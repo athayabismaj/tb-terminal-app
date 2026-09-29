@@ -1,5 +1,7 @@
 package com.tbterminal.app.ui.dashboard.owner
 
+import com.tbterminal.app.ui.dashboard.admin.AdminDashboardShell
+import com.tbterminal.app.ui.dashboard.admin.AdminDestination
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
@@ -97,10 +99,13 @@ fun OwnerDashboardScreen(
     val dashboardUiState by dashboardViewModel.uiState.collectAsStateWithLifecycle()
     val offlineUiState by offlineDashboardViewModel.uiState.collectAsStateWithLifecycle()
 
-    OwnerDashboardShell(
+    AdminDashboardShell(
         userName = name,
         role = role,
-        activeDestination = OwnerDestination.Dashboard,
+        activeDestination = AdminDestination.Dashboard,
+        onProductsClick = onProductsClick,
+        onCustomersClick = {},
+        onSalesTransactionsClick = onSalesTransactionsClick,
         onDashboardClick = {},
         onReportsClick = onReportsClick,
         onLocalReportsClick = onLocalReportsClick,

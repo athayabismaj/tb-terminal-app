@@ -3,6 +3,7 @@ package com.tbterminal.app.navigation
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.ui.res.stringResource
 import androidx.navigation.NavHostController
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.currentBackStackEntryAsState
@@ -11,6 +12,11 @@ import com.tbterminal.app.data.session.SessionManager
 import com.tbterminal.app.ui.auth.AuthViewModel
 import com.tbterminal.app.ui.dashboard.admin.AdminDestination
 import com.tbterminal.app.ui.dashboard.admin.LocalAdminDestinationNavigator
+import com.tbterminal.app.ui.dashboard.BackofficePageNavigation
+import com.tbterminal.app.ui.dashboard.LocalBackofficeSidebarState
+import com.tbterminal.app.ui.dashboard.LocalBackofficePageNavigation
+import com.tbterminal.app.ui.dashboard.isOwnerPersona
+import com.tbterminal.app.ui.dashboard.rememberBackofficeSidebarState
 
 @Composable
 fun AppNavGraph(
@@ -22,6 +28,7 @@ fun AppNavGraph(
 ) {
     val currentRoute = navController.currentBackStackEntryAsState().value?.destination?.route
     val sessionRole = sessionManager.readSessionUser()?.role
+    val backofficeSidebarState = rememberBackofficeSidebarState()
 
     LaunchedEffect(currentRoute, sessionRole) {
         if (currentRoute != null && !AppRouteAccessPolicy.isAllowed(currentRoute, sessionRole)) {
@@ -38,6 +45,22 @@ fun AppNavGraph(
     }
 
     CompositionLocalProvider(
+        LocalBackofficeSidebarState provides backofficeSidebarState,
+        LocalBackofficePageNavigation provides BackofficePageNavigation(
+            title = if (isOwnerPersona(sessionRole)) {
+                backofficeRouteTitleRes(currentRoute, sessionRole)?.let { stringResource(it) }
+                    ?: backofficeRouteTitle(currentRoute, sessionRole)
+            } else null,
+            onBack = if (isOwnerPersona(sessionRole) && currentRoute != null &&
+                !isBackofficePrimaryRoute(currentRoute, sessionRole)) ({
+                val menuParent = ownerMenuParentRoute(currentRoute, sessionRole)
+                if (menuParent != null) {
+                    navController.returnToBackofficePage(menuParent, sessionRole)
+                } else if (!navController.popBackStack()) {
+                    navController.navigateBackofficePage(AppRoute.Dashboard.route, sessionRole)
+                }
+            }) else null,
+        ),
         LocalAdminDestinationNavigator provides { destination ->
             destination.adminRouteOrNull(sessionRole)?.let { route ->
                 val destinationRoute = if (AppRouteAccessPolicy.isAllowed(route, sessionRole)) {
@@ -45,12 +68,12 @@ fun AppNavGraph(
                 } else {
                     AppRoute.Dashboard.route
                 }
-                navController.navigate(destinationRoute) {
-                    launchSingleTop = true
-                    if (destinationRoute != AppRoute.Dashboard.route) {
-                        popUpTo(AppRoute.Dashboard.route) {
-                            saveState = false
-                        }
+                if (AppAccessPolicy.can(sessionRole, AppCapability.BACKOFFICE)) {
+                    navController.navigateBackofficePage(destinationRoute, sessionRole)
+                } else {
+                    navController.navigate(destinationRoute) {
+                        launchSingleTop = true
+                        if (destinationRoute != AppRoute.Dashboard.route) popUpTo(AppRoute.Dashboard.route)
                     }
                 }
             }
@@ -73,7 +96,7 @@ fun AppNavGraph(
     }
 }
 
-private fun AdminDestination.adminRouteOrNull(role: String?): String? {
+internal fun AdminDestination.adminRouteOrNull(role: String?): String? {
     return when (this) {
         AdminDestination.Dashboard -> AppRoute.Dashboard.route
         AdminDestination.TransactionsHub -> AppRoute.BackofficeTransactions.route
@@ -90,6 +113,7 @@ private fun AdminDestination.adminRouteOrNull(role: String?): String? {
         AdminDestination.StockOpname -> AppRoute.StockOpname.route
         AdminDestination.IncomingGoods -> AppRoute.IncomingGoods.route
         AdminDestination.Suppliers -> AppRoute.Suppliers.route
+        AdminDestination.SupplierForm -> AppRoute.SupplierForm.route
         AdminDestination.PurchaseHistory -> AppRoute.PurchaseHistory.route
         AdminDestination.StockReport -> AppRoute.StockReport.route
         AdminDestination.Customers -> AppRoute.Customers.route
@@ -106,6 +130,8 @@ private fun AdminDestination.adminRouteOrNull(role: String?): String? {
         AdminDestination.OperationalAudit -> AppRoute.OperationalAudit.route
         AdminDestination.SyncCenter -> AppRoute.SyncCenter.route
         AdminDestination.BackupRestore -> AppRoute.BackupRestore.route
+        AdminDestination.UserManagement -> AppRoute.UserManagement.route
+        AdminDestination.SecurityLog -> AppRoute.SecurityLog.route
         AdminDestination.Profile -> if (AppAccessPolicy.can(role, AppCapability.POS)) AppRoute.CashierProfile.route else AppRoute.AdminProfile.route
         AdminDestination.Settings -> if (AppAccessPolicy.can(role, AppCapability.POS)) AppRoute.CashierSettings.route else AppRoute.AdminSettings.route
         else -> null

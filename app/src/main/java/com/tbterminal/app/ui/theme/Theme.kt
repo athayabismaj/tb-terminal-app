@@ -36,9 +36,9 @@ private val LightColorScheme = lightColorScheme(
     onPrimary = Color.White,
     primaryContainer = TbGreenLight,
     onPrimaryContainer = TbGreenDark,
-    secondary = Color(0xFF4E635A),
+    secondary = Color(0xFF53645B),
     onSecondary = Color.White,
-    secondaryContainer = Color(0xFFD1E8DD),
+    secondaryContainer = Color(0xFFDDE7E1),
     onSecondaryContainer = Color(0xFF0A3527),
     tertiary = TbAmber,
     onTertiary = Color.White,
@@ -50,7 +50,7 @@ private val LightColorScheme = lightColorScheme(
     onSurface = TbText,
     surfaceVariant = TbSurfaceMuted,
     onSurfaceVariant = TbTextMuted,
-    outline = Color(0xFF718078),
+    outline = Color(0xFF77827C),
     outlineVariant = TbOutline,
     error = TbError
 )
@@ -65,7 +65,7 @@ private val AppShapes = Shapes(
 
 @Composable
 fun TbterminalappTheme(
-    darkTheme: Boolean = isSystemInDarkTheme(),
+    darkTheme: Boolean = false,
     // Disabled by default so brand and status colors stay predictable on every device.
     dynamicColor: Boolean = false,
     content: @Composable () -> Unit

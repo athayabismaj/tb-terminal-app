@@ -65,11 +65,7 @@ internal object AppAccessPolicy {
     private const val ROLE_ADMIN = "admin"
     private const val ROLE_CASHIER = "kasir"
 
-    private val ownerCapabilities = AppCapability.entries.toSet() - setOf(
-        AppCapability.POS,
-        AppCapability.OWN_TRANSACTIONS,
-        AppCapability.APPROVED_TRANSACTION_CORRECTION,
-    )
+    private val ownerCapabilities = AppCapability.entries.toSet()
 
     private val adminCapabilities = ownerCapabilities - setOf(
         AppCapability.USER_MANAGEMENT,
@@ -141,7 +137,7 @@ internal object AppRouteAccessPolicy {
                 AppCapability.MANAGE_INVENTORY
             value == AppRoute.IncomingGoods.route || value.matchesRoute(AppRoute.IncomingGoodsForm.route) ||
                 value == AppRoute.PurchaseHistory.route -> AppCapability.PURCHASES
-            value == AppRoute.Suppliers.route -> AppCapability.SUPPLIERS
+            value == AppRoute.Suppliers.route || value == AppRoute.SupplierForm.route -> AppCapability.SUPPLIERS
             value == AppRoute.SupplierDebts.route -> AppCapability.PAYABLES
 
             value == AppRoute.Customers.route || value.matchesRoute(AppRoute.CustomerDetail.route) ->
@@ -168,7 +164,8 @@ internal object AppRouteAccessPolicy {
             value == AppRoute.SecurityLog.route -> AppCapability.SECURITY_SETTINGS
             value == AppRoute.AdminSettings.route -> AppCapability.STORE_SETTINGS
             value == AppRoute.CashierSettings.route -> AppCapability.DEVICE_SETTINGS
-            value == AppRoute.AdminProfile.route || value == AppRoute.CashierProfile.route -> AppCapability.ACCOUNT
+            value == AppRoute.AdminProfile.route || value == AppRoute.AdminEditProfile.route ||
+                value == AppRoute.CashierProfile.route || value == AppRoute.CashierEditProfile.route -> AppCapability.ACCOUNT
             else -> null
         }
     }

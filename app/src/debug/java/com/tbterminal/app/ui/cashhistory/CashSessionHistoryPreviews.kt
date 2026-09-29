@@ -78,3 +78,9 @@ fun PhoneCashHistoryPreview() {
         }
     }
 }
+
+@Preview(name = "Kas Harian - Tablet", widthDp = 1280, heightDp = 800, showBackground = true)
+@Composable
+fun TabletCashHistoryPreview() {
+    PhoneCashHistoryPreview()
+}

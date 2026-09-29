@@ -1,31 +1,16 @@
 package com.tbterminal.app.ui.dashboard.admin
 
-import androidx.compose.foundation.background
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.BoxWithConstraints
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.fillMaxHeight
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.layout.widthIn
-import androidx.compose.material3.DrawerValue
-import androidx.compose.material3.ModalDrawerSheet
-import androidx.compose.material3.ModalNavigationDrawer
-import androidx.compose.material3.rememberDrawerState
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.unit.dp
-import com.tbterminal.app.ui.dashboard.DashboardBackground
-import com.tbterminal.app.ui.dashboard.owner.OwnerDashboardSidebar
-import com.tbterminal.app.ui.dashboard.owner.OwnerDestination
-import com.tbterminal.app.ui.components.TbCompactDashboardTopBar
+import androidx.compose.ui.res.stringResource
+import androidx.annotation.StringRes
+import com.tbterminal.app.R
 import com.tbterminal.app.ui.dashboard.BackofficeAdaptiveShell
 import com.tbterminal.app.ui.dashboard.BackofficeSection
+import com.tbterminal.app.ui.dashboard.isOwnerPersona
 import com.tbterminal.app.ui.dashboard.cashier.CashierDashboardShell
 import com.tbterminal.app.ui.dashboard.cashier.CashierDestination
-import kotlinx.coroutines.launch
 import com.tbterminal.app.navigation.AppAccessPolicy
 import com.tbterminal.app.navigation.AppCapability
 
@@ -69,6 +54,7 @@ fun AdminDashboardShell(
     onSettingsClick: () -> Unit = {},
     pageTitle: String? = null,
     onBack: (() -> Unit)? = null,
+    showPageHeader: Boolean = true,
     onLogout: () -> Unit,
     content: @Composable (Modifier) -> Unit
 ) {
@@ -84,6 +70,7 @@ fun AdminDashboardShell(
             BackofficeSection.FINANCE -> navigateOrFallback(AdminDestination.FinanceHub, onReceivablesClick)()
             BackofficeSection.STOCK -> navigateOrFallback(AdminDestination.StockHub, onProductsClick)()
             BackofficeSection.MORE -> navigateOrFallback(AdminDestination.MoreHub, onSettingsClick)()
+            BackofficeSection.MENU -> navigateOrFallback(AdminDestination.MoreHub, onSettingsClick)()
         }
     }
 
@@ -118,15 +105,26 @@ fun AdminDashboardShell(
     BackofficeAdaptiveShell(
         userName = userName,
         role = role,
-        activeSection = activeDestination.backofficeSection(),
+        activeSection = activeDestination.backofficeSection(role),
         onSectionSelected = ::selectSection,
         onProfileClick = navigateOrFallback(AdminDestination.Profile, onProfileClick),
         onLogout = onLogout,
-        pageTitle = pageTitle,
-        onBack = onBack
+        pageTitle = pageTitle ?: activeDestination.backofficePageTitleRes()?.let { stringResource(it) }
+            ?: activeDestination.backofficePageTitle(),
+        onBack = onBack,
+        showPageHeader = showPageHeader && !activeDestination.isBackofficeRootDestination(),
     ) { contentModifier ->
         content(contentModifier)
     }
+}
+
+internal fun AdminDestination.isBackofficeRootDestination(): Boolean = when (this) {
+    AdminDestination.Dashboard,
+    AdminDestination.TransactionsHub,
+    AdminDestination.FinanceHub,
+    AdminDestination.StockHub,
+    AdminDestination.MoreHub -> true
+    else -> false
 }
 
 enum class AdminDestination {
@@ -152,6 +150,7 @@ enum class AdminDestination {
     IncomingGoods,
     IncomingGoodsForm,
     Suppliers,
+    SupplierForm,
     PurchaseHistory,
     StockReport,
     SupplierDebts,
@@ -165,11 +164,33 @@ enum class AdminDestination {
     OperationalAudit,
     SyncCenter,
     BackupRestore,
+    UserManagement,
+    SecurityLog,
     Profile,
     Settings
 }
 
-internal fun AdminDestination.backofficeSection(): BackofficeSection = when (this) {
+private val ownerMenuDestinations = setOf(
+    AdminDestination.MoreHub,
+    AdminDestination.Customers,
+    AdminDestination.CustomerForm,
+    AdminDestination.Suppliers,
+    AdminDestination.SupplierForm,
+    AdminDestination.Reports,
+    AdminDestination.LocalReports,
+    AdminDestination.BackupRestore,
+    AdminDestination.Settings,
+    AdminDestination.SyncCenter,
+    AdminDestination.OperationalAudit,
+    AdminDestination.UserManagement,
+    AdminDestination.SecurityLog,
+    AdminDestination.Profile,
+)
+
+/** Single source of truth for destination-to-primary-section mapping. */
+internal fun AdminDestination.backofficeSection(role: String? = null): BackofficeSection {
+    if (isOwnerPersona(role) && this in ownerMenuDestinations) return BackofficeSection.MENU
+    return when (this) {
     AdminDestination.Dashboard -> BackofficeSection.HOME
     AdminDestination.TransactionsHub,
     AdminDestination.NewTransaction,
@@ -195,30 +216,55 @@ internal fun AdminDestination.backofficeSection(): BackofficeSection = when (thi
     AdminDestination.IncomingGoodsForm,
     AdminDestination.StockReport -> BackofficeSection.STOCK
     else -> BackofficeSection.MORE
+    }
 }
 
-private fun AdminDestination.toOwnerDestination(): OwnerDestination = when (this) {
-    AdminDestination.TransactionsHub -> OwnerDestination.Dashboard
-    AdminDestination.NewTransaction -> OwnerDestination.Dashboard
-    AdminDestination.FinanceHub -> OwnerDestination.CashReconciliation
-    AdminDestination.StockHub -> OwnerDestination.StockReport
-    AdminDestination.MoreHub -> OwnerDestination.Settings
-    AdminDestination.Reports -> OwnerDestination.Reports
-    AdminDestination.LocalReports -> OwnerDestination.LocalReports
-    AdminDestination.StockReport -> OwnerDestination.StockReport
-    AdminDestination.Receivables,
-    AdminDestination.ReceivablePayments,
-    AdminDestination.Customers,
-    AdminDestination.CustomerForm -> OwnerDestination.Receivables
-    AdminDestination.SupplierDebts -> OwnerDestination.SupplierDebts
-    AdminDestination.CashReconciliation,
-    AdminDestination.CashSessionHistory,
-    AdminDestination.CashReconciliationDetail,
-    AdminDestination.CashExpenses,
-    AdminDestination.SalesTransactions -> OwnerDestination.CashReconciliation
-    AdminDestination.OperationalAudit -> OwnerDestination.OperationalAudit
-    AdminDestination.SyncCenter -> OwnerDestination.SyncCenter
-    AdminDestination.BackupRestore -> OwnerDestination.BackupRestore
-    AdminDestination.Settings -> OwnerDestination.Settings
-    else -> OwnerDestination.Dashboard
+/** Child pages name the actual task, not the navigation group. Hub/account titles come from the shell. */
+internal fun AdminDestination.backofficePageTitle(): String? = when (this) {
+    AdminDestination.Dashboard, AdminDestination.TransactionsHub, AdminDestination.FinanceHub,
+    AdminDestination.StockHub, AdminDestination.MoreHub -> null
+    AdminDestination.Profile -> "Profil"
+    AdminDestination.SalesTransactions, AdminDestination.CashierTransactionHistory -> "Penjualan"
+    AdminDestination.PurchaseHistory -> "Pembelian"
+    AdminDestination.Products -> "Produk"
+    AdminDestination.AddProduct -> "Tambah produk"
+    AdminDestination.ProductCategories -> "Kategori"
+    AdminDestination.ProductUnits -> "Satuan"
+    AdminDestination.PriceManagement -> "Harga produk"
+    AdminDestination.StockOpname, AdminDestination.StockOpnameForm -> "Sesuaikan stok"
+    AdminDestination.IncomingGoods, AdminDestination.IncomingGoodsForm -> "Barang masuk"
+    AdminDestination.StockReport -> "Kartu stok"
+    AdminDestination.Suppliers -> "Supplier"
+    AdminDestination.SupplierForm -> "Form supplier"
+    AdminDestination.Customers, AdminDestination.CustomerForm -> "Pelanggan"
+    AdminDestination.Receivables -> "Piutang pelanggan"
+    AdminDestination.ReceivablePayments -> "Pembayaran piutang"
+    AdminDestination.SupplierDebts -> "Hutang supplier"
+    AdminDestination.CashReconciliation, AdminDestination.CashierCashSession -> "Kas harian"
+    AdminDestination.CashReconciliationDetail -> "Cocokkan kas"
+    AdminDestination.CashSessionHistory -> "Riwayat kas"
+    AdminDestination.CashExpenses -> "Pengeluaran kas"
+    AdminDestination.Reports -> "Laporan"
+    AdminDestination.LocalReports -> "Laporan lokal"
+    AdminDestination.OperationalAudit -> "Riwayat aktivitas"
+    AdminDestination.UserManagement -> "Pengguna & akses"
+    AdminDestination.SecurityLog -> "Log keamanan"
+    AdminDestination.SyncCenter -> "Sinkronisasi"
+    AdminDestination.BackupRestore -> "Cadangan data"
+    AdminDestination.Settings -> "Pengaturan aplikasi"
+    AdminDestination.NewTransaction -> "Transaksi baru"
+}
+
+@StringRes
+internal fun AdminDestination.backofficePageTitleRes(): Int? = when (this) {
+    AdminDestination.Profile -> R.string.profile_title
+    AdminDestination.UserManagement -> R.string.owner_menu_users
+    AdminDestination.Reports -> R.string.owner_menu_reports
+    AdminDestination.LocalReports -> R.string.owner_menu_device_reports
+    AdminDestination.BackupRestore -> R.string.owner_menu_backup
+    AdminDestination.Settings -> R.string.owner_menu_settings
+    AdminDestination.SyncCenter -> R.string.owner_menu_sync
+    AdminDestination.OperationalAudit -> R.string.owner_menu_activity
+    AdminDestination.SecurityLog -> R.string.owner_menu_security_log
+    else -> null
 }
