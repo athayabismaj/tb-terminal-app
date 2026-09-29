@@ -295,47 +295,34 @@ private fun PurchaseToolbar(
             placeholder = { Text("Cari nomor nota atau supplier", color = PurchaseMuted, fontSize = 14.sp) },
             leadingIcon = { Icon(Icons.Outlined.Search, "Cari nota", tint = PurchaseMuted) },
             singleLine = true,
-            modifier = Modifier.weight(1f).height(56.dp), shape = RoundedCornerShape(24.dp),
-            colors = OutlinedTextFieldDefaults.colors(focusedTextColor = PurchaseText, unfocusedTextColor = PurchaseText, cursorColor = PurchasePrimary, focusedBorderColor = PurchasePrimary, unfocusedBorderColor = PurchaseBorder, focusedContainerColor = Color.White, unfocusedContainerColor = Color.White)
+            modifier = Modifier.weight(1f).height(48.dp), shape = RoundedCornerShape(24.dp),
+            colors = OutlinedTextFieldDefaults.colors(focusedTextColor = PurchaseText, unfocusedTextColor = PurchaseText, cursorColor = PurchasePrimary, focusedBorderColor = PurchaseBorder, unfocusedBorderColor = PurchaseBorder, focusedContainerColor = Color.White, unfocusedContainerColor = Color.White)
         )
-        Box(
-            modifier = Modifier
-                .size(56.dp)
-                .clip(RoundedCornerShape(20.dp))
-                .border(1.dp, Color(0xFFC3DFD5), RoundedCornerShape(20.dp))
-                .background(Color.White)
-                .clickable { /* Filter */ },
-            contentAlignment = Alignment.Center
-        ) {
-            Icon(Icons.Outlined.Tune, contentDescription = "Filter", tint = PurchasePrimary, modifier = Modifier.size(24.dp))
-        }
+        SupplierFilterDropdown(uiState, onSupplierSelected)
     }
 }
 
 @Composable
-private fun SupplierFilterDropdown(uiState: PurchaseHistoryUiState, onSupplierSelected: (String?) -> Unit, modifier: Modifier) {
+private fun SupplierFilterDropdown(uiState: PurchaseHistoryUiState, onSupplierSelected: (String?) -> Unit) {
     var expanded by remember { mutableStateOf(false) }
-    val supplierName = uiState.suppliers.firstOrNull { it.id == uiState.selectedSupplierId }?.name ?: "Semua supplier"
+    
     Box {
-        OutlinedButton(
-            onClick = { expanded = true },
-            modifier = modifier.height(56.dp),
-            shape = RoundedCornerShape(16.dp),
-            border = BorderStroke(1.dp, PurchaseBorder),
-            colors = ButtonDefaults.outlinedButtonColors(
-                containerColor = PurchaseBackground,
-                contentColor = PurchaseText
-            )
+        Box(
+            modifier = Modifier
+                .size(48.dp)
+                .clip(RoundedCornerShape(16.dp))
+                .border(1.dp, Color(0xFFC3DFD5), RoundedCornerShape(16.dp))
+                .background(Color.White)
+                .clickable { expanded = true },
+            contentAlignment = Alignment.Center
         ) {
-            Text(
-                text = supplierName,
-                modifier = Modifier.weight(1f),
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-                fontWeight = FontWeight.Medium
-            )
-            Icon(Icons.Outlined.ExpandMore, contentDescription = "Pilih supplier", tint = PurchaseMuted, modifier = Modifier.size(18.dp))
+            Icon(Icons.Outlined.Tune, contentDescription = "Filter", tint = PurchasePrimary, modifier = Modifier.size(20.dp))
+            
+            if (uiState.selectedSupplierId != null) {
+                Box(modifier = Modifier.align(Alignment.TopEnd).padding(8.dp).size(8.dp).background(Color(0xFFF59E0B), RoundedCornerShape(50)))
+            }
         }
+        
         DropdownMenu(
             expanded = expanded,
             onDismissRequest = { expanded = false },
@@ -349,10 +336,13 @@ private fun SupplierFilterDropdown(uiState: PurchaseHistoryUiState, onSupplierSe
                 expanded = false
             })
             uiState.suppliers.forEach { supplier ->
-                DropdownMenuItem(text = { Text(supplier.name) }, onClick = {
-                    onSupplierSelected(supplier.id)
-                    expanded = false
-                })
+                DropdownMenuItem(
+                    text = { Text(supplier.name, fontWeight = if (uiState.selectedSupplierId == supplier.id) FontWeight.Bold else FontWeight.Normal) }, 
+                    onClick = {
+                        onSupplierSelected(supplier.id)
+                        expanded = false
+                    }
+                )
             }
         }
     }
