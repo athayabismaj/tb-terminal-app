@@ -117,6 +117,18 @@ internal fun PurchaseHistoryScreen(
             PurchaseTable(uiState, compact, onRefresh, onShowDetail, onPreviousPage, onNextPage)
         }
     }
+    
+    if (showFilterPopup) {
+        PurchaseFilterBottomSheet(
+            uiState = uiState,
+            onDismiss = { showFilterPopup = false },
+            onApplyFilter = { supplierId, period ->
+                onSupplierSelected(supplierId)
+                // TODO: Implement Period filter if backend supports it
+            }
+        )
+    }
+    
     uiState.selectedPurchase?.let { PurchaseDetailDialog(it, onDismissDetail) }
 }
 
