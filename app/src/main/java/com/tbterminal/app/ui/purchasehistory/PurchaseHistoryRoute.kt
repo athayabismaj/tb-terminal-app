@@ -16,6 +16,7 @@ fun AdminPurchaseHistoryScreen(
     role: String,
     purchasingRepository: PurchasingRepository,
     onDashboardClick: () -> Unit,
+    onTransactionsClick: () -> Unit,
     onProductsClick: () -> Unit,
     onAddProductClick: () -> Unit,
     onProductCategoriesClick: () -> Unit,
@@ -42,6 +43,7 @@ fun AdminPurchaseHistoryScreen(
         role = role,
         activeDestination = AdminDestination.PurchaseHistory,
         pageTitle = "Riwayat Pembelian",
+        showPageHeader = true,
         onDashboardClick = onDashboardClick,
         onProductsClick = onProductsClick,
         onAddProductClick = onAddProductClick,
@@ -59,6 +61,7 @@ fun AdminPurchaseHistoryScreen(
         onCustomersClick = onCustomersClick,
         onReportsClick = onReportsClick,
         onOperationalAuditClick = onOperationalAuditClick,
+        onBack = onTransactionsClick,
         onLogout = onLogout
     ) { modifier ->
         RefreshableContent(

@@ -1,6 +1,7 @@
 package com.tbterminal.app.ui.receivablepayments
 
 import androidx.compose.foundation.BorderStroke
+import com.tbterminal.app.ui.components.TbPagination
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -420,43 +421,20 @@ private fun PaymentPagination(
     onPreviousPage: () -> Unit,
     onNextPage: () -> Unit
 ) {
-    val controls: @Composable () -> Unit = { Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
-        PaymentPageButton(Icons.Default.ChevronLeft, uiState.page > 1, onPreviousPage)
-        Text("${uiState.page} / ${uiState.totalPages}", color = PaymentText, fontWeight = FontWeight.Bold)
-        PaymentPageButton(Icons.Default.ChevronRight, uiState.page < uiState.totalPages, onNextPage)
-    } }
-    if (compact) Column(Modifier.fillMaxWidth().background(PaymentSoft).padding(14.dp), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(10.dp)) {
-        Text("${uiState.totalPayments} pembayaran", color = PaymentMuted, fontSize = 12.sp)
-        controls()
-    } else Row(Modifier.fillMaxWidth().background(PaymentSoft.copy(alpha = 0.7f)).padding(horizontal = 20.dp, vertical = 14.dp), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
-        Column {
-            Text(
-                if (uiState.hasLocalFilter) {
-                    "Menampilkan ${uiState.filteredPayments.size} pembayaran pada halaman ini"
-                } else {
-                    "Menampilkan ${uiState.currentStart}-${uiState.currentEnd} dari ${uiState.totalPayments} pembayaran"
-                },
-                color = PaymentText,
-                fontSize = 13.sp,
-                fontWeight = FontWeight.Medium
-            )
-            Text("Maksimal ${uiState.pageSize} pembayaran per halaman", color = PaymentMuted, fontSize = 11.sp)
-        }
-        controls()
+    val range = if (uiState.hasLocalFilter) {
+        "${uiState.filteredPayments.size} pembayaran pada halaman ini"
+    } else {
+        "${uiState.currentStart}-${uiState.currentEnd} dari ${uiState.totalPayments} pembayaran"
     }
-}
-
-@Composable
-private fun PaymentPageButton(icon: ImageVector, enabled: Boolean, onClick: () -> Unit) {
-    OutlinedButton(
-        onClick = onClick,
-        enabled = enabled,
-        shape = RoundedCornerShape(12.dp),
-        contentPadding = PaddingValues(0.dp),
-        modifier = Modifier.size(34.dp)
-    ) {
-        Icon(icon, contentDescription = null)
-    }
+    TbPagination(
+        currentPage = uiState.page,
+        totalPages = uiState.totalPages,
+        onPreviousPage = onPreviousPage,
+        onNextPage = onNextPage,
+        supportingText = if (compact) "${uiState.totalPayments} pembayaran" else "Menampilkan $range",
+        isLoading = uiState.isLoading,
+        testTag = "receivable-payment-pagination",
+    )
 }
 
 @Composable

@@ -1,6 +1,7 @@
 package com.tbterminal.app.ui.cashier.transactions
 
 import androidx.compose.foundation.BorderStroke
+import com.tbterminal.app.ui.components.TbPagination
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -636,79 +637,16 @@ private fun CashierHistoryPagination(
     onPreviousPage: () -> Unit,
     onNextPage: () -> Unit
 ) {
-    if (compact) {
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .background(CashierSurfaceSoft)
-                .padding(14.dp),
-            verticalArrangement = Arrangement.spacedBy(10.dp),
-            horizontalAlignment = Alignment.CenterHorizontally
-        ) {
-            Text(
-                "${state.currentStart}-${state.currentEnd} dari ${state.total} transaksi",
-                color = DashboardTextSecondary,
-                fontSize = 12.sp,
-                fontWeight = FontWeight.SemiBold
-            )
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                OutlinedButton(onClick = onPreviousPage, enabled = state.page > 1, shape = RoundedCornerShape(12.dp)) {
-                    Icon(Icons.Default.ChevronLeft, contentDescription = "Halaman sebelumnya")
-                }
-                Text("Halaman ${state.page} / ${state.totalPages}", color = DashboardTextPrimary, fontWeight = FontWeight.Bold)
-                OutlinedButton(onClick = onNextPage, enabled = state.page < state.totalPages, shape = RoundedCornerShape(12.dp)) {
-                    Icon(Icons.Default.ChevronRight, contentDescription = "Halaman berikutnya")
-                }
-            }
-        }
-        return
-    }
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .background(CashierSurfaceSoft)
-            .padding(horizontal = 24.dp, vertical = 16.dp),
-        horizontalArrangement = Arrangement.SpaceBetween,
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        Text(
-            "Menampilkan ${state.currentStart}-${state.currentEnd} dari ${state.total} transaksi",
-            color = DashboardTextSecondary,
-            fontWeight = FontWeight.Bold
-        )
-        Row(horizontalArrangement = Arrangement.spacedBy(10.dp), verticalAlignment = Alignment.CenterVertically) {
-            OutlinedButton(
-                onClick = onPreviousPage,
-                enabled = state.page > 1,
-                shape = RoundedCornerShape(12.dp),
-                border = BorderStroke(1.dp, CashierLine)
-            ) {
-                Icon(Icons.Default.ChevronLeft, contentDescription = null)
-            }
-            Box(
-                modifier = Modifier
-                    .size(44.dp)
-                    .clip(RoundedCornerShape(12.dp))
-                    .background(DashboardBrandGreenDark),
-                contentAlignment = Alignment.Center
-            ) {
-                Text(state.page.toString(), color = Color.White, fontWeight = FontWeight.Bold)
-            }
-            Text("/ ${state.totalPages}", color = DashboardTextSecondary, fontWeight = FontWeight.Bold)
-            OutlinedButton(
-                onClick = onNextPage,
-                enabled = state.page < state.totalPages,
-                shape = RoundedCornerShape(12.dp),
-                border = BorderStroke(1.dp, CashierLine)
-            ) {
-                Icon(Icons.Default.ChevronRight, contentDescription = null)
-            }
-        }
-    }
+    TbPagination(
+        currentPage = state.page,
+        totalPages = state.totalPages,
+        onPreviousPage = onPreviousPage,
+        onNextPage = onNextPage,
+        supportingText = if (compact) "${state.currentStart}-${state.currentEnd} dari ${state.total} transaksi"
+        else "Menampilkan ${state.currentStart}-${state.currentEnd} dari ${state.total} transaksi",
+        isLoading = state.isLoading,
+        testTag = "cashier-history-pagination",
+    )
 }
 
 // ═══════════════════════════════════════════════

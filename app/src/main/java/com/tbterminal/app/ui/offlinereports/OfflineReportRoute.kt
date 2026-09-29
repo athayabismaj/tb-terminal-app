@@ -1,6 +1,8 @@
 package com.tbterminal.app.ui.offlinereports
 
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.res.stringResource
+import com.tbterminal.app.R
 import androidx.compose.runtime.getValue
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
@@ -36,6 +38,7 @@ fun OfflineReportRoute(
     onSecurityLogClick: () -> Unit = {},
     onProfileClick: () -> Unit = {},
     onSettingsClick: () -> Unit = {},
+    onBackToPrevious: (() -> Unit)? = null,
     onLogout: () -> Unit,
     viewModel: OfflineReportViewModel = viewModel(
         factory = OfflineReportViewModel.factory(offlineReportRepository)
@@ -47,7 +50,8 @@ fun OfflineReportRoute(
         userName = name,
         role = role,
         activeDestination = AdminDestination.LocalReports,
-        pageTitle = "Laporan Lokal",
+        pageTitle = stringResource(R.string.owner_menu_device_reports),
+        onBack = onBackToPrevious,
         onDashboardClick = onDashboardClick,
         onProductsClick = onProductsClick,
         onAddProductClick = onAddProductClick,

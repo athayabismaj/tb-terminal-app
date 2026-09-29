@@ -1,6 +1,7 @@
 package com.tbterminal.app.ui.checkout.components
 
 import androidx.compose.foundation.BorderStroke
+import com.tbterminal.app.ui.components.TbPagination
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -116,99 +117,17 @@ internal fun ProductPaginationBar(
     val firstItem = if (totalItems == 0L) 0L else ((safePage.toLong() - 1L) * limit) + 1L
     val lastItem = if (totalItems == 0L) 0L else minOf(safePage.toLong() * limit, totalItems)
 
-    Surface(
-        modifier = modifier.fillMaxWidth(),
-        color = Color.White,
-        shape = RoundedCornerShape(12.dp),
-        border = BorderStroke(1.dp, OutlineVariant.copy(alpha = 0.45f))
-    ) {
-        Row(
-            modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Text(
-                text = if (totalItems == 0L) {
-                    "Tidak ada produk"
-                } else {
-                    "Menampilkan $firstItem-$lastItem dari $totalItems produk"
-                },
-                color = OnSurfaceVariant,
-                fontSize = 12.sp,
-                fontWeight = FontWeight.SemiBold
-            )
-
-            Row(
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                ProductPageIconButton(
-                    onClick = onPrevious,
-                    enabled = safePage > 1 && !isLoading
-                ) {
-                    Icon(
-                        Icons.AutoMirrored.Outlined.KeyboardArrowLeft,
-                        contentDescription = "Halaman sebelumnya",
-                        modifier = Modifier.size(18.dp)
-                    )
-                }
-
-                Surface(
-                    color = Primary,
-                    shape = RoundedCornerShape(12.dp),
-                    modifier = Modifier.size(40.dp)
-                ) {
-                    Box(contentAlignment = Alignment.Center) {
-                        Text(
-                            text = safePage.toString(),
-                            color = Color.White,
-                            fontSize = 14.sp,
-                            fontWeight = FontWeight.Bold
-                        )
-                    }
-                }
-
-                Text(
-                    text = "/ $safeTotalPages",
-                    color = OnSurfaceVariant,
-                    fontSize = 14.sp,
-                    fontWeight = FontWeight.SemiBold
-                )
-
-                ProductPageIconButton(
-                    onClick = onNext,
-                    enabled = safePage < safeTotalPages && !isLoading
-                ) {
-                    Icon(
-                        Icons.AutoMirrored.Outlined.KeyboardArrowRight,
-                        contentDescription = "Halaman berikutnya",
-                        modifier = Modifier.size(18.dp)
-                    )
-                }
-            }
-        }
-    }
-}
-
-@Composable
-private fun ProductPageIconButton(
-    enabled: Boolean,
-    onClick: () -> Unit,
-    content: @Composable () -> Unit
-) {
-    Surface(
-        onClick = onClick,
-        enabled = enabled,
-        color = Color.White,
-        contentColor = if (enabled) OnSurfaceVariant else Color(0xFFCBD5E1),
-        border = BorderStroke(1.dp, OutlineVariant.copy(alpha = 0.55f)),
-        shape = RoundedCornerShape(12.dp),
-        modifier = Modifier.size(40.dp)
-    ) {
-        Box(contentAlignment = Alignment.Center) {
-            content()
-        }
-    }
+    TbPagination(
+        currentPage = safePage,
+        totalPages = safeTotalPages,
+        onPreviousPage = onPrevious,
+        onNextPage = onNext,
+        modifier = modifier.padding(vertical = 4.dp),
+        supportingText = if (totalItems == 0L) "Tidak ada produk"
+        else "$firstItem-$lastItem dari $totalItems produk",
+        isLoading = isLoading,
+        testTag = "pos-product-pagination",
+    )
 }
 
 @Composable

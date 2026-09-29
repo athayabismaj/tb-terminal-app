@@ -1,6 +1,7 @@
 package com.tbterminal.app.ui.cashexpenses
 
 import androidx.compose.foundation.BorderStroke
+import com.tbterminal.app.ui.components.TbPagination
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -350,54 +351,16 @@ private fun ExpensePagination(
     } else {
         "$visibleCount hasil pada halaman ini"
     }
-    val controls: @Composable () -> Unit = {
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
-            ExpensePageButton(onPreviousPage, uiState.page > 1, "‹")
-            Text("${uiState.page} / ${uiState.totalPages}", color = ExpenseText, fontWeight = FontWeight.Bold)
-            ExpensePageButton(onNextPage, uiState.page < uiState.totalPages, "›")
-        }
-    }
-    if (compact) Column(Modifier.fillMaxWidth().background(ExpenseSoft).padding(14.dp), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(10.dp)) {
-        Text("$visibleCount pengeluaran pada halaman ini", color = ExpenseMuted, fontSize = 12.sp)
-        controls()
-    } else Row(
-        Modifier
-            .fillMaxWidth()
-            .background(ExpenseSoft)
-            .padding(horizontal = 20.dp, vertical = 14.dp),
-        horizontalArrangement = Arrangement.SpaceBetween,
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        Column {
-            Text(
-                "Menampilkan $start-$end dari $totalText",
-                color = ExpenseText,
-                fontSize = 13.sp,
-                fontWeight = FontWeight.Medium
-            )
-            Text(
-                "Maksimal ${uiState.pageSize} pengeluaran per halaman",
-                color = ExpenseMuted,
-                fontSize = 11.sp,
-                modifier = Modifier.padding(top = 2.dp)
-            )
-        }
-        controls()
-    }
-}
-
-@Composable
-private fun ExpensePageButton(onClick: () -> Unit, enabled: Boolean, text: String) {
-    OutlinedButton(
-        onClick = onClick,
-        enabled = enabled,
-        shape = RoundedCornerShape(12.dp),
-        contentPadding = androidx.compose.foundation.layout.PaddingValues(0.dp),
-        modifier = Modifier.size(34.dp),
-        colors = ButtonDefaults.outlinedButtonColors(contentColor = ExpenseText)
-    ) {
-        Text(text, fontSize = 16.sp, fontWeight = FontWeight.Bold)
-    }
+    TbPagination(
+        currentPage = uiState.page,
+        totalPages = uiState.totalPages,
+        onPreviousPage = onPreviousPage,
+        onNextPage = onNextPage,
+        supportingText = if (compact) "$visibleCount pengeluaran pada halaman ini"
+        else "Menampilkan $start-$end dari $totalText",
+        isLoading = uiState.isLoading,
+        testTag = "cash-expense-pagination",
+    )
 }
 
 @Composable

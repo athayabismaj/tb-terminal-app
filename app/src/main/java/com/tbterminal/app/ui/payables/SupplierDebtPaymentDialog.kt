@@ -95,7 +95,7 @@ private fun PaymentInputField(
         singleLine = minLines == 1,
         minLines = minLines,
         shape = RoundedCornerShape(12.dp),
-        colors = DebtTextFieldColors()
+        colors = debtTextFieldColors()
     )
 }
 

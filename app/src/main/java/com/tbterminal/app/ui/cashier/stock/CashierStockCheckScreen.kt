@@ -6,6 +6,7 @@ import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.BorderStroke
+import com.tbterminal.app.ui.components.TbPagination
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -610,100 +611,16 @@ private fun StockPagination(
     onNextPage: () -> Unit,
     compact: Boolean
 ) {
-    if (compact) {
-        Column(Modifier.fillMaxWidth().background(StockPaginationBg).padding(14.dp), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(10.dp)) {
-            Text("${uiState.total} produk", color = StockTextSecondary, fontSize = 12.sp)
-            Row(horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.CenterVertically) {
-                Surface(onClick = onPreviousPage, enabled = uiState.page > 1, shape = RoundedCornerShape(10.dp), color = StockSurface, border = BorderStroke(1.dp, StockBorder)) { Box(Modifier.size(40.dp), contentAlignment = Alignment.Center) { Icon(Icons.Default.ChevronLeft, null) } }
-                Text("${uiState.page} / ${uiState.totalPages}", color = StockTextPrimary, fontWeight = FontWeight.Bold)
-                Surface(onClick = onNextPage, enabled = uiState.page < uiState.totalPages, shape = RoundedCornerShape(10.dp), color = StockSurface, border = BorderStroke(1.dp, StockBorder)) { Box(Modifier.size(40.dp), contentAlignment = Alignment.Center) { Icon(Icons.Default.ChevronRight, null) } }
-            }
-        }
-    } else Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .background(StockPaginationBg)
-            .padding(horizontal = 24.dp, vertical = 14.dp),
-        horizontalArrangement = Arrangement.SpaceBetween,
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        Text(
-            text = "Menampilkan ${uiState.currentStart}-${uiState.currentEnd} dari ${uiState.total} produk",
-            color = StockTextSecondary,
-            fontSize = 13.sp,
-            fontWeight = FontWeight.SemiBold
-        )
-
-        Row(
-            horizontalArrangement = Arrangement.spacedBy(12.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            // Tombol Previous
-            Surface(
-                onClick = onPreviousPage,
-                enabled = uiState.page > 1,
-                shape = RoundedCornerShape(10.dp),
-                color = if (uiState.page > 1) StockSurface else Color.White,
-                border = BorderStroke(1.dp, if (uiState.page > 1) StockBorder else StockBorderLight)
-            ) {
-                Box(
-                    modifier = Modifier.size(40.dp),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Icon(
-                        Icons.Default.ChevronLeft,
-                        contentDescription = "Sebelumnya",
-                        tint = if (uiState.page > 1) StockTextPrimary else StockTextMuted,
-                        modifier = Modifier.size(20.dp)
-                    )
-                }
-            }
-
-            // Halaman Aktif (Kotak Hijau)
-            Box(
-                modifier = Modifier
-                    .size(40.dp)
-                    .background(StockPrimaryLight, RoundedCornerShape(10.dp)),
-                contentAlignment = Alignment.Center
-            ) {
-                Text(
-                    text = uiState.page.toString(),
-                    color = StockOnPrimary,
-                    fontSize = 14.sp,
-                    fontWeight = FontWeight.Bold
-                )
-            }
-
-            // Total Halaman
-            Text(
-                text = "/ ${uiState.totalPages}",
-                color = StockTextSecondary,
-                fontSize = 14.sp,
-                fontWeight = FontWeight.Bold
-            )
-
-            // Tombol Next
-            Surface(
-                onClick = onNextPage,
-                enabled = uiState.page < uiState.totalPages,
-                shape = RoundedCornerShape(10.dp),
-                color = if (uiState.page < uiState.totalPages) StockSurface else Color.White,
-                border = BorderStroke(1.dp, if (uiState.page < uiState.totalPages) StockBorder else StockBorderLight)
-            ) {
-                Box(
-                    modifier = Modifier.size(40.dp),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Icon(
-                        Icons.Default.ChevronRight,
-                        contentDescription = "Berikutnya",
-                        tint = if (uiState.page < uiState.totalPages) StockTextPrimary else StockTextMuted,
-                        modifier = Modifier.size(20.dp)
-                    )
-                }
-            }
-        }
-    }
+    TbPagination(
+        currentPage = uiState.page,
+        totalPages = uiState.totalPages,
+        onPreviousPage = onPreviousPage,
+        onNextPage = onNextPage,
+        supportingText = if (compact) "${uiState.total} produk"
+        else "Menampilkan ${uiState.currentStart}-${uiState.currentEnd} dari ${uiState.total} produk",
+        isLoading = uiState.isLoading,
+        testTag = "cashier-stock-pagination",
+    )
 }
 
 // ==========================================

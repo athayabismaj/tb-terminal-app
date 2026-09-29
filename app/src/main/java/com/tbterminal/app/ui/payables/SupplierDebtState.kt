@@ -44,7 +44,7 @@ data class SupplierDebtUiState(
         }
 
     val unpaidCount: Int
-        get() = payables.count { it.status != SupplierDebtStatusFilter.Paid.apiValue }
+        get() = payables.count { !it.status.equals(SupplierDebtStatusFilter.Paid.apiValue, ignoreCase = true) }
 }
 
 enum class SupplierDebtStatusFilter(

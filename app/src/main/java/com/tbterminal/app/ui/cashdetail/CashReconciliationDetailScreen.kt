@@ -1,6 +1,7 @@
 package com.tbterminal.app.ui.cashdetail
 
 import androidx.compose.foundation.BorderStroke
+import com.tbterminal.app.ui.components.TbPagination
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -148,13 +149,16 @@ private fun TransactionSection(uiState: CashReconciliationDetailUiState, onPrevi
             } else {
                 uiState.transactions.forEach { if (compact) TransactionMobileRow(it) else TransactionRow(it) }
             }
-            Row(Modifier.fillMaxWidth().background(Color(0xFFF8FAFC)).padding(14.dp), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
-                Text("Halaman ${uiState.page} dari ${uiState.totalPages}", color = DetailMuted, fontSize = 12.sp)
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    OutlinedButton(onClick = onPreviousPage, enabled = uiState.page > 1) { Text(if (compact) "‹" else "Sebelumnya") }
-                    OutlinedButton(onClick = onNextPage, enabled = uiState.page < uiState.totalPages) { Text(if (compact) "›" else "Berikutnya") }
-                }
-            }
+            TbPagination(
+                currentPage = uiState.page,
+                totalPages = uiState.totalPages,
+                onPreviousPage = onPreviousPage,
+                onNextPage = onNextPage,
+                modifier = Modifier.padding(14.dp),
+                supportingText = "${uiState.transactions.size} dari ${uiState.totalTransactions} transaksi",
+                isLoading = uiState.isLoading,
+                testTag = "cash-detail-pagination",
+            )
         }
     }
 }

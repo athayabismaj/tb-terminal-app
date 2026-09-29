@@ -495,7 +495,7 @@ fun OpenShiftForm(
         modifier = modifier.fillMaxWidth()
     ) {
         Column(modifier = Modifier.padding(28.dp), verticalArrangement = Arrangement.spacedBy(18.dp)) {
-            Text("Buka Sesi Kasir", fontSize = 22.sp, fontWeight = FontWeight.ExtraBold, color = OnSurface)
+            Text("Buka Sesi Harian", fontSize = 22.sp, fontWeight = FontWeight.ExtraBold, color = OnSurface)
 
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 Text("MODAL AWAL", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = Slate400)

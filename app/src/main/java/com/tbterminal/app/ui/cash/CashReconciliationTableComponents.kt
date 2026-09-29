@@ -1,6 +1,7 @@
 package com.tbterminal.app.ui.cash
 
 import androidx.compose.foundation.BorderStroke
+import com.tbterminal.app.ui.components.TbPagination
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -187,46 +188,13 @@ private fun CashPagination(
     onPreviousPage: () -> Unit,
     onNextPage: () -> Unit
 ) {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .background(CashSurfaceSoft)
-            .padding(horizontal = 24.dp, vertical = 16.dp),
-        horizontalArrangement = Arrangement.SpaceBetween,
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        Text(
-            "Menampilkan ${uiState.currentStart}-${uiState.currentEnd} dari ${uiState.total} transaksi",
-            color = CashMuted,
-            fontWeight = FontWeight.Bold
-        )
-        Row(horizontalArrangement = Arrangement.spacedBy(10.dp), verticalAlignment = Alignment.CenterVertically) {
-            OutlinedButton(
-                onClick = onPreviousPage,
-                enabled = uiState.page > 1,
-                shape = RoundedCornerShape(12.dp),
-                border = BorderStroke(1.dp, CashLine)
-            ) {
-                Icon(Icons.Default.ChevronLeft, contentDescription = null)
-            }
-            Box(
-                modifier = Modifier
-                    .size(44.dp)
-                    .clip(RoundedCornerShape(12.dp))
-                    .background(CashPrimary),
-                contentAlignment = Alignment.Center
-            ) {
-                Text(uiState.page.toString(), color = Color.White, fontWeight = FontWeight.Bold)
-            }
-            Text("/ ${uiState.totalPages}", color = CashMuted, fontWeight = FontWeight.Bold)
-            OutlinedButton(
-                onClick = onNextPage,
-                enabled = uiState.page < uiState.totalPages,
-                shape = RoundedCornerShape(12.dp),
-                border = BorderStroke(1.dp, CashLine)
-            ) {
-                Icon(Icons.Default.ChevronRight, contentDescription = null)
-            }
-        }
-    }
+    TbPagination(
+        currentPage = uiState.page,
+        totalPages = uiState.totalPages,
+        onPreviousPage = onPreviousPage,
+        onNextPage = onNextPage,
+        supportingText = "Menampilkan ${uiState.currentStart}-${uiState.currentEnd} dari ${uiState.total} transaksi",
+        isLoading = uiState.isLoading,
+        testTag = "cash-reconciliation-pagination",
+    )
 }

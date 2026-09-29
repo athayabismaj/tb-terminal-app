@@ -615,3 +615,4 @@ internal fun CashierPayDebtDialog(
         }
     }
 }
+

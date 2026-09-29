@@ -16,30 +16,29 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.outlined.ReceiptLong
-import androidx.compose.material.icons.outlined.CheckCircle
+import androidx.compose.material.icons.outlined.AccountBalanceWallet
 import androidx.compose.material.icons.outlined.ExpandMore
 import androidx.compose.material.icons.outlined.Payments
-import androidx.compose.material.icons.outlined.Search
 import androidx.compose.material.icons.outlined.Schedule
+import androidx.compose.material.icons.outlined.Search
 import androidx.compose.material.icons.outlined.Visibility
 import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
-import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
+import androidx.compose.material3.TextField
+import androidx.compose.material3.TextFieldDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -48,14 +47,29 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import com.tbterminal.app.data.model.CashSession
-import com.tbterminal.app.ui.components.HistoryDateFilter
 import com.tbterminal.app.ui.components.HistoryDatePickerDialog
+import com.tbterminal.app.ui.components.SkeletonBox
+import com.tbterminal.app.ui.components.TbMobileControlSheet
+import com.tbterminal.app.ui.components.TbMobileFilterButton
+import com.tbterminal.app.ui.components.TbMobileSheetDoneButton
+import com.tbterminal.app.ui.components.TbMobileSummaryButton
+import com.tbterminal.app.ui.components.TbPagination
+import com.tbterminal.app.ui.components.TbPeriodFilterRow
+import com.tbterminal.app.ui.theme.TbBackground
+import com.tbterminal.app.ui.theme.TbError
+import com.tbterminal.app.ui.theme.TbGreen
+import com.tbterminal.app.ui.theme.TbGreenDark
+import com.tbterminal.app.ui.theme.TbOutline
+import com.tbterminal.app.ui.theme.TbSurface
+import com.tbterminal.app.ui.theme.TbSurfaceMuted
+import com.tbterminal.app.ui.theme.TbText
+import com.tbterminal.app.ui.theme.TbTextMuted
 import java.math.BigDecimal
 import java.text.NumberFormat
 import java.time.LocalDate
@@ -64,11 +78,15 @@ import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 import java.util.Locale
 
-private val SessionBackground = Color(0xFFF4FAFD)
-private val SessionBorder = Color(0xFFE2E8F0)
-private val SessionText = Color(0xFF0F172A)
-private val SessionMuted = Color(0xFF64748B)
-private val SessionPrimary = Color(0xFF059669)
+private val SessionBackground = TbBackground
+private val SessionSurface = TbSurface
+private val SessionSoft = TbSurfaceMuted
+private val SessionBorder = TbOutline
+private val SessionText = TbText
+private val SessionMuted = TbTextMuted
+private val SessionPrimary = TbGreen
+private val SessionPrimaryDark = TbGreenDark
+private val SessionDanger = TbError
 
 @Composable
 internal fun CashSessionHistoryScreen(
@@ -83,36 +101,101 @@ internal fun CashSessionHistoryScreen(
     onNextDate: () -> Unit,
     onShowDetail: (String) -> Unit,
     onPreviousPage: () -> Unit,
-    onNextPage: () -> Unit
+    onNextPage: () -> Unit,
 ) {
     var showDatePicker by remember { mutableStateOf(false) }
+    var showMobileFilters by remember { mutableStateOf(false) }
+    var showMobileOverview by remember { mutableStateOf(false) }
 
     BoxWithConstraints(modifier = modifier.fillMaxSize().background(SessionBackground)) {
         val compact = maxWidth < 720.dp
-        Column(
-            modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState())
-                .padding(if (compact) 16.dp else 40.dp),
-            verticalArrangement = Arrangement.spacedBy(if (compact) 16.dp else 28.dp)
+        Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.TopCenter) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .widthIn(max = 1180.dp)
+                    .verticalScroll(rememberScrollState())
+                    .padding(
+                        horizontal = if (compact) 16.dp else 28.dp,
+                        vertical = if (compact) 14.dp else 20.dp,
+                    ),
+                verticalArrangement = Arrangement.spacedBy(if (compact) 14.dp else 18.dp),
+            ) {
+                if (uiState.isLoading && uiState.sessions.isEmpty() && uiState.errorMessage == null) {
+                    CashHistorySkeleton(compact)
+                } else {
+                    if (!compact) {
+                        SessionDateToolbar(
+                            uiState = uiState,
+                            compact = false,
+                            onCalendarClick = { showDatePicker = true },
+                            onDatePresetSelected = onDatePresetSelected,
+                        )
+                        SessionOverview(uiState, compact = false)
+                    }
+                    SessionListSection(
+                        uiState = uiState,
+                        compact = compact,
+                        onSearchChanged = onSearchChanged,
+                        onStatusFilterChanged = onStatusFilterChanged,
+                        onRefresh = onRefresh,
+                        onShowDetail = onShowDetail,
+                        onPreviousPage = onPreviousPage,
+                        onNextPage = onNextPage,
+                        onOpenMobileFilters = { showMobileFilters = true },
+                        onOpenMobileOverview = { showMobileOverview = true },
+                    )
+                }
+            }
+        }
+    }
+
+    if (showMobileFilters) {
+        TbMobileControlSheet(
+            title = "Filter sesi",
+            subtitle = "Atur periode dan status sesi kas",
+            onDismiss = { showMobileFilters = false },
+            testTag = "cash-session-filter-sheet",
         ) {
-            CashSessionHistoryHeader(
-                uiState = uiState,
-                compact = compact,
-                onPreviousDate = onPreviousDate,
-                onNextDate = onNextDate,
-                onCalendarClick = { showDatePicker = true },
-                onClearDate = { onDateChanged(null) },
-                onDatePresetSelected = onDatePresetSelected
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Text("Periode", style = MaterialTheme.typography.labelLarge, color = SessionText, fontWeight = FontWeight.SemiBold)
+                SessionPeriodSelector(
+                    selectedPreset = uiState.selectedPreset,
+                    dateLabel = uiState.compactDateRangeLabel(),
+                    onSelected = onDatePresetSelected,
+                    onCalendarClick = {
+                        showMobileFilters = false
+                        showDatePicker = true
+                    },
+                    modifier = Modifier.fillMaxWidth(),
+                )
+            }
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Text("Status", style = MaterialTheme.typography.labelLarge, color = SessionText, fontWeight = FontWeight.SemiBold)
+                SessionStatusSelector(
+                    selectedStatus = uiState.statusFilter,
+                    onSelected = onStatusFilterChanged,
+                )
+            }
+            TbMobileSheetDoneButton(
+                onClick = { showMobileFilters = false },
+                testTag = "cash-session-filter-done",
             )
-            SessionMetrics(uiState, compact)
-            SessionTable(
-                uiState = uiState,
-                onSearchChanged = onSearchChanged,
-                onStatusFilterChanged = onStatusFilterChanged,
-                onRefresh = onRefresh,
-                onShowDetail = onShowDetail,
-                onPreviousPage = onPreviousPage,
-                onNextPage = onNextPage,
-                compact = compact
+        }
+    }
+
+    if (showMobileOverview) {
+        TbMobileControlSheet(
+            title = "Ringkasan kas",
+            subtitle = uiState.fullDateRangeLabel(),
+            onDismiss = { showMobileOverview = false },
+            testTag = "cash-session-overview-sheet",
+        ) {
+            SessionOverview(uiState = uiState, compact = true)
+            TbMobileSheetDoneButton(
+                onClick = { showMobileOverview = false },
+                label = "Tutup",
+                testTag = "cash-session-overview-done",
             )
         }
     }
@@ -124,225 +207,212 @@ internal fun CashSessionHistoryScreen(
             onConfirm = {
                 onDateChanged(it)
                 showDatePicker = false
-            }
+            },
         )
     }
 }
 
 @Composable
-private fun CashSessionHistoryHeader(
+private fun SessionDateToolbar(
     uiState: CashSessionHistoryUiState,
     compact: Boolean,
-    onPreviousDate: () -> Unit,
-    onNextDate: () -> Unit,
     onCalendarClick: () -> Unit,
-    onClearDate: () -> Unit,
-    onDatePresetSelected: (String) -> Unit
+    onDatePresetSelected: (String) -> Unit,
 ) {
-    if (compact) {
-        Column(modifier = Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-            HistoryDateFilter(
-                selectedDate = uiState.endDate ?: uiState.selectedDate,
-                onPreviousDate = onPreviousDate,
-                onNextDate = onNextDate,
-                onCalendarClick = onCalendarClick,
-                onClearDate = onClearDate,
-                displayTextOverride = uiState.dateRangeLabel(),
-                modifier = Modifier.fillMaxWidth()
-            )
-            SessionDatePresets(
-                selectedPreset = uiState.selectedPreset,
-                onSelected = onDatePresetSelected,
-                modifier = Modifier.fillMaxWidth(),
-                compact = true
-            )
-        }
-        return
+    SessionPeriodSelector(
+        selectedPreset = uiState.selectedPreset,
+        dateLabel = uiState.compactDateRangeLabel(),
+        onSelected = onDatePresetSelected,
+        onCalendarClick = onCalendarClick,
+        modifier = Modifier
+            .then(if (compact) Modifier.fillMaxWidth() else Modifier.width(500.dp)),
+    )
+}
+
+@Composable
+private fun SessionPeriodSelector(
+    selectedPreset: String?,
+    dateLabel: String,
+    onSelected: (String) -> Unit,
+    onCalendarClick: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    TbPeriodFilterRow(
+        selectedValue = selectedPreset?.let { selected ->
+            listOf("Hari ini", "Minggu ini", "Bulan ini").firstOrNull { selected.matchesPreset(it) }
+        },
+        presets = listOf(
+            "Hari ini" to "Hari",
+            "Minggu ini" to "Minggu",
+            "Bulan ini" to "Bulan",
+        ),
+        dateLabel = dateLabel,
+        dateSelected = selectedPreset == null,
+        onPresetSelected = onSelected,
+        onDateClick = onCalendarClick,
+        modifier = modifier,
+        testTag = "cash-session-period-selector",
+        presetTestTags = listOf(
+            "cash-session-period-day",
+            "cash-session-period-week",
+            "cash-session-period-month",
+        ),
+        dateTestTag = "cash-session-period-date",
+    )
+}
+
+@Composable
+private fun SessionOverview(uiState: CashSessionHistoryUiState, compact: Boolean) {
+    val openCount = uiState.sessions.count { it.status.equals("OPEN", true) }
+    val difference = uiState.sessions.fold(BigDecimal.ZERO) { total, item ->
+        total + (item.difference ?: BigDecimal.ZERO)
     }
-    Row(
-        modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.End,
-        verticalAlignment = Alignment.Top
+    Surface(
+        modifier = Modifier.fillMaxWidth().testTag("cash-session-overview"),
+        color = SessionSurface,
+        shape = RoundedCornerShape(20.dp),
+        border = BorderStroke(1.dp, SessionBorder),
     ) {
-        Row(
-            horizontalArrangement = Arrangement.spacedBy(10.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            HistoryDateFilter(
-                selectedDate = uiState.endDate ?: uiState.selectedDate,
-                onPreviousDate = onPreviousDate,
-                onNextDate = onNextDate,
-                onCalendarClick = onCalendarClick,
-                onClearDate = onClearDate,
-                displayTextOverride = uiState.dateRangeLabel(),
-                modifier = Modifier.width(320.dp)
-            )
-            SessionDatePresets(
-                selectedPreset = uiState.selectedPreset,
-                onSelected = onDatePresetSelected,
-                modifier = Modifier
-            )
+        if (compact) {
+            Column(
+                modifier = Modifier.padding(16.dp),
+                verticalArrangement = Arrangement.spacedBy(14.dp),
+            ) {
+                SessionDifferenceSummary(difference)
+                HorizontalDivider(color = SessionBorder.copy(alpha = 0.75f))
+                Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                    SessionOverviewValue("Total sesi", uiState.totalSessions.toString(), Modifier.weight(1f))
+                    SessionOverviewValue("Masih terbuka", openCount.toString(), Modifier.weight(1f))
+                }
+            }
+        } else {
+            Row(
+                modifier = Modifier.padding(horizontal = 20.dp, vertical = 16.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                SessionDifferenceSummary(difference, Modifier.weight(1.5f))
+                OverviewDivider()
+                SessionOverviewValue("Total sesi", uiState.totalSessions.toString(), Modifier.weight(1f))
+                OverviewDivider()
+                SessionOverviewValue("Terbuka di halaman", openCount.toString(), Modifier.weight(1f))
+            }
         }
     }
 }
 
 @Composable
-private fun SessionDatePresets(
-    selectedPreset: String?,
-    onSelected: (String) -> Unit,
-    modifier: Modifier = Modifier,
-    compact: Boolean = false
-) {
-    Surface(
-        shape = RoundedCornerShape(12.dp),
-        color = Color.White,
-        border = BorderStroke(1.dp, SessionBorder),
-        modifier = modifier.height(48.dp)
+private fun SessionDifferenceSummary(difference: BigDecimal, modifier: Modifier = Modifier) {
+    Row(
+        modifier = modifier,
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
+        verticalAlignment = Alignment.CenterVertically,
     ) {
-        Row(
-            modifier = Modifier.padding(horizontal = 6.dp, vertical = 6.dp),
-            horizontalArrangement = Arrangement.spacedBy(4.dp),
-            verticalAlignment = Alignment.CenterVertically
+        Surface(
+            modifier = Modifier.size(42.dp),
+            color = SessionPrimary.copy(alpha = 0.12f),
+            shape = RoundedCornerShape(13.dp),
         ) {
-            listOf("Hari ini", "Minggu ini", "Bulan ini").forEach { preset ->
-                SessionDatePresetChip(
-                    text = preset,
-                    selected = selectedPreset == preset,
-                    onClick = { onSelected(preset) },
-                    modifier = if (compact) Modifier.weight(1f) else Modifier
+            Box(contentAlignment = Alignment.Center) {
+                Icon(
+                    Icons.Outlined.AccountBalanceWallet,
+                    contentDescription = null,
+                    tint = SessionPrimaryDark,
+                    modifier = Modifier.size(21.dp),
                 )
             }
         }
-    }
-}
-
-@Composable
-private fun SessionDatePresetChip(
-    text: String,
-    selected: Boolean,
-    onClick: () -> Unit,
-    modifier: Modifier = Modifier
-) {
-    Surface(
-        onClick = onClick,
-        color = if (selected) Color(0xFF86F8C9) else Color.Transparent,
-        shape = RoundedCornerShape(10.dp),
-        modifier = modifier.height(36.dp)
-    ) {
-        Box(
-            modifier = Modifier.padding(horizontal = 14.dp),
-            contentAlignment = Alignment.Center
-        ) {
+        Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+            Text("Selisih kas", style = MaterialTheme.typography.labelMedium, color = SessionMuted)
             Text(
-                text,
-                color = if (selected) Color(0xFF00513A) else SessionMuted,
-                fontSize = 12.sp,
-                fontWeight = FontWeight.Bold
+                difference.asCompactCurrency(),
+                style = MaterialTheme.typography.titleLarge,
+                color = difference.differenceColor(),
+                fontWeight = FontWeight.Bold,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
             )
+            Text("Akumulasi halaman ini", style = MaterialTheme.typography.labelSmall, color = SessionMuted)
         }
     }
 }
 
 @Composable
-private fun SessionMetrics(uiState: CashSessionHistoryUiState, compact: Boolean) {
-    val openCount = uiState.sessions.count { it.status.equals("OPEN", true) }
-    val difference = uiState.sessions.fold(BigDecimal.ZERO) { total, item -> total + (item.difference ?: BigDecimal.ZERO) }
-    if (compact) {
-        Card(
-            modifier = Modifier.fillMaxWidth(),
-            colors = CardDefaults.cardColors(Color.White),
-            border = BorderStroke(1.dp, SessionBorder),
-            shape = RoundedCornerShape(20.dp)
-        ) {
-            Column(modifier = Modifier.padding(20.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
-                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                    Box(
-                        modifier = Modifier.size(46.dp).background(SessionPrimary.copy(alpha = 0.12f), RoundedCornerShape(14.dp)),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Icon(Icons.Outlined.Payments, contentDescription = null, tint = SessionPrimary)
-                    }
-                    Column {
-                        Text("Selisih kas", color = SessionMuted, fontSize = 12.sp)
-                        Text(
-                            difference.asCompactCurrency(),
-                            color = difference.differenceColor(),
-                            fontSize = 22.sp,
-                            fontWeight = FontWeight.ExtraBold
-                        )
-                    }
-                }
-                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                    SessionSummaryValue("Total sesi", uiState.totalSessions.toString(), Modifier.weight(1f))
-                    SessionSummaryValue("Masih terbuka", openCount.toString(), Modifier.weight(1f))
-                }
-            }
-        }
-        return
-    }
-    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(16.dp)) {
-        SessionMetric("TOTAL SESI", uiState.totalSessions.toString(), "Sesuai histori tersimpan", Icons.AutoMirrored.Outlined.ReceiptLong, SessionPrimary, Modifier.weight(1f))
-        SessionMetric("SESI TERBUKA", openCount.toString(), "Pada halaman yang tampil", Icons.Outlined.Schedule, Color(0xFF2563EB), Modifier.weight(1f))
-        SessionMetric("SELISIH HALAMAN INI", difference.asCurrency(), "Akumulasi selisih kas", Icons.Outlined.Payments, Color(0xFFF59E0B), Modifier.weight(1f))
-    }
-}
-
-@Composable
-private fun SessionSummaryValue(label: String, value: String, modifier: Modifier = Modifier) {
+private fun SessionOverviewValue(label: String, value: String, modifier: Modifier = Modifier) {
     Column(
-        modifier = modifier.background(Color(0xFFF3F7F5), RoundedCornerShape(14.dp)).padding(12.dp),
-        verticalArrangement = Arrangement.spacedBy(2.dp)
+        modifier = modifier.padding(horizontal = 10.dp),
+        verticalArrangement = Arrangement.spacedBy(3.dp),
     ) {
-        Text(label, color = SessionMuted, fontSize = 11.sp)
-        Text(value, color = SessionText, fontSize = 17.sp, fontWeight = FontWeight.Bold)
+        Text(label, style = MaterialTheme.typography.labelMedium, color = SessionMuted)
+        Text(value, style = MaterialTheme.typography.titleMedium, color = SessionText, fontWeight = FontWeight.Bold)
     }
 }
 
 @Composable
-private fun SessionMetric(title: String, value: String, note: String, icon: ImageVector, tint: Color, modifier: Modifier) {
-    Card(modifier, colors = CardDefaults.cardColors(Color.White), border = BorderStroke(1.dp, SessionBorder), shape = RoundedCornerShape(12.dp)) {
-        Column(Modifier.padding(18.dp)) {
-            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                Text(title, color = Color(0xFF94A3B8), fontSize = 10.sp, fontWeight = FontWeight.Bold)
-                Icon(icon, null, tint = tint, modifier = Modifier.size(20.dp))
-            }
-            Spacer(Modifier.height(10.dp))
-            Text(value, color = SessionText, fontSize = 22.sp, fontWeight = FontWeight.ExtraBold)
-            Text(note, color = SessionMuted, fontSize = 11.sp)
-        }
-    }
+private fun OverviewDivider() {
+    Box(Modifier.width(1.dp).height(46.dp).background(SessionBorder))
 }
 
 @Composable
-private fun SessionTable(
+private fun SessionListSection(
     uiState: CashSessionHistoryUiState,
+    compact: Boolean,
     onSearchChanged: (String) -> Unit,
     onStatusFilterChanged: (String) -> Unit,
     onRefresh: () -> Unit,
     onShowDetail: (String) -> Unit,
     onPreviousPage: () -> Unit,
     onNextPage: () -> Unit,
-    compact: Boolean
+    onOpenMobileFilters: () -> Unit,
+    onOpenMobileOverview: () -> Unit,
 ) {
     val visibleSessions = uiState.filteredSessions()
-    Column(modifier = Modifier.fillMaxWidth()) {
+    Column(
+        modifier = Modifier.fillMaxWidth().testTag("cash-session-list"),
+        verticalArrangement = Arrangement.spacedBy(12.dp),
+    ) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Text(
+                "Daftar sesi",
+                modifier = Modifier.weight(1f),
+                style = MaterialTheme.typography.titleMedium,
+                color = SessionText,
+                fontWeight = FontWeight.SemiBold,
+            )
+            if (compact) {
+                TbMobileSummaryButton(
+                    onClick = onOpenMobileOverview,
+                    testTag = "cash-session-open-overview",
+                )
+            }
+        }
         SessionToolbar(
             searchQuery = uiState.searchQuery,
             selectedStatus = uiState.statusFilter,
             onSearchChanged = onSearchChanged,
             onStatusFilterChanged = onStatusFilterChanged,
-            compact = compact
+            compact = compact,
+            onOpenMobileFilters = onOpenMobileFilters,
         )
-        Spacer(Modifier.height(if (compact) 16.dp else 28.dp))
-        if (!compact) SessionHeader()
         when {
-            uiState.isLoading -> LoadingBox()
-            uiState.errorMessage != null -> ErrorBox(uiState.errorMessage, onRefresh)
-            uiState.sessions.isEmpty() -> EmptyBox()
-            visibleSessions.isEmpty() -> EmptyBox("Tidak ada sesi yang cocok.")
-            else -> visibleSessions.forEach {
-                if (compact) SessionCompactCard(it, onShowDetail) else SessionRow(it, onShowDetail)
+            uiState.isLoading -> SessionRowsSkeleton(compact)
+            uiState.errorMessage != null -> SessionFeedback(
+                title = "Sesi kas gagal dimuat",
+                message = uiState.errorMessage,
+                actionLabel = "Coba lagi",
+                onAction = onRefresh,
+            )
+            uiState.sessions.isEmpty() -> SessionFeedback(
+                title = "Belum ada sesi kas",
+                message = "Sesi kas yang sudah dibuka akan muncul di halaman ini.",
+            )
+            visibleSessions.isEmpty() -> SessionFeedback(
+                title = "Sesi tidak ditemukan",
+                message = "Coba ubah kata pencarian atau filter status.",
+            )
+            compact -> Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                visibleSessions.forEach { SessionCompactCard(it, onShowDetail) }
             }
+            else -> SessionDesktopTable(visibleSessions, onShowDetail)
         }
         SessionPagination(uiState, visibleSessions.size, onPreviousPage, onNextPage, compact)
     }
@@ -354,41 +424,104 @@ private fun SessionToolbar(
     selectedStatus: String,
     onSearchChanged: (String) -> Unit,
     onStatusFilterChanged: (String) -> Unit,
-    compact: Boolean
+    compact: Boolean,
+    onOpenMobileFilters: () -> Unit,
 ) {
-    val search: @Composable (Modifier) -> Unit = { fieldModifier ->
-        OutlinedTextField(
+    Row(
+        modifier = Modifier.fillMaxWidth().testTag("cash-session-toolbar"),
+        horizontalArrangement = Arrangement.spacedBy(10.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        TextField(
             value = searchQuery,
             onValueChange = onSearchChanged,
-            placeholder = { Text("Cari kasir atau nomor sesi", color = SessionMuted) },
-            leadingIcon = { Icon(Icons.Outlined.Search, contentDescription = null, tint = SessionMuted) },
+            placeholder = { Text("Cari kasir atau sesi", maxLines = 1, overflow = TextOverflow.Ellipsis) },
+            leadingIcon = { Icon(Icons.Outlined.Search, contentDescription = null, modifier = Modifier.size(20.dp)) },
             singleLine = true,
-            modifier = fieldModifier.height(56.dp),
-            shape = RoundedCornerShape(14.dp),
-            colors = OutlinedTextFieldDefaults.colors(
+            modifier = Modifier.weight(1f).height(50.dp).testTag("cash-session-search"),
+            shape = RoundedCornerShape(15.dp),
+            colors = TextFieldDefaults.colors(
+                focusedContainerColor = SessionSoft,
+                unfocusedContainerColor = SessionSoft,
+                disabledContainerColor = SessionSoft,
                 focusedTextColor = SessionText,
                 unfocusedTextColor = SessionText,
-                cursorColor = SessionPrimary,
-                focusedBorderColor = SessionPrimary,
-                unfocusedBorderColor = SessionBorder,
-                focusedContainerColor = Color.White,
-                unfocusedContainerColor = Color.White
-            )
+                focusedLeadingIconColor = SessionPrimaryDark,
+                unfocusedLeadingIconColor = SessionMuted,
+                focusedPlaceholderColor = SessionMuted,
+                unfocusedPlaceholderColor = SessionMuted,
+                focusedIndicatorColor = Color.Transparent,
+                unfocusedIndicatorColor = Color.Transparent,
+                disabledIndicatorColor = Color.Transparent,
+            ),
         )
-    }
-    if (compact) {
-        Column(modifier = Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-            search(Modifier.fillMaxWidth())
-            SessionStatusDropdown(selectedStatus, onStatusFilterChanged, Modifier.fillMaxWidth())
+        if (compact) {
+            TbMobileFilterButton(
+                onClick = onOpenMobileFilters,
+                active = selectedStatus != "Semua",
+                testTag = "cash-session-open-filters",
+            )
+        } else {
+            SessionStatusDropdown(
+                selectedStatus = selectedStatus,
+                onStatusFilterChanged = onStatusFilterChanged,
+                modifier = Modifier.width(180.dp),
+            )
         }
-    } else {
+    }
+}
+
+@Composable
+private fun SessionStatusSelector(
+    selectedStatus: String,
+    onSelected: (String) -> Unit,
+) {
+    Surface(
+        modifier = Modifier.fillMaxWidth().height(48.dp),
+        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.52f),
+        shape = RoundedCornerShape(15.dp),
+    ) {
         Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(16.dp),
-            verticalAlignment = Alignment.CenterVertically
+            modifier = Modifier.fillMaxSize().padding(horizontal = 3.dp),
+            horizontalArrangement = Arrangement.spacedBy(2.dp),
         ) {
-            search(Modifier.weight(1f))
-            SessionStatusDropdown(selectedStatus, onStatusFilterChanged, Modifier.width(220.dp))
+            listOf(
+                Triple("Semua", "Semua", "all"),
+                Triple("OPEN", "Terbuka", "open"),
+                Triple("CLOSED", "Ditutup", "closed"),
+            ).forEach { (value, label, tag) ->
+                SessionStatusOption(
+                    label = label,
+                    selected = selectedStatus == value,
+                    onClick = { onSelected(value) },
+                    modifier = Modifier.weight(1f).testTag("cash-session-status-$tag"),
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun SessionStatusOption(
+    label: String,
+    selected: Boolean,
+    onClick: () -> Unit,
+    modifier: Modifier,
+) {
+    Surface(
+        onClick = onClick,
+        modifier = modifier.fillMaxSize(),
+        color = if (selected) MaterialTheme.colorScheme.primaryContainer else Color.Transparent,
+        contentColor = if (selected) MaterialTheme.colorScheme.onPrimaryContainer else SessionMuted,
+        shape = RoundedCornerShape(12.dp),
+    ) {
+        Box(contentAlignment = Alignment.Center) {
+            Text(
+                text = label,
+                style = MaterialTheme.typography.labelMedium,
+                fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Medium,
+                maxLines = 1,
+            )
         }
     }
 }
@@ -397,41 +530,33 @@ private fun SessionToolbar(
 private fun SessionStatusDropdown(
     selectedStatus: String,
     onStatusFilterChanged: (String) -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
 ) {
     var expanded by remember { mutableStateOf(false) }
     Box(modifier = modifier) {
-        OutlinedButton(
+        Surface(
             onClick = { expanded = true },
-            modifier = Modifier.fillMaxWidth().height(56.dp),
-            shape = RoundedCornerShape(14.dp),
+            modifier = Modifier.fillMaxWidth().height(50.dp).testTag("cash-session-status-filter"),
+            color = SessionSurface,
+            contentColor = SessionText,
+            shape = RoundedCornerShape(15.dp),
             border = BorderStroke(1.dp, SessionBorder),
-            colors = ButtonDefaults.outlinedButtonColors(
-                containerColor = Color.White,
-                contentColor = SessionText
-            )
         ) {
-            Text(
-                text = if (selectedStatus == "Semua") "Semua status" else selectedStatus.statusLabel(),
-                modifier = Modifier.weight(1f),
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-                fontWeight = FontWeight.Medium
-            )
-            Icon(
-                imageVector = Icons.Outlined.ExpandMore,
-                contentDescription = "Pilih status",
-                tint = SessionMuted,
-                modifier = Modifier.size(18.dp)
-            )
+            Row(modifier = Modifier.padding(horizontal = 14.dp), verticalAlignment = Alignment.CenterVertically) {
+                Text(
+                    if (selectedStatus == "Semua") "Semua" else selectedStatus.statusLabel(),
+                    modifier = Modifier.weight(1f),
+                    style = MaterialTheme.typography.labelLarge,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+                Icon(Icons.Outlined.ExpandMore, contentDescription = "Pilih status", tint = SessionMuted, modifier = Modifier.size(18.dp))
+            }
         }
         DropdownMenu(
             expanded = expanded,
             onDismissRequest = { expanded = false },
-            modifier = Modifier
-                .width(220.dp)
-                .widthIn(min = 220.dp)
-                .background(Color.White)
+            modifier = Modifier.width(180.dp).background(SessionSurface),
         ) {
             listOf("Semua", "OPEN", "CLOSED").forEach { status ->
                 DropdownMenuItem(
@@ -439,8 +564,26 @@ private fun SessionStatusDropdown(
                     onClick = {
                         onStatusFilterChanged(status)
                         expanded = false
-                    }
+                    },
                 )
+            }
+        }
+    }
+}
+
+@Composable
+private fun SessionDesktopTable(sessions: List<CashSession>, onShowDetail: (String) -> Unit) {
+    Surface(
+        modifier = Modifier.fillMaxWidth(),
+        color = SessionSurface,
+        shape = RoundedCornerShape(18.dp),
+        border = BorderStroke(1.dp, SessionBorder),
+    ) {
+        Column {
+            SessionHeader()
+            sessions.forEachIndexed { index, session ->
+                if (index > 0) HorizontalDivider(color = SessionBorder)
+                SessionRow(session, onShowDetail)
             }
         }
     }
@@ -448,117 +591,185 @@ private fun SessionStatusDropdown(
 
 @Composable
 private fun SessionHeader() {
-    Row(Modifier.fillMaxWidth().background(Color(0xFFF8FAFC)).padding(horizontal = 18.dp, vertical = 12.dp)) {
-        Label("KASIR", Modifier.weight(1.3f))
-        Label("DIBUKA", Modifier.weight(1.5f))
-        Label("DITUTUP", Modifier.weight(1.5f))
-        Label("MODAL AWAL", Modifier.weight(1.1f))
-        Label("KAS SISTEM", Modifier.weight(1.1f))
-        Label("SELISIH", Modifier.weight(1f))
-        Label("STATUS", Modifier.weight(0.9f))
-        Label("AKSI", Modifier.weight(0.45f))
+    Row(
+        Modifier.fillMaxWidth().background(SessionSoft).padding(horizontal = 18.dp, vertical = 12.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        SessionHeaderLabel("Kasir", Modifier.weight(1.35f))
+        SessionHeaderLabel("Waktu sesi", Modifier.weight(1.55f))
+        SessionHeaderLabel("Modal awal", Modifier.weight(1.1f), Alignment.End)
+        SessionHeaderLabel("Kas sistem", Modifier.weight(1.1f), Alignment.End)
+        SessionHeaderLabel("Selisih", Modifier.weight(1f), Alignment.End)
+        SessionHeaderLabel("Status", Modifier.weight(0.85f), Alignment.CenterHorizontally)
+        Spacer(Modifier.width(48.dp))
     }
 }
 
 @Composable
 private fun SessionRow(session: CashSession, onShowDetail: (String) -> Unit) {
-    Row(Modifier.fillMaxWidth().padding(horizontal = 18.dp, vertical = 14.dp), verticalAlignment = Alignment.CenterVertically) {
-        Column(Modifier.weight(1.3f)) {
-            Text(session.userName ?: "Kasir", color = SessionText, fontSize = 13.sp, fontWeight = FontWeight.Bold)
-            Text(session.userId.take(8), color = SessionMuted, fontSize = 10.sp)
-        }
-        Text(session.openedAt.asDateTime(), Modifier.weight(1.5f), color = SessionMuted, fontSize = 12.sp)
-        Text(session.closedAt?.asDateTime() ?: "-", Modifier.weight(1.5f), color = SessionMuted, fontSize = 12.sp)
-        Text(session.openingCash.asCurrency(), Modifier.weight(1.1f), color = SessionText, fontSize = 12.sp)
-        Text((session.systemCash ?: session.openingCash).asCurrency(), Modifier.weight(1.1f), color = SessionText, fontSize = 12.sp)
-        Text((session.difference ?: BigDecimal.ZERO).asCurrency(), Modifier.weight(1f), color = session.difference.differenceColor(), fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
-        Box(Modifier.weight(0.9f)) { SessionStatusBadge(session.status) }
-        Box(Modifier.weight(0.45f)) {
-            IconButton(onClick = { onShowDetail(session.id) }) {
-                Icon(Icons.Outlined.Visibility, "Lihat detail", tint = SessionPrimary)
+    Row(
+        Modifier
+            .fillMaxWidth()
+            .testTag("cash-session-${session.id}")
+            .padding(horizontal = 18.dp, vertical = 12.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Row(Modifier.weight(1.35f), verticalAlignment = Alignment.CenterVertically) {
+            SessionAvatar(session.userName)
+            Spacer(Modifier.width(10.dp))
+            Column {
+                Text(
+                    session.userName ?: "Kasir",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = SessionText,
+                    fontWeight = FontWeight.SemiBold,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+                Text(session.id.take(8).uppercase(), style = MaterialTheme.typography.labelSmall, color = SessionMuted)
             }
         }
+        Column(Modifier.weight(1.55f)) {
+            Text(session.openedAt.asDateTime(), style = MaterialTheme.typography.bodySmall, color = SessionText)
+            Text(
+                session.closedAt?.let { "Tutup ${it.asDateTime()}" } ?: "Masih berjalan",
+                style = MaterialTheme.typography.labelSmall,
+                color = SessionMuted,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+        }
+        SessionAmount(session.openingCash.asCompactCurrency(), Modifier.weight(1.1f))
+        SessionAmount((session.systemCash ?: session.openingCash).asCompactCurrency(), Modifier.weight(1.1f), FontWeight.SemiBold)
+        SessionAmount(
+            (session.difference ?: BigDecimal.ZERO).asCompactCurrency(),
+            Modifier.weight(1f),
+            FontWeight.SemiBold,
+            session.difference.differenceColor(),
+        )
+        Box(Modifier.weight(0.85f), contentAlignment = Alignment.Center) { SessionStatusBadge(session.status) }
+        IconButton(
+            onClick = { onShowDetail(session.id) },
+            modifier = Modifier.size(48.dp).testTag("cash-session-detail-${session.id}"),
+        ) {
+            Icon(Icons.Outlined.Visibility, "Lihat rincian", tint = SessionPrimaryDark, modifier = Modifier.size(20.dp))
+        }
     }
-    HorizontalDivider(color = SessionBorder)
+}
+
+@Composable
+private fun SessionAmount(
+    text: String,
+    modifier: Modifier,
+    weight: FontWeight = FontWeight.Medium,
+    color: Color = SessionText,
+) {
+    Text(
+        text,
+        modifier = modifier.padding(horizontal = 6.dp),
+        style = MaterialTheme.typography.bodySmall,
+        color = color,
+        fontWeight = weight,
+        textAlign = TextAlign.End,
+        maxLines = 1,
+        overflow = TextOverflow.Ellipsis,
+    )
 }
 
 @Composable
 private fun SessionCompactCard(session: CashSession, onShowDetail: (String) -> Unit) {
-    Card(
-        modifier = Modifier.fillMaxWidth().padding(bottom = 10.dp),
-        colors = CardDefaults.cardColors(Color.White),
+    Surface(
+        modifier = Modifier.fillMaxWidth().testTag("cash-session-${session.id}"),
+        color = SessionSurface,
+        shape = RoundedCornerShape(18.dp),
         border = BorderStroke(1.dp, SessionBorder),
-        shape = RoundedCornerShape(18.dp)
     ) {
         Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
-            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                Box(
-                    modifier = Modifier.size(42.dp).background(SessionPrimary.copy(alpha = 0.1f), RoundedCornerShape(14.dp)),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Text(
-                        session.userName.orEmpty().ifBlank { "K" }.take(1).uppercase(),
-                        color = SessionPrimary,
-                        fontWeight = FontWeight.ExtraBold
-                    )
-                }
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                SessionAvatar(session.userName)
+                Spacer(Modifier.width(11.dp))
                 Column(modifier = Modifier.weight(1f)) {
                     Text(
                         session.userName ?: "Kasir",
+                        style = MaterialTheme.typography.titleSmall,
                         color = SessionText,
-                        fontWeight = FontWeight.Bold,
+                        fontWeight = FontWeight.SemiBold,
                         maxLines = 1,
-                        overflow = TextOverflow.Ellipsis
+                        overflow = TextOverflow.Ellipsis,
                     )
-                    Text("Dibuka ${session.openedAt.asDateTime()}", color = SessionMuted, fontSize = 11.sp)
+                    Text(session.openedAt.asDateTime(), style = MaterialTheme.typography.bodySmall, color = SessionMuted, maxLines = 1)
                 }
                 SessionStatusBadge(session.status)
             }
-            HorizontalDivider(color = SessionBorder.copy(alpha = 0.7f))
-            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                SessionCompactValue("Modal awal", session.openingCash.asCompactCurrency(), Modifier.weight(1f))
-                SessionCompactValue(
-                    "Kas sistem",
+            Column(verticalArrangement = Arrangement.spacedBy(3.dp)) {
+                Text("Kas sistem", style = MaterialTheme.typography.labelMedium, color = SessionMuted)
+                Text(
                     (session.systemCash ?: session.openingCash).asCompactCurrency(),
-                    Modifier.weight(1f)
+                    style = MaterialTheme.typography.headlineSmall,
+                    color = SessionText,
+                    fontWeight = FontWeight.Bold,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
                 )
-                SessionCompactValue(
+            }
+            Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                SessionCardValue("Modal awal", session.openingCash.asCompactCurrency(), Modifier.weight(1f))
+                SessionCardValue(
                     "Selisih",
                     (session.difference ?: BigDecimal.ZERO).asCompactCurrency(),
                     Modifier.weight(1f),
-                    session.difference.differenceColor()
+                    session.difference.differenceColor(),
                 )
             }
-            OutlinedButton(
-                onClick = { onShowDetail(session.id) },
-                modifier = Modifier.fillMaxWidth().height(48.dp),
-                shape = RoundedCornerShape(14.dp),
-                colors = ButtonDefaults.outlinedButtonColors(contentColor = SessionPrimary)
-            ) {
-                Icon(Icons.Outlined.Visibility, contentDescription = null, modifier = Modifier.size(18.dp))
-                Spacer(Modifier.width(8.dp))
-                Text("Lihat rincian", fontWeight = FontWeight.Bold)
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Icon(Icons.Outlined.Schedule, contentDescription = null, tint = SessionMuted, modifier = Modifier.size(17.dp))
+                Spacer(Modifier.width(7.dp))
+                Text(
+                    session.closedAt?.let { "Ditutup ${it.asDateTime()}" } ?: "Sesi masih berjalan",
+                    modifier = Modifier.weight(1f),
+                    style = MaterialTheme.typography.labelMedium,
+                    color = SessionMuted,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+                TextButton(
+                    onClick = { onShowDetail(session.id) },
+                    modifier = Modifier.height(48.dp).testTag("cash-session-detail-${session.id}"),
+                    colors = ButtonDefaults.textButtonColors(contentColor = SessionPrimaryDark),
+                ) { Text("Rincian", fontWeight = FontWeight.SemiBold) }
             }
         }
     }
 }
 
 @Composable
-private fun SessionCompactValue(
+private fun SessionAvatar(name: String?) {
+    Surface(modifier = Modifier.size(40.dp), shape = CircleShape, color = SessionSoft) {
+        Box(contentAlignment = Alignment.Center) {
+            Text(name.orEmpty().ifBlank { "K" }.take(1).uppercase(), color = SessionPrimaryDark, fontWeight = FontWeight.Bold)
+        }
+    }
+}
+
+@Composable
+private fun SessionCardValue(
     label: String,
     value: String,
-    modifier: Modifier = Modifier,
-    valueColor: Color = SessionText
+    modifier: Modifier,
+    valueColor: Color = SessionText,
 ) {
-    Column(modifier = modifier, verticalArrangement = Arrangement.spacedBy(3.dp)) {
-        Text(label, color = SessionMuted, fontSize = 10.sp, maxLines = 1)
+    Column(
+        modifier = modifier.background(SessionSoft, RoundedCornerShape(13.dp)).padding(12.dp),
+        verticalArrangement = Arrangement.spacedBy(3.dp),
+    ) {
+        Text(label, style = MaterialTheme.typography.labelSmall, color = SessionMuted)
         Text(
             value,
+            style = MaterialTheme.typography.bodyMedium,
             color = valueColor,
-            fontSize = 11.sp,
             fontWeight = FontWeight.SemiBold,
             maxLines = 1,
-            overflow = TextOverflow.Ellipsis
+            overflow = TextOverflow.Ellipsis,
         )
     }
 }
@@ -566,9 +777,15 @@ private fun SessionCompactValue(
 @Composable
 private fun SessionStatusBadge(status: String) {
     val isOpen = status.equals("OPEN", true)
-    val tint = if (isOpen) Color(0xFF2563EB) else SessionPrimary
-    Surface(color = tint.copy(alpha = 0.1f), shape = RoundedCornerShape(16.dp)) {
-        Text(status.statusLabel().uppercase(), Modifier.padding(horizontal = 9.dp, vertical = 4.dp), color = tint, fontSize = 9.sp, fontWeight = FontWeight.Bold)
+    val tint = if (isOpen) MaterialTheme.colorScheme.primary else SessionPrimaryDark
+    Surface(color = tint.copy(alpha = 0.1f), shape = RoundedCornerShape(14.dp)) {
+        Text(
+            status.statusLabel(),
+            Modifier.padding(horizontal = 9.dp, vertical = 5.dp),
+            style = MaterialTheme.typography.labelSmall,
+            color = tint,
+            fontWeight = FontWeight.Bold,
+        )
     }
 }
 
@@ -578,103 +795,110 @@ private fun SessionPagination(
     visibleCount: Int,
     onPreviousPage: () -> Unit,
     onNextPage: () -> Unit,
-    compact: Boolean
+    compact: Boolean,
 ) {
     val start = if (visibleCount == 0) 0 else ((uiState.page - 1) * uiState.pageSize) + 1
     val end = if (visibleCount == 0) 0 else start + visibleCount - 1
-    val totalText = if (uiState.searchQuery.isBlank()) {
-        "${uiState.totalSessions} sesi"
-    } else {
-        "$visibleCount hasil pada halaman ini"
-    }
-    Row(
-        Modifier
-            .fillMaxWidth()
-            .background(Color(0xFFF8FAFC))
-            .padding(horizontal = 20.dp, vertical = 14.dp),
-        horizontalArrangement = Arrangement.SpaceBetween,
-        verticalAlignment = Alignment.CenterVertically
+    val totalText = if (uiState.searchQuery.isBlank()) "${uiState.totalSessions} sesi" else "$visibleCount hasil"
+    TbPagination(
+        currentPage = uiState.page,
+        totalPages = uiState.totalPages,
+        onPreviousPage = onPreviousPage,
+        onNextPage = onNextPage,
+        supportingText = if (compact) {
+            if (uiState.searchQuery.isBlank()) "${uiState.totalSessions} data" else "$visibleCount hasil"
+        } else {
+            "Menampilkan $start-$end dari $totalText"
+        },
+        isLoading = uiState.isLoading,
+        testTag = "cash-session-pagination",
+    )
+}
+
+@Composable
+private fun SessionRowsSkeleton(compact: Boolean) {
+    Column(
+        modifier = Modifier.fillMaxWidth().testTag("cash-session-rows-skeleton"),
+        verticalArrangement = Arrangement.spacedBy(10.dp),
     ) {
-        if (compact) {
-            Text("$start-$end dari $totalText", color = SessionMuted, fontSize = 12.sp)
-        } else Column {
-                Text(
-                    "Menampilkan $start-$end dari $totalText",
-                    color = SessionText,
-                    fontSize = 13.sp,
-                    fontWeight = FontWeight.Medium
-                )
-                Text(
-                    "Maksimal ${uiState.pageSize} sesi per halaman",
-                    color = SessionMuted,
-                    fontSize = 11.sp,
-                    modifier = Modifier.padding(top = 2.dp)
-                )
+        repeat(if (compact) 3 else 5) {
+            SkeletonBox(Modifier.fillMaxWidth().height(if (compact) 210.dp else 64.dp))
         }
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
-            SessionPageButton(onClick = onPreviousPage, enabled = uiState.page > 1, text = "<")
-            Box(
-                modifier = Modifier
-                    .size(34.dp)
-                    .background(SessionPrimary, RoundedCornerShape(8.dp)),
-                contentAlignment = Alignment.Center
-            ) {
-                Text("${uiState.page}", color = Color.White, fontWeight = FontWeight.Bold)
+    }
+}
+
+@Composable
+private fun CashHistorySkeleton(compact: Boolean) {
+    Column(
+        modifier = Modifier.fillMaxWidth().testTag("cash-session-skeleton"),
+        verticalArrangement = Arrangement.spacedBy(14.dp),
+    ) {
+        SkeletonBox(Modifier.fillMaxWidth().height(if (compact) 98.dp else 50.dp))
+        SkeletonBox(Modifier.fillMaxWidth().height(if (compact) 154.dp else 92.dp))
+        SkeletonBox(Modifier.fillMaxWidth().height(50.dp))
+        repeat(if (compact) 3 else 5) {
+            SkeletonBox(Modifier.fillMaxWidth().height(if (compact) 210.dp else 64.dp))
+        }
+    }
+}
+
+@Composable
+private fun SessionFeedback(
+    title: String,
+    message: String,
+    actionLabel: String? = null,
+    onAction: (() -> Unit)? = null,
+) {
+    Surface(
+        modifier = Modifier.fillMaxWidth(),
+        color = SessionSurface,
+        shape = RoundedCornerShape(18.dp),
+        border = BorderStroke(1.dp, SessionBorder),
+    ) {
+        Column(
+            modifier = Modifier.padding(horizontal = 24.dp, vertical = 42.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(6.dp),
+        ) {
+            Icon(Icons.Outlined.Payments, contentDescription = null, tint = SessionMuted, modifier = Modifier.size(24.dp))
+            Text(title, style = MaterialTheme.typography.titleSmall, color = SessionText, fontWeight = FontWeight.SemiBold)
+            Text(message, style = MaterialTheme.typography.bodySmall, color = SessionMuted, textAlign = TextAlign.Center)
+            if (actionLabel != null && onAction != null) {
+                OutlinedButton(onClick = onAction, modifier = Modifier.height(48.dp)) { Text(actionLabel) }
             }
-            Text("/ ${uiState.totalPages}", color = SessionMuted, fontWeight = FontWeight.SemiBold)
-            SessionPageButton(onClick = onNextPage, enabled = uiState.page < uiState.totalPages, text = ">")
         }
     }
 }
 
 @Composable
-private fun SessionPageButton(onClick: () -> Unit, enabled: Boolean, text: String) {
-    OutlinedButton(
-        onClick = onClick,
-        enabled = enabled,
-        shape = RoundedCornerShape(12.dp),
-        contentPadding = androidx.compose.foundation.layout.PaddingValues(0.dp),
-        modifier = Modifier.size(34.dp),
-        colors = ButtonDefaults.outlinedButtonColors(contentColor = SessionText)
-    ) {
-        Text(text, fontSize = 16.sp, fontWeight = FontWeight.Bold)
+private fun SessionHeaderLabel(
+    text: String,
+    modifier: Modifier,
+    alignment: Alignment.Horizontal = Alignment.Start,
+) {
+    Column(modifier = modifier, horizontalAlignment = alignment) {
+        Text(text, style = MaterialTheme.typography.labelMedium, color = SessionMuted, fontWeight = FontWeight.SemiBold)
     }
 }
 
-@Composable
-private fun LoadingBox() = com.tbterminal.app.ui.components.SkeletonList(
-    modifier = Modifier.fillMaxWidth().height(180.dp),
-    itemCount = 4,
-)
-
-@Composable
-private fun EmptyBox(message: String = "Belum ada sesi kas.") = Box(Modifier.fillMaxWidth().height(180.dp), contentAlignment = Alignment.Center) { Text(message, color = SessionMuted) }
-
-@Composable
-private fun ErrorBox(message: String, onRetry: () -> Unit) {
-    Column(Modifier.fillMaxWidth().height(180.dp), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.Center) {
-        Text(message, color = Color(0xFFDC2626))
-        Spacer(Modifier.height(8.dp))
-        OutlinedButton(onClick = onRetry) { Text("Coba Lagi") }
-    }
-}
-
-@Composable
-private fun Label(text: String, modifier: Modifier) = Text(text, modifier, color = Color(0xFF94A3B8), fontSize = 10.sp, fontWeight = FontWeight.Bold)
-
-private fun String.statusLabel(): String = when (this) {
+private fun String.statusLabel(): String = when (uppercase()) {
     "OPEN" -> "Terbuka"
     "CLOSED" -> "Ditutup"
     else -> this
 }
 
-private fun BigDecimal?.differenceColor(): Color = when {
-    this == null || compareTo(BigDecimal.ZERO) == 0 -> SessionMuted
-    compareTo(BigDecimal.ZERO) < 0 -> Color(0xFFDC2626)
-    else -> SessionPrimary
+private fun String?.matchesPreset(preset: String): Boolean = when (preset) {
+    "Hari ini" -> this == "Hari ini"
+    "Minggu ini" -> this == "Minggu ini" || this == "7 hari"
+    "Bulan ini" -> this == "Bulan ini" || this == "30 hari"
+    else -> false
 }
 
-private fun BigDecimal.asCurrency(): String = NumberFormat.getCurrencyInstance(Locale.forLanguageTag("id-ID")).format(this)
+private fun BigDecimal?.differenceColor(): Color = when {
+    this == null || compareTo(BigDecimal.ZERO) == 0 -> SessionMuted
+    compareTo(BigDecimal.ZERO) < 0 -> SessionDanger
+    else -> SessionPrimaryDark
+}
 
 private fun BigDecimal.asCompactCurrency(): String =
     NumberFormat.getCurrencyInstance(Locale.forLanguageTag("id-ID")).apply {
@@ -693,20 +917,33 @@ private fun CashSessionHistoryUiState.filteredSessions(): List<CashSession> {
     }
 }
 
-private fun CashSessionHistoryUiState.dateRangeLabel(): String? {
+private fun CashSessionHistoryUiState.compactDateRangeLabel(): String {
     val start = startDate ?: selectedDate
     val end = endDate ?: selectedDate
-    if (start == null || end == null) return null
-    val startText = start.asShortDate()
-    val endText = end.asShortDate()
-    return if (start == end) startText else "$startText - $endText"
+    if (start == null || end == null) return "Tanggal"
+    val startDateValue = runCatching { LocalDate.parse(start) }.getOrNull() ?: return "Tanggal"
+    val endDateValue = runCatching { LocalDate.parse(end) }.getOrNull() ?: return "Tanggal"
+    val locale = Locale.forLanguageTag("id-ID")
+    return when {
+        startDateValue == endDateValue -> endDateValue.format(DateTimeFormatter.ofPattern("dd MMM", locale))
+        startDateValue.month == endDateValue.month ->
+            "${startDateValue.dayOfMonth.toString().padStart(2, '0')}–${endDateValue.format(DateTimeFormatter.ofPattern("dd MMM", locale))}"
+        else -> "${startDateValue.format(DateTimeFormatter.ofPattern("dd MMM", locale))}–${endDateValue.format(DateTimeFormatter.ofPattern("dd MMM", locale))}"
+    }
 }
 
-private fun String.asShortDate(): String = runCatching {
-    LocalDate.parse(this).format(DateTimeFormatter.ofPattern("dd MMM yyyy", Locale.forLanguageTag("id-ID")))
-}.getOrDefault(this)
+private fun CashSessionHistoryUiState.fullDateRangeLabel(): String {
+    val start = startDate ?: selectedDate
+    val end = endDate ?: selectedDate
+    if (start == null || end == null) return "Semua periode"
+    val locale = Locale.forLanguageTag("id-ID")
+    val formatter = DateTimeFormatter.ofPattern("dd MMM yyyy", locale)
+    val startValue = runCatching { LocalDate.parse(start) }.getOrNull() ?: return compactDateRangeLabel()
+    val endValue = runCatching { LocalDate.parse(end) }.getOrNull() ?: return compactDateRangeLabel()
+    return if (startValue == endValue) endValue.format(formatter) else "${startValue.format(formatter)} – ${endValue.format(formatter)}"
+}
 
 private fun String.asDateTime(): String = runCatching {
     OffsetDateTime.parse(this).atZoneSameInstant(ZoneId.of("Asia/Jakarta"))
-        .format(DateTimeFormatter.ofPattern("dd MMM yyyy HH:mm", Locale.forLanguageTag("id-ID")))
+        .format(DateTimeFormatter.ofPattern("dd MMM yyyy, HH:mm", Locale.forLanguageTag("id-ID")))
 }.getOrDefault(this)

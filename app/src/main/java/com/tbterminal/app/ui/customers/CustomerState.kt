@@ -6,7 +6,7 @@ import java.math.BigDecimal
 internal const val CUSTOMER_PAGE_SIZE = 10
 
 enum class CustomerCategoryFilter(val label: String) {
-    ALL("Semua kategori"),
+    ALL("Semua pelanggan"),
     GENERAL("Pelanggan umum"),
     CONTRACTOR("Kontraktor")
 }

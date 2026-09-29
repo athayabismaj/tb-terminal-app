@@ -1,8 +1,11 @@
 package com.tbterminal.app.ui.payables
 
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -14,38 +17,35 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import com.tbterminal.app.data.model.SupplierPayable
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.PaddingValues
+import com.tbterminal.app.ui.components.SkeletonBox
 
 @Composable
 internal fun DebtTableHeader() {
     Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .background(DebtSoft)
-            .padding(horizontal = 24.dp, vertical = 14.dp),
-        verticalAlignment = Alignment.CenterVertically
+        modifier = Modifier.fillMaxWidth().background(DebtSoft).padding(horizontal = 18.dp, vertical = 13.dp),
+        verticalAlignment = Alignment.CenterVertically,
     ) {
-        DebtHeaderText("SUPPLIER", Modifier.weight(2.2f))
-        DebtHeaderText("PEMBELIAN", Modifier.weight(1.4f))
-        DebtHeaderText("TOTAL", Modifier.weight(1.25f), Alignment.End)
-        DebtHeaderText("DIBAYAR", Modifier.weight(1.25f), Alignment.End)
-        DebtHeaderText("SISA", Modifier.weight(1.25f), Alignment.End)
-        DebtHeaderText("JATUH TEMPO", Modifier.weight(1.35f))
-        DebtHeaderText("STATUS", Modifier.weight(1.2f), Alignment.CenterHorizontally)
-        DebtHeaderText("AKSI", Modifier.weight(1f), Alignment.End)
+        DebtHeaderText("Supplier", Modifier.weight(2f))
+        DebtHeaderText("Pembelian", Modifier.weight(1.35f))
+        DebtHeaderText("Total / dibayar", Modifier.weight(1.45f), Alignment.End)
+        DebtHeaderText("Sisa", Modifier.weight(1.25f), Alignment.End)
+        DebtHeaderText("Jatuh tempo", Modifier.weight(1.5f))
+        DebtHeaderText("Status", Modifier.weight(1.1f), Alignment.CenterHorizontally)
+        DebtHeaderText("Aksi", Modifier.weight(0.8f), Alignment.End)
     }
 }
 
@@ -54,172 +54,178 @@ internal fun SupplierDebtRows(
     modifier: Modifier,
     uiState: SupplierDebtUiState,
     onPayClick: (SupplierPayable) -> Unit,
-    compact: Boolean = false
+    compact: Boolean = false,
 ) {
-    Box(modifier = modifier.fillMaxWidth()) {
-        when {
-            uiState.isLoading && uiState.payables.isEmpty() ->
-                com.tbterminal.app.ui.components.SkeletonList(
-                    modifier = Modifier.fillMaxWidth().height(180.dp),
-                    itemCount = 4,
-                )
-
-            uiState.errorMessage != null && uiState.payables.isEmpty() -> Box(
-                modifier = Modifier.fillMaxWidth().height(180.dp),
-                contentAlignment = Alignment.Center
-            ) {
-                Text(
-                    "Utang supplier gagal dimuat.",
-                    color = DebtDanger,
-                    fontWeight = FontWeight.Bold
-                )
-            }
-
-            uiState.filteredPayables.isEmpty() -> Box(
-                modifier = Modifier.fillMaxWidth().height(180.dp),
-                contentAlignment = Alignment.Center
-            ) {
-                Text(
-                    "Belum ada utang supplier yang cocok.",
-                    color = DebtMuted,
-                    fontWeight = FontWeight.SemiBold
-                )
-            }
-
-            else -> Column(modifier = Modifier.fillMaxWidth()) {
-                uiState.filteredPayables.forEach { payable ->
-                    if (compact) SupplierDebtCompactCard(payable, onPayClick)
-                    else {
-                        SupplierDebtRow(payable, onPayClick)
-                        HorizontalDivider(color = DebtLine.copy(alpha = 0.75f))
-                    }
-                }
+    when {
+        uiState.isLoading && uiState.payables.isEmpty() -> SupplierDebtLoading(modifier, compact)
+        uiState.errorMessage != null && uiState.payables.isEmpty() -> SupplierDebtError(modifier)
+        uiState.filteredPayables.isEmpty() -> SupplierDebtEmpty(modifier)
+        compact -> Column(
+            modifier = modifier.fillMaxWidth(),
+            verticalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            uiState.filteredPayables.forEach { payable -> SupplierDebtCompactCard(payable, onPayClick) }
+        }
+        else -> Column(modifier = modifier.fillMaxWidth()) {
+            uiState.filteredPayables.forEachIndexed { index, payable ->
+                if (index > 0) HorizontalDivider(color = DebtLine)
+                SupplierDebtRow(payable, onPayClick)
             }
         }
     }
 }
 
 @Composable
-private fun SupplierDebtCompactCard(
-    payable: SupplierPayable,
-    onPayClick: (SupplierPayable) -> Unit
-) {
-    androidx.compose.material3.Card(
-        modifier = Modifier.fillMaxWidth().padding(bottom = 10.dp),
-        colors = androidx.compose.material3.CardDefaults.cardColors(containerColor = DebtSurface),
-        shape = RoundedCornerShape(18.dp),
-        border = androidx.compose.foundation.BorderStroke(1.dp, DebtLine)
+private fun SupplierDebtCompactCard(payable: SupplierPayable, onPayClick: (SupplierPayable) -> Unit) {
+    Surface(
+        modifier = Modifier.fillMaxWidth().testTag("supplier-debt-${payable.id}"),
+        color = DebtSurface,
+        shape = RoundedCornerShape(20.dp),
+        border = BorderStroke(1.dp, DebtLine),
     ) {
-        Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
+        Column(
+            modifier = Modifier.fillMaxWidth().padding(18.dp),
+            verticalArrangement = Arrangement.spacedBy(18.dp),
+        ) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 SupplierInitial(payable.supplierName)
                 Spacer(Modifier.width(12.dp))
                 Column(modifier = Modifier.weight(1f)) {
                     Text(
                         payable.supplierName,
+                        style = MaterialTheme.typography.titleSmall,
                         color = DebtText,
                         fontWeight = FontWeight.Bold,
                         maxLines = 1,
-                        overflow = TextOverflow.Ellipsis
+                        overflow = TextOverflow.Ellipsis,
                     )
-                    Text(payable.purchaseId.shortId(), color = DebtMuted, fontSize = 12.sp)
+                    Text(payable.purchaseId.shortId(), style = MaterialTheme.typography.bodySmall, color = DebtMuted, maxLines = 1)
                 }
                 StatusBadge(payable.status)
             }
-            Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                Text("Sisa hutang", color = DebtMuted, fontSize = 12.sp)
+
+            Column(verticalArrangement = Arrangement.spacedBy(5.dp)) {
+                Text("Sisa hutang", style = MaterialTheme.typography.labelMedium, color = DebtMuted)
                 Text(
                     payable.remainingAmount.currencyText(),
+                    style = MaterialTheme.typography.headlineSmall,
                     color = DebtText,
-                    fontSize = 21.sp,
-                    fontWeight = FontWeight.ExtraBold
+                    fontWeight = FontWeight.Bold,
                 )
             }
-            HorizontalDivider(color = DebtLine.copy(alpha = 0.7f))
-            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                SupplierCompactValue("Total", payable.amount.currencyText(), Modifier.weight(1f))
-                SupplierCompactValue("Dibayar", payable.paidAmount.currencyText(), Modifier.weight(1f))
-                SupplierCompactValue(
-                    "Jatuh tempo",
-                    payable.dueDate.simpleDate(),
-                    Modifier.weight(1f),
-                    payable.dueDate.dueColor()
-                )
+
+            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(24.dp)) {
+                SupplierDebtAmountDetail("Total tagihan", payable.amount.currencyText(), Modifier.weight(1f))
+                SupplierDebtAmountDetail("Sudah dibayar", payable.paidAmount.currencyText(), Modifier.weight(1f))
             }
-            if (payable.status != SupplierDebtStatusFilter.Paid.apiValue) {
-                Button(
-                    onClick = { onPayClick(payable) },
-                    modifier = Modifier.fillMaxWidth().height(48.dp),
-                    colors = ButtonDefaults.buttonColors(containerColor = DebtPrimaryDark),
-                    shape = RoundedCornerShape(14.dp)
-                ) { Text("Bayar hutang", fontWeight = FontWeight.Bold) }
+
+            HorizontalDivider(color = DebtLine.copy(alpha = 0.75f))
+
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(16.dp),
+            ) {
+                Column(modifier = Modifier.weight(1f)) {
+                    Text("Jatuh tempo", style = MaterialTheme.typography.labelSmall, color = DebtMuted)
+                    Text(
+                        payable.dueDate.simpleDate(),
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = payable.dueDate.dueColor(),
+                        fontWeight = FontWeight.SemiBold,
+                    )
+                    Text(payable.dueDate.dueRelativeText(), style = MaterialTheme.typography.labelSmall, color = payable.dueDate.dueColor())
+                }
+                if (!payable.isPaid()) {
+                    FilledTonalButton(
+                        onClick = { onPayClick(payable) },
+                        modifier = Modifier.height(48.dp).testTag("pay-supplier-debt-${payable.id}"),
+                        colors = ButtonDefaults.filledTonalButtonColors(
+                            containerColor = DebtPrimary.copy(alpha = 0.14f),
+                            contentColor = DebtPrimaryDark,
+                        ),
+                        shape = RoundedCornerShape(24.dp),
+                        contentPadding = PaddingValues(horizontal = 18.dp),
+                    ) { Text("Bayar", fontWeight = FontWeight.SemiBold) }
+                }
             }
         }
     }
 }
 
 @Composable
-private fun SupplierCompactValue(
-    label: String,
-    value: String,
-    modifier: Modifier = Modifier,
-    valueColor: androidx.compose.ui.graphics.Color = DebtText
-) {
-    Column(modifier = modifier, verticalArrangement = Arrangement.spacedBy(3.dp)) {
-        Text(label, color = DebtMuted, fontSize = 10.sp, maxLines = 1)
+private fun SupplierDebtAmountDetail(label: String, value: String, modifier: Modifier) {
+    Column(modifier = modifier, verticalArrangement = Arrangement.spacedBy(4.dp)) {
+        Text(label, style = MaterialTheme.typography.labelSmall, color = DebtMuted)
         Text(
             value,
-            color = valueColor,
-            fontSize = 12.sp,
+            style = MaterialTheme.typography.bodyMedium,
+            color = DebtText,
             fontWeight = FontWeight.SemiBold,
             maxLines = 1,
-            overflow = TextOverflow.Ellipsis
+            overflow = TextOverflow.Ellipsis,
         )
     }
 }
 
 @Composable
-private fun SupplierDebtRow(
-    payable: SupplierPayable,
-    onPayClick: (SupplierPayable) -> Unit
-) {
+private fun SupplierDebtRow(payable: SupplierPayable, onPayClick: (SupplierPayable) -> Unit) {
     Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(horizontal = 24.dp, vertical = 18.dp),
-        verticalAlignment = Alignment.CenterVertically
+        modifier = Modifier.fillMaxWidth().testTag("supplier-debt-${payable.id}").padding(horizontal = 18.dp, vertical = 12.dp),
+        verticalAlignment = Alignment.CenterVertically,
     ) {
-        Row(modifier = Modifier.weight(2.2f), verticalAlignment = Alignment.CenterVertically) {
+        Row(modifier = Modifier.weight(2f), verticalAlignment = Alignment.CenterVertically) {
             SupplierInitial(payable.supplierName)
-            Spacer(modifier = Modifier.width(12.dp))
+            Spacer(Modifier.width(10.dp))
             Column {
-                Text(payable.supplierName, color = DebtText, fontSize = 14.sp, fontWeight = FontWeight.Bold)
-                Text(payable.createdAt.simpleDate(), color = DebtMuted, fontSize = 11.sp)
+                Text(
+                    payable.supplierName,
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = DebtText,
+                    fontWeight = FontWeight.SemiBold,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+                Text(payable.createdAt.simpleDate(), style = MaterialTheme.typography.labelSmall, color = DebtMuted)
             }
         }
-        Text(payable.purchaseId.shortId(), modifier = Modifier.weight(1.4f), color = DebtMuted, fontSize = 12.sp)
-        DebtAmountText(payable.amount, Modifier.weight(1.25f))
-        DebtAmountText(payable.paidAmount, Modifier.weight(1.25f))
-        DebtAmountText(payable.remainingAmount, Modifier.weight(1.25f), strong = true)
-        Column(modifier = Modifier.weight(1.35f)) {
-            Text(payable.dueDate, color = DebtText, fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
-            Text(payable.dueDate.dueRelativeText(), color = payable.dueDate.dueColor(), fontSize = 11.sp)
+        Text(
+            payable.purchaseId.shortId(),
+            Modifier.weight(1.35f),
+            style = MaterialTheme.typography.bodySmall,
+            color = DebtMuted,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+        )
+        Column(modifier = Modifier.weight(1.45f).padding(end = 8.dp), horizontalAlignment = Alignment.End) {
+            Text(payable.amount.currencyText(), style = MaterialTheme.typography.bodySmall, color = DebtText, fontWeight = FontWeight.SemiBold, maxLines = 1)
+            Text(payable.paidAmount.currencyText(), style = MaterialTheme.typography.labelSmall, color = DebtMuted, maxLines = 1)
         }
-        Box(modifier = Modifier.weight(1.2f), contentAlignment = Alignment.Center) {
-            StatusBadge(payable.status)
+        Text(
+            payable.remainingAmount.currencyText(),
+            Modifier.weight(1.25f).padding(horizontal = 8.dp),
+            style = MaterialTheme.typography.bodyMedium,
+            color = DebtText,
+            fontWeight = FontWeight.Bold,
+            textAlign = TextAlign.End,
+            maxLines = 1,
+        )
+        Column(modifier = Modifier.weight(1.5f).padding(start = 8.dp)) {
+            Text(payable.dueDate.simpleDate(), style = MaterialTheme.typography.bodySmall, color = DebtText, fontWeight = FontWeight.Medium)
+            Text(payable.dueDate.dueRelativeText(), style = MaterialTheme.typography.labelSmall, color = payable.dueDate.dueColor(), maxLines = 1)
         }
-        Box(modifier = Modifier.weight(1f), contentAlignment = Alignment.CenterEnd) {
-            if (payable.status == SupplierDebtStatusFilter.Paid.apiValue) {
-                Text("Lunas", color = DebtMuted, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+        Box(modifier = Modifier.weight(1.1f), contentAlignment = Alignment.Center) { StatusBadge(payable.status) }
+        Box(modifier = Modifier.weight(0.8f), contentAlignment = Alignment.CenterEnd) {
+            if (payable.isPaid()) {
+                Text("Lunas", style = MaterialTheme.typography.labelMedium, color = DebtMuted)
             } else {
                 Button(
                     onClick = { onPayClick(payable) },
+                    modifier = Modifier.height(48.dp).testTag("pay-supplier-debt-${payable.id}"),
+                    contentPadding = PaddingValues(horizontal = 14.dp),
                     colors = ButtonDefaults.buttonColors(containerColor = DebtPrimaryDark),
                     shape = RoundedCornerShape(12.dp),
-                    contentPadding = PaddingValues(horizontal = 14.dp, vertical = 8.dp)
-                ) {
-                    Text("Bayar", fontWeight = FontWeight.Bold)
-                }
+                ) { Text("Bayar", fontWeight = FontWeight.SemiBold) }
             }
         }
     }
@@ -227,13 +233,57 @@ private fun SupplierDebtRow(
 
 @Composable
 private fun SupplierInitial(name: String) {
-    Box(
-        modifier = Modifier
-            .size(42.dp)
-            .clip(CircleShape)
-            .background(DebtPrimary.copy(alpha = 0.12f)),
-        contentAlignment = Alignment.Center
-    ) {
-        Text(name.initial(), color = DebtPrimaryDark, fontWeight = FontWeight.Black)
+    Surface(color = DebtSoft, shape = CircleShape, modifier = Modifier.size(40.dp)) {
+        Box(contentAlignment = Alignment.Center) {
+            Text(name.initial(), color = DebtPrimaryDark, fontWeight = FontWeight.Bold)
+        }
     }
 }
+
+@Composable
+private fun SupplierDebtLoading(modifier: Modifier, compact: Boolean) {
+    Column(
+        modifier = modifier.fillMaxWidth().testTag("supplier-debt-skeleton"),
+        verticalArrangement = Arrangement.spacedBy(10.dp),
+    ) {
+        repeat(if (compact) 4 else 5) {
+            SkeletonBox(Modifier.fillMaxWidth().height(if (compact) 190.dp else 62.dp))
+        }
+    }
+}
+
+@Composable
+private fun SupplierDebtEmpty(modifier: Modifier) {
+    SupplierDebtFeedback(modifier, "Hutang supplier tidak ditemukan", "Coba ubah pencarian atau filter yang digunakan.", DebtText)
+}
+
+@Composable
+private fun SupplierDebtError(modifier: Modifier) {
+    SupplierDebtFeedback(modifier, "Hutang supplier gagal dimuat", "Tarik layar ke bawah untuk mencoba lagi.", DebtDanger)
+}
+
+@Composable
+private fun SupplierDebtFeedback(
+    modifier: Modifier,
+    title: String,
+    message: String,
+    titleColor: androidx.compose.ui.graphics.Color,
+) {
+    Surface(
+        modifier = modifier.fillMaxWidth(),
+        color = DebtSurface,
+        shape = RoundedCornerShape(18.dp),
+        border = BorderStroke(1.dp, DebtLine),
+    ) {
+        Column(
+            modifier = Modifier.fillMaxWidth().padding(horizontal = 24.dp, vertical = 46.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(6.dp),
+        ) {
+            Text(title, style = MaterialTheme.typography.titleSmall, color = titleColor, fontWeight = FontWeight.SemiBold)
+            Text(message, style = MaterialTheme.typography.bodySmall, color = DebtMuted, textAlign = TextAlign.Center)
+        }
+    }
+}
+
+private fun SupplierPayable.isPaid(): Boolean = status.equals(SupplierDebtStatusFilter.Paid.apiValue, ignoreCase = true)

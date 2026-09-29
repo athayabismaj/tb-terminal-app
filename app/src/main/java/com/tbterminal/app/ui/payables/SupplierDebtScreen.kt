@@ -18,27 +18,31 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.outlined.ReceiptLong
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.outlined.AccountBalanceWallet
 import androidx.compose.material.icons.outlined.Payments
 import androidx.compose.material.icons.outlined.Warning
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Icon
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import com.tbterminal.app.data.model.SupplierPayable
+import com.tbterminal.app.ui.components.TbMobileControlSheet
+import com.tbterminal.app.ui.components.TbMobileSheetDoneButton
 
 @Composable
 internal fun SupplierDebtScreen(
@@ -52,17 +56,20 @@ internal fun SupplierDebtScreen(
     onNextPage: () -> Unit,
     onDismissMessage: () -> Unit
 ) {
+    var showMobileOverview by remember { mutableStateOf(false) }
     BoxWithConstraints(modifier = modifier.fillMaxSize().background(DebtBackground)) {
         val compact = maxWidth < 720.dp
         Column(
             modifier = Modifier
                 .fillMaxSize()
                 .verticalScroll(rememberScrollState())
-                .padding(if (compact) 16.dp else 40.dp),
-            verticalArrangement = Arrangement.spacedBy(if (compact) 16.dp else 28.dp)
+                .padding(horizontal = if (compact) 16.dp else 28.dp, vertical = if (compact) 14.dp else 20.dp),
+            verticalArrangement = Arrangement.spacedBy(if (compact) 12.dp else 16.dp)
         ) {
             SupplierDebtMessage(uiState, onDismissMessage)
-            SupplierDebtMetrics(uiState, compact)
+            if (!compact && (uiState.payables.isNotEmpty() || (!uiState.isLoading && uiState.errorMessage == null))) {
+                SupplierDebtMetrics(uiState, compact = false)
+            }
             SupplierDebtTableCard(
                 modifier = Modifier.fillMaxWidth(),
                 uiState = uiState,
@@ -72,7 +79,24 @@ internal fun SupplierDebtScreen(
                 onPayClick = onPayClick,
                 onPreviousPage = onPreviousPage,
                 onNextPage = onNextPage,
-                compact = compact
+                compact = compact,
+                onOpenMobileOverview = { showMobileOverview = true },
+            )
+        }
+    }
+
+    if (showMobileOverview) {
+        TbMobileControlSheet(
+            title = "Ringkasan hutang",
+            subtitle = "Nilai berdasarkan data pada halaman ini",
+            onDismiss = { showMobileOverview = false },
+            testTag = "supplier-debt-overview-sheet",
+        ) {
+            SupplierDebtMetrics(uiState, compact = true)
+            TbMobileSheetDoneButton(
+                onClick = { showMobileOverview = false },
+                label = "Tutup",
+                testTag = "supplier-debt-overview-done",
             )
         }
     }
@@ -83,6 +107,7 @@ private fun SupplierDebtMessage(
     uiState: SupplierDebtUiState,
     onDismiss: () -> Unit
 ) {
+    if (uiState.errorMessage != null && uiState.payables.isEmpty()) return
     val message = uiState.errorMessage ?: uiState.message ?: return
     val isError = uiState.errorMessage != null
     val tint = if (isError) DebtDanger else DebtPrimaryDark
@@ -105,115 +130,69 @@ private fun SupplierDebtMessage(
 
 @Composable
 private fun SupplierDebtMetrics(uiState: SupplierDebtUiState, compact: Boolean) {
-    if (compact) {
-        Card(
-            modifier = Modifier.fillMaxWidth(),
-            colors = CardDefaults.cardColors(containerColor = DebtSurface),
-            shape = RoundedCornerShape(20.dp),
-            border = BorderStroke(1.dp, DebtLine)
-        ) {
-            Column(modifier = Modifier.padding(20.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
-                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                    Box(
-                        modifier = Modifier.size(46.dp).clip(RoundedCornerShape(14.dp))
-                            .background(DebtPrimary.copy(alpha = 0.12f)),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Icon(Icons.Outlined.AccountBalanceWallet, contentDescription = null, tint = DebtPrimaryDark)
-                    }
-                    Column {
-                        Text("Sisa hutang", color = DebtMuted, fontSize = 12.sp)
-                        Text(
-                            uiState.pageRemainingTotal.currencyText(),
-                            color = DebtText,
-                            fontSize = 22.sp,
-                            fontWeight = FontWeight.ExtraBold
-                        )
-                    }
-                }
-                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                    DebtSummaryValue("Total tagihan", uiState.total.toString(), Modifier.weight(1f))
-                    DebtSummaryValue("Belum lunas", uiState.unpaidCount.toString(), Modifier.weight(1f))
-                }
-            }
-        }
-        return
-    }
-    Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
-        DebtMetricCard(
-            modifier = Modifier.weight(1f),
-            title = "TOTAL DATA",
-            value = "${uiState.total}",
-            subtitle = "Tagihan pada filter aktif",
-            icon = Icons.AutoMirrored.Outlined.ReceiptLong,
-            tint = DebtPrimaryDark
-        )
-        DebtMetricCard(
-            modifier = Modifier.weight(1f),
-            title = "SISA HALAMAN INI",
-            value = uiState.pageRemainingTotal.currencyText(),
-            subtitle = "Akumulasi data yang tampil",
-            icon = Icons.Outlined.AccountBalanceWallet,
-            tint = DebtInfo
-        )
-        DebtMetricCard(
-            modifier = Modifier.weight(1f),
-            title = "BELUM LUNAS",
-            value = "${uiState.unpaidCount}",
-            subtitle = "Butuh tindak lanjut",
-            icon = Icons.Outlined.Payments,
-            tint = DebtWarning
-        )
-    }
-}
-
-@Composable
-private fun DebtSummaryValue(label: String, value: String, modifier: Modifier = Modifier) {
-    Column(
-        modifier = modifier.clip(RoundedCornerShape(14.dp)).background(DebtSoft).padding(12.dp),
-        verticalArrangement = Arrangement.spacedBy(2.dp)
-    ) {
-        Text(label, color = DebtMuted, fontSize = 11.sp)
-        Text(value, color = DebtText, fontSize = 17.sp, fontWeight = FontWeight.Bold)
-    }
-}
-
-@Composable
-private fun DebtMetricCard(
-    title: String,
-    value: String,
-    subtitle: String,
-    icon: ImageVector,
-    tint: Color,
-    modifier: Modifier = Modifier
-) {
-    Card(
-        modifier = modifier.height(132.dp),
-        colors = CardDefaults.cardColors(containerColor = DebtSurface),
-        shape = RoundedCornerShape(16.dp),
-        border = BorderStroke(1.dp, DebtLine)
+    Surface(
+        modifier = (if (compact) Modifier.fillMaxWidth() else Modifier.width(560.dp))
+            .height(96.dp)
+            .testTag("supplier-debt-overview"),
+        color = DebtSurface,
+        shape = RoundedCornerShape(20.dp),
+        border = BorderStroke(1.dp, DebtLine),
     ) {
         Row(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(20.dp),
-            verticalAlignment = Alignment.CenterVertically
+            modifier = Modifier.fillMaxSize().padding(horizontal = 16.dp, vertical = 14.dp),
+            verticalAlignment = Alignment.CenterVertically,
         ) {
-            Box(
-                modifier = Modifier
-                    .size(48.dp)
-                    .clip(RoundedCornerShape(14.dp))
-                    .background(tint.copy(alpha = 0.12f)),
-                contentAlignment = Alignment.Center
-            ) {
-                Icon(icon, contentDescription = null, tint = tint)
+            DebtMetricItem(
+                title = "Sisa di halaman",
+                value = uiState.pageRemainingTotal.currencyText(),
+                icon = Icons.Outlined.AccountBalanceWallet,
+                emphasized = true,
+                modifier = Modifier.weight(1.55f),
+            )
+            Box(Modifier.width(1.dp).height(48.dp).background(DebtLine))
+            DebtMetricItem(
+                title = "Belum lunas",
+                value = "${uiState.unpaidCount} tagihan",
+                icon = Icons.Outlined.Payments,
+                emphasized = false,
+                modifier = Modifier.weight(1f).padding(start = 14.dp),
+            )
+        }
+    }
+}
+
+@Composable
+private fun DebtMetricItem(
+    title: String,
+    value: String,
+    icon: ImageVector,
+    emphasized: Boolean,
+    modifier: Modifier,
+) {
+    Row(
+        modifier = modifier,
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(10.dp),
+    ) {
+        Surface(
+            color = if (emphasized) DebtPrimary.copy(alpha = 0.14f) else DebtSoft,
+            shape = RoundedCornerShape(12.dp),
+            modifier = Modifier.size(38.dp),
+        ) {
+            Box(contentAlignment = Alignment.Center) {
+                Icon(icon, contentDescription = null, tint = DebtPrimaryDark, modifier = Modifier.size(20.dp))
             }
-            Spacer(modifier = Modifier.width(16.dp))
-            Column {
-                Text(title, color = DebtMuted, fontSize = 10.sp, fontWeight = FontWeight.ExtraBold)
-                Text(value, color = DebtText, fontSize = 22.sp, fontWeight = FontWeight.ExtraBold, maxLines = 1)
-                Text(subtitle, color = tint, fontSize = 12.sp, fontWeight = FontWeight.SemiBold, maxLines = 1)
-            }
+        }
+        Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
+            Text(title, style = MaterialTheme.typography.labelMedium, color = DebtMuted, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            Text(
+                value,
+                style = MaterialTheme.typography.titleMedium,
+                color = if (emphasized) DebtPrimaryDark else DebtText,
+                fontWeight = FontWeight.Bold,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
         }
     }
 }
