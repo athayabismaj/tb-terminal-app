@@ -40,7 +40,7 @@ fun AdminStockReportScreen(
         userName = name,
         role = role,
         activeDestination = AdminDestination.StockReport,
-        pageTitle = "Stok",
+        pageTitle = "Kartu stok",
         onDashboardClick = onDashboardClick,
         onProductsClick = onProductsClick,
         onAddProductClick = onAddProductClick,
@@ -71,6 +71,8 @@ fun AdminStockReportScreen(
             onSearchChanged = viewModel::onSearchChanged,
             onCategoryFilterChanged = viewModel::onCategoryFilterChanged,
             onProductSelected = viewModel::selectProduct,
+            onMovementPeriodSelected = viewModel::selectMovementPeriod,
+            onMovementDateSelected = viewModel::selectMovementDate,
             onPreviousPage = viewModel::previousPage,
             onNextPage = viewModel::nextPage
             )

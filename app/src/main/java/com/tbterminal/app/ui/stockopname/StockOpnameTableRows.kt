@@ -15,13 +15,19 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.outlined.KeyboardArrowRight
 import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.Icon
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
@@ -52,7 +58,12 @@ internal fun StockTableRows(
                         useAlternateBackground = index % 2 != 0,
                         onClick = { onSelectProduct(product) }
                     )
-                    HorizontalDivider(color = OpnameLine.copy(alpha = 0.65f))
+                    if (index < uiState.tablePageProducts.lastIndex) {
+                        HorizontalDivider(
+                            modifier = if (compact) Modifier.padding(horizontal = 16.dp) else Modifier,
+                            color = OpnameLine.copy(alpha = 0.58f),
+                        )
+                    }
                 }
             }
         }
@@ -61,20 +72,98 @@ internal fun StockTableRows(
 
 @Composable
 private fun StockMobileRow(product: ProductStock, rowState: OpnameRowState, onClick: () -> Unit) {
-    Column(Modifier.fillMaxWidth().clickable(onClick = onClick).padding(horizontal = 16.dp, vertical = 14.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-        Row {
-            Column(Modifier.weight(1f)) {
-                Text(product.productName, color = OpnameText, fontWeight = FontWeight.Bold, maxLines = 2, overflow = TextOverflow.Ellipsis)
-                Text("${product.sku} · ${product.categoryName}", color = OpnameMuted, fontSize = 11.sp)
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(onClick = onClick)
+            .padding(horizontal = 16.dp, vertical = 16.dp)
+            .testTag("stock-adjustment-product-${product.productId}"),
+        verticalArrangement = Arrangement.spacedBy(10.dp),
+    ) {
+        Row(verticalAlignment = Alignment.Top, modifier = Modifier.fillMaxWidth()) {
+            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                Text(
+                    product.productName,
+                    color = OpnameText,
+                    fontSize = 16.sp,
+                    fontWeight = FontWeight.Bold,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis
+                )
+                Text(
+                    "${product.sku} · ${product.categoryName}",
+                    color = OpnameMuted,
+                    fontSize = 12.sp,
+                    fontWeight = FontWeight.Medium,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
             }
-            Text(rowState.statusLabel, color = rowState.statusColor, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+            Surface(
+                color = rowState.statusColor.copy(alpha = 0.11f),
+                shape = RoundedCornerShape(999.dp),
+            ) {
+                Row(
+                    modifier = Modifier.padding(start = 12.dp, end = 8.dp, top = 4.dp, bottom = 4.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(4.dp)
+                ) {
+                    Text(
+                        rowState.statusLabel,
+                        color = rowState.statusColor,
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.Medium,
+                        maxLines = 1,
+                    )
+                    Icon(
+                        Icons.AutoMirrored.Outlined.KeyboardArrowRight,
+                        contentDescription = "Sesuaikan stok ${product.productName}",
+                        tint = rowState.statusColor.copy(alpha = 0.6f),
+                        modifier = Modifier.size(14.dp),
+                    )
+                }
+            }
         }
-        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-            Text("Sistem ${product.quantity.qtyText()} ${product.unitName}", color = OpnameMuted, fontSize = 12.sp)
-            Text("Fisik ${rowState.physicalQty}", color = OpnameText, fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
-            Text("Selisih ${rowState.diffText}", color = rowState.statusColor, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+        Row(Modifier.fillMaxWidth().padding(top = 4.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            OpnameMetric("Sistem", "${product.quantity.qtyText()} ${product.unitName}", Modifier.weight(1f))
+            OpnameMetric(
+                "Fisik",
+                rowState.physicalQty.takeUnless { it == "-" }?.let { "$it ${product.unitName}" } ?: "-",
+                Modifier.weight(1f),
+            )
+            OpnameMetric(
+                "Selisih",
+                rowState.diffText,
+                Modifier.weight(1f),
+                rowState.statusColor,
+                Alignment.End
+            )
         }
-        if (rowState.reason != "-") Text(rowState.reason, color = OpnameMuted, fontSize = 11.sp)
+        if (rowState.reason != "-") {
+            Text(
+                "Alasan: ${rowState.reason}",
+                color = OpnameMuted,
+                fontSize = 12.sp,
+                fontWeight = FontWeight.Normal,
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.padding(top = 2.dp)
+            )
+        }
+    }
+}
+
+@Composable
+private fun OpnameMetric(
+    label: String,
+    value: String,
+    modifier: Modifier,
+    valueColor: Color = OpnameText,
+    alignment: Alignment.Horizontal = Alignment.Start,
+) {
+    Column(modifier = modifier, horizontalAlignment = alignment, verticalArrangement = Arrangement.spacedBy(2.dp)) {
+        Text(label, color = OpnameMuted, fontSize = 11.sp, fontWeight = FontWeight.Medium)
+        Text(value, color = valueColor, fontSize = 13.sp, fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis)
     }
 }
 
@@ -111,15 +200,32 @@ private fun StockTableRow(
             fontWeight = FontWeight.Bold,
             textAlign = TextAlign.End
         )
-        Text(
-            rowState.statusLabel,
-            modifier = Modifier.weight(1.35f).padding(horizontal = 10.dp),
-            color = rowState.statusColor,
-            fontSize = 11.sp,
-            fontWeight = FontWeight.Bold,
-            maxLines = 1,
-            textAlign = TextAlign.Center
-        )
+        Box(modifier = Modifier.weight(1.35f).padding(horizontal = 10.dp), contentAlignment = Alignment.Center) {
+            Surface(
+                color = rowState.statusColor.copy(alpha = 0.11f),
+                shape = RoundedCornerShape(999.dp),
+            ) {
+                Row(
+                    modifier = Modifier.padding(start = 12.dp, end = 8.dp, top = 4.dp, bottom = 4.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(4.dp)
+                ) {
+                    Text(
+                        rowState.statusLabel,
+                        color = rowState.statusColor,
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.Medium,
+                        maxLines = 1,
+                    )
+                    Icon(
+                        Icons.AutoMirrored.Outlined.KeyboardArrowRight,
+                        contentDescription = "Sesuaikan stok ${product.productName}",
+                        tint = rowState.statusColor.copy(alpha = 0.6f),
+                        modifier = Modifier.size(14.dp),
+                    )
+                }
+            }
+        }
         Text(
             rowState.reason,
             modifier = Modifier.weight(1.15f).padding(start = 10.dp),

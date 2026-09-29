@@ -15,9 +15,6 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.outlined.Inventory2
-import androidx.compose.material3.Icon
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -25,6 +22,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextOverflow
@@ -33,36 +31,17 @@ import androidx.compose.ui.unit.sp
 import com.tbterminal.app.data.model.ProductStock
 
 @Composable
-internal fun FormTitle() {
-    Row(verticalAlignment = Alignment.CenterVertically) {
-        Box(
-            modifier = Modifier
-                .size(42.dp)
-                .clip(RoundedCornerShape(12.dp))
-                .background(OpnamePrimary.copy(alpha = 0.12f)),
-            contentAlignment = Alignment.Center
-        ) {
-            Icon(Icons.Outlined.Inventory2, contentDescription = null, tint = OpnamePrimaryDark)
-        }
-        Spacer(modifier = Modifier.width(12.dp))
-        Column {
-            Text("Form Penyesuaian", color = OpnameText, fontSize = 18.sp, fontWeight = FontWeight.Bold)
-            Text("Input stok fisik untuk produk terpilih.", color = OpnameMuted, fontSize = 12.sp)
-        }
-    }
-}
-
-@Composable
 internal fun SelectedProductSummary(product: ProductStock?) {
     val title = product?.productName ?: "Belum ada produk dipilih"
-    val subtitle = product?.let { "${it.sku} - ${it.categoryName}" } ?: "Pilih produk dari tabel di sebelah kiri."
+    val subtitle = product?.let { "${it.sku} · ${it.categoryName}" } ?: "Pilih produk untuk mulai menyesuaikan stok."
 
     Column(
         modifier = Modifier
             .fillMaxWidth()
             .clip(RoundedCornerShape(14.dp))
-            .background(OpnameSoft)
-            .padding(16.dp)
+            .background(OpnameSoft.copy(alpha = 0.72f))
+            .border(1.dp, OpnameLine.copy(alpha = 0.55f), RoundedCornerShape(14.dp))
+            .padding(14.dp)
     ) {
         Text(title, color = OpnameText, fontSize = 16.sp, fontWeight = FontWeight.Bold, maxLines = 2, overflow = TextOverflow.Ellipsis)
         Text(subtitle, color = OpnameMuted, fontSize = 12.sp, modifier = Modifier.padding(top = 4.dp))
@@ -72,8 +51,8 @@ internal fun SelectedProductSummary(product: ProductStock?) {
 @Composable
 internal fun StockDifferenceSummary(uiState: StockOpnameUiState) {
     Row(horizontalArrangement = Arrangement.spacedBy(12.dp), modifier = Modifier.fillMaxWidth()) {
-        StockInfoTile(Modifier.weight(1f), "STOK SISTEM", uiState.selectedProduct?.quantity?.qtyText() ?: "-", uiState.selectedProduct?.unitName.orEmpty(), OpnameText)
-        StockInfoTile(Modifier.weight(1f), "SELISIH", uiState.difference?.signedQtyText() ?: "-", uiState.selectedProduct?.unitName.orEmpty(), uiState.difference.differenceColor())
+        StockInfoTile(Modifier.weight(1f), "Stok sistem", uiState.selectedProduct?.quantity?.qtyText() ?: "-", uiState.selectedProduct?.unitName.orEmpty(), OpnameText)
+        StockInfoTile(Modifier.weight(1f), "Selisih", uiState.difference?.signedQtyText() ?: "-", uiState.selectedProduct?.unitName.orEmpty(), uiState.difference.differenceColor())
     }
 }
 
@@ -88,8 +67,9 @@ private fun StockInfoTile(
     Column(
         modifier = modifier
             .clip(RoundedCornerShape(14.dp))
-            .background(OpnameSoft)
-            .padding(16.dp)
+            .background(OpnameSoft.copy(alpha = 0.72f))
+            .border(1.dp, OpnameLine.copy(alpha = 0.55f), RoundedCornerShape(14.dp))
+            .padding(14.dp)
     ) {
         Text(label, color = OpnameMuted, fontSize = 10.sp, fontWeight = FontWeight.Bold)
         Row(verticalAlignment = Alignment.Bottom) {
@@ -104,22 +84,18 @@ private fun StockInfoTile(
 @Composable
 internal fun AdjustmentTypeCards(
     selectedType: StockAdjustmentType,
-    onSelect: (StockAdjustmentType) -> Unit
+    onSelect: (StockAdjustmentType) -> Unit,
 ) {
-    Column {
-        Text("JENIS PENYESUAIAN", color = OpnameMuted, fontSize = 11.sp, fontWeight = FontWeight.Bold)
-        Spacer(modifier = Modifier.height(8.dp))
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(10.dp)
-        ) {
-            StockAdjustmentType.entries.forEach { type ->
-                AdjustmentTypeCard(
-                    modifier = Modifier.weight(1f),
-                    type = type,
-                    isSelected = selectedType == type,
-                    onClick = { onSelect(type) }
-                )
+    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        Text("Jenis penyesuaian", color = OpnameMuted, fontSize = 12.sp, fontWeight = FontWeight.Medium)
+        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            StockAdjustmentType.entries.chunked(2).forEach { rowTypes ->
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    rowTypes.forEach { type ->
+                        AdjustmentTypeCard(Modifier.weight(1f), type, selectedType == type) { onSelect(type) }
+                    }
+                    if (rowTypes.size == 1) Spacer(Modifier.weight(1f))
+                }
             }
         }
     }
@@ -138,28 +114,23 @@ private fun AdjustmentTypeCard(
 
     Column(
         modifier = modifier
-            .height(108.dp)
+            .height(88.dp)
             .clip(RoundedCornerShape(14.dp))
             .background(background)
-            .border(2.dp, borderColor, RoundedCornerShape(14.dp))
+            .border(1.dp, borderColor, RoundedCornerShape(14.dp))
             .clickable(onClick = onClick)
-            .padding(14.dp),
-        verticalArrangement = Arrangement.SpaceBetween
+            .testTag("stock-adjustment-type-${type.apiValue}")
+            .padding(12.dp),
+        verticalArrangement = Arrangement.spacedBy(5.dp),
     ) {
-        Text(type.label, color = titleColor, fontSize = 14.sp, fontWeight = FontWeight.Bold)
+        Text(type.label, color = titleColor, fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
         Text(
             type.description,
             color = OpnameMuted,
-            fontSize = 11.sp,
-            lineHeight = 15.sp,
+            fontSize = 10.sp,
+            lineHeight = 13.sp,
             maxLines = 2,
             overflow = TextOverflow.Ellipsis
-        )
-        Text(
-            if (isSelected) "Dipilih" else "Pilih",
-            color = if (isSelected) OpnamePrimaryDark else OpnameMuted,
-            fontSize = 10.sp,
-            fontWeight = FontWeight.Bold
         )
     }
 }
@@ -167,7 +138,7 @@ private fun AdjustmentTypeCard(
 @Composable
 internal fun QuantityInput(value: String, onValueChanged: (String) -> Unit) {
     LabeledInput(
-        label = "PHYSICAL STOCK",
+        label = "Stok fisik",
         value = value,
         onValueChanged = onValueChanged,
         placeholder = "Masukkan hasil hitung fisik",
@@ -178,7 +149,7 @@ internal fun QuantityInput(value: String, onValueChanged: (String) -> Unit) {
 @Composable
 internal fun OpeningDateInput(value: String, onValueChanged: (String) -> Unit) {
     LabeledInput(
-        label = "TANGGAL SALDO AWAL",
+        label = "Tanggal saldo awal",
         value = value,
         onValueChanged = onValueChanged,
         placeholder = "YYYY-MM-DD"
@@ -188,7 +159,7 @@ internal fun OpeningDateInput(value: String, onValueChanged: (String) -> Unit) {
 @Composable
 internal fun NotesInput(value: String, onValueChanged: (String) -> Unit) {
     LabeledInput(
-        label = "ALASAN / CATATAN",
+        label = "Alasan / catatan",
         value = value,
         onValueChanged = onValueChanged,
         placeholder = "Contoh: stok fisik gudang belakang sudah dihitung ulang",
@@ -206,8 +177,8 @@ private fun LabeledInput(
     minLines: Int = 1
 ) {
     Column {
-        Text(label, color = OpnameMuted, fontSize = 11.sp, fontWeight = FontWeight.Bold)
-        Spacer(modifier = Modifier.height(8.dp))
+        Text(label, color = OpnameMuted, fontSize = 12.sp, fontWeight = FontWeight.Medium)
+        Spacer(modifier = Modifier.height(6.dp))
         OutlinedTextField(
             value = value,
             onValueChange = onValueChanged,
@@ -217,7 +188,7 @@ private fun LabeledInput(
             maxLines = if (minLines > 1) 4 else 1,
             keyboardOptions = KeyboardOptions(keyboardType = keyboardType),
             modifier = Modifier.fillMaxWidth(),
-            shape = RoundedCornerShape(12.dp),
+            shape = RoundedCornerShape(14.dp),
             colors = OpnameTextFieldColors()
         )
     }

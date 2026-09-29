@@ -15,6 +15,8 @@ data class StockReportUiState(
     val isLoading: Boolean = true,
     val errorMessage: String? = null,
     val selectedProductId: String? = null,
+    val movementPeriod: StockMovementPeriod = StockMovementPeriod.DAY,
+    val customMovementDate: String? = null,
     val stockMovements: List<StockMovement> = emptyList(),
     val isCardLoading: Boolean = false,
     val cardErrorMessage: String? = null,

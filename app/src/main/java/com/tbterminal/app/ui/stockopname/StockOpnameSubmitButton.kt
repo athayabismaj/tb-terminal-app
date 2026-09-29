@@ -17,26 +17,32 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 
 @Composable
-internal fun SubmitButton(uiState: StockOpnameUiState, onSubmit: () -> Unit) {
+internal fun SubmitButton(
+    uiState: StockOpnameUiState,
+    onSubmit: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
     val isReady = uiState.selectedProduct != null && uiState.actualQty != null && !uiState.isSubmitting
     val label = when {
-        uiState.selectedProduct == null -> "Pilih produk terlebih dahulu"
-        uiState.actualQty == null -> "Isi stok fisik dulu"
-        else -> "Simpan Stok Opname"
+        uiState.selectedProduct == null -> "Pilih produk"
+        uiState.actualQty == null -> "Isi stok fisik"
+        else -> "Simpan penyesuaian"
     }
 
     Button(
         onClick = onSubmit,
         enabled = isReady,
-        modifier = Modifier
+        modifier = modifier
             .fillMaxWidth()
-            .height(54.dp),
-        shape = RoundedCornerShape(12.dp),
-        colors = ButtonDefaults.buttonColors(containerColor = OpnamePrimary),
+            .height(52.dp)
+            .testTag("stock-adjustment-submit"),
+        shape = RoundedCornerShape(14.dp),
+        colors = ButtonDefaults.buttonColors(containerColor = OpnamePrimaryDark),
         contentPadding = PaddingValues(horizontal = 18.dp)
     ) {
         if (uiState.isSubmitting) {
@@ -44,7 +50,7 @@ internal fun SubmitButton(uiState: StockOpnameUiState, onSubmit: () -> Unit) {
         } else {
             Icon(Icons.Outlined.Save, contentDescription = null, modifier = Modifier.size(20.dp))
             Spacer(modifier = Modifier.width(8.dp))
-            Text(label, fontWeight = FontWeight.Bold)
+            Text(label, fontWeight = FontWeight.SemiBold)
         }
     }
 }

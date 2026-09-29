@@ -18,6 +18,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -32,8 +33,8 @@ internal fun ProductSelectionDropdown(
     onSelectProduct: (ProductStock) -> Unit
 ) {
     Column {
-        Text("PRODUK", color = OpnameMuted, fontSize = 11.sp, fontWeight = FontWeight.Bold)
-        Spacer(modifier = Modifier.height(8.dp))
+        Text("Pilih produk", color = OpnameMuted, fontSize = 12.sp, fontWeight = FontWeight.Medium)
+        Spacer(modifier = Modifier.height(6.dp))
         var expanded by remember { mutableStateOf(false) }
         ExposedDropdownMenuBox(expanded = expanded, onExpandedChange = { expanded = !expanded }) {
             OutlinedTextField(
@@ -43,8 +44,9 @@ internal fun ProductSelectionDropdown(
                 trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = expanded) },
                 modifier = Modifier
                     .menuAnchor(MenuAnchorType.PrimaryNotEditable, enabled = true)
-                    .fillMaxWidth(),
-                shape = RoundedCornerShape(12.dp),
+                    .fillMaxWidth()
+                    .testTag("stock-adjustment-product-select"),
+                shape = RoundedCornerShape(14.dp),
                 colors = OpnameTextFieldColors()
             )
             ExposedDropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
