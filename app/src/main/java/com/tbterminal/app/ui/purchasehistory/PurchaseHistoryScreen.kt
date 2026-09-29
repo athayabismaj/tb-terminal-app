@@ -1,11 +1,6 @@
 package com.tbterminal.app.ui.purchasehistory
 
 import androidx.compose.foundation.BorderStroke
-import androidx.compose.foundation.border
-import androidx.compose.foundation.clickable
-
-import androidx.compose.material.icons.outlined.SignalCellularAlt
-
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -150,42 +145,12 @@ private fun PurchaseTable(
     onPreviousPage: () -> Unit,
     onNextPage: () -> Unit
 ) {
-    var showSummaryPopup by remember { mutableStateOf(false) }
-
     Column(Modifier.fillMaxWidth()) {
-        if (compact) {
-            // Header for List
-            Row(
-                modifier = Modifier.fillMaxWidth().padding(horizontal = 4.dp, vertical = 8.dp),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Text("Pembelian", fontSize = 17.sp, fontWeight = FontWeight.Bold, color = Color(0xFF0F172A))
-                }
-                Box(
-                    modifier = Modifier
-                        .size(32.dp)
-                        .clip(RoundedCornerShape(8.dp))
-                        .border(1.dp, Color(0xFFE2E8F0), RoundedCornerShape(8.dp))
-                        .clickable { showSummaryPopup = true }
-                        .background(Color.White),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Icon(Icons.Outlined.SignalCellularAlt, contentDescription = "Ringkasan", tint = Color(0xFF64748B), modifier = Modifier.size(18.dp))
-                }
-            }
-            androidx.compose.material3.Surface(
-                modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(24.dp),
-                color = Color.White,
-                border = BorderStroke(1.dp, Color(0xFFDFE5E1)),
-                shadowElevation = 2.dp
-            ) {
-                when {
-                    uiState.isLoading && uiState.purchases.isEmpty() -> LoadingBox()
-                    uiState.errorMessage != null -> PurchaseError(uiState.errorMessage, onRefresh)
-                    uiState.visiblePurchases.isEmpty() -> androidx.compose.material3.Surface(
+        if (!compact) PurchaseTableHeader()
+        when {
+            uiState.isLoading && uiState.purchases.isEmpty() -> LoadingBox()
+            uiState.errorMessage != null -> PurchaseError(uiState.errorMessage, onRefresh)
+            uiState.visiblePurchases.isEmpty() -> androidx.compose.material3.Surface(
                     modifier = Modifier.fillMaxWidth(),
                     shape = RoundedCornerShape(24.dp),
                     color = Color.White,
@@ -194,79 +159,8 @@ private fun PurchaseTable(
                 ) {
                     EmptyBox(uiState.searchQuery)
                 }
-                    else -> {
-                        Column {
-                            uiState.visiblePurchases.forEachIndexed { index, purchase ->
-                                PurchaseMobileRow(purchase, onShowDetail)
-                                if (index < uiState.visiblePurchases.lastIndex) {
-                                    HorizontalDivider(color = Color(0xFFEEF2F0), modifier = Modifier.padding(horizontal = 16.dp))
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-            
-            if (showSummaryPopup) {
-                com.tbterminal.app.ui.components.TbMobileControlSheet(
-                    title = "Ringkasan Pembelian",
-                    subtitle = "Informasi total nota dan nilai pembelian",
-                    onDismiss = { showSummaryPopup = false }
-                ) {
-                    Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
-                        PurchaseSummarySheetMetric(
-                            title = "TOTAL NOTA",
-                            value = uiState.totalPurchases.toString(),
-                            note = "Sesuai filter aktif",
-                            icon = Icons.AutoMirrored.Outlined.ReceiptLong,
-                            iconColor = PurchasePrimary,
-                            iconBgColor = Color(0xFFE1EFEA)
-                        )
-                        PurchaseSummarySheetMetric(
-                            title = "NILAI HALAMAN INI",
-                            value = uiState.pageTotal.asCurrency(),
-                            note = "Maksimal ${uiState.pageSize} nota",
-                            icon = Icons.Outlined.MonetizationOn,
-                            iconColor = PurchasePrimary,
-                            iconBgColor = Color(0xFFE1EFEA),
-                            isHighlighted = true
-                        )
-                        PurchaseSummarySheetMetric(
-                            title = "SUPPLIER AKTIF",
-                            value = uiState.suppliers.size.toString(),
-                            note = "Tersedia pada filter",
-                            icon = Icons.Outlined.Business,
-                            iconColor = Color(0xFFD97706),
-                            iconBgColor = Color(0xFFFEF3C7)
-                        )
-                    }
-                    Spacer(Modifier.height(20.dp))
-                    com.tbterminal.app.ui.components.TbMobileSheetDoneButton(
-                        onClick = { showSummaryPopup = false }
-                    )
-                }
-            }
-        } else {
-            PurchaseTableHeader()
-            when {
-                uiState.isLoading && uiState.purchases.isEmpty() -> LoadingBox()
-                uiState.errorMessage != null -> PurchaseError(uiState.errorMessage, onRefresh)
-                uiState.visiblePurchases.isEmpty() -> androidx.compose.material3.Surface(
-                    modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(24.dp),
-                    color = Color.White,
-                    border = BorderStroke(1.dp, Color(0xFFDFE5E1)),
-                    shadowElevation = 2.dp
-                ) {
-                    EmptyBox(uiState.searchQuery)
-                }
-                else -> {
-                    Column {
-                        uiState.visiblePurchases.forEachIndexed { index, purchase ->
-                            PurchaseRow(purchase, index, onShowDetail)
-                        }
-                    }
-                }
+            else -> uiState.visiblePurchases.forEachIndexed { index, purchase ->
+                if (compact) PurchaseMobileRow(purchase, onShowDetail) else PurchaseRow(purchase, index, onShowDetail)
             }
         }
         PurchasePagination(uiState, compact, onPreviousPage, onNextPage)
@@ -528,79 +422,4 @@ private fun String.asDisplayDate(): String {
     return runCatching {
         OffsetDateTime.parse(this).format(DateTimeFormatter.ofPattern("dd MMM yyyy HH:mm", Locale.forLanguageTag("id-ID")))
     }.getOrDefault(this)
-}
-
-@Composable
-private fun PurchaseSummarySheetMetric(
-    title: String,
-    value: String,
-    note: String,
-    icon: androidx.compose.ui.graphics.vector.ImageVector,
-    iconColor: androidx.compose.ui.graphics.Color,
-    iconBgColor: androidx.compose.ui.graphics.Color,
-    isHighlighted: Boolean = false
-) {
-    val bgColor = if (isHighlighted) androidx.compose.ui.graphics.Color(0xFFF2F8F5) else androidx.compose.ui.graphics.Color.White
-    val borderColor = if (isHighlighted) androidx.compose.ui.graphics.Color(0xFFC3DFD5) else androidx.compose.ui.graphics.Color(0xFFE2E8F0)
-    val titleColor = if (isHighlighted) androidx.compose.ui.graphics.Color(0xFF1E5847) else androidx.compose.ui.graphics.Color(0xFF94A3B8)
-    val valueColor = if (isHighlighted) androidx.compose.ui.graphics.Color(0xFF256B57) else androidx.compose.ui.graphics.Color(0xFF0F172A)
-
-    androidx.compose.material3.Surface(
-        modifier = Modifier.fillMaxWidth(),
-        color = bgColor,
-        border = androidx.compose.foundation.BorderStroke(1.dp, borderColor),
-        shape = androidx.compose.foundation.shape.RoundedCornerShape(16.dp),
-        shadowElevation = if (isHighlighted) 2.dp else 1.dp
-    ) {
-        androidx.compose.foundation.layout.Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(16.dp),
-            verticalAlignment = androidx.compose.ui.Alignment.CenterVertically,
-            horizontalArrangement = androidx.compose.foundation.layout.Arrangement.SpaceBetween
-        ) {
-            androidx.compose.foundation.layout.Row(
-                verticalAlignment = androidx.compose.ui.Alignment.CenterVertically,
-                horizontalArrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(16.dp)
-            ) {
-                androidx.compose.foundation.layout.Box(
-                    modifier = Modifier
-                        .size(48.dp)
-                        .clip(androidx.compose.foundation.shape.RoundedCornerShape(12.dp))
-                        .background(iconBgColor),
-                    contentAlignment = androidx.compose.ui.Alignment.Center
-                ) {
-                    androidx.compose.material3.Icon(
-                        icon,
-                        contentDescription = null,
-                        tint = iconColor,
-                        modifier = Modifier.size(24.dp)
-                    )
-                }
-                androidx.compose.foundation.layout.Column {
-                    androidx.compose.material3.Text(
-                        title,
-                        color = titleColor,
-                        fontSize = 11.sp,
-                        fontWeight = androidx.compose.ui.text.font.FontWeight.Bold,
-                        letterSpacing = 0.5.sp
-                    )
-                    androidx.compose.material3.Text(
-                        value,
-                        color = valueColor,
-                        fontSize = 18.sp,
-                        fontWeight = androidx.compose.ui.text.font.FontWeight.ExtraBold,
-                        modifier = Modifier.padding(top = 2.dp)
-                    )
-                }
-            }
-            androidx.compose.material3.Text(
-                note,
-                color = androidx.compose.ui.graphics.Color(0xFF64748B),
-                fontSize = 12.sp,
-                fontWeight = androidx.compose.ui.text.font.FontWeight.Medium,
-                textAlign = androidx.compose.ui.text.style.TextAlign.Right
-            )
-        }
-    }
 }
