@@ -36,6 +36,8 @@ import androidx.compose.material.icons.outlined.ExpandMore
 import androidx.compose.material.icons.outlined.Inventory2
 import androidx.compose.material.icons.outlined.MonetizationOn
 import androidx.compose.material.icons.outlined.Search
+import androidx.compose.material.icons.outlined.Paid
+import androidx.compose.material.icons.outlined.Store
 import androidx.compose.material.icons.outlined.Tune
 import androidx.compose.material.icons.outlined.ReceiptLong
 import androidx.compose.ui.draw.drawBehind
@@ -215,42 +217,93 @@ private fun PurchaseTable(
             }
             
             if (showSummaryPopup) {
-                com.tbterminal.app.ui.components.TbMobileControlSheet(
-                    title = "Ringkasan Pembelian",
-                    subtitle = "Informasi total nota dan nilai pembelian",
-                    onDismiss = { showSummaryPopup = false }
+                @OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class)
+                androidx.compose.material3.ModalBottomSheet(
+                    onDismissRequest = { showSummaryPopup = false },
+                    containerColor = Color.White,
+                    dragHandle = {
+                        Column(
+                            modifier = Modifier.fillMaxWidth().padding(top = 12.dp, bottom = 4.dp),
+                            horizontalAlignment = Alignment.CenterHorizontally
+                        ) {
+                            Box(modifier = Modifier.width(48.dp).height(6.dp).background(Color(0xFFCBD5E1), RoundedCornerShape(50)))
+                        }
+                    },
+                    shape = RoundedCornerShape(topStart = 32.dp, topEnd = 32.dp)
                 ) {
-                    Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
-                        PurchaseSummarySheetMetric(
-                            title = "TOTAL NOTA",
-                            value = uiState.totalPurchases.toString(),
-                            note = "Sesuai filter aktif",
-                            icon = Icons.Outlined.ReceiptLong,
-                            iconColor = PurchasePrimary,
-                            iconBgColor = Color(0xFFE1EFEA)
-                        )
-                        PurchaseSummarySheetMetric(
-                            title = "NILAI HALAMAN INI",
-                            value = uiState.pageTotal.asCurrency(),
-                            note = "Maksimal ${uiState.pageSize} nota",
-                            icon = Icons.Outlined.MonetizationOn,
-                            iconColor = PurchasePrimary,
-                            iconBgColor = Color(0xFFE1EFEA),
-                            isHighlighted = true
-                        )
-                        PurchaseSummarySheetMetric(
-                            title = "SUPPLIER AKTIF",
-                            value = uiState.suppliers.size.toString(),
-                            note = "Tersedia pada filter",
-                            icon = Icons.Outlined.Business,
-                            iconColor = Color(0xFFD97706),
-                            iconBgColor = Color(0xFFFEF3C7)
-                        )
+                    Column(
+                        modifier = Modifier.fillMaxWidth().padding(bottom = 24.dp)
+                    ) {
+                        // Header
+                        Row(
+                            modifier = Modifier.fillMaxWidth().padding(horizontal = 24.dp).padding(bottom = 16.dp),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.Top
+                        ) {
+                            Column {
+                                Text("Ringkasan Pembelian", fontSize = 20.sp, fontWeight = FontWeight.Bold, color = Color(0xFF0F172A), letterSpacing = (-0.5).sp)
+                                Text("Informasi total nota dan nilai pembelian", color = Color(0xFF64748B), fontSize = 12.sp, modifier = Modifier.padding(top = 2.dp))
+                            }
+                            Box(
+                                modifier = Modifier.size(32.dp).clickable { showSummaryPopup = false },
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Icon(Icons.Default.Close, contentDescription = "Tutup", tint = Color(0xFF94A3B8), modifier = Modifier.size(20.dp))
+                            }
+                        }
+
+                        // Content
+                        Column(
+                            modifier = Modifier.fillMaxWidth().weight(1f, fill = false).verticalScroll(rememberScrollState()).padding(horizontal = 20.dp, vertical = 8.dp),
+                            verticalArrangement = Arrangement.spacedBy(14.dp)
+                        ) {
+                            // Total Nota
+                            PurchaseSummarySheetMetric(
+                                title = "TOTAL NOTA",
+                                value = uiState.totalPurchases.toString(),
+                                note = "Sesuai filter aktif",
+                                icon = Icons.Outlined.ReceiptLong,
+                                iconColor = Color(0xFF256B57),
+                                iconBgColor = Color(0xFFEBF3F0),
+                                isHighlighted = false
+                            )
+                            
+                            // Nilai Halaman Ini
+                            PurchaseSummarySheetMetric(
+                                title = "NILAI HALAMAN INI",
+                                value = uiState.pageTotal.asCurrency(),
+                                note = "Maksimal ${uiState.pageSize} nota",
+                                icon = Icons.Outlined.Paid,
+                                iconColor = Color(0xFF256B57),
+                                iconBgColor = Color(0xFFEBF3F0),
+                                isHighlighted = true
+                            )
+                            
+                            // Supplier Aktif
+                            PurchaseSummarySheetMetric(
+                                title = "SUPPLIER AKTIF",
+                                value = uiState.suppliers.size.toString(),
+                                note = "Tersedia pada filter",
+                                icon = Icons.Outlined.Store,
+                                iconColor = Color(0xFFD97706),
+                                iconBgColor = Color(0xFFFFFBEB),
+                                isHighlighted = false
+                            )
+                        }
+
+                        // Footer
+                        HorizontalDivider(color = Color(0xFFF1F5F9))
+                        Box(modifier = Modifier.fillMaxWidth().padding(20.dp).padding(top = 4.dp)) {
+                            Button(
+                                onClick = { showSummaryPopup = false },
+                                modifier = Modifier.fillMaxWidth().height(52.dp),
+                                shape = RoundedCornerShape(16.dp),
+                                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF256B57))
+                            ) {
+                                Text("Selesai", fontSize = 15.sp, fontWeight = FontWeight.SemiBold)
+                            }
+                        }
                     }
-                    Spacer(Modifier.height(20.dp))
-                    com.tbterminal.app.ui.components.TbMobileSheetDoneButton(
-                        onClick = { showSummaryPopup = false }
-                    )
                 }
             }
         } else {
@@ -852,9 +905,9 @@ private fun PurchaseSummarySheetMetric(
     iconBgColor: androidx.compose.ui.graphics.Color,
     isHighlighted: Boolean = false
 ) {
-    val bgColor = if (isHighlighted) androidx.compose.ui.graphics.Color(0xFFF2F8F5) else androidx.compose.ui.graphics.Color.White
-    val borderColor = if (isHighlighted) androidx.compose.ui.graphics.Color(0xFFC3DFD5) else androidx.compose.ui.graphics.Color(0xFFE2E8F0)
-    val titleColor = if (isHighlighted) androidx.compose.ui.graphics.Color(0xFF1E5847) else androidx.compose.ui.graphics.Color(0xFF94A3B8)
+    val bgColor = if (isHighlighted) androidx.compose.ui.graphics.Color.White else androidx.compose.ui.graphics.Color.White
+    val borderColor = if (isHighlighted) androidx.compose.ui.graphics.Color(0xFFD2E3DC) else androidx.compose.ui.graphics.Color(0xFFE2E8F0).copy(alpha = 0.9f)
+    val titleColor = if (isHighlighted) androidx.compose.ui.graphics.Color(0xFF1E5646) else androidx.compose.ui.graphics.Color(0xFF94A3B8)
     val valueColor = if (isHighlighted) androidx.compose.ui.graphics.Color(0xFF256B57) else androidx.compose.ui.graphics.Color(0xFF0F172A)
 
     androidx.compose.material3.Surface(
@@ -862,57 +915,49 @@ private fun PurchaseSummarySheetMetric(
         color = bgColor,
         border = androidx.compose.foundation.BorderStroke(1.dp, borderColor),
         shape = androidx.compose.foundation.shape.RoundedCornerShape(16.dp),
-        shadowElevation = if (isHighlighted) 2.dp else 1.dp
+        shadowElevation = if (isHighlighted) 4.dp else 1.dp
     ) {
-        androidx.compose.foundation.layout.Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(16.dp),
-            verticalAlignment = androidx.compose.ui.Alignment.CenterVertically,
-            horizontalArrangement = androidx.compose.foundation.layout.Arrangement.SpaceBetween
+        Row(
+            modifier = Modifier.fillMaxWidth().padding(16.dp),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.Top
         ) {
-            androidx.compose.foundation.layout.Row(
-                verticalAlignment = androidx.compose.ui.Alignment.CenterVertically,
-                horizontalArrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(16.dp)
-            ) {
-                androidx.compose.foundation.layout.Box(
-                    modifier = Modifier
-                        .size(48.dp)
-                        .clip(androidx.compose.foundation.shape.RoundedCornerShape(12.dp))
-                        .background(iconBgColor),
-                    contentAlignment = androidx.compose.ui.Alignment.Center
-                ) {
-                    androidx.compose.material3.Icon(
-                        icon,
-                        contentDescription = null,
-                        tint = iconColor,
-                        modifier = Modifier.size(24.dp)
-                    )
-                }
-                androidx.compose.foundation.layout.Column {
-                    androidx.compose.material3.Text(
-                        title,
-                        color = titleColor,
-                        fontSize = 11.sp,
-                        fontWeight = androidx.compose.ui.text.font.FontWeight.Bold,
-                        letterSpacing = 0.5.sp
-                    )
-                    androidx.compose.material3.Text(
-                        value,
-                        color = valueColor,
-                        fontSize = 18.sp,
-                        fontWeight = androidx.compose.ui.text.font.FontWeight.ExtraBold,
-                        modifier = Modifier.padding(top = 2.dp)
-                    )
-                }
+            Column {
+                Text(
+                    text = title,
+                    color = titleColor,
+                    fontSize = 11.sp,
+                    fontWeight = FontWeight.Bold,
+                    letterSpacing = 1.sp
+                )
+                Text(
+                    text = value,
+                    color = valueColor,
+                    fontSize = if (isHighlighted) 26.sp else 24.sp,
+                    fontWeight = if (isHighlighted) FontWeight.ExtraBold else FontWeight.Bold,
+                    modifier = Modifier.padding(top = 4.dp),
+                    letterSpacing = (-0.5).sp
+                )
+                Text(
+                    text = note,
+                    color = androidx.compose.ui.graphics.Color(0xFF64748B),
+                    fontSize = 12.sp,
+                    modifier = Modifier.padding(top = 2.dp)
+                )
             }
-            androidx.compose.material3.Text(
-                note,
-                color = androidx.compose.ui.graphics.Color(0xFF64748B),
-                fontSize = 12.sp,
-                fontWeight = androidx.compose.ui.text.font.FontWeight.Medium,
-                textAlign = androidx.compose.ui.text.style.TextAlign.Right
-            )
+            Box(
+                modifier = Modifier
+                    .size(36.dp)
+                    .background(iconBgColor, RoundedCornerShape(12.dp)),
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(
+                    icon,
+                    contentDescription = null,
+                    tint = iconColor,
+                    modifier = Modifier.size(20.dp)
+                )
+            }
         }
     }
 }
