@@ -32,7 +32,9 @@ class PurchaseHistoryViewModel(
                 val result = purchasingRepository.getPurchases(
                     page = safePage,
                     limit = state.pageSize,
-                    supplierId = state.selectedSupplierId
+                    supplierId = state.selectedSupplierId,
+                    startDate = state.startDate,
+                    endDate = state.endDate
                 )
             ) {
                 is RepositoryResult.Success -> {
@@ -55,8 +57,17 @@ class PurchaseHistoryViewModel(
 
     fun refresh() = loadPurchases(_uiState.value.page)
 
-    fun onSupplierSelected(supplierId: String?) {
-        _uiState.update { it.copy(selectedSupplierId = supplierId, page = 1, errorMessage = null) }
+    fun onFilterApplied(supplierId: String?, startDate: String?, endDate: String?, periodType: String) {
+        _uiState.update { 
+            it.copy(
+                selectedSupplierId = supplierId, 
+                startDate = startDate, 
+                endDate = endDate,
+                selectedPeriodType = periodType,
+                page = 1, 
+                errorMessage = null
+            ) 
+        }
         loadPurchases(page = 1)
     }
 

@@ -72,7 +72,7 @@ fun AdminPurchaseHistoryScreen(
             PurchaseHistoryScreen(
             modifier = Modifier,
             uiState = uiState,
-            onSupplierSelected = viewModel::onSupplierSelected,
+            onFilterApplied = viewModel::onFilterApplied,
             onSearchChanged = viewModel::onSearchChanged,
             onRefresh = viewModel::refresh,
             onShowDetail = viewModel::showDetail,

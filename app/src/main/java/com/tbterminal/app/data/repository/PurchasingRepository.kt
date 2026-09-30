@@ -54,7 +54,9 @@ interface PurchasingRepository {
     suspend fun getPurchases(
         page: Int = 1,
         limit: Int = 20,
-        supplierId: String? = null
+        supplierId: String? = null,
+        startDate: String? = null,
+        endDate: String? = null
     ): RepositoryResult<PurchaseSummaryPage>
 
     suspend fun getPurchaseById(id: String): RepositoryResult<PurchaseDetail>
@@ -193,13 +195,17 @@ class RemotePurchasingRepository(
     override suspend fun getPurchases(
         page: Int,
         limit: Int,
-        supplierId: String?
+        supplierId: String?,
+        startDate: String?,
+        endDate: String?
     ): RepositoryResult<PurchaseSummaryPage> {
         return safeApiCall {
             purchasingApi.getPurchases(
                 page = page,
                 limit = limit,
-                supplierId = supplierId?.takeIf(String::isNotBlank)
+                supplierId = supplierId?.takeIf(String::isNotBlank),
+                startDate = startDate,
+                endDate = endDate
             )
         }.toRepositoryResult { response ->
             val purchasePage = response.data

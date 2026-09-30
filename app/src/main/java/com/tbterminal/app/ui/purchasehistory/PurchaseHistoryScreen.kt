@@ -1,3 +1,4 @@
+@file:OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class)
 package com.tbterminal.app.ui.purchasehistory
 
 import androidx.compose.foundation.BorderStroke
@@ -96,7 +97,7 @@ private val PurchaseSoft = Color(0xFFF8FAFC)
 internal fun PurchaseHistoryScreen(
     modifier: Modifier,
     uiState: PurchaseHistoryUiState,
-    onSupplierSelected: (String?) -> Unit,
+    onFilterApplied: (String?, String?, String?, String) -> Unit,
     onSearchChanged: (String) -> Unit,
     onRefresh: () -> Unit,
     onShowDetail: (String) -> Unit,
@@ -122,9 +123,8 @@ internal fun PurchaseHistoryScreen(
         PurchaseFilterBottomSheet(
             uiState = uiState,
             onDismiss = { showFilterPopup = false },
-            onApplyFilter = { supplierId, period ->
-                onSupplierSelected(supplierId)
-                // TODO: Implement Period filter if backend supports it
+            onApplyFilter = { supplierId, start, end, periodType ->
+                onFilterApplied(supplierId, start, end, periodType)
             }
         )
     }
@@ -392,21 +392,28 @@ private fun PurchaseToolbar(
 private fun PurchaseFilterBottomSheet(
     uiState: PurchaseHistoryUiState,
     onDismiss: () -> Unit,
-    onApplyFilter: (String?, String?) -> Unit // supplierId, period
+    onApplyFilter: (String?, String?, String?, String) -> Unit
 ) {
     var selectedSupplierId by remember { mutableStateOf(uiState.selectedSupplierId) }
-    var selectedPeriod by remember { mutableStateOf("Harian") }
+    var selectedPeriod by remember { mutableStateOf(uiState.selectedPeriodType) }
+    
+    var displayDate by remember { mutableStateOf(
+        if (uiState.startDate != null && uiState.startDate!!.length >= 10) 
+            uiState.startDate!!.substring(8, 10) + "/" + uiState.startDate!!.substring(5, 7) 
+        else "30/09"
+    )}
+
     var supplierExpanded by remember { mutableStateOf(false) }
 
     androidx.compose.material3.ModalBottomSheet(
         onDismissRequest = onDismiss,
-        containerColor = Color.White,
+        containerColor = androidx.compose.ui.graphics.Color.White,
         dragHandle = {
             Column(
                 modifier = Modifier.fillMaxWidth().padding(top = 12.dp, bottom = 4.dp),
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
-                Box(modifier = Modifier.width(48.dp).height(6.dp).background(Color(0xFFE2E8F0), RoundedCornerShape(50)))
+                Box(modifier = Modifier.width(48.dp).height(6.dp).background(androidx.compose.ui.graphics.Color(0xFFE2E8F0), RoundedCornerShape(50)))
             }
         },
         shape = RoundedCornerShape(topStart = 32.dp, topEnd = 32.dp)
@@ -414,115 +421,121 @@ private fun PurchaseFilterBottomSheet(
         Column(
             modifier = Modifier.fillMaxWidth().padding(bottom = 24.dp)
         ) {
-            // Header
             Row(
-                modifier = Modifier.fillMaxWidth().padding(horizontal = 24.dp, vertical = 8.dp).padding(bottom = 8.dp),
+                modifier = Modifier.fillMaxWidth().padding(horizontal = 24.dp, vertical = 12.dp),
                 horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
+                verticalAlignment = Alignment.Top
             ) {
-                Text("Filter Riwayat", fontSize = 18.sp, fontWeight = FontWeight.Bold, color = Color(0xFF0F172A))
-                Box(
-                    modifier = Modifier.size(36.dp).background(Color(0xFFF1F5F9), RoundedCornerShape(50)).clickable(onClick = onDismiss),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Icon(Icons.Default.Close, contentDescription = "Tutup", tint = Color(0xFF64748B), modifier = Modifier.size(20.dp))
+                Column {
+                    Text("Filter Riwayat", fontSize = 20.sp, fontWeight = androidx.compose.ui.text.font.FontWeight.Bold, color = androidx.compose.ui.graphics.Color(0xFF1E293B))
+                    Spacer(Modifier.height(4.dp))
+                    Text("Atur periode waktu dan supplier", fontSize = 14.sp, color = androidx.compose.ui.graphics.Color(0xFF64748B))
                 }
+                Icon(
+                    Icons.Default.Close, 
+                    contentDescription = "Tutup", 
+                    tint = androidx.compose.ui.graphics.Color(0xFF64748B), 
+                    modifier = Modifier.size(24.dp).clickable(onClick = onDismiss)
+                )
             }
-            HorizontalDivider(color = Color(0xFFF1F5F9))
+            
+            Spacer(Modifier.height(16.dp))
 
             Column(
-                modifier = Modifier.fillMaxWidth().padding(24.dp),
+                modifier = Modifier.fillMaxWidth().padding(horizontal = 24.dp),
                 verticalArrangement = Arrangement.spacedBy(24.dp)
             ) {
-                // Periode
-                Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                    Text("Periode Waktu", fontSize = 13.sp, fontWeight = FontWeight.Bold, color = Color(0xFF64748B))
-                    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        listOf("Harian", "Mingguan", "Bulanan").forEach { period ->
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(12.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Row(
+                        modifier = Modifier
+                            .weight(1f)
+                            .height(48.dp)
+                            .background(androidx.compose.ui.graphics.Color(0xFFF1F5F9), RoundedCornerShape(12.dp))
+                            .padding(4.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        listOf("Hari", "Minggu", "Bulan").forEach { period ->
                             val isSelected = selectedPeriod == period
                             Box(
                                 modifier = Modifier
                                     .weight(1f)
-                                    .clip(RoundedCornerShape(12.dp))
-                                    .background(if (isSelected) Color(0xFFEBF3F0) else Color.White)
-                                    .border(1.dp, if (isSelected) Color(0xFF256B57) else Color(0xFFE2E8F0), RoundedCornerShape(12.dp))
-                                    .clickable { selectedPeriod = period }
-                                    .padding(vertical = 10.dp),
+                                    .height(40.dp)
+                                    .clip(RoundedCornerShape(8.dp))
+                                    .background(if (isSelected) androidx.compose.ui.graphics.Color(0xFFE2E8F0) else androidx.compose.ui.graphics.Color.Transparent)
+                                    .clickable { selectedPeriod = period },
                                 contentAlignment = Alignment.Center
                             ) {
                                 Text(
                                     text = period,
-                                    fontSize = 13.sp,
-                                    fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
-                                    color = if (isSelected) Color(0xFF256B57) else Color(0xFF64748B)
+                                    fontSize = 14.sp,
+                                    fontWeight = if (isSelected) androidx.compose.ui.text.font.FontWeight.SemiBold else androidx.compose.ui.text.font.FontWeight.Medium,
+                                    color = if (isSelected) androidx.compose.ui.graphics.Color(0xFF0F4A3C) else androidx.compose.ui.graphics.Color(0xFF475569)
                                 )
                             }
                         }
                     }
-                }
 
-                // Pilih Tanggal
-                Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                    Text("Pilih Tanggal", fontSize = 13.sp, fontWeight = FontWeight.Bold, color = Color(0xFF64748B))
                     Row(
                         modifier = Modifier
-                            .fillMaxWidth()
+                            .height(48.dp)
                             .clip(RoundedCornerShape(12.dp))
-                            .border(1.dp, Color(0xFFE2E8F0), RoundedCornerShape(12.dp))
-                            .clickable { /* TODO: Open Date Picker */ }
-                            .padding(14.dp),
-                        verticalAlignment = Alignment.CenterVertically
+                            .border(1.dp, androidx.compose.ui.graphics.Color(0xFFCBD5E1), RoundedCornerShape(12.dp))
+                            .clickable { /* TODO: Date Picker */ }
+                            .padding(horizontal = 16.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
-                        Icon(Icons.Outlined.DateRange, contentDescription = null, tint = Color(0xFF64748B), modifier = Modifier.size(20.dp))
-                        Spacer(Modifier.width(12.dp))
+                        Icon(Icons.Outlined.DateRange, contentDescription = null, tint = androidx.compose.ui.graphics.Color(0xFF64748B), modifier = Modifier.size(20.dp))
                         Text(
-                            text = "28 Mei 2026", // Mockup date
+                            text = displayDate,
                             fontSize = 14.sp,
-                            fontWeight = FontWeight.Medium,
-                            color = Color(0xFF0F172A),
-                            modifier = Modifier.weight(1f)
+                            fontWeight = androidx.compose.ui.text.font.FontWeight.Medium,
+                            color = androidx.compose.ui.graphics.Color(0xFF334155)
                         )
-                        Icon(Icons.Outlined.EditCalendar, contentDescription = null, tint = Color(0xFF256B57), modifier = Modifier.size(20.dp))
                     }
                 }
 
-                // Supplier
                 Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                    Text("Supplier", fontSize = 13.sp, fontWeight = FontWeight.Bold, color = Color(0xFF64748B))
+                    Text("Supplier", fontSize = 14.sp, fontWeight = androidx.compose.ui.text.font.FontWeight.SemiBold, color = androidx.compose.ui.graphics.Color(0xFF334155))
                     Box {
                         Row(
                             modifier = Modifier
                                 .fillMaxWidth()
+                                .height(52.dp)
                                 .clip(RoundedCornerShape(12.dp))
-                                .border(1.dp, Color(0xFFE2E8F0), RoundedCornerShape(12.dp))
+                                .border(1.dp, androidx.compose.ui.graphics.Color(0xFFE2E8F0), RoundedCornerShape(12.dp))
                                 .clickable { supplierExpanded = true }
-                                .padding(14.dp),
+                                .padding(horizontal = 16.dp),
                             verticalAlignment = Alignment.CenterVertically
                         ) {
-                            Icon(Icons.Outlined.Store, contentDescription = null, tint = Color(0xFF64748B), modifier = Modifier.size(20.dp))
+                            Icon(Icons.Outlined.Store, contentDescription = null, tint = androidx.compose.ui.graphics.Color(0xFF64748B), modifier = Modifier.size(20.dp))
                             Spacer(Modifier.width(12.dp))
                             Text(
                                 text = uiState.suppliers.firstOrNull { it.id == selectedSupplierId }?.name ?: "Semua Supplier",
                                 fontSize = 14.sp,
-                                fontWeight = FontWeight.Medium,
-                                color = Color(0xFF0F172A),
+                                fontWeight = androidx.compose.ui.text.font.FontWeight.Medium,
+                                color = androidx.compose.ui.graphics.Color(0xFF0F172A),
                                 modifier = Modifier.weight(1f)
                             )
-                            Icon(Icons.Default.ArrowDropDown, contentDescription = null, tint = Color(0xFF64748B))
+                            Icon(Icons.Default.ArrowDropDown, contentDescription = null, tint = androidx.compose.ui.graphics.Color(0xFF64748B))
                         }
 
                         androidx.compose.material3.DropdownMenu(
                             expanded = supplierExpanded,
                             onDismissRequest = { supplierExpanded = false },
-                            modifier = Modifier.fillMaxWidth(0.9f).background(Color.White)
+                            modifier = Modifier.fillMaxWidth(0.85f).background(androidx.compose.ui.graphics.Color.White)
                         ) {
                             androidx.compose.material3.DropdownMenuItem(
-                                text = { Text("Semua Supplier", fontWeight = if (selectedSupplierId == null) FontWeight.Bold else FontWeight.Normal) },
+                                text = { Text("Semua Supplier", fontWeight = if (selectedSupplierId == null) androidx.compose.ui.text.font.FontWeight.Bold else androidx.compose.ui.text.font.FontWeight.Normal) },
                                 onClick = { selectedSupplierId = null; supplierExpanded = false }
                             )
                             uiState.suppliers.forEach { supplier ->
                                 androidx.compose.material3.DropdownMenuItem(
-                                    text = { Text(supplier.name, fontWeight = if (selectedSupplierId == supplier.id) FontWeight.Bold else FontWeight.Normal) },
+                                    text = { Text(supplier.name, fontWeight = if (selectedSupplierId == supplier.id) androidx.compose.ui.text.font.FontWeight.Bold else androidx.compose.ui.text.font.FontWeight.Normal) },
                                     onClick = { selectedSupplierId = supplier.id; supplierExpanded = false }
                                 )
                             }
@@ -531,24 +544,27 @@ private fun PurchaseFilterBottomSheet(
                 }
             }
 
-            HorizontalDivider(color = Color(0xFFF1F5F9))
+            Spacer(Modifier.height(32.dp))
             
-            Box(modifier = Modifier.fillMaxWidth().padding(24.dp).padding(bottom = 8.dp)) {
+            Box(modifier = Modifier.fillMaxWidth().padding(horizontal = 24.dp)) {
                 Button(
                     onClick = { 
-                        onApplyFilter(selectedSupplierId, selectedPeriod)
+                        val start = if (selectedPeriod == "Hari") "2026-09-30T00:00:00Z" else null
+                        val end = if (selectedPeriod == "Hari") "2026-09-30T23:59:59Z" else null
+                        onApplyFilter(selectedSupplierId, start, end, selectedPeriod)
                         onDismiss()
                     },
                     modifier = Modifier.fillMaxWidth().height(52.dp),
                     shape = RoundedCornerShape(12.dp),
-                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF256B57))
+                    colors = ButtonDefaults.buttonColors(containerColor = androidx.compose.ui.graphics.Color(0xFF256B57))
                 ) {
-                    Text("Terapkan Filter", fontSize = 15.sp, fontWeight = FontWeight.SemiBold)
+                    Text("Terapkan Filter", fontSize = 15.sp, fontWeight = androidx.compose.ui.text.font.FontWeight.SemiBold)
                 }
             }
         }
     }
 }
+
 
 @Composable
 private fun PurchaseMobileRow(purchase: PurchaseSummary, onShowDetail: (String) -> Unit) {

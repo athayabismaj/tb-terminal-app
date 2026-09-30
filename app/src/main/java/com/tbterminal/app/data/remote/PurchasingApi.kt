@@ -44,7 +44,9 @@ interface PurchasingApi {
     suspend fun getPurchases(
         @Query("page") page: Int = 1,
         @Query("limit") limit: Int = 20,
-        @Query("supplierId") supplierId: String? = null
+        @Query("supplierId") supplierId: String? = null,
+        @Query("startDate") startDate: String? = null,
+        @Query("endDate") endDate: String? = null
     ): Response<ApiResponse<PaginatedResponse<PurchaseSummaryDto>>>
 
     @GET("/api/purchasing/purchases/{id}")
