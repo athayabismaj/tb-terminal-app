@@ -570,7 +570,7 @@ private fun LocalCashExpenseEntity.toCashTransaction(session: LocalCashSessionEn
 
 private fun Long.toOffsetDateTimeString(): String {
     return Instant.ofEpochMilli(this)
-        .atZone(ZoneId.systemDefault())
+        .atZone(ZoneId.of("Asia/Jakarta"))
         .toOffsetDateTime()
         .toString()
 }

@@ -619,7 +619,7 @@ class OfflineCashSessionSyncService(
 
     private fun Long.toOffsetDateTimeString(): String =
         Instant.ofEpochMilli(this)
-            .atZone(ZoneId.systemDefault())
+            .atZone(ZoneId.of("Asia/Jakarta"))
             .toOffsetDateTime()
             .toString()
 

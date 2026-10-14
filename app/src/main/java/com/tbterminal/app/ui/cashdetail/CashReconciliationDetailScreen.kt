@@ -98,10 +98,23 @@ private fun DetailContent(uiState: CashReconciliationDetailUiState, onPreviousPa
 private fun SessionSummary(session: CashSession, compact: Boolean) {
     Card(Modifier.fillMaxWidth(), colors = CardDefaults.cardColors(Color.White), border = BorderStroke(1.dp, DetailBorder), shape = RoundedCornerShape(12.dp)) {
         Column(Modifier.padding(20.dp)) {
-            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                Column {
-                    Text(session.userName ?: "Kasir", color = DetailText, fontSize = 18.sp, fontWeight = FontWeight.Bold)
-                    Text("${session.openedAt.asDateTime()} - ${session.closedAt?.asDateTime() ?: "Sesi masih aktif"}", color = DetailMuted, fontSize = 12.sp)
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+                Column(modifier = Modifier.weight(1f).padding(end = 12.dp)) {
+                    Text(
+                        session.userName ?: "Kasir",
+                        color = DetailText,
+                        fontSize = 18.sp,
+                        fontWeight = FontWeight.Bold,
+                        maxLines = 1,
+                        overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis
+                    )
+                    Text(
+                        "${session.openedAt.asDateTime()} - ${session.closedAt?.asDateTime() ?: "Sesi masih aktif"}",
+                        color = DetailMuted,
+                        fontSize = 12.sp,
+                        maxLines = 1,
+                        overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis
+                    )
                 }
                 StatusBadge(session.status)
             }
