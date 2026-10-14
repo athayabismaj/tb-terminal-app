@@ -138,7 +138,7 @@ private fun SupplierDebtSearch(value: String, onValueChange: (String) -> Unit, c
 }
 
 @Composable
-private fun StatusFilterButton(
+internal fun StatusFilterButton(
     selected: SupplierDebtStatusFilter,
     onSelect: (SupplierDebtStatusFilter) -> Unit,
     compact: Boolean,

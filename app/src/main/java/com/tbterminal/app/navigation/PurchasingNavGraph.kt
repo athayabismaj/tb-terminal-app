@@ -34,6 +34,7 @@ import com.tbterminal.app.ui.dashboard.cashier.CashierDashboardScreen
 import com.tbterminal.app.ui.dashboard.owner.OwnerDashboardScreen
 import com.tbterminal.app.ui.incominggoods.AdminIncomingGoodsFormScreen
 import com.tbterminal.app.ui.incominggoods.AdminIncomingGoodsScreen
+import com.tbterminal.app.ui.payables.AdminSupplierDebtDetailScreen
 import com.tbterminal.app.ui.payables.AdminSupplierDebtScreen
 import com.tbterminal.app.ui.pricemanagement.AdminPriceManagementScreen
 import com.tbterminal.app.ui.products.AdminProductCategoriesScreen
@@ -388,6 +389,11 @@ internal fun NavGraphBuilder.purchasingGraph(navController: NavHostController, s
                         }
                     },
                     onSupplierDebtsClick = {},
+                    onSupplierDetailClick = { supplierId ->
+                        navController.navigate(AppRoute.SupplierDebtDetail.createRoute(supplierId)) {
+                            launchSingleTop = true
+                        }
+                    },
                     onReceivablesClick = {
                         navController.navigate(AppRoute.Receivables.route) {
                             launchSingleTop = true
@@ -429,4 +435,54 @@ internal fun NavGraphBuilder.purchasingGraph(navController: NavHostController, s
             }
         }
 
+        composable(
+            route = AppRoute.SupplierDebtDetail.route,
+            arguments = listOf(
+                navArgument(AppRoute.SupplierDebtDetail.SUPPLIER_ID_ARG) {
+                    type = NavType.StringType
+                }
+            )
+        ) { backStackEntry ->
+            val sessionUser = sessionManager.readSessionUser()
+            val supplierId = backStackEntry.arguments
+                ?.getString(AppRoute.SupplierDebtDetail.SUPPLIER_ID_ARG)
+
+            if (sessionUser == null || supplierId.isNullOrBlank()) {
+                LaunchedEffect(Unit) {
+                    sessionManager.logout()
+                    navController.navigate(AppRoute.Login.route) {
+                        popUpTo(0)
+                        launchSingleTop = true
+                    }
+                }
+            } else {
+                AdminSupplierDebtDetailScreen(
+                    name = sessionUser.name,
+                    role = sessionUser.role,
+                    supplierId = supplierId,
+                    purchasingRepository = appContainer.purchasingRepository,
+                    onDashboardClick = { navController.navigate(AppRoute.Dashboard.route) { launchSingleTop = true } },
+                    onProductsClick = { navController.navigate(AppRoute.Products.route) { launchSingleTop = true } },
+                    onStockOpnameClick = { navController.navigate(AppRoute.StockOpname.route) { launchSingleTop = true } },
+                    onIncomingGoodsClick = { navController.navigate(AppRoute.IncomingGoods.route) { launchSingleTop = true } },
+                    onSupplierDebtsClick = { navController.navigate(AppRoute.SupplierDebts.route) { launchSingleTop = true } },
+                    onReceivablesClick = { navController.navigate(AppRoute.Receivables.route) { launchSingleTop = true } },
+                    onCustomersClick = { navController.navigate(AppRoute.Customers.route) { launchSingleTop = true } },
+                    onReportsClick = { navController.navigate(AppRoute.Reports.route) { launchSingleTop = true } },
+                    onOperationalAuditClick = { navController.navigate(AppRoute.OperationalAudit.route) { launchSingleTop = true } },
+                    onBack = {
+                        if (!navController.popBackStack()) {
+                            navController.navigate(AppRoute.SupplierDebts.route) { launchSingleTop = true }
+                        }
+                    },
+                    onLogout = {
+                        sessionManager.logout()
+                        navController.navigate(AppRoute.Login.route) {
+                            popUpTo(0)
+                            launchSingleTop = true
+                        }
+                    }
+                )
+            }
+        }
 }

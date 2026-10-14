@@ -18,6 +18,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.outlined.ReceiptLong
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.outlined.AccountBalanceWallet
 import androidx.compose.material.icons.outlined.Payments
@@ -54,7 +55,8 @@ internal fun SupplierDebtScreen(
     onPayClick: (SupplierPayable) -> Unit,
     onPreviousPage: () -> Unit,
     onNextPage: () -> Unit,
-    onDismissMessage: () -> Unit
+    onDismissMessage: () -> Unit,
+    onSupplierDetailClick: (String) -> Unit = {}
 ) {
     var showMobileOverview by remember { mutableStateOf(false) }
     BoxWithConstraints(modifier = modifier.fillMaxSize().background(DebtBackground)) {
@@ -81,6 +83,7 @@ internal fun SupplierDebtScreen(
                 onNextPage = onNextPage,
                 compact = compact,
                 onOpenMobileOverview = { showMobileOverview = true },
+                onSupplierDetailClick = onSupplierDetailClick,
             )
         }
     }
@@ -130,34 +133,25 @@ private fun SupplierDebtMessage(
 
 @Composable
 private fun SupplierDebtMetrics(uiState: SupplierDebtUiState, compact: Boolean) {
-    Surface(
-        modifier = (if (compact) Modifier.fillMaxWidth() else Modifier.width(560.dp))
-            .height(96.dp)
+    Row(
+        modifier = (if (compact) Modifier.fillMaxWidth() else Modifier.width(548.dp))
             .testTag("supplier-debt-overview"),
-        color = DebtSurface,
-        shape = RoundedCornerShape(20.dp),
-        border = BorderStroke(1.dp, DebtLine),
+        horizontalArrangement = Arrangement.spacedBy(10.dp),
     ) {
-        Row(
-            modifier = Modifier.fillMaxSize().padding(horizontal = 16.dp, vertical = 14.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            DebtMetricItem(
-                title = "Sisa di halaman",
-                value = uiState.pageRemainingTotal.currencyText(),
-                icon = Icons.Outlined.AccountBalanceWallet,
-                emphasized = true,
-                modifier = Modifier.weight(1.55f),
-            )
-            Box(Modifier.width(1.dp).height(48.dp).background(DebtLine))
-            DebtMetricItem(
-                title = "Belum lunas",
-                value = "${uiState.unpaidCount} tagihan",
-                icon = Icons.Outlined.Payments,
-                emphasized = false,
-                modifier = Modifier.weight(1f).padding(start = 14.dp),
-            )
-        }
+        DebtMetricItem(
+            title = "Sisa di halaman",
+            value = uiState.pageRemainingTotal.currencyText(),
+            icon = Icons.Outlined.AccountBalanceWallet,
+            emphasized = true,
+            modifier = if (compact) Modifier.weight(1.55f) else Modifier.width(330.dp),
+        )
+        DebtMetricItem(
+            title = "Belum lunas",
+            value = "${uiState.unpaidCount} tagihan",
+            icon = Icons.AutoMirrored.Outlined.ReceiptLong,
+            emphasized = false,
+            modifier = if (compact) Modifier.weight(1f) else Modifier.width(208.dp),
+        )
     }
 }
 
@@ -169,25 +163,38 @@ private fun DebtMetricItem(
     emphasized: Boolean,
     modifier: Modifier,
 ) {
-    Row(
-        modifier = modifier,
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(10.dp),
+    Surface(
+        modifier = modifier.height(92.dp),
+        color = if (emphasized) DebtPrimary.copy(alpha = 0.12f) else DebtSurface,
+        shape = RoundedCornerShape(18.dp),
+        border = if (emphasized) null else BorderStroke(1.dp, DebtLine),
     ) {
-        Surface(
-            color = if (emphasized) DebtPrimary.copy(alpha = 0.14f) else DebtSoft,
-            shape = RoundedCornerShape(12.dp),
-            modifier = Modifier.size(38.dp),
+        Column(
+            modifier = Modifier.fillMaxWidth().padding(horizontal = 15.dp, vertical = 13.dp),
+            verticalArrangement = Arrangement.SpaceBetween,
         ) {
-            Box(contentAlignment = Alignment.Center) {
-                Icon(icon, contentDescription = null, tint = DebtPrimaryDark, modifier = Modifier.size(20.dp))
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Surface(
+                    color = if (emphasized) DebtPrimary.copy(alpha = 0.16f) else DebtSoft,
+                    shape = RoundedCornerShape(10.dp),
+                    modifier = Modifier.size(30.dp),
+                ) {
+                    Box(contentAlignment = Alignment.Center) {
+                        Icon(icon, contentDescription = null, tint = DebtPrimaryDark, modifier = Modifier.size(17.dp))
+                    }
+                }
+                Spacer(Modifier.width(8.dp))
+                Text(
+                    title,
+                    style = MaterialTheme.typography.labelMedium,
+                    color = DebtMuted,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
             }
-        }
-        Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
-            Text(title, style = MaterialTheme.typography.labelMedium, color = DebtMuted, maxLines = 1, overflow = TextOverflow.Ellipsis)
             Text(
                 value,
-                style = MaterialTheme.typography.titleMedium,
+                style = if (emphasized) MaterialTheme.typography.titleMedium else MaterialTheme.typography.titleSmall,
                 color = if (emphasized) DebtPrimaryDark else DebtText,
                 fontWeight = FontWeight.Bold,
                 maxLines = 1,

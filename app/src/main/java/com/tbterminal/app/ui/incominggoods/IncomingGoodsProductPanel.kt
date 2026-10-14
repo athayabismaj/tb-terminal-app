@@ -49,7 +49,7 @@ import androidx.compose.foundation.border
 import androidx.compose.material.icons.outlined.Inventory2
 import androidx.compose.material.icons.outlined.List
 import androidx.compose.material.icons.filled.Add
-import androidx.compose.material.icons.outlined.SignalCellularAlt
+import androidx.compose.material.icons.outlined.FactCheck
 import androidx.compose.material.icons.outlined.Tune
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.draw.drawBehind
@@ -476,7 +476,7 @@ private fun ProductMobileHeader(onShowSummaryClick: () -> Unit) {
             contentAlignment = Alignment.Center
         ) {
             Icon(
-                Icons.Outlined.SignalCellularAlt,
+                Icons.Outlined.FactCheck,
                 contentDescription = "Ringkasan",
                 tint = Color(0xFF334155),
                 modifier = Modifier.size(16.dp)

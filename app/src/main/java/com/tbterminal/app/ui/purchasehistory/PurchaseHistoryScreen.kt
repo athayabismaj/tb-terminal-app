@@ -5,7 +5,7 @@ import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 
-import androidx.compose.material.icons.outlined.SignalCellularAlt
+import androidx.compose.material.icons.outlined.FactCheck
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
@@ -198,7 +198,10 @@ private fun PurchaseTable(
                         .background(Color.White),
                     contentAlignment = Alignment.Center
                 ) {
-                    Icon(Icons.Outlined.SignalCellularAlt, contentDescription = "Ringkasan", tint = Color(0xFF64748B), modifier = Modifier.size(18.dp))
+                    com.tbterminal.app.ui.components.SummaryBarChartIcon(
+                        modifier = Modifier.size(16.dp),
+                        tint = Color(0xFF1E293B),
+                    )
                 }
             }
             androidx.compose.material3.Surface(

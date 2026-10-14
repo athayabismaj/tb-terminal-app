@@ -33,7 +33,8 @@ fun AdminSupplierDebtScreen(
     onOperationalAuditClick: () -> Unit = {},
     onProfileClick: () -> Unit = {},
     onSettingsClick: () -> Unit = {},
-     onBack: () -> Unit = {},
+    onSupplierDetailClick: (String) -> Unit = {},
+    onBack: () -> Unit = {},
     onLogout: () -> Unit,
     viewModel: SupplierDebtViewModel = viewModel(
         factory = SupplierDebtViewModel.factory(purchasingRepository)
@@ -74,15 +75,16 @@ fun AdminSupplierDebtScreen(
             modifier = contentModifier,
         ) {
             SupplierDebtScreen(
-            modifier = androidx.compose.ui.Modifier,
-            uiState = uiState,
-            onSearchChanged = viewModel::onSearchChanged,
-            onStatusFilterChanged = viewModel::onStatusFilterChanged,
-            onRefresh = viewModel::refresh,
-            onPayClick = viewModel::openPayment,
-            onPreviousPage = viewModel::previousPage,
-            onNextPage = viewModel::nextPage,
-            onDismissMessage = viewModel::clearMessage
+                modifier = androidx.compose.ui.Modifier,
+                uiState = uiState,
+                onSearchChanged = viewModel::onSearchChanged,
+                onStatusFilterChanged = viewModel::onStatusFilterChanged,
+                onRefresh = viewModel::refresh,
+                onPayClick = viewModel::openPayment,
+                onPreviousPage = viewModel::previousPage,
+                onNextPage = viewModel::nextPage,
+                onDismissMessage = viewModel::clearMessage,
+                onSupplierDetailClick = onSupplierDetailClick
             )
         }
     }
