@@ -53,6 +53,12 @@ suspend fun <T> safeApiCall(
     }
 }
 
+private val errorJson = Json {
+    ignoreUnknownKeys = true
+    isLenient = true
+    coerceInputValues = true
+}
+
 private fun <T> Response<T>.toApiErrorResponse(): ApiErrorResponse {
     val rawError = errorBody()?.string().orEmpty()
     if (rawError.isBlank()) {
@@ -63,8 +69,8 @@ private fun <T> Response<T>.toApiErrorResponse(): ApiErrorResponse {
     }
 
     return try {
-        Json.decodeFromString<ApiErrorResponse>(rawError)
-    } catch (serialization: SerializationException) {
+        errorJson.decodeFromString<ApiErrorResponse>(rawError)
+    } catch (_: Exception) {
         ApiErrorResponse(
             code = "HTTP_${code()}",
             message = "Format error server tidak sesuai kontrak."

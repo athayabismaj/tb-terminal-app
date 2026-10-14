@@ -16,8 +16,26 @@ internal object UserFacingErrorMapper {
             normalizedCode == "NETWORK_TIMEOUT" -> "Request terlalu lama. Periksa koneksi lalu coba lagi."
             normalizedCode in NETWORK_CODES -> "Koneksi bermasalah. Periksa jaringan dan status server."
             normalizedCode in INVALID_RESPONSE_CODES -> "Respons server tidak dapat diproses. Silakan coba lagi."
-            resolvedStatus == 400 -> "Input tidak valid. Periksa kembali data yang diisi."
-            resolvedStatus == 401 -> "Sesi Anda telah habis. Silakan login kembali."
+            resolvedStatus == 400 -> {
+                if (!backendMessage.isNullOrBlank() &&
+                    !backendMessage.startsWith("Format error") &&
+                    !backendMessage.startsWith("Server menolak")
+                ) {
+                    backendMessage
+                } else {
+                    "Input tidak valid. Periksa kembali data yang diisi."
+                }
+            }
+            resolvedStatus == 401 -> {
+                if (!backendMessage.isNullOrBlank() &&
+                    !backendMessage.startsWith("Format error") &&
+                    !backendMessage.startsWith("Server menolak")
+                ) {
+                    backendMessage
+                } else {
+                    "Sesi Anda telah habis. Silakan login kembali."
+                }
+            }
             resolvedStatus == 403 -> "Anda tidak memiliki akses ke fitur ini."
             resolvedStatus == 404 -> "Data yang diminta tidak ditemukan."
             resolvedStatus == 409 -> "Data berubah atau sedang diproses. Muat ulang lalu coba lagi."

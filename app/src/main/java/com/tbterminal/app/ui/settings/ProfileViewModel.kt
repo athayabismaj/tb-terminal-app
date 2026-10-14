@@ -77,7 +77,7 @@ class ProfileViewModel(
         if (_uiState.value.isSaving) return
         viewModelScope.launch {
             _uiState.update { it.copy(isSaving = true, error = null, message = null, profileUpdated = false) }
-            when (val result = authRepository.updateMyProfile(name, email)) {
+            when (val result = authRepository.getProfile()) {
                 is RepositoryResult.Success -> _uiState.update {
                     it.copy(
                         isSaving = false,

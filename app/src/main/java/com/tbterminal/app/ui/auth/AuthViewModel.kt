@@ -37,16 +37,20 @@ class AuthViewModel(
 
     fun login(username: String, password: String) {
         val normalizedUsername = username.trim()
-        if (normalizedUsername.isBlank() || password.isBlank()) {
-            _authState.value = AuthState.Error("Username dan password tidak boleh kosong")
+        if (normalizedUsername.isBlank()) {
+            _authState.value = AuthState.Error("Nama pengguna wajib diisi")
+            return
+        }
+        if (password.isBlank()) {
+            _authState.value = AuthState.Error("Kata sandi wajib diisi")
             return
         }
         if (normalizedUsername.length > 50) {
-            _authState.value = AuthState.Error("Username maksimal 50 karakter")
+            _authState.value = AuthState.Error("Nama pengguna maksimal 50 karakter")
             return
         }
         if (password.length < 6) {
-            _authState.value = AuthState.Error("Password minimal 6 karakter")
+            _authState.value = AuthState.Error("Kata sandi minimal 6 karakter")
             return
         }
 
@@ -63,7 +67,38 @@ class AuthViewModel(
                 }
 
                 is RepositoryResult.Error -> {
-                    _authState.value = AuthState.Error(result.message)
+                    val rawMessage = result.message.trim()
+                    val lower = rawMessage.lowercase()
+                    val message = when {
+                        lower.contains("akun tidak aktif") -> {
+                            "Akun tidak aktif. Hubungi admin toko."
+                        }
+                        lower.contains("kredensial default") -> {
+                            "Kredensial default tidak diizinkan pada production."
+                        }
+                        result.code == "401" ||
+                        result.code.contains("401") ||
+                        result.code == "LOGIN_FAILED" ||
+                        result.code == "INVALID_CREDENTIALS" ||
+                        result.code == "UNAUTHORIZED" ||
+                        lower.contains("username atau password") ||
+                        lower.contains("nama pengguna atau kata sandi") ||
+                        lower.contains("kredensial") ||
+                        lower.contains("sesi anda telah habis") ||
+                        lower.contains("unauthorized") ||
+                        lower.contains("login gagal") -> {
+                            "Nama pengguna atau kata sandi salah"
+                        }
+                        lower.contains("nama pengguna tidak") || lower.contains("user tidak") || lower.contains("user not found") -> {
+                            "Nama pengguna tidak ditemukan"
+                        }
+                        (lower.contains("sandi") || lower.contains("password")) &&
+                        !lower.contains("username") && !lower.contains("nama pengguna") -> {
+                            "Kata sandi yang Anda masukkan salah"
+                        }
+                        else -> rawMessage
+                    }
+                    _authState.value = AuthState.Error(message)
                 }
 
                 is RepositoryResult.Exception -> {
