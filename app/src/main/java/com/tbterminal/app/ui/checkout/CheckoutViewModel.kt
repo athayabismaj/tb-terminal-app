@@ -1293,7 +1293,7 @@ private fun LocalCashSessionEntity.toActiveCashSessionUi(): ActiveCashSessionUi 
 
 private fun Long.toOffsetDateTimeString(): String {
     return Instant.ofEpochMilli(this)
-        .atZone(ZoneId.systemDefault())
+        .atZone(ZoneId.of("Asia/Jakarta"))
         .toOffsetDateTime()
         .toString()
 }

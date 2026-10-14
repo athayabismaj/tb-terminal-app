@@ -12,8 +12,8 @@ import android.print.PrintDocumentAdapter
 import android.print.PrintDocumentInfo
 import android.print.PrintManager
 import android.print.pdf.PrintedPdfDocument
-
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -26,23 +26,27 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.outlined.ArrowBack
-import androidx.compose.material.icons.automirrored.outlined.ReceiptLong
+import androidx.compose.material.icons.automirrored.outlined.Undo
+import androidx.compose.material.icons.filled.ChevronLeft
+import androidx.compose.material.icons.outlined.DeleteOutline
+import androidx.compose.material.icons.outlined.Description
 import androidx.compose.material.icons.outlined.Info
 import androidx.compose.material.icons.outlined.Print
-import androidx.compose.material3.Card
-import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.OutlinedButton
-import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -50,47 +54,86 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import com.tbterminal.app.ui.cashier.transactions.remainingAmount
-
-
-import com.tbterminal.app.ui.cashier.transactions.CashierTransactionHistoryViewModel
-import com.tbterminal.app.ui.cashier.transactions.CashierTransactionHistoryUiState
-
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.PathEffect
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.window.Dialog
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.tbterminal.app.data.model.CashTransactionDetail
 import com.tbterminal.app.data.model.CashTransactionItem
+import com.tbterminal.app.data.model.TransactionRefundResult
 import com.tbterminal.app.data.repository.CashReconciliationRepository
 import com.tbterminal.app.data.repository.ManagerApprovalRepository
-import com.tbterminal.app.data.model.TransactionRefundResult
+import com.tbterminal.app.ui.cashier.transactions.CashierPayDebtDialog
+import com.tbterminal.app.ui.cashier.transactions.CashierTransactionHistoryUiState
+import com.tbterminal.app.ui.cashier.transactions.CashierTransactionHistoryViewModel
 import com.tbterminal.app.ui.cashier.transactions.TransactionActionDialogs
+import com.tbterminal.app.ui.cashier.transactions.remainingAmount
 import com.tbterminal.app.ui.cashier.transactions.transactionActionAccess
-import com.tbterminal.app.ui.dashboard.DashboardBackground
-import com.tbterminal.app.ui.dashboard.DashboardBrandGreen
-import com.tbterminal.app.ui.dashboard.DashboardBrandGreenDark
-import com.tbterminal.app.ui.dashboard.DashboardSurface
-import com.tbterminal.app.ui.dashboard.DashboardTextPrimary
-import com.tbterminal.app.ui.dashboard.DashboardTextSecondary
 import com.tbterminal.app.ui.dashboard.admin.AdminDashboardShell
 import com.tbterminal.app.ui.dashboard.admin.AdminDestination
-import com.tbterminal.app.ui.components.AppStatusChip
-
-import java.math.BigDecimal
 import java.io.FileOutputStream
+import java.math.BigDecimal
+import java.text.DecimalFormat
+import java.text.DecimalFormatSymbols
+import java.time.LocalDateTime
+import java.time.OffsetDateTime
+import java.time.format.DateTimeFormatter
+import java.util.Locale
 
-private val ReceiptLine = Color(0xFFE2E8F0)
-private val ReceiptSurfaceSoft = Color(0xFFF1F5F9)
+private val BrandGreen = Color(0xFF256B57)
+private val BrandGreenDark = Color(0xFF1D5545)
+private val TextPrimary = Color(0xFF0F172A)
+private val TextSlate800 = Color(0xFF1E293B)
+private val TextSlate700 = Color(0xFF334155)
+private val TextSecondary = Color(0xFF64748B)
+private val TextMuted = Color(0xFF94A3B8)
+private val BorderSlate200 = Color(0xFFE2E8F0)
+private val SurfaceSlate100 = Color(0xFFF1F5F9)
+private val SurfaceBackground = Color(0xFFF8F9FA)
+
+private fun String.formatReceiptDateTime(): String = runCatching {
+    OffsetDateTime.parse(this).format(
+        DateTimeFormatter.ofPattern("d MMM yyyy, HH:mm", Locale.forLanguageTag("id-ID"))
+    )
+}.getOrElse {
+    runCatching {
+        LocalDateTime.parse(this).format(
+            DateTimeFormatter.ofPattern("d MMM yyyy, HH:mm", Locale.forLanguageTag("id-ID"))
+        )
+    }.getOrDefault(this)
+}
+
+private fun BigDecimal?.formatReceiptMoney(): String {
+    val value = this ?: BigDecimal.ZERO
+    return "Rp" + DecimalFormat("#,###", DecimalFormatSymbols(Locale.forLanguageTag("id-ID"))).format(value)
+}
+
+private fun transactionStatusInfo(status: String, remainingAmount: BigDecimal = BigDecimal.ZERO): Pair<String, Color> {
+    val lower = status.lowercase()
+    if (lower in setOf("voided", "void")) return "Void" to Color(0xFFE11D48)
+    if (lower in setOf("refunded", "refund")) return "Refund" to Color(0xFFE11D48)
+    if (remainingAmount <= BigDecimal.ZERO) return "Lunas" to BrandGreen
+    return when (lower) {
+        "completed", "paid", "lunas", "success" -> "Lunas" to BrandGreen
+        "dp", "partial" -> "Sebagian" to Color(0xFFD97706)
+        "pending" -> "Menunggu" to Color(0xFFD97706)
+        "hutang", "unpaid" -> "Hutang" to Color(0xFFE11D48)
+        else -> (status.replaceFirstChar { it.uppercase() }) to Color(0xFFD97706)
+    }
+}
 
 @Composable
 fun AdminReceiptDetailScreen(
@@ -137,6 +180,8 @@ fun AdminReceiptDetailScreen(
         userName = name,
         role = role,
         activeDestination = AdminDestination.SalesTransactions,
+        pageTitle = "Detail Struk",
+        onBack = onBackClick,
         onDashboardClick = onDashboardClick,
         onProductsClick = onProductsClick,
         onAddProductClick = onAddProductClick,
@@ -162,7 +207,6 @@ fun AdminReceiptDetailScreen(
             state = uiState,
             transactionId = transactionId,
             role = role,
-            onBackClick = onBackClick,
             onShowPayDebt = viewModel::showPayDebtDialog,
             onHidePayDebt = viewModel::hidePayDebtDialog,
             onPayDebtAmountChanged = viewModel::onPayDebtAmountChanged,
@@ -188,12 +232,42 @@ fun AdminReceiptDetailScreen(
     )
 }
 
+
+@Composable
+private fun DashedDivider(
+    modifier: Modifier = Modifier,
+    color: Color = BorderSlate200,
+    thickness: Dp = 1.dp,
+    dashWidth: Dp = 6.dp,
+    gapWidth: Dp = 4.dp
+) {
+    val density = androidx.compose.ui.platform.LocalDensity.current
+    val strokeWidthPx = with(density) { thickness.toPx() }
+    val dashWidthPx = with(density) { dashWidth.toPx() }
+    val gapWidthPx = with(density) { gapWidth.toPx() }
+    val pathEffect = remember(dashWidthPx, gapWidthPx) {
+        PathEffect.dashPathEffect(floatArrayOf(dashWidthPx, gapWidthPx), 0f)
+    }
+    Canvas(
+        modifier = modifier
+            .fillMaxWidth()
+            .height(thickness)
+    ) {
+        drawLine(
+            color = color,
+            start = Offset(0f, size.height / 2),
+            end = Offset(size.width, size.height / 2),
+            strokeWidth = strokeWidthPx,
+            pathEffect = pathEffect
+        )
+    }
+}
+
 @Composable
 private fun ReceiptDetailContent(
     state: CashierTransactionHistoryUiState,
     transactionId: String,
     role: String,
-    onBackClick: () -> Unit,
     onShowPayDebt: () -> Unit,
     onHidePayDebt: () -> Unit,
     onPayDebtAmountChanged: (String) -> Unit,
@@ -203,33 +277,52 @@ private fun ReceiptDetailContent(
     onShowRefund: () -> Unit,
     modifier: Modifier = Modifier
 ) {
-    val compact = androidx.compose.ui.platform.LocalConfiguration.current.screenWidthDp < 700
-    Column(
+    var showPrintDialog by remember { mutableStateOf(false) }
+
+    Box(
         modifier = modifier
             .fillMaxSize()
-            .background(DashboardBackground)
-            .verticalScroll(rememberScrollState())
-            .padding(if (compact) 16.dp else 32.dp),
-        verticalArrangement = Arrangement.spacedBy(if (compact) 16.dp else 24.dp)
+            .background(SurfaceBackground),
+        contentAlignment = Alignment.TopCenter
     ) {
-        ReceiptDetailHeader(onBackClick, compact)
-        when {
-            state.isReceiptLoading -> ReceiptLoadingCard()
-            state.errorMessage != null -> ReceiptMessageCard(state.errorMessage)
-            state.selectedTransaction == null -> ReceiptMessageCard("Struk $transactionId belum dapat dimuat.")
-            else -> ReceiptSummaryCard(
-                transaction = state.selectedTransaction,
-                message = state.receiptMessage.orEmpty(),
-                refundResult = state.refundResult,
-                role = role,
-                onShowPayDebt = onShowPayDebt,
-                onShowVoid = onShowVoid,
-                onShowRefund = onShowRefund,
-                compact = compact
-            )
+        Column(
+            modifier = Modifier
+                .widthIn(max = 440.dp)
+                .fillMaxWidth()
+                .verticalScroll(rememberScrollState())
+                .padding(horizontal = 16.dp, vertical = 16.dp),
+            verticalArrangement = Arrangement.spacedBy(16.dp)
+        ) {
+                when {
+                    state.isReceiptLoading -> ReceiptLoadingCard()
+                    state.errorMessage != null -> ReceiptMessageCard(state.errorMessage)
+                    state.selectedTransaction == null -> ReceiptMessageCard("Struk $transactionId belum dapat dimuat.")
+                    else -> {
+                        ReceiptSummaryCard(
+                            transaction = state.selectedTransaction,
+                            refundResult = state.refundResult
+                        )
+                        ReceiptActions(
+                            transaction = state.selectedTransaction,
+                            role = role,
+                            onPrintClick = { showPrintDialog = true },
+                            onShowPayDebt = onShowPayDebt,
+                            onShowVoid = onShowVoid,
+                            onShowRefund = onShowRefund
+                        )
+                    }
+                }
+                Spacer(modifier = Modifier.height(16.dp))
+            }
         }
+
+    if (showPrintDialog && state.selectedTransaction != null) {
+        CetakStrukPreviewDialog(
+            transaction = state.selectedTransaction,
+            onDismiss = { showPrintDialog = false }
+        )
     }
-    
+
     if (state.isPayDebtDialogOpen) {
         CashierPayDebtDialog(
             state = state,
@@ -242,123 +335,378 @@ private fun ReceiptDetailContent(
 }
 
 @Composable
-private fun ReceiptDetailHeader(onBackClick: () -> Unit, compact: Boolean) {
-    Row(
-        modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.SpaceBetween,
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        Column {
-            Text("Detail Struk", color = DashboardTextPrimary, fontSize = if (compact) 24.sp else 32.sp, fontWeight = FontWeight.ExtraBold)
-            if (!compact) Text(
-                text = "Ringkasan transaksi kasir dan status pembayaran.",
-                color = DashboardTextSecondary,
-                fontSize = 14.sp,
-                fontWeight = FontWeight.Medium
-            )
-        }
-        OutlinedButton(
-            onClick = onBackClick,
-            shape = RoundedCornerShape(12.dp),
-            border = BorderStroke(1.dp, ReceiptLine)
-        ) {
-            Icon(Icons.AutoMirrored.Outlined.ArrowBack, contentDescription = "Kembali", modifier = Modifier.size(18.dp))
-            if (!compact) {
-                Spacer(modifier = Modifier.width(8.dp))
-                Text("Kembali", fontWeight = FontWeight.Bold)
-            }
-        }
-    }
-}
-
-@Composable
 private fun ReceiptSummaryCard(
     transaction: CashTransactionDetail,
-    message: String,
-    refundResult: TransactionRefundResult?,
-    role: String,
-    onShowPayDebt: () -> Unit,
-    onShowVoid: () -> Unit,
-    onShowRefund: () -> Unit,
-    compact: Boolean
+    refundResult: TransactionRefundResult?
 ) {
-    var showPrintDialog by remember { mutableStateOf(false) }
-
-    if (showPrintDialog) {
-        CetakStrukPreviewDialog(
-            transaction = transaction,
-            onDismiss = { showPrintDialog = false }
-        )
-    }
+    val (statusLabel, statusColor) = transactionStatusInfo(transaction.status, transaction.remainingAmount())
 
     Card(
         modifier = Modifier.fillMaxWidth(),
-        colors = CardDefaults.cardColors(containerColor = DashboardSurface),
-        shape = RoundedCornerShape(18.dp),
-        border = BorderStroke(1.dp, ReceiptLine)
+        colors = CardDefaults.cardColors(containerColor = Color.White),
+        shape = RoundedCornerShape(20.dp),
+        border = BorderStroke(1.dp, BorderSlate200),
+        elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
     ) {
-        Column(modifier = Modifier.padding(if (compact) 16.dp else 28.dp), verticalArrangement = Arrangement.spacedBy(if (compact) 16.dp else 22.dp)) {
-            ReceiptTopSection(transaction, compact)
-            HorizontalDivider(color = ReceiptLine)
-            ReceiptTotalsSection(transaction)
-            HorizontalDivider(color = ReceiptLine)
-            ReceiptItemsList(transaction.items)
-            refundResult?.takeIf { it.transactionId == transaction.id }?.let { refund ->
-                RefundInformation(refund)
-            }
-            ReceiptActions(
-                transaction = transaction,
-                role = role,
-                onPrintClick = { showPrintDialog = true },
-                onShowPayDebt = onShowPayDebt,
-                onShowVoid = onShowVoid,
-                onShowRefund = onShowRefund,
-                compact = compact
-            )
-        }
-    }
-}
-
-@Composable
-private fun ReceiptTopSection(transaction: CashTransactionDetail, compact: Boolean) {
-    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Box(
-                modifier = Modifier
-                    .size(if (compact) 44.dp else 56.dp)
-                    .clip(RoundedCornerShape(16.dp))
-                    .background(DashboardBrandGreen.copy(alpha = 0.14f)),
-                contentAlignment = Alignment.Center
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(20.dp),
+            verticalArrangement = Arrangement.spacedBy(14.dp)
+        ) {
+            // Header: Icon & No. Transaksi
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(10.dp)
             ) {
-                Icon(Icons.AutoMirrored.Outlined.ReceiptLong, contentDescription = null, tint = DashboardBrandGreenDark)
+                Box(
+                    modifier = Modifier
+                        .size(36.dp)
+                        .clip(RoundedCornerShape(12.dp))
+                        .background(SurfaceSlate100),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(
+                        imageVector = Icons.Outlined.Description,
+                        contentDescription = null,
+                        tint = TextSlate800,
+                        modifier = Modifier.size(20.dp)
+                    )
+                }
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = "NO. TRANSAKSI",
+                        color = TextMuted,
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.Medium,
+                        letterSpacing = 0.5.sp
+                    )
+                    Spacer(modifier = Modifier.height(2.dp))
+                    Text(
+                        text = transaction.receiptNumber(),
+                        color = TextSlate800,
+                        fontSize = 13.sp,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
             }
-            Spacer(modifier = Modifier.width(16.dp))
-            Column {
-                Text(transaction.receiptNumber(), color = DashboardTextPrimary, fontSize = if (compact) 17.sp else 22.sp, fontWeight = FontWeight.ExtraBold)
-                Text(transaction.createdAt.displayDateTime(), color = DashboardTextSecondary, fontSize = 13.sp)
-            }
-        }
-        AppStatusChip(transaction.status)
-    }
-}
 
-@Composable
-private fun ReceiptTotalsSection(transaction: CashTransactionDetail) {
-    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-        ReceiptInfoRow("ID transaksi", transaction.receiptNumber())
-        ReceiptInfoRow("Tipe transaksi", transaction.type.ifBlank { "-" })
-        ReceiptInfoRow("Pelanggan", transaction.customerName ?: "Umum")
-        ReceiptInfoRow("Kasir", transaction.cashierName ?: "-")
-        ReceiptInfoRow("Metode", transaction.paymentMethods.joinToString(", ").ifBlank { "-" })
-        ReceiptInfoRow("Subtotal", transaction.total.moneyText())
-        ReceiptInfoRow("Dibayar", transaction.paidAmount.moneyText())
-        ReceiptInfoRow("Uang diterima", transaction.amountTendered.moneyText())
-        if (transaction.changeAmount > BigDecimal.ZERO) {
-            ReceiptInfoRow("Kembalian", transaction.changeAmount.moneyText(), emphasized = true)
+            HorizontalDivider(color = SurfaceSlate100, thickness = 1.dp)
+
+            // Metadata Transaksi (Grid 2 Kolom Bernapas Lega & Simetris)
+            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                Row(modifier = Modifier.fillMaxWidth()) {
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            text = "WAKTU TRANSAKSI",
+                            color = TextMuted,
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.SemiBold,
+                            letterSpacing = 0.5.sp
+                        )
+                        Spacer(modifier = Modifier.height(2.dp))
+                        Text(
+                            text = transaction.createdAt.formatReceiptDateTime(),
+                            color = TextSlate800,
+                            fontSize = 13.sp,
+                            fontWeight = FontWeight.Medium
+                        )
+                    }
+                    Spacer(modifier = Modifier.width(16.dp))
+                    Column(
+                        modifier = Modifier.weight(1f),
+                        horizontalAlignment = Alignment.End
+                    ) {
+                        Text(
+                            text = "KASIR",
+                            color = TextMuted,
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.SemiBold,
+                            letterSpacing = 0.5.sp,
+                            textAlign = TextAlign.End
+                        )
+                        Spacer(modifier = Modifier.height(2.dp))
+                        Text(
+                            text = transaction.cashierName?.takeIf { it.isNotBlank() } ?: "-",
+                            color = TextSlate800,
+                            fontSize = 13.sp,
+                            fontWeight = FontWeight.Medium,
+                            textAlign = TextAlign.End
+                        )
+                    }
+                }
+                Row(modifier = Modifier.fillMaxWidth()) {
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            text = "PELANGGAN",
+                            color = TextMuted,
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.SemiBold,
+                            letterSpacing = 0.5.sp
+                        )
+                        Spacer(modifier = Modifier.height(2.dp))
+                        Text(
+                            text = transaction.customerName?.takeIf { it.isNotBlank() } ?: "Umum",
+                            color = TextSlate800,
+                            fontSize = 13.sp,
+                            fontWeight = FontWeight.Medium
+                        )
+                    }
+                    Spacer(modifier = Modifier.width(16.dp))
+                    Column(
+                        modifier = Modifier.weight(1f),
+                        horizontalAlignment = Alignment.End
+                    ) {
+                        Text(
+                            text = "TIPE TRANSAKSI",
+                            color = TextMuted,
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.SemiBold,
+                            letterSpacing = 0.5.sp,
+                            textAlign = TextAlign.End
+                        )
+                        Spacer(modifier = Modifier.height(2.dp))
+                        Text(
+                            text = transaction.type.ifBlank { "Penjualan" },
+                            color = TextSlate800,
+                            fontSize = 13.sp,
+                            fontWeight = FontWeight.Medium,
+                            textAlign = TextAlign.End
+                        )
+                    }
+                }
+                Row(modifier = Modifier.fillMaxWidth()) {
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            text = "STATUS",
+                            color = TextMuted,
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.SemiBold,
+                            letterSpacing = 0.5.sp
+                        )
+                        Spacer(modifier = Modifier.height(2.dp))
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(6.dp)
+                        ) {
+                            Box(
+                                modifier = Modifier
+                                    .size(6.dp)
+                                    .clip(CircleShape)
+                                    .background(statusColor)
+                            )
+                            Text(
+                                text = statusLabel,
+                                color = statusColor,
+                                fontSize = 13.sp,
+                                fontWeight = FontWeight.SemiBold
+                            )
+                        }
+                    }
+                    Spacer(modifier = Modifier.width(16.dp))
+                    Spacer(modifier = Modifier.weight(1f))
+                }
+            }
+
+            DashedDivider(color = BorderSlate200)
+
+            // Bagian Daftar Belanja
+            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                Text(
+                    text = "DAFTAR BELANJA",
+                    color = TextMuted,
+                    fontSize = 11.sp,
+                    fontWeight = FontWeight.Bold,
+                    letterSpacing = 0.5.sp
+                )
+                if (transaction.items.isEmpty()) {
+                    Text("Tidak ada item.", color = TextSecondary, fontSize = 13.sp)
+                } else {
+                    transaction.items.forEach { item ->
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.Top
+                        ) {
+                            Column(modifier = Modifier.weight(1f).padding(end = 8.dp)) {
+                                Text(
+                                    text = item.productName.ifBlank { "Produk ${item.productId.take(8)}" },
+                                    color = TextSlate800,
+                                    fontSize = 14.sp,
+                                    fontWeight = FontWeight.SemiBold
+                                )
+                                Spacer(modifier = Modifier.height(2.dp))
+                                val qtyText = if (item.quantity.compareTo(BigDecimal.ZERO) == 0) "0" else item.quantity.stripTrailingZeros().toPlainString()
+                                Text(
+                                    text = "$qtyText × ${item.priceAtTransaction.formatReceiptMoney()}",
+                                    color = TextSecondary,
+                                    fontSize = 12.sp,
+                                    fontWeight = FontWeight.Medium
+                                )
+                            }
+                            Text(
+                                text = item.subtotal.formatReceiptMoney(),
+                                color = TextSlate800,
+                                fontSize = 14.sp,
+                                fontWeight = FontWeight.SemiBold
+                            )
+                        }
+                    }
+                }
+            }
+
+            DashedDivider(color = BorderSlate200)
+
+            // Bagian Rincian Pembayaran
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Text(
+                    text = "RINCIAN PEMBAYARAN",
+                    color = TextMuted,
+                    fontSize = 11.sp,
+                    fontWeight = FontWeight.Bold,
+                    letterSpacing = 0.5.sp
+                )
+                Spacer(modifier = Modifier.height(2.dp))
+
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text("Subtotal", color = TextSecondary, fontSize = 13.sp)
+                    Text(transaction.total.formatReceiptMoney(), color = TextSlate800, fontSize = 13.sp, fontWeight = FontWeight.Medium)
+                }
+
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text("Diskon", color = TextSecondary, fontSize = 13.sp)
+                    Text(BigDecimal.ZERO.formatReceiptMoney(), color = TextMuted, fontSize = 13.sp, fontWeight = FontWeight.Medium)
+                }
+
+                HorizontalDivider(color = SurfaceSlate100, thickness = 1.dp, modifier = Modifier.padding(vertical = 2.dp))
+
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text("Total", color = TextPrimary, fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
+                    Text(transaction.total.formatReceiptMoney(), color = TextPrimary, fontSize = 14.sp, fontWeight = FontWeight.Bold)
+                }
+
+                DashedDivider(color = BorderSlate200)
+
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text("Metode Pembayaran", color = TextSecondary, fontSize = 13.sp)
+                    val isSettled = transaction.remainingAmount() <= BigDecimal.ZERO
+                    val effectiveMethods = if (isSettled) {
+                        transaction.paymentMethods.filterNot { it.lowercase() in setOf("hutang", "credit", "dp", "down_payment") }
+                            .ifEmpty { listOf("tunai") }
+                    } else {
+                        transaction.paymentMethods.ifEmpty { listOf("tunai") }
+                    }
+                    val method = effectiveMethods.joinToString(" + ") { m ->
+                        when (m.lowercase()) {
+                            "tunai", "cash" -> "Tunai"
+                            "transfer", "bank_transfer" -> "Transfer"
+                            "qris" -> "QRIS"
+                            "hutang", "credit" -> "Hutang"
+                            "dp", "down_payment" -> "DP"
+                            else -> m.replaceFirstChar { it.uppercase() }
+                        }
+                    }
+                    Text(
+                        text = method,
+                        color = TextSlate800,
+                        fontSize = 13.sp,
+                        fontWeight = FontWeight.Medium
+                    )
+                }
+
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text("Dibayar", color = TextSecondary, fontSize = 13.sp)
+                    Text(transaction.paidAmount.formatReceiptMoney(), color = TextSlate800, fontSize = 13.sp, fontWeight = FontWeight.Medium)
+                }
+
+                if (transaction.amountTendered > BigDecimal.ZERO) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text("Uang diterima", color = TextSecondary, fontSize = 13.sp)
+                        Text(transaction.amountTendered.formatReceiptMoney(), color = TextSlate800, fontSize = 13.sp, fontWeight = FontWeight.Medium)
+                    }
+                }
+
+                if (transaction.changeAmount > BigDecimal.ZERO) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text("Kembalian", color = TextSecondary, fontSize = 13.sp)
+                        Text(transaction.changeAmount.formatReceiptMoney(), color = Color(0xFF047857), fontSize = 13.sp, fontWeight = FontWeight.Bold)
+                    }
+                }
+
+                HorizontalDivider(color = SurfaceSlate100, thickness = 1.dp, modifier = Modifier.padding(vertical = 4.dp))
+
+                val remaining = transaction.remainingAmount()
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text("Sisa tagihan", color = TextPrimary, fontSize = 14.sp, fontWeight = FontWeight.SemiBold)
+                    Text(
+                        text = remaining.formatReceiptMoney(),
+                        color = if (remaining > BigDecimal.ZERO) Color(0xFFEF4444) else BrandGreen,
+                        fontSize = 16.sp,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
+            }
+
+            // Informasi Void jika dibatalkan
+            if (transaction.status.equals("voided", true) || transaction.voidReason != null) {
+                HorizontalDivider(color = SurfaceSlate100, thickness = 1.dp)
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text("INFORMASI PEMBATALAN", color = Color(0xFFE11D48), fontSize = 11.sp, fontWeight = FontWeight.SemiBold)
+                    transaction.voidedAt?.let {
+                        ReceiptInfoRow("Dibatalkan", it.formatReceiptDateTime())
+                    }
+                    transaction.voidReason?.let {
+                        ReceiptInfoRow("Alasan void", it, emphasized = true)
+                    }
+                }
+            }
+
+            // Informasi Refund jika ada
+            refundResult?.takeIf { it.transactionId == transaction.id }?.let { refund ->
+                HorizontalDivider(color = SurfaceSlate100, thickness = 1.dp)
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text("INFORMASI REFUND", color = Color(0xFFE11D48), fontSize = 11.sp, fontWeight = FontWeight.SemiBold)
+                    ReceiptInfoRow("Nomor refund", refund.refundNumber)
+                    ReceiptInfoRow("Nominal", refund.refundedAmount.formatReceiptMoney(), emphasized = true)
+                    ReceiptInfoRow("Kondisi barang", refund.returnDisposition.displayName)
+                    ReceiptInfoRow("Alasan", refund.reason)
+                    ReceiptInfoRow("Tanggal", refund.createdAt.formatReceiptDateTime())
+                }
+            }
         }
-        ReceiptInfoRow("Sisa tagihan", transaction.remainingAmount().moneyText(), emphasized = transaction.remainingAmount() > BigDecimal.ZERO)
-        transaction.voidedAt?.let { ReceiptInfoRow("Dibatalkan", it.displayDateTime()) }
-        transaction.voidReason?.let { ReceiptInfoRow("Alasan void", it, emphasized = true) }
     }
 }
 
@@ -369,40 +717,15 @@ private fun ReceiptInfoRow(
     emphasized: Boolean = false
 ) {
     Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-        Text(label, color = DashboardTextSecondary, fontSize = 14.sp, fontWeight = FontWeight.SemiBold)
+        Text(label, color = TextSecondary, fontSize = 13.sp, fontWeight = FontWeight.Normal)
         Text(
             value,
-            color = if (emphasized) Color(0xFFEF4444) else DashboardTextPrimary,
-            fontSize = 14.sp,
-            fontWeight = FontWeight.Bold,
+            color = if (emphasized) Color(0xFFE11D48) else TextSlate800,
+            fontSize = 13.sp,
+            fontWeight = FontWeight.Medium,
             textAlign = TextAlign.End,
             modifier = Modifier.weight(1f)
         )
-    }
-}
-
-@Composable
-private fun ReceiptItemsList(items: List<CashTransactionItem>) {
-    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        Text("Daftar Belanja", color = DashboardTextPrimary, fontWeight = FontWeight.Bold, fontSize = 16.sp)
-        Spacer(modifier = Modifier.height(4.dp))
-        if (items.isEmpty()) {
-            Text("Tidak ada item.", color = DashboardTextSecondary, fontSize = 14.sp)
-        } else {
-            items.forEach { item ->
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Column {
-                        Text(item.productName.ifBlank { "Produk ${item.productId.take(8)}" }, color = DashboardTextPrimary, fontWeight = FontWeight.SemiBold, fontSize = 14.sp)
-                        Text("${item.quantity} x ${item.priceAtTransaction.moneyText()}", color = DashboardTextSecondary, fontSize = 12.sp)
-                    }
-                    Text(item.subtotal.moneyText(), color = DashboardTextPrimary, fontWeight = FontWeight.Bold, fontSize = 14.sp)
-                }
-            }
-        }
     }
 }
 
@@ -413,77 +736,131 @@ private fun ReceiptActions(
     onPrintClick: () -> Unit,
     onShowPayDebt: () -> Unit,
     onShowVoid: () -> Unit,
-    onShowRefund: () -> Unit,
-    compact: Boolean
+    onShowRefund: () -> Unit
 ) {
-    val actions: @Composable () -> Unit = {
+    Column(
+        modifier = Modifier.fillMaxWidth(),
+        verticalArrangement = Arrangement.spacedBy(10.dp)
+    ) {
+        // Tombol Utama Cetak Struk (Sage Green #256B57)
+        Button(
+            onClick = onPrintClick,
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(48.dp),
+            shape = RoundedCornerShape(12.dp),
+            colors = ButtonDefaults.buttonColors(containerColor = BrandGreen),
+            elevation = ButtonDefaults.buttonElevation(defaultElevation = 0.dp)
+        ) {
+            Icon(
+                imageVector = Icons.Outlined.Print,
+                contentDescription = null,
+                tint = Color.White,
+                modifier = Modifier.size(18.dp)
+            )
+            Spacer(modifier = Modifier.width(8.dp))
+            Text(
+                text = if (transaction.status.equals("voided", true)) "Cetak struk void" else "Cetak struk",
+                color = Color.White,
+                fontSize = 14.sp,
+                fontWeight = FontWeight.Medium
+            )
+        }
+
+        // Tombol Terima Pelunasan jika masih ada sisa tagihan
         val canAcceptPayment = role.equals("KASIR", ignoreCase = true) || role.equals("OWNER", ignoreCase = true)
         if (!transaction.status.equals("voided", true) && transaction.remainingAmount() > BigDecimal.ZERO && canAcceptPayment) {
-            androidx.compose.material3.Button(
-                onClick = onShowPayDebt,
-                modifier = if (compact) Modifier.fillMaxWidth() else Modifier,
-                shape = RoundedCornerShape(12.dp),
-                colors = androidx.compose.material3.ButtonDefaults.buttonColors(containerColor = DashboardBrandGreenDark)
-            ) {
-                Icon(Icons.Outlined.Info, contentDescription = null, modifier = Modifier.size(18.dp))
-                Spacer(modifier = Modifier.width(8.dp))
-                Text("Terima Pelunasan", fontWeight = FontWeight.Bold)
-            }
-            Spacer(modifier = if (compact) Modifier.height(10.dp) else Modifier.width(12.dp))
-        }
-        val access = transactionActionAccess(role, transaction.status, transaction.type)
-        if (access.canVoid) {
             Button(
-                onClick = onShowVoid,
-                modifier = if (compact) Modifier.fillMaxWidth() else Modifier,
-                colors = androidx.compose.material3.ButtonDefaults.buttonColors(containerColor = Color(0xFFB91C1C)),
-                shape = RoundedCornerShape(12.dp)
-            ) { Text("Void transaksi", fontWeight = FontWeight.Bold) }
-            Spacer(modifier = if (compact) Modifier.height(10.dp) else Modifier.width(12.dp))
-        }
-        if (access.canRefund) {
-            OutlinedButton(
-                onClick = onShowRefund,
-                modifier = if (compact) Modifier.fillMaxWidth() else Modifier,
+                onClick = onShowPayDebt,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(48.dp),
                 shape = RoundedCornerShape(12.dp),
-                border = BorderStroke(1.dp, Color(0xFFB91C1C)),
-            ) { Text("Refund transaksi", color = Color(0xFFB91C1C), fontWeight = FontWeight.Bold) }
-            Spacer(modifier = if (compact) Modifier.height(10.dp) else Modifier.width(12.dp))
+                colors = ButtonDefaults.buttonColors(containerColor = BrandGreenDark),
+                elevation = ButtonDefaults.buttonElevation(defaultElevation = 0.dp)
+            ) {
+                Icon(
+                    imageVector = Icons.Outlined.Info,
+                    contentDescription = null,
+                    tint = Color.White,
+                    modifier = Modifier.size(18.dp)
+                )
+                Spacer(modifier = Modifier.width(8.dp))
+                Text(
+                    text = "Terima Pelunasan",
+                    color = Color.White,
+                    fontSize = 14.sp,
+                    fontWeight = FontWeight.Medium
+                )
+            }
         }
 
-        OutlinedButton(
-            onClick = onPrintClick,
-            modifier = if (compact) Modifier.fillMaxWidth() else Modifier,
-            enabled = true,
-            shape = RoundedCornerShape(12.dp),
-            border = BorderStroke(1.dp, ReceiptLine)
-        ) {
-            Icon(Icons.Outlined.Print, contentDescription = null, modifier = Modifier.size(18.dp))
-            Spacer(modifier = Modifier.width(8.dp))
-            Text("Cetak struk")
+        // Tombol Sekunder Berdampingan (Void & Refund)
+        val access = transactionActionAccess(role, transaction.status, transaction.type)
+        if (access.canVoid || access.canRefund) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(10.dp)
+            ) {
+                if (access.canVoid) {
+                    OutlinedButton(
+                        onClick = onShowVoid,
+                        modifier = Modifier
+                            .weight(1f)
+                            .height(44.dp),
+                        shape = RoundedCornerShape(12.dp),
+                        border = BorderStroke(1.dp, Color(0xFFFECDD3)), // rose-200
+                        colors = ButtonDefaults.outlinedButtonColors(containerColor = Color(0xFFFFF1F2)) // rose-50
+                    ) {
+                        Icon(
+                            imageVector = Icons.Outlined.DeleteOutline,
+                            contentDescription = null,
+                            tint = Color(0xFFE11D48),
+                            modifier = Modifier.size(16.dp)
+                        )
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text(
+                            text = "Void transaksi",
+                            color = Color(0xFFE11D48),
+                            fontSize = 13.sp,
+                            fontWeight = FontWeight.Medium
+                        )
+                    }
+                }
+                if (access.canRefund) {
+                    OutlinedButton(
+                        onClick = onShowRefund,
+                        modifier = Modifier
+                            .weight(1f)
+                            .height(44.dp),
+                        shape = RoundedCornerShape(12.dp),
+                        border = BorderStroke(1.dp, Color(0xFFFECDD3)), // rose-200
+                        colors = ButtonDefaults.outlinedButtonColors(containerColor = Color(0xFFFFF1F2)) // rose-50
+                    ) {
+                        Icon(
+                            imageVector = Icons.AutoMirrored.Outlined.Undo,
+                            contentDescription = null,
+                            tint = Color(0xFFE11D48),
+                            modifier = Modifier.size(16.dp)
+                        )
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text(
+                            text = "Refund transaksi",
+                            color = Color(0xFFE11D48),
+                            fontSize = 13.sp,
+                            fontWeight = FontWeight.Medium
+                        )
+                    }
+                }
+            }
         }
-    }
-    if (compact) Column(modifier = Modifier.fillMaxWidth()) { actions() }
-    else Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) { actions() }
-}
-
-@Composable
-private fun RefundInformation(refund: TransactionRefundResult) {
-    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        HorizontalDivider(color = ReceiptLine)
-        Text("Informasi Refund", color = DashboardTextPrimary, fontWeight = FontWeight.Bold)
-        ReceiptInfoRow("Nomor refund", refund.refundNumber)
-        ReceiptInfoRow("Nominal", refund.refundedAmount.moneyText(), emphasized = true)
-        ReceiptInfoRow("Kondisi barang", refund.returnDisposition.displayName)
-        ReceiptInfoRow("Alasan", refund.reason)
-        ReceiptInfoRow("Tanggal", refund.createdAt.displayDateTime())
     }
 }
 
 @Composable
 private fun ReceiptLoadingCard() {
     com.tbterminal.app.ui.components.SkeletonCard(
-        modifier = Modifier.fillMaxWidth().height(320.dp),
+        modifier = Modifier.fillMaxWidth().height(360.dp),
     )
 }
 
@@ -491,12 +868,12 @@ private fun ReceiptLoadingCard() {
 private fun ReceiptMessageCard(message: String) {
     Card(
         modifier = Modifier.fillMaxWidth(),
-        colors = CardDefaults.cardColors(containerColor = DashboardSurface),
-        shape = RoundedCornerShape(18.dp),
-        border = BorderStroke(1.dp, ReceiptLine)
+        colors = CardDefaults.cardColors(containerColor = Color.White),
+        shape = RoundedCornerShape(16.dp),
+        border = BorderStroke(1.dp, BorderSlate200)
     ) {
         Box(modifier = Modifier.fillMaxWidth().height(240.dp), contentAlignment = Alignment.Center) {
-            Text(message, color = DashboardTextSecondary, fontWeight = FontWeight.Bold)
+            Text(message, color = TextSecondary, fontWeight = FontWeight.Bold)
         }
     }
 }
@@ -655,6 +1032,8 @@ private class TransactionReceiptPrintAdapter(
         val canvas = page.canvas
         var y = 42f
         val isVoided = transaction.status.equals("voided", true)
+        val isSettled = !isVoided && transaction.remainingAmount() <= BigDecimal.ZERO
+        val displayStatus = if (isSettled) "LUNAS" else transaction.status.uppercase()
         canvas.drawText(if (isVoided) "STRUK VOID" else "TB TERMINAL", 32f, y, bold)
         y += 24f
         listOf(
@@ -662,7 +1041,7 @@ private class TransactionReceiptPrintAdapter(
             "Tanggal: ${transaction.createdAt.displayDateTime()}",
             "Kasir: ${transaction.cashierName ?: "-"}",
             "Pelanggan: ${transaction.customerName ?: "Umum"}",
-            "Status: ${transaction.status.uppercase()}"
+            "Status: $displayStatus"
         ).forEach { canvas.drawText(it.take(82), 32f, y, normal); y += 18f }
         if (isVoided) {
             canvas.drawText("Alasan void: ${transaction.voidReason ?: "-"}".take(82), 32f, y, normal)
@@ -683,72 +1062,6 @@ private class TransactionReceiptPrintAdapter(
 }
 
 internal fun CashTransactionDetail.receiptNumber(): String {
-    return receiptId
-}
-
-@Composable
-internal fun CashierPayDebtDialog(
-    state: CashierTransactionHistoryUiState,
-    onDismiss: () -> Unit,
-    onAmountChanged: (String) -> Unit,
-    onMethodChanged: (String) -> Unit,
-    onConfirm: () -> Unit
-) {
-    Dialog(onDismissRequest = onDismiss) {
-        Card(
-            shape = RoundedCornerShape(18.dp),
-            colors = CardDefaults.cardColors(containerColor = Color.White)
-        ) {
-            Column(
-                modifier = Modifier.padding(24.dp),
-                verticalArrangement = Arrangement.spacedBy(16.dp)
-            ) {
-                Text(
-                    "Terima Pelunasan",
-                    color = DashboardTextPrimary,
-                    fontSize = 20.sp,
-                    fontWeight = FontWeight.ExtraBold
-                )
-                Text(
-                    "Masukkan nominal pembayaran untuk sisa tagihan struk ini.",
-                    color = DashboardTextSecondary,
-                    fontSize = 14.sp
-                )
-                
-                Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                    Text("NOMINAL BAYAR", color = DashboardTextSecondary, fontSize = 11.sp, fontWeight = FontWeight.ExtraBold)
-                    androidx.compose.material3.OutlinedTextField(
-                        value = state.payDebtAmountInput,
-                        onValueChange = onAmountChanged,
-                        placeholder = { Text("Misal: 50000", color = DashboardTextSecondary) },
-                        leadingIcon = { Text("Rp", color = DashboardTextSecondary, fontWeight = FontWeight.Bold) },
-                        keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(keyboardType = androidx.compose.ui.text.input.KeyboardType.Decimal),
-                        modifier = Modifier.fillMaxWidth(),
-                        singleLine = true,
-                        shape = RoundedCornerShape(12.dp)
-                    )
-                }
-
-                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
-                    androidx.compose.material3.TextButton(onClick = onDismiss, enabled = !state.isSubmittingDebt) {
-                        Text("Batal", color = DashboardTextSecondary, fontWeight = FontWeight.Bold)
-                    }
-                    Spacer(modifier = Modifier.width(8.dp))
-                    androidx.compose.material3.Button(
-                        onClick = onConfirm,
-                        enabled = !state.isSubmittingDebt,
-                        colors = androidx.compose.material3.ButtonDefaults.buttonColors(containerColor = DashboardBrandGreenDark),
-                        shape = RoundedCornerShape(12.dp)
-                    ) {
-                        if (state.isSubmittingDebt) {
-                            CircularProgressIndicator(modifier = Modifier.size(18.dp), color = Color.White, strokeWidth = 2.dp)
-                        } else {
-                            Text("Simpan", fontWeight = FontWeight.Bold)
-                        }
-                    }
-                }
-            }
-        }
-    }
+    return receiptId.ifBlank { id }
 }
 

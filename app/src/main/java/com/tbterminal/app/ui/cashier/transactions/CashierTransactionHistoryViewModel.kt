@@ -33,6 +33,8 @@ import java.time.format.DateTimeFormatter
 import java.time.temporal.ChronoUnit
 import java.util.UUID
 
+private val WIB_ZONE = ZoneId.of("Asia/Jakarta")
+
 class CashierTransactionHistoryViewModel(
     private val repository: CashReconciliationRepository,
     private val transactionDao: TransactionDao? = null,
@@ -203,7 +205,7 @@ class CashierTransactionHistoryViewModel(
     }
 
     fun setDate(date: String?) {
-        val resolvedDate = date ?: LocalDate.now().format(DateTimeFormatter.ISO_LOCAL_DATE)
+        val resolvedDate = date ?: LocalDate.now(WIB_ZONE).format(DateTimeFormatter.ISO_LOCAL_DATE)
         _uiState.update {
             it.copy(
                 selectedDate = resolvedDate,
@@ -217,7 +219,7 @@ class CashierTransactionHistoryViewModel(
     }
 
     fun setDatePreset(preset: String) {
-        val today = LocalDate.now()
+        val today = LocalDate.now(WIB_ZONE)
         val startDate = when (preset) {
             "7 hari" -> today.minusDays(6)
             "30 hari" -> today.minusDays(29)
@@ -232,7 +234,7 @@ class CashierTransactionHistoryViewModel(
 
     fun nextDate() {
         val (startDate, endDate) = currentDateRange()
-        val today = LocalDate.now()
+        val today = LocalDate.now(WIB_ZONE)
         if (endDate >= today) return
 
         val rangeLength = ChronoUnit.DAYS.between(startDate, endDate).coerceAtLeast(0) + 1
@@ -271,10 +273,10 @@ class CashierTransactionHistoryViewModel(
 
         val startDate = (state.startDate ?: state.selectedDate)?.let(LocalDate::parse)
         val endDate = (state.endDate ?: state.selectedDate)?.let(LocalDate::parse)
-        if (startDate != null && endDate != null) {
+        if (startDate != null || endDate != null) {
             filtered = filtered.filter { tx ->
-                val txDate = runCatching { LocalDate.parse(tx.createdAt.take(10)) }.getOrNull()
-                txDate != null && !txDate.isBefore(startDate) && !txDate.isAfter(endDate)
+                val txDate = tx.createdAt.toLocalDateOrNull()
+                txDate != null && (startDate == null || !txDate.isBefore(startDate)) && (endDate == null || !txDate.isAfter(endDate))
             }
         }
 
@@ -713,7 +715,7 @@ class CashierTransactionHistoryViewModel(
 
     private fun currentDateRange(): Pair<LocalDate, LocalDate> {
         val state = _uiState.value
-        val endDate = (state.endDate ?: state.selectedDate)?.let(LocalDate::parse) ?: LocalDate.now()
+        val endDate = (state.endDate ?: state.selectedDate)?.let(LocalDate::parse) ?: LocalDate.now(WIB_ZONE)
         val startDate = (state.startDate ?: state.selectedDate)?.let(LocalDate::parse) ?: endDate
         return startDate to endDate
     }
@@ -806,13 +808,13 @@ internal fun com.tbterminal.app.data.model.CashTransactionDetail.remainingAmount
 private fun String.toLocalDateOrNull(): LocalDate? {
     val value = trim()
     return runCatching {
-        OffsetDateTime.parse(value).atZoneSameInstant(ZoneId.systemDefault()).toLocalDate()
+        OffsetDateTime.parse(value).atZoneSameInstant(WIB_ZONE).toLocalDate()
     }.getOrNull()
         ?: runCatching {
-            Instant.parse(value).atZone(ZoneId.systemDefault()).toLocalDate()
+            Instant.parse(value).atZone(WIB_ZONE).toLocalDate()
         }.getOrNull()
         ?: runCatching {
-            LocalDateTime.parse(value).atZone(ZoneId.systemDefault()).toLocalDate()
+            LocalDateTime.parse(value).atZone(WIB_ZONE).toLocalDate()
         }.getOrNull()
         ?: runCatching {
             LocalDate.parse(value.take(10))

@@ -73,8 +73,12 @@ import com.tbterminal.app.ui.dashboard.cashier.CashierDestination
 import com.tbterminal.app.ui.offline.LocalPendingTransactionsCard
 import java.math.BigDecimal
 import java.text.NumberFormat
+import java.time.Instant
 import java.time.LocalDate
+import java.time.LocalDateTime
 import java.time.OffsetDateTime
+import java.time.ZoneId
+import java.time.ZonedDateTime
 import java.time.format.DateTimeFormatter
 import java.util.Locale
 
@@ -523,52 +527,162 @@ private fun CashierHistoryMobileRow(
         modifier = Modifier
             .fillMaxWidth()
             .clickable { onReceiptClick(transaction.id) }
-            .padding(horizontal = 16.dp, vertical = 14.dp),
-        verticalArrangement = Arrangement.spacedBy(10.dp)
+            .padding(16.dp),
     ) {
+        // Header: Icon, Details & Chevron
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.SpaceBetween,
+        ) {
+            Row(
+                modifier = Modifier.weight(1f),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Surface(
+                    modifier = Modifier.size(40.dp),
+                    shape = RoundedCornerShape(12.dp),
+                    color = Color.White,
+                    border = BorderStroke(1.dp, Color(0xFFE2E8F0)),
+                ) {
+                    Box(contentAlignment = Alignment.Center) {
+                        Icon(
+                            Icons.Outlined.Visibility,
+                            contentDescription = null,
+                            tint = Color(0xFF1E293B),
+                            modifier = Modifier.size(20.dp),
+                        )
+                    }
+                }
+                Spacer(Modifier.width(12.dp))
+                Column(
+                    modifier = Modifier.weight(1f),
+                ) {
+                    Text(
+                        text = transaction.receiptNumber(),
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.SemiBold,
+                        color = Color(0xFF0F172A),
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                    Spacer(Modifier.height(2.dp))
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Text(
+                            text = transaction.customerName?.takeIf { it.isNotBlank() } ?: "Pelanggan umum",
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.Medium,
+                            color = Color(0xFF334155),
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                            modifier = Modifier.weight(1f, fill = false),
+                        )
+                        Text(
+                            text = " • ",
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.Normal,
+                            color = Color(0xFFCBD5E1),
+                        )
+                        val cashierName = transaction.cashierName?.takeIf { it.isNotBlank() } ?: "-"
+                        Text(
+                            text = "Kasir: $cashierName",
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.Normal,
+                            color = Color(0xFF64748B),
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                            modifier = Modifier.weight(1f, fill = false),
+                        )
+                    }
+                }
+            }
+            Spacer(Modifier.width(8.dp))
+            Icon(
+                Icons.Default.ChevronRight,
+                contentDescription = null,
+                tint = Color(0xFF94A3B8),
+                modifier = Modifier.size(16.dp),
+            )
+        }
+
+        Spacer(Modifier.height(10.dp))
+        HorizontalDivider(color = Color(0xFFF1F5F9))
+        Spacer(Modifier.height(10.dp))
+
+        // Details Grid: Baris 1 Total & Dibayar
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.Top
+            verticalAlignment = Alignment.CenterVertically,
         ) {
-            Column(modifier = Modifier.weight(1f)) {
+            Column {
                 Text(
-                    transaction.receiptNumber(),
-                    color = DashboardTextPrimary,
-                    fontWeight = FontWeight.ExtraBold,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
+                    text = "TOTAL",
+                    fontSize = 10.sp,
+                    fontWeight = FontWeight.Medium,
+                    letterSpacing = 0.5.sp,
+                    color = Color(0xFF94A3B8),
                 )
+                Spacer(Modifier.height(2.dp))
                 Text(
-                    "${transaction.createdAt.displayDate()} · ${transaction.createdAt.displayTime()}",
-                    color = DashboardTextSecondary,
-                    fontSize = 12.sp
+                    text = transaction.total.moneyText(),
+                    fontSize = 14.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    color = Color(0xFF1E293B),
                 )
             }
-            Box(
-                modifier = Modifier
-                    .clip(RoundedCornerShape(16.dp))
-                    .background(transaction.status.statusColor().copy(alpha = 0.12f))
-                    .padding(horizontal = 10.dp, vertical = 5.dp)
-            ) {
+            Column(horizontalAlignment = Alignment.End) {
                 Text(
-                    transaction.status.uppercase(),
-                    color = transaction.status.statusColor(),
-                    fontSize = 11.sp,
-                    fontWeight = FontWeight.Bold
+                    text = "DIBAYAR",
+                    fontSize = 10.sp,
+                    fontWeight = FontWeight.Medium,
+                    letterSpacing = 0.5.sp,
+                    color = Color(0xFF94A3B8),
+                    textAlign = TextAlign.End,
+                )
+                Spacer(Modifier.height(2.dp))
+                Text(
+                    text = transaction.paidAmount.moneyText(),
+                    fontSize = 14.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = Color(0xFF15803D),
+                    textAlign = TextAlign.End,
                 )
             }
         }
+
+        Spacer(Modifier.height(6.dp))
+        HorizontalDivider(color = Color(0xFFF8FAFC))
+        Spacer(Modifier.height(6.dp))
+
+        // Details Grid: Baris 2 Tanggal & Status
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.Bottom
+            verticalAlignment = Alignment.CenterVertically,
         ) {
-            Column(modifier = Modifier.weight(1f)) {
-                Text(transaction.customerName ?: "Pelanggan umum", color = DashboardTextSecondary, fontSize = 12.sp)
-                Text(transaction.total.moneyText(), color = DashboardTextPrimary, fontWeight = FontWeight.Bold)
+            Text(
+                text = "${transaction.createdAt.displayDate()}, ${transaction.createdAt.displayTime()}",
+                fontSize = 12.sp,
+                fontWeight = FontWeight.Medium,
+                color = Color(0xFF64748B),
+            )
+            val statusColor = when (transaction.status.lowercase()) {
+                "lunas", "paid", "success", "completed" -> Color(0xFF15803D)
+                "dp", "partial", "pending" -> Color(0xFFD97706)
+                "voided", "void", "refunded", "cancelled" -> Color(0xFFE11D48)
+                "hutang", "unpaid" -> Color(0xFFEA580C)
+                else -> Color(0xFF15803D)
             }
-            Icon(Icons.Outlined.Visibility, contentDescription = "Lihat struk", tint = DashboardBrandGreenDark)
+            Text(
+                text = transaction.status,
+                fontSize = 12.sp,
+                fontWeight = FontWeight.SemiBold,
+                color = statusColor,
+            )
         }
     }
 }
@@ -657,16 +771,26 @@ internal fun CashTransaction.receiptNumber(): String = receiptId
 internal fun BigDecimal.moneyText(): String =
     NumberFormat.getCurrencyInstance(Locale.forLanguageTag("id-ID")).format(this)
 
+private val WIB_ZONE = ZoneId.of("Asia/Jakarta")
+
+private fun parseToWib(raw: String): ZonedDateTime? {
+    val trimmed = raw.trim()
+    return runCatching { OffsetDateTime.parse(trimmed).atZoneSameInstant(WIB_ZONE) }.getOrNull()
+        ?: runCatching { Instant.parse(trimmed).atZone(WIB_ZONE) }.getOrNull()
+        ?: runCatching { LocalDateTime.parse(trimmed).atZone(WIB_ZONE) }.getOrNull()
+        ?: runCatching { LocalDate.parse(trimmed.take(10)).atStartOfDay(WIB_ZONE) }.getOrNull()
+}
+
 internal fun String.displayDateTime(): String = runCatching {
-    OffsetDateTime.parse(this).format(DateTimeFormatter.ofPattern("dd MMM yyyy HH:mm", Locale.forLanguageTag("id-ID")))
+    parseToWib(this)?.format(DateTimeFormatter.ofPattern("dd MMM yyyy HH:mm", Locale.forLanguageTag("id-ID"))) ?: this
 }.getOrDefault(this)
 
 internal fun String.displayDate(): String = runCatching {
-    OffsetDateTime.parse(this).format(DateTimeFormatter.ofPattern("dd MMM yyyy", Locale.forLanguageTag("id-ID")))
+    parseToWib(this)?.format(DateTimeFormatter.ofPattern("dd MMM yyyy", Locale.forLanguageTag("id-ID"))) ?: "-"
 }.getOrDefault("-")
 
 internal fun String.displayTime(): String = runCatching {
-    OffsetDateTime.parse(this).format(DateTimeFormatter.ofPattern("HH:mm", Locale.forLanguageTag("id-ID")))
+    parseToWib(this)?.format(DateTimeFormatter.ofPattern("HH:mm", Locale.forLanguageTag("id-ID"))) ?: "-"
 }.getOrDefault("-")
 
 internal fun String.statusColor(): Color = when (lowercase()) {

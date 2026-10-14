@@ -19,8 +19,12 @@ import com.tbterminal.app.ui.dashboard.admin.AdminDashboardShell
 import com.tbterminal.app.ui.dashboard.admin.AdminDestination
 import java.math.BigDecimal
 import java.text.NumberFormat
+import java.time.Instant
 import java.time.LocalDate
+import java.time.LocalDateTime
 import java.time.OffsetDateTime
+import java.time.ZoneId
+import java.time.ZonedDateTime
 import java.time.format.DateTimeFormatter
 import java.util.Locale
 
@@ -52,6 +56,7 @@ fun AdminTransactionHistoryScreen(
     onSettingsClick: () -> Unit = {},
     onReceiptClick: (String) -> Unit,
     onLogout: () -> Unit,
+    onBack: (() -> Unit)? = null,
     viewModel: AdminTransactionHistoryViewModel = viewModel(
         factory = AdminTransactionHistoryViewModel.factory(
             repository = cashReconciliationRepository,
@@ -69,6 +74,7 @@ fun AdminTransactionHistoryScreen(
         role = role,
         activeDestination = AdminDestination.SalesTransactions,
         pageTitle = "Riwayat Penjualan",
+        onBack = onBack,
         onDashboardClick = onDashboardClick,
         onProductsClick = onProductsClick,
         onAddProductClick = onAddProductClick,
@@ -116,23 +122,36 @@ fun AdminTransactionHistoryScreen(
 
 internal fun CashTransaction.receiptNumber(): String = receiptId
 
-internal fun BigDecimal.moneyText(): String =
-    NumberFormat.getCurrencyInstance(Locale.forLanguageTag("id-ID")).format(this)
+internal fun BigDecimal.moneyText(): String {
+    val formatter = NumberFormat.getCurrencyInstance(Locale.forLanguageTag("id-ID"))
+    formatter.maximumFractionDigits = 0
+    return formatter.format(this).replace(" ", "")
+}
+
+private val WIB_ZONE = ZoneId.of("Asia/Jakarta")
+
+private fun parseToWib(raw: String): ZonedDateTime? {
+    val trimmed = raw.trim()
+    return runCatching { OffsetDateTime.parse(trimmed).atZoneSameInstant(WIB_ZONE) }.getOrNull()
+        ?: runCatching { Instant.parse(trimmed).atZone(WIB_ZONE) }.getOrNull()
+        ?: runCatching { LocalDateTime.parse(trimmed).atZone(WIB_ZONE) }.getOrNull()
+        ?: runCatching { LocalDate.parse(trimmed.take(10)).atStartOfDay(WIB_ZONE) }.getOrNull()
+}
 
 internal fun String.displayDateTime(): String = runCatching {
-    OffsetDateTime.parse(this).format(
+    parseToWib(this)?.format(
         DateTimeFormatter.ofPattern("dd MMM yyyy HH:mm", Locale.forLanguageTag("id-ID")),
-    )
+    ) ?: this
 }.getOrDefault(this)
 
 internal fun String.displayDate(): String = runCatching {
-    OffsetDateTime.parse(this).format(
+    parseToWib(this)?.format(
         DateTimeFormatter.ofPattern("dd MMM yyyy", Locale.forLanguageTag("id-ID")),
-    )
+    ) ?: "-"
 }.getOrDefault("-")
 
 internal fun String.displayTime(): String = runCatching {
-    OffsetDateTime.parse(this).format(DateTimeFormatter.ofPattern("HH:mm", Locale.forLanguageTag("id-ID")))
+    parseToWib(this)?.format(DateTimeFormatter.ofPattern("HH:mm", Locale.forLanguageTag("id-ID"))) ?: "-"
 }.getOrDefault("-")
 
 internal fun String.statusColor(): Color = when (lowercase()) {

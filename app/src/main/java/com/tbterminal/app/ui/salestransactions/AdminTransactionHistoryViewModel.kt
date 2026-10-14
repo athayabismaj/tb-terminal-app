@@ -28,6 +28,8 @@ import java.time.OffsetDateTime
 import java.time.ZoneId
 import java.time.temporal.ChronoUnit
 
+private val WIB_ZONE = ZoneId.of("Asia/Jakarta")
+
 data class AdminTransactionHistoryUiState(
     val transactions: List<CashTransaction> = emptyList(),
     val localPendingTransactions: List<LocalPendingTransactionUi> = emptyList(),
@@ -36,9 +38,9 @@ data class AdminTransactionHistoryUiState(
     val query: String = "",
     val statusFilter: String = "Semua", // Semua, Lunas, DP, Hutang
     val paymentMethodFilter: String = "Semua",
-    val selectedDate: String? = LocalDate.now().toString(),
-    val startDate: String? = LocalDate.now().toString(),
-    val endDate: String? = LocalDate.now().toString(),
+    val selectedDate: String? = LocalDate.now(WIB_ZONE).toString(),
+    val startDate: String? = LocalDate.now(WIB_ZONE).toString(),
+    val endDate: String? = LocalDate.now(WIB_ZONE).toString(),
     val selectedPreset: String? = "Hari ini",
     val currentStart: Int = 0,
     val currentEnd: Int = 0,
@@ -240,9 +242,10 @@ class AdminTransactionHistoryViewModel(
 
         val start = (state.startDate ?: state.selectedDate)?.let(LocalDate::parse)
         val end = (state.endDate ?: state.selectedDate)?.let(LocalDate::parse)
-        if (start != null && end != null) {
+        if (start != null || end != null) {
             val transactionDate = createdAt.toTransactionLocalDate() ?: return false
-            if (transactionDate.isBefore(start) || transactionDate.isAfter(end)) return false
+            if (start != null && transactionDate.isBefore(start)) return false
+            if (end != null && transactionDate.isAfter(end)) return false
         }
 
         return true
@@ -299,7 +302,7 @@ class AdminTransactionHistoryViewModel(
     }
 
     fun setDatePreset(preset: String) {
-        val today = LocalDate.now()
+        val today = LocalDate.now(WIB_ZONE)
         val startDate = when (preset) {
             "Minggu ini", "7 hari" -> today.with(DayOfWeek.MONDAY)
             "Bulan ini", "30 hari" -> today.withDayOfMonth(1)
@@ -316,7 +319,7 @@ class AdminTransactionHistoryViewModel(
     fun nextDate() {
         val state = _uiState.value
         val (startDate, endDate) = currentDateRange()
-        val today = LocalDate.now()
+        val today = LocalDate.now(WIB_ZONE)
         if (endDate >= today) return
 
         when (state.selectedPreset) {
@@ -378,14 +381,14 @@ class AdminTransactionHistoryViewModel(
 
     private fun currentDateRange(): Pair<LocalDate, LocalDate> {
         val state = _uiState.value
-        val endDate = (state.endDate ?: state.selectedDate)?.let(LocalDate::parse) ?: LocalDate.now()
+        val endDate = (state.endDate ?: state.selectedDate)?.let(LocalDate::parse) ?: LocalDate.now(WIB_ZONE)
         val startDate = (state.startDate ?: state.selectedDate)?.let(LocalDate::parse) ?: endDate
         return startDate to endDate
     }
 
     private fun shiftRange(daysDirection: Int) {
         val (startDate, endDate) = currentDateRange()
-        val today = LocalDate.now()
+        val today = LocalDate.now(WIB_ZONE)
         val rangeLength = ChronoUnit.DAYS.between(startDate, endDate).coerceAtLeast(0) + 1
         val shiftedStart = startDate.plusDays(rangeLength * daysDirection)
         val shiftedEnd = endDate.plusDays(rangeLength * daysDirection)
@@ -415,11 +418,13 @@ class AdminTransactionHistoryViewModel(
 }
 
 private fun String.toTransactionLocalDate(): LocalDate? {
+    val trimmed = trim()
     return runCatching {
-        OffsetDateTime.parse(this)
-            .atZoneSameInstant(ZoneId.systemDefault())
+        OffsetDateTime.parse(trimmed)
+            .atZoneSameInstant(WIB_ZONE)
             .toLocalDate()
     }.getOrNull()
-        ?: runCatching { LocalDateTime.parse(this).toLocalDate() }.getOrNull()
-        ?: runCatching { LocalDate.parse(take(10)) }.getOrNull()
+        ?: runCatching { java.time.Instant.parse(trimmed).atZone(WIB_ZONE).toLocalDate() }.getOrNull()
+        ?: runCatching { LocalDateTime.parse(trimmed).atZone(WIB_ZONE).toLocalDate() }.getOrNull()
+        ?: runCatching { LocalDate.parse(trimmed.take(10)) }.getOrNull()
 }
