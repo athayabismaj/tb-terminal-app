@@ -2,6 +2,16 @@ package com.tbterminal.app.ui.receivables
 
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.ui.graphics.Color
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material.icons.outlined.Tune
+import androidx.compose.material.icons.Icons
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.padding
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.rotate
+import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.tbterminal.app.data.repository.ReceivableRepository
@@ -37,6 +47,7 @@ fun AdminReceivableScreen(
     onProfileClick: () -> Unit = {},
     onSettingsClick: () -> Unit = {},
     onBack: () -> Unit = {},
+    onCustomerDetailClick: (String) -> Unit = {},
     onLogout: () -> Unit,
     viewModel: ReceivableViewModel = viewModel(
         factory = ReceivableViewModel.factory(receivableRepository, customerRepository, role)
@@ -48,7 +59,7 @@ fun AdminReceivableScreen(
         userName = name,
         role = role,
         activeDestination = AdminDestination.Receivables,
-        showPageHeader = true,
+        
         onDashboardClick = onDashboardClick,
         onProductsClick = onProductsClick,
         onAddProductClick = onAddProductClick,
@@ -68,7 +79,23 @@ fun AdminReceivableScreen(
         onOperationalAuditClick = onOperationalAuditClick,
         onProfileClick = onProfileClick,
         onSettingsClick = onSettingsClick,
+                showPageHeader = true,
         pageTitle = "Piutang Pelanggan",
+        topBarActions = {
+            if (canManageReceivableAdjustment(role)) {
+                IconButton(
+                    onClick = viewModel::openAdjustment,
+                    modifier = Modifier.padding(end = 0.dp) // Shifted to the right by removing end padding
+                ) {
+                    Icon(
+                        imageVector = androidx.compose.material.icons.Icons.Outlined.Tune,
+                        contentDescription = "Sesuaikan",
+                        tint = Color(0xFF1E293B),
+                        modifier = Modifier.rotate(90f).size(20.dp) // Slightly smaller icon
+                    )
+                }
+            }
+        },
         onBack = onBack,
         onLogout = onLogout
     ) { contentModifier ->
@@ -78,7 +105,7 @@ fun AdminReceivableScreen(
             modifier = contentModifier,
         ) {
             ReceivableScreen(
-            modifier = androidx.compose.ui.Modifier,
+            modifier = Modifier,
             uiState = uiState,
             onSearchChanged = viewModel::onSearchChanged,
             onStatusFilterChanged = viewModel::onStatusFilterChanged,
@@ -89,7 +116,8 @@ fun AdminReceivableScreen(
             onPayClick = viewModel::openPayment,
             onPreviousPage = viewModel::previousPage,
             onNextPage = viewModel::nextPage,
-            onDismissMessage = viewModel::clearMessage
+            onDismissMessage = viewModel::clearMessage,
+            onCustomerDetailClick = onCustomerDetailClick
             )
         }
     }
@@ -109,8 +137,10 @@ fun AdminReceivableScreen(
 
     if (uiState.isOpeningBalanceOpen) {
         OpeningReceivableDialog(
+            customerRepository = customerRepository,
             uiState = uiState,
             onCustomerChanged = viewModel::onOpeningCustomerChanged,
+            onCustomerSelected = viewModel::onOpeningCustomerSelected,
             onAmountChanged = viewModel::onOpeningAmountChanged,
             onDebtDateChanged = viewModel::onOpeningDebtDateChanged,
             onDueDateChanged = viewModel::onOpeningDueDateChanged,
@@ -123,8 +153,10 @@ fun AdminReceivableScreen(
 
     if (uiState.isAdjustmentOpen) {
         AdjustmentReceivableDialog(
+            customerRepository = customerRepository,
             uiState = uiState,
             onCustomerChanged = viewModel::onAdjustmentCustomerChanged,
+            onCustomerSelected = viewModel::onAdjustmentCustomerSelected,
             onAmountChanged = viewModel::onAdjustmentAmountChanged,
             onDebtDateChanged = viewModel::onAdjustmentDebtDateChanged,
             onDueDateChanged = viewModel::onAdjustmentDueDateChanged,

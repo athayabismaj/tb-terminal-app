@@ -27,7 +27,8 @@ internal fun ReceivableScreen(
     onPayClick: (Receivable) -> Unit,
     onPreviousPage: () -> Unit,
     onNextPage: () -> Unit,
-    onDismissMessage: () -> Unit
+    onDismissMessage: () -> Unit,
+    onCustomerDetailClick: (String) -> Unit = {}
 ) {
     BoxWithConstraints(modifier = modifier.fillMaxSize().background(ReceivableBackground)) {
         val compact = maxWidth < 720.dp
@@ -42,6 +43,7 @@ internal fun ReceivableScreen(
             ReceivableMessage(uiState, onDismissMessage)
             if (showMetrics && !compact) ReceivableMetrics(uiState, compact = false)
             ReceivableTableCard(
+                canAdjust = canAdjust,
                 onAddOpeningBalance = onAddOpeningBalance,
                 onAddAdjustment = onAddAdjustment,
                 modifier = Modifier.fillMaxWidth(),
@@ -52,7 +54,8 @@ internal fun ReceivableScreen(
                 onPayClick = onPayClick,
                 onPreviousPage = onPreviousPage,
                 onNextPage = onNextPage,
-                compact = compact
+                compact = compact,
+                onCustomerDetailClick = onCustomerDetailClick
             )
         }
     }

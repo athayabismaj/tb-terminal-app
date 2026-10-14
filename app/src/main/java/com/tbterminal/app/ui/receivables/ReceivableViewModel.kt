@@ -6,6 +6,7 @@ import androidx.lifecycle.viewModelScope
 import com.tbterminal.app.data.model.CreateReceivablePaymentCommand
 import com.tbterminal.app.data.model.CreateOpeningReceivableCommand
 import com.tbterminal.app.data.model.CreateReceivableAdjustmentCommand
+import com.tbterminal.app.data.model.Customer
 import com.tbterminal.app.data.model.Receivable
 import com.tbterminal.app.data.repository.CustomerRepository
 import com.tbterminal.app.data.repository.ReceivableRepository
@@ -167,6 +168,10 @@ class ReceivableViewModel(
     }
 
     fun onAdjustmentCustomerChanged(value: String) = _uiState.update { it.copy(adjustmentCustomerId = value) }
+    fun onAdjustmentCustomerSelected(customer: Customer) = _uiState.update { state ->
+        val updated = if (state.customers.none { it.id == customer.id }) state.customers + customer else state.customers
+        state.copy(adjustmentCustomerId = customer.id, customers = updated)
+    }
     fun onAdjustmentAmountChanged(value: String) = _uiState.update { it.copy(adjustmentAmountInput = value.decimalInput()) }
     fun onAdjustmentDebtDateChanged(value: String) = _uiState.update { it.copy(adjustmentDebtDateInput = value) }
     fun onAdjustmentDueDateChanged(value: String) = _uiState.update { it.copy(adjustmentDueDateInput = value) }
@@ -219,6 +224,10 @@ class ReceivableViewModel(
     }
 
     fun onOpeningCustomerChanged(value: String) = _uiState.update { it.copy(openingCustomerId = value) }
+    fun onOpeningCustomerSelected(customer: Customer) = _uiState.update { state ->
+        val updated = if (state.customers.none { it.id == customer.id }) state.customers + customer else state.customers
+        state.copy(openingCustomerId = customer.id, customers = updated)
+    }
     fun onOpeningAmountChanged(value: String) = _uiState.update { it.copy(openingAmountInput = value.decimalInput()) }
     fun onOpeningDebtDateChanged(value: String) = _uiState.update { it.copy(openingDebtDateInput = value) }
     fun onOpeningDueDateChanged(value: String) = _uiState.update { it.copy(openingDueDateInput = value) }
@@ -357,7 +366,7 @@ class ReceivableViewModel(
 
     private fun loadCustomers() {
         viewModelScope.launch {
-            when (val result = customerRepository.getCustomers(page = 1, limit = 100)) {
+            when (val result = customerRepository.getCustomers(page = 1, limit = 10)) {
                 is RepositoryResult.Success -> _uiState.update { it.copy(customers = result.data.data.filter { row -> row.isActive }) }
                 else -> Unit
             }

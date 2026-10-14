@@ -41,6 +41,7 @@ import com.tbterminal.app.ui.products.AdminProductDetailScreen
 import com.tbterminal.app.ui.products.AdminProductFormScreen
 import com.tbterminal.app.ui.products.AdminProductListScreen
 import com.tbterminal.app.ui.products.AdminProductUnitsScreen
+import com.tbterminal.app.ui.receivables.AdminReceivableCustomerDetailScreen
 import com.tbterminal.app.ui.receivables.AdminReceivableScreen
 import com.tbterminal.app.ui.reports.AdminReportsScreen
 import com.tbterminal.app.ui.reports.AdminReportsViewModel
@@ -164,11 +165,67 @@ internal fun NavGraphBuilder.receivableGraph(navController: NavHostController, s
                             launchSingleTop = true
                         }
                     },
+                    onCustomerDetailClick = { customerId ->
+                        navController.navigate(AppRoute.ReceivableCustomerDetail.createRoute(customerId)) {
+                            launchSingleTop = true
+                        }
+                    },
                     onBack = {
                         if (!navController.popBackStack()) {
                             navController.navigate(AppRoute.Dashboard.route) {
                                 launchSingleTop = true
                             }
+                        }
+                    },
+                    onLogout = {
+                        sessionManager.logout()
+                        navController.navigate(AppRoute.Login.route) {
+                            popUpTo(0)
+                            launchSingleTop = true
+                        }
+                    }
+                )
+            }
+        }
+
+        composable(
+            route = AppRoute.ReceivableCustomerDetail.route,
+            arguments = listOf(
+                navArgument(AppRoute.ReceivableCustomerDetail.CUSTOMER_ID_ARG) {
+                    type = NavType.StringType
+                }
+            )
+        ) { backStackEntry ->
+            val sessionUser = sessionManager.readSessionUser()
+            val customerId = backStackEntry.arguments
+                ?.getString(AppRoute.ReceivableCustomerDetail.CUSTOMER_ID_ARG)
+
+            if (sessionUser == null || customerId.isNullOrBlank()) {
+                LaunchedEffect(Unit) {
+                    sessionManager.logout()
+                    navController.navigate(AppRoute.Login.route) {
+                        popUpTo(0)
+                        launchSingleTop = true
+                    }
+                }
+            } else {
+                AdminReceivableCustomerDetailScreen(
+                    name = sessionUser.name,
+                    role = sessionUser.role,
+                    customerId = customerId,
+                    receivableRepository = appContainer.receivableRepository,
+                    onDashboardClick = { navController.navigate(AppRoute.Dashboard.route) { launchSingleTop = true } },
+                    onProductsClick = { navController.navigate(AppRoute.Products.route) { launchSingleTop = true } },
+                    onStockOpnameClick = { navController.navigate(AppRoute.StockOpname.route) { launchSingleTop = true } },
+                    onIncomingGoodsClick = { navController.navigate(AppRoute.IncomingGoods.route) { launchSingleTop = true } },
+                    onSupplierDebtsClick = { navController.navigate(AppRoute.SupplierDebts.route) { launchSingleTop = true } },
+                    onReceivablesClick = { navController.navigate(AppRoute.Receivables.route) { launchSingleTop = true } },
+                    onCustomersClick = { navController.navigate(AppRoute.Customers.route) { launchSingleTop = true } },
+                    onReportsClick = { navController.navigate(AppRoute.Reports.route) { launchSingleTop = true } },
+                    onOperationalAuditClick = { navController.navigate(AppRoute.OperationalAudit.route) { launchSingleTop = true } },
+                    onBack = {
+                        if (!navController.popBackStack()) {
+                            navController.navigate(AppRoute.Receivables.route) { launchSingleTop = true }
                         }
                     },
                     onLogout = {

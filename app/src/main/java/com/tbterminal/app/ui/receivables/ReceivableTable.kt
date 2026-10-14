@@ -1,10 +1,28 @@
 package com.tbterminal.app.ui.receivables
 
+import androidx.compose.ui.unit.sp
+import androidx.compose.ui.draw.drawBehind
+import androidx.compose.material.icons.filled.ExpandLess
+import androidx.compose.material.icons.filled.ExpandMore
+import androidx.compose.material.icons.outlined.Receipt
+import androidx.compose.ui.text.withStyle
+
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
+import androidx.compose.runtime.getValue
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.draw.clip
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.border
+import androidx.compose.material3.Icon
+
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.outlined.Tune
+import androidx.compose.material.icons.outlined.FactCheck
 import androidx.compose.material.icons.outlined.AddCircleOutline
 import androidx.compose.material.icons.outlined.AssignmentTurnedIn
 import androidx.compose.foundation.layout.Arrangement
@@ -48,7 +66,6 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -64,6 +81,7 @@ import com.tbterminal.app.ui.components.TbPagination
 
 @Composable
 internal fun ReceivableTableCard(
+    canAdjust: Boolean,
     onAddOpeningBalance: () -> Unit,
     onAddAdjustment: () -> Unit,
     modifier: Modifier,
@@ -75,6 +93,7 @@ internal fun ReceivableTableCard(
     onPreviousPage: () -> Unit,
     onNextPage: () -> Unit,
     compact: Boolean = false,
+    onCustomerDetailClick: (String) -> Unit = {},
 ) {
     if (compact) {
         var showMobileFilters by remember { mutableStateOf(false) }
@@ -82,35 +101,6 @@ internal fun ReceivableTableCard(
             modifier = modifier.fillMaxWidth().testTag("receivable-list-content"),
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
-            // 1. Top App Bar with Sesuaikan
-            Row(
-                modifier = Modifier.fillMaxWidth().padding(horizontal = 4.dp).padding(bottom = 4.dp),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                    val navigator = com.tbterminal.app.ui.dashboard.admin.LocalAdminDestinationNavigator.current
-                    IconButton(
-                        onClick = { navigator?.invoke(com.tbterminal.app.ui.dashboard.admin.AdminDestination.FinanceHub) },
-                        modifier = Modifier.size(36.dp).background(Color.Transparent, CircleShape)
-                    ) {
-                        Icon(androidx.compose.material.icons.Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Kembali", tint = Color(0xFF334155))
-                    }
-                    Text("Piutang Pelanggan", fontSize = 18.sp, fontWeight = FontWeight.Bold, color = Color(0xFF0F172A))
-                }
-                
-                Surface(
-                    onClick = onAddAdjustment,
-                    color = Color(0xFFE1EFEA),
-                    shape = RoundedCornerShape(50),
-                ) {
-                    Row(modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                        Icon(androidx.compose.material.icons.Icons.Outlined.Tune, contentDescription = null, tint = Color(0xFF256B57), modifier = Modifier.size(14.dp))
-                        Text("Sesuaikan", fontSize = 12.sp, fontWeight = FontWeight.SemiBold, color = Color(0xFF256B57))
-                    }
-                }
-            }
-            
             // 2. Search and Action Row
             Row(
                 modifier = Modifier.fillMaxWidth(),
@@ -172,10 +162,21 @@ internal fun ReceivableTableCard(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Text("Daftar piutang", fontSize = 14.sp, fontWeight = FontWeight.Bold, color = Color(0xFF0F172A))
-                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                    Icon(androidx.compose.material.icons.Icons.Outlined.AssignmentTurnedIn, contentDescription = null, tint = Color(0xFF256B57), modifier = Modifier.size(16.dp))
-                    Text("Ringkasan", fontSize = 12.sp, fontWeight = FontWeight.SemiBold, color = Color(0xFF256B57))
-                    Icon(androidx.compose.material.icons.Icons.Default.ChevronRight, contentDescription = null, tint = Color(0xFF256B57), modifier = Modifier.size(14.dp))
+                Box(
+                    modifier = Modifier
+                        .size(32.dp)
+                        .clip(RoundedCornerShape(12.dp))
+                        .border(1.dp, Color(0xFFE2E8F0), RoundedCornerShape(12.dp))
+                        .clickable { }
+                        .background(Color.White),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(
+                        Icons.Outlined.FactCheck,
+                        contentDescription = "Ringkasan",
+                        tint = Color(0xFF334155),
+                        modifier = Modifier.size(16.dp)
+                    )
                 }
             }
             
@@ -185,9 +186,10 @@ internal fun ReceivableTableCard(
                 uiState.errorMessage != null && uiState.receivables.isEmpty() -> ReceivableError()
                 uiState.filteredReceivables.isEmpty() -> ReceivableEmpty()
                 else -> {
+                    val groupedByCustomer = uiState.filteredReceivables.groupBy { it.customerId }
                     Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
-                        uiState.filteredReceivables.forEach { receivable ->
-                            MobileReceivableCard(receivable, onPayClick)
+                        groupedByCustomer.forEach { (customerId, customerReceivables) ->
+                            CustomerReceivableGroupCard(customerId, customerReceivables, onPayClick, { id, _ -> onCustomerDetailClick(id) })
                         }
                     }
                     
@@ -202,7 +204,7 @@ internal fun ReceivableTableCard(
                             shape = RoundedCornerShape(50),
                             border = BorderStroke(1.dp, Color(0xFFE2E8F0).copy(alpha = 0.9f))
                         ) {
-                            Text(" data", fontSize = 12.sp, fontWeight = FontWeight.SemiBold, color = Color(0xFF475569), modifier = Modifier.padding(horizontal = 14.dp, vertical = 6.dp))
+                            Text("${if (uiState.total == 0L) 0 else uiState.receivables.size} dari ${uiState.total} nota", fontSize = 12.sp, fontWeight = FontWeight.SemiBold, color = Color(0xFF475569), modifier = Modifier.padding(horizontal = 14.dp, vertical = 6.dp))
                         }
                         
                         Surface(
@@ -214,7 +216,7 @@ internal fun ReceivableTableCard(
                                 IconButton(onClick = onPreviousPage, modifier = Modifier.size(28.dp).background(Color.Transparent, CircleShape)) {
                                     Icon(androidx.compose.material.icons.Icons.Default.ChevronLeft, contentDescription = null, tint = Color(0xFF94A3B8), modifier = Modifier.size(16.dp))
                                 }
-                                Text("-", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = Color(0xFF1E293B))
+                                Text("${uiState.page} / ${uiState.totalPages}", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = Color(0xFF1E293B))
                                 IconButton(onClick = onNextPage, modifier = Modifier.size(28.dp).background(Color.Transparent, CircleShape)) {
                                     Icon(androidx.compose.material.icons.Icons.Default.ChevronRight, contentDescription = null, tint = Color(0xFF94A3B8), modifier = Modifier.size(16.dp))
                                 }
@@ -467,13 +469,31 @@ private fun MobileReceivableCard(receivable: Receivable, onPayClick: (Receivable
         Column(modifier = Modifier.fillMaxWidth().padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
             // Customer Top Info
             Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
-                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                Row(
+                    modifier = Modifier.weight(1f).padding(end = 8.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
                     Box(modifier = Modifier.size(40.dp).background(Color(0xFFF1F5F9), CircleShape).border(1.dp, Color(0xFFE2E8F0).copy(alpha = 0.8f), CircleShape), contentAlignment = Alignment.Center) {
                         Text(receivable.customerName.take(1).uppercase(), fontSize = 14.sp, fontWeight = FontWeight.Bold, color = Color(0xFF334155))
                     }
-                    Column {
-                        Text(receivable.customerName, fontSize = 14.sp, fontWeight = FontWeight.Bold, color = Color(0xFF0F172A))
-                        Text(receivable.mobileReference(), fontSize = 12.sp, color = Color(0xFF94A3B8), modifier = Modifier.padding(top = 2.dp))
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            text = receivable.customerName,
+                            fontSize = 14.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = Color(0xFF0F172A),
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                        Text(
+                            text = receivable.mobileReference(),
+                            fontSize = 12.sp,
+                            color = Color(0xFF94A3B8),
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                            modifier = Modifier.padding(top = 2.dp)
+                        )
                     }
                 }
                 
@@ -484,10 +504,12 @@ private fun MobileReceivableCard(receivable: Receivable, onPayClick: (Receivable
                     shape = RoundedCornerShape(50)
                 ) {
                     Text(
-                        if (isPaid) "LUNAS" else "BELUM LUNAS",
+                        text = if (isPaid) "LUNAS" else "BELUM LUNAS",
                         fontSize = 11.sp,
                         fontWeight = FontWeight.Bold,
                         color = if (isPaid) Color(0xFF256B57) else Color(0xFFC2410C),
+                        maxLines = 1,
+                        softWrap = false,
                         modifier = Modifier.padding(horizontal = 10.dp, vertical = 2.dp)
                     )
                 }
@@ -723,3 +745,235 @@ private fun ReceivableDueFilter.compactLabel(): String = when (this) {
 
 
 
+
+
+
+@Composable
+private fun CustomerReceivableGroupCard(
+    customerId: String,
+    receivables: List<Receivable>,
+    onPayClick: (Receivable) -> Unit,
+    onOpenLedger: (String, String) -> Unit
+) {
+    val customerName = receivables.firstOrNull()?.customerName ?: "Unknown"
+    val totalRemaining = receivables.sumOf { it.remainingAmount }
+    val allPaid = totalRemaining <= java.math.BigDecimal.ZERO
+    var isExpanded by remember { mutableStateOf(false) }
+    
+    val brand50 = Color(0xFFF0F6F3)
+    val brand100 = Color(0xFFE1ECE6)
+    val brand600 = Color(0xFF256B57)
+    val brand700 = Color(0xFF1D5545)
+    val slate100 = Color(0xFFF1F5F9)
+    val slate200 = Color(0xFFE2E8F0)
+    val slate400 = Color(0xFF94A3B8)
+    val slate600 = Color(0xFF475569)
+    val slate700 = Color(0xFF334155)
+    val slate900 = Color(0xFF0F172A)
+    val surfaceBorder = Color(0xFFE5EBE8)
+    
+    androidx.compose.material3.Card(
+        modifier = Modifier.fillMaxWidth().testTag("customer-group-$customerId"),
+        shape = RoundedCornerShape(16.dp),
+        colors = androidx.compose.material3.CardDefaults.cardColors(containerColor = Color.White),
+        border = androidx.compose.foundation.BorderStroke(1.dp, surfaceBorder),
+        elevation = androidx.compose.material3.CardDefaults.cardElevation(defaultElevation = 2.dp)
+    ) {
+        Column {
+            Surface(
+                onClick = { isExpanded = !isExpanded },
+                color = Color.White,
+            ) {
+                Row(
+                    modifier = Modifier.fillMaxWidth().padding(14.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Row(
+                        modifier = Modifier.weight(1f).padding(end = 8.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(12.dp)
+                    ) {
+                        val circleBg = if (allPaid) brand50 else slate100
+                        val circleBorder = if (allPaid) brand100 else slate200
+                        val circleText = if (allPaid) brand700 else slate700
+                        
+                        Box(
+                            modifier = Modifier.size(40.dp).background(circleBg, CircleShape).border(1.dp, circleBorder, CircleShape),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Text(customerName.take(1).uppercase(), fontSize = 14.sp, fontWeight = FontWeight.Bold, color = circleText)
+                        }
+                        
+                        Column(modifier = Modifier.weight(1f)) {
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                            ) {
+                                Text(
+                                    text = customerName,
+                                    fontSize = 14.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = slate900,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis,
+                                    modifier = Modifier.weight(1f, fill = false)
+                                )
+                                val badgeBg = if (allPaid) brand50 else slate100
+                                val badgeText = if (allPaid) brand600 else slate600
+                                Surface(color = badgeBg, shape = RoundedCornerShape(50)) {
+                                    Text(
+                                        text = "${receivables.size} Nota",
+                                        fontSize = 10.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        color = badgeText,
+                                        maxLines = 1,
+                                        softWrap = false,
+                                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp)
+                                    )
+                                }
+                            }
+                            
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(4.dp),
+                                modifier = Modifier.padding(top = 2.dp)
+                            ) {
+                                val amountColor = if (allPaid) brand600 else brand700
+                                Text(totalRemaining.currencyText(), fontSize = 12.sp, fontWeight = FontWeight.SemiBold, color = amountColor, maxLines = 1)
+                                Text(if (allPaid) "(Semua lunas)" else "(Belum lunas)", fontSize = 10.sp, color = slate400, maxLines = 1)
+                            }
+                        }
+                    }
+                    
+                    Icon(
+                        if (isExpanded) androidx.compose.material.icons.Icons.Default.ExpandLess else androidx.compose.material.icons.Icons.Default.ExpandMore,
+                        contentDescription = null,
+                        tint = slate400,
+                        modifier = Modifier.size(24.dp)
+                    )
+                }
+            }
+            
+            if (isExpanded) {
+                HorizontalDivider(color = surfaceBorder)
+                Column(modifier = Modifier.fillMaxWidth()) {
+                    val limit = 3
+                    val itemsToDisplay = receivables.take(limit)
+                    val remainingCount = receivables.size - limit
+                    
+                    itemsToDisplay.forEachIndexed { index, receivable ->
+                        if (index > 0) {
+                            HorizontalDivider(color = surfaceBorder.copy(alpha = 0.8f))
+                        }
+                        MobileReceivableAccordionItem(receivable = receivable, index = index, onPayClick = onPayClick, onOpenLedger = onOpenLedger)
+                    }
+                    
+                    // Show "Buku Piutang" / Ledger button
+                    HorizontalDivider(color = surfaceBorder)
+                    Surface(
+                        onClick = { onOpenLedger(customerId, customerName) },
+                        color = Color(0xFFF8FAF9),
+                    ) {
+                        Box(
+                            modifier = Modifier.fillMaxWidth().padding(12.dp),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            val text = if (remainingCount > 0) "Lihat $remainingCount nota lainnya & detail →" else "Lihat Detail Piutang →"
+                            Text(text, fontSize = 12.sp, fontWeight = FontWeight.SemiBold, color = brand600)
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun MobileReceivableAccordionItem(
+    receivable: Receivable,
+    index: Int,
+    onPayClick: (Receivable) -> Unit,
+    onOpenLedger: (String, String) -> Unit
+) {
+    val isPaid = receivable.isPaid()
+    val brand50 = Color(0xFFF0F6F3)
+    val brand600 = Color(0xFF256B57)
+    val brand700 = Color(0xFF1D5545)
+    val slate100 = Color(0xFFF1F5F9)
+    val slate400 = Color(0xFF94A3B8)
+    val slate500 = Color(0xFF64748B)
+    val slate700 = Color(0xFF334155)
+    val slate800 = Color(0xFF1E293B)
+    val slate900 = Color(0xFF0F172A)
+
+    Surface(
+        onClick = { onPayClick(receivable) },
+        color = Color.White
+    ) {
+        Column(modifier = Modifier.fillMaxWidth().padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Icon(androidx.compose.material.icons.Icons.Outlined.Receipt, contentDescription = null, tint = slate400, modifier = Modifier.size(18.dp))
+                    Text(receivable.mobileReference(), fontSize = 12.sp, fontWeight = FontWeight.SemiBold, color = slate900, fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace)
+                }
+                Surface(color = brand50, shape = RoundedCornerShape(50)) {
+                    Text("Nota ${index + 1}", fontSize = 10.sp, fontWeight = FontWeight.Bold, color = brand600, modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp))
+                }
+            }
+            
+            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.Bottom) {
+                Column {
+                    Text("SISA PIUTANG", fontSize = 10.sp, fontWeight = FontWeight.SemiBold, color = slate400, letterSpacing = 0.5.sp)
+                    Text(receivable.remainingAmount.currencyText(), fontSize = 20.sp, fontWeight = FontWeight.Black, color = if (isPaid) slate900 else brand700, modifier = Modifier.padding(top = 2.dp))
+                }
+                Column(horizontalAlignment = Alignment.End) {
+                    Text("STATUS", fontSize = 10.sp, fontWeight = FontWeight.SemiBold, color = slate400, letterSpacing = 0.5.sp)
+                    Text(if (isPaid) "Terbayar Penuh" else "Sebagian", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = if (isPaid) brand600 else slate700, modifier = Modifier.padding(top = 2.dp))
+                }
+            }
+            
+            Row(modifier = Modifier.fillMaxWidth().drawBehind {
+                drawLine(
+                    color = slate100,
+                    start = androidx.compose.ui.geometry.Offset(0f, 0f),
+                    end = androidx.compose.ui.geometry.Offset(size.width, 0f),
+                    strokeWidth = 1f,
+                    pathEffect = androidx.compose.ui.graphics.PathEffect.dashPathEffect(floatArrayOf(10f, 10f), 0f)
+                )
+            }.padding(top = 8.dp)) {
+                Column(modifier = Modifier.weight(1f)) {
+                    Text("TOTAL TAGIHAN", fontSize = 10.sp, fontWeight = FontWeight.SemiBold, color = slate400, letterSpacing = 0.5.sp)
+                    Text(receivable.amount.currencyText(), fontSize = 12.sp, fontWeight = FontWeight.Bold, color = slate800, modifier = Modifier.padding(top = 2.dp))
+                }
+                Column(modifier = Modifier.weight(1f), horizontalAlignment = Alignment.End) {
+                    Text("SUDAH DIBAYAR", fontSize = 10.sp, fontWeight = FontWeight.SemiBold, color = slate400, letterSpacing = 0.5.sp)
+                    Text(receivable.paidAmount.currencyText(), fontSize = 12.sp, fontWeight = FontWeight.Bold, color = if (isPaid) slate800 else brand600, modifier = Modifier.padding(top = 2.dp))
+                }
+            }
+            
+            Row(modifier = Modifier.fillMaxWidth().drawBehind {
+                drawLine(
+                    color = slate100, 
+                    start = androidx.compose.ui.geometry.Offset(0f, 0f), 
+                    end = androidx.compose.ui.geometry.Offset(size.width, 0f), 
+                    strokeWidth = 1f
+                )
+            }.padding(top = 8.dp), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+                Text(
+                    androidx.compose.ui.text.buildAnnotatedString {
+                        withStyle(androidx.compose.ui.text.SpanStyle(color = slate500)) { append("Jatuh tempo: ") }
+                        withStyle(androidx.compose.ui.text.SpanStyle(color = slate800, fontWeight = FontWeight.SemiBold)) { append(receivable.dueDate.simpleDate()) }
+                    },
+                    fontSize = 12.sp
+                )
+                if (!isPaid) {
+                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                        Box(modifier = Modifier.size(6.dp).background(brand600, CircleShape))
+                        Text("Aktif", fontSize = 12.sp, fontWeight = FontWeight.SemiBold, color = brand600)
+                    }
+                }
+            }
+        }
+    }
+}
