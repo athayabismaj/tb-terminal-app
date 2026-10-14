@@ -55,6 +55,7 @@ fun AdminDashboardShell(
     pageTitle: String? = null,
     onBack: (() -> Unit)? = null,
     showPageHeader: Boolean = true,
+    topBarActions: @Composable androidx.compose.foundation.layout.RowScope.() -> Unit = {},
     onLogout: () -> Unit,
     content: @Composable (Modifier) -> Unit
 ) {
@@ -112,6 +113,7 @@ fun AdminDashboardShell(
         pageTitle = pageTitle ?: activeDestination.backofficePageTitleRes()?.let { stringResource(it) }
             ?: activeDestination.backofficePageTitle(),
         onBack = onBack,
+        topBarActions = topBarActions,
         showPageHeader = showPageHeader && !activeDestination.isBackofficeRootDestination(),
     ) { contentModifier ->
         content(contentModifier)

@@ -146,6 +146,7 @@ fun BackofficeAdaptiveShell(
     pageTitle: String? = null,
     onBack: (() -> Unit)? = null,
     showPageHeader: Boolean = true,
+    topBarActions: @Composable androidx.compose.foundation.layout.RowScope.() -> Unit = {},
     modifier: Modifier = Modifier,
     content: @Composable (Modifier) -> Unit
 ) {
@@ -174,6 +175,7 @@ fun BackofficeAdaptiveShell(
                             compact = true,
                             onProfileClick = onProfileClick,
                             showProfile = !ownerNavigation,
+                            actions = topBarActions
                         )
                     }
                 },
@@ -301,6 +303,7 @@ fun BackofficeAdaptiveShell(
                             compact = false,
                             onProfileClick = onProfileClick,
                             showProfile = !ownerNavigation,
+                            actions = topBarActions
                         )
                     }
                     content(
@@ -321,11 +324,13 @@ private fun BackofficeTopBar(
     compact: Boolean,
     onProfileClick: () -> Unit,
     showProfile: Boolean = true,
+    actions: @Composable androidx.compose.foundation.layout.RowScope.() -> Unit = {}
 ) {
     com.tbterminal.app.ui.components.TBTopAppBar(
         title = pageTitle ?: stringResource(activeSection.labelRes),
         onBackClick = onBack,
         actions = {
+            actions()
             if (showProfile) {
                 IconButton(onClick = onProfileClick) {
                     Icon(

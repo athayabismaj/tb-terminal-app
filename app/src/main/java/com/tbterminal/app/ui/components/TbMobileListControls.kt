@@ -1,6 +1,14 @@
 package com.tbterminal.app.ui.components
 
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.geometry.CornerRadius
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -137,7 +145,7 @@ fun TbMobileFilterButton(
         onClick = onClick,
         modifier = modifier.size(50.dp).testTag(testTag),
         color = if (active) MaterialTheme.colorScheme.primaryContainer else TbSurface,
-        contentColor = if (active) MaterialTheme.colorScheme.onPrimaryContainer else TbGreenDark,
+        contentColor = if (active) MaterialTheme.colorScheme.onPrimaryContainer else TbText,
         shape = RoundedCornerShape(15.dp),
         border = BorderStroke(1.dp, TbOutline),
     ) {
@@ -163,6 +171,75 @@ fun TbMobileSummaryButton(
         Icon(Icons.Outlined.Insights, contentDescription = null, modifier = Modifier.size(18.dp))
         Spacer(Modifier.width(6.dp))
         Text(label, fontWeight = FontWeight.SemiBold)
+    }
+}
+
+/**
+ * Three-bar chart icon with rounded pill bars matching the mobile design mockup.
+ * Left bar: medium height, Center bar: tall height, Right bar: short height.
+ */
+@Composable
+fun SummaryBarChartIcon(
+    modifier: Modifier = Modifier,
+    tint: Color = Color(0xFF1E293B),
+) {
+    Canvas(modifier = modifier) {
+        val w = size.width
+        val h = size.height
+        val barWidth = w * 0.22f
+        val cornerRadius = CornerRadius(barWidth / 2f, barWidth / 2f)
+
+        // Bar 1 (left): height ~60%
+        val h1 = h * 0.60f
+        drawRoundRect(
+            color = tint,
+            topLeft = Offset(x = w * 0.08f, y = h - h1),
+            size = Size(barWidth, h1),
+            cornerRadius = cornerRadius,
+        )
+
+        // Bar 2 (center): height ~98%
+        val h2 = h * 0.98f
+        drawRoundRect(
+            color = tint,
+            topLeft = Offset(x = w * 0.39f, y = h - h2),
+            size = Size(barWidth, h2),
+            cornerRadius = cornerRadius,
+        )
+
+        // Bar 3 (right): height ~45%
+        val h3 = h * 0.45f
+        drawRoundRect(
+            color = tint,
+            topLeft = Offset(x = w * 0.70f, y = h - h3),
+            size = Size(barWidth, h3),
+            cornerRadius = cornerRadius,
+        )
+    }
+}
+
+/**
+ * Square summary button with 8.dp rounded corners and the 3-bar chart icon.
+ */
+@Composable
+fun SummaryIconButton(
+    onClick: () -> Unit = {},
+    modifier: Modifier = Modifier,
+    contentDescription: String = "Ringkasan",
+) {
+    Box(
+        modifier = modifier
+            .size(32.dp)
+            .clip(RoundedCornerShape(8.dp))
+            .border(1.dp, Color(0xFFE2E8F0), RoundedCornerShape(8.dp))
+            .background(Color.White)
+            .clickable(onClick = onClick),
+        contentAlignment = Alignment.Center,
+    ) {
+        SummaryBarChartIcon(
+            modifier = Modifier.size(16.dp),
+            tint = Color(0xFF1E293B),
+        )
     }
 }
 

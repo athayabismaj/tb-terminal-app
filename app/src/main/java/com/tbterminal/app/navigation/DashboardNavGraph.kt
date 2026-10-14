@@ -412,6 +412,9 @@ internal fun NavGraphBuilder.dashboardGraph(navController: NavHostController, se
                             onDashboardClick = {
                                 navController.navigateBackofficePage(AppRoute.Dashboard.route, sessionUser.role)
                             },
+                            onProfileClick = {
+                                navController.navigateBackofficePage(AppRoute.AdminProfile.route, sessionUser.role)
+                            },
                             onLogout = logout,
                         )
                     } else {

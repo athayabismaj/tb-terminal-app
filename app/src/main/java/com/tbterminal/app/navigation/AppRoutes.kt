@@ -204,6 +204,15 @@ sealed interface AppRoute {
         override val route = "admin/supplier-debts"
     }
 
+    data object SupplierDebtDetail : AppRoute {
+        const val SUPPLIER_ID_ARG = "supplierId"
+        override val route = "admin/supplier-debts/supplier/{$SUPPLIER_ID_ARG}"
+
+        fun createRoute(supplierId: String): String {
+            return "admin/supplier-debts/supplier/$supplierId"
+        }
+    }
+
     data object CashSessionHistory : AppRoute {
         override val route = "admin/cash-sessions"
     }
@@ -227,6 +236,15 @@ sealed interface AppRoute {
 
     data object Receivables : AppRoute {
         override val route = "admin/receivables"
+    }
+
+    data object ReceivableCustomerDetail : AppRoute {
+        const val CUSTOMER_ID_ARG = "customerId"
+        override val route = "admin/receivables/customer/{$CUSTOMER_ID_ARG}"
+
+        fun createRoute(customerId: String): String {
+            return "admin/receivables/customer/$customerId"
+        }
     }
 
     data object ReceivablePayments : AppRoute {

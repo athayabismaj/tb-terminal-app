@@ -20,6 +20,7 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.rememberDatePickerState
+import com.tbterminal.app.ui.components.AppDatePickerDialog
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -93,102 +94,21 @@ fun ReportsDateRangeFilter(
     }
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun ReportsSingleDatePickerDialog(
     currentDate: String,
     onDismiss: () -> Unit,
     onConfirm: (LocalDate) -> Unit
 ) {
-    val initialMillis = currentDate.toLocalDateOrNull()?.toEpochMillis()
-    val datePickerState = rememberDatePickerState(initialSelectedDateMillis = initialMillis)
-
-    Dialog(
-        onDismissRequest = onDismiss,
-        properties = DialogProperties(usePlatformDefaultWidth = false)
-    ) {
-        Surface(
-            modifier = Modifier
-                .fillMaxWidth(0.88f)
-                .padding(vertical = 32.dp),
-            shape = RoundedCornerShape(24.dp),
-            color = ReportColors.Surface,
-            tonalElevation = 8.dp
-        ) {
-            Column(modifier = Modifier.padding(16.dp)) {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Text(
-                        text = "Pilih Tanggal",
-                        fontSize = 18.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = ReportColors.OnSurface
-                    )
-                    Surface(
-                        modifier = Modifier.size(40.dp),
-                        shape = RoundedCornerShape(12.dp),
-                        color = ReportColors.SurfaceSoft,
-                        onClick = onDismiss
-                    ) {
-                        Box(contentAlignment = Alignment.Center) {
-                            Icon(
-                                imageVector = Icons.Outlined.Close,
-                                contentDescription = "Tutup",
-                                tint = ReportColors.Outline,
-                                modifier = Modifier.size(18.dp)
-                            )
-                        }
-                    }
-                }
-
-                DatePicker(
-                    state = datePickerState,
-                    modifier = Modifier.height(430.dp),
-                    title = null,
-                    headline = null,
-                    showModeToggle = false,
-                    colors = DatePickerDefaults.colors(
-                        containerColor = ReportColors.Surface,
-                        selectedDayContainerColor = ReportColors.PrimaryDark,
-                        todayDateBorderColor = ReportColors.PrimaryDark
-                    )
-                )
-
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.End,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    TextButton(onClick = onDismiss) {
-                        Text(
-                            text = "Batal",
-                            color = ReportColors.Slate500,
-                            fontWeight = FontWeight.Bold
-                        )
-                    }
-                    Surface(
-                        shape = RoundedCornerShape(12.dp),
-                        color = ReportColors.PrimaryDark,
-                        onClick = {
-                            datePickerState.selectedDateMillis?.let { millis ->
-                                onConfirm(millis.toLocalDateUtc())
-                            }
-                        }
-                    ) {
-                        Text(
-                            text = "Terapkan",
-                            color = Color.White,
-                            fontWeight = FontWeight.Bold,
-                            modifier = Modifier.padding(horizontal = 24.dp, vertical = 12.dp)
-                        )
-                    }
-                }
-            }
+    AppDatePickerDialog(
+        initialDate = currentDate,
+        title = "Pilih Tanggal",
+        subtitle = "Filter laporan berdasarkan tanggal",
+        onDismiss = onDismiss,
+        onConfirm = { dateStr ->
+            runCatching { LocalDate.parse(dateStr) }.getOrNull()?.let(onConfirm)
         }
-    }
+    )
 }
 
 private fun String.toCompactDateLabel(): String =

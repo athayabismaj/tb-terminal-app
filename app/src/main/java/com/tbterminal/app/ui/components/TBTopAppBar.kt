@@ -25,6 +25,7 @@ fun TBTopAppBar(
     title: String,
     modifier: Modifier = Modifier,
     onBackClick: (() -> Unit)? = null,
+    windowInsets: androidx.compose.foundation.layout.WindowInsets = TopAppBarDefaults.windowInsets,
     actions: @Composable androidx.compose.foundation.layout.RowScope.() -> Unit = {}
 ) {
     TopAppBar(
@@ -50,6 +51,7 @@ fun TBTopAppBar(
             }
         },
         actions = actions,
+        windowInsets = windowInsets,
         colors = TopAppBarDefaults.topAppBarColors(
             containerColor = Color.White,
             navigationIconContentColor = Color(0xFF1E293B),

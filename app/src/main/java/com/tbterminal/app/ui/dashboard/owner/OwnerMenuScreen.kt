@@ -26,11 +26,13 @@ fun OwnerMenuScreen(
     authRepository: AuthRepository,
     onDashboardClick: () -> Unit,
     onLogout: () -> Unit,
+    onProfileClick: (() -> Unit)? = null,
     profileViewModel: ProfileViewModel = viewModel(factory = ProfileViewModel.factory(authRepository)),
 ) {
     val uiState by profileViewModel.uiState.collectAsStateWithLifecycle()
     val navigator = LocalAdminDestinationNavigator.current
     val navigate: (AdminDestination) -> Unit = { destination -> navigator?.invoke(destination) }
+    val effectiveOnProfileClick = onProfileClick ?: { navigate(AdminDestination.Profile) }
 
     AdminDashboardShell(
         userName = name,
@@ -38,7 +40,7 @@ fun OwnerMenuScreen(
         activeDestination = AdminDestination.MoreHub,
         onDashboardClick = onDashboardClick,
         onProductsClick = {},
-        onProfileClick = { navigate(AdminDestination.Profile) },
+        onProfileClick = effectiveOnProfileClick,
         onLogout = onLogout,
     ) { contentModifier ->
         TbPageSurface(modifier = contentModifier, maxContentWidth = 1120.dp) { layout, pageModifier ->
@@ -59,7 +61,7 @@ fun OwnerMenuScreen(
                     sessionName = name,
                     role = role,
                     profile = uiState.profile,
-                    onProfileClick = { navigate(AdminDestination.Profile) },
+                    onProfileClick = effectiveOnProfileClick,
                     onNavigate = navigate,
                 )
             }

@@ -138,13 +138,15 @@ internal object AppRouteAccessPolicy {
             value == AppRoute.IncomingGoods.route || value.matchesRoute(AppRoute.IncomingGoodsForm.route) ||
                 value == AppRoute.PurchaseHistory.route -> AppCapability.PURCHASES
             value == AppRoute.Suppliers.route || value == AppRoute.SupplierForm.route -> AppCapability.SUPPLIERS
-            value == AppRoute.SupplierDebts.route -> AppCapability.PAYABLES
+            value == AppRoute.SupplierDebts.route || value.matchesRoute(AppRoute.SupplierDebtDetail.route) ->
+                AppCapability.PAYABLES
 
             value == AppRoute.Customers.route || value.matchesRoute(AppRoute.CustomerDetail.route) ->
                 AppCapability.CUSTOMERS
             value == AppRoute.AddCustomer.route || value.matchesRoute(AppRoute.EditCustomer.route) ->
                 AppCapability.MANAGE_CUSTOMERS
-            value == AppRoute.Receivables.route -> AppCapability.RECEIVABLES
+            value == AppRoute.Receivables.route || value.matchesRoute(AppRoute.ReceivableCustomerDetail.route) ->
+                AppCapability.RECEIVABLES
             value == AppRoute.ReceivablePayments.route -> AppCapability.RECEIVABLE_PAYMENTS
 
             value == AppRoute.SalesTransactions.route || value.matchesRoute(AppRoute.AdminReceiptDetail.route) ->

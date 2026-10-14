@@ -97,6 +97,7 @@ fun AppNavGraph(
 }
 
 internal fun AdminDestination.adminRouteOrNull(role: String?): String? {
+    val isCashier = role?.trim()?.equals("kasir", ignoreCase = true) == true
     return when (this) {
         AdminDestination.Dashboard -> AppRoute.Dashboard.route
         AdminDestination.TransactionsHub -> AppRoute.BackofficeTransactions.route
@@ -132,8 +133,8 @@ internal fun AdminDestination.adminRouteOrNull(role: String?): String? {
         AdminDestination.BackupRestore -> AppRoute.BackupRestore.route
         AdminDestination.UserManagement -> AppRoute.UserManagement.route
         AdminDestination.SecurityLog -> AppRoute.SecurityLog.route
-        AdminDestination.Profile -> if (AppAccessPolicy.can(role, AppCapability.POS)) AppRoute.CashierProfile.route else AppRoute.AdminProfile.route
-        AdminDestination.Settings -> if (AppAccessPolicy.can(role, AppCapability.POS)) AppRoute.CashierSettings.route else AppRoute.AdminSettings.route
+        AdminDestination.Profile -> if (isCashier) AppRoute.CashierProfile.route else AppRoute.AdminProfile.route
+        AdminDestination.Settings -> if (isCashier) AppRoute.CashierSettings.route else AppRoute.AdminSettings.route
         else -> null
     }
 }

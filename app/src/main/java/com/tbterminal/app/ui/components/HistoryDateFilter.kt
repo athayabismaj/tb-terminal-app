@@ -157,79 +157,19 @@ fun HistoryDateFilter(
     }
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun HistoryDatePickerDialog(
     currentDate: String?,
     onDismiss: () -> Unit,
     onConfirm: (String) -> Unit
 ) {
-    val initialDate = currentDate?.let { runCatching { LocalDate.parse(it) }.getOrNull() }
-        ?: LocalDate.now()
-    val initialMillis = initialDate.toEpochDay() * 86_400_000L
-    val datePickerState = rememberDatePickerState(initialSelectedDateMillis = initialMillis)
-
-    Dialog(
-        onDismissRequest = onDismiss,
-        properties = DialogProperties(usePlatformDefaultWidth = false)
-    ) {
-        Surface(
-            modifier = Modifier.fillMaxWidth(0.92f).padding(vertical = 32.dp),
-            shape = RoundedCornerShape(24.dp),
-            color = Color.White,
-            tonalElevation = 8.dp
-        ) {
-            Column(Modifier.padding(16.dp)) {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Text("Pilih Tanggal", color = HistoryText, fontSize = 18.sp, fontWeight = FontWeight.Bold)
-                    IconButton(onClick = onDismiss) {
-                        Icon(Icons.Outlined.Close, "Tutup")
-                    }
-                }
-                DatePicker(
-                    state = datePickerState,
-                    modifier = Modifier.height(460.dp),
-                    title = null,
-                    headline = null,
-                    showModeToggle = false,
-                    colors = DatePickerDefaults.colors(
-                        containerColor = Color.White,
-                        selectedDayContainerColor = HistoryPrimary,
-                        todayDateBorderColor = HistoryPrimary
-                    )
-                )
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.End,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    TextButton(onClick = onDismiss) {
-                        Text("Batal", color = HistoryMuted)
-                    }
-                    Spacer(Modifier.width(12.dp))
-                    Button(
-                        onClick = {
-                            val selectedMillis = datePickerState.selectedDateMillis ?: initialMillis
-                            onConfirm(Instant.ofEpochMilli(selectedMillis).atOffset(ZoneOffset.UTC).toLocalDate().toString())
-                        },
-                        modifier = Modifier.height(48.dp),
-                        shape = RoundedCornerShape(12.dp),
-                        colors = ButtonDefaults.buttonColors(containerColor = HistoryPrimary),
-                    ) {
-                        Text(
-                            "Terapkan",
-                            color = Color.White,
-                            fontWeight = FontWeight.Bold,
-                        )
-                    }
-                }
-            }
-        }
-    }
+    AppDatePickerDialog(
+        initialDate = currentDate,
+        title = "Pilih Tanggal",
+        subtitle = "Filter transaksi berdasarkan tanggal",
+        onDismiss = onDismiss,
+        onConfirm = onConfirm
+    )
 }
 
 private fun String.toDisplayDate(): String = runCatching {
