@@ -160,15 +160,17 @@ fun HistoryDateFilter(
 @Composable
 fun HistoryDatePickerDialog(
     currentDate: String?,
+    initialMode: String = "Hari",
     onDismiss: () -> Unit,
-    onConfirm: (String) -> Unit
+    onConfirm: (String) -> Unit = {},
+    onConfirmRange: ((startDate: String, endDate: String, mode: String) -> Unit)? = null
 ) {
     AppDatePickerDialog(
         initialDate = currentDate,
-        title = "Pilih Tanggal",
-        subtitle = "Filter transaksi berdasarkan tanggal",
+        initialMode = initialMode,
         onDismiss = onDismiss,
-        onConfirm = onConfirm
+        onConfirm = onConfirm,
+        onConfirmRange = onConfirmRange
     )
 }
 

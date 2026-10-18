@@ -137,7 +137,7 @@ class CashSessionHistoryViewModel(
         if (_uiState.value.page < _uiState.value.totalPages) loadSessions(_uiState.value.page + 1)
     }
 
-    private fun setDateRange(startDate: LocalDate, endDate: LocalDate, preset: String?) {
+    fun setDateRange(startDate: LocalDate, endDate: LocalDate, preset: String?) {
         _uiState.update {
             it.copy(
                 selectedDate = endDate.toString(),
@@ -148,6 +148,12 @@ class CashSessionHistoryViewModel(
             )
         }
         loadSessions()
+    }
+
+    fun setDateRange(startDateStr: String, endDateStr: String, preset: String?) {
+        val start = runCatching { LocalDate.parse(startDateStr) }.getOrDefault(LocalDate.now())
+        val end = runCatching { LocalDate.parse(endDateStr) }.getOrDefault(LocalDate.now())
+        setDateRange(start, end, preset)
     }
 
     private fun currentDateRange(): Pair<LocalDate, LocalDate> {

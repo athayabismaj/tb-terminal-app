@@ -13,5 +13,9 @@ data class CashReconciliationDetailUiState(
     val totalPages: Int = 1,
     val totalTransactions: Long = 0,
     val isLoading: Boolean = false,
-    val errorMessage: String? = null
+    val errorMessage: String? = null,
+    val isClosingSession: Boolean = false,
+    val closeSuccessMessage: String? = null,
+    val closeErrorMessage: String? = null,
+    val showCloseDialog: Boolean = false
 )

@@ -157,7 +157,7 @@ class IncomingGoodsViewModel(
     }
 
     fun onQuantityChanged(value: String) {
-        _uiState.update { it.copy(quantityInput = value.decimalInput()).withSyncedCashPayment() }
+        _uiState.update { it.copy(quantityInput = value.filter(Char::isDigit)).withSyncedCashPayment() }
     }
 
     fun onBuyPriceChanged(value: String) {
@@ -193,7 +193,8 @@ class IncomingGoodsViewModel(
         val state = _uiState.value
         val product = state.selectedProduct ?: return setActionError("Pilih produk yang akan direstok.")
         val supplier = state.selectedSupplier ?: return setActionError("Pilih supplier terlebih dahulu.")
-        val quantity = state.quantity ?: return setActionError("Jumlah masuk wajib diisi dengan angka valid.")
+        val quantity = state.quantity?.setScale(0, java.math.RoundingMode.HALF_UP)
+            ?: return setActionError("Jumlah masuk wajib diisi dengan bilangan bulat valid.")
         val buyPrice = state.buyPrice ?: return setActionError("Harga beli wajib diisi dengan angka valid.")
         val total = state.total ?: return setActionError("Total pembelian tidak valid.")
         val amountPaid = state.effectiveAmountPaid ?: return setActionError("Jumlah bayar tidak valid.")

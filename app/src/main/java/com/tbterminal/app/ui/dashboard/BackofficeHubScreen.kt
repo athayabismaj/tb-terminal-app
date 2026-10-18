@@ -531,26 +531,6 @@ private fun TransactionsHub(
                             }
                             Icon(Icons.Default.ChevronRight, contentDescription = null, tint = Color(0xFF94A3B8), modifier = Modifier.size(20.dp))
                         }
-                        HorizontalDivider(color = Color(0xFFF1F5F9))
-                        
-                        // Kasir Baru
-                        Row(
-                            modifier = Modifier.fillMaxWidth().clickable { onNavigate(AdminDestination.CashierCashSession) }.padding(16.dp),
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(14.dp)
-                        ) {
-                            Box(
-                                modifier = Modifier.size(40.dp).background(Color(0xFFE1EFEA), RoundedCornerShape(12.dp)),
-                                contentAlignment = Alignment.Center
-                            ) {
-                                Icon(Icons.Outlined.PointOfSale, contentDescription = null, tint = Color(0xFF1B4D3E), modifier = Modifier.size(20.dp))
-                            }
-                            Column(modifier = Modifier.weight(1f)) {
-                                Text("Buka kasir baru", color = Color(0xFF0F172A), fontSize = 14.sp, fontWeight = FontWeight.SemiBold)
-                                Text("Mulai sesi penjualan baru", color = Color(0xFF64748B), fontSize = 12.sp, modifier = Modifier.padding(top = 2.dp))
-                            }
-                            Icon(Icons.Default.ChevronRight, contentDescription = null, tint = Color(0xFF94A3B8), modifier = Modifier.size(20.dp))
-                        }
                     }
                 }
             }

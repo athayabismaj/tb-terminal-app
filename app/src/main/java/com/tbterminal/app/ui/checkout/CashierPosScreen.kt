@@ -13,9 +13,13 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.ArrowForward
+import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.outlined.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import com.tbterminal.app.ui.barcode.CameraBarcodeScannerDialog
+import com.tbterminal.app.ui.barcode.hardwareBarcodeScanner
+import kotlinx.coroutines.delay
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -71,6 +75,7 @@ fun CashierPosScreen(
     onUseCustomerName: () -> Unit,
     onRefreshCustomers: () -> Unit,
     onUpdateQty: (String, Int) -> Unit,
+    onToggleUnit: (String, Boolean) -> Unit = { _, _ -> },
     onSelectPayment: (PaymentMethod) -> Unit,
     onAmountPaidChanged: (String) -> Unit,
     onStartingCashChanged: (String) -> Unit,
@@ -78,8 +83,11 @@ fun CashierPosScreen(
     onRefreshCashSession: () -> Unit,
     onCheckout: () -> Unit,
     onNavigateToCart: () -> Unit,
+    onScanBarcode: (String) -> Unit = {},
+    onClearScanNotification: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
+    var showCameraScanner by remember { mutableStateOf(false) }
     val allCategory = "Semua kategori"
     val categories = listOf(allCategory) + state.products.map { it.categoryName }.filter { it.isNotBlank() }.distinct()
     var selectedCategory by remember { mutableStateOf(allCategory) }
@@ -94,7 +102,9 @@ fun CashierPosScreen(
     val cartItemCount = state.cartItems.sumOf { it.quantity }
 
     Scaffold(
-        modifier = modifier.fillMaxSize(),
+        modifier = modifier
+            .fillMaxSize()
+            .hardwareBarcodeScanner { barcode -> onScanBarcode(barcode) },
         containerColor = SurfaceBright,
         contentWindowInsets = WindowInsets(0.dp),
         floatingActionButton = {
@@ -161,6 +171,15 @@ fun CashierPosScreen(
                     onValueChange = onSearchChanged,
                     placeholder = { Text("Cari produk, SKU, atau scan barcode...", color = Outline) },
                     leadingIcon = { Icon(Icons.Outlined.Search, contentDescription = null, tint = Outline) },
+                    trailingIcon = {
+                        IconButton(onClick = { showCameraScanner = true }) {
+                            Icon(
+                                imageVector = Icons.Outlined.QrCodeScanner,
+                                contentDescription = "Scan Barcode Kamera",
+                                tint = Primary
+                            )
+                        }
+                    },
                     modifier = fieldModifier.height(56.dp),
                     shape = RoundedCornerShape(12.dp),
                     colors = OutlinedTextFieldDefaults.colors(
@@ -198,6 +217,40 @@ fun CashierPosScreen(
                         onCategorySelected = { selectedCategory = it },
                         modifier = Modifier.width(220.dp)
                     )
+                }
+            }
+
+            state.scanNotification?.let { notification ->
+                LaunchedEffect(notification) {
+                    delay(2500)
+                    onClearScanNotification()
+                }
+                Surface(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(bottom = 12.dp),
+                    shape = RoundedCornerShape(12.dp),
+                    color = Color(0xFFE8F5E9),
+                    border = BorderStroke(1.dp, Color(0xFFA5D6A7))
+                ) {
+                    Row(
+                        modifier = Modifier.padding(horizontal = 14.dp, vertical = 10.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Icon(
+                            Icons.Filled.CheckCircle,
+                            contentDescription = null,
+                            tint = Color(0xFF2E7D32),
+                            modifier = Modifier.size(20.dp)
+                        )
+                        Spacer(Modifier.width(8.dp))
+                        Text(
+                            notification,
+                            fontSize = 13.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = Color(0xFF1B5E20)
+                        )
+                    }
                 }
             }
 
@@ -239,6 +292,16 @@ fun CashierPosScreen(
             )
             }
         }
+    }
+
+    if (showCameraScanner) {
+        CameraBarcodeScannerDialog(
+            onDismissRequest = { showCameraScanner = false },
+            onBarcodeScanned = { barcode ->
+                showCameraScanner = false
+                onScanBarcode(barcode)
+            }
+        )
     }
 }
 

@@ -12,6 +12,10 @@ import android.print.PrintDocumentAdapter
 import android.print.PrintDocumentInfo
 import android.print.PrintManager
 import android.print.pdf.PrintedPdfDocument
+import android.widget.Toast
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
@@ -74,13 +78,14 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import com.tbterminal.app.data.model.CashTransactionDetail
 import com.tbterminal.app.data.model.CashTransactionItem
 import com.tbterminal.app.data.model.TransactionRefundResult
+import com.tbterminal.app.data.model.receiptNumber
+import com.tbterminal.app.data.model.remainingAmount
 import com.tbterminal.app.data.repository.CashReconciliationRepository
 import com.tbterminal.app.data.repository.ManagerApprovalRepository
 import com.tbterminal.app.ui.cashier.transactions.CashierPayDebtDialog
 import com.tbterminal.app.ui.cashier.transactions.CashierTransactionHistoryUiState
 import com.tbterminal.app.ui.cashier.transactions.CashierTransactionHistoryViewModel
 import com.tbterminal.app.ui.cashier.transactions.TransactionActionDialogs
-import com.tbterminal.app.ui.cashier.transactions.remainingAmount
 import com.tbterminal.app.ui.cashier.transactions.transactionActionAccess
 import com.tbterminal.app.ui.dashboard.admin.AdminDashboardShell
 import com.tbterminal.app.ui.dashboard.admin.AdminDestination
@@ -486,23 +491,12 @@ private fun ReceiptSummaryCard(
                             letterSpacing = 0.5.sp
                         )
                         Spacer(modifier = Modifier.height(2.dp))
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(6.dp)
-                        ) {
-                            Box(
-                                modifier = Modifier
-                                    .size(6.dp)
-                                    .clip(CircleShape)
-                                    .background(statusColor)
-                            )
-                            Text(
-                                text = statusLabel,
-                                color = statusColor,
-                                fontSize = 13.sp,
-                                fontWeight = FontWeight.SemiBold
-                            )
-                        }
+                        Text(
+                            text = statusLabel,
+                            color = statusColor,
+                            fontSize = 13.sp,
+                            fontWeight = FontWeight.SemiBold
+                        )
                     }
                     Spacer(modifier = Modifier.width(16.dp))
                     Spacer(modifier = Modifier.weight(1f))
@@ -982,7 +976,38 @@ fun CetakStrukPreviewDialog(
     }
 }
 
-internal fun printTransactionReceipt(context: Context, transaction: CashTransactionDetail) {
+internal fun printTransactionReceipt(
+    context: Context,
+    transaction: CashTransactionDetail,
+    coroutineScope: CoroutineScope? = null
+) {
+    val app = context.applicationContext as? com.tbterminal.app.TbTerminalApplication
+    val printerManager = app?.appContainer?.thermalPrinterManager
+
+    if (printerManager == null) {
+        printTransactionReceiptPdf(context, transaction)
+        return
+    }
+
+    val scope = coroutineScope ?: CoroutineScope(Dispatchers.Main)
+    scope.launch {
+        val result = printerManager.printReceipt(context, transaction)
+        when (result) {
+            is com.tbterminal.app.data.printer.PrinterResult.Success -> {
+                Toast.makeText(context, "Struk berhasil dicetak ke printer.", Toast.LENGTH_SHORT).show()
+            }
+            is com.tbterminal.app.data.printer.PrinterResult.Error -> {
+                if (result.message == "USE_SYSTEM_PRINT") {
+                    printTransactionReceiptPdf(context, transaction)
+                } else {
+                    Toast.makeText(context, result.message, Toast.LENGTH_LONG).show()
+                }
+            }
+        }
+    }
+}
+
+internal fun printTransactionReceiptPdf(context: Context, transaction: CashTransactionDetail) {
     val printManager = context.getSystemService(Context.PRINT_SERVICE) as PrintManager
     printManager.print(
         "${if (transaction.status.equals("voided", true)) "Void" else "Struk"}-${transaction.receiptNumber()}",
@@ -1059,9 +1084,5 @@ private class TransactionReceiptPrintAdapter(
         canvas.drawText("Kembalian: ${transaction.changeAmount.moneyText()}", 32f, y, normal); y += 18f
         canvas.drawText("Sisa: ${transaction.remainingAmount().moneyText()}", 32f, y, normal)
     }
-}
-
-internal fun CashTransactionDetail.receiptNumber(): String {
-    return receiptId.ifBlank { id }
 }
 

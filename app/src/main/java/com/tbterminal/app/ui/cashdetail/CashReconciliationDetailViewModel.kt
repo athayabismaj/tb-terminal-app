@@ -5,6 +5,7 @@ import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import com.tbterminal.app.data.repository.CashReconciliationRepository
 import com.tbterminal.app.data.repository.RepositoryResult
+import java.math.BigDecimal
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -77,6 +78,49 @@ class CashReconciliationDetailViewModel(
 
     fun nextPage() {
         if (_uiState.value.page < _uiState.value.totalPages) loadDetail(_uiState.value.page + 1)
+    }
+
+    fun openCloseDialog() {
+        _uiState.update { it.copy(showCloseDialog = true, closeErrorMessage = null) }
+    }
+
+    fun dismissCloseDialog() {
+        _uiState.update { it.copy(showCloseDialog = false, closeErrorMessage = null) }
+    }
+
+    fun forceCloseSession(endingCashPhysical: BigDecimal, notes: String?) {
+        viewModelScope.launch {
+            _uiState.update { it.copy(isClosingSession = true, closeErrorMessage = null) }
+            when (val result = repository.forceCloseSession(sessionId, endingCashPhysical, notes)) {
+                is RepositoryResult.Success -> {
+                    _uiState.update {
+                        it.copy(
+                            session = result.data,
+                            isClosingSession = false,
+                            showCloseDialog = false,
+                            closeSuccessMessage = "Sesi kasir berhasil ditutup oleh supervisor."
+                        )
+                    }
+                    loadDetail(_uiState.value.page)
+                }
+                is RepositoryResult.Error -> {
+                    _uiState.update {
+                        it.copy(
+                            isClosingSession = false,
+                            closeErrorMessage = result.message
+                        )
+                    }
+                }
+                is RepositoryResult.Exception -> {
+                    _uiState.update {
+                        it.copy(
+                            isClosingSession = false,
+                            closeErrorMessage = "Koneksi ke server gagal."
+                        )
+                    }
+                }
+            }
+        }
     }
 
     companion object {

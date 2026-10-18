@@ -9,6 +9,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.outlined.TrendingUp
 import androidx.compose.material.icons.outlined.*
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material3.*
@@ -201,10 +202,11 @@ private fun ProductInfoPill(product: ProductStock) {
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 Column(Modifier.weight(1f).background(Color.White, RoundedCornerShape(8.dp)).border(1.dp, Color(0xFFF1F5F9), RoundedCornerShape(8.dp)).padding(8.dp)) {
                     Text("Stok sekarang", fontSize = 10.sp, color = Color(0xFF94A3B8))
-                    Text("${product.quantity} ${product.unitName ?: "Pcs"}", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = Color(0xFF1E293B))
+                    val currentStock = product.quantity.setScale(0, java.math.RoundingMode.HALF_UP).toPlainString()
+                    Text("$currentStock ${product.unitName ?: "Pcs"}", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = Color(0xFF1E293B))
                 }
                 Column(Modifier.weight(1f).background(Color.White, RoundedCornerShape(8.dp)).border(1.dp, Color(0xFFF1F5F9), RoundedCornerShape(8.dp)).padding(8.dp)) {
-                    Text("Harga beli terakhir", fontSize = 10.sp, color = Color(0xFF94A3B8))
+                    Text("HPP saat ini", fontSize = 10.sp, color = Color(0xFF94A3B8))
                     Text(product.priceBuy.asCurrency(), fontSize = 12.sp, fontWeight = FontWeight.Bold, color = Color(0xFF1E293B))
                 }
             }
@@ -374,7 +376,7 @@ private fun PurchaseDetailsCard(
                         textStyle = androidx.compose.ui.text.TextStyle(fontSize = 12.sp, fontWeight = FontWeight.SemiBold, color = Color(0xFF1E293B)),
                         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                         singleLine = true,
-                        trailingIcon = { Text("Pcs", fontSize = 11.sp, color = Color(0xFF94A3B8), fontWeight = FontWeight.Medium, modifier = Modifier.padding(end = 12.dp)) }
+                        trailingIcon = { Text(uiState.selectedProduct?.unitName ?: "Pcs", fontSize = 11.sp, color = Color(0xFF94A3B8), fontWeight = FontWeight.Medium, modifier = Modifier.padding(end = 12.dp)) }
                     )
                 }
                 Column(Modifier.weight(1f)) {
@@ -416,11 +418,16 @@ private fun PurchaseDetailsCard(
                     Spacer(Modifier.height(8.dp))
                     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
                         Text("Estimasi utang", fontSize = 12.sp, fontWeight = FontWeight.Medium, color = Color(0xFF64748B))
-                        Text("-", fontSize = 12.sp, fontWeight = FontWeight.SemiBold, color = Color(0xFF94A3B8))
+                        val payable = uiState.payableAmount
+                        val payableText = if (payable != null && payable > BigDecimal.ZERO) payable.asCurrency() else "Lunas"
+                        Text(payableText, fontSize = 12.sp, fontWeight = FontWeight.SemiBold, color = if (payable != null && payable > BigDecimal.ZERO) Color(0xFFD97706) else Brand700)
                     }
                 }
             }
             
+            Spacer(Modifier.height(14.dp))
+            MovingAverageCogsPreviewCard(uiState)
+
             Spacer(Modifier.height(16.dp))
             
             // Catatan
@@ -438,6 +445,145 @@ private fun PurchaseDetailsCard(
                 textStyle = androidx.compose.ui.text.TextStyle(fontSize = 12.sp, color = Color(0xFF1E293B)),
                 maxLines = 3
             )
+        }
+    }
+}
+
+@Composable
+private fun MovingAverageCogsPreviewCard(uiState: IncomingGoodsUiState) {
+    val movingAverage = uiState.movingAverageResult
+    val product = uiState.selectedProduct
+
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .background(Color(0xFFF8FAFC), RoundedCornerShape(12.dp))
+            .border(1.dp, Color(0xFFE2E8F0), RoundedCornerShape(12.dp))
+            .padding(14.dp)
+    ) {
+        Column {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(
+                        imageVector = Icons.AutoMirrored.Outlined.TrendingUp,
+                        contentDescription = null,
+                        tint = Brand600,
+                        modifier = Modifier.size(16.dp)
+                    )
+                    Spacer(Modifier.width(6.dp))
+                    Text(
+                        text = "Simulasi HPP Bergerak",
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = Color(0xFF1E293B)
+                    )
+                }
+
+                if (movingAverage != null) {
+                    val diff = movingAverage.cogsDifference
+                    val isUp = diff > BigDecimal.ZERO
+                    val isDown = diff < BigDecimal.ZERO
+                    val badgeColor = when {
+                        isUp -> Color(0xFFD97706)
+                        isDown -> Brand600
+                        else -> Color(0xFF64748B)
+                    }
+                    val badgeBg = when {
+                        isUp -> Color(0xFFFFFBEB)
+                        isDown -> Brand50
+                        else -> Color(0xFFF1F5F9)
+                    }
+                    val prefix = if (isUp) "+" else ""
+                    val percentStr = movingAverage.percentChange.toPlainString()
+
+                    Box(
+                        modifier = Modifier
+                            .background(badgeBg, RoundedCornerShape(8.dp))
+                            .border(1.dp, badgeColor.copy(alpha = 0.3f), RoundedCornerShape(8.dp))
+                            .padding(horizontal = 8.dp, vertical = 2.dp)
+                    ) {
+                        Text(
+                            text = "$prefix${diff.asCurrency()} ($percentStr%)",
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = badgeColor
+                        )
+                    }
+                }
+            }
+
+            Spacer(Modifier.height(10.dp))
+
+            if (movingAverage != null && product != null) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    Column(
+                        modifier = Modifier
+                            .weight(1f)
+                            .background(Color.White, RoundedCornerShape(8.dp))
+                            .border(1.dp, Color(0xFFF1F5F9), RoundedCornerShape(8.dp))
+                            .padding(8.dp)
+                    ) {
+                        Text("HPP Saat Ini", fontSize = 10.sp, color = Color(0xFF94A3B8))
+                        Text(
+                            text = product.priceBuy.asCurrency(),
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = Color(0xFF475569)
+                        )
+                    }
+
+                    Column(
+                        modifier = Modifier
+                            .weight(1f)
+                            .background(Brand50, RoundedCornerShape(8.dp))
+                            .border(1.dp, Brand100, RoundedCornerShape(8.dp))
+                            .padding(8.dp)
+                    ) {
+                        Text("HPP Baru (Moving Avg)", fontSize = 10.sp, fontWeight = FontWeight.SemiBold, color = Brand700)
+                        Text(
+                            text = movingAverage.newCogs.asCurrency(),
+                            fontSize = 13.sp,
+                            fontWeight = FontWeight.ExtraBold,
+                            color = Brand700
+                        )
+                    }
+                }
+
+                Spacer(Modifier.height(8.dp))
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    val newStockUnits = movingAverage.newStock.setScale(0, java.math.RoundingMode.HALF_UP).toPlainString()
+                    Text(
+                        text = "Stok Baru: $newStockUnits ${product.unitName ?: "Pcs"}",
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.Medium,
+                        color = Color(0xFF64748B)
+                    )
+                    Text(
+                        text = "Valuasi: ${movingAverage.newValuation.asCurrency()}",
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.SemiBold,
+                        color = Color(0xFF334155)
+                    )
+                }
+            } else {
+                Text(
+                    text = "Isi jumlah & harga satuan untuk melihat simulasi HPP rata-rata bergerak dan valuasi stok baru.",
+                    fontSize = 11.sp,
+                    color = Color(0xFF94A3B8),
+                    lineHeight = 15.sp
+                )
+            }
         }
     }
 }
@@ -495,7 +641,7 @@ internal fun IncomingPaymentBottomSheet(
                         Icon(Icons.Outlined.Storefront, contentDescription = null, tint = Brand700, modifier = Modifier.size(14.dp))
                         Spacer(Modifier.width(6.dp))
                         Text(
-                            "${uiState.quantityInput} Pcs ${uiState.selectedProduct?.productName ?: "-"} • ${uiState.selectedSupplier?.name ?: "-"}",
+                            "${uiState.quantityInput.ifBlank { "0" }} ${uiState.selectedProduct?.unitName ?: "Pcs"} ${uiState.selectedProduct?.productName ?: "-"} • ${uiState.selectedSupplier?.name ?: "-"}",
                             fontSize = 12.sp,
                             fontWeight = FontWeight.Medium,
                             color = Color(0xFF475569),

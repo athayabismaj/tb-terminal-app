@@ -53,7 +53,23 @@ internal fun ProductResponseDto.toProduct(): Product {
 }
 
 internal fun StockDetailResponseDto.toProductStock(): ProductStock {
-    return ProductStock(productId, sku, productName, categoryName, unitName, quantity, minStock, priceBuy, priceRetail, priceContractor, discount, isActive)
+    return ProductStock(
+        productId = productId,
+        sku = sku,
+        productName = productName,
+        categoryName = categoryName,
+        unitName = unitName,
+        quantity = quantity,
+        minStock = minStock,
+        priceBuy = priceBuy,
+        priceRetail = priceRetail,
+        priceContractor = priceContractor,
+        discount = discount,
+        isActive = isActive,
+        secondaryUnitId = secondaryUnitId,
+        secondaryUnitName = secondaryUnitName,
+        secondaryUnitFactor = secondaryUnitFactor?.toBigDecimalOrNull()
+    )
 }
 
 internal fun StockAdjustmentResponseDto.toStockAdjustment(): StockAdjustment {

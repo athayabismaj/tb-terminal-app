@@ -84,6 +84,15 @@ data class CashTransactionDetail(
     val items: List<CashTransactionItem>
 )
 
+fun CashTransactionDetail.remainingAmount(): BigDecimal =
+    total.subtract(paidAmount).coerceAtLeast(BigDecimal.ZERO)
+
+fun CashTransactionDetail.receiptNumber(): String =
+    receiptId.ifBlank { id }
+
+fun CashTransaction.remainingAmount(): BigDecimal =
+    total.subtract(paidAmount).coerceAtLeast(BigDecimal.ZERO)
+
 data class TransactionVoidResult(
     val voidId: String,
     val transactionId: String,

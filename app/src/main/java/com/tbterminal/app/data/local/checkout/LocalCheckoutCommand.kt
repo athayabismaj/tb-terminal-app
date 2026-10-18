@@ -25,6 +25,8 @@ data class LocalCheckoutItemCommand(
     val skuSnapshot: String? = null,
     val unitNameSnapshot: String? = null,
     val quantity: Double,
+    val baseQuantity: Double = quantity,
+    val conversionFactor: Double = 1.0,
     val priceAtTransaction: Double,
     val cogsAtTransaction: Double = 0.0,
     val discount: Double = 0.0,

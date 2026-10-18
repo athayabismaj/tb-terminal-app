@@ -10,6 +10,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
@@ -224,13 +225,13 @@ private fun IncomingGoodsListContent(
     onDismissMessage: () -> Unit
 ) {
     BoxWithConstraints(modifier.fillMaxSize().background(androidx.compose.ui.graphics.Color(0xFFF8FAFC))) {
-        val compact = maxWidth < 720.dp
+        val compact = maxWidth < 700.dp
         Box(
-            modifier = Modifier.fillMaxSize().padding(horizontal = if (compact) 16.dp else 28.dp, vertical = if (compact) 14.dp else 24.dp),
+            modifier = Modifier.fillMaxSize().padding(horizontal = if (compact) 16.dp else 28.dp, vertical = if (compact) 12.dp else 20.dp),
             contentAlignment = Alignment.TopCenter,
         ) {
             Column(
-                modifier = Modifier.widthIn(max = 1180.dp).fillMaxWidth().verticalScroll(rememberScrollState()),
+                modifier = Modifier.widthIn(max = 1280.dp).fillMaxWidth().verticalScroll(rememberScrollState()),
                 verticalArrangement = Arrangement.spacedBy(if (compact) 12.dp else 16.dp),
             ) {
                 IncomingGoodsAlert(uiState, onDismissMessage)
@@ -245,6 +246,7 @@ private fun IncomingGoodsListContent(
                     onPreviousPage = onPreviousPage,
                     onNextPage = onNextPage
                 )
+                Spacer(Modifier.height(4.dp))
             }
         }
     }

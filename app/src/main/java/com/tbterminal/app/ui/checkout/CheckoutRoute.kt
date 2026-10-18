@@ -61,6 +61,7 @@ fun CashierPosRoute(
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val snackbarHostState = remember { SnackbarHostState() }
+    val context = androidx.compose.ui.platform.LocalContext.current
     var approvalAttemptId by remember { mutableStateOf<String?>(null) }
 
     LaunchedEffect(uiState.checkoutPreview?.checkoutAttemptId, uiState.checkoutPreview?.approvalRequired) {
@@ -116,6 +117,7 @@ fun CashierPosRoute(
                 onUseCustomerName = viewModel::useQuickCustomerName,
                 onRefreshCustomers = viewModel::loadCustomers,
                 onUpdateQty = viewModel::updateCartQuantity,
+                onToggleUnit = viewModel::toggleCartItemUnit,
                 onSelectPayment = viewModel::selectPaymentMethod,
                 onAmountPaidChanged = viewModel::onAmountPaidChanged,
                 onStartingCashChanged = viewModel::onStartingCashChanged,
@@ -140,6 +142,8 @@ fun CashierPosRoute(
                     }
                 },
                 onNavigateToCart = onNavigateToCart,
+                onScanBarcode = { barcode -> viewModel.onScanBarcode(barcode, context) },
+                onClearScanNotification = viewModel::clearScanNotification,
                 modifier = Modifier
                     .fillMaxSize()
                     .padding(contentPadding)
@@ -248,6 +252,7 @@ fun CashierCartRoute(
         },
         onItemDiscountChanged = viewModel::setItemDiscount,
         onTransactionDiscountChanged = viewModel::setTransactionDiscount,
+        onToggleUnit = viewModel::toggleCartItemUnit,
         onCheckout = {
             val preview = uiState.checkoutPreview
             if (uiState.hasAmbiguousCheckout) {

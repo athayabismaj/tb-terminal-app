@@ -79,7 +79,8 @@ internal fun CashExpenseHistoryScreen(
     onNextDate: () -> Unit,
     onShowSessionDetail: (String) -> Unit,
     onPreviousPage: () -> Unit,
-    onNextPage: () -> Unit
+    onNextPage: () -> Unit,
+    onDateRangeChanged: (String, String, String?) -> Unit = { _, _, _ -> },
 ) {
     var showDatePicker by remember { mutableStateOf(false) }
 
@@ -111,9 +112,24 @@ internal fun CashExpenseHistoryScreen(
     }
 
     if (showDatePicker) {
+        val activeMode = when (uiState.selectedPreset) {
+            "Bulan ini", "Bulan" -> "Bulan"
+            "Minggu ini", "Minggu" -> "Minggu"
+            else -> "Hari"
+        }
         HistoryDatePickerDialog(
-            currentDate = uiState.endDate ?: uiState.selectedDate,
+            currentDate = uiState.startDate ?: uiState.selectedDate,
+            initialMode = activeMode,
             onDismiss = { showDatePicker = false },
+            onConfirmRange = { newStartStr, newEndStr, mode ->
+                val preset = when (mode) {
+                    "Bulan" -> "Bulan ini"
+                    "Minggu" -> "Minggu ini"
+                    else -> "Hari ini"
+                }
+                onDateRangeChanged(newStartStr, newEndStr, preset)
+                showDatePicker = false
+            },
             onConfirm = {
                 onDateChanged(it)
                 showDatePicker = false

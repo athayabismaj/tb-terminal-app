@@ -77,6 +77,7 @@ fun CashierCartScreen(
     onClearCart: () -> Unit,
     onItemDiscountChanged: (String, CheckoutDiscount?) -> Unit,
     onTransactionDiscountChanged: (CheckoutDiscount?) -> Unit,
+    onToggleUnit: (String, Boolean) -> Unit = { _, _ -> },
     onCheckout: () -> Unit,
     onBackToPos: () -> Unit,
     onDashboardClick: () -> Unit = {},
@@ -132,6 +133,7 @@ fun CashierCartScreen(
                     onClearCart = onClearCart,
                     onEditItemDiscount = { discountItemId = it },
                     onEditTransactionDiscount = { showTransactionDiscount = true },
+                    onToggleUnit = onToggleUnit,
                     onCheckout = onCheckout,
                     onBackToPos = onBackToPos,
                     modifier = Modifier
@@ -191,6 +193,7 @@ private fun CartContent(
     onClearCart: () -> Unit,
     onEditItemDiscount: (String) -> Unit,
     onEditTransactionDiscount: () -> Unit,
+    onToggleUnit: (String, Boolean) -> Unit,
     onCheckout: () -> Unit,
     onBackToPos: () -> Unit,
     modifier: Modifier = Modifier
@@ -304,6 +307,7 @@ private fun CartContent(
                         onDecrease = { onDecrease(item.cartItemId) },
                         onRemove = { onRemove(item.cartItemId) },
                         onDiscountClick = { onEditItemDiscount(item.cartItemId) },
+                        onToggleUnit = { toSecondary -> onToggleUnit(item.cartItemId, toSecondary) },
                     )
                 }
             }

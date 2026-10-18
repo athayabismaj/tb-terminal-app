@@ -40,7 +40,8 @@ data class CheckoutUiState(
     val isLoading: Boolean = false,
     val productError: UiText? = null,
     val customerError: UiText? = null,
-    val errorEvent: UiText? = null
+    val errorEvent: UiText? = null,
+    val scanNotification: String? = null
 )
 
 data class ActiveCashSessionUi(
@@ -57,9 +58,13 @@ data class Product(
     val name: String,
     val unitPrice: BigDecimal,
     val sku: String = "",
+    val barcode: String = "",
     val unitName: String = "",
     val categoryName: String = "",
-    val stockQty: BigDecimal = BigDecimal.ZERO
+    val stockQty: BigDecimal = BigDecimal.ZERO,
+    val secondaryUnitId: String? = null,
+    val secondaryUnitName: String? = null,
+    val secondaryUnitFactor: BigDecimal? = null
 )
 
 data class CartItem(
@@ -70,8 +75,31 @@ data class CartItem(
     val sku: String = "",
     val unitName: String = "",
     val discountRequest: CheckoutDiscount? = null,
-    val cartItemId: String = productId
-)
+    val cartItemId: String = productId,
+    val baseUnitPrice: BigDecimal = unitPrice,
+    val baseUnitName: String = unitName,
+    val secondaryUnitId: String? = null,
+    val secondaryUnitName: String? = null,
+    val secondaryUnitFactor: BigDecimal? = null,
+    val isSecondaryUnit: Boolean = false
+) {
+    val hasSecondaryUnit: Boolean
+        get() = secondaryUnitFactor != null && secondaryUnitFactor > BigDecimal.ONE
+
+    val equivalentBaseQuantity: Double
+        get() = if (isSecondaryUnit && secondaryUnitFactor != null) {
+            quantity.toDouble() * secondaryUnitFactor.toDouble()
+        } else {
+            quantity.toDouble()
+        }
+
+    val equivalentBaseQuantityBigDecimal: BigDecimal
+        get() = if (isSecondaryUnit && secondaryUnitFactor != null) {
+            quantity.toBigDecimal().multiply(secondaryUnitFactor)
+        } else {
+            quantity.toBigDecimal()
+        }
+}
 
 enum class PaymentMethod {
     TUNAI,

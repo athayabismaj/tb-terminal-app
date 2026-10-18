@@ -220,6 +220,17 @@ private fun ProductMinimalCard(
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis
                     )
+                    if (product.secondaryUnitFactor != null && product.secondaryUnitFactor > BigDecimal.ONE) {
+                        Spacer(modifier = Modifier.height(2.dp))
+                        Text(
+                            text = "1 ${product.secondaryUnitName?.ifBlank { "Satuan 2" } ?: "Satuan 2"} = ${product.secondaryUnitFactor.stripTrailingZeros().toPlainString()} ${product.unitName}",
+                            color = Primary,
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.SemiBold,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                    }
                 }
                 StockPill(
                     stockQty = product.stockQty,
@@ -230,14 +241,28 @@ private fun ProductMinimalCard(
             Spacer(modifier = Modifier.weight(1f))
 
             Column {
-                Text(
-                    text = product.unitPrice.moneyText(),
-                    color = Primary,
-                    fontSize = 18.sp,
-                    fontWeight = FontWeight.ExtraBold,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
-                )
+                Row(
+                    verticalAlignment = Alignment.Bottom,
+                    horizontalArrangement = Arrangement.spacedBy(4.dp)
+                ) {
+                    Text(
+                        text = product.unitPrice.moneyText(),
+                        color = Primary,
+                        fontSize = 18.sp,
+                        fontWeight = FontWeight.ExtraBold,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                    if (product.unitName.isNotBlank()) {
+                        Text(
+                            text = "/ ${product.unitName}",
+                            color = OnSurfaceVariant,
+                            fontSize = 12.sp,
+                            modifier = Modifier.padding(bottom = 2.dp),
+                            maxLines = 1
+                        )
+                    }
+                }
                 Spacer(modifier = Modifier.height(8.dp))
                 ProductCardAction(
                     cartQty = cartQty,

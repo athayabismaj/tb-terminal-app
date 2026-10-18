@@ -53,7 +53,11 @@ fun AdminCashReconciliationDetailScreen(
             onOpenHistory = onOpenHistory,
             onRetry = { viewModel.loadDetail(uiState.page) },
             onPreviousPage = viewModel::previousPage,
-            onNextPage = viewModel::nextPage
+            onNextPage = viewModel::nextPage,
+            onOpenCloseDialog = viewModel::openCloseDialog,
+            onDismissCloseDialog = viewModel::dismissCloseDialog,
+            onConfirmForceClose = viewModel::forceCloseSession
         )
     }
 }
+

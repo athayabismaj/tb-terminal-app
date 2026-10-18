@@ -24,14 +24,20 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.outlined.KeyboardArrowRight
+import androidx.compose.material.icons.filled.ChevronLeft
+import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material.icons.outlined.AccountBalanceWallet
 import androidx.compose.material.icons.outlined.ChevronRight
 import androidx.compose.material.icons.outlined.Close
 import androidx.compose.material.icons.outlined.ExpandMore
+import androidx.compose.material.icons.outlined.FactCheck
 import androidx.compose.material.icons.outlined.Payments
 import androidx.compose.material.icons.outlined.Schedule
 import androidx.compose.material.icons.outlined.Search
+import androidx.compose.material.icons.outlined.Tune
 import androidx.compose.material.icons.outlined.Visibility
+import androidx.compose.ui.draw.clip
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
@@ -54,6 +60,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
@@ -62,10 +69,10 @@ import androidx.compose.ui.unit.sp
 import com.tbterminal.app.data.model.CashSession
 import com.tbterminal.app.ui.components.HistoryDatePickerDialog
 import com.tbterminal.app.ui.components.SkeletonBox
+import com.tbterminal.app.ui.components.SummaryBarChartIcon
+import com.tbterminal.app.ui.components.SummaryIconButton
 import com.tbterminal.app.ui.components.TbMobileControlSheet
-import com.tbterminal.app.ui.components.TbMobileFilterButton
 import com.tbterminal.app.ui.components.TbMobileSheetDoneButton
-import com.tbterminal.app.ui.components.TbMobileSummaryButton
 import com.tbterminal.app.ui.components.TbPagination
 import com.tbterminal.app.ui.components.TbPeriodFilterRow
 import com.tbterminal.app.ui.theme.TbBackground
@@ -124,6 +131,7 @@ internal fun CashSessionHistoryScreen(
     onShowDetail: (String) -> Unit,
     onPreviousPage: () -> Unit,
     onNextPage: () -> Unit,
+    onDateRangeChanged: (String, String, String?) -> Unit = { _, _, _ -> },
 ) {
     var showDatePicker by remember { mutableStateOf(false) }
     var showMobileFilters by remember { mutableStateOf(false) }
@@ -146,17 +154,6 @@ internal fun CashSessionHistoryScreen(
                 if (uiState.isLoading && uiState.sessions.isEmpty() && uiState.errorMessage == null) {
                     CashHistorySkeleton(compact)
                 } else {
-                    // Toolbar periode selalu ditampilkan agar pengguna mobile dapat langsung mengganti periode
-                    SessionDateToolbar(
-                        uiState = uiState,
-                        compact = compact,
-                        onCalendarClick = { showDatePicker = true },
-                        onDatePresetSelected = onDatePresetSelected,
-                    )
-
-                    // Ringkasan metrik kas sesi
-                    SessionOverview(uiState = uiState, compact = compact)
-
                     SessionListSection(
                         uiState = uiState,
                         compact = compact,
@@ -225,9 +222,24 @@ internal fun CashSessionHistoryScreen(
     }
 
     if (showDatePicker) {
+        val activeMode = when (uiState.selectedPreset) {
+            "Bulan ini", "Bulan" -> "Bulan"
+            "Minggu ini", "Minggu" -> "Minggu"
+            else -> "Hari"
+        }
         HistoryDatePickerDialog(
-            currentDate = uiState.endDate ?: uiState.selectedDate,
+            currentDate = uiState.startDate ?: uiState.selectedDate,
+            initialMode = activeMode,
             onDismiss = { showDatePicker = false },
+            onConfirmRange = { newStartStr, newEndStr, mode ->
+                val preset = when (mode) {
+                    "Bulan" -> "Bulan ini"
+                    "Minggu" -> "Minggu ini"
+                    else -> "Hari ini"
+                }
+                onDateRangeChanged(newStartStr, newEndStr, preset)
+                showDatePicker = false
+            },
             onConfirm = {
                 onDateChanged(it)
                 showDatePicker = false
@@ -489,33 +501,54 @@ private fun SessionListSection(
     onOpenMobileOverview: () -> Unit,
 ) {
     val visibleSessions = uiState.filteredSessions()
+    val isFiltered = uiState.statusFilter != "Semua" ||
+        (uiState.selectedPreset != null && uiState.selectedPreset != "Hari ini") ||
+        (uiState.selectedPreset == null && uiState.selectedDate != null)
+
     Column(
         modifier = Modifier.fillMaxWidth().testTag("cash-session-list"),
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Text(
-                "Daftar sesi",
-                modifier = Modifier.weight(1f),
-                style = MaterialTheme.typography.titleMedium,
-                color = Slate900,
-                fontWeight = FontWeight.Bold,
-            )
-            if (compact) {
-                TbMobileSummaryButton(
-                    onClick = onOpenMobileOverview,
-                    testTag = "cash-session-open-overview",
-                )
-            }
-        }
         SessionToolbar(
             searchQuery = uiState.searchQuery,
             selectedStatus = uiState.statusFilter,
+            isFiltered = isFiltered,
             onSearchChanged = onSearchChanged,
             onStatusFilterChanged = onStatusFilterChanged,
             compact = compact,
             onOpenMobileFilters = onOpenMobileFilters,
         )
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 2.dp, vertical = 2.dp),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Text(
+                "Daftar sesi",
+                style = MaterialTheme.typography.titleMedium,
+                color = Slate900,
+                fontWeight = FontWeight.Bold,
+            )
+            Box(
+                modifier = Modifier
+                    .size(32.dp)
+                    .clip(RoundedCornerShape(12.dp))
+                    .border(1.dp, Color(0xFFE2E8F0), RoundedCornerShape(12.dp))
+                    .background(Color.White)
+                    .clickable(onClick = onOpenMobileOverview)
+                    .testTag("cash-session-open-overview"),
+                contentAlignment = Alignment.Center,
+            ) {
+                Icon(
+                    Icons.Outlined.FactCheck,
+                    contentDescription = "Ringkasan",
+                    tint = Color(0xFF334155),
+                    modifier = Modifier.size(16.dp),
+                )
+            }
+        }
         when {
             uiState.isLoading -> SessionRowsSkeleton(compact)
             uiState.errorMessage != null -> SessionFeedback(
@@ -532,12 +565,28 @@ private fun SessionListSection(
                 title = "Sesi tidak ditemukan",
                 message = "Coba ubah kata pencarian atau filter status.",
             )
-            compact -> Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                visibleSessions.forEach { SessionCompactCard(it, onShowDetail) }
+            compact -> Surface(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .testTag("cash-session-grouped-list"),
+                shape = RoundedCornerShape(16.dp),
+                color = Color.White,
+                border = BorderStroke(1.dp, Color(0xFFE2E8F0)),
+            ) {
+                Column {
+                    visibleSessions.forEachIndexed { index, session ->
+                        SessionMobileItem(session, onShowDetail)
+                        if (index < visibleSessions.lastIndex) {
+                            HorizontalDivider(color = Color(0xFFF1F5F9))
+                        }
+                    }
+                }
             }
             else -> SessionDesktopTable(visibleSessions, onShowDetail)
         }
-        SessionPagination(uiState, visibleSessions.size, onPreviousPage, onNextPage, compact)
+        if (visibleSessions.isNotEmpty()) {
+            SessionPagination(uiState, visibleSessions.size, onPreviousPage, onNextPage, compact)
+        }
     }
 }
 
@@ -545,6 +594,7 @@ private fun SessionListSection(
 private fun SessionToolbar(
     searchQuery: String,
     selectedStatus: String,
+    isFiltered: Boolean,
     onSearchChanged: (String) -> Unit,
     onStatusFilterChanged: (String) -> Unit,
     compact: Boolean,
@@ -558,29 +608,31 @@ private fun SessionToolbar(
         Surface(
             modifier = Modifier
                 .weight(1f)
-                .height(48.dp)
+                .height(if (compact) 42.dp else 48.dp)
                 .testTag("cash-session-search"),
             color = Color.White,
-            shape = RoundedCornerShape(14.dp),
-            border = BorderStroke(1.dp, Slate200),
+            shape = RoundedCornerShape(if (compact) 12.dp else 14.dp),
+            border = BorderStroke(1.dp, Color(0xFFCBD5E1)),
         ) {
             Row(
-                modifier = Modifier.fillMaxSize().padding(start = 14.dp, end = 6.dp),
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(start = 12.dp, end = 6.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 Icon(
                     Icons.Outlined.Search,
                     contentDescription = null,
-                    tint = Slate400,
-                    modifier = Modifier.size(19.dp),
+                    tint = Color(0xFF94A3B8),
+                    modifier = Modifier.size(18.dp),
                 )
                 Spacer(Modifier.width(10.dp))
                 Box(modifier = Modifier.weight(1f), contentAlignment = Alignment.CenterStart) {
                     if (searchQuery.isEmpty()) {
                         Text(
                             text = if (compact) "Cari kasir atau sesi..." else "Cari kasir atau nomor sesi...",
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = Slate400,
+                            fontSize = 14.sp,
+                            color = Color(0xFF94A3B8),
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis,
                         )
@@ -589,8 +641,8 @@ private fun SessionToolbar(
                         value = searchQuery,
                         onValueChange = onSearchChanged,
                         singleLine = true,
-                        textStyle = LocalTextStyle.current.copy(
-                            color = Slate900,
+                        textStyle = TextStyle(
+                            color = Color(0xFF0F172A),
                             fontSize = 14.sp,
                         ),
                         modifier = Modifier.fillMaxWidth(),
@@ -604,26 +656,41 @@ private fun SessionToolbar(
                         Icon(
                             Icons.Outlined.Close,
                             contentDescription = "Hapus pencarian",
-                            tint = Slate400,
-                            modifier = Modifier.size(17.dp),
+                            tint = Color(0xFF64748B),
+                            modifier = Modifier.size(16.dp),
                         )
                     }
                 }
             }
         }
 
-        if (compact) {
-            TbMobileFilterButton(
-                onClick = onOpenMobileFilters,
-                active = selectedStatus != "Semua",
-                testTag = "cash-session-open-filters",
-            )
-        } else {
-            SessionStatusDropdown(
-                selectedStatus = selectedStatus,
-                onStatusFilterChanged = onStatusFilterChanged,
-                modifier = Modifier.width(180.dp),
-            )
+        Surface(
+            onClick = onOpenMobileFilters,
+            modifier = Modifier
+                .size(if (compact) 42.dp else 48.dp)
+                .testTag("cash-session-open-filters"),
+            shape = RoundedCornerShape(if (compact) 12.dp else 14.dp),
+            color = Color.White,
+            border = BorderStroke(1.dp, if (isFiltered) Color(0xFF0F172A) else Color(0xFFCBD5E1)),
+            contentColor = Color(0xFF0F172A),
+        ) {
+            Box(contentAlignment = Alignment.Center) {
+                Icon(
+                    Icons.Outlined.Tune,
+                    contentDescription = "Filter sesi kas",
+                    modifier = Modifier.size(18.dp),
+                    tint = Color(0xFF0F172A),
+                )
+                if (isFiltered) {
+                    Box(
+                        modifier = Modifier
+                            .align(Alignment.TopEnd)
+                            .padding(6.dp)
+                            .size(8.dp)
+                            .background(Color(0xFFF59E0B), CircleShape)
+                    )
+                }
+            }
         }
     }
 }
@@ -845,235 +912,176 @@ private fun SessionAmount(
 
 @Composable
 private fun SessionCompactCard(session: CashSession, onShowDetail: (String) -> Unit) {
+    SessionMobileItem(session, onShowDetail)
+}
+
+@Composable
+private fun SessionMobileItem(
+    session: CashSession,
+    onShowDetail: (String) -> Unit,
+) {
     val isOpen = session.status.equals("OPEN", true)
     val diff = session.difference ?: BigDecimal.ZERO
     val hasDiff = diff.compareTo(BigDecimal.ZERO) != 0
-    val diffColor = when {
-        diff.compareTo(BigDecimal.ZERO) < 0 -> ErrorRed
-        diff.compareTo(BigDecimal.ZERO) > 0 -> Brand600
-        else -> Slate500
-    }
 
-    Surface(
-        onClick = { onShowDetail(session.id) },
-        modifier = Modifier.fillMaxWidth().testTag("cash-session-${session.id}"),
-        color = Color.White,
-        shape = RoundedCornerShape(16.dp),
-        border = BorderStroke(1.dp, Slate200),
-        shadowElevation = 1.dp,
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable { onShowDetail(session.id) }
+            .testTag("cash-session-${session.id}")
+            .padding(16.dp),
     ) {
-        Column(
-            modifier = Modifier.padding(15.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp),
+        // Header: Icon, Details & Chevron
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.SpaceBetween,
         ) {
-            // Header Row: Avatar, Cashier Name & Session ID, Status Badge, Chevron
             Row(
-                modifier = Modifier.fillMaxWidth(),
+                modifier = Modifier.weight(1f),
                 verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(10.dp),
             ) {
-                Box(
-                    modifier = Modifier
-                        .size(40.dp)
-                        .background(if (isOpen) Brand50 else Slate100, CircleShape)
-                        .border(1.dp, if (isOpen) Brand100 else Slate200, CircleShape),
-                    contentAlignment = Alignment.Center,
-                ) {
-                    Text(
-                        text = session.userName.orEmpty().ifBlank { "K" }.take(1).uppercase(),
-                        fontSize = 14.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = if (isOpen) Brand700 else Slate700,
-                    )
-                }
-
-                Column(modifier = Modifier.weight(1f)) {
-                    Text(
-                        text = session.userName ?: "Kasir",
-                        style = MaterialTheme.typography.titleSmall,
-                        color = Slate900,
-                        fontWeight = FontWeight.Bold,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                    )
-                    Text(
-                        text = "#${session.id.take(8).uppercase()} • Buka ${session.openedAt.asDateTimeShort()}",
-                        style = MaterialTheme.typography.labelSmall,
-                        color = Slate400,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                    )
-                }
-
                 Surface(
-                    color = if (isOpen) Brand50 else Slate100,
-                    shape = RoundedCornerShape(50),
-                    border = BorderStroke(1.dp, if (isOpen) Brand100 else Slate200),
+                    modifier = Modifier.size(40.dp),
+                    shape = RoundedCornerShape(12.dp),
+                    color = Color.White,
+                    border = BorderStroke(1.dp, Color(0xFFE2E8F0)),
                 ) {
+                    Box(contentAlignment = Alignment.Center) {
+                        Icon(
+                            Icons.Outlined.AccountBalanceWallet,
+                            contentDescription = null,
+                            tint = Color(0xFF1E293B),
+                            modifier = Modifier.size(20.dp),
+                        )
+                    }
+                }
+                Spacer(Modifier.width(12.dp))
+                Column(
+                    modifier = Modifier.weight(1f),
+                ) {
+                    Text(
+                        text = session.userName?.takeIf { it.isNotBlank() } ?: "Kasir",
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.SemiBold,
+                        color = Color(0xFF0F172A),
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                    Spacer(Modifier.height(2.dp))
                     Row(
-                        modifier = Modifier.padding(horizontal = 9.dp, vertical = 4.dp),
+                        modifier = Modifier.fillMaxWidth(),
                         verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(5.dp),
                     ) {
-                        Box(
-                            modifier = Modifier
-                                .size(6.dp)
-                                .background(if (isOpen) Brand600 else Slate400, CircleShape),
+                        Text(
+                            text = "Sesi #${session.id.take(8).uppercase()}",
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.Medium,
+                            color = Color(0xFF334155),
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                            modifier = Modifier.weight(1f, fill = false),
                         )
                         Text(
-                            text = if (isOpen) "Terbuka" else "Ditutup",
+                            text = " • ",
                             fontSize = 11.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = if (isOpen) Brand700 else Slate600,
+                            fontWeight = FontWeight.Normal,
+                            color = Color(0xFFCBD5E1),
+                        )
+                        Text(
+                            text = "Modal: ${session.openingCash.asCompactCurrency()}",
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.Normal,
+                            color = Color(0xFF64748B),
                             maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
                         )
                     }
                 }
+            }
+            Spacer(Modifier.width(8.dp))
+            Icon(
+                Icons.AutoMirrored.Outlined.KeyboardArrowRight,
+                contentDescription = null,
+                tint = Color(0xFF94A3B8),
+                modifier = Modifier.size(16.dp),
+            )
+        }
 
-                Icon(
-                    Icons.Outlined.ChevronRight,
-                    contentDescription = null,
-                    tint = Slate400,
-                    modifier = Modifier.size(20.dp),
+        Spacer(Modifier.height(10.dp))
+        HorizontalDivider(color = Color(0xFFF1F5F9))
+        Spacer(Modifier.height(10.dp))
+
+        // Details Grid: Baris 1 Kas Sistem & Selisih
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Column {
+                Text(
+                    text = "KAS SISTEM",
+                    fontSize = 10.sp,
+                    fontWeight = FontWeight.Medium,
+                    letterSpacing = 0.5.sp,
+                    color = Color(0xFF94A3B8),
+                )
+                Spacer(Modifier.height(2.dp))
+                Text(
+                    text = (session.systemCash ?: session.openingCash).asCompactCurrency(),
+                    fontSize = 14.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    color = Color(0xFF1E293B),
                 )
             }
-
-            // Financial Summary Block
-            Surface(
-                color = Slate50,
-                shape = RoundedCornerShape(12.dp),
-                border = BorderStroke(1.dp, Slate200.copy(alpha = 0.6f)),
-            ) {
-                Column(
-                    modifier = Modifier.fillMaxWidth().padding(12.dp),
-                    verticalArrangement = Arrangement.spacedBy(8.dp),
-                ) {
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically,
-                    ) {
-                        Column {
-                            Text(
-                                "KAS SISTEM",
-                                fontSize = 10.sp,
-                                fontWeight = FontWeight.Bold,
-                                color = Slate400,
-                                letterSpacing = 0.5.sp,
-                            )
-                            Text(
-                                (session.systemCash ?: session.openingCash).asCompactCurrency(),
-                                fontSize = 17.sp,
-                                fontWeight = FontWeight.ExtraBold,
-                                color = Slate900,
-                            )
-                        }
-                        Column(horizontalAlignment = Alignment.End) {
-                            Text(
-                                "SELISIH",
-                                fontSize = 10.sp,
-                                fontWeight = FontWeight.Bold,
-                                color = Slate400,
-                                letterSpacing = 0.5.sp,
-                            )
-                            Text(
-                                if (hasDiff) diff.asCompactCurrency() else "Rp 0 (Pas)",
-                                fontSize = 13.sp,
-                                fontWeight = FontWeight.Bold,
-                                color = diffColor,
-                            )
-                        }
-                    }
-
-                    HorizontalDivider(color = Slate200.copy(alpha = 0.7f))
-
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                    ) {
-                        Column(modifier = Modifier.weight(1f)) {
-                            Text("Modal Awal", fontSize = 10.sp, color = Slate400)
-                            Text(
-                                session.openingCash.asCompactCurrency(),
-                                fontSize = 12.sp,
-                                fontWeight = FontWeight.SemiBold,
-                                color = Slate700,
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis,
-                            )
-                        }
-                        Column(modifier = Modifier.weight(1f)) {
-                            Text("Pengeluaran", fontSize = 10.sp, color = Slate400)
-                            val hasExpense = session.totalExpenses.compareTo(BigDecimal.ZERO) > 0
-                            Text(
-                                session.totalExpenses.asCompactCurrency(),
-                                fontSize = 12.sp,
-                                fontWeight = FontWeight.SemiBold,
-                                color = if (hasExpense) ErrorRed else Slate700,
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis,
-                            )
-                        }
-                        Column(modifier = Modifier.weight(1f), horizontalAlignment = Alignment.End) {
-                            Text("Kas Fisik", fontSize = 10.sp, color = Slate400)
-                            Text(
-                                session.closingCash?.asCompactCurrency() ?: "—",
-                                fontSize = 12.sp,
-                                fontWeight = FontWeight.SemiBold,
-                                color = Slate700,
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis,
-                            )
-                        }
-                    }
+            Column(horizontalAlignment = Alignment.End) {
+                Text(
+                    text = "SELISIH",
+                    fontSize = 10.sp,
+                    fontWeight = FontWeight.Medium,
+                    letterSpacing = 0.5.sp,
+                    color = Color(0xFF94A3B8),
+                    textAlign = TextAlign.End,
+                )
+                Spacer(Modifier.height(2.dp))
+                val diffColor = when {
+                    diff.compareTo(BigDecimal.ZERO) < 0 -> Color(0xFFDC2626)
+                    diff.compareTo(BigDecimal.ZERO) > 0 -> Color(0xFF15803D)
+                    else -> Color(0xFF15803D)
                 }
+                Text(
+                    text = if (hasDiff) diff.asCompactCurrency() else "Rp 0 (Pas)",
+                    fontSize = 14.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = diffColor,
+                    textAlign = TextAlign.End,
+                )
             }
+        }
 
-            // Footer Row: Status lifecycle note & Detail button
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.SpaceBetween,
-            ) {
-                Row(
-                    modifier = Modifier.weight(1f),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(5.dp),
-                ) {
-                    Icon(
-                        Icons.Outlined.Schedule,
-                        contentDescription = null,
-                        tint = if (isOpen) Brand600 else Slate400,
-                        modifier = Modifier.size(15.dp),
-                    )
-                    Text(
-                        text = if (isOpen) {
-                            "Sesi masih berlangsung"
-                        } else {
-                            "Ditutup ${session.closedAt?.asDateTimeShort() ?: "-"}"
-                        },
-                        fontSize = 11.sp,
-                        fontWeight = if (isOpen) FontWeight.SemiBold else FontWeight.Normal,
-                        color = if (isOpen) Brand700 else Slate500,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                    )
-                }
+        Spacer(Modifier.height(6.dp))
+        HorizontalDivider(color = Color(0xFFF8FAFC))
+        Spacer(Modifier.height(6.dp))
 
-                Surface(
-                    onClick = { onShowDetail(session.id) },
-                    modifier = Modifier.testTag("cash-session-detail-${session.id}"),
-                    color = Color.Transparent,
-                ) {
-                    Text(
-                        "Lihat Rincian →",
-                        fontSize = 12.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = Brand600,
-                        modifier = Modifier.padding(vertical = 4.dp, horizontal = 2.dp),
-                    )
-                }
-            }
+        // Details Grid: Baris 2 Tanggal & Status
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Text(
+                text = session.openedAt.asDateTime(),
+                fontSize = 12.sp,
+                fontWeight = FontWeight.Medium,
+                color = Color(0xFF64748B),
+            )
+            val statusColor = if (isOpen) Color(0xFF15803D) else Color(0xFF64748B)
+            Text(
+                text = if (isOpen) "Terbuka" else "Ditutup",
+                fontSize = 12.sp,
+                fontWeight = FontWeight.SemiBold,
+                color = statusColor,
+            )
         }
     }
 }
@@ -1155,22 +1163,93 @@ private fun SessionPagination(
     onNextPage: () -> Unit,
     compact: Boolean,
 ) {
-    val start = if (visibleCount == 0) 0 else ((uiState.page - 1) * uiState.pageSize) + 1
-    val end = if (visibleCount == 0) 0 else start + visibleCount - 1
-    val totalText = if (uiState.searchQuery.isBlank()) "${uiState.totalSessions} sesi" else "$visibleCount hasil"
-    TbPagination(
-        currentPage = uiState.page,
-        totalPages = uiState.totalPages,
-        onPreviousPage = onPreviousPage,
-        onNextPage = onNextPage,
-        supportingText = if (compact) {
-            if (uiState.searchQuery.isBlank()) "${uiState.totalSessions} data" else "$visibleCount hasil"
-        } else {
-            "Menampilkan $start-$end dari $totalText"
-        },
-        isLoading = uiState.isLoading,
-        testTag = "cash-session-pagination",
-    )
+    val currentStart = if (visibleCount == 0) 0 else ((uiState.page - 1) * uiState.pageSize) + 1
+    val currentEnd = if (visibleCount == 0) 0 else currentStart + visibleCount - 1
+    val effectiveTotal = if (uiState.searchQuery.isBlank() && uiState.statusFilter == "Semua") {
+        maxOf(uiState.totalSessions, visibleCount.toLong())
+    } else {
+        visibleCount.toLong()
+    }
+
+    if (compact) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(top = 14.dp, bottom = 4.dp)
+                .testTag("cash-session-pagination"),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Surface(
+                shape = CircleShape,
+                color = Color.White,
+                border = BorderStroke(1.dp, Color(0xFFE2E8F0)),
+            ) {
+                Text(
+                    text = "$effectiveTotal data",
+                    modifier = Modifier.padding(horizontal = 14.dp, vertical = 6.dp),
+                    fontSize = 12.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    color = Color(0xFF475569),
+                )
+            }
+
+            Surface(
+                shape = CircleShape,
+                color = Color.White,
+                border = BorderStroke(1.dp, Color(0xFFE2E8F0)),
+            ) {
+                Row(
+                    modifier = Modifier.padding(horizontal = 6.dp, vertical = 3.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    val canPrev = uiState.page > 1 && !uiState.isLoading
+                    val canNext = uiState.page < uiState.totalPages && !uiState.isLoading
+                    IconButton(
+                        onClick = onPreviousPage,
+                        enabled = canPrev,
+                        modifier = Modifier.size(28.dp),
+                    ) {
+                        Icon(
+                            Icons.Default.ChevronLeft,
+                            contentDescription = "Halaman sebelumnya",
+                            tint = if (canPrev) Color(0xFF475569) else Color(0xFFCBD5E1),
+                            modifier = Modifier.size(16.dp),
+                        )
+                    }
+                    Text(
+                        text = "${uiState.page} / ${uiState.totalPages.coerceAtLeast(1)}",
+                        modifier = Modifier.padding(horizontal = 8.dp),
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.Medium,
+                        color = Color(0xFF334155),
+                    )
+                    IconButton(
+                        onClick = onNextPage,
+                        enabled = canNext,
+                        modifier = Modifier.size(28.dp),
+                    ) {
+                        Icon(
+                            Icons.Default.ChevronRight,
+                            contentDescription = "Halaman berikutnya",
+                            tint = if (canNext) Color(0xFF475569) else Color(0xFFCBD5E1),
+                            modifier = Modifier.size(16.dp),
+                        )
+                    }
+                }
+            }
+        }
+    } else {
+        TbPagination(
+            currentPage = uiState.page,
+            totalPages = uiState.totalPages,
+            onPreviousPage = onPreviousPage,
+            onNextPage = onNextPage,
+            supportingText = "Menampilkan $currentStart–$currentEnd dari $effectiveTotal",
+            isLoading = uiState.isLoading,
+            testTag = "cash-session-pagination",
+        )
+    }
 }
 
 @Composable
@@ -1189,11 +1268,17 @@ private fun SessionRowsSkeleton(compact: Boolean) {
 private fun CashHistorySkeleton(compact: Boolean) {
     Column(
         modifier = Modifier.fillMaxWidth().testTag("cash-session-skeleton"),
-        verticalArrangement = Arrangement.spacedBy(14.dp),
+        verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
-        SkeletonBox(Modifier.fillMaxWidth().height(50.dp))
-        SkeletonBox(Modifier.fillMaxWidth().height(if (compact) 110.dp else 88.dp))
-        SkeletonBox(Modifier.fillMaxWidth().height(48.dp))
+        SkeletonBox(Modifier.fillMaxWidth().height(if (compact) 42.dp else 48.dp))
+        Row(
+            modifier = Modifier.fillMaxWidth().padding(horizontal = 2.dp),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            SkeletonBox(Modifier.width(110.dp).height(22.dp))
+            SkeletonBox(Modifier.size(32.dp))
+        }
         repeat(if (compact) 3 else 5) {
             SkeletonBox(Modifier.fillMaxWidth().height(if (compact) 180.dp else 64.dp))
         }

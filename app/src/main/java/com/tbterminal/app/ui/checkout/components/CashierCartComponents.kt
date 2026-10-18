@@ -3,6 +3,7 @@ package com.tbterminal.app.ui.checkout.components
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -73,6 +74,7 @@ fun CartItemCard(
     onDecrease: () -> Unit,
     onRemove: () -> Unit,
     onDiscountClick: () -> Unit,
+    onToggleUnit: ((Boolean) -> Unit)? = null,
 ) {
     val subtotal = item.unitPrice.multiply(item.quantity.toBigDecimal())
 
@@ -133,6 +135,64 @@ fun CartItemCard(
                             fontSize = 13.sp,
                             color = CartOnSurfaceVariant
                         )
+                    }
+                }
+                if (item.hasSecondaryUnit && onToggleUnit != null) {
+                    Spacer(modifier = Modifier.height(6.dp))
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                    ) {
+                        Surface(
+                            shape = RoundedCornerShape(8.dp),
+                            color = if (!item.isSecondaryUnit) CartPrimary else CartSurfaceContainerLow,
+                            border = BorderStroke(
+                                1.dp,
+                                if (!item.isSecondaryUnit) CartPrimary else CartOutlineVariant.copy(alpha = 0.5f)
+                            ),
+                            modifier = Modifier.clickable { onToggleUnit(false) }
+                        ) {
+                            Text(
+                                text = item.baseUnitName.ifBlank { "Utama" },
+                                fontSize = 11.sp,
+                                fontWeight = if (!item.isSecondaryUnit) FontWeight.Bold else FontWeight.Medium,
+                                color = if (!item.isSecondaryUnit) CartOnPrimary else CartOnSurfaceVariant,
+                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp)
+                            )
+                        }
+
+                        val secLabel = buildString {
+                            append(item.secondaryUnitName?.ifBlank { "Satuan 2" } ?: "Satuan 2")
+                            item.secondaryUnitFactor?.let {
+                                append(" (x${it.stripTrailingZeros().toPlainString()})")
+                            }
+                        }
+                        Surface(
+                            shape = RoundedCornerShape(8.dp),
+                            color = if (item.isSecondaryUnit) CartPrimary else CartSurfaceContainerLow,
+                            border = BorderStroke(
+                                1.dp,
+                                if (item.isSecondaryUnit) CartPrimary else CartOutlineVariant.copy(alpha = 0.5f)
+                            ),
+                            modifier = Modifier.clickable { onToggleUnit(true) }
+                        ) {
+                            Text(
+                                text = secLabel,
+                                fontSize = 11.sp,
+                                fontWeight = if (item.isSecondaryUnit) FontWeight.Bold else FontWeight.Medium,
+                                color = if (item.isSecondaryUnit) CartOnPrimary else CartOnSurfaceVariant,
+                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp)
+                            )
+                        }
+
+                        if (item.isSecondaryUnit && item.secondaryUnitFactor != null) {
+                            Text(
+                                text = "= ${item.equivalentBaseQuantityBigDecimal.stripTrailingZeros().toPlainString()} ${item.baseUnitName}",
+                                fontSize = 10.sp,
+                                color = CartOutline,
+                                maxLines = 1
+                            )
+                        }
                     }
                 }
                 TextButton(

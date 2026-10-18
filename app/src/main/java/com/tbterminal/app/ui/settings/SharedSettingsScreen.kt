@@ -1,5 +1,11 @@
 package com.tbterminal.app.ui.settings
 
+import android.Manifest
+import android.content.pm.PackageManager
+import android.os.Build
+import androidx.activity.compose.BackHandler
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -24,10 +30,12 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.CheckCircle
 import androidx.compose.material.icons.automirrored.outlined.KeyboardArrowRight
+import androidx.compose.material.icons.outlined.PointOfSale
 import androidx.compose.material.icons.outlined.Print
 import androidx.compose.material.icons.outlined.Save
 import androidx.compose.material.icons.outlined.Storefront
 import androidx.compose.material3.Button
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.HorizontalDivider
@@ -40,16 +48,19 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextField
 import androidx.compose.material3.TextFieldDefaults
 import androidx.compose.runtime.Composable
-import androidx.activity.compose.BackHandler
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
+import androidx.core.content.ContextCompat
+import com.tbterminal.app.data.printer.PrinterConnectionType
+import com.tbterminal.app.data.printer.PrinterDeviceItem
 import com.tbterminal.app.navigation.AppAccessPolicy
 import com.tbterminal.app.navigation.AppCapability
 import com.tbterminal.app.ui.components.SkeletonCard
@@ -89,6 +100,13 @@ fun SharedSettingsScreen(
     onAutoLockMinutesChanged: (String) -> Unit,
     onAutoPrintReceiptChanged: (Boolean) -> Unit,
     onSelectPrinter: () -> Unit,
+    onPrinterConnectionTypeChanged: (PrinterConnectionType) -> Unit = {},
+    onPrinterDeviceSelected: (PrinterDeviceItem) -> Unit = {},
+    onAutoCutPaperChanged: (Boolean) -> Unit = {},
+    onOpenCashDrawerChanged: (Boolean) -> Unit = {},
+    onScanPrinters: () -> Unit = {},
+    onTestPrint: () -> Unit = {},
+    onTestCashDrawer: () -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
     val pages = visibleSettingsPages(role)
@@ -141,9 +159,21 @@ fun SharedSettingsScreen(
                                 onSaveStoreSettings,
                             )
                             SettingsPage.DEVICE -> DevicePanel(
-                                uiState, wide, onPrinterSizeChanged, onCashToleranceChanged,
-                                onAutoLockMinutesChanged, onAutoPrintReceiptChanged,
-                                onSelectPrinter, onSaveLocalPreferences,
+                                uiState = uiState,
+                                wide = wide,
+                                onPrinterSizeChanged = onPrinterSizeChanged,
+                                onCashToleranceChanged = onCashToleranceChanged,
+                                onAutoLockMinutesChanged = onAutoLockMinutesChanged,
+                                onAutoPrintReceiptChanged = onAutoPrintReceiptChanged,
+                                onPrinterConnectionTypeChanged = onPrinterConnectionTypeChanged,
+                                onPrinterDeviceSelected = onPrinterDeviceSelected,
+                                onAutoCutPaperChanged = onAutoCutPaperChanged,
+                                onOpenCashDrawerChanged = onOpenCashDrawerChanged,
+                                onScanPrinters = onScanPrinters,
+                                onTestPrint = onTestPrint,
+                                onTestCashDrawer = onTestCashDrawer,
+                                onSelectPrinter = onSelectPrinter,
+                                onSave = onSaveLocalPreferences,
                             )
                         }
                     }
@@ -381,28 +411,299 @@ private fun DevicePanel(
     onCashToleranceChanged: (String) -> Unit,
     onAutoLockMinutesChanged: (String) -> Unit,
     onAutoPrintReceiptChanged: (Boolean) -> Unit,
+    onPrinterConnectionTypeChanged: (PrinterConnectionType) -> Unit,
+    onPrinterDeviceSelected: (PrinterDeviceItem) -> Unit,
+    onAutoCutPaperChanged: (Boolean) -> Unit,
+    onOpenCashDrawerChanged: (Boolean) -> Unit,
+    onScanPrinters: () -> Unit,
+    onTestPrint: () -> Unit,
+    onTestCashDrawer: () -> Unit,
     onSelectPrinter: () -> Unit,
     onSave: () -> Unit,
 ) {
+    val context = LocalContext.current
+    val permissionLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.RequestMultiplePermissions()
+    ) { results ->
+        val allGranted = results.values.all { it }
+        if (allGranted) {
+            onScanPrinters()
+        }
+    }
+
+    val checkAndScanBluetooth: () -> Unit = {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            val hasConnect = ContextCompat.checkSelfPermission(
+                context,
+                Manifest.permission.BLUETOOTH_CONNECT
+            ) == PackageManager.PERMISSION_GRANTED
+            val hasScan = ContextCompat.checkSelfPermission(
+                context,
+                Manifest.permission.BLUETOOTH_SCAN
+            ) == PackageManager.PERMISSION_GRANTED
+
+            if (hasConnect && hasScan) {
+                onScanPrinters()
+            } else {
+                permissionLauncher.launch(
+                    arrayOf(
+                        Manifest.permission.BLUETOOTH_CONNECT,
+                        Manifest.permission.BLUETOOTH_SCAN
+                    )
+                )
+            }
+        } else {
+            onScanPrinters()
+        }
+    }
+
     SettingsPanel(
         title = "Perangkat",
-        subtitle = "Preferensi yang berlaku pada terminal ini.",
+        subtitle = "Preferensi printer thermal ESC/POS dan perangkat terminal.",
         icon = Icons.Outlined.Print,
         tag = "settings-section-device",
     ) {
-        PrinterSelector(uiState.selectedPrinterName, uiState.printerSize, onSelectPrinter)
-        HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
-        Text("Ukuran kertas", style = MaterialTheme.typography.labelLarge)
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            PaperSizeChip("58 mm", uiState.printerSize == "58mm") { onPrinterSizeChanged("58mm") }
-            PaperSizeChip("80 mm", uiState.printerSize == "80mm") { onPrinterSizeChanged("80mm") }
+        Text("Tipe koneksi printer", style = MaterialTheme.typography.labelLarge)
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            FilterChip(
+                selected = uiState.printerConnectionType == PrinterConnectionType.BLUETOOTH,
+                onClick = { onPrinterConnectionTypeChanged(PrinterConnectionType.BLUETOOTH) },
+                label = { Text("Bluetooth") },
+                leadingIcon = if (uiState.printerConnectionType == PrinterConnectionType.BLUETOOTH) {
+                    { Icon(Icons.Outlined.CheckCircle, null, modifier = Modifier.size(16.dp)) }
+                } else null
+            )
+            FilterChip(
+                selected = uiState.printerConnectionType == PrinterConnectionType.USB,
+                onClick = { onPrinterConnectionTypeChanged(PrinterConnectionType.USB) },
+                label = { Text("USB OTG") },
+                leadingIcon = if (uiState.printerConnectionType == PrinterConnectionType.USB) {
+                    { Icon(Icons.Outlined.CheckCircle, null, modifier = Modifier.size(16.dp)) }
+                } else null
+            )
+            FilterChip(
+                selected = uiState.printerConnectionType == PrinterConnectionType.SYSTEM,
+                onClick = { onPrinterConnectionTypeChanged(PrinterConnectionType.SYSTEM) },
+                label = { Text("Android Spooler") },
+                leadingIcon = if (uiState.printerConnectionType == PrinterConnectionType.SYSTEM) {
+                    { Icon(Icons.Outlined.CheckCircle, null, modifier = Modifier.size(16.dp)) }
+                } else null
+            )
         }
+
+        when (uiState.printerConnectionType) {
+            PrinterConnectionType.BLUETOOTH -> {
+                Surface(
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(14.dp),
+                    color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.45f),
+                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.6f))
+                ) {
+                    Column(
+                        modifier = Modifier.padding(14.dp),
+                        verticalArrangement = Arrangement.spacedBy(10.dp)
+                    ) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text("Printer Bluetooth Terpilih", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.primary)
+                                Text(
+                                    uiState.printerBluetoothName.ifBlank { "Belum ada printer dipilih" },
+                                    style = MaterialTheme.typography.bodyLarge,
+                                    fontWeight = FontWeight.Bold
+                                )
+                                if (uiState.printerBluetoothAddress.isNotBlank()) {
+                                    Text(
+                                        uiState.printerBluetoothAddress,
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                }
+                            }
+                            FilledTonalButton(
+                                onClick = checkAndScanBluetooth,
+                                enabled = !uiState.isScanningPrinters
+                            ) {
+                                if (uiState.isScanningPrinters) {
+                                    CircularProgressIndicator(modifier = Modifier.size(16.dp), strokeWidth = 2.dp)
+                                    Spacer(Modifier.width(6.dp))
+                                    Text("Memindai...")
+                                } else {
+                                    Text("Pindai Perangkat")
+                                }
+                            }
+                        }
+
+                        if (uiState.availablePrinters.isNotEmpty()) {
+                            Text("Pilih perangkat printer:", style = MaterialTheme.typography.labelMedium)
+                            Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                                uiState.availablePrinters.forEach { device ->
+                                    val isSelected = device.address == uiState.printerBluetoothAddress
+                                    Surface(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .clip(RoundedCornerShape(10.dp))
+                                            .clickable { onPrinterDeviceSelected(device) },
+                                        shape = RoundedCornerShape(10.dp),
+                                        color = if (isSelected) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surface,
+                                        border = BorderStroke(
+                                            1.dp,
+                                            if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outlineVariant
+                                        )
+                                    ) {
+                                        Row(
+                                            modifier = Modifier.padding(12.dp),
+                                            horizontalArrangement = Arrangement.SpaceBetween,
+                                            verticalAlignment = Alignment.CenterVertically
+                                        ) {
+                                            Column {
+                                                Text(device.name, fontWeight = FontWeight.SemiBold, style = MaterialTheme.typography.bodyMedium)
+                                                Text(device.address, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                            }
+                                            if (isSelected) {
+                                                Icon(
+                                                    Icons.Outlined.CheckCircle,
+                                                    contentDescription = "Terpilih",
+                                                    tint = MaterialTheme.colorScheme.primary,
+                                                    modifier = Modifier.size(18.dp)
+                                                )
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            PrinterConnectionType.USB -> {
+                Surface(
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(14.dp),
+                    color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.45f),
+                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.6f))
+                ) {
+                    Column(
+                        modifier = Modifier.padding(14.dp),
+                        verticalArrangement = Arrangement.spacedBy(10.dp)
+                    ) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text("Printer USB OTG", style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.SemiBold)
+                                Text(
+                                    "Hubungkan kabel data printer thermal kasir via adaptor OTG USB.",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
+                            FilledTonalButton(
+                                onClick = onScanPrinters,
+                                enabled = !uiState.isScanningPrinters
+                            ) {
+                                if (uiState.isScanningPrinters) {
+                                    CircularProgressIndicator(modifier = Modifier.size(16.dp), strokeWidth = 2.dp)
+                                } else {
+                                    Text("Deteksi USB")
+                                }
+                            }
+                        }
+
+                        if (uiState.availablePrinters.isNotEmpty()) {
+                            Text("Daftar USB printer terdeteksi:", style = MaterialTheme.typography.labelMedium)
+                            Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                                uiState.availablePrinters.forEach { device ->
+                                    Surface(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        shape = RoundedCornerShape(10.dp),
+                                        color = MaterialTheme.colorScheme.surface,
+                                        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
+                                    ) {
+                                        Row(
+                                            modifier = Modifier.padding(12.dp),
+                                            horizontalArrangement = Arrangement.SpaceBetween,
+                                            verticalAlignment = Alignment.CenterVertically
+                                        ) {
+                                            Column {
+                                                Text(device.name, fontWeight = FontWeight.SemiBold, style = MaterialTheme.typography.bodyMedium)
+                                                Text(device.address, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            PrinterConnectionType.SYSTEM -> {
+                PrinterSelector(uiState.selectedPrinterName, uiState.printerSize, onSelectPrinter)
+            }
+        }
+
+        HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+        Text("Ukuran kertas thermal", style = MaterialTheme.typography.labelLarge)
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            PaperSizeChip("58 mm (Standar)", uiState.printerSize == "58mm") { onPrinterSizeChanged("58mm") }
+            PaperSizeChip("80 mm (Lebar)", uiState.printerSize == "80mm") { onPrinterSizeChanged("80mm") }
+        }
+
+        HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+        Text("Opsi perangkat keras kasir", style = MaterialTheme.typography.labelLarge)
         SettingsSwitchRow(
-            "Cetak struk otomatis",
-            "Buka layanan cetak setelah transaksi berhasil.",
-            uiState.autoPrintReceipt,
-            onAutoPrintReceiptChanged,
+            title = "Potong kertas otomatis (Auto-cutter)",
+            subtitle = "Kirim sinyal potong kertas ESC/POS setelah struk selesai dicetak.",
+            checked = uiState.autoCutPaper,
+            onCheckedChange = onAutoCutPaperChanged
         )
+        SettingsSwitchRow(
+            title = "Buka laci kasir otomatis (Cash Drawer)",
+            subtitle = "Kirim sinyal kick-out pulse (ESC p) ke RJ11 laci uang saat pembayaran tunai selesai.",
+            checked = uiState.openCashDrawer,
+            onCheckedChange = onOpenCashDrawerChanged
+        )
+        SettingsSwitchRow(
+            title = "Cetak struk otomatis",
+            subtitle = "Kirim instruksi cetak seketika transaksi kasir berhasil diselesaikan.",
+            checked = uiState.autoPrintReceipt,
+            onCheckedChange = onAutoPrintReceiptChanged
+        )
+
+        HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+        Text("Uji coba perangkat keras", style = MaterialTheme.typography.labelLarge)
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(10.dp)
+        ) {
+            OutlinedButton(
+                onClick = onTestPrint,
+                enabled = !uiState.isPrintingTest,
+                modifier = Modifier.weight(1f)
+            ) {
+                Icon(Icons.Outlined.Print, null, modifier = Modifier.size(18.dp))
+                Spacer(Modifier.width(6.dp))
+                Text(if (uiState.isPrintingTest) "Mencetak..." else "Uji Cetak Struk")
+            }
+            OutlinedButton(
+                onClick = onTestCashDrawer,
+                modifier = Modifier.weight(1f)
+            ) {
+                Icon(Icons.Outlined.PointOfSale, null, modifier = Modifier.size(18.dp))
+                Spacer(Modifier.width(6.dp))
+                Text("Uji Buka Laci")
+            }
+        }
+
+        HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
         if (wide) {
             Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                 SettingsField(

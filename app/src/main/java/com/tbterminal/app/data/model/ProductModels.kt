@@ -69,7 +69,10 @@ data class ProductStock(
     val priceRetail: BigDecimal,
     val priceContractor: BigDecimal,
     val discount: BigDecimal,
-    val isActive: Boolean
+    val isActive: Boolean,
+    val secondaryUnitId: String? = null,
+    val secondaryUnitName: String? = null,
+    val secondaryUnitFactor: BigDecimal? = null
 )
 
 data class ProductStockPage(

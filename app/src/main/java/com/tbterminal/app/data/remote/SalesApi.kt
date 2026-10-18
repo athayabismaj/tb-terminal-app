@@ -47,6 +47,12 @@ interface SalesApi {
         @Body request: CloseSessionRequestDto
     ): Response<ApiResponse<CashSessionResponseDto>>
 
+    @POST("/api/sales/sessions/{sessionId}/force-close")
+    suspend fun forceCloseSession(
+        @Path("sessionId") sessionId: String,
+        @Body request: CloseSessionRequestDto
+    ): Response<ApiResponse<CashSessionResponseDto>>
+
     @POST("/api/sales/sessions/expenses")
     suspend fun addExpense(
         @Body request: CashExpenseRequestDto

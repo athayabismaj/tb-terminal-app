@@ -94,6 +94,7 @@ internal fun TransactionHistoryContent(
     onPaymentMethodChanged: (String) -> Unit,
     onDatePresetSelected: (String) -> Unit,
     onDateSelected: (String) -> Unit,
+    onDateRangeSelected: (String, String, String?) -> Unit = { _, _, _ -> },
     onSyncClick: (Long) -> Unit,
     onSyncAllClick: () -> Unit,
     onRetry: () -> Unit,
@@ -202,8 +203,22 @@ internal fun TransactionHistoryContent(
 
     if (showDatePicker) {
         HistoryDatePickerDialog(
-            currentDate = state.endDate ?: state.selectedDate,
+            currentDate = state.startDate ?: state.selectedDate,
+            initialMode = when (state.selectedPreset) {
+                "Bulan ini", "Bulan" -> "Bulan"
+                "Minggu ini", "Minggu" -> "Minggu"
+                else -> "Hari"
+            },
             onDismiss = { showDatePicker = false },
+            onConfirmRange = { newStartStr, newEndStr, mode ->
+                val preset = when (mode) {
+                    "Bulan" -> "Bulan ini"
+                    "Minggu" -> "Minggu ini"
+                    else -> "Hari ini"
+                }
+                onDateRangeSelected(newStartStr, newEndStr, preset)
+                showDatePicker = false
+            },
             onConfirm = {
                 onDateSelected(it)
                 showDatePicker = false
@@ -1656,6 +1671,17 @@ private fun String.salesStatusDisplay(): String = when (lowercase()) {
 }
 
 private fun AdminTransactionHistoryUiState.historyShortDateLabel(): String {
+    val start = startDate?.take(10)?.let { runCatching { java.time.LocalDate.parse(it) }.getOrNull() }
+    val end = (endDate ?: selectedDate)?.take(10)?.let { runCatching { java.time.LocalDate.parse(it) }.getOrNull() }
+
+    if (start != null && end != null) {
+        return if (start == end) {
+            start.format(java.time.format.DateTimeFormatter.ofPattern("dd/MM"))
+        } else {
+            "${start.format(java.time.format.DateTimeFormatter.ofPattern("dd/MM"))} - ${end.format(java.time.format.DateTimeFormatter.ofPattern("dd/MM"))}"
+        }
+    }
+
     val raw = endDate ?: selectedDate
     if (raw.isNullOrBlank()) {
         return runCatching {

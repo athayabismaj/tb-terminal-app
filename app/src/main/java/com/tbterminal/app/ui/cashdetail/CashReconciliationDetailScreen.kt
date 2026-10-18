@@ -12,22 +12,38 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material.icons.filled.Warning
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.Icon
 import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.tbterminal.app.data.model.CashExpense
@@ -53,7 +69,10 @@ internal fun CashReconciliationDetailScreen(
     onOpenHistory: () -> Unit,
     onRetry: () -> Unit,
     onPreviousPage: () -> Unit,
-    onNextPage: () -> Unit
+    onNextPage: () -> Unit,
+    onOpenCloseDialog: () -> Unit = {},
+    onDismissCloseDialog: () -> Unit = {},
+    onConfirmForceClose: (BigDecimal, String?) -> Unit = { _, _ -> }
 ) {
     val compact = androidx.compose.ui.platform.LocalConfiguration.current.screenWidthDp < 700
     Column(
@@ -61,12 +80,47 @@ internal fun CashReconciliationDetailScreen(
             .verticalScroll(rememberScrollState()).padding(if (compact) 16.dp else 32.dp)
     ) {
         DetailHeader(onOpenHistory, compact)
+
+        uiState.closeSuccessMessage?.let { successMsg ->
+            Surface(
+                modifier = Modifier.fillMaxWidth().padding(bottom = 16.dp),
+                color = Color(0xFFDCFCE7),
+                border = BorderStroke(1.dp, Color(0xFF86EFAC)),
+                shape = RoundedCornerShape(8.dp)
+            ) {
+                Row(
+                    modifier = Modifier.padding(14.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Icon(Icons.Default.CheckCircle, contentDescription = null, tint = DetailPrimary)
+                    Spacer(Modifier.width(10.dp))
+                    Text(successMsg, color = Color(0xFF166534), fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
+                }
+            }
+        }
+
         when {
             uiState.sessionId.isBlank() -> SelectSessionPrompt(onOpenHistory)
             uiState.isLoading -> LoadingBox()
             uiState.errorMessage != null -> ErrorBox(uiState.errorMessage, onRetry)
-            uiState.session != null -> DetailContent(uiState, onPreviousPage, onNextPage, compact)
+            uiState.session != null -> DetailContent(
+                uiState = uiState,
+                onPreviousPage = onPreviousPage,
+                onNextPage = onNextPage,
+                onOpenCloseDialog = onOpenCloseDialog,
+                compact = compact
+            )
         }
+    }
+
+    if (uiState.showCloseDialog && uiState.session != null) {
+        SupervisorCloseSessionDialog(
+            session = uiState.session,
+            isClosing = uiState.isClosingSession,
+            errorMessage = uiState.closeErrorMessage,
+            onDismiss = onDismissCloseDialog,
+            onConfirm = onConfirmForceClose
+        )
     }
 }
 
@@ -85,9 +139,15 @@ private fun DetailHeader(onOpenHistory: () -> Unit, compact: Boolean) {
 }
 
 @Composable
-private fun DetailContent(uiState: CashReconciliationDetailUiState, onPreviousPage: () -> Unit, onNextPage: () -> Unit, compact: Boolean) {
+private fun DetailContent(
+    uiState: CashReconciliationDetailUiState,
+    onPreviousPage: () -> Unit,
+    onNextPage: () -> Unit,
+    onOpenCloseDialog: () -> Unit,
+    compact: Boolean
+) {
     val session = requireNotNull(uiState.session)
-    SessionSummary(session, compact)
+    SessionSummary(session, onOpenCloseDialog, compact)
     Spacer(Modifier.height(16.dp))
     TransactionSection(uiState, onPreviousPage, onNextPage, compact)
     Spacer(Modifier.height(16.dp))
@@ -95,7 +155,88 @@ private fun DetailContent(uiState: CashReconciliationDetailUiState, onPreviousPa
 }
 
 @Composable
-private fun SessionSummary(session: CashSession, compact: Boolean) {
+private fun SessionSummary(
+    session: CashSession,
+    onOpenCloseDialog: () -> Unit,
+    compact: Boolean
+) {
+    val isOpen = session.status.equals("OPEN", true)
+
+    if (isOpen) {
+        Card(
+            modifier = Modifier.fillMaxWidth().padding(bottom = 16.dp),
+            colors = CardDefaults.cardColors(containerColor = Color(0xFFFEF3C7)),
+            border = BorderStroke(1.dp, Color(0xFFF59E0B)),
+            shape = RoundedCornerShape(12.dp)
+        ) {
+            if (compact) {
+                Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Icon(Icons.Default.Warning, contentDescription = null, tint = Color(0xFFB45309))
+                        Spacer(Modifier.width(8.dp))
+                        Text(
+                            "Sesi Kasir Masih Terbuka",
+                            color = Color(0xFF92400E),
+                            fontSize = 15.sp,
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
+                    Text(
+                        "Sesi kas ini sedang aktif/belum ditutup oleh ${session.userName ?: "kasir"}. Admin dan Owner dapat menutup sesi secara manual.",
+                        color = Color(0xFFB45309),
+                        fontSize = 12.sp
+                    )
+                    Button(
+                        onClick = onOpenCloseDialog,
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = Color(0xFFD97706),
+                            contentColor = Color.White
+                        ),
+                        shape = RoundedCornerShape(8.dp),
+                        modifier = Modifier.fillMaxWidth().height(42.dp)
+                    ) {
+                        Text("Tutup Sesi (Force Close)", fontWeight = FontWeight.Bold, fontSize = 13.sp)
+                    }
+                }
+            } else {
+                Row(
+                    modifier = Modifier.fillMaxWidth().padding(18.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Row(modifier = Modifier.weight(1f).padding(end = 16.dp), verticalAlignment = Alignment.CenterVertically) {
+                        Icon(Icons.Default.Warning, contentDescription = null, tint = Color(0xFFB45309), modifier = Modifier.padding(end = 12.dp))
+                        Column {
+                            Text(
+                                "Sesi Kasir Masih Terbuka",
+                                color = Color(0xFF92400E),
+                                fontSize = 15.sp,
+                                fontWeight = FontWeight.Bold
+                            )
+                            Spacer(Modifier.height(4.dp))
+                            Text(
+                                "Sesi kas ini belum ditutup oleh ${session.userName ?: "kasir"}. Anda dapat menutup sesi ini sebagai supervisor.",
+                                color = Color(0xFFB45309),
+                                fontSize = 12.sp
+                            )
+                        }
+                    }
+                    Button(
+                        onClick = onOpenCloseDialog,
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = Color(0xFFD97706),
+                            contentColor = Color.White
+                        ),
+                        shape = RoundedCornerShape(8.dp),
+                        modifier = Modifier.height(42.dp)
+                    ) {
+                        Text("Tutup Sesi (Force Close)", fontWeight = FontWeight.Bold, fontSize = 13.sp)
+                    }
+                }
+            }
+        }
+    }
+
     Card(Modifier.fillMaxWidth(), colors = CardDefaults.cardColors(Color.White), border = BorderStroke(1.dp, DetailBorder), shape = RoundedCornerShape(12.dp)) {
         Column(Modifier.padding(20.dp)) {
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
@@ -315,3 +456,130 @@ private fun String.asDateTime(): String = runCatching {
     OffsetDateTime.parse(this).atZoneSameInstant(ZoneId.of("Asia/Jakarta"))
         .format(DateTimeFormatter.ofPattern("dd MMM yyyy HH:mm", Locale.forLanguageTag("id-ID")))
 }.getOrDefault(this)
+
+@Composable
+private fun SupervisorCloseSessionDialog(
+    session: CashSession,
+    isClosing: Boolean,
+    errorMessage: String?,
+    onDismiss: () -> Unit,
+    onConfirm: (BigDecimal, String?) -> Unit
+) {
+    var cashInput by remember { mutableStateOf("") }
+    var notesInput by remember { mutableStateOf("") }
+    var localError by remember { mutableStateOf<String?>(null) }
+
+    val systemCash = session.systemCash ?: session.openingCash
+
+    AlertDialog(
+        onDismissRequest = {
+            if (!isClosing) onDismiss()
+        },
+        title = {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Icon(Icons.Default.Warning, contentDescription = null, tint = Color(0xFFD97706))
+                Spacer(Modifier.width(8.dp))
+                Text("Tutup Sesi (Force Close)", fontWeight = FontWeight.Bold, fontSize = 18.sp)
+            }
+        },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                Text(
+                    "Anda akan menutup paksa sesi kasir untuk ${session.userName ?: "Kasir"}. Sesi ini akan ditandai CLOSED.",
+                    fontSize = 13.sp,
+                    color = DetailText
+                )
+
+                Surface(
+                    color = Color(0xFFF1F5F9),
+                    shape = RoundedCornerShape(8.dp),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Column(Modifier.padding(12.dp)) {
+                        Text("KAS SISTEM SAAT INI", fontSize = 10.sp, fontWeight = FontWeight.Bold, color = DetailMuted)
+                        Spacer(Modifier.height(4.dp))
+                        Text(systemCash.asCurrency(), fontSize = 16.sp, fontWeight = FontWeight.Bold, color = DetailText)
+                    }
+                }
+
+                OutlinedTextField(
+                    value = cashInput,
+                    onValueChange = { input ->
+                        val filtered = input.filter { it.isDigit() }
+                        cashInput = filtered
+                        localError = null
+                    },
+                    label = { Text("Jumlah Kas Fisik (Rp)") },
+                    placeholder = { Text("Contoh: 1500000") },
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                    singleLine = true,
+                    enabled = !isClosing,
+                    modifier = Modifier.fillMaxWidth()
+                )
+
+                OutlinedTextField(
+                    value = notesInput,
+                    onValueChange = { notesInput = it },
+                    label = { Text("Catatan Penutupan Supervisor (Opsional)") },
+                    placeholder = { Text("Contoh: Ditutup oleh admin karena shift selesai") },
+                    maxLines = 3,
+                    enabled = !isClosing,
+                    modifier = Modifier.fillMaxWidth()
+                )
+
+                val displayError = localError ?: errorMessage
+                if (!displayError.isNullOrBlank()) {
+                    Text(
+                        displayError,
+                        color = Color(0xFFDC2626),
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.SemiBold
+                    )
+                }
+            }
+        },
+        confirmButton = {
+            Button(
+                onClick = {
+                    val raw = cashInput.trim()
+                    if (raw.isBlank()) {
+                        localError = "Masukkan jumlah uang kas fisik."
+                        return@Button
+                    }
+                    val amount = raw.toBigDecimalOrNull()
+                    if (amount == null || amount < BigDecimal.ZERO) {
+                        localError = "Nominal kas fisik tidak valid."
+                        return@Button
+                    }
+                    onConfirm(amount, notesInput.trim().ifBlank { null })
+                },
+                enabled = !isClosing,
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = Color(0xFFD97706),
+                    contentColor = Color.White
+                )
+            ) {
+                if (isClosing) {
+                    CircularProgressIndicator(
+                        modifier = Modifier.size(16.dp),
+                        color = Color.White,
+                        strokeWidth = 2.dp
+                    )
+                    Spacer(Modifier.width(8.dp))
+                    Text("Menutup...")
+                } else {
+                    Text("Konfirmasi Tutup Sesi")
+                }
+            }
+        },
+        dismissButton = {
+            TextButton(
+                onClick = onDismiss,
+                enabled = !isClosing
+            ) {
+                Text("Batal")
+            }
+        }
+    )
+}
+

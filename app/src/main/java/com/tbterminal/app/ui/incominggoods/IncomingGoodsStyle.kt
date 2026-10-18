@@ -59,7 +59,7 @@ internal fun EmptyState(message: String) {
 }
 
 internal fun BigDecimal.qtyText(): String {
-    return stripTrailingZeros().toPlainString()
+    return setScale(0, java.math.RoundingMode.HALF_UP).toPlainString()
 }
 
 internal fun BigDecimal?.currencyText(): String {

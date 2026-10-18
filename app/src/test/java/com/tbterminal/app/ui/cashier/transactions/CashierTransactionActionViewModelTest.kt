@@ -279,6 +279,7 @@ private class FakeTransactionActionRepository(
     override suspend fun getSessionById(id: String): RepositoryResult<CashSession> = error("Not used")
     override suspend fun openSession(startingCash: BigDecimal): RepositoryResult<CashSession> = error("Not used")
     override suspend fun closeSession(endingCashPhysical: BigDecimal, notes: String?): RepositoryResult<CashSession> = error("Not used")
+    override suspend fun forceCloseSession(sessionId: String, endingCashPhysical: BigDecimal, notes: String?): RepositoryResult<CashSession> = error("Not used")
     override suspend fun getTransactions(
         page: Int, limit: Int, sessionId: String?, search: String?, receiptNumber: String?,
         cashierId: String?, customerId: String?, paymentMethod: String?, status: String?,

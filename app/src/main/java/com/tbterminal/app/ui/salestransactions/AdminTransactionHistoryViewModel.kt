@@ -366,7 +366,7 @@ class AdminTransactionHistoryViewModel(
         }
     }
 
-    private fun setDateRange(startDate: LocalDate, endDate: LocalDate, preset: String?) {
+    fun setDateRange(startDate: LocalDate, endDate: LocalDate, preset: String?) {
         _uiState.update {
             it.copy(
                 selectedDate = endDate.toString(),
@@ -377,6 +377,12 @@ class AdminTransactionHistoryViewModel(
             )
         }
         loadTransactions(page = 1)
+    }
+
+    fun setDateRange(startDateStr: String, endDateStr: String, preset: String?) {
+        val start = runCatching { LocalDate.parse(startDateStr) }.getOrDefault(LocalDate.now(WIB_ZONE))
+        val end = runCatching { LocalDate.parse(endDateStr) }.getOrDefault(LocalDate.now(WIB_ZONE))
+        setDateRange(start, end, preset)
     }
 
     private fun currentDateRange(): Pair<LocalDate, LocalDate> {

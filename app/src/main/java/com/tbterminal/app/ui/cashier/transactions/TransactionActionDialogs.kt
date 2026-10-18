@@ -62,6 +62,8 @@ import androidx.compose.ui.unit.sp
 import com.tbterminal.app.data.model.ManagerApprovalContext
 import com.tbterminal.app.data.model.ManagerApprovalGrant
 import com.tbterminal.app.data.model.RefundDisposition
+import com.tbterminal.app.data.model.receiptNumber
+import com.tbterminal.app.data.model.remainingAmount
 import com.tbterminal.app.data.repository.ManagerApprovalRepository
 import com.tbterminal.app.ui.managerapproval.ManagerApprovalDialog
 

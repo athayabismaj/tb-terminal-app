@@ -62,6 +62,8 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import com.tbterminal.app.data.model.CashTransactionDetail
 import com.tbterminal.app.data.model.CashTransactionItem
 import com.tbterminal.app.data.model.TransactionRefundResult
+import com.tbterminal.app.data.model.receiptNumber
+import com.tbterminal.app.data.model.remainingAmount
 import com.tbterminal.app.data.repository.CashReconciliationRepository
 import com.tbterminal.app.data.repository.ManagerApprovalRepository
 import com.tbterminal.app.ui.dashboard.cashier.CashierDashboardShell
@@ -462,23 +464,12 @@ private fun ReceiptSummaryCard(
                             letterSpacing = 0.5.sp
                         )
                         Spacer(modifier = Modifier.height(2.dp))
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(6.dp)
-                        ) {
-                            Box(
-                                modifier = Modifier
-                                    .size(6.dp)
-                                    .clip(CircleShape)
-                                    .background(statusColor)
-                            )
-                            Text(
-                                text = statusLabel,
-                                color = statusColor,
-                                fontSize = 13.sp,
-                                fontWeight = FontWeight.SemiBold
-                            )
-                        }
+                        Text(
+                            text = statusLabel,
+                            color = statusColor,
+                            fontSize = 13.sp,
+                            fontWeight = FontWeight.SemiBold
+                        )
                     }
                     Spacer(modifier = Modifier.width(16.dp))
                     Spacer(modifier = Modifier.weight(1f))
@@ -954,9 +945,5 @@ fun CetakStrukPreviewDialog(
             }
         }
     }
-}
-
-internal fun CashTransactionDetail.receiptNumber(): String {
-    return receiptId.ifBlank { id }
 }
 

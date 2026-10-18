@@ -13,6 +13,11 @@ import kotlinx.coroutines.flow.map
 data class DevicePreferences(
     val autoPrintReceipt: Boolean = true,
     val paperSize: String = "58mm",
+    val printerConnectionType: String = "BLUETOOTH",
+    val printerBluetoothAddress: String = "",
+    val printerBluetoothName: String = "",
+    val autoCutPaper: Boolean = true,
+    val openCashDrawer: Boolean = false,
     val cashTolerance: String = "0",
     val autoLockMinutes: Int = 15
 )
@@ -57,6 +62,14 @@ class LocalAppSettingsDataSource(
                 ?.toBooleanStrictOrNull() ?: true,
             paperSize = appSettingDao.getValue(AppSettingKeys.PAPER_SIZE)
                 ?.takeIf { it == "58mm" || it == "80mm" } ?: "58mm",
+            printerConnectionType = appSettingDao.getValue(AppSettingKeys.PRINTER_CONNECTION_TYPE)
+                ?.takeIf { it in listOf("BLUETOOTH", "USB", "SYSTEM") } ?: "BLUETOOTH",
+            printerBluetoothAddress = appSettingDao.getValue(AppSettingKeys.PRINTER_BLUETOOTH_ADDRESS).orEmpty(),
+            printerBluetoothName = appSettingDao.getValue(AppSettingKeys.PRINTER_BLUETOOTH_NAME).orEmpty(),
+            autoCutPaper = appSettingDao.getValue(AppSettingKeys.PRINTER_AUTO_CUT)
+                ?.toBooleanStrictOrNull() ?: true,
+            openCashDrawer = appSettingDao.getValue(AppSettingKeys.PRINTER_OPEN_DRAWER)
+                ?.toBooleanStrictOrNull() ?: false,
             cashTolerance = appSettingDao.getValue(AppSettingKeys.CASH_TOLERANCE)
                 ?.takeIf(String::isNotBlank) ?: "0",
             autoLockMinutes = appSettingDao.getValue(AppSettingKeys.AUTO_LOCK_MINUTES)
@@ -70,6 +83,11 @@ class LocalAppSettingsDataSource(
             listOf(
                 AppSettingEntity(AppSettingKeys.AUTO_PRINT_RECEIPT, preferences.autoPrintReceipt.toString(), now),
                 AppSettingEntity(AppSettingKeys.PAPER_SIZE, preferences.paperSize, now),
+                AppSettingEntity(AppSettingKeys.PRINTER_CONNECTION_TYPE, preferences.printerConnectionType, now),
+                AppSettingEntity(AppSettingKeys.PRINTER_BLUETOOTH_ADDRESS, preferences.printerBluetoothAddress, now),
+                AppSettingEntity(AppSettingKeys.PRINTER_BLUETOOTH_NAME, preferences.printerBluetoothName, now),
+                AppSettingEntity(AppSettingKeys.PRINTER_AUTO_CUT, preferences.autoCutPaper.toString(), now),
+                AppSettingEntity(AppSettingKeys.PRINTER_OPEN_DRAWER, preferences.openCashDrawer.toString(), now),
                 AppSettingEntity(AppSettingKeys.CASH_TOLERANCE, preferences.cashTolerance, now),
                 AppSettingEntity(AppSettingKeys.AUTO_LOCK_MINUTES, preferences.autoLockMinutes.toString(), now)
             )

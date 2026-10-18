@@ -1,4 +1,4 @@
-﻿package com.tbterminal.app.ui.products
+package com.tbterminal.app.ui.products
 
 import androidx.compose.ui.graphics.Color
 import com.tbterminal.app.ui.theme.TbAmber
@@ -38,5 +38,5 @@ internal fun BigDecimal.moneyText(): String {
 }
 
 internal fun BigDecimal.quantityText(): String {
-    return stripTrailingZeros().toPlainString()
+    return setScale(0, java.math.RoundingMode.HALF_UP).toPlainString()
 }

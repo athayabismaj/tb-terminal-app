@@ -7,6 +7,7 @@ import com.tbterminal.app.data.local.dao.TransactionDao
 import com.tbterminal.app.data.local.model.SyncEntityType
 import com.tbterminal.app.data.local.model.SyncStatus
 import com.tbterminal.app.data.model.CashTransaction
+import com.tbterminal.app.data.model.remainingAmount
 import com.tbterminal.app.data.model.ManagerApprovalAction
 import com.tbterminal.app.data.model.ManagerApprovalGrant
 import com.tbterminal.app.data.model.RefundDisposition
@@ -801,9 +802,6 @@ class CashierTransactionHistoryViewModel(
         }
     }
 }
-
-internal fun CashTransaction.remainingAmount() = total.subtract(paidAmount).coerceAtLeast(java.math.BigDecimal.ZERO)
-internal fun com.tbterminal.app.data.model.CashTransactionDetail.remainingAmount() = total.subtract(paidAmount).coerceAtLeast(java.math.BigDecimal.ZERO)
 
 private fun String.toLocalDateOrNull(): LocalDate? {
     val value = trim()

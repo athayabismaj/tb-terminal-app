@@ -120,6 +120,13 @@ fun AdminSettingsScreen(
                     viewModel.onPrinterFrameworkFailed()
                 }
             },
+            onPrinterConnectionTypeChanged = viewModel::onPrinterConnectionTypeChanged,
+            onPrinterDeviceSelected = viewModel::onPrinterDeviceSelected,
+            onAutoCutPaperChanged = viewModel::onAutoCutPaperChanged,
+            onOpenCashDrawerChanged = viewModel::onOpenCashDrawerChanged,
+            onScanPrinters = { viewModel.scanPrinters(context) },
+            onTestPrint = { viewModel.testPrint(context) },
+            onTestCashDrawer = { viewModel.testCashDrawer(context) },
             modifier = contentModifier
         )
     }

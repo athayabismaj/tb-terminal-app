@@ -35,6 +35,7 @@ interface CashReconciliationRepository {
     suspend fun getSessionById(id: String): RepositoryResult<CashSession>
     suspend fun openSession(startingCash: BigDecimal): RepositoryResult<CashSession>
     suspend fun closeSession(endingCashPhysical: BigDecimal, notes: String?): RepositoryResult<CashSession>
+    suspend fun forceCloseSession(sessionId: String, endingCashPhysical: BigDecimal, notes: String?): RepositoryResult<CashSession>
     suspend fun getTransactions(
         page: Int,
         limit: Int,
@@ -159,6 +160,29 @@ class RemoteCashReconciliationRepository(
                     RepositoryResult.Error(
                         code = response.code ?: "CLOSE_CASH_SESSION_FAILED",
                         message = response.message ?: response.error ?: "Sesi kas gagal ditutup."
+                    )
+                } else {
+                    RepositoryResult.Success(session.toCashSession())
+                }
+            }
+    }
+
+    override suspend fun forceCloseSession(
+        sessionId: String,
+        endingCashPhysical: BigDecimal,
+        notes: String?
+    ): RepositoryResult<CashSession> {
+        val request = CloseSessionRequestDto(
+            endingCashPhysical = endingCashPhysical,
+            notes = notes
+        )
+        return safeApiCall { salesApi.forceCloseSession(sessionId, request) }
+            .toRepositoryResult { response ->
+                val session = response.data
+                if (!response.success || session == null) {
+                    RepositoryResult.Error(
+                        code = response.code ?: "FORCE_CLOSE_CASH_SESSION_FAILED",
+                        message = response.message ?: response.error ?: "Sesi kas gagal ditutup oleh supervisor."
                     )
                 } else {
                     RepositoryResult.Success(session.toCashSession())

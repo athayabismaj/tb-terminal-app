@@ -59,6 +59,33 @@ data class IncomingGoodsUiState(
             return currentTotal.subtract(paid)
         }
 
+    val movingAverageResult: com.tbterminal.app.data.costing.MovingAverageResult?
+        get() {
+            val product = selectedProduct ?: return null
+            val qty = quantity ?: return null
+            val price = buyPrice ?: return null
+            if (qty <= BigDecimal.ZERO || price <= BigDecimal.ZERO) return null
+            return com.tbterminal.app.data.costing.MovingAverageCalculator.calculateDetails(
+                existingStock = product.quantity,
+                existingCogs = product.priceBuy,
+                incomingQuantity = qty,
+                incomingPrice = price,
+                scale = 0
+            )
+        }
+
+    val estimatedNewCogs: BigDecimal?
+        get() = movingAverageResult?.newCogs
+
+    val cogsDifference: BigDecimal?
+        get() = movingAverageResult?.cogsDifference
+
+    val cogsPercentChange: BigDecimal?
+        get() = movingAverageResult?.percentChange
+
+    val inventoryValuationSummary: com.tbterminal.app.data.costing.InventoryValuationSummary
+        get() = com.tbterminal.app.data.costing.MovingAverageCalculator.calculateInventoryValuation(products)
+
     val categoryOptions: List<String>
         get() = products.map(ProductStock::categoryName).distinct().sorted()
 

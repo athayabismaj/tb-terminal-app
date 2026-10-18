@@ -240,9 +240,13 @@ class CheckoutViewModel(
                                         name = product.productName,
                                         unitPrice = product.priceRetail,
                                         sku = product.sku,
+                                        barcode = product.sku,
                                         unitName = product.unitName,
                                         categoryName = product.categoryName,
-                                        stockQty = product.quantity
+                                        stockQty = product.quantity,
+                                        secondaryUnitId = product.secondaryUnitId,
+                                        secondaryUnitName = product.secondaryUnitName,
+                                        secondaryUnitFactor = product.secondaryUnitFactor
                                     )
                                 },
                             productPage = productPage.page.coerceAtLeast(1),
@@ -410,33 +414,60 @@ class CheckoutViewModel(
         }
     }
 
-    fun addProduct(product: Product) {
+    fun addProduct(product: Product, isSecondary: Boolean = false) {
         if (product.stockQty <= BigDecimal.ZERO) {
             setError(UiText.DynamicString("Stok ${product.name} kosong."))
             return
         }
 
-        val currentQuantity = _uiState.value.cartItems
-            .firstOrNull { item -> item.productId == product.productId }
-            ?.quantity ?: 0
-        if ((currentQuantity + 1).toBigDecimal() > product.stockQty) {
-            setError(UiText.DynamicString("Stok ${product.name} tidak cukup."))
+        val factor = if (isSecondary && product.secondaryUnitFactor != null) product.secondaryUnitFactor else BigDecimal.ONE
+        val targetCartItemId = if (isSecondary) "${product.productId}__sec" else product.productId
+
+        val currentConsumedBaseQty = _uiState.value.cartItems
+            .filter { it.productId == product.productId }
+            .fold(BigDecimal.ZERO) { acc, item -> acc.add(item.equivalentBaseQuantityBigDecimal) }
+
+        val neededBaseQty = currentConsumedBaseQty.add(factor)
+        if (neededBaseQty > product.stockQty) {
+            val sisa = product.stockQty.subtract(currentConsumedBaseQty).coerceAtLeast(BigDecimal.ZERO)
+            setError(
+                UiText.DynamicString(
+                    "Stok ${product.name} tidak cukup (tersedia ${sisa.stripTrailingZeros().toPlainString()} ${product.unitName})."
+                )
+            )
             return
         }
 
         if (!allowCheckoutIntentMutation()) return
         _uiState.update { state ->
             val existingItem = state.cartItems.firstOrNull { item ->
-                item.productId == product.productId
+                item.cartItemId == targetCartItemId
             }
             val updatedItems = if (existingItem == null) {
+                val effectiveUnitPrice = if (isSecondary && product.secondaryUnitFactor != null) {
+                    product.unitPrice.multiply(product.secondaryUnitFactor)
+                } else {
+                    product.unitPrice
+                }
+                val effectiveUnitName = if (isSecondary) {
+                    product.secondaryUnitName?.ifBlank { "Satuan 2" } ?: "Satuan 2"
+                } else {
+                    product.unitName
+                }
                 state.cartItems + CartItem(
                     productId = product.productId,
                     productName = product.name,
-                    unitPrice = product.unitPrice,
+                    unitPrice = effectiveUnitPrice,
                     quantity = 1,
                     sku = product.sku,
-                    unitName = product.unitName
+                    unitName = effectiveUnitName,
+                    cartItemId = targetCartItemId,
+                    baseUnitPrice = product.unitPrice,
+                    baseUnitName = product.unitName,
+                    secondaryUnitId = product.secondaryUnitId,
+                    secondaryUnitName = product.secondaryUnitName,
+                    secondaryUnitFactor = product.secondaryUnitFactor,
+                    isSecondaryUnit = isSecondary
                 )
             } else {
                 state.cartItems.map { item ->
@@ -452,16 +483,101 @@ class CheckoutViewModel(
         }
     }
 
+    fun onScanBarcode(barcode: String, context: android.content.Context? = null) {
+        val cleanBarcode = barcode.trim()
+        if (cleanBarcode.isBlank()) return
+
+        // 1. Cek produk di katalog memori aktif
+        val matchedProduct = _uiState.value.products.firstOrNull { product ->
+            product.sku.equals(cleanBarcode, ignoreCase = true) ||
+            product.barcode.equals(cleanBarcode, ignoreCase = true) ||
+            product.productId.equals(cleanBarcode, ignoreCase = true)
+        }
+
+        if (matchedProduct != null) {
+            addProduct(matchedProduct)
+            com.tbterminal.app.ui.barcode.BarcodeFeedbackHelper.playSuccessBeep()
+            context?.let { ctx ->
+                com.tbterminal.app.ui.barcode.BarcodeFeedbackHelper.vibrate(ctx)
+            }
+            _uiState.update { it.copy(scanNotification = "Ditambahkan: ${matchedProduct.name} (+1)") }
+            return
+        }
+
+        // 2. Jika tidak ada di memori aktif, cari ke repository
+        viewModelScope.launch {
+            when (val result = inventoryRepository.getProductStocks(page = 1, limit = 5, search = cleanBarcode)) {
+                is RepositoryResult.Success -> {
+                    val found = result.data.data.firstOrNull { p ->
+                        p.isActive && (p.sku.equals(cleanBarcode, ignoreCase = true) || p.productId.equals(cleanBarcode, ignoreCase = true))
+                    } ?: result.data.data.firstOrNull { it.isActive }
+
+                    if (found != null) {
+                        val uiProduct = Product(
+                            productId = found.productId,
+                            name = found.productName,
+                            unitPrice = found.priceRetail,
+                            sku = found.sku,
+                            barcode = found.sku,
+                            unitName = found.unitName,
+                            categoryName = found.categoryName,
+                            stockQty = found.quantity,
+                            secondaryUnitId = found.secondaryUnitId,
+                            secondaryUnitName = found.secondaryUnitName,
+                            secondaryUnitFactor = found.secondaryUnitFactor
+                        )
+                        addProduct(uiProduct)
+                        com.tbterminal.app.ui.barcode.BarcodeFeedbackHelper.playSuccessBeep()
+                        context?.let { ctx ->
+                            com.tbterminal.app.ui.barcode.BarcodeFeedbackHelper.vibrate(ctx)
+                        }
+                        _uiState.update { it.copy(scanNotification = "Ditambahkan: ${found.productName} (+1)") }
+                    } else {
+                        com.tbterminal.app.ui.barcode.BarcodeFeedbackHelper.playErrorBeep()
+                        setError(UiText.DynamicString("Barcode \"$cleanBarcode\" tidak ditemukan."))
+                    }
+                }
+                else -> {
+                    com.tbterminal.app.ui.barcode.BarcodeFeedbackHelper.playErrorBeep()
+                    setError(UiText.DynamicString("Barcode \"$cleanBarcode\" tidak ditemukan."))
+                }
+            }
+        }
+    }
+
+    fun clearScanNotification() {
+        _uiState.update { it.copy(scanNotification = null) }
+    }
+
     fun updateCartQuantity(
         cartItemId: String,
         quantity: Int
     ) {
-        val product = _uiState.value.products.firstOrNull { item ->
-            item.productId == cartItemId
-        }
-        if (product != null && quantity.toBigDecimal() > product.stockQty) {
-            setError(UiText.DynamicString("Stok ${product.name} tidak cukup."))
-            return
+        val currentItem = _uiState.value.cartItems.firstOrNull { it.cartItemId == cartItemId }
+            ?: return
+        val product = _uiState.value.products.firstOrNull { it.productId == currentItem.productId }
+
+        if (quantity > currentItem.quantity && product != null) {
+            val otherItemsConsumedBaseQty = _uiState.value.cartItems
+                .filter { it.productId == currentItem.productId && it.cartItemId != cartItemId }
+                .fold(BigDecimal.ZERO) { acc, item -> acc.add(item.equivalentBaseQuantityBigDecimal) }
+            val thisItemFactor = if (currentItem.isSecondaryUnit && currentItem.secondaryUnitFactor != null) {
+                currentItem.secondaryUnitFactor
+            } else {
+                BigDecimal.ONE
+            }
+            val newThisItemBaseQty = quantity.toBigDecimal().multiply(thisItemFactor)
+            val totalNeededBaseQty = otherItemsConsumedBaseQty.add(newThisItemBaseQty)
+
+            if (totalNeededBaseQty > product.stockQty) {
+                val sisa = product.stockQty.subtract(otherItemsConsumedBaseQty).coerceAtLeast(BigDecimal.ZERO)
+                setError(
+                    UiText.DynamicString(
+                        "Stok ${product.name} tidak cukup (tersedia ${sisa.stripTrailingZeros().toPlainString()} ${product.unitName})."
+                    )
+                )
+                return
+            }
         }
 
         if (!allowCheckoutIntentMutation()) return
@@ -474,6 +590,77 @@ class CheckoutViewModel(
                 state.cartItems.map { item ->
                     if (item.cartItemId == cartItemId) {
                         item.copy(quantity = quantity)
+                    } else {
+                        item
+                    }
+                }
+            }
+
+            state.withCart(updatedItems)
+        }
+    }
+
+    fun toggleCartItemUnit(cartItemId: String, toSecondary: Boolean) {
+        val currentItem = _uiState.value.cartItems.firstOrNull { it.cartItemId == cartItemId }
+            ?: return
+        if (currentItem.isSecondaryUnit == toSecondary) return
+        val factor = currentItem.secondaryUnitFactor
+        if (toSecondary && (factor == null || factor <= BigDecimal.ONE)) return
+
+        val product = _uiState.value.products.firstOrNull { it.productId == currentItem.productId }
+        val newFactor = if (toSecondary) (factor ?: BigDecimal.ONE) else BigDecimal.ONE
+        val otherItemsConsumedBaseQty = _uiState.value.cartItems
+            .filter { it.productId == currentItem.productId && it.cartItemId != cartItemId }
+            .fold(BigDecimal.ZERO) { acc, item -> acc.add(item.equivalentBaseQuantityBigDecimal) }
+        val newThisItemBaseQty = currentItem.quantity.toBigDecimal().multiply(newFactor)
+        val totalNeeded = otherItemsConsumedBaseQty.add(newThisItemBaseQty)
+
+        if (product != null && totalNeeded > product.stockQty) {
+            val sisa = product.stockQty.subtract(otherItemsConsumedBaseQty).coerceAtLeast(BigDecimal.ZERO)
+            setError(
+                UiText.DynamicString(
+                    "Stok ${currentItem.productName} tidak cukup untuk beralih satuan (tersedia ${sisa.stripTrailingZeros().toPlainString()} ${currentItem.baseUnitName})."
+                )
+            )
+            return
+        }
+
+        if (!allowCheckoutIntentMutation()) return
+
+        val targetCartItemId = if (toSecondary) "${currentItem.productId}__sec" else currentItem.productId
+        val newUnitPrice = if (toSecondary) {
+            currentItem.baseUnitPrice.multiply(factor ?: BigDecimal.ONE)
+        } else {
+            currentItem.baseUnitPrice
+        }
+        val newUnitName = if (toSecondary) {
+            currentItem.secondaryUnitName?.ifBlank { "Satuan 2" } ?: "Satuan 2"
+        } else {
+            currentItem.baseUnitName
+        }
+
+        _uiState.update { state ->
+            val existingTarget = state.cartItems.firstOrNull { it.cartItemId == targetCartItemId }
+            val updatedItems = if (existingTarget != null) {
+                state.cartItems
+                    .filterNot { it.cartItemId == cartItemId }
+                    .map { item ->
+                        if (item.cartItemId == targetCartItemId) {
+                            item.copy(quantity = item.quantity + currentItem.quantity)
+                        } else {
+                            item
+                        }
+                    }
+            } else {
+                state.cartItems.map { item ->
+                    if (item.cartItemId == cartItemId) {
+                        item.copy(
+                            cartItemId = targetCartItemId,
+                            unitPrice = newUnitPrice,
+                            unitName = newUnitName,
+                            isSecondaryUnit = toSecondary,
+                            discountRequest = null
+                        )
                     } else {
                         item
                     }
@@ -589,9 +776,14 @@ class CheckoutViewModel(
             val cartSnapshot = _uiState.value.cartItems
             val previewCommand = CheckoutPreviewCommand(
                 items = cartSnapshot.map { item ->
+                    val effectiveQty = if (item.isSecondaryUnit && item.secondaryUnitFactor != null) {
+                        (item.quantity.toBigDecimal() * item.secondaryUnitFactor).toInt()
+                    } else {
+                        item.quantity
+                    }
                     CheckoutSubmitItem(
                         productId = item.productId,
-                        quantity = item.quantity,
+                        quantity = effectiveQty,
                         discountRequest = item.discountRequest,
                     )
                 },
@@ -719,9 +911,14 @@ class CheckoutViewModel(
                 managerApprovalId = managerApprovalId,
             ),
             items = cartSnapshot.map { item ->
+                val effectiveQty = if (item.isSecondaryUnit && item.secondaryUnitFactor != null) {
+                    (item.quantity.toBigDecimal() * item.secondaryUnitFactor).toInt()
+                } else {
+                    item.quantity
+                }
                 CheckoutSubmitItem(
                     productId = item.productId,
-                    quantity = item.quantity,
+                    quantity = effectiveQty,
                     discountRequest = item.discountRequest,
                 )
             },
@@ -917,9 +1114,10 @@ class CheckoutViewModel(
             append(customerId.orEmpty()).append('|').append(notes.orEmpty()).append('|')
             append(checkoutAttemptId.orEmpty()).append('|').append(managerApprovalId.orEmpty()).append('|')
             append(transactionDiscount.fingerprintPart()).append('|')
-            items.sortedBy(CartItem::productId).forEach { item ->
-                append(item.productId).append(':').append(item.quantity).append(':')
-                    .append(item.discountRequest.fingerprintPart()).append(';')
+            items.sortedBy(CartItem::cartItemId).forEach { item ->
+                append(item.cartItemId).append(':').append(item.quantity).append(':')
+                    .append(item.discountRequest.fingerprintPart()).append(':')
+                    .append(item.isSecondaryUnit).append(';')
             }
         }
         val existing = pendingOnlineCheckout
@@ -1114,7 +1312,16 @@ class CheckoutViewModel(
                     "Data lokal produk ${cartItem.productName} belum tersedia."
                 )
             val quantity = cartItem.quantity.toDouble()
-            if (productLookup.stock < quantity) {
+            val baseQuantity = cartItem.equivalentBaseQuantity
+            val factor = if (cartItem.isSecondaryUnit && cartItem.secondaryUnitFactor != null) {
+                cartItem.secondaryUnitFactor.toDouble()
+            } else {
+                1.0
+            }
+            val totalProductBaseQty = state.cartItems
+                .filter { it.productId == cartItem.productId }
+                .sumOf { it.equivalentBaseQuantity }
+            if (productLookup.stock < totalProductBaseQty) {
                 return LocalCheckoutCommandBuildResult.Failed(
                     "Stok lokal ${cartItem.productName} tidak cukup."
                 )
@@ -1129,8 +1336,10 @@ class CheckoutViewModel(
                 skuSnapshot = cartItem.sku.takeIf(String::isNotBlank),
                 unitNameSnapshot = cartItem.unitName.takeIf(String::isNotBlank),
                 quantity = quantity,
+                baseQuantity = baseQuantity,
+                conversionFactor = factor,
                 priceAtTransaction = cartItem.unitPrice.toSafeDouble(),
-                cogsAtTransaction = productLookup.cogsAtTransaction,
+                cogsAtTransaction = productLookup.cogsAtTransaction * factor,
                 discount = 0.0,
                 subtotal = lineSubtotal.toSafeDouble()
             )

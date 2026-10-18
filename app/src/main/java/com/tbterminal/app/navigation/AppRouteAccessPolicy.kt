@@ -22,6 +22,7 @@ internal enum class AppCapability {
     DIRECT_TRANSACTION_CORRECTION,
     APPROVED_TRANSACTION_CORRECTION,
     CASH_SESSIONS,
+    CASHIER_SHIFT,
     REPORTS,
     FINANCIAL_ANALYTICS,
     AUDIT,
@@ -65,7 +66,12 @@ internal object AppAccessPolicy {
     private const val ROLE_ADMIN = "admin"
     private const val ROLE_CASHIER = "kasir"
 
-    private val ownerCapabilities = AppCapability.entries.toSet()
+    private val ownerCapabilities = AppCapability.entries.toSet() - setOf(
+        AppCapability.POS,
+        AppCapability.OWN_TRANSACTIONS,
+        AppCapability.APPROVED_TRANSACTION_CORRECTION,
+        AppCapability.CASHIER_SHIFT,
+    )
 
     private val adminCapabilities = ownerCapabilities - setOf(
         AppCapability.USER_MANAGEMENT,
@@ -83,6 +89,7 @@ internal object AppAccessPolicy {
         AppCapability.RECEIVABLE_PAYMENTS,
         AppCapability.OWN_TRANSACTIONS,
         AppCapability.CASH_SESSIONS,
+        AppCapability.CASHIER_SHIFT,
         AppCapability.DEVICE_SETTINGS,
         AppCapability.ACCOUNT,
         AppCapability.APPROVED_TRANSACTION_CORRECTION,
@@ -121,7 +128,7 @@ internal object AppRouteAccessPolicy {
             ) -> AppCapability.BACKOFFICE
 
             value == AppRoute.CashierPos.route || value == AppRoute.CashierCart.route -> AppCapability.POS
-            value == AppRoute.CashierCashSession.route -> AppCapability.CASH_SESSIONS
+            value == AppRoute.CashierCashSession.route -> AppCapability.CASHIER_SHIFT
             value == AppRoute.CashierStockCheck.route -> AppCapability.STOCK
             value == AppRoute.CashierTransactionHistory.route ||
                 value.matchesRoute(AppRoute.CashierReceiptDetail.route) -> AppCapability.OWN_TRANSACTIONS

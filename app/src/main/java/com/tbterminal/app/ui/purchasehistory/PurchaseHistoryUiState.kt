@@ -4,13 +4,19 @@ import com.tbterminal.app.data.model.PurchaseDetail
 import com.tbterminal.app.data.model.PurchaseSummary
 import com.tbterminal.app.data.model.Supplier
 import java.math.BigDecimal
+import java.time.LocalDate
+import java.time.ZoneId
+
+private val WIB_ZONE = ZoneId.of("Asia/Jakarta")
+
+fun todayPurchaseDateString(): String = LocalDate.now(WIB_ZONE).toString()
 
 data class PurchaseHistoryUiState(
     val purchases: List<PurchaseSummary> = emptyList(),
     val suppliers: List<Supplier> = emptyList(),
     val selectedSupplierId: String? = null,
-    val startDate: String? = null,
-    val endDate: String? = null,
+    val startDate: String? = todayPurchaseDateString(),
+    val endDate: String? = todayPurchaseDateString(),
     val selectedPeriodType: String = "Hari",
     val searchQuery: String = "",
     val selectedPurchase: PurchaseDetail? = null,
@@ -22,22 +28,42 @@ data class PurchaseHistoryUiState(
     val isLoadingDetail: Boolean = false,
     val errorMessage: String? = null
 ) {
-    val pageTotal: BigDecimal
-        get() = purchases.fold(BigDecimal.ZERO) { total, purchase -> total.add(purchase.total) }
-
     val visiblePurchases: List<PurchaseSummary>
         get() {
             val query = searchQuery.trim()
-            if (query.isBlank()) return purchases
-            return purchases.filter { purchase ->
-                purchase.invoiceNo.orEmpty().contains(query, ignoreCase = true) ||
-                    purchase.supplierName.contains(query, ignoreCase = true)
+            val filteredByQuery = if (query.isBlank()) purchases else {
+                purchases.filter { purchase ->
+                    purchase.invoiceNo.orEmpty().contains(query, ignoreCase = true) ||
+                        purchase.supplierName.contains(query, ignoreCase = true)
+                }
+            }
+            val start = startDate?.take(10)
+            val end = endDate?.take(10)
+            if (start == null && end == null) return filteredByQuery
+
+            return filteredByQuery.filter { purchase ->
+                val purchaseDate = purchase.receivedAt.take(10)
+                val matchesStart = start == null || purchaseDate >= start
+                val matchesEnd = end == null || purchaseDate <= end
+                matchesStart && matchesEnd
             }
         }
 
+    val effectiveTotalPurchases: Long
+        get() {
+            if (visiblePurchases.isEmpty() || purchases.isEmpty()) return 0L
+            if (visiblePurchases.size < purchases.size) {
+                return visiblePurchases.size.toLong()
+            }
+            return totalPurchases
+        }
+
+    val pageTotal: BigDecimal
+        get() = visiblePurchases.fold(BigDecimal.ZERO) { total, purchase -> total.add(purchase.total) }
+
     val pageStartIndex: Long
-        get() = if (totalPurchases == 0L) 0 else ((page - 1L) * pageSize) + 1L
+        get() = if (visiblePurchases.isEmpty() || effectiveTotalPurchases == 0L) 0L else ((page - 1L) * pageSize) + 1L
 
     val pageEndIndex: Long
-        get() = minOf(page.toLong() * pageSize, totalPurchases)
+        get() = if (visiblePurchases.isEmpty() || effectiveTotalPurchases == 0L) 0L else minOf(page.toLong() * pageSize, effectiveTotalPurchases)
 }

@@ -92,6 +92,7 @@ interface AppContainer {
     val analyticsRepository: AnalyticsRepository
     val managerApprovalRepository: ManagerApprovalRepository
     val systemRepository: com.tbterminal.app.data.repository.SystemRepository
+    val thermalPrinterManager: com.tbterminal.app.data.printer.ThermalPrinterManager
 }
 
 class DefaultAppContainer(
@@ -108,6 +109,10 @@ class DefaultAppContainer(
 
     override val localAppSettingsDataSource: LocalAppSettingsDataSource by lazy {
         LocalAppSettingsDataSource(localDatabase.appSettingDao())
+    }
+
+    override val thermalPrinterManager: com.tbterminal.app.data.printer.ThermalPrinterManager by lazy {
+        com.tbterminal.app.data.printer.ThermalPrinterManager(localAppSettingsDataSource)
     }
 
     override val productLocalDataSource: ProductLocalDataSource by lazy {

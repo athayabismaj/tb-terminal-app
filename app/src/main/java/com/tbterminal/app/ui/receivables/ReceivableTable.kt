@@ -767,6 +767,7 @@ private fun CustomerReceivableGroupCard(
     val slate100 = Color(0xFFF1F5F9)
     val slate200 = Color(0xFFE2E8F0)
     val slate400 = Color(0xFF94A3B8)
+    val slate500 = Color(0xFF64748B)
     val slate600 = Color(0xFF475569)
     val slate700 = Color(0xFF334155)
     val slate900 = Color(0xFF0F172A)
@@ -806,33 +807,14 @@ private fun CustomerReceivableGroupCard(
                         }
                         
                         Column(modifier = Modifier.weight(1f)) {
-                            Row(
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.spacedBy(8.dp)
-                            ) {
-                                Text(
-                                    text = customerName,
-                                    fontSize = 14.sp,
-                                    fontWeight = FontWeight.Bold,
-                                    color = slate900,
-                                    maxLines = 1,
-                                    overflow = TextOverflow.Ellipsis,
-                                    modifier = Modifier.weight(1f, fill = false)
-                                )
-                                val badgeBg = if (allPaid) brand50 else slate100
-                                val badgeText = if (allPaid) brand600 else slate600
-                                Surface(color = badgeBg, shape = RoundedCornerShape(50)) {
-                                    Text(
-                                        text = "${receivables.size} Nota",
-                                        fontSize = 10.sp,
-                                        fontWeight = FontWeight.Bold,
-                                        color = badgeText,
-                                        maxLines = 1,
-                                        softWrap = false,
-                                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp)
-                                    )
-                                }
-                            }
+                            Text(
+                                text = customerName,
+                                fontSize = 14.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = slate900,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis
+                            )
                             
                             Row(
                                 verticalAlignment = Alignment.CenterVertically,
@@ -846,12 +828,25 @@ private fun CustomerReceivableGroupCard(
                         }
                     }
                     
-                    Icon(
-                        if (isExpanded) androidx.compose.material.icons.Icons.Default.ExpandLess else androidx.compose.material.icons.Icons.Default.ExpandMore,
-                        contentDescription = null,
-                        tint = slate400,
-                        modifier = Modifier.size(24.dp)
-                    )
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        Text(
+                            text = "${receivables.size} Nota",
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.Medium,
+                            color = slate500,
+                            maxLines = 1,
+                            softWrap = false
+                        )
+                        Icon(
+                            if (isExpanded) androidx.compose.material.icons.Icons.Default.ExpandLess else androidx.compose.material.icons.Icons.Default.ExpandMore,
+                            contentDescription = null,
+                            tint = slate400,
+                            modifier = Modifier.size(24.dp)
+                        )
+                    }
                 }
             }
             
@@ -917,9 +912,12 @@ private fun MobileReceivableAccordionItem(
                     Icon(androidx.compose.material.icons.Icons.Outlined.Receipt, contentDescription = null, tint = slate400, modifier = Modifier.size(18.dp))
                     Text(receivable.mobileReference(), fontSize = 12.sp, fontWeight = FontWeight.SemiBold, color = slate900, fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace)
                 }
-                Surface(color = brand50, shape = RoundedCornerShape(50)) {
-                    Text("Nota ${index + 1}", fontSize = 10.sp, fontWeight = FontWeight.Bold, color = brand600, modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp))
-                }
+                Text(
+                    text = "Nota ${index + 1}",
+                    fontSize = 11.sp,
+                    fontWeight = FontWeight.Medium,
+                    color = slate500
+                )
             }
             
             Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.Bottom) {

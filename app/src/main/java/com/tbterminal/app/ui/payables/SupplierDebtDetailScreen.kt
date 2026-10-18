@@ -207,22 +207,14 @@ private fun SupplierSummaryCard(uiState: SupplierDebtDetailUiState) {
                                 overflow = TextOverflow.Ellipsis,
                                 modifier = Modifier.weight(1f, fill = false)
                             )
-                            val badgeBg = if (allPaid) Brand50 else Slate100
-                            val badgeText = if (allPaid) Brand600 else Slate600
-                            Surface(
-                                color = badgeBg,
-                                shape = RoundedCornerShape(50)
-                            ) {
-                                Text(
-                                    text = "${uiState.payables.size} Nota",
-                                    fontSize = 10.sp,
-                                    fontWeight = FontWeight.Bold,
-                                    color = badgeText,
-                                    maxLines = 1,
-                                    softWrap = false,
-                                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp)
-                                )
-                            }
+                            Text(
+                                text = "${uiState.payables.size} Nota",
+                                fontSize = 11.sp,
+                                fontWeight = FontWeight.Medium,
+                                color = Slate500,
+                                maxLines = 1,
+                                softWrap = false
+                            )
                         }
                         Text(
                             text = if (allPaid) "Semua hutang lunas" else "Belum lunas",

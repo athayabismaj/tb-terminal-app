@@ -62,7 +62,7 @@ class LocalCheckoutService(
                     item.productLocalId?.let { productLocalId ->
                         database.productDao().decrementStock(
                             localId = productLocalId,
-                            quantity = item.quantity,
+                            quantity = item.baseQuantity,
                             status = SyncStatus.PENDING,
                             updatedAt = now
                         )
@@ -257,6 +257,8 @@ class LocalCheckoutService(
             append("\"skuSnapshot\":${skuSnapshot?.replace("\"", "\\\"")?.quoted() ?: "null"},")
             append("\"unitNameSnapshot\":${unitNameSnapshot?.replace("\"", "\\\"")?.quoted() ?: "null"},")
             append("\"quantity\":$quantity,")
+            append("\"baseQuantity\":$baseQuantity,")
+            append("\"conversionFactor\":$conversionFactor,")
             append("\"priceAtTransaction\":$priceAtTransaction,")
             append("\"cogsAtTransaction\":$cogsAtTransaction,")
             append("\"discount\":$discount,")

@@ -90,7 +90,7 @@ fun AdminDashboardShell(
             activeDestination = cashierDestination,
             onDashboardClick = navigateOrFallback(AdminDestination.Dashboard, onDashboardClick),
             onPosClick = navigateOrFallback(AdminDestination.NewTransaction, onSalesTransactionsClick),
-            onCashSessionClick = navigateOrFallback(AdminDestination.CashierCashSession, onCashReconciliationClick),
+            onCashSessionClick = onCashReconciliationClick,
             onTransactionHistoryClick = navigateOrFallback(AdminDestination.CashierTransactionHistory, onSalesTransactionsClick),
             onReceivablesClick = navigateOrFallback(AdminDestination.Receivables, onReceivablesClick),
             onCustomersClick = navigateOrFallback(AdminDestination.Customers, onCustomersClick),

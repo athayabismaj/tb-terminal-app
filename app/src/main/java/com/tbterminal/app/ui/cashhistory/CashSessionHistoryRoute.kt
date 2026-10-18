@@ -68,7 +68,8 @@ fun AdminCashSessionHistoryScreen(
             onNextDate = viewModel::nextDate,
             onShowDetail = onShowDetail,
             onPreviousPage = viewModel::previousPage,
-            onNextPage = viewModel::nextPage
+            onNextPage = viewModel::nextPage,
+            onDateRangeChanged = viewModel::setDateRange
             )
         }
     }

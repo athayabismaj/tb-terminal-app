@@ -239,7 +239,10 @@ data class StockDetailResponseDto(
     @Serializable(with = BigDecimalStringSerializer::class) val priceRetail: BigDecimal,
     @Serializable(with = BigDecimalStringSerializer::class) val priceContractor: BigDecimal,
     @Serializable(with = BigDecimalStringSerializer::class) val discount: BigDecimal = BigDecimal.ZERO,
-    val isActive: Boolean
+    val isActive: Boolean,
+    val secondaryUnitId: String? = null,
+    val secondaryUnitName: String? = null,
+    val secondaryUnitFactor: String? = null
 )
 
 @Serializable

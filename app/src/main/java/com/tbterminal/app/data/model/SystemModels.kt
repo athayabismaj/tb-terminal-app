@@ -30,14 +30,14 @@ data class AuditLogItem(
 
 @Serializable
 data class StoreSettings(
-    val id: String,
+    val id: String = "",
     val storeName: String,
-    val address: String?,
-    val phone: String?,
-    val receiptHeader: String?,
-    val receiptFooter: String?,
-    val printerSize: String,
-    val updatedAt: String
+    val address: String? = null,
+    val phone: String? = null,
+    val receiptHeader: String? = null,
+    val receiptFooter: String? = null,
+    val printerSize: String = "58mm",
+    val updatedAt: String = ""
 )
 
 @Serializable

@@ -108,6 +108,7 @@ fun AdminTransactionHistoryScreen(
                 onPaymentMethodChanged = viewModel::updatePaymentMethodFilter,
                 onDatePresetSelected = viewModel::setDatePreset,
                 onDateSelected = viewModel::setDate,
+                onDateRangeSelected = viewModel::setDateRange,
                 onSyncClick = viewModel::syncLocalTransaction,
                 onSyncAllClick = viewModel::syncAllLocalTransactions,
                 onRetry = viewModel::refresh,
