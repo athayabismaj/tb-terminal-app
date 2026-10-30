@@ -41,7 +41,36 @@ data class CheckoutUiState(
     val productError: UiText? = null,
     val customerError: UiText? = null,
     val errorEvent: UiText? = null,
-    val scanNotification: String? = null
+    val scanNotification: String? = null,
+    val heldCarts: List<HeldCart> = emptyList(),
+    val isHoldCartDialogOpen: Boolean = false,
+    val isHeldCartsSheetOpen: Boolean = false,
+    val isDeliveryEnabled: Boolean = false,
+    val deliveryFee: BigDecimal = BigDecimal.ZERO,
+    val deliveryFeeInput: String = "",
+    val deliveryAddress: String = "",
+    val deliveryCourier: String = "",
+    val isScreenLocked: Boolean = false,
+    val lockPinInput: String = "",
+    val lockPinError: String? = null,
+    val isQrisDialogOpen: Boolean = false,
+    val isCameraScannerOpen: Boolean = false,
+    val quickFeedbackMessage: String? = null,
+)
+
+data class HeldCart(
+    val id: String = java.util.UUID.randomUUID().toString(),
+    val note: String,
+    val customer: Customer? = null,
+    val items: List<CartItem>,
+    val transactionDiscount: CheckoutDiscount? = null,
+    val deliveryFee: BigDecimal = BigDecimal.ZERO,
+    val deliveryAddress: String = "",
+    val deliveryCourier: String = "",
+    val isDeliveryEnabled: Boolean = false,
+    val subtotal: BigDecimal,
+    val finalTotal: BigDecimal,
+    val createdAt: Long = System.currentTimeMillis()
 )
 
 data class ActiveCashSessionUi(

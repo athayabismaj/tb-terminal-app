@@ -100,4 +100,5 @@ enum class ReceivablePaymentMethod(
     Qris("qris", "QRIS", "Dibayar menggunakan QRIS")
 }
 
-internal const val RECEIVABLE_PAGE_SIZE = 10
+internal const val RECEIVABLE_PAGE_SIZE = 100
+internal const val RECEIVABLE_USERS_PER_PAGE = 5

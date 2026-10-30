@@ -160,6 +160,10 @@ class ReceivablePaymentHistoryViewModel(
         if (state.page < state.totalPages && !state.isLoading) loadPayments(state.page + 1)
     }
 
+    fun clearFeedback() {
+        _uiState.update { it.copy(message = null, errorMessage = null) }
+    }
+
     private fun setError(message: String) {
         _uiState.update { it.copy(isLoading = false, errorMessage = message) }
     }

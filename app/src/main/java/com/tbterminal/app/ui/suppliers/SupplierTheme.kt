@@ -4,31 +4,27 @@ import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
-import com.tbterminal.app.ui.theme.TbBackground
-import com.tbterminal.app.ui.theme.TbError
-import com.tbterminal.app.ui.theme.TbGreen
-import com.tbterminal.app.ui.theme.TbGreenDark
-import com.tbterminal.app.ui.theme.TbGreenLight
-import com.tbterminal.app.ui.theme.TbOutline
-import com.tbterminal.app.ui.theme.TbSurfaceMuted
-import com.tbterminal.app.ui.theme.TbText
-import com.tbterminal.app.ui.theme.TbTextMuted
 
-internal val SupplierBackground = TbBackground
+internal val SupplierBackground = Color(0xFFF8F9FA)
 internal val SupplierSurface = Color.White
-internal val SupplierSlate50 = TbSurfaceMuted
-internal val SupplierSlate100 = TbSurfaceMuted
-internal val SupplierSlate200 = TbOutline
-internal val SupplierSlate400 = TbTextMuted
-internal val SupplierSlate500 = TbTextMuted
-internal val SupplierSlate600 = TbText
-internal val SupplierSlate900 = TbText
-internal val SupplierEmerald50 = TbGreenLight
-internal val SupplierEmerald100 = TbGreenLight
-internal val SupplierEmerald600 = TbGreen
-internal val SupplierEmerald700 = TbGreenDark
-internal val SupplierEmerald800 = TbGreenDark
-internal val SupplierDanger = TbError
+internal val SupplierSlate50 = Color(0xFFF8FAFC)
+internal val SupplierSlate100 = Color(0xFFF1F5F9)
+internal val SupplierSlate200 = Color(0xFFE2E8F0)
+internal val SupplierSlate300 = Color(0xFFCBD5E1)
+internal val SupplierSlate400 = Color(0xFF94A3B8)
+internal val SupplierSlate500 = Color(0xFF64748B)
+internal val SupplierSlate600 = Color(0xFF475569)
+internal val SupplierSlate700 = Color(0xFF334155)
+internal val SupplierSlate800 = Color(0xFF1E293B)
+internal val SupplierSlate900 = Color(0xFF0F172A)
+
+internal val SupplierEmerald50 = Color(0xFFF0F7F4)
+internal val SupplierEmerald100 = Color(0xFFE8F2EE)
+internal val SupplierEmeraldBorder = Color(0xFFC7E0D6)
+internal val SupplierEmerald600 = Color(0xFF256B57) // Brand Sage
+internal val SupplierEmerald700 = Color(0xFF1C5343)
+internal val SupplierEmerald800 = Color(0xFF1C5343)
+internal val SupplierDanger = Color(0xFFDC2626)
 internal val SupplierListHeight = 240.dp
 
 @Composable
@@ -36,5 +32,5 @@ internal fun supplierTextFieldColors() = OutlinedTextFieldDefaults.colors(
     focusedBorderColor = SupplierEmerald600,
     unfocusedBorderColor = SupplierSlate200,
     focusedContainerColor = SupplierSlate50,
-    unfocusedContainerColor = SupplierSlate50
+    unfocusedContainerColor = SupplierSlate50,
 )

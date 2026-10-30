@@ -83,7 +83,7 @@ internal fun SupplierDebtRows(
                 modifier = modifier.fillMaxWidth(),
                 verticalArrangement = Arrangement.spacedBy(14.dp),
             ) {
-                groupedBySupplier.forEach { (supplierId, payables) ->
+                groupedBySupplier.entries.take(SUPPLIER_DEBT_USERS_PER_PAGE).forEach { (supplierId, payables) ->
                     SupplierDebtGroupCard(supplierId, payables, onPayClick, onSupplierDetailClick)
                 }
             }
@@ -264,12 +264,123 @@ private fun SupplierInitial(name: String) {
 
 @Composable
 internal fun SupplierDebtLoading(modifier: Modifier, compact: Boolean) {
-    Column(
-        modifier = modifier.fillMaxWidth().testTag("supplier-debt-skeleton"),
-        verticalArrangement = Arrangement.spacedBy(10.dp),
+    if (compact) {
+        Column(
+            modifier = modifier.fillMaxWidth().testTag("supplier-debt-skeleton"),
+            verticalArrangement = Arrangement.spacedBy(14.dp),
+        ) {
+            repeat(3) {
+                SupplierDebtGroupCardSkeleton()
+            }
+        }
+    } else {
+        Box(modifier = modifier.fillMaxWidth().testTag("supplier-debt-skeleton")) {
+            SupplierDebtTableDesktopSkeleton()
+        }
+    }
+}
+
+@Composable
+private fun SupplierDebtGroupCardSkeleton() {
+    val surfaceBorder = Color(0xFFE5EBE8)
+    androidx.compose.material3.Card(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(16.dp),
+        colors = androidx.compose.material3.CardDefaults.cardColors(containerColor = Color.White),
+        border = BorderStroke(1.dp, surfaceBorder),
+        elevation = androidx.compose.material3.CardDefaults.cardElevation(defaultElevation = 2.dp)
     ) {
-        repeat(if (compact) 4 else 5) {
-            SkeletonBox(Modifier.fillMaxWidth().height(if (compact) 190.dp else 62.dp))
+        Column {
+            Row(
+                modifier = Modifier.fillMaxWidth().padding(14.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Row(
+                    modifier = Modifier.weight(1f).padding(end = 8.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    SkeletonBox(Modifier.size(40.dp), shape = CircleShape)
+                    Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                        SkeletonBox(Modifier.fillMaxWidth(0.55f).height(15.dp), shape = RoundedCornerShape(4.dp))
+                        Row(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
+                            SkeletonBox(Modifier.width(90.dp).height(12.dp), shape = RoundedCornerShape(3.dp))
+                            SkeletonBox(Modifier.width(60.dp).height(10.dp), shape = RoundedCornerShape(3.dp))
+                        }
+                    }
+                }
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    SkeletonBox(Modifier.width(46.dp).height(14.dp), shape = RoundedCornerShape(4.dp))
+                    SkeletonBox(Modifier.size(18.dp), shape = CircleShape)
+                }
+            }
+            HorizontalDivider(color = surfaceBorder)
+            Column(
+                modifier = Modifier.fillMaxWidth().padding(horizontal = 14.dp, vertical = 10.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+                    SkeletonBox(Modifier.width(100.dp).height(14.dp), shape = RoundedCornerShape(4.dp))
+                    SkeletonBox(Modifier.width(64.dp).height(20.dp), shape = RoundedCornerShape(6.dp))
+                }
+                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+                    SkeletonBox(Modifier.width(130.dp).height(12.dp), shape = RoundedCornerShape(3.dp))
+                    SkeletonBox(Modifier.width(76.dp).height(28.dp), shape = RoundedCornerShape(8.dp))
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun SupplierDebtTableDesktopSkeleton() {
+    Surface(
+        modifier = Modifier.fillMaxWidth(),
+        color = DebtSurface,
+        shape = RoundedCornerShape(18.dp),
+        border = BorderStroke(1.dp, DebtLine),
+    ) {
+        Column {
+            DebtTableHeader()
+            repeat(5) { index ->
+                if (index > 0) HorizontalDivider(color = DebtLine)
+                Row(
+                    modifier = Modifier.fillMaxWidth().padding(horizontal = 18.dp, vertical = 12.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Row(modifier = Modifier.weight(2f), verticalAlignment = Alignment.CenterVertically) {
+                        SkeletonBox(Modifier.size(34.dp), shape = CircleShape)
+                        Spacer(Modifier.width(10.dp))
+                        Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                            SkeletonBox(Modifier.width(110.dp).height(14.dp), shape = RoundedCornerShape(4.dp))
+                            SkeletonBox(Modifier.width(75.dp).height(11.dp), shape = RoundedCornerShape(3.dp))
+                        }
+                    }
+                    Box(Modifier.weight(1.35f)) {
+                        SkeletonBox(Modifier.width(85.dp).height(14.dp), shape = RoundedCornerShape(4.dp))
+                    }
+                    Column(Modifier.weight(1.45f), horizontalAlignment = Alignment.End, verticalArrangement = Arrangement.spacedBy(3.dp)) {
+                        SkeletonBox(Modifier.width(90.dp).height(13.dp), shape = RoundedCornerShape(4.dp))
+                        SkeletonBox(Modifier.width(65.dp).height(11.dp), shape = RoundedCornerShape(3.dp))
+                    }
+                    Box(Modifier.weight(1.25f), contentAlignment = Alignment.CenterEnd) {
+                        SkeletonBox(Modifier.width(80.dp).height(14.dp), shape = RoundedCornerShape(4.dp))
+                    }
+                    Box(Modifier.weight(1.5f)) {
+                        SkeletonBox(Modifier.width(85.dp).height(13.dp), shape = RoundedCornerShape(4.dp))
+                    }
+                    Box(Modifier.weight(1.1f), contentAlignment = Alignment.Center) {
+                        SkeletonBox(Modifier.width(62.dp).height(22.dp), shape = RoundedCornerShape(6.dp))
+                    }
+                    Box(Modifier.weight(0.8f), contentAlignment = Alignment.CenterEnd) {
+                        SkeletonBox(Modifier.width(64.dp).height(28.dp), shape = RoundedCornerShape(8.dp))
+                    }
+                }
+            }
         }
     }
 }

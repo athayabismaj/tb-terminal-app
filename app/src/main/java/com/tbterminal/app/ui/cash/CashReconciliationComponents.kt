@@ -218,7 +218,15 @@ private fun OpenSessionCard(
                 color = CashMuted,
                 fontSize = 13.sp
             )
-            CashTextField("MODAL AWAL", uiState.openingCashInput, onOpeningCashChanged, "0")
+            val isError = !uiState.hasActiveSession && uiState.errorMessage != null
+            CashTextField(
+                label = "MODAL AWAL",
+                value = uiState.openingCashInput,
+                onValueChange = onOpeningCashChanged,
+                placeholder = "0",
+                isError = isError,
+                supportingText = if (isError) uiState.errorMessage else null
+            )
             Button(
                 onClick = onOpenSession,
                 enabled = !uiState.isSubmitting,
@@ -298,11 +306,14 @@ private fun CloseSessionCard(
     ) {
         Column(modifier = Modifier.padding(24.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
             Text("Tutup Sesi", color = CashText, fontSize = 20.sp, fontWeight = FontWeight.ExtraBold)
+            val isError = uiState.hasActiveSession && !uiState.isExpenseDialogOpen && uiState.errorMessage != null
             CashTextField(
                 label = "KAS FISIK AKHIR",
                 value = uiState.closingCashInput,
                 onValueChange = onClosingCashChanged,
-                placeholder = "Hitung uang fisik di laci"
+                placeholder = "Hitung uang fisik di laci",
+                isError = isError,
+                supportingText = if (isError) uiState.errorMessage else null
             )
             CashNotesField(value = uiState.closingNotesInput, onValueChange = onClosingNotesChanged)
             Button(
@@ -333,7 +344,9 @@ private fun CashTextField(
     label: String,
     value: String,
     onValueChange: (String) -> Unit,
-    placeholder: String
+    placeholder: String,
+    isError: Boolean = false,
+    supportingText: String? = null
 ) {
     Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
         Text(label, color = CashMuted, fontSize = 11.sp, fontWeight = FontWeight.ExtraBold)
@@ -341,7 +354,11 @@ private fun CashTextField(
             value = value,
             onValueChange = onValueChange,
             placeholder = { Text(placeholder, color = CashMuted) },
-            leadingIcon = { Text("Rp", color = CashMuted, fontWeight = FontWeight.Bold) },
+            leadingIcon = { Text("Rp", color = if (isError) CashDanger else CashMuted, fontWeight = FontWeight.Bold) },
+            isError = isError,
+            supportingText = supportingText?.let {
+                { Text(it, color = CashDanger, fontSize = 12.sp) }
+            },
             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
             modifier = Modifier.fillMaxWidth(),
             singleLine = true,
@@ -352,13 +369,22 @@ private fun CashTextField(
 }
 
 @Composable
-private fun CashNotesField(value: String, onValueChange: (String) -> Unit) {
+private fun CashNotesField(
+    value: String,
+    onValueChange: (String) -> Unit,
+    isError: Boolean = false,
+    supportingText: String? = null
+) {
     Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
         Text("CATATAN", color = CashMuted, fontSize = 11.sp, fontWeight = FontWeight.ExtraBold)
         OutlinedTextField(
             value = value,
             onValueChange = onValueChange,
             placeholder = { Text("Opsional, misal selisih kas atau catatan shift", color = CashMuted) },
+            isError = isError,
+            supportingText = supportingText?.let {
+                { Text(it, color = CashDanger, fontSize = 12.sp) }
+            },
             modifier = Modifier.fillMaxWidth(),
             minLines = 2,
             shape = RoundedCornerShape(12.dp),
@@ -371,8 +397,10 @@ private fun CashNotesField(value: String, onValueChange: (String) -> Unit) {
 private fun cashFieldColors() = OutlinedTextFieldDefaults.colors(
     focusedBorderColor = CashPrimary,
     unfocusedBorderColor = CashLine,
+    errorBorderColor = CashDanger,
     focusedContainerColor = CashSurfaceSoft,
-    unfocusedContainerColor = CashSurfaceSoft
+    unfocusedContainerColor = CashSurfaceSoft,
+    errorContainerColor = CashDanger.copy(alpha = 0.05f)
 )
 
 @Composable
@@ -403,15 +431,21 @@ internal fun CashExpenseDialog(
                     color = CashMuted,
                     fontSize = 14.sp
                 )
+                val isDescError = uiState.errorMessage?.contains("Keterangan", ignoreCase = true) == true
+                val isAmountError = uiState.errorMessage != null && !isDescError
                 CashTextField(
                     label = "NOMINAL",
                     value = uiState.expenseAmountInput,
                     onValueChange = onAmountChanged,
-                    placeholder = "Misal: 15000"
+                    placeholder = "Misal: 15000",
+                    isError = isAmountError,
+                    supportingText = if (isAmountError) uiState.errorMessage else null
                 )
                 CashNotesField(
                     value = uiState.expenseDescriptionInput,
-                    onValueChange = onDescriptionChanged
+                    onValueChange = onDescriptionChanged,
+                    isError = isDescError,
+                    supportingText = if (isDescError) uiState.errorMessage else null
                 )
                 
                 Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {

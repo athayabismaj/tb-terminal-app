@@ -170,6 +170,10 @@ class StockReportViewModel(
         if (state.page < state.totalPages && !state.isLoading) loadStocks(state.page + 1)
     }
 
+    fun clearError() {
+        _uiState.update { it.copy(errorMessage = null) }
+    }
+
     private fun setError(message: String) {
         _uiState.update { it.copy(isLoading = false, errorMessage = message) }
     }

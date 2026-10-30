@@ -101,6 +101,7 @@ fun AdminReportsRoute(
         onProfileClick = onProfileClick,
         onSettingsClick = onSettingsClick,
         onBackToPrevious = onBackToPrevious,
-        onLogout = onLogout
+        onLogout = onLogout,
+        onDismissFeedback = viewModel::clearErrors,
     )
 }

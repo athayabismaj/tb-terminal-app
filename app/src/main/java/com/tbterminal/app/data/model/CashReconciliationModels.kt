@@ -81,6 +81,7 @@ data class CashTransactionDetail(
     val voidedAt: String? = null,
     val voidedByName: String? = null,
     val voidReason: String? = null,
+    val notes: String? = null,
     val items: List<CashTransactionItem>
 )
 
@@ -125,6 +126,7 @@ data class CashTransactionItem(
     val productId: String,
     val productName: String,
     val unitId: String,
+    val unitName: String? = null,
     val quantity: BigDecimal,
     val priceAtTransaction: BigDecimal,
     val subtotal: BigDecimal

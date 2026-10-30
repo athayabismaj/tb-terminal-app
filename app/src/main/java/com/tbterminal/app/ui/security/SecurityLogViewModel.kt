@@ -11,8 +11,12 @@ import com.tbterminal.app.data.model.AuditLogItem
 import com.tbterminal.app.data.remote.NetworkResult
 import com.tbterminal.app.data.repository.SecurityLogRepository
 import com.tbterminal.app.ui.common.viewModelFactory
+import java.time.DayOfWeek
 import java.time.Duration
 import java.time.Instant
+import java.time.LocalDate
+import java.time.OffsetDateTime
+import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 import java.util.Locale
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -21,11 +25,18 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
+private val WIB_ZONE = ZoneId.of("Asia/Jakarta")
+
 data class SecurityLogUiState(
     val logs: List<SecurityLogItem> = emptyList(),
     val visibleLogs: List<SecurityLogItem> = emptyList(),
     val searchQuery: String = "",
-    val dateFilter: SecurityDateFilter = SecurityDateFilter.All,
+    val dateFilter: SecurityDateFilter = SecurityDateFilter.Today,
+    val selectedDate: String? = LocalDate.now(WIB_ZONE).toString(),
+    val startDate: String? = LocalDate.now(WIB_ZONE).toString(),
+    val endDate: String? = LocalDate.now(WIB_ZONE).toString(),
+    val selectedPreset: String? = "Hari",
+    val customDate: String? = null,
     val activityFilter: SecurityActivityFilter = SecurityActivityFilter.All,
     val selectedLog: SecurityLogItem? = null,
     val totalLogs: Long = 0,
@@ -43,6 +54,31 @@ data class SecurityLogUiState(
 
     val latestCompactRelativeTime: String
         get() = logs.firstOrNull()?.compactRelativeTime ?: "Belum ada"
+
+    fun historyShortDateLabel(): String {
+        val start = startDate?.take(10)?.let { runCatching { LocalDate.parse(it) }.getOrNull() }
+        val end = (endDate ?: selectedDate)?.take(10)?.let { runCatching { LocalDate.parse(it) }.getOrNull() }
+
+        if (start != null && end != null) {
+            return if (start == end) {
+                start.format(DateTimeFormatter.ofPattern("dd/MM"))
+            } else {
+                "${start.format(DateTimeFormatter.ofPattern("dd/MM"))} - ${end.format(DateTimeFormatter.ofPattern("dd/MM"))}"
+            }
+        }
+
+        val raw = endDate ?: selectedDate ?: startDate
+        if (raw.isNullOrBlank()) {
+            return runCatching {
+                LocalDate.now(WIB_ZONE).format(DateTimeFormatter.ofPattern("dd/MM"))
+            }.getOrDefault("Tanggal")
+        }
+        return runCatching {
+            LocalDate.parse(raw).format(DateTimeFormatter.ofPattern("dd/MM"))
+        }.getOrElse {
+            raw.take(5)
+        }
+    }
 }
 
 enum class SecurityLogType(val label: String) {
@@ -55,10 +91,17 @@ enum class SecurityDateFilter(
     val label: String,
     val queryValue: String?
 ) {
-    All("Semua tanggal", null),
-    Today("Hari ini", "today"),
-    Last7Days("7 hari terakhir", "7d"),
-    Last30Days("30 hari terakhir", "30d")
+    All("Semua", null),
+    Today("Hari", "today"),
+    Last7Days("Minggu", "7d"),
+    Last30Days("Bulan", "30d"),
+    Custom("Kustom", null);
+
+    companion object {
+        val Week: SecurityDateFilter get() = Last7Days
+        val Month: SecurityDateFilter get() = Last30Days
+        val Day: SecurityDateFilter get() = Today
+    }
 }
 
 enum class SecurityActivityFilter(
@@ -82,6 +125,7 @@ data class SecurityLogItem(
     val deviceName: String,
     val time: String,
     val dateLabel: String = "-",
+    val rawDateIso: String = "",
     val relativeTime: String,
     val compactRelativeTime: String
 )
@@ -96,47 +140,51 @@ class SecurityLogViewModel(
         loadLogs()
     }
 
-    fun loadLogs() {
-        val current = _uiState.value
-        loadLogs(page = current.page, dateFilter = current.dateFilter, activityFilter = current.activityFilter)
-    }
-
-    fun refresh() = loadLogs()
-
-    private fun loadLogs(
-        page: Int,
-        dateFilter: SecurityDateFilter,
-        activityFilter: SecurityActivityFilter
-    ) {
+    fun loadLogs(page: Int = _uiState.value.page) {
         val current = _uiState.value
         viewModelScope.launch {
             _uiState.update { state ->
                 state.copy(
                     page = page,
-                    dateFilter = dateFilter,
-                    activityFilter = activityFilter,
                     isLoading = true,
                     errorMessage = null
                 )
             }
 
+            val todayStr = LocalDate.now(WIB_ZONE).toString()
+            val isSingleToday = current.selectedPreset == "Hari" ||
+                current.selectedPreset == "Hari ini" ||
+                (current.startDate == todayStr && current.endDate == todayStr)
+
+            val rangeQuery = when {
+                isSingleToday -> "today"
+                current.selectedPreset in listOf("Minggu", "Minggu ini", "7 hari", "7 Hari") -> "7d"
+                current.selectedPreset in listOf("Bulan", "Bulan ini", "30 hari", "30 Hari") -> "30d"
+                current.selectedPreset == "Semua" -> null
+                current.startDate != null || current.endDate != null -> null
+                current.dateFilter == SecurityDateFilter.Custom -> null
+                else -> current.dateFilter.queryValue
+            }
+
             when (val result = securityLogRepository.getAuditLogs(
-                    page = page,
-                    limit = current.limit,
-                    action = activityFilter.actionQuery,
-                    range = dateFilter.queryValue
-                )) {
-                                is com.tbterminal.app.data.remote.NetworkResult.Success -> {
-                    val page = result.data.data
-                    if (page != null) {
-                        val logs = page.data.map(AuditLogItem::toSecurityLogItem)
+                page = page,
+                limit = current.limit,
+                action = current.activityFilter.actionQuery,
+                range = rangeQuery,
+                startDate = current.startDate,
+                endDate = current.endDate
+            )) {
+                is NetworkResult.Success -> {
+                    val pageData = result.data.data
+                    if (pageData != null) {
+                        val logs = pageData.data.map(AuditLogItem::toSecurityLogItem)
                         _uiState.update { state ->
                             val updated = state.copy(
                                 logs = logs,
-                                totalLogs = page.total,
-                                page = page.page,
-                                limit = page.limit,
-                                totalPages = page.totalPages,
+                                totalLogs = pageData.total,
+                                page = pageData.page,
+                                limit = pageData.limit,
+                                totalPages = pageData.totalPages,
                                 isLoading = false,
                                 errorMessage = null
                             )
@@ -154,6 +202,8 @@ class SecurityLogViewModel(
         }
     }
 
+    fun refresh() = loadLogs(page = _uiState.value.page)
+
     fun updateSearchQuery(value: String) {
         _uiState.update { state ->
             val updated = state.copy(searchQuery = value)
@@ -161,21 +211,127 @@ class SecurityLogViewModel(
         }
     }
 
-    fun updateDateFilter(filter: SecurityDateFilter) {
-        val current = _uiState.value
-        loadLogs(page = 1, dateFilter = filter, activityFilter = current.activityFilter)
+    fun setDatePreset(preset: String) {
+        val today = LocalDate.now(WIB_ZONE)
+        val startDate = when (preset) {
+            "Minggu", "Minggu ini", "7 hari", "7 Hari" -> today.with(DayOfWeek.MONDAY)
+            "Bulan", "Bulan ini", "30 hari", "30 Hari" -> today.withDayOfMonth(1)
+            "Semua" -> null
+            else -> today
+        }
+        val endDate = if (preset == "Semua") null else today
+        val filter = when (preset) {
+            "Semua" -> SecurityDateFilter.All
+            "Minggu", "Minggu ini", "7 hari", "7 Hari" -> SecurityDateFilter.Last7Days
+            "Bulan", "Bulan ini", "30 hari", "30 Hari" -> SecurityDateFilter.Last30Days
+            else -> SecurityDateFilter.Today
+        }
+        val normalizedPreset = when (preset) {
+            "7 hari", "7 Hari", "Minggu ini" -> "Minggu"
+            "30 hari", "30 Hari", "Bulan ini" -> "Bulan"
+            "Hari ini" -> "Hari"
+            else -> preset
+        }
+        setDateRange(startDate, endDate, normalizedPreset, filter)
+    }
+
+    fun setDate(date: String?) {
+        val resolvedDate = date ?: LocalDate.now(WIB_ZONE).toString()
+        val parsedDate = runCatching { LocalDate.parse(resolvedDate) }.getOrDefault(LocalDate.now(WIB_ZONE))
+        val preset = if (resolvedDate == LocalDate.now(WIB_ZONE).toString()) "Hari" else null
+        val filter = if (preset == "Hari") SecurityDateFilter.Today else SecurityDateFilter.Custom
+        setDateRange(parsedDate, parsedDate, preset, filter)
+    }
+
+    fun setDateRange(
+        startDate: LocalDate?,
+        endDate: LocalDate?,
+        preset: String?,
+        filter: SecurityDateFilter = if (preset == null) SecurityDateFilter.Custom else when (preset) {
+            "Semua" -> SecurityDateFilter.All
+            "Minggu" -> SecurityDateFilter.Last7Days
+            "Bulan" -> SecurityDateFilter.Last30Days
+            else -> SecurityDateFilter.Today
+        }
+    ) {
+        _uiState.update {
+            it.copy(
+                selectedDate = endDate?.toString(),
+                startDate = startDate?.toString(),
+                endDate = endDate?.toString(),
+                selectedPreset = preset,
+                dateFilter = filter,
+                customDate = if (preset == null || filter == SecurityDateFilter.Custom) startDate?.toString() else null,
+                page = 1
+            )
+        }
+        loadLogs(page = 1)
+    }
+
+    fun setDateRange(startDateStr: String?, endDateStr: String?, preset: String?) {
+        val start = startDateStr?.let { runCatching { LocalDate.parse(it) }.getOrNull() }
+        val end = endDateStr?.let { runCatching { LocalDate.parse(it) }.getOrNull() }
+        setDateRange(start, end, preset)
+    }
+
+    fun updateDateFilter(filter: SecurityDateFilter, customDate: String? = null) {
+        when (filter) {
+            SecurityDateFilter.All -> setDatePreset("Semua")
+            SecurityDateFilter.Today -> setDatePreset("Hari")
+            SecurityDateFilter.Last7Days -> setDatePreset("Minggu")
+            SecurityDateFilter.Last30Days -> setDatePreset("Bulan")
+            SecurityDateFilter.Custom -> {
+                if (customDate != null) {
+                    setDate(customDate)
+                } else {
+                    val state = _uiState.value
+                    val start = state.startDate?.let { runCatching { LocalDate.parse(it) }.getOrNull() }
+                    val end = state.endDate?.let { runCatching { LocalDate.parse(it) }.getOrNull() }
+                    setDateRange(start, end, null, SecurityDateFilter.Custom)
+                }
+            }
+        }
     }
 
     fun updateActivityFilter(filter: SecurityActivityFilter) {
-        val current = _uiState.value
-        loadLogs(page = 1, dateFilter = current.dateFilter, activityFilter = filter)
+        _uiState.update { it.copy(activityFilter = filter, page = 1) }
+        loadLogs(page = 1)
+    }
+
+    fun applyFilters(
+        startDateStr: String?,
+        endDateStr: String?,
+        preset: String?,
+        activityFilter: SecurityActivityFilter
+    ) {
+        val start = startDateStr?.let { runCatching { LocalDate.parse(it) }.getOrNull() }
+        val end = endDateStr?.let { runCatching { LocalDate.parse(it) }.getOrNull() }
+        val filter = if (preset == null) SecurityDateFilter.Custom else when (preset) {
+            "Semua" -> SecurityDateFilter.All
+            "Minggu" -> SecurityDateFilter.Last7Days
+            "Bulan" -> SecurityDateFilter.Last30Days
+            else -> SecurityDateFilter.Today
+        }
+        _uiState.update {
+            it.copy(
+                selectedDate = end?.toString(),
+                startDate = start?.toString(),
+                endDate = end?.toString(),
+                selectedPreset = preset,
+                dateFilter = filter,
+                customDate = if (preset == null || filter == SecurityDateFilter.Custom) start?.toString() else null,
+                activityFilter = activityFilter,
+                page = 1
+            )
+        }
+        loadLogs(page = 1)
     }
 
     fun goToPage(page: Int) {
         val current = _uiState.value
         val safePage = page.coerceIn(1, current.totalPages.coerceAtLeast(1))
         if (safePage != current.page) {
-            loadLogs(page = safePage, dateFilter = current.dateFilter, activityFilter = current.activityFilter)
+            loadLogs(page = safePage)
         }
     }
 
@@ -197,6 +353,10 @@ class SecurityLogViewModel(
         _uiState.update { state -> state.copy(selectedLog = null) }
     }
 
+    fun clearError() {
+        _uiState.update { state -> state.copy(errorMessage = null) }
+    }
+
     private fun setError(message: String) {
         _uiState.update { state ->
             state.copy(isLoading = false, errorMessage = message)
@@ -213,9 +373,26 @@ class SecurityLogViewModel(
 }
 
 private fun SecurityLogUiState.filteredLogs(): List<SecurityLogItem> {
-    if (searchQuery.isBlank()) return logs
+    var filtered = logs
 
-    return logs.filter { log ->
+    val start = startDate?.let { runCatching { LocalDate.parse(it) }.getOrNull() }
+    val end = endDate?.let { runCatching { LocalDate.parse(it) }.getOrNull() }
+
+    if (start != null || end != null) {
+        filtered = filtered.filter { log ->
+            val logDate = log.rawDateIso.takeIf { it.isNotBlank() }?.let {
+                runCatching { LocalDate.parse(it) }.getOrNull()
+            } ?: return@filter true
+
+            if (start != null && logDate.isBefore(start)) return@filter false
+            if (end != null && logDate.isAfter(end)) return@filter false
+            true
+        }
+    }
+
+    if (searchQuery.isBlank()) return filtered
+
+    return filtered.filter { log ->
         log.userName.contains(searchQuery, ignoreCase = true) ||
             log.userRole.contains(searchQuery, ignoreCase = true) ||
             log.activityLabel.contains(searchQuery, ignoreCase = true) ||
@@ -239,6 +416,7 @@ private fun AuditLogItem.toSecurityLogItem(): SecurityLogItem {
         deviceName = if (ipAddress.isNullOrBlank()) "Server" else "Client POS",
         time = createdAtInstant?.toClockText() ?: createdAt,
         dateLabel = createdAtInstant?.toDateText() ?: "-",
+        rawDateIso = createdAtInstant?.atZone(WIB_ZONE)?.toLocalDate()?.toString() ?: "",
         relativeTime = createdAtInstant?.toRelativeText() ?: "-",
         compactRelativeTime = createdAtInstant?.toCompactRelativeText() ?: "-"
     )
@@ -253,16 +431,17 @@ private fun String.toSecurityLogType(): SecurityLogType {
 }
 
 private fun String.toServerInstantOrNull(): Instant? {
-    return runCatching { Instant.parse(this) }.getOrNull()
+    return runCatching { OffsetDateTime.parse(this).toInstant() }
+        .getOrElse { runCatching { Instant.parse(this) }.getOrNull() }
 }
 
 private fun Instant.toClockText(): String {
-    val localTime = atZone(java.time.ZoneId.systemDefault()).toLocalTime()
+    val localTime = atZone(WIB_ZONE).toLocalTime()
     return "%02d:%02d".format(localTime.hour, localTime.minute)
 }
 
 private fun Instant.toDateText(): String {
-    return atZone(java.time.ZoneId.systemDefault()).format(SECURITY_DATE_FORMATTER)
+    return atZone(WIB_ZONE).format(SECURITY_DATE_FORMATTER)
 }
 
 private fun Instant.toRelativeText(now: Instant = Instant.now()): String {

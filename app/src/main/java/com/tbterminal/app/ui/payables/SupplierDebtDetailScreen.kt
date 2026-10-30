@@ -13,6 +13,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -43,6 +44,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.tbterminal.app.data.model.SupplierPayable
 import com.tbterminal.app.data.repository.PurchasingRepository
+import com.tbterminal.app.ui.components.SkeletonBox
 import com.tbterminal.app.ui.dashboard.admin.AdminDashboardShell
 import com.tbterminal.app.ui.dashboard.admin.AdminDestination
 
@@ -105,11 +107,7 @@ internal fun AdminSupplierDebtDetailScreen(
         onLogout = onLogout
     ) { contentModifier ->
         when {
-            uiState.isLoading -> {
-                Box(modifier = contentModifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                    CircularProgressIndicator(color = Brand600)
-                }
-            }
+            uiState.isLoading -> SupplierDebtDetailSkeleton(modifier = contentModifier)
             uiState.errorMessage != null && uiState.payables.isEmpty() -> {
                 Box(modifier = contentModifier.fillMaxSize().padding(24.dp), contentAlignment = Alignment.Center) {
                     Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(12.dp)) {
@@ -150,6 +148,119 @@ internal fun AdminSupplierDebtDetailScreen(
             onDismiss = viewModel::closePayment,
             onSubmit = viewModel::submitPayment
         )
+    }
+}
+
+@Composable
+private fun SupplierDebtDetailSkeleton(modifier: Modifier = Modifier) {
+    Column(
+        modifier = modifier
+            .fillMaxSize()
+            .background(SurfaceBg)
+            .verticalScroll(rememberScrollState())
+            .padding(horizontal = 16.dp, vertical = 14.dp),
+        verticalArrangement = Arrangement.spacedBy(20.dp)
+    ) {
+        Card(
+            modifier = Modifier.fillMaxWidth(),
+            shape = RoundedCornerShape(16.dp),
+            colors = CardDefaults.cardColors(containerColor = Color.White),
+            border = BorderStroke(1.dp, BorderLight),
+            elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
+        ) {
+            Column(modifier = Modifier.padding(14.dp)) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Row(
+                        modifier = Modifier.weight(1f).padding(end = 8.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(12.dp)
+                    ) {
+                        SkeletonBox(Modifier.size(40.dp), shape = CircleShape)
+                        Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                            ) {
+                                SkeletonBox(Modifier.width(130.dp).height(16.dp), shape = RoundedCornerShape(4.dp))
+                                SkeletonBox(Modifier.width(46.dp).height(13.dp), shape = RoundedCornerShape(4.dp))
+                            }
+                            SkeletonBox(Modifier.width(80.dp).height(11.dp), shape = RoundedCornerShape(3.dp))
+                        }
+                    }
+                    Column(horizontalAlignment = Alignment.End, verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                        SkeletonBox(Modifier.width(88.dp).height(10.dp), shape = RoundedCornerShape(3.dp))
+                        SkeletonBox(Modifier.width(115.dp).height(20.dp), shape = RoundedCornerShape(4.dp))
+                    }
+                }
+
+                HorizontalDivider(color = BorderLight, modifier = Modifier.padding(vertical = 12.dp))
+
+                Row(modifier = Modifier.fillMaxWidth()) {
+                    Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                        SkeletonBox(Modifier.width(78.dp).height(10.dp), shape = RoundedCornerShape(3.dp))
+                        SkeletonBox(Modifier.width(100.dp).height(15.dp), shape = RoundedCornerShape(4.dp))
+                    }
+                    Column(modifier = Modifier.weight(1f), horizontalAlignment = Alignment.End, verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                        SkeletonBox(Modifier.width(78.dp).height(10.dp), shape = RoundedCornerShape(3.dp))
+                        SkeletonBox(Modifier.width(100.dp).height(15.dp), shape = RoundedCornerShape(4.dp))
+                    }
+                }
+            }
+        }
+
+        Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+            SkeletonBox(Modifier.width(90.dp).height(16.dp), shape = RoundedCornerShape(4.dp))
+
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(16.dp),
+                colors = CardDefaults.cardColors(containerColor = Color.White),
+                border = BorderStroke(1.dp, BorderLight),
+                elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
+            ) {
+                Column {
+                    repeat(3) { index ->
+                        if (index > 0) HorizontalDivider(color = BorderLight)
+                        Column(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(16.dp),
+                            verticalArrangement = Arrangement.spacedBy(12.dp)
+                        ) {
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                ) {
+                                    SkeletonBox(Modifier.width(95.dp).height(14.dp), shape = RoundedCornerShape(4.dp))
+                                    SkeletonBox(Modifier.width(55.dp).height(18.dp), shape = RoundedCornerShape(6.dp))
+                                }
+                                SkeletonBox(Modifier.width(80.dp).height(12.dp), shape = RoundedCornerShape(3.dp))
+                            }
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                                    SkeletonBox(Modifier.width(70.dp).height(10.dp), shape = RoundedCornerShape(3.dp))
+                                    SkeletonBox(Modifier.width(110.dp).height(16.dp), shape = RoundedCornerShape(4.dp))
+                                }
+                                SkeletonBox(Modifier.width(76.dp).height(32.dp), shape = RoundedCornerShape(8.dp))
+                            }
+                        }
+                    }
+                }
+            }
+        }
     }
 }
 

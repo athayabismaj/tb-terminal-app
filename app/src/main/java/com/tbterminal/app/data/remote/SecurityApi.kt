@@ -11,7 +11,9 @@ interface SecurityApi {
         @Query("page") page: Int = 1,
         @Query("limit") limit: Int = 50,
         @Query("action") action: String? = null,
-        @Query("range") range: String? = null
+        @Query("range") range: String? = null,
+        @Query("startDate") startDate: String? = null,
+        @Query("endDate") endDate: String? = null
     ): Response<ApiResponse<PaginatedResponse<AuditLogResponseDto>>>
 }
 

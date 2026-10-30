@@ -2,26 +2,39 @@ package com.tbterminal.app.ui.stockopname
 
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
-import com.tbterminal.app.ui.components.TbPagination
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.MaterialTheme
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.ChevronLeft
+import androidx.compose.material.icons.filled.ChevronRight
+import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import com.tbterminal.app.data.model.ProductStock
+import com.tbterminal.app.ui.components.TbPagination
+
+private val TextPrimary = Color(0xFF0F172A)
+private val TextSecondary = Color(0xFF64748B)
+private val BorderSlate200 = Color(0xFFE2E8F0)
 
 @Composable
 internal fun StockOpnameTableCard(
@@ -35,49 +48,54 @@ internal fun StockOpnameTableCard(
     onOpenForm: () -> Unit,
     compact: Boolean = false
 ) {
-    Column(modifier = modifier.fillMaxWidth()) {
+    Column(
+        modifier = modifier.fillMaxWidth(),
+        verticalArrangement = Arrangement.spacedBy(if (compact) 12.dp else 16.dp),
+    ) {
         StockTableToolbar(uiState, onSearchChanged, onCategoryFilterChanged, onOpenForm, compact)
-        Spacer(modifier = Modifier.height(if (compact) 12.dp else 16.dp))
+
         Row(
-            modifier = Modifier.fillMaxWidth().padding(horizontal = 4.dp),
+            modifier = Modifier.fillMaxWidth().padding(horizontal = 2.dp),
+            verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
         ) {
-            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
                 Text(
-                    "Daftar produk",
-                    color = OpnameText,
-                    style = MaterialTheme.typography.titleMedium,
+                    text = "Daftar produk",
+                    color = TextPrimary,
+                    fontSize = 15.sp,
                     fontWeight = FontWeight.Bold,
                 )
-                androidx.compose.material3.Surface(
-                    shape = RoundedCornerShape(999.dp),
-                    color = OpnameSoft,
+                Surface(
+                    shape = CircleShape,
+                    color = Color.White,
+                    border = BorderStroke(1.dp, BorderSlate200),
                 ) {
                     Text(
-                        uiState.totalTableProducts.toString(),
-                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp),
-                        style = MaterialTheme.typography.labelSmall,
-                        fontWeight = FontWeight.Bold,
-                        color = OpnameMuted
+                        text = "${uiState.totalTableProducts} produk",
+                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 3.dp),
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.SemiBold,
+                        color = TextSecondary,
                     )
                 }
             }
-            Text(
-                "Total penyesuaian",
-                style = MaterialTheme.typography.labelSmall,
-                color = OpnameMuted,
-            )
         }
-        Spacer(modifier = Modifier.height(12.dp))
-        Card(
+
+        Surface(
             modifier = Modifier.fillMaxWidth().testTag("stock-adjustment-list-card"),
-            shape = RoundedCornerShape(20.dp),
-            colors = CardDefaults.cardColors(containerColor = OpnameSurface),
-            border = BorderStroke(1.dp, OpnameLine.copy(alpha = 0.72f)),
+            shape = RoundedCornerShape(16.dp),
+            color = Color.White,
+            border = BorderStroke(1.dp, BorderSlate200),
         ) {
             Column {
-                if (!compact) StockTableHeader()
+                if (!compact && !uiState.isLoading && uiState.tableProducts.isNotEmpty()) {
+                    StockTableHeader()
+                    HorizontalDivider(color = BorderSlate200)
+                }
                 StockTableRows(
                     modifier = Modifier.fillMaxWidth(),
                     uiState = uiState,
@@ -86,9 +104,9 @@ internal fun StockOpnameTableCard(
                 )
             }
         }
+
         if (!uiState.isLoading && uiState.totalTableProducts > 0) {
-            Spacer(modifier = Modifier.height(12.dp))
-            StockTableFooter(uiState, onPreviousPage, onNextPage)
+            StockTableFooter(uiState, compact, onPreviousPage, onNextPage)
         }
     }
 }
@@ -98,8 +116,8 @@ private fun StockTableHeader() {
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .background(OpnameSoft)
-            .padding(horizontal = 24.dp, vertical = 16.dp),
+            .background(Color(0xFFF8FAFC))
+            .padding(horizontal = 24.dp, vertical = 14.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
         HeaderText("PRODUK", Modifier.weight(2.45f).padding(end = 16.dp))
@@ -114,16 +132,92 @@ private fun StockTableHeader() {
 @Composable
 private fun StockTableFooter(
     uiState: StockOpnameUiState,
+    compact: Boolean,
     onPreviousPage: () -> Unit,
     onNextPage: () -> Unit
 ) {
-    TbPagination(
-        currentPage = uiState.tablePage,
-        totalPages = uiState.totalTablePages,
-        onPreviousPage = onPreviousPage,
-        onNextPage = onNextPage,
-        supportingText = null,
-        isLoading = uiState.isLoading,
-        testTag = "stock-adjustment-pagination",
-    )
+    val safePage = uiState.tablePage.coerceAtLeast(1)
+    val safeTotalPages = uiState.totalTablePages.coerceAtLeast(1)
+
+    if (compact) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(top = 10.dp, bottom = 4.dp)
+                .testTag("stock-adjustment-pagination"),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Surface(
+                shape = CircleShape,
+                color = Color.White,
+                border = BorderStroke(1.dp, BorderSlate200),
+            ) {
+                Text(
+                    text = "${uiState.totalTableProducts} produk",
+                    modifier = Modifier.padding(horizontal = 14.dp, vertical = 6.dp),
+                    fontSize = 12.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    color = Color(0xFF475569),
+                )
+            }
+
+            Surface(
+                shape = CircleShape,
+                color = Color.White,
+                border = BorderStroke(1.dp, BorderSlate200),
+            ) {
+                Row(
+                    modifier = Modifier.padding(horizontal = 6.dp, vertical = 3.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    val canPrev = safePage > 1 && !uiState.isLoading
+                    val canNext = safePage < safeTotalPages && !uiState.isLoading
+                    IconButton(
+                        onClick = onPreviousPage,
+                        enabled = canPrev,
+                        modifier = Modifier.size(28.dp),
+                    ) {
+                        Icon(
+                            Icons.Default.ChevronLeft,
+                            contentDescription = "Halaman sebelumnya",
+                            tint = if (canPrev) Color(0xFF475569) else Color(0xFFCBD5E1),
+                            modifier = Modifier.size(16.dp),
+                        )
+                    }
+                    Text(
+                        text = "$safePage / $safeTotalPages",
+                        modifier = Modifier.padding(horizontal = 8.dp),
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.Medium,
+                        color = Color(0xFF334155),
+                    )
+                    IconButton(
+                        onClick = onNextPage,
+                        enabled = canNext,
+                        modifier = Modifier.size(28.dp),
+                    ) {
+                        Icon(
+                            Icons.Default.ChevronRight,
+                            contentDescription = "Halaman berikutnya",
+                            tint = if (canNext) Color(0xFF475569) else Color(0xFFCBD5E1),
+                            modifier = Modifier.size(16.dp),
+                        )
+                    }
+                }
+            }
+        }
+    } else {
+        val first = if (uiState.totalTableProducts == 0) 0 else (safePage - 1) * STOCK_OPNAME_TABLE_PAGE_SIZE + 1
+        val last = minOf(safePage * STOCK_OPNAME_TABLE_PAGE_SIZE, uiState.totalTableProducts)
+        TbPagination(
+            currentPage = safePage,
+            totalPages = safeTotalPages,
+            onPreviousPage = onPreviousPage,
+            onNextPage = onNextPage,
+            supportingText = "Menampilkan $first–$last dari ${uiState.totalTableProducts} produk",
+            isLoading = uiState.isLoading,
+            testTag = "stock-adjustment-pagination",
+        )
+    }
 }

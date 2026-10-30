@@ -64,6 +64,8 @@ import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.zIndex
+import com.tbterminal.app.ui.components.TopFloatingCapsule
 import com.tbterminal.app.data.model.UserRole
 import com.tbterminal.app.ui.components.TbMobileControlSheet
 import com.tbterminal.app.ui.components.TbMobileSheetDoneButton
@@ -109,37 +111,47 @@ fun EditUserContent(
 ) {
     val compact = androidx.compose.ui.platform.LocalConfiguration.current.screenWidthDp < 700
     var showAccessDetails by remember { mutableStateOf(false) }
-    Column(
-        modifier = modifier
-            .fillMaxSize()
-            .background(EditSurface)
-            .padding(horizontal = if (compact) 16.dp else 32.dp, vertical = if (compact) 16.dp else 28.dp)
-            .verticalScroll(rememberScrollState())
-    ) {
-        when {
-            uiState.isLoadingUser -> EditLoadingCard(message = "Memuat data user...")
-            uiState.errorMessage != null && uiState.fullName.isBlank() -> {
-                EditErrorCard(message = uiState.errorMessage, onRetry = onRetry)
-            }
-            else -> Box(
-                modifier = Modifier.fillMaxWidth(),
-                contentAlignment = Alignment.TopCenter,
-            ) {
-                EditUserFormCard(
-                    uiState = uiState,
-                    onFullNameChange = onFullNameChange,
-                    onEmailChange = onEmailChange,
-                    onUsernameChange = onUsernameChange,
-                    onRoleChange = onRoleChange,
-                    onActiveChange = onActiveChange,
-                    onShowAccessDetails = { showAccessDetails = true },
-                    onCancel = onCancel,
-                    onSubmit = onSubmit,
-                    modifier = Modifier.fillMaxWidth().widthIn(max = 860.dp),
-                    compact = compact,
-                )
+    Box(modifier = modifier.fillMaxSize().background(EditSurface)) {
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(horizontal = if (compact) 16.dp else 32.dp, vertical = if (compact) 16.dp else 28.dp)
+                .verticalScroll(rememberScrollState())
+        ) {
+            when {
+                uiState.isLoadingUser -> EditLoadingCard(message = "Memuat data user...")
+                uiState.errorMessage != null && uiState.fullName.isBlank() -> {
+                    EditErrorCard(message = uiState.errorMessage, onRetry = onRetry)
+                }
+                else -> Box(
+                    modifier = Modifier.fillMaxWidth(),
+                    contentAlignment = Alignment.TopCenter,
+                ) {
+                    EditUserFormCard(
+                        uiState = uiState,
+                        onFullNameChange = onFullNameChange,
+                        onEmailChange = onEmailChange,
+                        onUsernameChange = onUsernameChange,
+                        onRoleChange = onRoleChange,
+                        onActiveChange = onActiveChange,
+                        onShowAccessDetails = { showAccessDetails = true },
+                        onCancel = onCancel,
+                        onSubmit = onSubmit,
+                        modifier = Modifier.fillMaxWidth().widthIn(max = 860.dp),
+                        compact = compact,
+                    )
+                }
             }
         }
+
+        TopFloatingCapsule(
+            message = null,
+            error = uiState.errorMessage,
+            modifier = Modifier
+                .align(Alignment.TopCenter)
+                .padding(top = 16.dp, start = 20.dp, end = 20.dp)
+                .zIndex(99f),
+        )
     }
 
     if (showAccessDetails) {
@@ -166,6 +178,10 @@ private fun EditUserFormCard(
     modifier: Modifier = Modifier,
     compact: Boolean
 ) {
+    val isFullNameError = uiState.errorMessage?.contains("Nama", ignoreCase = true) == true
+    val isUsernameError = uiState.errorMessage?.contains("Username", ignoreCase = true) == true
+    val isEmailError = uiState.errorMessage?.contains("Email", ignoreCase = true) == true
+
     Card(
         modifier = modifier,
         colors = CardDefaults.cardColors(containerColor = Color.White),
@@ -176,14 +192,31 @@ private fun EditUserFormCard(
             modifier = Modifier.padding(if (compact) 16.dp else 28.dp),
             verticalArrangement = Arrangement.spacedBy(20.dp)
         ) {
-            if (uiState.errorMessage != null) {
-                EditUserErrorBanner(message = uiState.errorMessage)
-            }
-
             EditUserSectionTitle("Informasi pengguna")
             if (compact) Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
-                EditUserInputField("Nama lengkap", uiState.fullName, onFullNameChange, Icons.Outlined.Person, "Nama karyawan", Modifier.fillMaxWidth(), enabled = !uiState.isSubmitting)
-                EditUserInputField("Alamat email", uiState.email, onEmailChange, Icons.Outlined.Email, "contoh@email.com", Modifier.fillMaxWidth(), keyboardType = KeyboardType.Email, enabled = !uiState.isSubmitting)
+                EditUserInputField(
+                    label = "Nama lengkap",
+                    value = uiState.fullName,
+                    onValueChange = onFullNameChange,
+                    icon = Icons.Outlined.Person,
+                    placeholder = "Nama karyawan",
+                    modifier = Modifier.fillMaxWidth(),
+                    enabled = !uiState.isSubmitting,
+                    isError = isFullNameError,
+                    supportingText = if (isFullNameError) uiState.errorMessage else null,
+                )
+                EditUserInputField(
+                    label = "Alamat email",
+                    value = uiState.email,
+                    onValueChange = onEmailChange,
+                    icon = Icons.Outlined.Email,
+                    placeholder = "contoh@email.com",
+                    modifier = Modifier.fillMaxWidth(),
+                    keyboardType = KeyboardType.Email,
+                    enabled = !uiState.isSubmitting,
+                    isError = isEmailError,
+                    supportingText = if (isEmailError) uiState.errorMessage else null,
+                )
             } else Row(horizontalArrangement = Arrangement.spacedBy(20.dp)) {
                 EditUserInputField(
                     modifier = Modifier.weight(1f),
@@ -192,7 +225,9 @@ private fun EditUserFormCard(
                     onValueChange = onFullNameChange,
                     icon = Icons.Outlined.Person,
                     placeholder = "Nama karyawan",
-                    enabled = !uiState.isSubmitting
+                    enabled = !uiState.isSubmitting,
+                    isError = isFullNameError,
+                    supportingText = if (isFullNameError) uiState.errorMessage else null,
                 )
                 EditUserInputField(
                     modifier = Modifier.weight(1f),
@@ -202,13 +237,25 @@ private fun EditUserFormCard(
                     icon = Icons.Outlined.Email,
                     placeholder = "contoh@email.com",
                     keyboardType = KeyboardType.Email,
-                    enabled = !uiState.isSubmitting
+                    enabled = !uiState.isSubmitting,
+                    isError = isEmailError,
+                    supportingText = if (isEmailError) uiState.errorMessage else null,
                 )
             }
 
             EditUserSectionTitle("Akun")
             if (compact) Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
-                EditUserInputField("Username", uiState.username, onUsernameChange, Icons.Outlined.AlternateEmail, "username", Modifier.fillMaxWidth(), enabled = !uiState.isSubmitting)
+                EditUserInputField(
+                    label = "Username",
+                    value = uiState.username,
+                    onValueChange = onUsernameChange,
+                    icon = Icons.Outlined.AlternateEmail,
+                    placeholder = "username",
+                    modifier = Modifier.fillMaxWidth(),
+                    enabled = !uiState.isSubmitting,
+                    isError = isUsernameError,
+                    supportingText = if (isUsernameError) uiState.errorMessage else null,
+                )
                 EditUserStatusCard(uiState.isActive, !uiState.isSubmitting, onActiveChange, Modifier.fillMaxWidth())
             } else Row(horizontalArrangement = Arrangement.spacedBy(20.dp)) {
                 EditUserInputField(
@@ -218,7 +265,9 @@ private fun EditUserFormCard(
                     onValueChange = onUsernameChange,
                     icon = Icons.Outlined.AlternateEmail,
                     placeholder = "username",
-                    enabled = !uiState.isSubmitting
+                    enabled = !uiState.isSubmitting,
+                    isError = isUsernameError,
+                    supportingText = if (isUsernameError) uiState.errorMessage else null,
                 )
                 EditUserStatusCard(
                     modifier = Modifier.weight(1f),
@@ -312,12 +361,14 @@ private fun EditUserInputField(
     modifier: Modifier = Modifier,
     isPassword: Boolean = false,
     keyboardType: KeyboardType = KeyboardType.Text,
-    enabled: Boolean = true
+    enabled: Boolean = true,
+    isError: Boolean = false,
+    supportingText: String? = null,
 ) {
     Column(modifier = modifier) {
         Text(
             text = label,
-            color = EditSlate600,
+            color = if (isError) EditError else EditSlate600,
             fontSize = 12.sp,
             fontWeight = FontWeight.Bold
         )
@@ -327,17 +378,30 @@ private fun EditUserInputField(
             onValueChange = onValueChange,
             enabled = enabled,
             placeholder = { Text(text = placeholder, color = EditSlate400) },
-            leadingIcon = { Icon(imageVector = icon, contentDescription = null, tint = EditSlate400) },
+            leadingIcon = { Icon(imageVector = icon, contentDescription = null, tint = if (isError) EditError else EditSlate400) },
             visualTransformation = if (isPassword) PasswordVisualTransformation() else VisualTransformation.None,
             keyboardOptions = KeyboardOptions(keyboardType = keyboardType),
             modifier = Modifier.fillMaxWidth(),
             shape = RoundedCornerShape(14.dp),
+            isError = isError,
+            supportingText = supportingText?.let { text ->
+                {
+                    Text(
+                        text = text,
+                        color = EditError,
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.Medium,
+                    )
+                }
+            },
             colors = OutlinedTextFieldDefaults.colors(
-                unfocusedContainerColor = EditSurfaceLow,
-                focusedContainerColor = EditSurfaceLow,
+                unfocusedContainerColor = if (isError) Color(0xFFFFF5F5) else EditSurfaceLow,
+                focusedContainerColor = if (isError) Color(0xFFFFF5F5) else EditSurfaceLow,
                 disabledContainerColor = EditSurfaceLow,
-                unfocusedBorderColor = EditSlate200,
-                focusedBorderColor = EditPrimary
+                unfocusedBorderColor = if (isError) EditError else EditSlate200,
+                focusedBorderColor = if (isError) EditError else EditPrimary,
+                errorBorderColor = EditError,
+                errorContainerColor = Color(0xFFFFF5F5),
             ),
             singleLine = true
         )

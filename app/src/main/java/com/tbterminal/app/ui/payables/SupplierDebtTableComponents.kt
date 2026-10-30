@@ -44,8 +44,12 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.tbterminal.app.data.model.SupplierPayable
+import com.tbterminal.app.ui.components.SkeletonBox
 import com.tbterminal.app.ui.components.TbMobileControlSheet
 import com.tbterminal.app.ui.components.TbMobileSheetDoneButton
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.LaunchedEffect
 
 @Composable
 internal fun SupplierDebtTableCard(
@@ -63,125 +67,165 @@ internal fun SupplierDebtTableCard(
 ) {
     if (compact) {
         var showMobileFilters by remember { mutableStateOf(false) }
+        var userPage by rememberSaveable { mutableIntStateOf(1) }
+
+        LaunchedEffect(uiState.searchQuery, uiState.statusFilter) {
+            userPage = 1
+        }
         Column(
             modifier = modifier.fillMaxWidth().testTag("supplier-debt-list-content"),
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
-            // Search and Action Row
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                BasicTextField(
-                    value = uiState.searchQuery,
-                    onValueChange = onSearchChanged,
-                    modifier = Modifier
-                        .weight(1f)
-                        .height(40.dp)
-                        .background(Color.White, RoundedCornerShape(12.dp))
-                        .border(1.dp, Color(0xFFE2E8F0).copy(alpha = 0.8f), RoundedCornerShape(12.dp)),
-                    textStyle = LocalTextStyle.current.copy(fontSize = 12.sp, color = Color(0xFF1E293B)),
-                    singleLine = true,
-                    decorationBox = { innerTextField ->
-                        Row(
-                            modifier = Modifier.fillMaxSize().padding(horizontal = 12.dp),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
+            if (uiState.isLoading && uiState.payables.isEmpty()) {
+                // Search and Action Row Skeleton
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    SkeletonBox(Modifier.weight(1f).height(40.dp), shape = RoundedCornerShape(12.dp))
+                    SkeletonBox(Modifier.size(40.dp), shape = RoundedCornerShape(12.dp))
+                }
+
+                // Section Header Skeleton (Text di atas card)
+                Row(
+                    modifier = Modifier.fillMaxWidth().padding(top = 4.dp, bottom = 2.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    SkeletonBox(Modifier.width(110.dp).height(20.dp), shape = RoundedCornerShape(4.dp))
+                    SkeletonBox(Modifier.size(32.dp), shape = RoundedCornerShape(12.dp))
+                }
+
+                // Cards Skeleton
+                SupplierDebtLoading(Modifier, compact = true)
+            } else {
+                // Search and Action Row
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    BasicTextField(
+                        value = uiState.searchQuery,
+                        onValueChange = onSearchChanged,
+                        modifier = Modifier
+                            .weight(1f)
+                            .height(40.dp)
+                            .background(Color.White, RoundedCornerShape(12.dp))
+                            .border(1.dp, Color(0xFFE2E8F0).copy(alpha = 0.8f), RoundedCornerShape(12.dp)),
+                        textStyle = LocalTextStyle.current.copy(fontSize = 12.sp, color = Color(0xFF1E293B)),
+                        singleLine = true,
+                        decorationBox = { innerTextField ->
+                            Row(
+                                modifier = Modifier.fillMaxSize().padding(horizontal = 12.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Icon(
+                                    Icons.Outlined.Search,
+                                    contentDescription = null,
+                                    tint = Color(0xFF94A3B8),
+                                    modifier = Modifier.size(16.dp)
+                                )
+                                Spacer(Modifier.width(8.dp))
+                                Box(Modifier.weight(1f)) {
+                                    if (uiState.searchQuery.isEmpty()) {
+                                        Text(
+                                            "Cari supplier atau nomor nota...",
+                                            color = Color(0xFF94A3B8),
+                                            fontSize = 12.sp
+                                        )
+                                    }
+                                    innerTextField()
+                                }
+                            }
+                        }
+                    )
+
+                    Surface(
+                        onClick = { showMobileFilters = true },
+                        color = Color.White,
+                        shape = RoundedCornerShape(12.dp),
+                        border = BorderStroke(1.dp, Color(0xFFE2E8F0).copy(alpha = 0.8f)),
+                        modifier = Modifier.size(40.dp).testTag("supplier-debt-open-filters")
+                    ) {
+                        Box(contentAlignment = Alignment.Center) {
                             Icon(
-                                Icons.Outlined.Search,
-                                contentDescription = null,
-                                tint = Color(0xFF94A3B8),
+                                Icons.Outlined.Tune,
+                                contentDescription = "Filter",
+                                tint = Color(0xFF334155),
                                 modifier = Modifier.size(16.dp)
                             )
-                            Spacer(Modifier.width(8.dp))
-                            Box(Modifier.weight(1f)) {
-                                if (uiState.searchQuery.isEmpty()) {
-                                    Text(
-                                        "Cari supplier atau nomor nota...",
-                                        color = Color(0xFF94A3B8),
-                                        fontSize = 12.sp
-                                    )
-                                }
-                                innerTextField()
+                            if (uiState.statusFilter != SupplierDebtStatusFilter.All) {
+                                Box(
+                                    modifier = Modifier
+                                        .align(Alignment.TopEnd)
+                                        .padding(8.dp)
+                                        .size(8.dp)
+                                        .background(Color(0xFF256B57), CircleShape)
+                                        .border(2.dp, Color.White, CircleShape)
+                                        .testTag("supplier-debt-filter-dot")
+                                )
                             }
                         }
                     }
-                )
+                }
 
-                Surface(
-                    onClick = { showMobileFilters = true },
-                    color = Color.White,
-                    shape = RoundedCornerShape(12.dp),
-                    border = BorderStroke(1.dp, Color(0xFFE2E8F0).copy(alpha = 0.8f)),
-                    modifier = Modifier.size(40.dp).testTag("supplier-debt-open-filters")
+                // Section Header
+                Row(
+                    modifier = Modifier.fillMaxWidth().padding(top = 4.dp, bottom = 2.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Box(contentAlignment = Alignment.Center) {
+                    Text(
+                        "Daftar hutang",
+                        fontSize = 14.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = Color(0xFF0F172A)
+                    )
+                    Box(
+                        modifier = Modifier
+                            .size(32.dp)
+                            .clip(RoundedCornerShape(12.dp))
+                            .border(1.dp, Color(0xFFE2E8F0), RoundedCornerShape(12.dp))
+                            .clickable { onOpenMobileOverview() }
+                            .background(Color.White)
+                            .testTag("supplier-debt-open-overview"),
+                        contentAlignment = Alignment.Center
+                    ) {
                         Icon(
-                            Icons.Outlined.Tune,
-                            contentDescription = "Filter",
+                            Icons.Outlined.FactCheck,
+                            contentDescription = "Ringkasan",
                             tint = Color(0xFF334155),
                             modifier = Modifier.size(16.dp)
                         )
-                        if (uiState.statusFilter != SupplierDebtStatusFilter.All) {
-                            Box(
-                                modifier = Modifier
-                                    .align(Alignment.TopEnd)
-                                    .padding(8.dp)
-                                    .size(8.dp)
-                                    .background(Color(0xFF256B57), CircleShape)
-                                    .border(2.dp, Color.White, CircleShape)
-                            )
-                        }
                     }
                 }
-            }
 
-            // Section Header
-            Row(
-                modifier = Modifier.fillMaxWidth().padding(top = 4.dp, bottom = 2.dp),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Text(
-                    "Daftar hutang",
-                    fontSize = 14.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = Color(0xFF0F172A)
-                )
-                Box(
-                    modifier = Modifier
-                        .size(32.dp)
-                        .clip(RoundedCornerShape(12.dp))
-                        .border(1.dp, Color(0xFFE2E8F0), RoundedCornerShape(12.dp))
-                        .clickable { onOpenMobileOverview() }
-                        .background(Color.White)
-                        .testTag("supplier-debt-open-overview"),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Icon(
-                        Icons.Outlined.FactCheck,
-                        contentDescription = "Ringkasan",
-                        tint = Color(0xFF334155),
-                        modifier = Modifier.size(16.dp)
-                    )
-                }
-            }
-
-            // Cards Area
-            when {
-                uiState.isLoading && uiState.payables.isEmpty() -> SupplierDebtLoading(Modifier, compact = true)
-                uiState.errorMessage != null && uiState.payables.isEmpty() -> SupplierDebtError(Modifier)
-                uiState.filteredPayables.isEmpty() -> SupplierDebtEmpty(Modifier)
+                // Cards Area
+                when {
+                    uiState.errorMessage != null && uiState.payables.isEmpty() -> SupplierDebtError(Modifier)
+                    uiState.filteredPayables.isEmpty() -> SupplierDebtEmpty(Modifier)
                 else -> {
-                    val groupedBySupplier = uiState.filteredPayables.groupBy { it.supplierId.ifBlank { it.supplierName } }
+                    val groupedBySupplier = remember(uiState.filteredPayables) {
+                        uiState.filteredPayables.groupBy { it.supplierId.ifBlank { it.supplierName } }.toList()
+                    }
+                    val totalUsers = groupedBySupplier.size
+                    val totalUserPages = ((totalUsers + SUPPLIER_DEBT_USERS_PER_PAGE - 1) / SUPPLIER_DEBT_USERS_PER_PAGE).coerceAtLeast(1)
+                    val safeUserPage = userPage.coerceIn(1, totalUserPages)
+                    val pageSuppliers = remember(groupedBySupplier, safeUserPage) {
+                        groupedBySupplier.drop((safeUserPage - 1) * SUPPLIER_DEBT_USERS_PER_PAGE).take(SUPPLIER_DEBT_USERS_PER_PAGE)
+                    }
+
                     Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
-                        groupedBySupplier.forEach { (supplierId, payables) ->
+                        pageSuppliers.forEach { (supplierId, payables) ->
                             SupplierDebtGroupCard(supplierId, payables, onPayClick, onSupplierDetailClick)
                         }
                     }
 
-                    // Pagination (Mobile Style)
+                    // Pagination (Mobile Style: 5 users per page)
+                    val startUser = if (totalUsers == 0) 0 else ((safeUserPage - 1) * SUPPLIER_DEBT_USERS_PER_PAGE) + 1
+                    val endUser = minOf(safeUserPage * SUPPLIER_DEBT_USERS_PER_PAGE, totalUsers)
                     Row(
                         modifier = Modifier.fillMaxWidth().padding(top = 8.dp, bottom = 8.dp),
                         horizontalArrangement = Arrangement.SpaceBetween,
@@ -192,8 +236,9 @@ internal fun SupplierDebtTableCard(
                             shape = RoundedCornerShape(50),
                             border = BorderStroke(1.dp, Color(0xFFE2E8F0).copy(alpha = 0.9f))
                         ) {
+                            val userRangeText = if (totalUsers == 0) "0 supplier" else "$startUser-$endUser dari $totalUsers supplier"
                             Text(
-                                "${if (uiState.total == 0L) 0 else uiState.payables.size} dari ${uiState.total} nota",
+                                userRangeText,
                                 fontSize = 12.sp,
                                 fontWeight = FontWeight.SemiBold,
                                 color = Color(0xFF475569),
@@ -212,32 +257,32 @@ internal fun SupplierDebtTableCard(
                                 horizontalArrangement = Arrangement.spacedBy(12.dp)
                             ) {
                                 IconButton(
-                                    onClick = onPreviousPage,
+                                    onClick = { userPage = (safeUserPage - 1).coerceAtLeast(1) },
                                     modifier = Modifier.size(28.dp).background(Color.Transparent, CircleShape),
-                                    enabled = uiState.page > 1
+                                    enabled = safeUserPage > 1
                                 ) {
                                     Icon(
                                         Icons.Default.ChevronLeft,
                                         contentDescription = "Sebelumnya",
-                                        tint = if (uiState.page > 1) Color(0xFF334155) else Color(0xFF94A3B8).copy(alpha = 0.5f),
+                                        tint = if (safeUserPage > 1) Color(0xFF334155) else Color(0xFF94A3B8).copy(alpha = 0.5f),
                                         modifier = Modifier.size(16.dp)
                                     )
                                 }
                                 Text(
-                                    "${uiState.page} / ${uiState.totalPages}",
+                                    "$safeUserPage / $totalUserPages",
                                     fontSize = 12.sp,
                                     fontWeight = FontWeight.Bold,
                                     color = Color(0xFF1E293B)
                                 )
                                 IconButton(
-                                    onClick = onNextPage,
+                                    onClick = { userPage = (safeUserPage + 1).coerceAtMost(totalUserPages) },
                                     modifier = Modifier.size(28.dp).background(Color.Transparent, CircleShape),
-                                    enabled = uiState.page < uiState.totalPages
+                                    enabled = safeUserPage < totalUserPages
                                 ) {
                                     Icon(
                                         Icons.Default.ChevronRight,
                                         contentDescription = "Selanjutnya",
-                                        tint = if (uiState.page < uiState.totalPages) Color(0xFF334155) else Color(0xFF94A3B8).copy(alpha = 0.5f),
+                                        tint = if (safeUserPage < totalUserPages) Color(0xFF334155) else Color(0xFF94A3B8).copy(alpha = 0.5f),
                                         modifier = Modifier.size(16.dp)
                                     )
                                 }
@@ -247,8 +292,9 @@ internal fun SupplierDebtTableCard(
                 }
             }
         }
+    }
 
-        if (showMobileFilters) {
+    if (showMobileFilters) {
             TbMobileControlSheet(
                 title = "Filter hutang",
                 subtitle = "Pilih status hutang supplier",
@@ -281,40 +327,63 @@ internal fun SupplierDebtTableCard(
             modifier = modifier.fillMaxWidth().testTag("supplier-debt-list-content"),
             verticalArrangement = Arrangement.spacedBy(14.dp),
         ) {
-            SupplierDebtToolbar(uiState, onSearchChanged, onStatusFilterChanged, compact = false)
+            if (uiState.isLoading && uiState.payables.isEmpty()) {
+                // Skeleton Toolbar (Searchbar + Filter dropdown)
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(10.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    SkeletonBox(Modifier.weight(1f).height(44.dp), shape = RoundedCornerShape(12.dp))
+                    SkeletonBox(Modifier.width(210.dp).height(44.dp), shape = RoundedCornerShape(12.dp))
+                }
 
-            when {
-                uiState.isLoading && uiState.payables.isEmpty() -> SupplierDebtLoading(Modifier, compact = false)
-                uiState.errorMessage != null && uiState.payables.isEmpty() -> SupplierDebtError(Modifier)
-                else -> {
-                    Row(
-                        modifier = Modifier.fillMaxWidth().padding(top = 2.dp),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically,
-                    ) {
-                        Text(
-                            "Daftar hutang",
-                            modifier = Modifier.weight(1f),
-                            style = MaterialTheme.typography.titleMedium,
-                            color = DebtText,
-                            fontWeight = FontWeight.SemiBold,
-                        )
-                    }
-                    if (uiState.filteredPayables.isEmpty()) {
-                        SupplierDebtEmpty(Modifier)
-                    } else {
-                        Surface(
-                            modifier = Modifier.fillMaxWidth(),
-                            color = DebtSurface,
-                            shape = RoundedCornerShape(18.dp),
-                            border = BorderStroke(1.dp, DebtLine),
+                // Skeleton Section Header (Text di atas tabel)
+                Row(
+                    modifier = Modifier.fillMaxWidth().padding(top = 2.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    SkeletonBox(Modifier.width(120.dp).height(22.dp), shape = RoundedCornerShape(4.dp))
+                }
+
+                // Skeleton Table
+                SupplierDebtLoading(Modifier, compact = false)
+            } else {
+                SupplierDebtToolbar(uiState, onSearchChanged, onStatusFilterChanged, compact = false)
+
+                when {
+                    uiState.errorMessage != null && uiState.payables.isEmpty() -> SupplierDebtError(Modifier)
+                    else -> {
+                        Row(
+                            modifier = Modifier.fillMaxWidth().padding(top = 2.dp),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically,
                         ) {
-                            Column {
-                                DebtTableHeader()
-                                SupplierDebtRows(Modifier.fillMaxWidth(), uiState, onPayClick, compact = false, onSupplierDetailClick = onSupplierDetailClick)
-                            }
+                            Text(
+                                "Daftar hutang",
+                                modifier = Modifier.weight(1f),
+                                style = MaterialTheme.typography.titleMedium,
+                                color = DebtText,
+                                fontWeight = FontWeight.SemiBold,
+                            )
                         }
-                        SupplierDebtFooter(uiState, onPreviousPage, onNextPage, compact = false)
+                        if (uiState.filteredPayables.isEmpty()) {
+                            SupplierDebtEmpty(Modifier)
+                        } else {
+                            Surface(
+                                modifier = Modifier.fillMaxWidth(),
+                                color = DebtSurface,
+                                shape = RoundedCornerShape(18.dp),
+                                border = BorderStroke(1.dp, DebtLine),
+                            ) {
+                                Column {
+                                    DebtTableHeader()
+                                    SupplierDebtRows(Modifier.fillMaxWidth(), uiState, onPayClick, compact = false, onSupplierDetailClick = onSupplierDetailClick)
+                                }
+                            }
+                            SupplierDebtFooter(uiState, onPreviousPage, onNextPage, compact = false)
+                        }
                     }
                 }
             }

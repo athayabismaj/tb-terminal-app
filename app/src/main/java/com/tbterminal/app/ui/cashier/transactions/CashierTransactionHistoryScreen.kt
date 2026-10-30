@@ -68,6 +68,8 @@ import com.tbterminal.app.ui.dashboard.DashboardWarningOrange
 import com.tbterminal.app.ui.components.HistoryDateFilter
 import com.tbterminal.app.ui.components.HistoryDatePickerDialog
 import com.tbterminal.app.ui.components.RefreshableContent
+import com.tbterminal.app.ui.components.TopFloatingCapsule
+import androidx.compose.ui.zIndex
 import com.tbterminal.app.ui.dashboard.cashier.CashierDashboardShell
 import com.tbterminal.app.ui.dashboard.cashier.CashierDestination
 import com.tbterminal.app.ui.offline.LocalPendingTransactionsCard
@@ -128,18 +130,26 @@ fun CashierTransactionHistoryScreen(
         onSettingsClick = onSettingsClick,
         onLogout = onLogout
     ) { contentModifier ->
-        RefreshableContent(
-            isRefreshing = uiState.isLoading && uiState.transactions.isNotEmpty(),
-            onRefresh = viewModel::refresh,
-            modifier = contentModifier,
-        ) {
-            CashierTransactionHistoryContent(
-            state = uiState,
-            viewModel = viewModel,
-            onPreviousPage = viewModel::previousPage,
-            onNextPage = viewModel::nextPage,
-            onReceiptClick = onReceiptClick,
-            modifier = Modifier
+        Box(modifier = contentModifier.fillMaxSize()) {
+            RefreshableContent(
+                isRefreshing = uiState.isLoading && uiState.transactions.isNotEmpty(),
+                onRefresh = viewModel::refresh,
+                modifier = Modifier.fillMaxSize(),
+            ) {
+                CashierTransactionHistoryContent(
+                    state = uiState,
+                    viewModel = viewModel,
+                    onPreviousPage = viewModel::previousPage,
+                    onNextPage = viewModel::nextPage,
+                    onReceiptClick = onReceiptClick,
+                    modifier = Modifier
+                )
+            }
+            TopFloatingCapsule(
+                message = uiState.receiptMessage,
+                error = uiState.errorMessage,
+                onDismiss = viewModel::clearFeedback,
+                modifier = Modifier.align(Alignment.TopCenter).zIndex(99f)
             )
         }
     }

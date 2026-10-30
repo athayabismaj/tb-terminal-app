@@ -1,6 +1,7 @@
 package com.tbterminal.app.ui.incominggoods
 
 import androidx.compose.foundation.BorderStroke
+import com.tbterminal.app.ui.components.SkeletonBox
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -89,9 +90,14 @@ internal fun ProductSelectorCard(
             onOpenForm = onOpenForm,
         )
         if (compact) {
-            ProductMobileHeader(onShowSummaryClick = { showSummaryPopup = true })
+            ProductMobileHeader(
+                isLoading = uiState.isLoadingProducts && uiState.products.isEmpty(),
+                onShowSummaryClick = { showSummaryPopup = true }
+            )
             ProductMobileList(uiState, onSelectProduct)
-            ProductMobilePagination(uiState, onPreviousPage, onNextPage)
+            if (!uiState.isLoadingProducts || uiState.products.isNotEmpty()) {
+                ProductMobilePagination(uiState, onPreviousPage, onNextPage)
+            }
             if (showSummaryPopup) {
                 @OptIn(ExperimentalMaterial3Api::class)
                 ModalBottomSheet(
@@ -290,7 +296,9 @@ internal fun ProductSelectorCard(
                 ProductHeader()
                 ProductRows(uiState, onSelectProduct)
             }
-            ProductPagination(uiState, onPreviousPage, onNextPage)
+            if (!uiState.isLoadingProducts || uiState.products.isNotEmpty()) {
+                ProductPagination(uiState, onPreviousPage, onNextPage)
+            }
         }
     }
 }
@@ -304,6 +312,30 @@ private fun ProductToolbar(
     onOpenForm: () -> Unit = {}
 ) {
     val isCompact = compact || LocalConfiguration.current.screenWidthDp < 700
+    val isLoading = uiState.isLoadingProducts && uiState.products.isEmpty()
+
+    if (isLoading) {
+        if (isCompact) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(10.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                SkeletonBox(Modifier.weight(1f).height(42.dp), shape = RoundedCornerShape(12.dp))
+                SkeletonBox(Modifier.size(42.dp), shape = RoundedCornerShape(12.dp))
+            }
+        } else {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(10.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                SkeletonBox(Modifier.weight(1f).height(48.dp), shape = RoundedCornerShape(14.dp))
+                SkeletonBox(Modifier.width(220.dp).height(48.dp), shape = RoundedCornerShape(14.dp))
+            }
+        }
+        return
+    }
     
     if (isCompact) {
         var showMobileFilters by remember { mutableStateOf(false) }
@@ -738,7 +770,7 @@ private fun ProductRows(
     onSelectProduct: (ProductStock) -> Unit
 ) {
     when {
-        uiState.isLoadingProducts -> com.tbterminal.app.ui.components.SkeletonList(modifier = Modifier.fillMaxWidth().height(180.dp), itemCount = 4)
+        uiState.isLoadingProducts -> IncomingProductTableSkeleton()
         uiState.tableProducts.isEmpty() -> androidx.compose.material3.Surface(
             modifier = Modifier.fillMaxWidth().height(180.dp),
             shape = RoundedCornerShape(24.dp),
@@ -895,7 +927,10 @@ private fun ProductPageButton(
 
 
 @Composable
-private fun ProductMobileHeader(onShowSummaryClick: () -> Unit) {
+private fun ProductMobileHeader(
+    isLoading: Boolean = false,
+    onShowSummaryClick: () -> Unit,
+) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -903,27 +938,32 @@ private fun ProductMobileHeader(onShowSummaryClick: () -> Unit) {
         horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.CenterVertically
     ) {
-        androidx.compose.material3.Text(
-            text = "Daftar Produk Masuk",
-            fontSize = 16.sp,
-            fontWeight = FontWeight.Bold,
-            color = Color(0xFF0F172A),
-        )
-        Box(
-            modifier = Modifier
-                .size(32.dp)
-                .clip(RoundedCornerShape(12.dp))
-                .border(1.dp, Color(0xFFE2E8F0), RoundedCornerShape(12.dp))
-                .clickable { onShowSummaryClick() }
-                .background(Color.White),
-            contentAlignment = Alignment.Center
-        ) {
-            Icon(
-                Icons.Outlined.FactCheck,
-                contentDescription = "Ringkasan",
-                tint = Color(0xFF334155),
-                modifier = Modifier.size(16.dp)
+        if (isLoading) {
+            SkeletonBox(Modifier.width(120.dp).height(20.dp), shape = RoundedCornerShape(4.dp))
+            SkeletonBox(Modifier.size(32.dp), shape = RoundedCornerShape(12.dp))
+        } else {
+            androidx.compose.material3.Text(
+                text = "Barang Masuk",
+                fontSize = 16.sp,
+                fontWeight = FontWeight.Bold,
+                color = Color(0xFF0F172A),
             )
+            Box(
+                modifier = Modifier
+                    .size(32.dp)
+                    .clip(RoundedCornerShape(12.dp))
+                    .border(1.dp, Color(0xFFE2E8F0), RoundedCornerShape(12.dp))
+                    .clickable { onShowSummaryClick() }
+                    .background(Color.White),
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(
+                    Icons.Outlined.FactCheck,
+                    contentDescription = "Ringkasan",
+                    tint = Color(0xFF334155),
+                    modifier = Modifier.size(16.dp)
+                )
+            }
         }
     }
 }
@@ -941,10 +981,7 @@ private fun ProductMobileList(
     ) {
         when {
             uiState.isLoadingProducts -> {
-                com.tbterminal.app.ui.components.SkeletonList(
-                    modifier = Modifier.fillMaxWidth().height(180.dp),
-                    itemCount = 4,
-                )
+                IncomingProductMobileSkeleton()
             }
             uiState.tableProducts.isEmpty() -> {
                 Box(modifier = Modifier.fillMaxWidth().height(180.dp), contentAlignment = Alignment.Center) {
@@ -963,8 +1000,7 @@ private fun ProductMobileList(
                         )
                         if (index < uiState.tablePageProducts.size - 1) {
                             androidx.compose.material3.HorizontalDivider(
-                                color = Color(0xFFEEF2F0),
-                                modifier = Modifier.padding(horizontal = 16.dp)
+                                color = Color(0xFFF1F5F9)
                             )
                         }
                     }
@@ -985,32 +1021,40 @@ private fun ProductMobileCard(
             .clickable(onClick = onClick)
             .padding(16.dp)
     ) {
-        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.Top) {
-            Box(
-                modifier = Modifier
-                    .size(40.dp)
-                    .clip(RoundedCornerShape(12.dp))
-                    .background(Color.White)
-                    .border(1.dp, Color(0xFFEEF2F0), RoundedCornerShape(12.dp)),
-                contentAlignment = Alignment.Center
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Surface(
+                modifier = Modifier.size(40.dp),
+                shape = RoundedCornerShape(12.dp),
+                color = Color.White,
+                border = BorderStroke(1.dp, Color(0xFFE2E8F0)),
             ) {
-                androidx.compose.material3.Text(
-                    text = product.productName.firstOrNull()?.uppercase() ?: "P",
-                    color = Color(0xFF256B57), // PurchasePrimary
-                    fontSize = 16.sp,
-                    fontWeight = FontWeight.Bold
-                )
+                Box(contentAlignment = Alignment.Center) {
+                    androidx.compose.material3.Text(
+                        text = product.productName.firstOrNull()?.uppercase() ?: "P",
+                        color = Color(0xFF256B57),
+                        fontSize = 16.sp,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
             }
             Column(modifier = Modifier.weight(1f)) {
-                Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
                     androidx.compose.material3.Text(
                         text = product.productName,
                         color = Color(0xFF0F172A),
-                        fontWeight = FontWeight.Bold,
-                        fontSize = 14.sp,
+                        fontWeight = FontWeight.SemiBold,
+                        fontSize = 12.sp,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
-                        modifier = Modifier.weight(1f, fill=false)
+                        modifier = Modifier.weight(1f, fill = false)
                     )
                     Icon(
                         Icons.Default.ChevronRight,
@@ -1020,9 +1064,9 @@ private fun ProductMobileCard(
                     )
                 }
                 androidx.compose.material3.Text(
-                    text = "${product.sku} • ${product.categoryName}",
+                    text = "${product.sku} · ${product.categoryName}",
                     color = Color(0xFF64748B),
-                    fontSize = 13.sp,
+                    fontSize = 11.sp,
                     fontWeight = FontWeight.Medium,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
@@ -1030,31 +1074,52 @@ private fun ProductMobileCard(
                 )
             }
         }
-        
+
+        Spacer(Modifier.height(10.dp))
+        HorizontalDivider(color = Color(0xFFF1F5F9))
+        Spacer(Modifier.height(10.dp))
+
         Row(
-            modifier = Modifier.fillMaxWidth().padding(top = 14.dp),
-            horizontalArrangement = Arrangement.SpaceBetween
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
         ) {
             Column {
-                androidx.compose.material3.Text("STOK SAAT INI", color = Color(0xFF94A3B8), fontSize = 11.sp, fontWeight = FontWeight.Medium)
+                androidx.compose.material3.Text(
+                    text = "STOK SAAT INI",
+                    color = Color(0xFF94A3B8),
+                    fontSize = 10.sp,
+                    fontWeight = FontWeight.Medium,
+                    letterSpacing = 0.5.sp
+                )
+                Spacer(Modifier.height(2.dp))
                 val qtyText = if (product.quantity <= java.math.BigDecimal.ZERO) "0" else product.quantity.setScale(0, java.math.RoundingMode.HALF_UP).toPlainString()
                 androidx.compose.material3.Text(
                     text = "$qtyText ${product.unitName}",
-                    color = Color(0xFF334155),
-                    fontSize = 13.sp,
+                    color = Color(0xFF1E293B),
+                    fontSize = 14.sp,
                     fontWeight = FontWeight.SemiBold
                 )
             }
             Column(horizontalAlignment = Alignment.End) {
-                androidx.compose.material3.Text("HARGA BELI", color = Color(0xFF94A3B8), fontSize = 11.sp, fontWeight = FontWeight.Medium)
+                androidx.compose.material3.Text(
+                    text = "HARGA BELI",
+                    color = Color(0xFF94A3B8),
+                    fontSize = 10.sp,
+                    fontWeight = FontWeight.Medium,
+                    letterSpacing = 0.5.sp,
+                    textAlign = androidx.compose.ui.text.style.TextAlign.End
+                )
+                Spacer(Modifier.height(2.dp))
                 val currencyText = java.text.NumberFormat.getCurrencyInstance(java.util.Locale("id", "ID")).apply {
                     maximumFractionDigits = 0
                 }.format(product.priceBuy)
                 androidx.compose.material3.Text(
                     text = currencyText,
                     color = Color(0xFF256B57),
-                    fontSize = 15.sp,
-                    fontWeight = FontWeight.Bold
+                    fontSize = 14.sp,
+                    fontWeight = FontWeight.Bold,
+                    textAlign = androidx.compose.ui.text.style.TextAlign.End
                 )
             }
         }
@@ -1070,45 +1135,141 @@ private fun ProductMobilePagination(
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(horizontal = 2.dp),
+            .padding(top = 14.dp, bottom = 4.dp),
         horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.CenterVertically
     ) {
         val totalProducts = uiState.totalTableProducts
-        // Pill
-        Box(
-            modifier = Modifier
-                .background(Color.White, RoundedCornerShape(50.dp))
-                .border(1.dp, Color(0xFFE0E7E3), RoundedCornerShape(50.dp))
-                .padding(horizontal = 14.dp, vertical = 6.dp)
+        Surface(
+            shape = CircleShape,
+            color = Color.White,
+            border = BorderStroke(1.dp, Color(0xFFE2E8F0)),
         ) {
             androidx.compose.material3.Text(
                 text = "${uiState.tablePageProducts.size} dari $totalProducts produk",
+                modifier = Modifier.padding(horizontal = 14.dp, vertical = 6.dp),
                 fontSize = 12.sp,
-                fontWeight = FontWeight.Medium,
+                fontWeight = FontWeight.SemiBold,
                 color = Color(0xFF475569)
             )
         }
-        
-        // Pagination Nav
-        Row(
-            modifier = Modifier
-                .background(Color.White, RoundedCornerShape(50.dp))
-                .border(1.dp, Color(0xFFE0E7E3), RoundedCornerShape(50.dp))
-                .padding(horizontal = 12.dp, vertical = 6.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(8.dp)
+
+        Surface(
+            shape = CircleShape,
+            color = Color.White,
+            border = BorderStroke(1.dp, Color(0xFFE2E8F0)),
         ) {
-            val hasPrevious = uiState.tablePage > 1 && !uiState.isLoadingProducts
-            androidx.compose.material3.IconButton(onClick = onPreviousPage, enabled = hasPrevious, modifier = Modifier.size(24.dp)) {
-                Icon(Icons.Default.ChevronLeft, null, tint = if (hasPrevious) Color(0xFF334155) else Color(0xFF94A3B8), modifier = Modifier.size(16.dp))
-            }
-            androidx.compose.material3.Text("${uiState.tablePage} / ${uiState.totalTablePages}", fontSize = 12.sp, fontWeight = FontWeight.SemiBold, color = Color(0xFF334155))
-            val hasNext = uiState.tablePage < uiState.totalTablePages && !uiState.isLoadingProducts
-            androidx.compose.material3.IconButton(onClick = onNextPage, enabled = hasNext, modifier = Modifier.size(24.dp)) {
-                Icon(Icons.Default.ChevronRight, null, tint = if (hasNext) Color(0xFF334155) else Color(0xFF94A3B8), modifier = Modifier.size(16.dp))
+            Row(
+                modifier = Modifier.padding(horizontal = 6.dp, vertical = 3.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                val hasPrevious = uiState.tablePage > 1 && !uiState.isLoadingProducts
+                val hasNext = uiState.tablePage < uiState.totalTablePages && !uiState.isLoadingProducts
+                androidx.compose.material3.IconButton(
+                    onClick = onPreviousPage,
+                    enabled = hasPrevious,
+                    modifier = Modifier.size(28.dp)
+                ) {
+                    Icon(
+                        Icons.Default.ChevronLeft,
+                        contentDescription = "Halaman sebelumnya",
+                        tint = if (hasPrevious) Color(0xFF475569) else Color(0xFFCBD5E1),
+                        modifier = Modifier.size(16.dp)
+                    )
+                }
+                androidx.compose.material3.Text(
+                    text = "${uiState.tablePage} / ${uiState.totalTablePages.coerceAtLeast(1)}",
+                    modifier = Modifier.padding(horizontal = 8.dp),
+                    fontSize = 12.sp,
+                    fontWeight = FontWeight.Medium,
+                    color = Color(0xFF334155)
+                )
+                androidx.compose.material3.IconButton(
+                    onClick = onNextPage,
+                    enabled = hasNext,
+                    modifier = Modifier.size(28.dp)
+                ) {
+                    Icon(
+                        Icons.Default.ChevronRight,
+                        contentDescription = "Halaman berikutnya",
+                        tint = if (hasNext) Color(0xFF475569) else Color(0xFFCBD5E1),
+                        modifier = Modifier.size(16.dp)
+                    )
+                }
             }
         }
     }
 }
 
+@Composable
+private fun IncomingProductMobileSkeleton() {
+    Column {
+        repeat(4) { index ->
+            Column(modifier = Modifier.fillMaxWidth().padding(16.dp)) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                ) {
+                    Row(
+                        modifier = Modifier.weight(1f),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        SkeletonBox(Modifier.size(40.dp))
+                        Spacer(Modifier.width(12.dp))
+                        Column(modifier = Modifier.weight(1f)) {
+                            SkeletonBox(Modifier.fillMaxWidth(0.5f).height(14.dp))
+                            Spacer(Modifier.height(4.dp))
+                            SkeletonBox(Modifier.fillMaxWidth(0.35f).height(12.dp))
+                        }
+                    }
+                    SkeletonBox(Modifier.size(16.dp))
+                }
+                Spacer(Modifier.height(10.dp))
+                HorizontalDivider(color = Color(0xFFF1F5F9))
+                Spacer(Modifier.height(10.dp))
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Column {
+                        SkeletonBox(Modifier.width(70.dp).height(10.dp))
+                        Spacer(Modifier.height(4.dp))
+                        SkeletonBox(Modifier.width(60.dp).height(14.dp))
+                    }
+                    Column(horizontalAlignment = Alignment.End) {
+                        SkeletonBox(Modifier.width(60.dp).height(10.dp))
+                        Spacer(Modifier.height(4.dp))
+                        SkeletonBox(Modifier.width(90.dp).height(16.dp))
+                    }
+                }
+            }
+            if (index < 3) {
+                HorizontalDivider(color = Color(0xFFF1F5F9))
+            }
+        }
+    }
+}
+
+@Composable
+private fun IncomingProductTableSkeleton() {
+    Column {
+        repeat(5) { index ->
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .background(if (index % 2 == 0) Color.White else IncomingSoft.copy(alpha = 0.7f))
+                    .padding(horizontal = 20.dp, vertical = 14.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                SkeletonBox(Modifier.weight(1.8f).height(16.dp).padding(end = 12.dp))
+                SkeletonBox(Modifier.weight(1.4f).height(16.dp).padding(end = 12.dp))
+                SkeletonBox(Modifier.weight(1.1f).height(16.dp).padding(end = 12.dp))
+                SkeletonBox(Modifier.weight(1.2f).height(16.dp).padding(end = 12.dp))
+                SkeletonBox(Modifier.weight(0.8f).height(16.dp))
+            }
+            HorizontalDivider(color = IncomingLine)
+        }
+    }
+}

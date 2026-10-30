@@ -1,5 +1,6 @@
 package com.tbterminal.app.ui.incominggoods
 
+import com.tbterminal.app.ui.components.SkeletonBox
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -54,32 +55,36 @@ internal fun IncomingGoodsFormBody(
     onDueDaysChanged: (String) -> Unit,
     onNotesChanged: (String) -> Unit
 ) {
-    LazyColumn(
-        modifier = Modifier.fillMaxSize(),
-        contentPadding = PaddingValues(if (compact) 16.dp else 32.dp),
-        verticalArrangement = Arrangement.spacedBy(16.dp)
-    ) {
-        item {
-            ProductSupplierCard(
-                uiState = uiState,
-                onSelectProduct = onSelectProduct,
-                onSelectSupplier = onSelectSupplier,
-                onSupplierNameChanged = onSupplierNameChanged,
-                onCreateSupplier = onCreateSupplier
-            )
-        }
-        item {
-            PurchaseDetailsCard(
-                uiState = uiState,
-                onInvoiceChanged = onInvoiceChanged,
-                onGenerateInvoiceNumber = onGenerateInvoiceNumber,
-                onQuantityChanged = onQuantityChanged,
-                onBuyPriceChanged = onBuyPriceChanged,
-                onNotesChanged = onNotesChanged
-            )
-        }
-        item {
-            Spacer(Modifier.height(100.dp))
+    if ((uiState.isLoadingProducts && uiState.products.isEmpty()) || (uiState.isLoadingSuppliers && uiState.suppliers.isEmpty())) {
+        IncomingGoodsFormSkeleton(compact)
+    } else {
+        LazyColumn(
+            modifier = Modifier.fillMaxSize(),
+            contentPadding = PaddingValues(horizontal = if (compact) 16.dp else 28.dp, vertical = if (compact) 12.dp else 20.dp),
+            verticalArrangement = Arrangement.spacedBy(if (compact) 12.dp else 16.dp)
+        ) {
+            item {
+                ProductSupplierCard(
+                    uiState = uiState,
+                    onSelectProduct = onSelectProduct,
+                    onSelectSupplier = onSelectSupplier,
+                    onSupplierNameChanged = onSupplierNameChanged,
+                    onCreateSupplier = onCreateSupplier
+                )
+            }
+            item {
+                PurchaseDetailsCard(
+                    uiState = uiState,
+                    onInvoiceChanged = onInvoiceChanged,
+                    onGenerateInvoiceNumber = onGenerateInvoiceNumber,
+                    onQuantityChanged = onQuantityChanged,
+                    onBuyPriceChanged = onBuyPriceChanged,
+                    onNotesChanged = onNotesChanged
+                )
+            }
+            item {
+                Spacer(Modifier.height(100.dp))
+            }
         }
     }
 }
@@ -96,8 +101,7 @@ private fun ProductSupplierCard(
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(16.dp),
         color = Color.White,
-        border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFFE2E8F0)),
-        shadowElevation = 1.dp
+        border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFFE2E8F0))
     ) {
         Column(modifier = Modifier.padding(16.dp)) {
             // Header
@@ -316,8 +320,7 @@ private fun PurchaseDetailsCard(
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(16.dp),
         color = Color.White,
-        border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFFE2E8F0)),
-        shadowElevation = 1.dp
+        border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFFE2E8F0))
     ) {
         Column(modifier = Modifier.padding(16.dp)) {
             // Header
@@ -812,3 +815,63 @@ private fun PaymentOptionCard(
 
 private fun Double.asCurrency(): String = NumberFormat.getCurrencyInstance(Locale.forLanguageTag("id-ID")).format(this)
 private fun BigDecimal.asCurrency(): String = NumberFormat.getCurrencyInstance(Locale.forLanguageTag("id-ID")).format(this)
+
+
+@Composable
+private fun IncomingGoodsFormSkeleton(compact: Boolean) {
+    LazyColumn(
+        modifier = Modifier.fillMaxSize(),
+        contentPadding = PaddingValues(horizontal = if (compact) 16.dp else 28.dp, vertical = if (compact) 12.dp else 20.dp),
+        verticalArrangement = Arrangement.spacedBy(if (compact) 12.dp else 16.dp)
+    ) {
+        item {
+            Surface(
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(16.dp),
+                color = Color.White,
+                border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFFE2E8F0))
+            ) {
+                Column(modifier = Modifier.padding(16.dp)) {
+                    Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(bottom = 14.dp)) {
+                        SkeletonBox(Modifier.size(28.dp))
+                        Spacer(Modifier.width(10.dp))
+                        SkeletonBox(Modifier.width(140.dp).height(16.dp))
+                    }
+                    SkeletonBox(Modifier.width(60.dp).height(12.dp))
+                    Spacer(Modifier.height(6.dp))
+                    SkeletonBox(Modifier.fillMaxWidth().height(48.dp))
+                    Spacer(Modifier.height(16.dp))
+                    SkeletonBox(Modifier.width(60.dp).height(12.dp))
+                    Spacer(Modifier.height(6.dp))
+                    SkeletonBox(Modifier.fillMaxWidth().height(48.dp))
+                }
+            }
+        }
+        item {
+            Surface(
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(16.dp),
+                color = Color.White,
+                border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFFE2E8F0))
+            ) {
+                Column(modifier = Modifier.padding(16.dp)) {
+                    Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(bottom = 14.dp)) {
+                        SkeletonBox(Modifier.size(28.dp))
+                        Spacer(Modifier.width(10.dp))
+                        SkeletonBox(Modifier.width(140.dp).height(16.dp))
+                    }
+                    SkeletonBox(Modifier.width(80.dp).height(12.dp))
+                    Spacer(Modifier.height(6.dp))
+                    SkeletonBox(Modifier.fillMaxWidth().height(48.dp))
+                    Spacer(Modifier.height(16.dp))
+                    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                        SkeletonBox(Modifier.weight(1f).height(48.dp))
+                        SkeletonBox(Modifier.weight(1f).height(48.dp))
+                    }
+                    Spacer(Modifier.height(16.dp))
+                    SkeletonBox(Modifier.fillMaxWidth().height(72.dp))
+                }
+            }
+        }
+    }
+}

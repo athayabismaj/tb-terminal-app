@@ -11,10 +11,17 @@ enum class CustomerCategoryFilter(val label: String) {
     CONTRACTOR("Kontraktor")
 }
 
+enum class CustomerStatusFilter(val label: String) {
+    ALL("Semua status"),
+    ACTIVE("Aktif"),
+    INACTIVE("Nonaktif")
+}
+
 data class CustomerListUiState(
     val customers: List<Customer> = emptyList(),
     val searchQuery: String = "",
     val categoryFilter: CustomerCategoryFilter = CustomerCategoryFilter.ALL,
+    val statusFilter: CustomerStatusFilter = CustomerStatusFilter.ALL,
     val page: Int = 1,
     val totalPages: Int = 1,
     val totalCustomers: Long = 0,
@@ -25,11 +32,21 @@ data class CustomerListUiState(
     val message: String? = null
 ) {
     val visibleCustomers: List<Customer>
-        get() = when (categoryFilter) {
-            CustomerCategoryFilter.ALL -> customers
-            CustomerCategoryFilter.GENERAL -> customers.filterNot(Customer::isContractor)
-            CustomerCategoryFilter.CONTRACTOR -> customers.filter(Customer::isContractor)
-        }
+        get() = customers
+            .filter { customer ->
+                when (categoryFilter) {
+                    CustomerCategoryFilter.ALL -> true
+                    CustomerCategoryFilter.GENERAL -> !customer.isContractor
+                    CustomerCategoryFilter.CONTRACTOR -> customer.isContractor
+                }
+            }
+            .filter { customer ->
+                when (statusFilter) {
+                    CustomerStatusFilter.ALL -> true
+                    CustomerStatusFilter.ACTIVE -> customer.isActive
+                    CustomerStatusFilter.INACTIVE -> !customer.isActive
+                }
+            }
 
     val contractorCount: Int
         get() = customers.count(Customer::isContractor)

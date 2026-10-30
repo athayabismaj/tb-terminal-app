@@ -405,6 +405,10 @@ class AdminTransactionHistoryViewModel(
         }
     }
 
+    fun clearError() {
+        _uiState.update { it.copy(error = null) }
+    }
+
     private fun LocalDate.endOfMonth(): LocalDate = withDayOfMonth(lengthOfMonth())
 
     companion object {

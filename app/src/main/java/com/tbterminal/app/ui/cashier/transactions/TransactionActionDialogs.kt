@@ -276,6 +276,7 @@ private fun VoidTransactionBottomSheet(
                 }
 
                 // Text Input Field
+                val isReasonError = error != null
                 OutlinedTextField(
                     value = reason,
                     onValueChange = onReasonChanged,
@@ -295,25 +296,20 @@ private fun VoidTransactionBottomSheet(
                         color = Color(0xFF1E293B),
                         lineHeight = 18.sp,
                     ),
+                    isError = isReasonError,
+                    supportingText = error?.let {
+                        { Text(text = it, color = Color(0xFFE11D48), fontSize = 11.sp) }
+                    },
                     colors = OutlinedTextFieldDefaults.colors(
-                        focusedBorderColor = Color(0xFF256B57),
-                        unfocusedBorderColor = Color(0xFFE2E8F0),
-                        focusedContainerColor = Color.White,
-                        unfocusedContainerColor = Color.White,
+                        focusedBorderColor = if (isReasonError) Color(0xFFE11D48) else Color(0xFF256B57),
+                        unfocusedBorderColor = if (isReasonError) Color(0xFFE11D48) else Color(0xFFE2E8F0),
+                        focusedContainerColor = if (isReasonError) Color(0xFFFFF1F2) else Color.White,
+                        unfocusedContainerColor = if (isReasonError) Color(0xFFFFF1F2) else Color.White,
                         errorBorderColor = Color(0xFFE11D48),
-                        errorContainerColor = Color.White,
+                        errorContainerColor = Color(0xFFFFF1F2),
                     ),
-                    isError = error != null,
                     modifier = Modifier.fillMaxWidth(),
                 )
-
-                if (error != null) {
-                    Text(
-                        text = error,
-                        color = Color(0xFFE11D48),
-                        fontSize = 11.sp,
-                    )
-                }
 
                 if (ambiguous) {
                     Text(
@@ -658,6 +654,7 @@ private fun RefundTransactionBottomSheet(
                 }
 
                 // Text Input Field
+                val isReasonError = error != null
                 OutlinedTextField(
                     value = reason,
                     onValueChange = onReasonChanged,
@@ -677,25 +674,20 @@ private fun RefundTransactionBottomSheet(
                         color = Color(0xFF1E293B),
                         lineHeight = 18.sp,
                     ),
+                    isError = isReasonError,
+                    supportingText = error?.let {
+                        { Text(text = it, color = Color(0xFFE11D48), fontSize = 11.sp) }
+                    },
                     colors = OutlinedTextFieldDefaults.colors(
-                        focusedBorderColor = Color(0xFF256B57),
-                        unfocusedBorderColor = Color(0xFFE2E8F0),
-                        focusedContainerColor = Color.White,
-                        unfocusedContainerColor = Color.White,
+                        focusedBorderColor = if (isReasonError) Color(0xFFE11D48) else Color(0xFF256B57),
+                        unfocusedBorderColor = if (isReasonError) Color(0xFFE11D48) else Color(0xFFE2E8F0),
+                        focusedContainerColor = if (isReasonError) Color(0xFFFFF1F2) else Color.White,
+                        unfocusedContainerColor = if (isReasonError) Color(0xFFFFF1F2) else Color.White,
                         errorBorderColor = Color(0xFFE11D48),
-                        errorContainerColor = Color.White,
+                        errorContainerColor = Color(0xFFFFF1F2),
                     ),
-                    isError = error != null,
                     modifier = Modifier.fillMaxWidth(),
                 )
-
-                if (error != null) {
-                    Text(
-                        text = error,
-                        color = Color(0xFFE11D48),
-                        fontSize = 11.sp,
-                    )
-                }
 
                 if (ambiguous) {
                     Text(

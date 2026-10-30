@@ -2,6 +2,7 @@ package com.tbterminal.app.ui.cash
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -9,8 +10,11 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.zIndex
+import com.tbterminal.app.ui.components.TopFloatingCapsule
 
 @Composable
 internal fun CashReconciliationScreen(
@@ -31,32 +35,46 @@ internal fun CashReconciliationScreen(
     onExpenseDescriptionChanged: (String) -> Unit,
     onAddExpense: () -> Unit
 ) {
-    Column(
+    Box(
         modifier = modifier
             .fillMaxSize()
             .background(CashBackground)
-            .verticalScroll(rememberScrollState())
-            .padding(32.dp),
-        verticalArrangement = Arrangement.spacedBy(20.dp)
     ) {
-        CashHeader()
-        CashMessage(uiState, onDismissMessage)
-        CashMetrics(uiState)
-        CashSessionPanel(
-            uiState = uiState,
-            onOpeningCashChanged = onOpeningCashChanged,
-            onOpenSession = onOpenSession,
-            onClosingCashChanged = onClosingCashChanged,
-            onClosingNotesChanged = onClosingNotesChanged,
-            onCloseSession = onCloseSession,
-            onShowExpenseDialog = onShowExpenseDialog
-        )
-        CashTransactionsTable(
-            uiState = uiState,
-            onRefresh = onRefresh,
-            onPreviousPage = onPreviousPage,
-            onNextPage = onNextPage,
-            modifier = Modifier.fillMaxWidth()
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .verticalScroll(rememberScrollState())
+                .padding(32.dp),
+            verticalArrangement = Arrangement.spacedBy(20.dp)
+        ) {
+            CashHeader()
+            CashMetrics(uiState)
+            CashSessionPanel(
+                uiState = uiState,
+                onOpeningCashChanged = onOpeningCashChanged,
+                onOpenSession = onOpenSession,
+                onClosingCashChanged = onClosingCashChanged,
+                onClosingNotesChanged = onClosingNotesChanged,
+                onCloseSession = onCloseSession,
+                onShowExpenseDialog = onShowExpenseDialog
+            )
+            CashTransactionsTable(
+                uiState = uiState,
+                onRefresh = onRefresh,
+                onPreviousPage = onPreviousPage,
+                onNextPage = onNextPage,
+                modifier = Modifier.fillMaxWidth()
+            )
+        }
+
+        TopFloatingCapsule(
+            message = uiState.message,
+            error = uiState.errorMessage,
+            onDismiss = onDismissMessage,
+            modifier = Modifier
+                .align(Alignment.TopCenter)
+                .padding(top = 16.dp, start = 20.dp, end = 20.dp)
+                .zIndex(99f),
         )
     }
 

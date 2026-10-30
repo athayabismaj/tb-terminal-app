@@ -46,14 +46,15 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.zIndex
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.tbterminal.app.data.model.ProductStock
 import com.tbterminal.app.data.repository.InventoryRepository
+import com.tbterminal.app.ui.components.TopFloatingCapsule
 import com.tbterminal.app.ui.dashboard.DashboardTextSecondary
 import com.tbterminal.app.ui.dashboard.admin.AdminDashboardShell
 import com.tbterminal.app.ui.dashboard.admin.AdminDestination
-import com.tbterminal.app.ui.products.ProductBanner
 import com.tbterminal.app.ui.products.ProductErrorState
 import com.tbterminal.app.ui.products.ProductLoadingState
 import com.tbterminal.app.ui.products.ProductPrimaryDark
@@ -153,6 +154,14 @@ private fun PriceManagementContent(
 ) {
     BoxWithConstraints(modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
         val compact = maxWidth < 700.dp
+
+        TopFloatingCapsule(
+            message = state.actionMessage,
+            error = if (state.products.isNotEmpty()) state.error else null,
+            onDismiss = onClearActionMessage,
+            modifier = Modifier.align(Alignment.TopCenter).zIndex(99f)
+        )
+
         Column(modifier = Modifier.fillMaxSize().padding(horizontal = if (compact) 16.dp else 32.dp, vertical = if (compact) 14.dp else 24.dp).verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(if (compact) 14.dp else 22.dp)) {
 
         PriceManagementToolbar(
@@ -161,14 +170,6 @@ private fun PriceManagementContent(
             onCategorySelected = onCategorySelected,
             compact = compact,
         )
-
-        if (state.actionMessage != null) {
-            ProductBanner(message = state.actionMessage)
-            LaunchedEffect(state.actionMessage) {
-                kotlinx.coroutines.delay(3000)
-                onClearActionMessage()
-            }
-        }
 
         Column(modifier = Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(12.dp)) {
             Text(
@@ -262,14 +263,20 @@ internal fun PriceUpdateDialog(
                     itemCount = 3,
                 )
             } else if (state.selectedProductDetail != null) {
+                val isRetailError = state.error != null
                 Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
                     PriceEditField("Harga beli", priceBuyStr, { priceBuyStr = it }, "price-edit-buy", !state.isSaving)
-                    PriceEditField("Harga jual", priceRetailStr, { priceRetailStr = it }, "price-edit-retail", !state.isSaving)
+                    PriceEditField(
+                        label = "Harga jual",
+                        value = priceRetailStr,
+                        onValueChange = { priceRetailStr = it },
+                        testTag = "price-edit-retail",
+                        enabled = !state.isSaving,
+                        isError = isRetailError,
+                        supportingText = if (isRetailError) state.error else null
+                    )
                     PriceEditField("Harga kontraktor", priceContractorStr, { priceContractorStr = it }, "price-edit-contractor", !state.isSaving)
                     PriceEditField("Diskon", discountStr, { discountStr = it }, "price-edit-discount", !state.isSaving)
-                }
-                if (state.error != null) {
-                    Text(state.error, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall)
                 }
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                     OutlinedButton(
@@ -311,12 +318,18 @@ private fun PriceEditField(
     onValueChange: (String) -> Unit,
     testTag: String,
     enabled: Boolean,
+    isError: Boolean = false,
+    supportingText: String? = null
 ) {
     OutlinedTextField(
         value = value,
         onValueChange = onValueChange,
         label = { Text(label) },
         prefix = { Text("Rp") },
+        isError = isError,
+        supportingText = supportingText?.let {
+            { Text(it, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall) }
+        },
         modifier = Modifier.fillMaxWidth().testTag(testTag),
         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
         singleLine = true,
@@ -327,6 +340,8 @@ private fun PriceEditField(
             unfocusedBorderColor = MaterialTheme.colorScheme.outlineVariant,
             focusedContainerColor = Color.White,
             unfocusedContainerColor = Color.White,
+            errorBorderColor = MaterialTheme.colorScheme.error,
+            errorContainerColor = MaterialTheme.colorScheme.error.copy(alpha = 0.05f)
         ),
     )
 }

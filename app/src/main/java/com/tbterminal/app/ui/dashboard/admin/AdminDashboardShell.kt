@@ -52,6 +52,8 @@ fun AdminDashboardShell(
     onSecurityLogClick: () -> Unit = {},
     onProfileClick: () -> Unit = {},
     onSettingsClick: () -> Unit = {},
+    onStoreSettingsClick: () -> Unit = onSettingsClick,
+    onDeviceSettingsClick: () -> Unit = onSettingsClick,
     pageTitle: String? = null,
     onBack: (() -> Unit)? = null,
     showPageHeader: Boolean = true,
@@ -169,7 +171,9 @@ enum class AdminDestination {
     UserManagement,
     SecurityLog,
     Profile,
-    Settings
+    Settings,
+    StoreSettings,
+    DeviceSettings
 }
 
 private val ownerMenuDestinations = setOf(
@@ -182,6 +186,8 @@ private val ownerMenuDestinations = setOf(
     AdminDestination.LocalReports,
     AdminDestination.BackupRestore,
     AdminDestination.Settings,
+    AdminDestination.StoreSettings,
+    AdminDestination.DeviceSettings,
     AdminDestination.SyncCenter,
     AdminDestination.OperationalAudit,
     AdminDestination.UserManagement,
@@ -197,7 +203,9 @@ internal fun AdminDestination.backofficeSection(role: String? = null): Backoffic
     AdminDestination.TransactionsHub,
     AdminDestination.NewTransaction,
     AdminDestination.SalesTransactions,
-    AdminDestination.PurchaseHistory -> BackofficeSection.TRANSACTIONS
+    AdminDestination.PurchaseHistory,
+    AdminDestination.IncomingGoods,
+    AdminDestination.IncomingGoodsForm -> BackofficeSection.TRANSACTIONS
     AdminDestination.FinanceHub,
     AdminDestination.Receivables,
     AdminDestination.ReceivablePayments,
@@ -214,8 +222,6 @@ internal fun AdminDestination.backofficeSection(role: String? = null): Backoffic
     AdminDestination.PriceManagement,
     AdminDestination.StockOpname,
     AdminDestination.StockOpnameForm,
-    AdminDestination.IncomingGoods,
-    AdminDestination.IncomingGoodsForm,
     AdminDestination.StockReport -> BackofficeSection.STOCK
     else -> BackofficeSection.MORE
     }
@@ -254,6 +260,8 @@ internal fun AdminDestination.backofficePageTitle(): String? = when (this) {
     AdminDestination.SyncCenter -> "Sinkronisasi"
     AdminDestination.BackupRestore -> "Cadangan data"
     AdminDestination.Settings -> "Pengaturan aplikasi"
+    AdminDestination.StoreSettings -> "Identitas toko"
+    AdminDestination.DeviceSettings -> "Perangkat & struk"
     AdminDestination.NewTransaction -> "Transaksi baru"
 }
 
@@ -265,6 +273,8 @@ internal fun AdminDestination.backofficePageTitleRes(): Int? = when (this) {
     AdminDestination.LocalReports -> R.string.owner_menu_device_reports
     AdminDestination.BackupRestore -> R.string.owner_menu_backup
     AdminDestination.Settings -> R.string.owner_menu_settings
+    AdminDestination.StoreSettings -> R.string.owner_menu_store_settings
+    AdminDestination.DeviceSettings -> R.string.owner_menu_device_settings
     AdminDestination.SyncCenter -> R.string.owner_menu_sync
     AdminDestination.OperationalAudit -> R.string.owner_menu_activity
     AdminDestination.SecurityLog -> R.string.owner_menu_security_log

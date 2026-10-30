@@ -3,6 +3,7 @@ package com.tbterminal.app.ui.suppliers
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.tbterminal.app.data.repository.PurchasingRepository
@@ -40,6 +41,8 @@ fun AdminSupplierScreen(
     viewModel: SupplierViewModel = viewModel(factory = SupplierViewModel.factory(purchasingRepository))
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+    val configuration = LocalConfiguration.current
+    val isCompactScreen = configuration.screenWidthDp < 700
 
     AdminDashboardShell(
         userName = name,
@@ -48,6 +51,15 @@ fun AdminSupplierScreen(
         pageTitle = "Supplier",
         onBack = onBackToPrevious,
         showPageHeader = true,
+        topBarActions = {
+            SupplierHeaderAddButton(
+                compact = isCompactScreen,
+                onClick = {
+                    viewModel.cancelEdit()
+                    onAddSupplierClick()
+                },
+            )
+        },
         onDashboardClick = onDashboardClick,
         onProductsClick = onProductsClick,
         onAddProductClick = onAddProductClick,
@@ -76,6 +88,7 @@ fun AdminSupplierScreen(
                 modifier = Modifier,
                 uiState = uiState,
                 onSearchChanged = viewModel::onSearchChanged,
+                onStatusFilterChanged = viewModel::onStatusFilterChanged,
                 onAdd = {
                     viewModel.cancelEdit()
                     onAddSupplierClick()

@@ -63,7 +63,10 @@ fun RefreshableContent(
 }
 
 @Composable
-fun SkeletonBox(modifier: Modifier = Modifier) {
+fun SkeletonBox(
+    modifier: Modifier = Modifier,
+    shape: androidx.compose.ui.graphics.Shape = RoundedCornerShape(12.dp),
+) {
     val transition = rememberInfiniteTransition(label = "skeleton")
     val alpha by transition.animateFloat(
         initialValue = 0.38f,
@@ -79,7 +82,7 @@ fun SkeletonBox(modifier: Modifier = Modifier) {
             .alpha(alpha)
             .background(
                 MaterialTheme.colorScheme.surfaceVariant,
-                RoundedCornerShape(12.dp),
+                shape,
             ),
     )
 }

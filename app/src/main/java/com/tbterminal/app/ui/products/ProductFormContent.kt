@@ -15,6 +15,8 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.zIndex
+import com.tbterminal.app.ui.components.TopFloatingCapsule
 
 @Composable
 internal fun ProductFormContent(
@@ -61,5 +63,14 @@ internal fun ProductFormContent(
                 }
             }
         }
+
+        TopFloatingCapsule(
+            message = null,
+            error = uiState.errorMessage,
+            modifier = Modifier
+                .align(Alignment.TopCenter)
+                .padding(top = 16.dp, start = 20.dp, end = 20.dp)
+                .zIndex(99f),
+        )
     }
 }

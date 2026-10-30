@@ -34,7 +34,9 @@ import androidx.compose.material3.VerticalDivider
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
@@ -42,6 +44,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.tbterminal.app.ui.common.UiText
+import com.tbterminal.app.ui.components.TopFloatingCapsule
 import java.math.BigDecimal
 import kotlinx.coroutines.flow.filterNotNull
 
@@ -52,6 +55,7 @@ fun CheckoutScreen(
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val snackbarHostState = remember { SnackbarHostState() }
+    var feedbackMessage by remember { mutableStateOf<String?>(null) }
     val onProductClick = remember(viewModel) {
         { product: Product -> viewModel.addProduct(product) }
     }
@@ -73,6 +77,7 @@ fun CheckoutScreen(
         viewModel.errorEvent
             .filterNotNull()
             .collect { error ->
+                feedbackMessage = error.message()
                 snackbarHostState.showSnackbar(error.message())
                 viewModel.clearErrorEvent()
             }
@@ -89,11 +94,19 @@ fun CheckoutScreen(
     Scaffold(
         snackbarHost = { SnackbarHost(snackbarHostState) }
     ) { contentPadding ->
-        Row(
+        Box(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(contentPadding)
         ) {
+            TopFloatingCapsule(
+                message = feedbackMessage,
+                isError = true,
+                onDismiss = { feedbackMessage = null }
+            )
+            Row(
+                modifier = Modifier.fillMaxSize()
+            ) {
             Column(
                 modifier = Modifier
                     .fillMaxHeight()
@@ -131,6 +144,7 @@ fun CheckoutScreen(
                     .fillMaxHeight()
                     .weight(0.35f)
             )
+        }
         }
     }
 }

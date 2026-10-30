@@ -21,6 +21,8 @@
     <string name="owner_menu_device_reports">Laporan perangkat</string>
     <string name="owner_menu_backup">Cadangan data</string>
     <string name="owner_menu_settings">Pengaturan aplikasi</string>
+    <string name="owner_menu_store_settings">Identitas toko</string>
+    <string name="owner_menu_device_settings">Perangkat &amp; struk</string>
     <string name="owner_menu_sync">Sinkronisasi</string>
     <string name="owner_menu_activity">Riwayat aktivitas</string>
     <string name="owner_menu_security_log">Log keamanan</string>
@@ -41,6 +43,8 @@
     <string name="hub_group_purchases">Aktivitas pembelian</string>
     <string name="hub_group_finance">Kelola keuangan</string>
     <string name="hub_group_stock">Operasional stok</string>
+    <string name="hub_group_stock_catalog">Katalog &amp; Nilai Jual</string>
+    <string name="hub_group_stock_audit">Audit &amp; Kontrol Stok</string>
     <string name="hub_group_product_settings">Data produk</string>
     <string name="hub_sales_history">Riwayat penjualan</string>
     <string name="hub_new_sale">Transaksi baru</string>

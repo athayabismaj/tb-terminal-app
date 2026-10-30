@@ -1,6 +1,7 @@
 package com.tbterminal.app.ui.receivablepayments
 
 import androidx.compose.foundation.BorderStroke
+import com.tbterminal.app.ui.components.SkeletonBox
 import com.tbterminal.app.ui.components.TbPagination
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
@@ -58,6 +59,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -205,7 +207,7 @@ private fun PaymentTable(
         Spacer(Modifier.height(if (compact) 12.dp else 28.dp))
         if (!compact) PaymentTableHeader()
         when {
-            uiState.isLoading -> LoadingBox()
+            uiState.isLoading -> LoadingBox(compact)
             uiState.errorMessage != null -> PaymentError(uiState.errorMessage)
             uiState.filteredPayments.isEmpty() -> EmptyBox()
             else -> uiState.filteredPayments.forEachIndexed { index, payment ->
@@ -526,10 +528,81 @@ private fun DetailInfo(label: String, value: String) {
 }
 
 @Composable
-private fun LoadingBox() = com.tbterminal.app.ui.components.SkeletonList(
-    modifier = Modifier.fillMaxWidth().height(180.dp),
-    itemCount = 4,
-)
+private fun LoadingBox(compact: Boolean) {
+    if (compact) {
+        Column(Modifier.fillMaxWidth().testTag("payment-history-skeleton")) {
+            repeat(4) { index ->
+                if (index > 0) HorizontalDivider(color = PaymentBorder)
+                Column(
+                    Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 14.dp),
+                    verticalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                            SkeletonBox(Modifier.width(130.dp).height(14.dp), shape = RoundedCornerShape(4.dp))
+                            SkeletonBox(Modifier.width(90.dp).height(11.dp), shape = RoundedCornerShape(3.dp))
+                        }
+                        SkeletonBox(Modifier.width(55.dp).height(20.dp), shape = RoundedCornerShape(6.dp))
+                    }
+                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                        Column(verticalArrangement = Arrangement.spacedBy(3.dp)) {
+                            SkeletonBox(Modifier.width(45.dp).height(10.dp), shape = RoundedCornerShape(3.dp))
+                            SkeletonBox(Modifier.width(75.dp).height(12.dp), shape = RoundedCornerShape(3.dp))
+                        }
+                        Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(3.dp)) {
+                            SkeletonBox(Modifier.width(45.dp).height(10.dp), shape = RoundedCornerShape(3.dp))
+                            SkeletonBox(Modifier.width(60.dp).height(12.dp), shape = RoundedCornerShape(3.dp))
+                        }
+                        Column(horizontalAlignment = Alignment.End, verticalArrangement = Arrangement.spacedBy(3.dp)) {
+                            SkeletonBox(Modifier.width(45.dp).height(10.dp), shape = RoundedCornerShape(3.dp))
+                            SkeletonBox(Modifier.width(80.dp).height(12.dp), shape = RoundedCornerShape(3.dp))
+                        }
+                    }
+                }
+            }
+        }
+    } else {
+        Column(Modifier.fillMaxWidth().testTag("payment-history-skeleton")) {
+            repeat(5) { index ->
+                if (index > 0) HorizontalDivider(color = PaymentBorder)
+                Row(
+                    Modifier
+                        .fillMaxWidth()
+                        .background(if (index % 2 != 0) PaymentSoft.copy(alpha = 0.76f) else PaymentSurface)
+                        .padding(horizontal = 20.dp, vertical = 14.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Box(Modifier.weight(1.7f)) {
+                        SkeletonBox(Modifier.width(110.dp).height(13.dp), shape = RoundedCornerShape(4.dp))
+                    }
+                    Column(Modifier.weight(1.6f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                        SkeletonBox(Modifier.width(100.dp).height(12.dp), shape = RoundedCornerShape(3.dp))
+                        SkeletonBox(Modifier.width(60.dp).height(10.dp), shape = RoundedCornerShape(3.dp))
+                    }
+                    Box(Modifier.weight(1.4f)) {
+                        SkeletonBox(Modifier.width(85.dp).height(13.dp), shape = RoundedCornerShape(4.dp))
+                    }
+                    Box(Modifier.weight(0.9f)) {
+                        SkeletonBox(Modifier.width(55.dp).height(13.dp), shape = RoundedCornerShape(4.dp))
+                    }
+                    Box(Modifier.weight(1.1f)) {
+                        SkeletonBox(Modifier.width(75.dp).height(13.dp), shape = RoundedCornerShape(4.dp))
+                    }
+                    Box(Modifier.weight(0.9f)) {
+                        SkeletonBox(Modifier.width(55.dp).height(20.dp), shape = RoundedCornerShape(6.dp))
+                    }
+                    Box(Modifier.weight(0.45f)) {
+                        SkeletonBox(Modifier.size(24.dp), shape = RoundedCornerShape(4.dp))
+                    }
+                }
+            }
+        }
+    }
+}
 
 @Composable
 private fun EmptyBox() = Box(Modifier.fillMaxWidth().height(180.dp), contentAlignment = Alignment.Center) { Text("Belum ada pembayaran piutang.", color = PaymentMuted) }

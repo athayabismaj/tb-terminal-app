@@ -11,6 +11,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.ArrowBack
+import androidx.compose.material.icons.automirrored.outlined.ArrowForward
 import androidx.compose.material.icons.automirrored.outlined.ReceiptLong
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material.icons.outlined.*
@@ -26,10 +27,14 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.tbterminal.app.data.model.Customer
 import com.tbterminal.app.data.model.CheckoutDiscount
+import com.tbterminal.app.ui.barcode.CameraBarcodeScannerDialog
+import com.tbterminal.app.ui.barcode.hardwareBarcodeScanner
 import com.tbterminal.app.ui.common.UiText
 import com.tbterminal.app.ui.checkout.components.CartCalculationRow
 import com.tbterminal.app.ui.checkout.components.CartEmptyState
 import com.tbterminal.app.ui.checkout.components.CartItemCard
+import com.tbterminal.app.ui.checkout.components.DeliverySectionCard
+import com.tbterminal.app.ui.checkout.components.CustomerCreditInspectorCard
 import com.tbterminal.app.ui.checkout.components.PaymentMethodSelector
 import com.tbterminal.app.ui.dashboard.cashier.CashierDashboardShell
 import com.tbterminal.app.ui.dashboard.cashier.CashierDestination
@@ -80,6 +85,12 @@ fun CashierCartScreen(
     onToggleUnit: (String, Boolean) -> Unit = { _, _ -> },
     onCheckout: () -> Unit,
     onBackToPos: () -> Unit,
+    onOpenHoldCartDialog: () -> Unit = {},
+    onOpenHeldCarts: () -> Unit = {},
+    onToggleDelivery: (Boolean) -> Unit = {},
+    onDeliveryFeeChanged: (String) -> Unit = {},
+    onDeliveryAddressChanged: (String) -> Unit = {},
+    onDeliveryCourierChanged: (String) -> Unit = {},
     onDashboardClick: () -> Unit = {},
     onPosClick: () -> Unit = {},
     onCashSessionClick: () -> Unit = {},
@@ -87,10 +98,14 @@ fun CashierCartScreen(
     onStockCheckClick: () -> Unit = {},
     onProfileClick: () -> Unit = {},
     onSettingsClick: () -> Unit = {},
-    onLogout: () -> Unit = {}
+    onLogout: () -> Unit = {},
+    onScanBarcode: (String) -> Unit = {},
+    onOpenQrisDialog: () -> Unit = {}
 ) {
     var discountItemId by remember { mutableStateOf<String?>(null) }
     var showTransactionDiscount by remember { mutableStateOf(false) }
+    var showCameraScanner by remember { mutableStateOf(false) }
+
     CashierDashboardShell(
         userName = name,
         role = role,
@@ -108,7 +123,7 @@ fun CashierCartScreen(
         Scaffold(
             snackbarHost = { SnackbarHost(snackbarHostState) },
             containerColor = CartBackground,
-            modifier = contentModifier,
+            modifier = contentModifier.hardwareBarcodeScanner { barcode -> onScanBarcode(barcode) },
             contentWindowInsets = WindowInsets(0.dp)
         ) { contentPadding ->
             if (state.cartItems.isEmpty()) {
@@ -136,12 +151,30 @@ fun CashierCartScreen(
                     onToggleUnit = onToggleUnit,
                     onCheckout = onCheckout,
                     onBackToPos = onBackToPos,
+                    onOpenHoldCartDialog = onOpenHoldCartDialog,
+                    onOpenHeldCarts = onOpenHeldCarts,
+                    onToggleDelivery = onToggleDelivery,
+                    onDeliveryFeeChanged = onDeliveryFeeChanged,
+                    onDeliveryAddressChanged = onDeliveryAddressChanged,
+                    onDeliveryCourierChanged = onDeliveryCourierChanged,
+                    onOpenCameraScanner = { showCameraScanner = true },
+                    onOpenQrisDialog = onOpenQrisDialog,
                     modifier = Modifier
                         .fillMaxSize()
                         .padding(contentPadding)
                 )
             }
         }
+    }
+
+    if (showCameraScanner) {
+        CameraBarcodeScannerDialog(
+            onDismissRequest = { showCameraScanner = false },
+            onBarcodeScanned = { barcode ->
+                showCameraScanner = false
+                onScanBarcode(barcode)
+            }
+        )
     }
 
     discountItemId?.let { cartItemId ->
@@ -196,6 +229,14 @@ private fun CartContent(
     onToggleUnit: (String, Boolean) -> Unit,
     onCheckout: () -> Unit,
     onBackToPos: () -> Unit,
+    onOpenHoldCartDialog: () -> Unit = {},
+    onOpenHeldCarts: () -> Unit = {},
+    onToggleDelivery: (Boolean) -> Unit = {},
+    onDeliveryFeeChanged: (String) -> Unit = {},
+    onDeliveryAddressChanged: (String) -> Unit = {},
+    onDeliveryCourierChanged: (String) -> Unit = {},
+    onOpenCameraScanner: () -> Unit = {},
+    onOpenQrisDialog: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     val totalItems = state.cartItems.sumOf { it.quantity }
@@ -277,19 +318,57 @@ private fun CartContent(
                         )
                     }
                 }
-                TextButton(onClick = onBackToPos) {
-                    Icon(
-                        Icons.Outlined.Add,
-                        contentDescription = null,
-                        tint = CartPrimary,
-                        modifier = Modifier.size(18.dp)
-                    )
-                    Spacer(modifier = Modifier.width(4.dp))
-                    Text(
-                        "Tambah Barang",
-                        color = CartPrimary,
-                        fontWeight = FontWeight.SemiBold
-                    )
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    if (state.heldCarts.isNotEmpty()) {
+                        Surface(
+                            onClick = onOpenHeldCarts,
+                            shape = RoundedCornerShape(12.dp),
+                            color = Color(0xFFFEF3C7),
+                            border = BorderStroke(1.dp, Color(0xFFF59E0B)),
+                            modifier = Modifier.padding(end = 8.dp)
+                        ) {
+                            Row(
+                                modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Icon(Icons.Outlined.PauseCircleOutline, contentDescription = null, tint = Color(0xFFB45309), modifier = Modifier.size(16.dp))
+                                Spacer(Modifier.width(4.dp))
+                                Text("Parkir (${state.heldCarts.size})", color = Color(0xFFB45309), fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                            }
+                        }
+                    }
+                    FilledTonalButton(
+                        onClick = onOpenCameraScanner,
+                        shape = RoundedCornerShape(10.dp),
+                        colors = ButtonDefaults.filledTonalButtonColors(
+                            containerColor = CartPrimary.copy(alpha = 0.12f),
+                            contentColor = CartPrimary
+                        ),
+                        contentPadding = PaddingValues(horizontal = 10.dp, vertical = 6.dp),
+                        modifier = Modifier.padding(end = 4.dp)
+                    ) {
+                        Icon(
+                            Icons.Outlined.QrCodeScanner,
+                            contentDescription = "Scan Barcode",
+                            modifier = Modifier.size(16.dp)
+                        )
+                        Spacer(Modifier.width(4.dp))
+                        Text("Scan", fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                    }
+                    TextButton(onClick = onBackToPos) {
+                        Icon(
+                            Icons.Outlined.Add,
+                            contentDescription = null,
+                            tint = CartPrimary,
+                            modifier = Modifier.size(18.dp)
+                        )
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text(
+                            "Tambah Barang",
+                            color = CartPrimary,
+                            fontWeight = FontWeight.SemiBold
+                        )
+                    }
                 }
             }
 
@@ -351,6 +430,12 @@ private fun CartContent(
                         "Diskon transaksi",
                         "-${formatRupiah(state.transactionDiscountAmount)}",
                         isDiscount = true
+                    )
+                }
+                if (state.isDeliveryEnabled && state.deliveryFee > BigDecimal.ZERO) {
+                    CartCalculationRow(
+                        "Ongkos kirim",
+                        "+${formatRupiah(state.deliveryFee)}"
                     )
                 }
                 TextButton(
@@ -421,6 +506,28 @@ private fun CartContent(
                     error = state.customerError
                 )
 
+                if (state.selectedCustomer != null) {
+                    Spacer(modifier = Modifier.height(8.dp))
+                    CustomerCreditInspectorCard(
+                        customer = state.selectedCustomer,
+                        currentBillTotal = state.finalTotal
+                    )
+                }
+
+                Spacer(modifier = Modifier.height(10.dp))
+
+                // Pengiriman / Ekspedisi Toko
+                DeliverySectionCard(
+                    isDeliveryEnabled = state.isDeliveryEnabled,
+                    deliveryFeeInput = state.deliveryFeeInput,
+                    deliveryAddress = state.deliveryAddress,
+                    deliveryCourier = state.deliveryCourier,
+                    onToggleDelivery = onToggleDelivery,
+                    onDeliveryFeeChanged = onDeliveryFeeChanged,
+                    onDeliveryAddressChanged = onDeliveryAddressChanged,
+                    onDeliveryCourierChanged = onDeliveryCourierChanged,
+                )
+
                 Spacer(modifier = Modifier.height(12.dp))
 
                 // Metode Pembayaran
@@ -469,20 +576,71 @@ private fun CartContent(
                     }
                 }
 
+                if (state.selectedPaymentMethod == PaymentMethod.QRIS) {
+                    Spacer(modifier = Modifier.height(12.dp))
+                    Surface(
+                        onClick = onOpenQrisDialog,
+                        shape = RoundedCornerShape(12.dp),
+                        color = Color(0xFFF0FDF4),
+                        border = BorderStroke(1.dp, Color(0xFF86EFAC)),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(12.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Surface(
+                                color = Color(0xFF10B981),
+                                shape = CircleShape,
+                                modifier = Modifier.size(36.dp)
+                            ) {
+                                Box(contentAlignment = Alignment.Center) {
+                                    Icon(
+                                        imageVector = Icons.Outlined.QrCode2,
+                                        contentDescription = null,
+                                        tint = Color.White,
+                                        modifier = Modifier.size(20.dp)
+                                    )
+                                }
+                            }
+                            Spacer(Modifier.width(10.dp))
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text(
+                                    "Tampilkan Kode QRIS",
+                                    fontSize = 13.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = Color(0xFF065F46)
+                                )
+                                Text(
+                                    "Tampilkan QR di layar tablet untuk discan pembeli",
+                                    fontSize = 11.sp,
+                                    color = Color(0xFF047857)
+                                )
+                            }
+                            Icon(
+                                imageVector = Icons.AutoMirrored.Outlined.ArrowForward,
+                                contentDescription = null,
+                                tint = Color(0xFF059669),
+                                modifier = Modifier.size(18.dp)
+                            )
+                        }
+                    }
+                }
+
                 Spacer(modifier = Modifier.weight(1f))
 
                 // Tombol Aksi
                 Row(
-                    horizontalArrangement = Arrangement.spacedBy(12.dp),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
                     modifier = Modifier.fillMaxWidth()
                 ) {
                     OutlinedButton(
                         onClick = onClearCart,
                         modifier = Modifier
                             .height(56.dp)
-                            .weight(1f),
+                            .weight(0.75f),
                         shape = RoundedCornerShape(12.dp),
-                        border = BorderStroke(2.dp, CartError),
+                        border = BorderStroke(1.5.dp, CartError),
                         colors = ButtonDefaults.outlinedButtonColors(
                             contentColor = CartError
                         )
@@ -490,22 +648,52 @@ private fun CartContent(
                         Icon(
                             Icons.Outlined.DeleteSweep,
                             contentDescription = null,
-                            modifier = Modifier.size(20.dp)
+                            modifier = Modifier.size(18.dp)
                         )
-                        Spacer(modifier = Modifier.width(6.dp))
+                        Spacer(modifier = Modifier.width(4.dp))
                         Text(
                             "Batal",
                             fontWeight = FontWeight.Bold,
-                            fontSize = 16.sp
+                            fontSize = 14.sp
+                        )
+                    }
+
+                    OutlinedButton(
+                        onClick = onOpenHoldCartDialog,
+                        modifier = Modifier
+                            .height(56.dp)
+                            .weight(0.85f),
+                        shape = RoundedCornerShape(12.dp),
+                        border = BorderStroke(1.5.dp, Color(0xFFD97706)),
+                        colors = ButtonDefaults.outlinedButtonColors(
+                            contentColor = Color(0xFFD97706)
+                        )
+                    ) {
+                        Icon(
+                            Icons.Outlined.BookmarkAdd,
+                            contentDescription = null,
+                            modifier = Modifier.size(18.dp)
+                        )
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text(
+                            "Parkir",
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 14.sp
                         )
                     }
 
                     Button(
-                        onClick = onCheckout,
+                        onClick = {
+                            if (state.selectedPaymentMethod == PaymentMethod.QRIS) {
+                                onOpenQrisDialog()
+                            } else {
+                                onCheckout()
+                            }
+                        },
                         enabled = !state.isLoading && !state.isPreviewLoading && state.cartItems.isNotEmpty() && paymentIsValid && creditCustomerIsValid,
                         modifier = Modifier
                             .height(56.dp)
-                            .weight(1f),
+                            .weight(1.4f),
                         shape = RoundedCornerShape(12.dp),
                         colors = ButtonDefaults.buttonColors(
                             containerColor = CartPrimary
@@ -519,15 +707,16 @@ private fun CartContent(
                             )
                         } else {
                             Icon(
-                                Icons.Outlined.Payments,
+                                if (state.selectedPaymentMethod == PaymentMethod.QRIS) Icons.Outlined.QrCode2 else Icons.AutoMirrored.Outlined.ReceiptLong,
                                 contentDescription = null,
                                 modifier = Modifier.size(20.dp)
                             )
                             Spacer(modifier = Modifier.width(6.dp))
                             Text(
                                 when {
-                                    state.hasAmbiguousCheckout -> "Periksa Checkout"
-                                    state.checkoutPreview?.approvalRequired == true -> "Minta Persetujuan"
+                                    state.hasAmbiguousCheckout -> "Periksa"
+                                    state.checkoutPreview?.approvalRequired == true -> "Persetujuan"
+                                    state.selectedPaymentMethod == PaymentMethod.QRIS -> "QRIS"
                                     else -> "Bayar"
                                 },
                                 fontWeight = FontWeight.Bold,

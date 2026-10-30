@@ -19,6 +19,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Edit
+import androidx.compose.material.icons.outlined.Label
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.HorizontalDivider
@@ -28,6 +29,10 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -37,6 +42,8 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.tbterminal.app.data.model.ProductDetail
 import com.tbterminal.app.data.model.ProductStock
+import com.tbterminal.app.ui.products.components.PriceTagDialog
+import java.math.BigDecimal
 
 @Composable
 internal fun ProductDetailContent(
@@ -45,6 +52,8 @@ internal fun ProductDetailContent(
     onRetry: () -> Unit,
     onEditProductClick: (String) -> Unit,
 ) {
+    var showPriceTagDialog by remember { mutableStateOf(false) }
+
     BoxWithConstraints(modifier.fillMaxSize().background(ProductBackground).testTag("product-detail-screen")) {
         val compact = maxWidth < 700.dp
         Column(
@@ -61,15 +70,34 @@ internal fun ProductDetailContent(
                     detail = detail,
                     compact = compact,
                     onEdit = { onEditProductClick(detail.product.id) },
+                    onPrintTag = { showPriceTagDialog = true },
                 )
             }
         }
     }
+
+    if (showPriceTagDialog && uiState.detail != null) {
+        val prod = uiState.detail.product
+        val stock = uiState.detail.stock
+        PriceTagDialog(
+            productName = prod.name,
+            sku = prod.sku ?: "",
+            barcode = prod.sku ?: "",
+            price = stock?.priceRetail ?: BigDecimal.ZERO,
+            unitName = stock?.unitName ?: "Pcs",
+            onDismissRequest = { showPriceTagDialog = false }
+        )
+    }
 }
 
 @Composable
-private fun ProductDetailCards(detail: ProductDetail, compact: Boolean, onEdit: () -> Unit) {
-    ProductIdentityCard(detail = detail, onEdit = onEdit)
+private fun ProductDetailCards(
+    detail: ProductDetail,
+    compact: Boolean,
+    onEdit: () -> Unit,
+    onPrintTag: () -> Unit = {}
+) {
+    ProductIdentityCard(detail = detail, onEdit = onEdit, onPrintTag = onPrintTag)
     if (compact) {
         ProductPricesCard(detail = detail, modifier = Modifier.fillMaxWidth())
         ProductStockCard(detail = detail, modifier = Modifier.fillMaxWidth())
@@ -82,7 +110,11 @@ private fun ProductDetailCards(detail: ProductDetail, compact: Boolean, onEdit: 
 }
 
 @Composable
-private fun ProductIdentityCard(detail: ProductDetail, onEdit: () -> Unit) {
+private fun ProductIdentityCard(
+    detail: ProductDetail,
+    onEdit: () -> Unit,
+    onPrintTag: () -> Unit = {}
+) {
     ProductDetailCard(modifier = Modifier.fillMaxWidth().testTag("product-detail-identity")) {
         Row(verticalAlignment = Alignment.Top) {
             Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
@@ -102,8 +134,13 @@ private fun ProductIdentityCard(detail: ProductDetail, onEdit: () -> Unit) {
                     overflow = TextOverflow.Ellipsis,
                 )
             }
-            IconButton(onClick = onEdit, modifier = Modifier.size(48.dp).testTag("product-detail-edit")) {
-                Icon(Icons.Outlined.Edit, contentDescription = "Edit produk", tint = ProductPrimaryDark, modifier = Modifier.size(20.dp))
+            Row {
+                IconButton(onClick = onPrintTag, modifier = Modifier.size(48.dp).testTag("product-detail-print-tag")) {
+                    Icon(Icons.Outlined.Label, contentDescription = "Cetak Label Rak", tint = ProductPrimaryDark, modifier = Modifier.size(20.dp))
+                }
+                IconButton(onClick = onEdit, modifier = Modifier.size(48.dp).testTag("product-detail-edit")) {
+                    Icon(Icons.Outlined.Edit, contentDescription = "Edit produk", tint = ProductPrimaryDark, modifier = Modifier.size(20.dp))
+                }
             }
         }
         ProductDetailBadge(

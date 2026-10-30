@@ -50,6 +50,8 @@ fun AdminSettingsScreen(
     onSecurityLogClick: () -> Unit = {},
     onProfileClick: () -> Unit = {},
     onSettingsClick: () -> Unit = {},
+    initialPage: SettingsPage? = null,
+    onBackToPrevious: (() -> Unit)? = null,
     onLogout: () -> Unit = {},
     viewModel: SettingsViewModel = viewModel(
         factory = SettingsViewModel.factory(systemRepository, localAppSettingsDataSource)
@@ -57,14 +59,14 @@ fun AdminSettingsScreen(
 ) {
     val context = LocalContext.current
     val uiState = viewModel.uiState.collectAsStateWithLifecycle().value
-    var selectedPage by rememberSaveable { mutableStateOf<SettingsPage?>(null) }
+    var selectedPage by rememberSaveable { mutableStateOf<SettingsPage?>(initialPage) }
 
     AdminDashboardShell(
         userName = name,
         role = role,
         activeDestination = AdminDestination.Settings,
         pageTitle = selectedPage?.title ?: stringResource(R.string.owner_menu_settings),
-        onBack = selectedPage?.let { { selectedPage = null } },
+        onBack = if (initialPage != null) onBackToPrevious else (selectedPage?.let { { selectedPage = null } } ?: onBackToPrevious),
         onDashboardClick = onDashboardClick,
         onProductsClick = onProductsClick,
         onAddProductClick = onAddProductClick,
@@ -127,6 +129,7 @@ fun AdminSettingsScreen(
             onScanPrinters = { viewModel.scanPrinters(context) },
             onTestPrint = { viewModel.testPrint(context) },
             onTestCashDrawer = { viewModel.testCashDrawer(context) },
+            onDismissMessage = viewModel::clearMessage,
             modifier = contentModifier
         )
     }

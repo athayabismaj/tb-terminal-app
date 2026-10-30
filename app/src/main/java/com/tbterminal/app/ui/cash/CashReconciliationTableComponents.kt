@@ -11,6 +11,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -29,11 +30,13 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.tbterminal.app.data.model.CashTransaction
+import com.tbterminal.app.ui.components.SkeletonBox
 
 @Composable
 internal fun CashTransactionsTable(
@@ -169,10 +172,35 @@ private fun CashHeaderText(text: String, modifier: Modifier, align: Alignment.Ho
 
 @Composable
 private fun CashLoadingState() {
-    com.tbterminal.app.ui.components.SkeletonList(
-        modifier = Modifier.fillMaxWidth().height(220.dp),
-        itemCount = 5,
-    )
+    Column(
+        modifier = Modifier.fillMaxWidth().testTag("cash-transactions-skeleton")
+    ) {
+        repeat(5) { index ->
+            if (index > 0) HorizontalDivider(color = CashLine.copy(alpha = 0.7f))
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 24.dp, vertical = 18.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Box(Modifier.weight(1.2f)) {
+                    SkeletonBox(Modifier.width(60.dp).height(14.dp), shape = RoundedCornerShape(4.dp))
+                }
+                Box(Modifier.weight(2f)) {
+                    SkeletonBox(Modifier.width(110.dp).height(14.dp), shape = RoundedCornerShape(4.dp))
+                }
+                Box(Modifier.weight(1f)) {
+                    SkeletonBox(Modifier.width(60.dp).height(22.dp), shape = RoundedCornerShape(14.dp))
+                }
+                Box(Modifier.weight(1.3f), contentAlignment = Alignment.CenterEnd) {
+                    SkeletonBox(Modifier.width(80.dp).height(14.dp), shape = RoundedCornerShape(4.dp))
+                }
+                Box(Modifier.weight(1.3f), contentAlignment = Alignment.CenterEnd) {
+                    SkeletonBox(Modifier.width(80.dp).height(14.dp), shape = RoundedCornerShape(4.dp))
+                }
+            }
+        }
+    }
 }
 
 @Composable

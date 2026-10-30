@@ -67,6 +67,10 @@ class SupplierViewModel(
         }
     }
 
+    fun onStatusFilterChanged(filter: SupplierStatusFilter) {
+        _uiState.update { it.copy(statusFilter = filter) }
+    }
+
     fun onNameChanged(value: String) = updateInput { it.copy(nameInput = value) }
     fun onPhoneChanged(value: String) = updateInput { it.copy(phoneInput = value) }
     fun onAddressChanged(value: String) = updateInput { it.copy(addressInput = value) }

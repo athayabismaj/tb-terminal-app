@@ -50,7 +50,9 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.zIndex
 import androidx.core.hardware.fingerprint.FingerprintManagerCompat
+import com.tbterminal.app.ui.components.TopFloatingCapsule
 
 private const val PREFS_NAME = "login_prefs"
 private const val KEY_REMEMBER_USERNAME = "remember_username"
@@ -254,6 +256,13 @@ internal fun LoginContent(
             .imePadding(),
         contentAlignment = Alignment.TopCenter
     ) {
+        TopFloatingCapsule(
+            message = null,
+            error = serverBannerErrorMessage,
+            onDismiss = { /* auto-dismiss */ },
+            modifier = Modifier.padding(top = 16.dp).zIndex(99f)
+        )
+
         Column(
             modifier = Modifier
                 .widthIn(max = 440.dp)
@@ -370,12 +379,6 @@ internal fun LoginContent(
                             .padding(vertical = 8.dp, horizontal = 4.dp)
                             .testTag("login-forgot-password-link")
                     )
-                }
-
-                // Banner Error Server jika ada kesalahan non-kredensial (misal jaringan/akun terkunci)
-                if (!serverBannerErrorMessage.isNullOrBlank()) {
-                    Spacer(modifier = Modifier.height(16.dp))
-                    LoginErrorBanner(message = serverBannerErrorMessage)
                 }
 
                 Spacer(modifier = Modifier.height(20.dp))

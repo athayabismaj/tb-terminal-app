@@ -41,9 +41,11 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.zIndex
 import com.tbterminal.app.data.model.SupplierPayable
 import com.tbterminal.app.ui.components.TbMobileControlSheet
 import com.tbterminal.app.ui.components.TbMobileSheetDoneButton
+import com.tbterminal.app.ui.components.TopFloatingCapsule
 
 @Composable
 internal fun SupplierDebtScreen(
@@ -68,7 +70,6 @@ internal fun SupplierDebtScreen(
                 .padding(horizontal = if (compact) 16.dp else 28.dp, vertical = if (compact) 14.dp else 20.dp),
             verticalArrangement = Arrangement.spacedBy(if (compact) 12.dp else 16.dp)
         ) {
-            SupplierDebtMessage(uiState, onDismissMessage)
             if (!compact && (uiState.payables.isNotEmpty() || (!uiState.isLoading && uiState.errorMessage == null))) {
                 SupplierDebtMetrics(uiState, compact = false)
             }
@@ -86,6 +87,16 @@ internal fun SupplierDebtScreen(
                 onSupplierDetailClick = onSupplierDetailClick,
             )
         }
+
+        TopFloatingCapsule(
+            message = uiState.message,
+            error = uiState.errorMessage,
+            onDismiss = onDismissMessage,
+            modifier = Modifier
+                .align(Alignment.TopCenter)
+                .padding(top = 16.dp, start = 20.dp, end = 20.dp)
+                .zIndex(99f),
+        )
     }
 
     if (showMobileOverview) {

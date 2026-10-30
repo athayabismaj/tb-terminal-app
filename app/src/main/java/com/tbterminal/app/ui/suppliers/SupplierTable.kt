@@ -35,8 +35,9 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -52,16 +53,15 @@ internal fun SupplierTable(
     Surface(
         modifier = Modifier.fillMaxWidth().testTag("supplier-table"),
         color = SupplierSurface,
-        shape = RoundedCornerShape(20.dp),
-        tonalElevation = 2.dp,
-        border = BorderStroke(1.dp, SupplierSlate200.copy(alpha = 0.8f)),
+        shape = RoundedCornerShape(16.dp),
+        border = BorderStroke(1.dp, SupplierSlate200),
     ) {
         Column(Modifier.fillMaxWidth()) {
             SupplierTableHeader()
             suppliers.forEachIndexed { index, supplier ->
                 SupplierTableRow(supplier, onEdit, onDelete)
                 if (index < suppliers.lastIndex) {
-                    HorizontalDivider(Modifier.padding(start = 24.dp), color = SupplierSlate200.copy(alpha = 0.55f))
+                    HorizontalDivider(color = SupplierSlate100, thickness = 1.dp)
                 }
             }
         }
@@ -74,18 +74,30 @@ internal fun SupplierMobileList(
     onEdit: (Supplier) -> Unit,
     onDelete: (Supplier) -> Unit,
 ) {
-    Column(
+    Surface(
         modifier = Modifier.fillMaxWidth().testTag("supplier-card-list"),
-        verticalArrangement = Arrangement.spacedBy(10.dp),
+        shape = RoundedCornerShape(16.dp),
+        color = Color.White,
+        border = BorderStroke(1.dp, SupplierSlate200),
     ) {
-        suppliers.forEach { supplier -> SupplierMobileCard(supplier, onEdit, onDelete) }
+        Column(modifier = Modifier.fillMaxWidth()) {
+            suppliers.forEachIndexed { index, supplier ->
+                SupplierMobileCard(supplier, onEdit, onDelete)
+                if (index < suppliers.lastIndex) {
+                    HorizontalDivider(color = SupplierSlate100, thickness = 1.dp)
+                }
+            }
+        }
     }
 }
 
 @Composable
 private fun SupplierTableHeader() {
     Row(
-        Modifier.fillMaxWidth().background(SupplierSlate50.copy(alpha = 0.55f)).padding(horizontal = 24.dp, vertical = 14.dp),
+        modifier = Modifier
+            .fillMaxWidth()
+            .background(SupplierSlate50)
+            .padding(horizontal = 20.dp, vertical = 14.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         SupplierTableLabel("Supplier", Modifier.weight(2.4f))
@@ -97,22 +109,55 @@ private fun SupplierTableHeader() {
 }
 
 @Composable
-private fun SupplierTableRow(supplier: Supplier, onEdit: (Supplier) -> Unit, onDelete: (Supplier) -> Unit) {
+private fun SupplierTableRow(
+    supplier: Supplier,
+    onEdit: (Supplier) -> Unit,
+    onDelete: (Supplier) -> Unit,
+) {
     Row(
-        Modifier.fillMaxWidth().padding(horizontal = 24.dp, vertical = 16.dp),
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 20.dp, vertical = 14.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Row(Modifier.weight(2.4f), verticalAlignment = Alignment.CenterVertically) {
             SupplierAvatar(supplier.name)
             Spacer(Modifier.width(12.dp))
             Column {
-                Text(supplier.name, color = SupplierSlate900, fontSize = 14.sp, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                Text(supplier.address ?: "Alamat belum diisi", color = SupplierSlate500, fontSize = 12.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                Text(
+                    text = supplier.name,
+                    color = SupplierSlate900,
+                    fontSize = 14.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+                Text(
+                    text = supplier.address ?: "Alamat belum diisi",
+                    color = SupplierSlate500,
+                    fontSize = 12.sp,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
             }
         }
-        Text(supplier.phone ?: "-", Modifier.weight(1.5f), color = SupplierSlate500, fontSize = 13.sp, maxLines = 1)
-        Text("${supplier.paymentTermDays} hari", Modifier.weight(0.9f), color = SupplierSlate900, fontSize = 13.sp)
-        Box(Modifier.weight(1.1f)) { SupplierStatusBadge(supplier.isActive) }
+        Text(
+            text = supplier.phone ?: "-",
+            modifier = Modifier.weight(1.5f),
+            color = SupplierSlate600,
+            fontSize = 13.sp,
+            maxLines = 1,
+        )
+        Text(
+            text = "${supplier.paymentTermDays} hari",
+            modifier = Modifier.weight(0.9f),
+            color = SupplierSlate900,
+            fontSize = 13.sp,
+            fontWeight = FontWeight.Medium,
+        )
+        Box(Modifier.weight(1.1f)) {
+            SupplierStatusBadge(supplier.isActive, Modifier.testTag("supplier-status-${supplier.id}"))
+        }
         Box(Modifier.weight(0.7f), contentAlignment = Alignment.CenterEnd) {
             SupplierActionsMenu(supplier, onEdit, onDelete)
         }
@@ -120,170 +165,273 @@ private fun SupplierTableRow(supplier: Supplier, onEdit: (Supplier) -> Unit, onD
 }
 
 @Composable
-private fun SupplierMobileCard(supplier: Supplier, onEdit: (Supplier) -> Unit, onDelete: (Supplier) -> Unit) {
-    Surface(
-        modifier = Modifier.fillMaxWidth().testTag("supplier-card-${supplier.id}"),
-        color = SupplierSurface,
-        shape = RoundedCornerShape(16.dp),
-        border = BorderStroke(1.dp, com.tbterminal.app.ui.theme.TbOutline.copy(alpha = 0.7f)),
-        shadowElevation = 1.dp
+private fun SupplierMobileCard(
+    supplier: Supplier,
+    onEdit: (Supplier) -> Unit,
+    onDelete: (Supplier) -> Unit,
+) {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .testTag("supplier-card-${supplier.id}")
+            .padding(16.dp),
+        verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
-        Column(
-            Modifier.fillMaxWidth().padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(14.dp),
+        // Item Header: Avatar, Name & Status Inline, More Menu
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.Top,
         ) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                SupplierAvatar(supplier.name)
-                Spacer(Modifier.width(12.dp))
-                Text(
-                    supplier.name,
-                    modifier = Modifier.weight(1f),
-                    color = SupplierSlate900,
-                    fontSize = 14.sp,
-                    fontWeight = FontWeight.SemiBold,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                )
-                SupplierStatusBadge(
-                    supplier.isActive,
-                    Modifier.testTag("supplier-status-${supplier.id}"),
-                )
-                Spacer(Modifier.width(6.dp))
-                SupplierActionsMenu(supplier, onEdit, onDelete)
-            }
-
             Row(
-                modifier = Modifier.fillMaxWidth(),
+                modifier = Modifier.weight(1f).padding(end = 8.dp),
+                verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(12.dp),
-                verticalAlignment = Alignment.Top,
             ) {
-                SupplierInfoRow(
-                    icon = Icons.Outlined.Phone,
-                    label = "Nomor telepon",
-                    value = supplier.phone ?: "Belum diisi",
-                    modifier = Modifier.weight(1f),
-                    isEmpty = supplier.phone.isNullOrBlank()
+                SupplierAvatar(supplier.name)
+                Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                    Text(
+                        text = supplier.name,
+                        color = SupplierSlate900,
+                        fontSize = 15.sp,
+                        fontWeight = FontWeight.Bold,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                    SupplierStatusInline(
+                        isActive = supplier.isActive,
+                        modifier = Modifier.testTag("supplier-status-${supplier.id}"),
+                    )
+                }
+            }
+            SupplierActionsMenu(supplier, onEdit, onDelete)
+        }
+
+        // Contact & Address Clean List
+        Column(
+            modifier = Modifier.fillMaxWidth().padding(top = 2.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            // Telepon Row
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                Icon(
+                    imageVector = Icons.Outlined.Phone,
+                    contentDescription = null,
+                    modifier = Modifier.size(16.dp),
+                    tint = SupplierEmerald600,
                 )
-                SupplierInfoRow(
-                    icon = Icons.Outlined.Place,
-                    label = "Alamat",
-                    value = supplier.address ?: "Belum diisi",
-                    modifier = Modifier.weight(1f),
-                    maxLines = 2,
-                    isEmpty = supplier.address.isNullOrBlank()
+                Text(
+                    text = "Telepon:",
+                    fontSize = 12.sp,
+                    color = SupplierSlate500,
+                    fontWeight = FontWeight.Normal,
                 )
+                if (supplier.phone.isNullOrBlank()) {
+                    Text(
+                        text = "Belum diisi",
+                        fontSize = 12.sp,
+                        color = SupplierSlate400,
+                        fontStyle = FontStyle.Italic,
+                    )
+                } else {
+                    Text(
+                        text = supplier.phone,
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.SemiBold,
+                        color = SupplierSlate900,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                }
             }
 
-            HorizontalDivider(color = SupplierSlate200.copy(alpha = 0.55f))
-            Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                Text("Termin pembayaran", color = SupplierSlate500, fontSize = 11.sp, fontWeight = FontWeight.Medium)
-                Text("${supplier.paymentTermDays} hari", color = SupplierSlate900, fontWeight = FontWeight.Bold, fontSize = 12.sp)
+            // Alamat Row
+            Row(
+                verticalAlignment = Alignment.Top,
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                Icon(
+                    imageVector = Icons.Outlined.Place,
+                    contentDescription = null,
+                    modifier = Modifier.size(16.dp).padding(top = 1.dp),
+                    tint = SupplierEmerald600,
+                )
+                Text(
+                    text = "Alamat:",
+                    fontSize = 12.sp,
+                    color = SupplierSlate500,
+                    fontWeight = FontWeight.Normal,
+                )
+                if (supplier.address.isNullOrBlank()) {
+                    Text(
+                        text = "Belum diisi",
+                        fontSize = 12.sp,
+                        color = SupplierSlate400,
+                        fontStyle = FontStyle.Italic,
+                    )
+                } else {
+                    Text(
+                        text = supplier.address,
+                        fontSize = 12.sp,
+                        color = SupplierSlate700,
+                        maxLines = 2,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                }
             }
+        }
+
+        // Divider & Payment Term (Clean inline text without container)
+        HorizontalDivider(color = SupplierSlate100, thickness = 1.dp)
+        Row(
+            modifier = Modifier.fillMaxWidth().padding(top = 2.dp),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Text(
+                text = "Termin Pembayaran",
+                fontSize = 12.sp,
+                color = SupplierSlate500,
+                fontWeight = FontWeight.Normal,
+            )
+            Text(
+                text = "${supplier.paymentTermDays} hari",
+                fontSize = 12.sp,
+                fontWeight = FontWeight.SemiBold,
+                color = SupplierSlate900,
+            )
         }
     }
 }
 
 @Composable
-private fun SupplierInfoRow(
-    icon: ImageVector,
-    label: String,
-    value: String,
-    modifier: Modifier = Modifier,
-    maxLines: Int = 1,
-    isEmpty: Boolean = false,
-) {
+private fun SupplierStatusInline(isActive: Boolean, modifier: Modifier = Modifier) {
     Row(
-        modifier = modifier.heightIn(min = 40.dp),
-        horizontalArrangement = Arrangement.spacedBy(10.dp),
-        verticalAlignment = Alignment.Top,
+        modifier = modifier,
+        horizontalArrangement = Arrangement.spacedBy(5.dp),
+        verticalAlignment = Alignment.CenterVertically,
     ) {
         Box(
             modifier = Modifier
-                .padding(top = 2.dp)
-                .size(28.dp)
-                .clip(RoundedCornerShape(8.dp))
-                .background(com.tbterminal.app.ui.theme.TbGreenLight.copy(alpha = 0.7f)),
-            contentAlignment = Alignment.Center,
-        ) {
-            Icon(
-                imageVector = icon,
-                contentDescription = null,
-                modifier = Modifier.size(14.dp),
-                tint = com.tbterminal.app.ui.theme.TbGreenDark,
-            )
-        }
-        Column(modifier = Modifier.weight(1f)) {
-            Text(label, color = SupplierSlate500, fontSize = 11.sp, fontWeight = FontWeight.Medium)
-            Text(
-                value,
-                modifier = Modifier.padding(top = 4.dp),
-                color = if (isEmpty) SupplierSlate500 else SupplierSlate900,
-                fontSize = 12.sp,
-                fontWeight = if (isEmpty) FontWeight.Normal else FontWeight.SemiBold,
-                fontStyle = if (isEmpty) androidx.compose.ui.text.font.FontStyle.Italic else androidx.compose.ui.text.font.FontStyle.Normal,
-                maxLines = maxLines,
-                overflow = TextOverflow.Ellipsis,
-            )
-        }
+                .size(6.dp)
+                .clip(CircleShape)
+                .background(if (isActive) SupplierEmerald600 else SupplierSlate400),
+        )
+        Text(
+            text = if (isActive) "Aktif" else "Nonaktif",
+            color = if (isActive) SupplierEmerald600 else SupplierSlate500,
+            fontSize = 12.sp,
+            fontWeight = FontWeight.Medium,
+        )
     }
 }
 
 @Composable
 private fun SupplierAvatar(name: String, modifier: Modifier = Modifier) {
     Box(
-        modifier.size(40.dp).clip(CircleShape).background(com.tbterminal.app.ui.theme.TbGreenLight),
+        modifier = modifier
+            .size(40.dp)
+            .clip(CircleShape)
+            .background(SupplierEmerald100),
         contentAlignment = Alignment.Center,
     ) {
-        Text(name.trim().firstOrNull()?.uppercase() ?: "S", color = com.tbterminal.app.ui.theme.TbGreenDark, fontSize = 16.sp, fontWeight = FontWeight.Bold)
+        Text(
+            text = name.trim().firstOrNull()?.uppercase() ?: "S",
+            color = SupplierEmerald600,
+            fontSize = 16.sp,
+            fontWeight = FontWeight.Bold,
+        )
     }
 }
 
 @Composable
 private fun SupplierStatusBadge(isActive: Boolean, modifier: Modifier = Modifier) {
-    val tint = if (isActive) SupplierEmerald700 else SupplierSlate500
+    val bg = if (isActive) SupplierEmerald100 else SupplierSlate100
+    val fg = if (isActive) SupplierEmerald600 else SupplierSlate500
+
     Row(
-        modifier.clip(RoundedCornerShape(999.dp)).background(tint.copy(alpha = 0.11f)).padding(horizontal = 10.dp, vertical = 5.dp),
+        modifier = modifier
+            .clip(RoundedCornerShape(999.dp))
+            .background(bg)
+            .padding(horizontal = 9.dp, vertical = 3.dp),
         horizontalArrangement = Arrangement.spacedBy(6.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Box(Modifier.size(6.dp).clip(CircleShape).background(tint))
-        Text(if (isActive) "Aktif" else "Nonaktif", color = tint, fontSize = 11.sp, fontWeight = FontWeight.SemiBold)
+        Box(
+            modifier = Modifier
+                .size(6.dp)
+                .clip(CircleShape)
+                .background(fg),
+        )
+        Text(
+            text = if (isActive) "Aktif" else "Nonaktif",
+            color = fg,
+            fontSize = 11.sp,
+            fontWeight = FontWeight.SemiBold,
+        )
     }
 }
 
 @Composable
-private fun SupplierActionsMenu(supplier: Supplier, onEdit: (Supplier) -> Unit, onDelete: (Supplier) -> Unit) {
+private fun SupplierActionsMenu(
+    supplier: Supplier,
+    onEdit: (Supplier) -> Unit,
+    onDelete: (Supplier) -> Unit,
+) {
     var expanded by remember { mutableStateOf(false) }
+
     Box {
         IconButton(
             onClick = { expanded = true },
-            modifier = Modifier.size(32.dp).testTag("supplier-actions-${supplier.id}"),
+            modifier = Modifier.size(30.dp).testTag("supplier-actions-${supplier.id}"),
         ) {
-            Icon(Icons.Default.MoreVert, contentDescription = "Aksi supplier", modifier = Modifier.size(20.dp), tint = SupplierSlate500)
+            Icon(
+                imageVector = Icons.Default.MoreVert,
+                contentDescription = "Opsi supplier",
+                modifier = Modifier.size(18.dp),
+                tint = SupplierSlate400,
+            )
         }
         DropdownMenu(
             expanded = expanded,
             onDismissRequest = { expanded = false },
-            modifier = Modifier.background(SupplierSurface, RoundedCornerShape(14.dp)),
+            modifier = Modifier.background(SupplierSurface, RoundedCornerShape(12.dp)),
         ) {
             DropdownMenuItem(
-                text = { Text("Edit supplier") },
-                leadingIcon = { Icon(Icons.Outlined.Edit, null, Modifier.size(19.dp), tint = SupplierSlate900) },
+                text = { Text("Edit supplier", fontSize = 13.sp, color = SupplierSlate900) },
+                leadingIcon = {
+                    Icon(
+                        imageVector = Icons.Outlined.Edit,
+                        contentDescription = null,
+                        modifier = Modifier.size(18.dp),
+                        tint = SupplierSlate700,
+                    )
+                },
                 onClick = {
                     expanded = false
                     onEdit(supplier)
                 },
-                modifier = Modifier.heightIn(min = 48.dp),
+                modifier = Modifier.heightIn(min = 44.dp),
             )
             if (supplier.isActive) {
                 DropdownMenuItem(
-                    text = { Text("Nonaktifkan", color = SupplierDanger) },
-                    leadingIcon = { Icon(Icons.Outlined.DeleteOutline, null, Modifier.size(19.dp), tint = SupplierDanger) },
+                    text = { Text("Nonaktifkan", fontSize = 13.sp, color = SupplierDanger) },
+                    leadingIcon = {
+                        Icon(
+                            imageVector = Icons.Outlined.DeleteOutline,
+                            contentDescription = null,
+                            modifier = Modifier.size(18.dp),
+                            tint = SupplierDanger,
+                        )
+                    },
                     onClick = {
                         expanded = false
                         onDelete(supplier)
                     },
-                    modifier = Modifier.heightIn(min = 48.dp),
+                    modifier = Modifier.heightIn(min = 44.dp),
                 )
             }
         }

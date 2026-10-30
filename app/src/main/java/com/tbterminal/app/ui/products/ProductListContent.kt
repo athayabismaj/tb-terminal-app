@@ -1,4 +1,4 @@
-﻿package com.tbterminal.app.ui.products
+package com.tbterminal.app.ui.products
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
@@ -10,9 +10,12 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.zIndex
 import com.tbterminal.app.data.model.ProductStock
+import com.tbterminal.app.ui.components.TopFloatingCapsule
 import com.tbterminal.app.ui.products.components.ProductListToolbar
 import com.tbterminal.app.ui.products.components.ProductTableCard
 
@@ -36,6 +39,13 @@ internal fun ProductListContent(
 ) {
     BoxWithConstraints(modifier = modifier.fillMaxSize().background(ProductBackground)) {
         val compact = maxWidth < 720.dp
+
+        TopFloatingCapsule(
+            message = uiState.actionMessage,
+            onDismiss = onDismissMessage,
+            modifier = Modifier.align(Alignment.TopCenter).zIndex(99f)
+        )
+
         Column(
             modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState())
                 .padding(if (compact) 16.dp else 32.dp),
@@ -51,10 +61,6 @@ internal fun ProductListContent(
                 onImportProductClick = onImportProductClick,
                 compact = compact,
             )
-
-            if (uiState.actionMessage != null) {
-                ProductBanner(message = uiState.actionMessage, onDismiss = onDismissMessage)
-            }
 
             ProductTableCard(
                 uiState = uiState,

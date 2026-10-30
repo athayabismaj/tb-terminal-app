@@ -1,10 +1,14 @@
 package com.tbterminal.app.ui.salestransactions
 
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.zIndex
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.tbterminal.app.data.local.dao.TransactionDao
@@ -12,6 +16,7 @@ import com.tbterminal.app.data.model.CashTransaction
 import com.tbterminal.app.data.repository.CashReconciliationRepository
 import com.tbterminal.app.data.sync.OfflineCheckoutSyncService
 import com.tbterminal.app.ui.components.RefreshableContent
+import com.tbterminal.app.ui.components.TopFloatingCapsule
 import com.tbterminal.app.ui.dashboard.DashboardBrandGreenDark
 import com.tbterminal.app.ui.dashboard.DashboardTextSecondary
 import com.tbterminal.app.ui.dashboard.DashboardWarningOrange
@@ -96,27 +101,37 @@ fun AdminTransactionHistoryScreen(
         onSettingsClick = onSettingsClick,
         onLogout = onLogout,
     ) { contentModifier ->
-        RefreshableContent(
-            isRefreshing = uiState.isLoading && uiState.transactions.isNotEmpty(),
-            onRefresh = viewModel::refresh,
-            modifier = contentModifier,
-        ) {
-            TransactionHistoryContent(
-                state = uiState,
-                onSearchChanged = viewModel::updateSearchQuery,
-                onStatusChanged = viewModel::updateStatusFilter,
-                onPaymentMethodChanged = viewModel::updatePaymentMethodFilter,
-                onDatePresetSelected = viewModel::setDatePreset,
-                onDateSelected = viewModel::setDate,
-                onDateRangeSelected = viewModel::setDateRange,
-                onSyncClick = viewModel::syncLocalTransaction,
-                onSyncAllClick = viewModel::syncAllLocalTransactions,
-                onRetry = viewModel::refresh,
-                onPreviousPage = viewModel::previousPage,
-                onNextPage = viewModel::nextPage,
-                onReceiptClick = onReceiptClick,
-                modifier = Modifier,
-            )
+        Box(modifier = contentModifier.fillMaxSize()) {
+            RefreshableContent(
+                isRefreshing = uiState.isLoading && uiState.transactions.isNotEmpty(),
+                onRefresh = viewModel::refresh,
+                modifier = Modifier.fillMaxSize(),
+            ) {
+                TransactionHistoryContent(
+                    state = uiState,
+                    onSearchChanged = viewModel::updateSearchQuery,
+                    onStatusChanged = viewModel::updateStatusFilter,
+                    onPaymentMethodChanged = viewModel::updatePaymentMethodFilter,
+                    onDatePresetSelected = viewModel::setDatePreset,
+                    onDateSelected = viewModel::setDate,
+                    onDateRangeSelected = viewModel::setDateRange,
+                    onSyncClick = viewModel::syncLocalTransaction,
+                    onSyncAllClick = viewModel::syncAllLocalTransactions,
+                    onRetry = viewModel::refresh,
+                    onPreviousPage = viewModel::previousPage,
+                    onNextPage = viewModel::nextPage,
+                    onReceiptClick = onReceiptClick,
+                    modifier = Modifier,
+                )
+            }
+            if (uiState.transactions.isNotEmpty()) {
+                TopFloatingCapsule(
+                    message = null,
+                    error = uiState.error,
+                    onDismiss = viewModel::clearError,
+                    modifier = Modifier.align(Alignment.TopCenter).zIndex(99f)
+                )
+            }
         }
     }
 }

@@ -14,6 +14,15 @@ interface SecurityLogRepository {
         limit: Int,
         action: String?,
         range: String?
+    ): NetworkResult<ApiResponse<AuditLogPage>> = getAuditLogs(page, limit, action, range, null, null)
+
+    suspend fun getAuditLogs(
+        page: Int,
+        limit: Int,
+        action: String?,
+        range: String?,
+        startDate: String?,
+        endDate: String?
     ): NetworkResult<ApiResponse<AuditLogPage>>
 }
 
@@ -24,10 +33,19 @@ class RemoteSecurityLogRepository(
         page: Int,
         limit: Int,
         action: String?,
-        range: String?
+        range: String?,
+        startDate: String?,
+        endDate: String?
     ): NetworkResult<ApiResponse<AuditLogPage>> {
         val result = safeApiCall {
-            securityApi.getAuditLogs(page = page, limit = limit, action = action, range = range)
+            securityApi.getAuditLogs(
+                page = page,
+                limit = limit,
+                action = action,
+                range = range,
+                startDate = startDate,
+                endDate = endDate
+            )
         }
         return when (result) {
             is NetworkResult.Success -> {

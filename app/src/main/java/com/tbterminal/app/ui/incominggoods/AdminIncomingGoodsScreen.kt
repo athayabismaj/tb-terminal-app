@@ -38,15 +38,19 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.zIndex
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.tbterminal.app.data.model.ProductStock
 import com.tbterminal.app.data.model.Supplier
 import com.tbterminal.app.data.numbering.DocumentNumberGenerator
+import com.tbterminal.app.ui.components.TopFloatingCapsule
 import com.tbterminal.app.data.repository.InventoryRepository
 import com.tbterminal.app.data.repository.PurchasingRepository
 import com.tbterminal.app.ui.dashboard.admin.AdminDashboardShell
 import com.tbterminal.app.ui.dashboard.admin.AdminDestination
+
+import androidx.activity.compose.BackHandler
 
 @Composable
 fun AdminIncomingGoodsScreen(
@@ -74,6 +78,7 @@ fun AdminIncomingGoodsScreen(
     onOperationalAuditClick: () -> Unit = {},
     onProfileClick: () -> Unit = {},
     onSettingsClick: () -> Unit = {},
+    onBack: () -> Unit = {},
     onLogout: () -> Unit,
     viewModel: IncomingGoodsViewModel = viewModel(
         factory = IncomingGoodsViewModel.factory(
@@ -85,6 +90,8 @@ fun AdminIncomingGoodsScreen(
     )
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+
+    BackHandler(onBack = onBack)
 
     AdminDashboardShell(
         userName = name,
@@ -109,6 +116,7 @@ fun AdminIncomingGoodsScreen(
         onOperationalAuditClick = onOperationalAuditClick,
         onProfileClick = onProfileClick,
         onSettingsClick = onSettingsClick,
+        onBack = onBack,
         onLogout = onLogout
     ) { contentModifier ->
         IncomingGoodsListContent(
@@ -152,6 +160,7 @@ fun AdminIncomingGoodsFormScreen(
     onOperationalAuditClick: () -> Unit = {},
     onProfileClick: () -> Unit = {},
     onSettingsClick: () -> Unit = {},
+    onBack: () -> Unit = onIncomingGoodsClick,
     onLogout: () -> Unit,
     viewModel: IncomingGoodsViewModel = viewModel(
         factory = IncomingGoodsViewModel.factory(
@@ -164,6 +173,8 @@ fun AdminIncomingGoodsFormScreen(
     )
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+
+    BackHandler(onBack = onBack)
 
     AdminDashboardShell(
         userName = name,
@@ -188,7 +199,7 @@ fun AdminIncomingGoodsFormScreen(
         onOperationalAuditClick = onOperationalAuditClick,
         onProfileClick = onProfileClick,
         onSettingsClick = onSettingsClick,
-        onBack = onIncomingGoodsClick,
+        onBack = onBack,
         onLogout = onLogout
     ) { contentModifier ->
         IncomingGoodsFormContent(
@@ -234,7 +245,6 @@ private fun IncomingGoodsListContent(
                 modifier = Modifier.widthIn(max = 1280.dp).fillMaxWidth().verticalScroll(rememberScrollState()),
                 verticalArrangement = Arrangement.spacedBy(if (compact) 12.dp else 16.dp),
             ) {
-                IncomingGoodsAlert(uiState, onDismissMessage)
                 ProductSelectorCard(
                     modifier = Modifier.fillMaxWidth(),
                     uiState = uiState,
@@ -249,6 +259,16 @@ private fun IncomingGoodsListContent(
                 Spacer(Modifier.height(4.dp))
             }
         }
+
+        TopFloatingCapsule(
+            message = uiState.message,
+            error = uiState.errorMessage,
+            onDismiss = onDismissMessage,
+            modifier = Modifier
+                .align(Alignment.TopCenter)
+                .padding(top = 16.dp, start = 20.dp, end = 20.dp)
+                .zIndex(99f),
+        )
     }
 }
 
@@ -310,7 +330,6 @@ private fun IncomingGoodsFormContent(
                 onPaymentMethodChanged = onPaymentMethodChanged,
                 onSubmit = onSubmit // Not used inside anymore
             )
-            IncomingGoodsAlert(uiState, onDismissMessage)
         }
 
         if (showPaymentSheet) {
@@ -326,6 +345,16 @@ private fun IncomingGoodsFormContent(
                 onDismiss = { showPaymentSheet = false }
             )
         }
+
+        TopFloatingCapsule(
+            message = uiState.message,
+            error = uiState.errorMessage,
+            onDismiss = onDismissMessage,
+            modifier = Modifier
+                .align(Alignment.TopCenter)
+                .padding(top = 16.dp, start = 20.dp, end = 20.dp)
+                .zIndex(99f),
+        )
     }
 }
 

@@ -59,8 +59,10 @@ import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.zIndex
 import com.tbterminal.app.ui.components.TbMobileControlSheet
 import com.tbterminal.app.ui.components.TbMobileSheetDoneButton
+import com.tbterminal.app.ui.components.TopFloatingCapsule
 import com.tbterminal.app.ui.theme.TbBackground
 import com.tbterminal.app.ui.theme.TbError
 import com.tbterminal.app.ui.theme.TbGreen
@@ -97,35 +99,50 @@ fun UserCredentialContent(
 ) {
     val compact = androidx.compose.ui.platform.LocalConfiguration.current.screenWidthDp < 700
     var showPolicy by remember(mode) { mutableStateOf(false) }
-    Column(
+
+    Box(
         modifier = modifier
             .fillMaxSize()
             .background(CredentialSurface)
-            .padding(horizontal = if (compact) 16.dp else 32.dp, vertical = if (compact) 16.dp else 28.dp)
-            .verticalScroll(rememberScrollState())
     ) {
-        when {
-            uiState.isLoadingUser -> CredentialLoadingCard(message = "Memuat data user...")
-            uiState.errorMessage != null && uiState.targetUser == null -> {
-                CredentialErrorCard(message = uiState.errorMessage, onRetry = onRetry)
-            }
-            else -> Box(
-                modifier = Modifier.fillMaxWidth(),
-                contentAlignment = Alignment.TopCenter,
-            ) {
-                CredentialFormCard(
-                    mode = mode,
-                    uiState = uiState,
-                    onCredentialChange = onCredentialChange,
-                    onConfirmationChange = onConfirmationChange,
-                    onCancel = onCancel,
-                    onSubmit = onSubmit,
-                    onShowPolicy = { showPolicy = true },
-                    modifier = Modifier.fillMaxWidth().widthIn(max = 720.dp),
-                    compact = compact,
-                )
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(horizontal = if (compact) 16.dp else 32.dp, vertical = if (compact) 16.dp else 28.dp)
+                .verticalScroll(rememberScrollState())
+        ) {
+            when {
+                uiState.isLoadingUser -> CredentialLoadingCard(message = "Memuat data user...")
+                uiState.errorMessage != null && uiState.targetUser == null -> {
+                    CredentialErrorCard(message = uiState.errorMessage, onRetry = onRetry)
+                }
+                else -> Box(
+                    modifier = Modifier.fillMaxWidth(),
+                    contentAlignment = Alignment.TopCenter,
+                ) {
+                    CredentialFormCard(
+                        mode = mode,
+                        uiState = uiState,
+                        onCredentialChange = onCredentialChange,
+                        onConfirmationChange = onConfirmationChange,
+                        onCancel = onCancel,
+                        onSubmit = onSubmit,
+                        onShowPolicy = { showPolicy = true },
+                        modifier = Modifier.fillMaxWidth().widthIn(max = 720.dp),
+                        compact = compact,
+                    )
+                }
             }
         }
+
+        TopFloatingCapsule(
+            message = null,
+            error = uiState.errorMessage,
+            modifier = Modifier
+                .align(Alignment.TopCenter)
+                .padding(top = 16.dp, start = 20.dp, end = 20.dp)
+                .zIndex(99f),
+        )
     }
 
     if (showPolicy) {
@@ -152,6 +169,9 @@ private fun CredentialFormCard(
     var showCredential by remember(mode) { mutableStateOf(false) }
     val fieldIcon = if (mode == UserCredentialMode.Password) Icons.Default.Password else Icons.Default.CreditCard
 
+    val isConfirmationError = uiState.errorMessage?.contains("cocok", ignoreCase = true) == true
+    val isCredentialError = uiState.errorMessage != null && !isConfirmationError
+
     Card(
         modifier = modifier,
         colors = CardDefaults.cardColors(containerColor = Color.White),
@@ -162,10 +182,6 @@ private fun CredentialFormCard(
             modifier = Modifier.padding(if (compact) 16.dp else 28.dp),
             verticalArrangement = Arrangement.spacedBy(20.dp)
         ) {
-            if (uiState.errorMessage != null) {
-                CredentialErrorBanner(message = uiState.errorMessage)
-            }
-
             CredentialTargetSummary(uiState = uiState)
 
             HorizontalDivider(color = CredentialSlate200)
@@ -179,7 +195,9 @@ private fun CredentialFormCard(
                 showValue = showCredential,
                 onShowValueChange = { showCredential = it },
                 keyboardType = mode.keyboardType(),
-                enabled = !uiState.isSubmitting
+                enabled = !uiState.isSubmitting,
+                isError = isCredentialError,
+                supportingText = if (isCredentialError) uiState.errorMessage else null,
             )
 
             CredentialInputField(
@@ -191,7 +209,9 @@ private fun CredentialFormCard(
                 showValue = showCredential,
                 onShowValueChange = { showCredential = it },
                 keyboardType = mode.keyboardType(),
-                enabled = !uiState.isSubmitting
+                enabled = !uiState.isSubmitting,
+                isError = isConfirmationError,
+                supportingText = if (isConfirmationError) uiState.errorMessage else null,
             )
 
             TextButton(
@@ -325,12 +345,14 @@ private fun CredentialInputField(
     showValue: Boolean,
     onShowValueChange: (Boolean) -> Unit,
     keyboardType: KeyboardType,
-    enabled: Boolean
+    enabled: Boolean,
+    isError: Boolean = false,
+    supportingText: String? = null,
 ) {
     Column {
         Text(
             text = label,
-            color = CredentialSlate600,
+            color = if (isError) CredentialError else CredentialSlate600,
             fontSize = 12.sp,
             fontWeight = FontWeight.Bold
         )
@@ -341,14 +363,14 @@ private fun CredentialInputField(
             enabled = enabled,
             placeholder = { Text(text = placeholder, color = CredentialSlate400) },
             leadingIcon = {
-                Icon(imageVector = icon, contentDescription = null, tint = CredentialSlate400)
+                Icon(imageVector = icon, contentDescription = null, tint = if (isError) CredentialError else CredentialSlate400)
             },
             trailingIcon = {
                 IconButton(onClick = { onShowValueChange(!showValue) }) {
                     Icon(
                         imageVector = if (showValue) Icons.Default.VisibilityOff else Icons.Default.Visibility,
                         contentDescription = if (showValue) "Sembunyikan" else "Tampilkan",
-                        tint = CredentialSlate500
+                        tint = if (isError) CredentialError else CredentialSlate500
                     )
                 }
             },
@@ -356,12 +378,25 @@ private fun CredentialInputField(
             keyboardOptions = KeyboardOptions(keyboardType = keyboardType),
             modifier = Modifier.fillMaxWidth(),
             shape = RoundedCornerShape(14.dp),
+            isError = isError,
+            supportingText = supportingText?.let { text ->
+                {
+                    Text(
+                        text = text,
+                        color = CredentialError,
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.Medium,
+                    )
+                }
+            },
             colors = OutlinedTextFieldDefaults.colors(
-                unfocusedContainerColor = CredentialSurfaceLow,
-                focusedContainerColor = CredentialSurfaceLow,
+                unfocusedContainerColor = if (isError) Color(0xFFFFF5F5) else CredentialSurfaceLow,
+                focusedContainerColor = if (isError) Color(0xFFFFF5F5) else CredentialSurfaceLow,
                 disabledContainerColor = CredentialSurfaceLow,
-                unfocusedBorderColor = CredentialSlate200,
-                focusedBorderColor = CredentialPrimary
+                unfocusedBorderColor = if (isError) CredentialError else CredentialSlate200,
+                focusedBorderColor = if (isError) CredentialError else CredentialPrimary,
+                errorBorderColor = CredentialError,
+                errorContainerColor = Color(0xFFFFF5F5),
             ),
             singleLine = true
         )

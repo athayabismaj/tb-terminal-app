@@ -15,7 +15,9 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.zIndex
 import com.tbterminal.app.data.model.ProductStock
+import com.tbterminal.app.ui.components.TopFloatingCapsule
 
 @Composable
 internal fun StockOpnameFormScreen(
@@ -57,7 +59,6 @@ internal fun StockOpnameFormScreen(
                     modifier = Modifier.widthIn(max = 1180.dp).fillMaxWidth(),
                     verticalArrangement = Arrangement.spacedBy(12.dp),
                 ) {
-                    StockOpnameMessage(uiState, onDismissMessage)
                     StockOpnameFormCard(
                         modifier = Modifier.fillMaxWidth(),
                         uiState = uiState,
@@ -71,5 +72,15 @@ internal fun StockOpnameFormScreen(
                 }
             }
         }
+
+        TopFloatingCapsule(
+            message = uiState.message,
+            error = uiState.errorMessage,
+            onDismiss = onDismissMessage,
+            modifier = Modifier
+                .align(Alignment.TopCenter)
+                .padding(top = 16.dp, start = 20.dp, end = 20.dp)
+                .zIndex(99f),
+        )
     }
 }

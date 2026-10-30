@@ -50,18 +50,23 @@ class BackofficeHubModelTest {
         assertEquals(
             listOf(
                 BackofficeHubAction.PRODUCTS_STOCK,
-                BackofficeHubAction.ADJUST_STOCK,
-                BackofficeHubAction.STOCK_CARD,
+                BackofficeHubAction.PRODUCT_PRICES,
             ),
             content.groups[0].actions,
         )
         assertEquals(
             listOf(
-                BackofficeHubAction.PRODUCT_PRICES,
+                BackofficeHubAction.STOCK_CARD,
+                BackofficeHubAction.ADJUST_STOCK,
+            ),
+            content.groups[1].actions,
+        )
+        assertEquals(
+            listOf(
                 BackofficeHubAction.CATEGORIES,
                 BackofficeHubAction.UNITS,
             ),
-            content.groups[1].actions,
+            content.groups[2].actions,
         )
         assertEquals(actions.size, actions.distinctBy { it.destination }.size)
         assertTrue(content.primaryAction?.destination !in actions.map { it.destination })

@@ -15,7 +15,9 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.zIndex
 import com.tbterminal.app.data.model.ProductUnit
+import com.tbterminal.app.ui.components.TopFloatingCapsule
 
 @Composable
 internal fun ProductUnitContent(
@@ -36,17 +38,27 @@ internal fun ProductUnitContent(
     BoxWithConstraints(modifier.fillMaxSize().background(UnitSurfaceBg)) {
         val compact = maxWidth < 720.dp
         Box(
-            modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState())
-                .padding(horizontal = if (compact) 16.dp else 32.dp, vertical = if (compact) 16.dp else 28.dp),
+            modifier = Modifier
+                .fillMaxSize()
+                .verticalScroll(rememberScrollState())
+                .padding(
+                    horizontal = if (compact) 16.dp else 28.dp,
+                    vertical = if (compact) 12.dp else 20.dp,
+                ),
             contentAlignment = Alignment.TopCenter,
         ) {
             Column(
-                modifier = Modifier.fillMaxWidth().widthIn(max = 1180.dp),
-                verticalArrangement = Arrangement.spacedBy(if (compact) 14.dp else 18.dp),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .widthIn(max = 1280.dp),
+                verticalArrangement = Arrangement.spacedBy(if (compact) 12.dp else 16.dp),
             ) {
                 if (uiState.isFormVisible) {
                     ProductUnitFormCard(
-                        modifier = Modifier.fillMaxWidth().widthIn(max = 680.dp).align(Alignment.CenterHorizontally),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .widthIn(max = 680.dp)
+                            .align(Alignment.CenterHorizontally),
                         uiState = uiState,
                         onNameChanged = onNameChanged,
                         onSymbolChanged = onSymbolChanged,
@@ -54,7 +66,6 @@ internal fun ProductUnitContent(
                         onCancelEdit = onCancelEdit,
                     )
                 } else {
-                    uiState.message?.let { ProductUnitMessage(it) }
                     ProductUnitListCard(
                         modifier = Modifier.fillMaxWidth(),
                         uiState = uiState,
@@ -70,5 +81,20 @@ internal fun ProductUnitContent(
                 }
             }
         }
+
+        val isErrorMessage = uiState.message?.let {
+            it.contains("gagal", ignoreCase = true) ||
+            it.contains("tidak", ignoreCase = true) ||
+            it.contains("kosong", ignoreCase = true)
+        } == true
+
+        TopFloatingCapsule(
+            message = if (!isErrorMessage) uiState.message else null,
+            error = if (isErrorMessage) uiState.message else null,
+            modifier = Modifier
+                .align(Alignment.TopCenter)
+                .padding(top = 16.dp, start = 20.dp, end = 20.dp)
+                .zIndex(99f),
+        )
     }
 }

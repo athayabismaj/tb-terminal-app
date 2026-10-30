@@ -149,16 +149,19 @@ internal fun TransactionHistoryContent(
                 )
             }
 
-            if (state.error != null && state.transactions.isNotEmpty()) {
-                SalesHistoryInlineError(state.error, onRetry)
-            }
+
+            SalesHistorySectionHeader(
+                compact = compact,
+                isLoading = state.isLoading && state.transactions.isEmpty(),
+                showSummary = state.transactions.isNotEmpty(),
+                onSummaryClick = { showSummarySheet = true },
+            )
 
             when {
                 state.isLoading && state.transactions.isEmpty() -> SalesHistoryLoading(compact)
                 state.error != null && state.transactions.isEmpty() -> SalesHistoryError(state.error, onRetry)
                 state.transactions.isEmpty() -> SalesHistoryEmpty()
                 else -> {
-                    SalesHistorySectionHeader(compact, onSummaryClick = { showSummarySheet = true })
                     if (compact) {
                         Surface(
                             modifier = Modifier
@@ -245,6 +248,31 @@ private fun SalesHistoryFilters(
     onDatePresetSelected: (String) -> Unit,
     onOpenMobileFilters: () -> Unit,
 ) {
+    if (state.isLoading && state.transactions.isEmpty()) {
+        if (compact) {
+            Row(
+                modifier = Modifier.fillMaxWidth().testTag("sales-history-filters"),
+                horizontalArrangement = Arrangement.spacedBy(10.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                SkeletonBox(Modifier.weight(1f).height(42.dp), shape = RoundedCornerShape(12.dp))
+                SkeletonBox(Modifier.size(42.dp), shape = RoundedCornerShape(12.dp))
+            }
+        } else {
+            Row(
+                modifier = Modifier.fillMaxWidth().testTag("sales-history-filters"),
+                horizontalArrangement = Arrangement.spacedBy(10.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                SkeletonBox(Modifier.weight(1f).height(48.dp), shape = RoundedCornerShape(14.dp))
+                SkeletonBox(Modifier.width(430.dp).height(48.dp), shape = RoundedCornerShape(14.dp))
+                SkeletonBox(Modifier.width(190.dp).height(48.dp), shape = RoundedCornerShape(14.dp))
+                SkeletonBox(Modifier.width(190.dp).height(48.dp), shape = RoundedCornerShape(14.dp))
+            }
+        }
+        return
+    }
+
     Column(
         modifier = Modifier.fillMaxWidth().testTag("sales-history-filters"),
         verticalArrangement = Arrangement.spacedBy(8.dp),
@@ -279,6 +307,15 @@ private fun SalesHistoryFilters(
                             modifier = Modifier.size(18.dp),
                             tint = Color(0xFF0F172A),
                         )
+                        if (isFiltered) {
+                            Box(
+                                modifier = Modifier
+                                    .align(Alignment.TopEnd)
+                                    .padding(6.dp)
+                                    .size(7.dp)
+                                    .background(Color(0xFFF59E0B), CircleShape),
+                            )
+                        }
                     }
                 }
             }
@@ -985,6 +1022,8 @@ private fun formatSalesSummaryCurrency(amount: BigDecimal): String {
 @Composable
 private fun SalesHistorySectionHeader(
     compact: Boolean = false,
+    isLoading: Boolean = false,
+    showSummary: Boolean = true,
     onSummaryClick: (() -> Unit)? = null,
 ) {
     Row(
@@ -994,31 +1033,38 @@ private fun SalesHistorySectionHeader(
         horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Text(
-            "Penjualan",
-            fontSize = 16.sp,
-            fontWeight = FontWeight.Bold,
-            color = Color(0xFF0F172A),
-        )
-        if (compact) {
-            Box(
-                modifier = Modifier
-                    .size(32.dp)
-                    .clip(RoundedCornerShape(12.dp))
-                    .border(1.dp, Color(0xFFE2E8F0), RoundedCornerShape(12.dp))
-                    .background(Color.White)
-                    .then(
-                        if (onSummaryClick != null) Modifier.clickable(onClick = onSummaryClick)
-                        else Modifier
-                    ),
-                contentAlignment = Alignment.Center,
-            ) {
-                Icon(
-                    Icons.Outlined.FactCheck,
-                    contentDescription = "Ringkasan",
-                    tint = Color(0xFF334155),
-                    modifier = Modifier.size(16.dp),
-                )
+        if (isLoading) {
+            SkeletonBox(Modifier.width(110.dp).height(20.dp), shape = RoundedCornerShape(4.dp))
+            if (compact) {
+                SkeletonBox(Modifier.size(32.dp), shape = RoundedCornerShape(12.dp))
+            }
+        } else {
+            Text(
+                "Penjualan",
+                fontSize = 16.sp,
+                fontWeight = FontWeight.Bold,
+                color = Color(0xFF0F172A),
+            )
+            if (compact && showSummary) {
+                Box(
+                    modifier = Modifier
+                        .size(32.dp)
+                        .clip(RoundedCornerShape(12.dp))
+                        .border(1.dp, Color(0xFFE2E8F0), RoundedCornerShape(12.dp))
+                        .background(Color.White)
+                        .then(
+                            if (onSummaryClick != null) Modifier.clickable(onClick = onSummaryClick)
+                            else Modifier
+                        ),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Icon(
+                        Icons.Outlined.FactCheck,
+                        contentDescription = "Ringkasan",
+                        tint = Color(0xFF334155),
+                        modifier = Modifier.size(16.dp),
+                    )
+                }
             }
         }
     }

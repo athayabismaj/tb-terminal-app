@@ -20,6 +20,8 @@ import androidx.compose.material.icons.outlined.Group
 import androidx.compose.material.icons.outlined.Groups
 import androidx.compose.material.icons.outlined.Lock
 import androidx.compose.material.icons.outlined.Person
+import androidx.compose.material.icons.outlined.Print
+import androidx.compose.material.icons.outlined.Storefront
 import androidx.compose.material.icons.outlined.Security
 import androidx.compose.material.icons.outlined.Settings
 import androidx.compose.material.icons.outlined.Summarize
@@ -225,6 +227,8 @@ private fun OwnerMenuAction.icon(): ImageVector = when (this) {
     OwnerMenuAction.REPORTS -> Icons.Outlined.Summarize
     OwnerMenuAction.DEVICE_REPORTS -> Icons.AutoMirrored.Outlined.ReceiptLong
     OwnerMenuAction.BACKUP -> Icons.Outlined.Backup
+    OwnerMenuAction.STORE_SETTINGS -> Icons.Outlined.Storefront
+    OwnerMenuAction.DEVICE_SETTINGS -> Icons.Outlined.Print
     OwnerMenuAction.SETTINGS -> Icons.Outlined.Settings
     OwnerMenuAction.SYNC -> Icons.Outlined.Sync
     OwnerMenuAction.ACTIVITY -> Icons.Outlined.Security

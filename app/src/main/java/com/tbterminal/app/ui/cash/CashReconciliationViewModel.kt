@@ -131,15 +131,15 @@ class CashReconciliationViewModel(
     }
 
     fun onOpeningCashChanged(value: String) {
-        _uiState.update { it.copy(openingCashInput = value.moneyInput()) }
+        _uiState.update { it.copy(openingCashInput = value.moneyInput(), errorMessage = null) }
     }
 
     fun onClosingCashChanged(value: String) {
-        _uiState.update { it.copy(closingCashInput = value.moneyInput()) }
+        _uiState.update { it.copy(closingCashInput = value.moneyInput(), errorMessage = null) }
     }
 
     fun onClosingNotesChanged(value: String) {
-        _uiState.update { it.copy(closingNotesInput = value) }
+        _uiState.update { it.copy(closingNotesInput = value, errorMessage = null) }
     }
 
     fun openSession() {
@@ -289,11 +289,11 @@ class CashReconciliationViewModel(
     }
 
     fun onExpenseAmountChanged(value: String) {
-        _uiState.update { it.copy(expenseAmountInput = value.moneyInput()) }
+        _uiState.update { it.copy(expenseAmountInput = value.moneyInput(), errorMessage = null) }
     }
 
     fun onExpenseDescriptionChanged(value: String) {
-        _uiState.update { it.copy(expenseDescriptionInput = value) }
+        _uiState.update { it.copy(expenseDescriptionInput = value, errorMessage = null) }
     }
 
     fun addExpense() {

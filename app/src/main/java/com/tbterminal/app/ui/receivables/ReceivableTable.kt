@@ -78,6 +78,9 @@ import com.tbterminal.app.ui.components.TbMobileControlSheet
 import com.tbterminal.app.ui.components.TbMobileFilterButton
 import com.tbterminal.app.ui.components.TbMobileSheetDoneButton
 import com.tbterminal.app.ui.components.TbPagination
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.LaunchedEffect
 
 @Composable
 internal fun ReceivableTableCard(
@@ -97,103 +100,143 @@ internal fun ReceivableTableCard(
 ) {
     if (compact) {
         var showMobileFilters by remember { mutableStateOf(false) }
+        var userPage by rememberSaveable { mutableIntStateOf(1) }
+
+        LaunchedEffect(uiState.searchQuery, uiState.statusFilter, uiState.dueFilter) {
+            userPage = 1
+        }
         Column(
             modifier = modifier.fillMaxWidth().testTag("receivable-list-content"),
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
-            // 2. Search and Action Row
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                BasicTextField(
-                    value = uiState.searchQuery,
-                    onValueChange = onSearchChanged,
-                    modifier = Modifier.weight(1f).height(40.dp).background(Color.White, RoundedCornerShape(12.dp)).border(1.dp, Color(0xFFE2E8F0).copy(alpha = 0.8f), RoundedCornerShape(12.dp)),
-                    textStyle = LocalTextStyle.current.copy(fontSize = 12.sp, color = Color(0xFF1E293B)),
-                    singleLine = true,
-                    decorationBox = { innerTextField ->
-                        Row(modifier = Modifier.fillMaxSize().padding(horizontal = 12.dp), verticalAlignment = Alignment.CenterVertically) {
-                            Icon(androidx.compose.material.icons.Icons.Outlined.Search, contentDescription = null, tint = Color(0xFF94A3B8), modifier = Modifier.size(16.dp))
-                            Spacer(Modifier.width(8.dp))
-                            Box(Modifier.weight(1f)) {
-                                if (uiState.searchQuery.isEmpty()) {
-                                    Text("Cari pelanggan atau nomor nota...", color = Color(0xFF94A3B8), fontSize = 12.sp)
+            if (uiState.isLoading && uiState.receivables.isEmpty()) {
+                // 2. Search and Action Row Skeleton
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    SkeletonBox(Modifier.weight(1f).height(40.dp), shape = RoundedCornerShape(12.dp))
+                    SkeletonBox(Modifier.size(40.dp), shape = RoundedCornerShape(12.dp))
+                    SkeletonBox(Modifier.width(96.dp).height(40.dp), shape = RoundedCornerShape(12.dp))
+                }
+
+                // 3. Section Header Skeleton
+                Row(
+                    modifier = Modifier.fillMaxWidth().padding(top = 4.dp, bottom = 2.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    SkeletonBox(Modifier.width(110.dp).height(20.dp), shape = RoundedCornerShape(4.dp))
+                    SkeletonBox(Modifier.size(32.dp), shape = RoundedCornerShape(12.dp))
+                }
+
+                // 4. Cards Skeleton
+                ReceivableLoading(compact = true)
+            } else {
+                // 2. Search and Action Row
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    BasicTextField(
+                        value = uiState.searchQuery,
+                        onValueChange = onSearchChanged,
+                        modifier = Modifier.weight(1f).height(40.dp).background(Color.White, RoundedCornerShape(12.dp)).border(1.dp, Color(0xFFE2E8F0).copy(alpha = 0.8f), RoundedCornerShape(12.dp)),
+                        textStyle = LocalTextStyle.current.copy(fontSize = 12.sp, color = Color(0xFF1E293B)),
+                        singleLine = true,
+                        decorationBox = { innerTextField ->
+                            Row(modifier = Modifier.fillMaxSize().padding(horizontal = 12.dp), verticalAlignment = Alignment.CenterVertically) {
+                                Icon(androidx.compose.material.icons.Icons.Outlined.Search, contentDescription = null, tint = Color(0xFF94A3B8), modifier = Modifier.size(16.dp))
+                                Spacer(Modifier.width(8.dp))
+                                Box(Modifier.weight(1f)) {
+                                    if (uiState.searchQuery.isEmpty()) {
+                                        Text("Cari pelanggan atau nomor nota...", color = Color(0xFF94A3B8), fontSize = 12.sp)
+                                    }
+                                    innerTextField()
                                 }
-                                innerTextField()
+                            }
+                        }
+                    )
+                    
+                    Surface(
+                        onClick = { showMobileFilters = true },
+                        color = Color.White,
+                        shape = RoundedCornerShape(12.dp),
+                        border = BorderStroke(1.dp, Color(0xFFE2E8F0).copy(alpha = 0.8f)),
+                        modifier = Modifier.size(40.dp)
+                    ) {
+                        Box(contentAlignment = Alignment.Center) {
+                            Icon(androidx.compose.material.icons.Icons.Outlined.Tune, contentDescription = "Filter", tint = Color(0xFF334155), modifier = Modifier.size(16.dp))
+                            if (uiState.statusFilter != ReceivableStatusFilter.All || uiState.dueFilter != ReceivableDueFilter.All) {
+                                Box(modifier = Modifier.align(Alignment.TopEnd).padding(8.dp).size(8.dp).background(Color(0xFF256B57), CircleShape).border(2.dp, Color.White, CircleShape))
                             }
                         }
                     }
-                )
-                
-                Surface(
-                    onClick = { showMobileFilters = true },
-                    color = Color.White,
-                    shape = RoundedCornerShape(12.dp),
-                    border = BorderStroke(1.dp, Color(0xFFE2E8F0).copy(alpha = 0.8f)),
-                    modifier = Modifier.size(40.dp)
-                ) {
-                    Box(contentAlignment = Alignment.Center) {
-                        Icon(androidx.compose.material.icons.Icons.Outlined.Tune, contentDescription = "Filter", tint = Color(0xFF334155), modifier = Modifier.size(16.dp))
-                        if (uiState.statusFilter != ReceivableStatusFilter.All || uiState.dueFilter != ReceivableDueFilter.All) {
-                            Box(modifier = Modifier.align(Alignment.TopEnd).padding(8.dp).size(8.dp).background(Color(0xFF256B57), CircleShape).border(2.dp, Color.White, CircleShape))
+                    
+                    Surface(
+                        onClick = onAddOpeningBalance,
+                        color = Color(0xFF256B57),
+                        shape = RoundedCornerShape(12.dp),
+                        modifier = Modifier.height(40.dp)
+                    ) {
+                        Row(modifier = Modifier.padding(horizontal = 14.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                            Icon(androidx.compose.material.icons.Icons.Outlined.AddCircleOutline, contentDescription = null, tint = Color.White, modifier = Modifier.size(16.dp))
+                            Text("Isi Saldo", fontSize = 12.sp, fontWeight = FontWeight.SemiBold, color = Color.White)
                         }
                     }
                 }
                 
-                Surface(
-                    onClick = onAddOpeningBalance,
-                    color = Color(0xFF256B57),
-                    shape = RoundedCornerShape(12.dp),
-                    modifier = Modifier.height(40.dp)
+                // 3. Section Header
+                Row(
+                    modifier = Modifier.fillMaxWidth().padding(top = 4.dp, bottom = 2.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Row(modifier = Modifier.padding(horizontal = 14.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                        Icon(androidx.compose.material.icons.Icons.Outlined.AddCircleOutline, contentDescription = null, tint = Color.White, modifier = Modifier.size(16.dp))
-                        Text("Isi Saldo", fontSize = 12.sp, fontWeight = FontWeight.SemiBold, color = Color.White)
+                    Text("Daftar piutang", fontSize = 14.sp, fontWeight = FontWeight.Bold, color = Color(0xFF0F172A))
+                    Box(
+                        modifier = Modifier
+                            .size(32.dp)
+                            .clip(RoundedCornerShape(12.dp))
+                            .border(1.dp, Color(0xFFE2E8F0), RoundedCornerShape(12.dp))
+                            .clickable { }
+                            .background(Color.White),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(
+                            Icons.Outlined.FactCheck,
+                            contentDescription = "Ringkasan",
+                            tint = Color(0xFF334155),
+                            modifier = Modifier.size(16.dp)
+                        )
                     }
                 }
-            }
-            
-            // 3. Section Header
-            Row(
-                modifier = Modifier.fillMaxWidth().padding(top = 4.dp, bottom = 2.dp),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Text("Daftar piutang", fontSize = 14.sp, fontWeight = FontWeight.Bold, color = Color(0xFF0F172A))
-                Box(
-                    modifier = Modifier
-                        .size(32.dp)
-                        .clip(RoundedCornerShape(12.dp))
-                        .border(1.dp, Color(0xFFE2E8F0), RoundedCornerShape(12.dp))
-                        .clickable { }
-                        .background(Color.White),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Icon(
-                        Icons.Outlined.FactCheck,
-                        contentDescription = "Ringkasan",
-                        tint = Color(0xFF334155),
-                        modifier = Modifier.size(16.dp)
-                    )
-                }
-            }
-            
-            // 4. Cards
-            when {
-                uiState.isLoading && uiState.receivables.isEmpty() -> ReceivableLoading(compact = true)
-                uiState.errorMessage != null && uiState.receivables.isEmpty() -> ReceivableError()
-                uiState.filteredReceivables.isEmpty() -> ReceivableEmpty()
+                
+                // 4. Cards
+                when {
+                    uiState.errorMessage != null && uiState.receivables.isEmpty() -> ReceivableError()
+                    uiState.filteredReceivables.isEmpty() -> ReceivableEmpty()
                 else -> {
-                    val groupedByCustomer = uiState.filteredReceivables.groupBy { it.customerId }
+                    val groupedByCustomer = remember(uiState.filteredReceivables) {
+                        uiState.filteredReceivables.groupBy { it.customerId }.toList()
+                    }
+                    val totalUsers = groupedByCustomer.size
+                    val totalUserPages = ((totalUsers + RECEIVABLE_USERS_PER_PAGE - 1) / RECEIVABLE_USERS_PER_PAGE).coerceAtLeast(1)
+                    val safeUserPage = userPage.coerceIn(1, totalUserPages)
+                    val pageCustomers = remember(groupedByCustomer, safeUserPage) {
+                        groupedByCustomer.drop((safeUserPage - 1) * RECEIVABLE_USERS_PER_PAGE).take(RECEIVABLE_USERS_PER_PAGE)
+                    }
+
                     Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
-                        groupedByCustomer.forEach { (customerId, customerReceivables) ->
+                        pageCustomers.forEach { (customerId, customerReceivables) ->
                             CustomerReceivableGroupCard(customerId, customerReceivables, onPayClick, { id, _ -> onCustomerDetailClick(id) })
                         }
                     }
                     
-                    // 5. Pagination (Mobile Style)
+                    // 5. Pagination (Mobile Style: 5 users per page)
+                    val startUser = if (totalUsers == 0) 0 else ((safeUserPage - 1) * RECEIVABLE_USERS_PER_PAGE) + 1
+                    val endUser = minOf(safeUserPage * RECEIVABLE_USERS_PER_PAGE, totalUsers)
                     Row(
                         modifier = Modifier.fillMaxWidth().padding(top = 8.dp, bottom = 8.dp),
                         horizontalArrangement = Arrangement.SpaceBetween,
@@ -204,7 +247,8 @@ internal fun ReceivableTableCard(
                             shape = RoundedCornerShape(50),
                             border = BorderStroke(1.dp, Color(0xFFE2E8F0).copy(alpha = 0.9f))
                         ) {
-                            Text("${if (uiState.total == 0L) 0 else uiState.receivables.size} dari ${uiState.total} nota", fontSize = 12.sp, fontWeight = FontWeight.SemiBold, color = Color(0xFF475569), modifier = Modifier.padding(horizontal = 14.dp, vertical = 6.dp))
+                            val userRangeText = if (totalUsers == 0) "0 pelanggan" else "$startUser-$endUser dari $totalUsers pelanggan"
+                            Text(userRangeText, fontSize = 12.sp, fontWeight = FontWeight.SemiBold, color = Color(0xFF475569), modifier = Modifier.padding(horizontal = 14.dp, vertical = 6.dp))
                         }
                         
                         Surface(
@@ -213,12 +257,30 @@ internal fun ReceivableTableCard(
                             border = BorderStroke(1.dp, Color(0xFFE2E8F0).copy(alpha = 0.9f))
                         ) {
                             Row(modifier = Modifier.padding(horizontal = 6.dp, vertical = 4.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                                IconButton(onClick = onPreviousPage, modifier = Modifier.size(28.dp).background(Color.Transparent, CircleShape)) {
-                                    Icon(androidx.compose.material.icons.Icons.Default.ChevronLeft, contentDescription = null, tint = Color(0xFF94A3B8), modifier = Modifier.size(16.dp))
+                                IconButton(
+                                    onClick = { userPage = (safeUserPage - 1).coerceAtLeast(1) },
+                                    modifier = Modifier.size(28.dp).background(Color.Transparent, CircleShape),
+                                    enabled = safeUserPage > 1
+                                ) {
+                                    Icon(
+                                        androidx.compose.material.icons.Icons.Default.ChevronLeft,
+                                        contentDescription = "Sebelumnya",
+                                        tint = if (safeUserPage > 1) Color(0xFF334155) else Color(0xFF94A3B8).copy(alpha = 0.5f),
+                                        modifier = Modifier.size(16.dp)
+                                    )
                                 }
-                                Text("${uiState.page} / ${uiState.totalPages}", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = Color(0xFF1E293B))
-                                IconButton(onClick = onNextPage, modifier = Modifier.size(28.dp).background(Color.Transparent, CircleShape)) {
-                                    Icon(androidx.compose.material.icons.Icons.Default.ChevronRight, contentDescription = null, tint = Color(0xFF94A3B8), modifier = Modifier.size(16.dp))
+                                Text("$safeUserPage / $totalUserPages", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = Color(0xFF1E293B))
+                                IconButton(
+                                    onClick = { userPage = (safeUserPage + 1).coerceAtMost(totalUserPages) },
+                                    modifier = Modifier.size(28.dp).background(Color.Transparent, CircleShape),
+                                    enabled = safeUserPage < totalUserPages
+                                ) {
+                                    Icon(
+                                        androidx.compose.material.icons.Icons.Default.ChevronRight,
+                                        contentDescription = "Selanjutnya",
+                                        tint = if (safeUserPage < totalUserPages) Color(0xFF334155) else Color(0xFF94A3B8).copy(alpha = 0.5f),
+                                        modifier = Modifier.size(16.dp)
+                                    )
                                 }
                             }
                         }
@@ -226,8 +288,9 @@ internal fun ReceivableTableCard(
                 }
             }
         }
-        
-        if (showMobileFilters) {
+    }
+
+    if (showMobileFilters) {
             TbMobileControlSheet(
                 title = "Filter piutang",
                 subtitle = "Atur status pembayaran dan jatuh tempo",
@@ -244,18 +307,43 @@ internal fun ReceivableTableCard(
             modifier = modifier.fillMaxWidth().testTag("receivable-list-content"),
             verticalArrangement = Arrangement.spacedBy(14.dp),
         ) {
-            ReceivableToolbar(uiState, onSearchChanged, onStatusFilterChanged, onDueFilterChanged, compact = false)
+            if (uiState.isLoading && uiState.receivables.isEmpty()) {
+                // Skeleton Toolbar (Searchbar + Filter dropdowns)
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(10.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    SkeletonBox(Modifier.weight(1f).height(44.dp), shape = RoundedCornerShape(12.dp))
+                    SkeletonBox(Modifier.width(170.dp).height(44.dp), shape = RoundedCornerShape(12.dp))
+                    SkeletonBox(Modifier.width(170.dp).height(44.dp), shape = RoundedCornerShape(12.dp))
+                }
 
-            when {
-                uiState.isLoading && uiState.receivables.isEmpty() -> ReceivableLoading(compact = false)
-                uiState.errorMessage != null && uiState.receivables.isEmpty() -> ReceivableError()
-                else -> {
-                    ReceivableSectionHeader(uiState, compact = false)
-                    if (uiState.filteredReceivables.isEmpty()) {
-                        ReceivableEmpty()
-                    } else {
-                        ReceivableTable(uiState.filteredReceivables, onPayClick)
-                        ReceivableFooter(uiState, onPreviousPage, onNextPage, compact = false)
+                // Skeleton Section Header (Text di atas tabel)
+                Row(
+                    modifier = Modifier.fillMaxWidth().padding(top = 2.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    SkeletonBox(Modifier.width(120.dp).height(22.dp), shape = RoundedCornerShape(4.dp))
+                    SkeletonBox(Modifier.width(90.dp).height(16.dp), shape = RoundedCornerShape(4.dp))
+                }
+
+                // Skeleton Table
+                ReceivableLoading(compact = false)
+            } else {
+                ReceivableToolbar(uiState, onSearchChanged, onStatusFilterChanged, onDueFilterChanged, compact = false)
+
+                when {
+                    uiState.errorMessage != null && uiState.receivables.isEmpty() -> ReceivableError()
+                    else -> {
+                        ReceivableSectionHeader(uiState, compact = false)
+                        if (uiState.filteredReceivables.isEmpty()) {
+                            ReceivableEmpty()
+                        } else {
+                            ReceivableTable(uiState.filteredReceivables, onPayClick)
+                            ReceivableFooter(uiState, onPreviousPage, onNextPage, compact = false)
+                        }
                     }
                 }
             }
@@ -680,12 +768,131 @@ private fun ReceivableFooter(
 
 @Composable
 private fun ReceivableLoading(compact: Boolean) {
-    Column(
-        modifier = Modifier.fillMaxWidth().testTag("receivable-skeleton"),
-        verticalArrangement = Arrangement.spacedBy(10.dp),
+    if (compact) {
+        Column(
+            modifier = Modifier.fillMaxWidth().testTag("receivable-skeleton"),
+            verticalArrangement = Arrangement.spacedBy(14.dp),
+        ) {
+            repeat(3) {
+                CustomerReceivableGroupCardSkeleton()
+            }
+        }
+    } else {
+        Box(modifier = Modifier.fillMaxWidth().testTag("receivable-skeleton")) {
+            ReceivableTableDesktopSkeleton()
+        }
+    }
+}
+
+@Composable
+private fun CustomerReceivableGroupCardSkeleton() {
+    val surfaceBorder = Color(0xFFE5EBE8)
+    androidx.compose.material3.Card(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(16.dp),
+        colors = androidx.compose.material3.CardDefaults.cardColors(containerColor = Color.White),
+        border = BorderStroke(1.dp, surfaceBorder),
+        elevation = androidx.compose.material3.CardDefaults.cardElevation(defaultElevation = 2.dp)
     ) {
-        repeat(if (compact) 4 else 5) {
-            SkeletonBox(Modifier.fillMaxWidth().height(if (compact) 174.dp else 62.dp))
+        Column {
+            Row(
+                modifier = Modifier.fillMaxWidth().padding(14.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Row(
+                    modifier = Modifier.weight(1f).padding(end = 8.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    SkeletonBox(Modifier.size(40.dp), shape = CircleShape)
+                    Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                        SkeletonBox(Modifier.fillMaxWidth(0.55f).height(15.dp), shape = RoundedCornerShape(4.dp))
+                        Row(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
+                            SkeletonBox(Modifier.width(90.dp).height(12.dp), shape = RoundedCornerShape(3.dp))
+                            SkeletonBox(Modifier.width(60.dp).height(10.dp), shape = RoundedCornerShape(3.dp))
+                        }
+                    }
+                }
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    SkeletonBox(Modifier.width(46.dp).height(14.dp), shape = RoundedCornerShape(4.dp))
+                    SkeletonBox(Modifier.size(18.dp), shape = CircleShape)
+                }
+            }
+            HorizontalDivider(color = surfaceBorder)
+            Column(
+                modifier = Modifier.fillMaxWidth().padding(horizontal = 14.dp, vertical = 10.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+                    SkeletonBox(Modifier.width(100.dp).height(14.dp), shape = RoundedCornerShape(4.dp))
+                    SkeletonBox(Modifier.width(64.dp).height(20.dp), shape = RoundedCornerShape(6.dp))
+                }
+                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+                    SkeletonBox(Modifier.width(130.dp).height(12.dp), shape = RoundedCornerShape(3.dp))
+                    SkeletonBox(Modifier.width(76.dp).height(28.dp), shape = RoundedCornerShape(8.dp))
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun ReceivableTableDesktopSkeleton() {
+    Surface(
+        modifier = Modifier.fillMaxWidth(),
+        color = ReceivableSurface,
+        shape = RoundedCornerShape(18.dp),
+        border = BorderStroke(1.dp, ReceivableLine),
+    ) {
+        Column {
+            Row(Modifier.fillMaxWidth().background(ReceivableSoft).padding(horizontal = 18.dp, vertical = 13.dp)) {
+                ReceivableTableLabel("Pelanggan", Modifier.weight(2f))
+                ReceivableTableLabel("Referensi", Modifier.weight(1.35f))
+                ReceivableTableLabel("Total / dibayar", Modifier.weight(1.45f), Alignment.End)
+                ReceivableTableLabel("Sisa", Modifier.weight(1.25f), Alignment.End)
+                ReceivableTableLabel("Jatuh tempo", Modifier.weight(1.5f))
+                ReceivableTableLabel("Status", Modifier.weight(1.1f), Alignment.CenterHorizontally)
+                ReceivableTableLabel("Aksi", Modifier.weight(0.8f), Alignment.End)
+            }
+            repeat(5) { index ->
+                if (index > 0) HorizontalDivider(color = ReceivableLine)
+                Row(
+                    modifier = Modifier.fillMaxWidth().padding(horizontal = 18.dp, vertical = 12.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Row(modifier = Modifier.weight(2f), verticalAlignment = Alignment.CenterVertically) {
+                        SkeletonBox(Modifier.size(34.dp), shape = CircleShape)
+                        Spacer(Modifier.width(10.dp))
+                        Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                            SkeletonBox(Modifier.width(110.dp).height(14.dp), shape = RoundedCornerShape(4.dp))
+                            SkeletonBox(Modifier.width(75.dp).height(11.dp), shape = RoundedCornerShape(3.dp))
+                        }
+                    }
+                    Box(Modifier.weight(1.35f)) {
+                        SkeletonBox(Modifier.width(85.dp).height(14.dp), shape = RoundedCornerShape(4.dp))
+                    }
+                    Column(Modifier.weight(1.45f), horizontalAlignment = Alignment.End, verticalArrangement = Arrangement.spacedBy(3.dp)) {
+                        SkeletonBox(Modifier.width(90.dp).height(13.dp), shape = RoundedCornerShape(4.dp))
+                        SkeletonBox(Modifier.width(65.dp).height(11.dp), shape = RoundedCornerShape(3.dp))
+                    }
+                    Box(Modifier.weight(1.25f), contentAlignment = Alignment.CenterEnd) {
+                        SkeletonBox(Modifier.width(80.dp).height(14.dp), shape = RoundedCornerShape(4.dp))
+                    }
+                    Box(Modifier.weight(1.5f)) {
+                        SkeletonBox(Modifier.width(85.dp).height(13.dp), shape = RoundedCornerShape(4.dp))
+                    }
+                    Box(Modifier.weight(1.1f), contentAlignment = Alignment.Center) {
+                        SkeletonBox(Modifier.width(62.dp).height(22.dp), shape = RoundedCornerShape(6.dp))
+                    }
+                    Box(Modifier.weight(0.8f), contentAlignment = Alignment.CenterEnd) {
+                        SkeletonBox(Modifier.width(64.dp).height(28.dp), shape = RoundedCornerShape(8.dp))
+                    }
+                }
+            }
         }
     }
 }

@@ -1,5 +1,6 @@
 package com.tbterminal.app.ui.checkout
 
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
@@ -14,6 +15,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
@@ -26,6 +28,11 @@ import com.tbterminal.app.data.model.ManagerApprovalAction
 import com.tbterminal.app.data.model.ManagerApprovalContext
 import com.tbterminal.app.ui.managerapproval.ManagerApprovalDialog
 import com.tbterminal.app.ui.common.UiText
+import com.tbterminal.app.ui.components.TopFloatingCapsule
+import com.tbterminal.app.ui.checkout.components.HeldCartsSheet
+import com.tbterminal.app.ui.checkout.components.HoldCartDialog
+import com.tbterminal.app.ui.checkout.components.QuickPinLockOverlay
+import com.tbterminal.app.ui.checkout.components.QrisPaymentDialog
 import com.tbterminal.app.ui.dashboard.cashier.CashierDashboardShell
 import com.tbterminal.app.ui.dashboard.cashier.CashierDestination
 import kotlinx.coroutines.flow.filterNotNull
@@ -63,6 +70,7 @@ fun CashierPosRoute(
     val snackbarHostState = remember { SnackbarHostState() }
     val context = androidx.compose.ui.platform.LocalContext.current
     var approvalAttemptId by remember { mutableStateOf<String?>(null) }
+    var feedbackMessage by remember { mutableStateOf<String?>(null) }
 
     LaunchedEffect(uiState.checkoutPreview?.checkoutAttemptId, uiState.checkoutPreview?.approvalRequired) {
         val preview = uiState.checkoutPreview
@@ -73,6 +81,7 @@ fun CashierPosRoute(
         viewModel.errorEvent
             .filterNotNull()
             .collect { error ->
+                feedbackMessage = error.message()
                 snackbarHostState.showSnackbar(error.message())
                 viewModel.clearErrorEvent()
             }
@@ -99,12 +108,22 @@ fun CashierPosRoute(
         onSettingsClick = onSettingsClick,
         onLogout = onLogout
     ) { contentModifier ->
-        Scaffold(
-            snackbarHost = { SnackbarHost(snackbarHostState) },
-            containerColor = SurfaceBright,
-            contentWindowInsets = WindowInsets(0.dp),
-            modifier = contentModifier
-        ) { contentPadding ->
+        Box(modifier = contentModifier.fillMaxSize()) {
+            TopFloatingCapsule(
+                message = feedbackMessage ?: uiState.quickFeedbackMessage,
+                isError = feedbackMessage != null,
+                onDismiss = {
+                    feedbackMessage = null
+                    viewModel.clearQuickFeedback()
+                }
+            )
+
+            Scaffold(
+                snackbarHost = { SnackbarHost(snackbarHostState) },
+                containerColor = SurfaceBright,
+                contentWindowInsets = WindowInsets(0.dp),
+                modifier = Modifier.fillMaxSize()
+            ) { contentPadding ->
             CashierPosScreen(
                 state = uiState,
                 onSearchChanged = viewModel::onSearchChanged,
@@ -144,11 +163,48 @@ fun CashierPosRoute(
                 onNavigateToCart = onNavigateToCart,
                 onScanBarcode = { barcode -> viewModel.onScanBarcode(barcode, context) },
                 onClearScanNotification = viewModel::clearScanNotification,
+                onOpenHoldCartDialog = viewModel::openHoldCartDialog,
+                onOpenHeldCarts = viewModel::openHeldCartsSheet,
+                onLockScreen = viewModel::lockScreen,
                 modifier = Modifier
                     .fillMaxSize()
                     .padding(contentPadding)
             )
         }
+    }
+}
+    if (uiState.isHoldCartDialogOpen) {
+        HoldCartDialog(
+            itemCount = uiState.cartItems.sumOf { it.quantity },
+            defaultNote = uiState.selectedCustomer?.name?.let { "Pesanan $it" } ?: "",
+            onDismiss = viewModel::dismissHoldCartDialog,
+            onConfirm = viewModel::holdCurrentCart
+        )
+    }
+    if (uiState.isHeldCartsSheetOpen) {
+        HeldCartsSheet(
+            heldCarts = uiState.heldCarts,
+            onDismiss = viewModel::dismissHeldCartsSheet,
+            onResumeCart = viewModel::resumeHeldCart,
+            onDeleteCart = viewModel::deleteHeldCart
+        )
+    }
+    if (uiState.isScreenLocked) {
+        QuickPinLockOverlay(
+            cashierName = name,
+            pinInput = uiState.lockPinInput,
+            errorMessage = uiState.lockPinError,
+            onPinChange = viewModel::updateLockPinInput,
+            onUnlock = { viewModel.unlockScreen() }
+        )
+    }
+    if (uiState.isQrisDialogOpen) {
+        QrisPaymentDialog(
+            amount = uiState.finalTotal,
+            storeName = "TB TERMINAL",
+            onConfirmPayment = viewModel::confirmQrisPayment,
+            onDismissRequest = viewModel::dismissQrisDialog
+        )
     }
     approvalAttemptId?.let { attemptId ->
         ManagerApprovalDialog(
@@ -195,9 +251,11 @@ fun CashierCartRoute(
         )
     )
 ) {
+    val context = LocalContext.current
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val snackbarHostState = remember { SnackbarHostState() }
     var approvalAttemptId by remember { mutableStateOf<String?>(null) }
+    var feedbackMessage by remember { mutableStateOf<String?>(null) }
 
     LaunchedEffect(uiState.checkoutPreview?.checkoutAttemptId, uiState.checkoutPreview?.approvalRequired) {
         val preview = uiState.checkoutPreview
@@ -208,6 +266,7 @@ fun CashierCartRoute(
         viewModel.errorEvent
             .filterNotNull()
             .collect { error ->
+                feedbackMessage = error.message()
                 snackbarHostState.showSnackbar(error.message())
                 viewModel.clearErrorEvent()
             }
@@ -221,9 +280,19 @@ fun CashierCartRoute(
         }
     }
 
-    CashierCartScreen(
-        name = name,
-        role = role,
+    Box(modifier = Modifier.fillMaxSize()) {
+        TopFloatingCapsule(
+            message = feedbackMessage ?: uiState.quickFeedbackMessage,
+            isError = feedbackMessage != null,
+            onDismiss = {
+                feedbackMessage = null
+                viewModel.clearQuickFeedback()
+            }
+        )
+
+        CashierCartScreen(
+            name = name,
+            role = role,
         state = uiState,
         snackbarHostState = snackbarHostState,
         onIncrease = { cartItemId ->
@@ -272,6 +341,12 @@ fun CashierCartRoute(
             }
         },
         onBackToPos = onBackToPos,
+        onOpenHoldCartDialog = viewModel::openHoldCartDialog,
+        onOpenHeldCarts = viewModel::openHeldCartsSheet,
+        onToggleDelivery = viewModel::toggleDelivery,
+        onDeliveryFeeChanged = viewModel::updateDeliveryFee,
+        onDeliveryAddressChanged = viewModel::updateDeliveryAddress,
+        onDeliveryCourierChanged = viewModel::updateDeliveryCourier,
         onDashboardClick = onDashboardClick,
         onPosClick = onPosClick,
         onCashSessionClick = onCashSessionClick,
@@ -279,8 +354,44 @@ fun CashierCartRoute(
         onStockCheckClick = onStockCheckClick,
         onProfileClick = onProfileClick,
         onSettingsClick = onSettingsClick,
-        onLogout = onLogout
+        onLogout = onLogout,
+        onScanBarcode = { barcode -> viewModel.onScanBarcode(barcode, context) },
+        onOpenQrisDialog = viewModel::openQrisDialog
     )
+}
+    if (uiState.isHoldCartDialogOpen) {
+        HoldCartDialog(
+            itemCount = uiState.cartItems.sumOf { it.quantity },
+            defaultNote = uiState.selectedCustomer?.name?.let { "Pesanan $it" } ?: "",
+            onDismiss = viewModel::dismissHoldCartDialog,
+            onConfirm = viewModel::holdCurrentCart
+        )
+    }
+    if (uiState.isHeldCartsSheetOpen) {
+        HeldCartsSheet(
+            heldCarts = uiState.heldCarts,
+            onDismiss = viewModel::dismissHeldCartsSheet,
+            onResumeCart = viewModel::resumeHeldCart,
+            onDeleteCart = viewModel::deleteHeldCart
+        )
+    }
+    if (uiState.isScreenLocked) {
+        QuickPinLockOverlay(
+            cashierName = name,
+            pinInput = uiState.lockPinInput,
+            errorMessage = uiState.lockPinError,
+            onPinChange = viewModel::updateLockPinInput,
+            onUnlock = { viewModel.unlockScreen() }
+        )
+    }
+    if (uiState.isQrisDialogOpen) {
+        QrisPaymentDialog(
+            amount = uiState.finalTotal,
+            storeName = "TB TERMINAL",
+            onConfirmPayment = viewModel::confirmQrisPayment,
+            onDismissRequest = viewModel::dismissQrisDialog
+        )
+    }
     approvalAttemptId?.let { attemptId ->
         ManagerApprovalDialog(
             context = ManagerApprovalContext(

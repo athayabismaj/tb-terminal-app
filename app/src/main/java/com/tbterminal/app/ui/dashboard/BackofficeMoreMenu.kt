@@ -20,6 +20,8 @@ internal enum class MoreMenuAction(
     ACTIVITY("Riwayat aktivitas", "Perubahan data toko", AppCapability.AUDIT, AdminDestination.OperationalAudit),
     SECURITY_LOG("Log keamanan", "Login dan keamanan akun", AppCapability.SECURITY_SETTINGS),
     BACKUP("Cadangan data", "Data perangkat dan server", AppCapability.SERVER_BACKUP, AdminDestination.BackupRestore),
+    STORE_SETTINGS("Identitas toko", "Nama dan kontak toko", AppCapability.STORE_SETTINGS, AdminDestination.StoreSettings),
+    DEVICE_SETTINGS("Perangkat & struk", "Printer dan nota kasir", AppCapability.DEVICE_SETTINGS, AdminDestination.DeviceSettings),
     SETTINGS("Pengaturan aplikasi", "Printer, toko, dan perangkat", AppCapability.STORE_SETTINGS, AdminDestination.Settings),
     SYNC("Sinkronisasi", "Status data offline", AppCapability.SYNC, AdminDestination.SyncCenter),
     PROFILE("Profil & keamanan", "Profil, password, dan PIN", AppCapability.ACCOUNT, AdminDestination.Profile),
@@ -36,7 +38,7 @@ internal fun moreMenuSections(role: String): List<MoreMenuSection> {
         MoreMenuSection("Administrasi", listOf(
             MoreMenuAction.USERS, MoreMenuAction.ACTIVITY, MoreMenuAction.SECURITY_LOG, MoreMenuAction.BACKUP,
         )),
-        MoreMenuSection("Perangkat", listOf(MoreMenuAction.SETTINGS, MoreMenuAction.SYNC)),
+        MoreMenuSection("Pengaturan", listOf(MoreMenuAction.STORE_SETTINGS, MoreMenuAction.DEVICE_SETTINGS, MoreMenuAction.SYNC)),
         MoreMenuSection("Akun", listOf(MoreMenuAction.PROFILE, MoreMenuAction.LOGOUT)),
     ).map { section ->
         section.copy(actions = section.actions.filter { AppAccessPolicy.can(role, it.capability) })

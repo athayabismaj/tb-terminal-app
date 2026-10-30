@@ -2,6 +2,7 @@
 package com.tbterminal.app.ui.purchasehistory
 
 import androidx.compose.foundation.BorderStroke
+import com.tbterminal.app.ui.components.SkeletonBox
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 
@@ -128,8 +129,8 @@ internal fun PurchaseHistoryScreen(
         val compact = maxWidth < 700.dp
         Column(
             modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState())
-                .padding(horizontal = if (compact) 16.dp else 32.dp, vertical = if (compact) 14.dp else 24.dp),
-            verticalArrangement = Arrangement.spacedBy(if (compact) 14.dp else 22.dp)
+                .padding(horizontal = if (compact) 16.dp else 28.dp, vertical = if (compact) 12.dp else 20.dp),
+            verticalArrangement = Arrangement.spacedBy(if (compact) 12.dp else 16.dp)
         ) {
             // PurchaseSummaryCards moved
             PurchaseToolbar(uiState, compact, { showFilterPopup = true }, onSearchChanged)
@@ -147,7 +148,13 @@ internal fun PurchaseHistoryScreen(
         )
     }
     
-    uiState.selectedPurchase?.let { PurchaseDetailDialog(it, onDismissDetail) }
+    if (uiState.isLoadingDetail || uiState.selectedPurchase != null) {
+        PurchaseDetailDialog(
+            detail = uiState.selectedPurchase,
+            isLoading = uiState.isLoadingDetail,
+            onDismiss = onDismissDetail
+        )
+    }
 }
 
 @Composable
@@ -200,41 +207,44 @@ private fun PurchaseTable(
         if (compact) {
             // Header for List
             Row(
-                modifier = Modifier.fillMaxWidth().padding(horizontal = 4.dp, vertical = 8.dp),
+                modifier = Modifier.fillMaxWidth().padding(horizontal = 2.dp),
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Text("Pembelian", fontSize = 17.sp, fontWeight = FontWeight.Bold, color = Color(0xFF0F172A))
-                }
-                if (uiState.visiblePurchases.isNotEmpty()) {
-                    Box(
-                        modifier = Modifier
-                            .size(32.dp)
-                            .clip(RoundedCornerShape(12.dp))
-                            .border(1.dp, Color(0xFFE2E8F0), RoundedCornerShape(12.dp))
-                            .clickable { showSummaryPopup = true }
-                            .background(Color.White),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Icon(
-                            Icons.Outlined.FactCheck,
-                            contentDescription = "Ringkasan",
-                            tint = Color(0xFF334155),
-                            modifier = Modifier.size(16.dp),
-                        )
+                if (uiState.isLoading && uiState.purchases.isEmpty()) {
+                    SkeletonBox(Modifier.width(110.dp).height(20.dp), shape = RoundedCornerShape(4.dp))
+                    SkeletonBox(Modifier.size(32.dp), shape = RoundedCornerShape(12.dp))
+                } else {
+                    Text("Pembelian", fontSize = 16.sp, fontWeight = FontWeight.Bold, color = Color(0xFF0F172A))
+                    if (uiState.visiblePurchases.isNotEmpty()) {
+                        Box(
+                            modifier = Modifier
+                                .size(32.dp)
+                                .clip(RoundedCornerShape(12.dp))
+                                .border(1.dp, Color(0xFFE2E8F0), RoundedCornerShape(12.dp))
+                                .clickable { showSummaryPopup = true }
+                                .background(Color.White),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Icon(
+                                Icons.Outlined.FactCheck,
+                                contentDescription = "Ringkasan",
+                                tint = Color(0xFF334155),
+                                modifier = Modifier.size(16.dp),
+                            )
+                        }
                     }
                 }
             }
+            Spacer(Modifier.height(12.dp))
             androidx.compose.material3.Surface(
                 modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(24.dp),
+                shape = RoundedCornerShape(16.dp),
                 color = Color.White,
-                border = BorderStroke(1.dp, Color(0xFFDFE5E1)),
-                shadowElevation = 2.dp
+                border = BorderStroke(1.dp, Color(0xFFE2E8F0)),
             ) {
                 when {
-                    uiState.isLoading && uiState.purchases.isEmpty() -> LoadingBox()
+                    uiState.isLoading && uiState.purchases.isEmpty() -> PurchaseMobileSkeleton()
                     uiState.errorMessage != null -> PurchaseError(uiState.errorMessage, onRefresh)
                     uiState.visiblePurchases.isEmpty() -> EmptyBox(uiState.searchQuery)
                     else -> {
@@ -242,7 +252,7 @@ private fun PurchaseTable(
                             uiState.visiblePurchases.forEachIndexed { index, purchase ->
                                 PurchaseMobileRow(purchase, onShowDetail)
                                 if (index < uiState.visiblePurchases.lastIndex) {
-                                    HorizontalDivider(color = Color(0xFFEEF2F0), modifier = Modifier.padding(horizontal = 16.dp))
+                                    HorizontalDivider(color = Color(0xFFF1F5F9))
                                 }
                             }
                         }
@@ -498,14 +508,13 @@ private fun PurchaseTable(
         } else {
             PurchaseTableHeader()
             when {
-                uiState.isLoading && uiState.purchases.isEmpty() -> LoadingBox()
+                uiState.isLoading && uiState.purchases.isEmpty() -> PurchaseTableSkeleton()
                 uiState.errorMessage != null -> PurchaseError(uiState.errorMessage, onRefresh)
                 uiState.visiblePurchases.isEmpty() -> androidx.compose.material3.Surface(
                     modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(24.dp),
+                    shape = RoundedCornerShape(16.dp),
                     color = Color.White,
-                    border = BorderStroke(1.dp, Color(0xFFDFE5E1)),
-                    shadowElevation = 2.dp
+                    border = BorderStroke(1.dp, Color(0xFFE2E8F0)),
                 ) {
                     EmptyBox(uiState.searchQuery)
                 }
@@ -531,6 +540,24 @@ private fun PurchaseToolbar(
     onFilterClick: () -> Unit,
     onSearchChanged: (String) -> Unit
 ) {
+    if (uiState.isLoading && uiState.purchases.isEmpty()) {
+        Row(
+            modifier = Modifier.fillMaxWidth().padding(horizontal = 4.dp),
+            horizontalArrangement = Arrangement.spacedBy(10.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            SkeletonBox(
+                modifier = Modifier.weight(1f).height(if (compact) 42.dp else 48.dp),
+                shape = RoundedCornerShape(if (compact) 12.dp else 14.dp),
+            )
+            SkeletonBox(
+                modifier = Modifier.size(if (compact) 42.dp else 48.dp),
+                shape = RoundedCornerShape(if (compact) 12.dp else 14.dp),
+            )
+        }
+        return
+    }
+
     val isFiltered = uiState.selectedSupplierId != null || (uiState.startDate != null && uiState.selectedPeriodType != "Hari")
     Row(
         modifier = Modifier.fillMaxWidth().padding(horizontal = 4.dp),
@@ -1166,7 +1193,9 @@ private fun PurchasePagination(
 ) {
     if (compact) {
         Row(
-            modifier = Modifier.fillMaxWidth().padding(top = 16.dp, bottom = 8.dp),
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(top = 14.dp, bottom = 4.dp),
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically
         ) {
@@ -1177,29 +1206,62 @@ private fun PurchasePagination(
             } else {
                 "${uiState.visiblePurchases.size} dari ${uiState.effectiveTotalPurchases} nota"
             }
-            Box(
-                modifier = Modifier.background(Color.White, RoundedCornerShape(50)).border(1.dp, Color(0xFFE2E8F0), RoundedCornerShape(50)).padding(horizontal = 14.dp, vertical = 6.dp)
+            Surface(
+                shape = CircleShape,
+                color = Color.White,
+                border = BorderStroke(1.dp, Color(0xFFE2E8F0)),
             ) {
-                Text(countText, color = Color(0xFF475569), fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
+                Text(
+                    text = countText,
+                    modifier = Modifier.padding(horizontal = 14.dp, vertical = 6.dp),
+                    fontSize = 12.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    color = Color(0xFF475569)
+                )
             }
-            Row(
-                modifier = Modifier.background(Color.White, RoundedCornerShape(50)).border(1.dp, Color(0xFFE2E8F0), RoundedCornerShape(50)).padding(horizontal = 12.dp, vertical = 6.dp),
-                horizontalArrangement = Arrangement.spacedBy(16.dp),
-                verticalAlignment = Alignment.CenterVertically
+            Surface(
+                shape = CircleShape,
+                color = Color.White,
+                border = BorderStroke(1.dp, Color(0xFFE2E8F0)),
             ) {
-                Icon(
-                    Icons.Default.ChevronLeft,
-                    contentDescription = "Sebelumnya",
-                    tint = if (uiState.page > 1) Color(0xFF0F172A) else Color(0xFFCBD5E1),
-                    modifier = Modifier.size(16.dp).clickable(enabled = uiState.page > 1, onClick = onPreviousPage)
-                )
-                Text("${uiState.page} / ${uiState.totalPages.coerceAtLeast(1)}", color = Color(0xFF1E293B), fontSize = 13.sp, fontWeight = FontWeight.Bold, letterSpacing = 1.sp)
-                Icon(
-                    Icons.Default.ChevronRight,
-                    contentDescription = "Berikutnya",
-                    tint = if (uiState.page < uiState.totalPages) Color(0xFF0F172A) else Color(0xFFCBD5E1),
-                    modifier = Modifier.size(16.dp).clickable(enabled = uiState.page < uiState.totalPages, onClick = onNextPage)
-                )
+                Row(
+                    modifier = Modifier.padding(horizontal = 6.dp, vertical = 3.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    val canPrev = uiState.page > 1 && !uiState.isLoading
+                    val canNext = uiState.page < uiState.totalPages && !uiState.isLoading
+                    IconButton(
+                        onClick = onPreviousPage,
+                        enabled = canPrev,
+                        modifier = Modifier.size(28.dp)
+                    ) {
+                        Icon(
+                            Icons.Default.ChevronLeft,
+                            contentDescription = "Halaman sebelumnya",
+                            tint = if (canPrev) Color(0xFF475569) else Color(0xFFCBD5E1),
+                            modifier = Modifier.size(16.dp)
+                        )
+                    }
+                    Text(
+                        text = "${uiState.page} / ${uiState.totalPages.coerceAtLeast(1)}",
+                        modifier = Modifier.padding(horizontal = 8.dp),
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.Medium,
+                        color = Color(0xFF334155)
+                    )
+                    IconButton(
+                        onClick = onNextPage,
+                        enabled = canNext,
+                        modifier = Modifier.size(28.dp)
+                    ) {
+                        Icon(
+                            Icons.Default.ChevronRight,
+                            contentDescription = "Halaman berikutnya",
+                            tint = if (canNext) Color(0xFF475569) else Color(0xFFCBD5E1),
+                            modifier = Modifier.size(16.dp)
+                        )
+                    }
+                }
             }
         }
     } else {
@@ -1237,9 +1299,9 @@ private fun PurchasePageButton(enabled: Boolean, onClick: () -> Unit, icon: Imag
     }
 }
 
-@Composable
 @OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class)
-private fun PurchaseDetailDialog(detail: PurchaseDetail, onDismiss: () -> Unit) {
+@Composable
+private fun PurchaseDetailDialog(detail: PurchaseDetail?, isLoading: Boolean = false, onDismiss: () -> Unit) {
     androidx.compose.material3.ModalBottomSheet(
         onDismissRequest = onDismiss,
         containerColor = Color.White,
@@ -1255,9 +1317,12 @@ private fun PurchaseDetailDialog(detail: PurchaseDetail, onDismiss: () -> Unit) 
         },
         shape = RoundedCornerShape(topStart = 32.dp, topEnd = 32.dp)
     ) {
-        Column(
-            modifier = Modifier.fillMaxWidth().padding(bottom = 24.dp)
-        ) {
+        if (detail == null) {
+            PurchaseDetailSkeletonContent(onDismiss = onDismiss)
+        } else {
+            Column(
+                modifier = Modifier.fillMaxWidth().padding(bottom = 24.dp)
+            ) {
             // Header
             Row(
                 modifier = Modifier
@@ -1478,6 +1543,7 @@ private fun PurchaseDetailDialog(detail: PurchaseDetail, onDismiss: () -> Unit) 
         }
     }
 }
+}
 
 @Composable
 private fun DetailInfoMobile(label: String, value: String, isNote: Boolean) {
@@ -1517,10 +1583,173 @@ private fun DetailInfoMobile(label: String, value: String, isNote: Boolean) {
 }
 
 @Composable
-private fun LoadingBox() = com.tbterminal.app.ui.components.SkeletonList(
-    modifier = Modifier.fillMaxWidth().height(180.dp),
-    itemCount = 4,
-)
+private fun PurchaseMobileSkeleton() {
+    Column {
+        repeat(3) { index ->
+            Column(modifier = Modifier.fillMaxWidth().padding(16.dp)) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                ) {
+                    Row(
+                        modifier = Modifier.weight(1f),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        SkeletonBox(Modifier.size(40.dp))
+                        Spacer(Modifier.width(12.dp))
+                        Column(modifier = Modifier.weight(1f)) {
+                            SkeletonBox(Modifier.fillMaxWidth(0.5f).height(14.dp))
+                            Spacer(Modifier.height(4.dp))
+                            SkeletonBox(Modifier.fillMaxWidth(0.35f).height(12.dp))
+                        }
+                    }
+                    SkeletonBox(Modifier.size(16.dp))
+                }
+                Spacer(Modifier.height(10.dp))
+                HorizontalDivider(color = Color(0xFFF1F5F9))
+                Spacer(Modifier.height(10.dp))
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Column {
+                        SkeletonBox(Modifier.width(80.dp).height(10.dp))
+                        Spacer(Modifier.height(4.dp))
+                        SkeletonBox(Modifier.width(100.dp).height(14.dp))
+                    }
+                    Column(horizontalAlignment = Alignment.End) {
+                        SkeletonBox(Modifier.width(50.dp).height(10.dp))
+                        Spacer(Modifier.height(4.dp))
+                        SkeletonBox(Modifier.width(80.dp).height(16.dp))
+                    }
+                }
+            }
+            if (index < 2) {
+                HorizontalDivider(color = Color(0xFFF1F5F9))
+            }
+        }
+    }
+}
+
+@Composable
+private fun PurchaseTableSkeleton() {
+    Column {
+        repeat(5) { index ->
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .background(if (index % 2 == 0) Color.White else PurchaseSoft.copy(alpha = 0.7f))
+                    .padding(horizontal = 20.dp, vertical = 14.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                SkeletonBox(Modifier.weight(1.6f).height(16.dp).padding(end = 12.dp))
+                SkeletonBox(Modifier.weight(1.8f).height(16.dp).padding(end = 12.dp))
+                SkeletonBox(Modifier.weight(1.4f).height(16.dp).padding(end = 12.dp))
+                SkeletonBox(Modifier.weight(1.2f).height(16.dp).padding(end = 12.dp))
+                SkeletonBox(Modifier.size(24.dp))
+            }
+            HorizontalDivider(color = PurchaseBorder)
+        }
+    }
+}
+
+@Composable
+private fun PurchaseDetailSkeletonContent(onDismiss: () -> Unit) {
+    Column(
+        modifier = Modifier.fillMaxWidth().padding(bottom = 24.dp)
+    ) {
+        // Header
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 24.dp)
+                .padding(bottom = 16.dp),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Column {
+                SkeletonBox(Modifier.width(180.dp).height(18.dp))
+                Spacer(Modifier.height(6.dp))
+                SkeletonBox(Modifier.width(120.dp).height(12.dp))
+            }
+            Box(
+                modifier = Modifier
+                    .size(36.dp)
+                    .background(Color(0xFFF1F5F9), RoundedCornerShape(50))
+                    .clickable(onClick = onDismiss),
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(
+                    Icons.Default.Close,
+                    contentDescription = "Tutup",
+                    tint = Color(0xFF64748B),
+                    modifier = Modifier.size(20.dp)
+                )
+            }
+        }
+
+        HorizontalDivider(color = Color(0xFFF1F5F9))
+
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 24.dp, vertical = 16.dp),
+            verticalArrangement = Arrangement.spacedBy(16.dp)
+        ) {
+            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                    SkeletonBox(Modifier.width(80.dp).height(14.dp))
+                    SkeletonBox(Modifier.width(120.dp).height(14.dp))
+                }
+                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                    SkeletonBox(Modifier.width(90.dp).height(14.dp))
+                    SkeletonBox(Modifier.width(140.dp).height(14.dp))
+                }
+                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                    SkeletonBox(Modifier.width(60.dp).height(14.dp))
+                    SkeletonBox(Modifier.width(100.dp).height(14.dp))
+                }
+            }
+
+            HorizontalDivider(color = Color(0xFFF1F5F9))
+
+            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                    SkeletonBox(Modifier.width(110.dp).height(12.dp))
+                    SkeletonBox(Modifier.width(60.dp).height(12.dp))
+                }
+                repeat(2) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .background(Color(0xFFF8FAFC), RoundedCornerShape(16.dp))
+                            .border(1.dp, Color(0xFFF1F5F9), RoundedCornerShape(16.dp))
+                            .padding(14.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        SkeletonBox(Modifier.size(44.dp))
+                        Spacer(Modifier.width(14.dp))
+                        Column(modifier = Modifier.weight(1f)) {
+                            SkeletonBox(Modifier.fillMaxWidth(0.6f).height(14.dp))
+                            Spacer(Modifier.height(4.dp))
+                            SkeletonBox(Modifier.width(90.dp).height(12.dp))
+                        }
+                        SkeletonBox(Modifier.width(70.dp).height(14.dp))
+                    }
+                }
+            }
+
+            SkeletonBox(Modifier.fillMaxWidth().height(88.dp))
+        }
+
+        HorizontalDivider(color = Color(0xFFF1F5F9))
+        Box(modifier = Modifier.fillMaxWidth().padding(24.dp)) {
+            SkeletonBox(Modifier.fillMaxWidth().height(52.dp))
+        }
+    }
+}
 
 @Composable
 private fun EmptyBox(searchQuery: String) = Box(Modifier.fillMaxWidth().height(180.dp), contentAlignment = Alignment.Center) {

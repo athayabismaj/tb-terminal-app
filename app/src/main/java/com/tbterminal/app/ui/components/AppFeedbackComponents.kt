@@ -1,14 +1,32 @@
 package com.tbterminal.app.ui.components
 
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.spring
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.slideOutVertically
+import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.wrapContentSize
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.Check
+import androidx.compose.material.icons.outlined.Close
+import androidx.compose.material.icons.outlined.ErrorOutline
 import androidx.compose.material.icons.outlined.Info
 import androidx.compose.material.icons.outlined.Warning
 import androidx.compose.material3.AlertDialog
@@ -25,13 +43,20 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import kotlinx.coroutines.delay
 
 data class AppConfirmationSpec(
     val title: String,
@@ -161,5 +186,104 @@ fun AppStatusChip(status: String, modifier: Modifier = Modifier) {
             style = MaterialTheme.typography.labelMedium,
             fontWeight = FontWeight.Bold,
         )
+    }
+}
+
+@Composable
+fun TopFloatingCapsule(
+    message: String?,
+    error: String? = null,
+    isError: Boolean = error != null,
+    onDismiss: () -> Unit = {},
+    durationMillis: Long = 3500L,
+    modifier: Modifier = Modifier,
+) {
+    val activeText = error ?: message
+    val effectiveIsError = isError || (error != null)
+
+    var isVisible by remember(activeText) { mutableStateOf(activeText != null) }
+
+    LaunchedEffect(activeText) {
+        if (activeText != null) {
+            isVisible = true
+            delay(durationMillis)
+            isVisible = false
+            onDismiss()
+        }
+    }
+
+    AnimatedVisibility(
+        visible = isVisible && activeText != null,
+        enter = slideInVertically(
+            initialOffsetY = { -it },
+            animationSpec = spring(
+                dampingRatio = Spring.DampingRatioLowBouncy,
+                stiffness = Spring.StiffnessMediumLow,
+            ),
+        ) + fadeIn(animationSpec = tween(200)),
+        exit = slideOutVertically(
+            targetOffsetY = { -it },
+            animationSpec = tween(200),
+        ) + fadeOut(animationSpec = tween(150)),
+        modifier = modifier,
+    ) {
+        Surface(
+            shape = RoundedCornerShape(999.dp),
+            color = Color.White,
+            border = BorderStroke(
+                1.dp,
+                if (effectiveIsError) Color(0xFFFECACA) else Color(0xFFC2DFD4),
+            ),
+            shadowElevation = 8.dp,
+            modifier = Modifier
+                .clickable {
+                    isVisible = false
+                    onDismiss()
+                }
+                .wrapContentSize(),
+        ) {
+            Row(
+                modifier = Modifier.padding(horizontal = 14.dp, vertical = 9.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(10.dp),
+            ) {
+                Box(
+                    modifier = Modifier
+                        .size(24.dp)
+                        .clip(CircleShape)
+                        .background(if (effectiveIsError) Color(0xFFFEE2E2) else Color(0xFFE1EFEA)),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Icon(
+                        imageVector = if (effectiveIsError) Icons.Outlined.ErrorOutline else Icons.Outlined.Check,
+                        contentDescription = if (effectiveIsError) "Gagal" else "Berhasil",
+                        tint = if (effectiveIsError) Color(0xFFDC2626) else Color(0xFF256B57),
+                        modifier = Modifier.size(14.dp),
+                    )
+                }
+
+                Text(
+                    text = activeText.orEmpty(),
+                    fontSize = 13.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    color = if (effectiveIsError) Color(0xFF991B1B) else Color(0xFF0F172A),
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.weight(1f, fill = false),
+                )
+
+                Icon(
+                    imageVector = Icons.Outlined.Close,
+                    contentDescription = "Tutup",
+                    tint = Color(0xFF94A3B8),
+                    modifier = Modifier
+                        .size(16.dp)
+                        .clickable {
+                            isVisible = false
+                            onDismiss()
+                        },
+                )
+            }
+        }
     }
 }

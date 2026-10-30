@@ -15,7 +15,6 @@ import com.tbterminal.app.data.repository.CashReconciliationRepository
 import com.tbterminal.app.data.sync.OfflineStatusRepository
 import com.tbterminal.app.ui.cash.CashExpenseDialog
 import com.tbterminal.app.ui.cash.CashReconciliationViewModel
-import com.tbterminal.app.ui.cashier.session.components.CashSessionErrorOverlay
 import com.tbterminal.app.ui.cashier.session.components.SuccessModalOverlay
 import com.tbterminal.app.ui.dashboard.cashier.CashierDashboardShell
 import com.tbterminal.app.ui.dashboard.cashier.CashierDestination
@@ -82,14 +81,8 @@ fun CashierCashSessionRoute(
             onClosingNotesChanged = viewModel::onClosingNotesChanged,
             onCloseSession = viewModel::closeSession,
             onShowExpenseDialog = viewModel::showExpenseDialog,
-            onTransactionHistoryClick = onTransactionHistoryClick
-        )
-    }
-
-    if (uiState.errorMessage != null) {
-        CashSessionErrorOverlay(
-            message = uiState.errorMessage.orEmpty(),
-            onDismiss = viewModel::clearMessage
+            onTransactionHistoryClick = onTransactionHistoryClick,
+            onClearMessage = viewModel::clearMessage
         )
     }
 

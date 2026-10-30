@@ -1,38 +1,37 @@
 package com.tbterminal.app.ui.stockopname
 
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.outlined.Close
 import androidx.compose.material.icons.outlined.ExpandMore
 import androidx.compose.material.icons.outlined.Search
+import androidx.compose.material.icons.outlined.Tune
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
-import androidx.compose.material3.FilledIconButton
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButtonDefaults
-import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
-import com.tbterminal.app.ui.components.TbMobileControlSheet
-import com.tbterminal.app.ui.components.TbMobileFilterButton
-import com.tbterminal.app.ui.components.TbMobileSheetDoneButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -40,10 +39,23 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import com.tbterminal.app.ui.components.SkeletonBox
+import com.tbterminal.app.ui.components.TbMobileControlSheet
+import com.tbterminal.app.ui.components.TbMobileSheetDoneButton
+
+private val BrandGreen = Color(0xFF256B57)
+private val TextPrimary = Color(0xFF0F172A)
+private val TextSecondary = Color(0xFF64748B)
+private val TextMuted = Color(0xFF94A3B8)
+private val BorderSlate200 = Color(0xFFE2E8F0)
+private val BorderSlate300 = Color(0xFFCBD5E1)
 
 @Composable
 internal fun StockTableToolbar(
@@ -55,78 +67,96 @@ internal fun StockTableToolbar(
 ) {
     var showFilterSheet by remember { mutableStateOf(false) }
     var pendingCategory by remember { mutableStateOf<String?>(null) }
-    val search: @Composable (Modifier) -> Unit = { fieldModifier ->
-        Surface(
-            modifier = fieldModifier.height(52.dp).testTag("stock-adjustment-search"),
-            color = OpnameSurface,
-            shape = RoundedCornerShape(16.dp),
-            border = BorderStroke(1.dp, OpnameLine.copy(alpha = 0.7f)),
+    val isFiltered = uiState.categoryFilter != null
+
+    if (uiState.isLoading && uiState.totalTableProducts == 0) {
+        Row(
+            modifier = Modifier.fillMaxWidth().testTag("stock-adjustment-toolbar"),
+            horizontalArrangement = Arrangement.spacedBy(10.dp),
+            verticalAlignment = Alignment.CenterVertically,
         ) {
-            Row(
-                modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                Icon(Icons.Outlined.Search, "Cari produk", modifier = Modifier.size(20.dp), tint = OpnameMuted)
-                BasicTextField(
-                    value = uiState.searchQuery,
-                    onValueChange = onSearchChanged,
-                    modifier = Modifier.weight(1f).fillMaxHeight().padding(start = 12.dp),
-                    singleLine = true,
-                    textStyle = MaterialTheme.typography.bodyMedium.copy(color = OpnameText),
-                    decorationBox = { innerTextField ->
-                        Box(contentAlignment = Alignment.CenterStart) {
-                            if (uiState.searchQuery.isBlank()) {
-                                Text("Cari nama atau SKU", color = OpnameMuted, style = MaterialTheme.typography.bodyMedium)
-                            }
-                            innerTextField()
-                        }
-                    },
-                )
-            }
+            SkeletonBox(
+                modifier = Modifier.weight(1f).height(if (compact) 42.dp else 48.dp),
+                shape = RoundedCornerShape(if (compact) 12.dp else 14.dp),
+            )
+            SkeletonBox(
+                modifier = Modifier.size(if (compact) 42.dp else 48.dp),
+                shape = RoundedCornerShape(if (compact) 12.dp else 14.dp),
+            )
+            SkeletonBox(
+                modifier = Modifier.width(if (compact) 110.dp else 168.dp).height(if (compact) 42.dp else 48.dp),
+                shape = RoundedCornerShape(if (compact) 12.dp else 14.dp),
+            )
         }
+        return
     }
 
     Row(
-        modifier = Modifier.fillMaxWidth(),
+        modifier = Modifier.fillMaxWidth().testTag("stock-adjustment-toolbar"),
         horizontalArrangement = Arrangement.spacedBy(10.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        search(Modifier.weight(1f))
-        TbMobileFilterButton(
+        StockOpnameSearchField(
+            value = uiState.searchQuery,
+            onValueChange = onSearchChanged,
+            modifier = Modifier.weight(1f),
+            compact = compact,
+        )
+
+        Surface(
             onClick = {
                 pendingCategory = uiState.categoryFilter
                 showFilterSheet = true
             },
-            active = uiState.categoryFilter != null,
-            contentDescription = "Filter kategori produk",
-            testTag = "stock-adjustment-open-filter",
-        )
-        if (compact) {
-            FilledIconButton(
-                onClick = onOpenForm,
-                modifier = Modifier.size(52.dp).testTag("stock-adjustment-add"),
-                shape = RoundedCornerShape(16.dp),
-                colors = IconButtonDefaults.filledIconButtonColors(
-                    containerColor = OpnameSurface,
-                    contentColor = OpnamePrimaryDark,
-                ),
-            ) {
-                Icon(Icons.Default.Add, contentDescription = "Buat penyesuaian stok", modifier = Modifier.size(22.dp))
-            }
-        } else {
-            Button(
-                onClick = onOpenForm,
-                modifier = Modifier.height(52.dp).testTag("stock-adjustment-add"),
-                shape = RoundedCornerShape(14.dp),
-                colors = ButtonDefaults.buttonColors(containerColor = OpnamePrimaryDark),
-                contentPadding = PaddingValues(horizontal = 18.dp),
-            ) {
-                Icon(Icons.Default.Add, contentDescription = "Buat penyesuaian stok", modifier = Modifier.size(20.dp))
-                Spacer(Modifier.width(7.dp))
-                Text("Buat penyesuaian", maxLines = 1)
+            modifier = Modifier
+                .size(if (compact) 42.dp else 48.dp)
+                .testTag("stock-adjustment-open-filter"),
+            shape = RoundedCornerShape(if (compact) 12.dp else 14.dp),
+            color = Color.White,
+            border = BorderStroke(1.dp, if (isFiltered) Color(0xFF0F172A) else BorderSlate300),
+            contentColor = Color(0xFF0F172A),
+        ) {
+            Box(contentAlignment = Alignment.Center) {
+                Icon(
+                    imageVector = Icons.Outlined.Tune,
+                    contentDescription = "Filter kategori produk",
+                    modifier = Modifier.size(18.dp),
+                    tint = Color(0xFF0F172A),
+                )
+                if (isFiltered) {
+                    Box(
+                        modifier = Modifier
+                            .align(Alignment.TopEnd)
+                            .padding(6.dp)
+                            .size(8.dp)
+                            .background(Color(0xFFF59E0B), CircleShape)
+                    )
+                }
             }
         }
+
+        Button(
+            onClick = onOpenForm,
+            modifier = Modifier
+                .height(if (compact) 42.dp else 48.dp)
+                .testTag("stock-adjustment-add"),
+            shape = RoundedCornerShape(if (compact) 12.dp else 14.dp),
+            colors = ButtonDefaults.buttonColors(containerColor = BrandGreen),
+            contentPadding = PaddingValues(horizontal = if (compact) 12.dp else 18.dp),
+            elevation = ButtonDefaults.buttonElevation(defaultElevation = 0.dp),
+        ) {
+            Icon(Icons.Default.Add, contentDescription = null, modifier = Modifier.size(18.dp), tint = Color.White)
+            Spacer(Modifier.width(if (compact) 4.dp else 8.dp))
+            Text(
+                text = if (compact) "Penyesuaian" else "Buat penyesuaian",
+                fontSize = if (compact) 13.sp else 14.sp,
+                fontWeight = FontWeight.SemiBold,
+                color = Color.White,
+                maxLines = 1,
+            )
+        }
     }
+
     if (showFilterSheet) {
         TbMobileControlSheet(
             title = "Filter kategori",
@@ -135,7 +165,7 @@ internal fun StockTableToolbar(
             testTag = "stock-adjustment-filter-sheet",
         ) {
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                Text("Kategori", color = OpnameText, fontWeight = FontWeight.SemiBold)
+                Text("Kategori", color = TextPrimary, fontWeight = FontWeight.SemiBold, fontSize = 13.sp)
                 CategoryFilterDropdown(
                     selectedCategory = pendingCategory,
                     categories = uiState.categoryOptions,
@@ -155,6 +185,69 @@ internal fun StockTableToolbar(
 }
 
 @Composable
+private fun StockOpnameSearchField(
+    value: String,
+    onValueChange: (String) -> Unit,
+    modifier: Modifier,
+    compact: Boolean = false,
+) {
+    Surface(
+        modifier = modifier
+            .height(if (compact) 42.dp else 48.dp)
+            .testTag("stock-adjustment-search"),
+        color = Color.White,
+        shape = RoundedCornerShape(if (compact) 12.dp else 14.dp),
+        border = BorderStroke(1.dp, BorderSlate300),
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(start = 12.dp, end = 6.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Icon(
+                Icons.Outlined.Search,
+                contentDescription = null,
+                tint = TextMuted,
+                modifier = Modifier.size(18.dp),
+            )
+            Spacer(Modifier.width(10.dp))
+            Box(modifier = Modifier.weight(1f), contentAlignment = Alignment.CenterStart) {
+                if (value.isEmpty()) {
+                    Text(
+                        text = "Cari nama atau SKU...",
+                        fontSize = 14.sp,
+                        color = TextMuted,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                }
+                BasicTextField(
+                    value = value,
+                    onValueChange = onValueChange,
+                    singleLine = true,
+                    textStyle = TextStyle(
+                        color = TextPrimary,
+                        fontSize = 14.sp,
+                    ),
+                    modifier = Modifier.fillMaxWidth(),
+                )
+            }
+            if (value.isNotEmpty()) {
+                IconButton(onClick = { onValueChange("") }, modifier = Modifier.size(36.dp)) {
+                    Icon(
+                        Icons.Outlined.Close,
+                        contentDescription = "Hapus pencarian",
+                        tint = TextSecondary,
+                        modifier = Modifier.size(16.dp),
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
 private fun CategoryFilterDropdown(
     selectedCategory: String?,
     categories: List<String>,
@@ -165,11 +258,11 @@ private fun CategoryFilterDropdown(
     Box(modifier = modifier) {
         Surface(
             onClick = { expanded = true },
-            modifier = Modifier.fillMaxWidth().height(52.dp).testTag("stock-adjustment-category"),
-            shape = RoundedCornerShape(14.dp),
-            border = BorderStroke(1.dp, OpnameLine.copy(alpha = 0.62f)),
-            color = OpnameSurface,
-            contentColor = OpnameText,
+            modifier = Modifier.fillMaxWidth().height(48.dp).testTag("stock-adjustment-category"),
+            shape = RoundedCornerShape(12.dp),
+            border = BorderStroke(1.dp, BorderSlate300),
+            color = Color.White,
+            contentColor = TextPrimary,
         ) {
             Row(
                 modifier = Modifier.fillMaxWidth().padding(horizontal = 14.dp),
@@ -181,23 +274,27 @@ private fun CategoryFilterDropdown(
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                     fontWeight = FontWeight.Medium,
+                    fontSize = 13.sp,
                 )
-                Icon(Icons.Outlined.ExpandMore, "Pilih kategori", tint = OpnameMuted, modifier = Modifier.size(20.dp))
+                Icon(Icons.Outlined.ExpandMore, "Pilih kategori", tint = TextSecondary, modifier = Modifier.size(18.dp))
             }
         }
         DropdownMenu(
             expanded = expanded,
             onDismissRequest = { expanded = false },
-            modifier = Modifier.width(220.dp).heightIn(max = 320.dp),
-            shape = RoundedCornerShape(14.dp),
-            containerColor = OpnameSurface,
+            modifier = Modifier
+                .width(240.dp)
+                .heightIn(max = 320.dp)
+                .background(Color.White, RoundedCornerShape(12.dp)),
+            shape = RoundedCornerShape(12.dp),
+            border = BorderStroke(1.dp, BorderSlate200),
         ) {
-            DropdownMenuItem(text = { Text("Semua kategori") }, onClick = {
+            DropdownMenuItem(text = { Text("Semua kategori", fontSize = 13.sp) }, onClick = {
                 onCategoryFilterChanged(null)
                 expanded = false
             })
             categories.forEach { category ->
-                DropdownMenuItem(text = { Text(category) }, onClick = {
+                DropdownMenuItem(text = { Text(category, fontSize = 13.sp) }, onClick = {
                     onCategoryFilterChanged(category)
                     expanded = false
                 })

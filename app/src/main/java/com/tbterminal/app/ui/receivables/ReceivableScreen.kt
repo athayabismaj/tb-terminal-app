@@ -10,9 +10,12 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.zIndex
 import com.tbterminal.app.data.model.Receivable
+import com.tbterminal.app.ui.components.TopFloatingCapsule
 
 @Composable
 internal fun ReceivableScreen(
@@ -40,7 +43,6 @@ internal fun ReceivableScreen(
             verticalArrangement = Arrangement.spacedBy(if (compact) 12.dp else 16.dp)
         ) {
             if (!compact) ReceivableHeader(canAdjust, onAddOpeningBalance, onAddAdjustment, compact)
-            ReceivableMessage(uiState, onDismissMessage)
             if (showMetrics && !compact) ReceivableMetrics(uiState, compact = false)
             ReceivableTableCard(
                 canAdjust = canAdjust,
@@ -58,6 +60,16 @@ internal fun ReceivableScreen(
                 onCustomerDetailClick = onCustomerDetailClick
             )
         }
+
+        TopFloatingCapsule(
+            message = uiState.message,
+            error = uiState.errorMessage,
+            onDismiss = onDismissMessage,
+            modifier = Modifier
+                .align(Alignment.TopCenter)
+                .padding(top = 16.dp, start = 20.dp, end = 20.dp)
+                .zIndex(99f),
+        )
     }
 }
 

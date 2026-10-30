@@ -46,6 +46,15 @@ interface ProductDao {
     @Query("SELECT * FROM local_products WHERE serverId = :serverId LIMIT 1")
     suspend fun getByServerId(serverId: String): LocalProductEntity?
 
+    @Query(
+        """
+        SELECT * FROM local_products
+        WHERE deletedAt IS NULL AND isActive = 1 AND stock <= CASE WHEN minimumStock > 0 THEN minimumStock ELSE 5.0 END
+        ORDER BY stock ASC
+        """
+    )
+    suspend fun getLowStockProducts(): List<LocalProductEntity>
+
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun upsert(product: LocalProductEntity): Long
 

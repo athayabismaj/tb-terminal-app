@@ -18,6 +18,8 @@ internal enum class OwnerMenuAction(
     REPORTS(R.string.owner_menu_reports, AppCapability.REPORTS, AdminDestination.Reports),
     DEVICE_REPORTS(R.string.owner_menu_device_reports, AppCapability.REPORTS, AdminDestination.LocalReports),
     BACKUP(R.string.owner_menu_backup, AppCapability.SERVER_BACKUP, AdminDestination.BackupRestore),
+    STORE_SETTINGS(R.string.owner_menu_store_settings, AppCapability.STORE_SETTINGS, AdminDestination.StoreSettings),
+    DEVICE_SETTINGS(R.string.owner_menu_device_settings, AppCapability.DEVICE_SETTINGS, AdminDestination.DeviceSettings),
     SETTINGS(R.string.owner_menu_settings, AppCapability.STORE_SETTINGS, AdminDestination.Settings),
     SYNC(R.string.owner_menu_sync, AppCapability.SYNC, AdminDestination.SyncCenter),
     ACTIVITY(R.string.owner_menu_activity, AppCapability.AUDIT, AdminDestination.OperationalAudit),
@@ -43,7 +45,8 @@ internal fun ownerMenuGroups(role: String?): List<OwnerMenuGroup> {
         OwnerMenuGroup(
             R.string.owner_menu_group_app,
             listOf(
-                OwnerMenuAction.SETTINGS,
+                OwnerMenuAction.STORE_SETTINGS,
+                OwnerMenuAction.DEVICE_SETTINGS,
                 OwnerMenuAction.SYNC,
                 OwnerMenuAction.ACTIVITY,
                 OwnerMenuAction.SECURITY_LOG,

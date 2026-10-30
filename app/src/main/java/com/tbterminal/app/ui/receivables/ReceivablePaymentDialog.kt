@@ -13,11 +13,13 @@ import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextOverflow
@@ -36,6 +38,7 @@ internal fun ReceivablePaymentDialog(
     onDismiss: () -> Unit,
     onSubmit: () -> Unit
 ) {
+    val isAmountError = uiState.errorMessage != null
     AlertDialog(
         onDismissRequest = onDismiss,
         title = { Text("Bayar Piutang Pelanggan", color = ReceivableText, fontWeight = FontWeight.ExtraBold) },
@@ -47,7 +50,9 @@ internal fun ReceivablePaymentDialog(
                     onValueChange = onAmountChanged,
                     label = "Nominal pembayaran",
                     prefix = "Rp",
-                    isNumber = true
+                    isNumber = true,
+                    isError = isAmountError,
+                    supportingText = if (isAmountError) uiState.errorMessage else null,
                 )
                 PaymentMethodCards(uiState.paymentMethod, onMethodChanged)
                 PaymentInputField(
@@ -86,21 +91,41 @@ private fun PaymentInputField(
     label: String,
     prefix: String? = null,
     minLines: Int = 1,
-    isNumber: Boolean = false
+    isNumber: Boolean = false,
+    isError: Boolean = false,
+    supportingText: String? = null,
 ) {
     OutlinedTextField(
         value = value,
         onValueChange = onValueChange,
         label = { Text(label) },
         leadingIcon = prefix?.let {
-            { Text(it, color = ReceivableMuted, modifier = Modifier.padding(start = 12.dp)) }
+            { Text(it, color = if (isError) Color(0xFFDC2626) else ReceivableMuted, modifier = Modifier.padding(start = 12.dp)) }
         },
         keyboardOptions = KeyboardOptions(keyboardType = if (isNumber) KeyboardType.Number else KeyboardType.Text),
         modifier = Modifier.fillMaxWidth(),
         singleLine = minLines == 1,
         minLines = minLines,
         shape = RoundedCornerShape(12.dp),
-        colors = ReceivableTextFieldColors()
+        isError = isError,
+        supportingText = supportingText?.let { text ->
+            {
+                Text(
+                    text = text,
+                    color = Color(0xFFDC2626),
+                    fontSize = 11.sp,
+                    fontWeight = FontWeight.Medium,
+                )
+            }
+        },
+        colors = OutlinedTextFieldDefaults.colors(
+            focusedBorderColor = if (isError) Color(0xFFDC2626) else ReceivablePrimaryDark,
+            unfocusedBorderColor = if (isError) Color(0xFFDC2626) else ReceivableLine,
+            focusedContainerColor = if (isError) Color(0xFFFFF5F5) else ReceivableSoft,
+            unfocusedContainerColor = if (isError) Color(0xFFFFF5F5) else ReceivableSoft,
+            errorBorderColor = Color(0xFFDC2626),
+            errorContainerColor = Color(0xFFFFF5F5),
+        )
     )
 }
 

@@ -33,7 +33,7 @@ internal fun NavHostController.navigateBackofficePage(route: String, role: Strin
 
 /** A back-to-list action must not push a second copy of the list above its detail/form. */
 internal fun NavHostController.returnToBackofficePage(route: String, role: String?) {
-    if (isOwnerPersona(role) && popBackStack(route, false)) return
+    if (popBackStack(route, false)) return
     navigate(route) { launchSingleTop = true }
 }
 

@@ -710,6 +710,204 @@ class CheckoutViewModel(
         }
     }
 
+    fun openHoldCartDialog() {
+        if (_uiState.value.cartItems.isEmpty()) {
+            setError(UiText.DynamicString("Keranjang kosong, tidak ada pesanan untuk diparkir."))
+            return
+        }
+        _uiState.update { it.copy(isHoldCartDialogOpen = true) }
+    }
+
+    fun dismissHoldCartDialog() {
+        _uiState.update { it.copy(isHoldCartDialogOpen = false) }
+    }
+
+    fun holdCurrentCart(note: String) {
+        val state = _uiState.value
+        if (state.cartItems.isEmpty()) return
+        val resolvedNote = note.trim().ifBlank {
+            state.selectedCustomer?.name?.let { "Pesanan $it" } ?: "Pesanan #${state.heldCarts.size + 1}"
+        }
+        val heldCart = HeldCart(
+            note = resolvedNote,
+            customer = state.selectedCustomer,
+            items = state.cartItems,
+            transactionDiscount = state.transactionDiscount,
+            deliveryFee = state.deliveryFee,
+            deliveryAddress = state.deliveryAddress,
+            deliveryCourier = state.deliveryCourier,
+            isDeliveryEnabled = state.isDeliveryEnabled,
+            subtotal = state.subtotal,
+            finalTotal = state.finalTotal
+        )
+        _uiState.update { current ->
+            current.copy(
+                heldCarts = current.heldCarts + heldCart,
+                isHoldCartDialogOpen = false,
+                quickFeedbackMessage = "Pesanan \"$resolvedNote\" berhasil diparkir."
+            ).recalculateCheckoutState(
+                items = emptyList(),
+                discount = null,
+                deliveryFeeAmount = BigDecimal.ZERO
+            ).copy(
+                selectedCustomer = null,
+                customerSearchQuery = "",
+                isDeliveryEnabled = false,
+                deliveryFee = BigDecimal.ZERO,
+                deliveryFeeInput = "",
+                deliveryAddress = "",
+                deliveryCourier = "",
+            )
+        }
+    }
+
+    fun openHeldCartsSheet() {
+        _uiState.update { it.copy(isHeldCartsSheetOpen = true) }
+    }
+
+    fun dismissHeldCartsSheet() {
+        _uiState.update { it.copy(isHeldCartsSheetOpen = false) }
+    }
+
+    fun resumeHeldCart(heldCartId: String) {
+        val state = _uiState.value
+        val target = state.heldCarts.firstOrNull { it.id == heldCartId } ?: return
+
+        // Jika keranjang aktif saat ini memiliki item, simpan otomatis dulu agar tidak hilang
+        val updatedHeldCarts = state.heldCarts.filterNot { it.id == heldCartId }.toMutableList()
+        if (state.cartItems.isNotEmpty()) {
+            val autoSaveNote = state.selectedCustomer?.name?.let { "Tukar ($it)" } ?: "Tukar Pesanan #${updatedHeldCarts.size + 1}"
+            updatedHeldCarts.add(
+                HeldCart(
+                    note = autoSaveNote,
+                    customer = state.selectedCustomer,
+                    items = state.cartItems,
+                    transactionDiscount = state.transactionDiscount,
+                    deliveryFee = state.deliveryFee,
+                    deliveryAddress = state.deliveryAddress,
+                    deliveryCourier = state.deliveryCourier,
+                    isDeliveryEnabled = state.isDeliveryEnabled,
+                    subtotal = state.subtotal,
+                    finalTotal = state.finalTotal
+                )
+            )
+        }
+
+        _uiState.update { current ->
+            current.copy(
+                heldCarts = updatedHeldCarts,
+                isHeldCartsSheetOpen = false,
+                selectedCustomer = target.customer,
+                customerSearchQuery = target.customer?.name.orEmpty(),
+                isDeliveryEnabled = target.isDeliveryEnabled,
+                deliveryFee = target.deliveryFee,
+                deliveryFeeInput = if (target.deliveryFee > BigDecimal.ZERO) target.deliveryFee.toPlainString() else "",
+                deliveryAddress = target.deliveryAddress,
+                deliveryCourier = target.deliveryCourier,
+                quickFeedbackMessage = "Pesanan \"${target.note}\" dimuat ke keranjang."
+            ).recalculateCheckoutState(
+                items = target.items,
+                discount = target.transactionDiscount,
+                deliveryFeeAmount = if (target.isDeliveryEnabled) target.deliveryFee else BigDecimal.ZERO
+            )
+        }
+    }
+
+    fun deleteHeldCart(heldCartId: String) {
+        _uiState.update { current ->
+            current.copy(
+                heldCarts = current.heldCarts.filterNot { it.id == heldCartId },
+                quickFeedbackMessage = "Pesanan terparkir dihapus."
+            )
+        }
+    }
+
+    fun toggleDelivery(enabled: Boolean) {
+        _uiState.update { state ->
+            val fee = if (enabled) state.deliveryFee else BigDecimal.ZERO
+            state.copy(isDeliveryEnabled = enabled).recalculateCheckoutState(
+                items = state.cartItems,
+                discount = state.transactionDiscount,
+                deliveryFeeAmount = fee
+            )
+        }
+    }
+
+    fun updateDeliveryFee(feeInput: String) {
+        val sanitized = feeInput.filter(Char::isDigit).trimStart('0').ifBlank { "0" }
+        val feeAmount = BigDecimal(sanitized)
+        _uiState.update { state ->
+            state.copy(
+                deliveryFeeInput = feeInput,
+                deliveryFee = feeAmount,
+            ).recalculateCheckoutState(
+                items = state.cartItems,
+                discount = state.transactionDiscount,
+                deliveryFeeAmount = if (state.isDeliveryEnabled) feeAmount else BigDecimal.ZERO
+            )
+        }
+    }
+
+    fun updateDeliveryAddress(address: String) {
+        _uiState.update { it.copy(deliveryAddress = address) }
+    }
+
+    fun updateDeliveryCourier(courier: String) {
+        _uiState.update { it.copy(deliveryCourier = courier) }
+    }
+
+    fun lockScreen() {
+        _uiState.update { it.copy(isScreenLocked = true, lockPinInput = "", lockPinError = null) }
+    }
+
+    fun updateLockPinInput(pin: String) {
+        val cleanPin = pin.filter(Char::isDigit).take(6)
+        _uiState.update { it.copy(lockPinInput = cleanPin, lockPinError = null) }
+    }
+
+    fun unlockScreen(validPin: String? = null) {
+        val input = _uiState.value.lockPinInput
+        if (input.length < 4) {
+            _uiState.update { it.copy(lockPinError = "PIN minimal 4 angka.") }
+            return
+        }
+        if (validPin != null && input != validPin) {
+            _uiState.update { it.copy(lockPinError = "PIN salah. Coba lagi.") }
+            return
+        }
+        _uiState.update { it.copy(isScreenLocked = false, lockPinInput = "", lockPinError = null) }
+    }
+
+    fun clearQuickFeedback() {
+        _uiState.update { it.copy(quickFeedbackMessage = null) }
+    }
+
+    fun openQrisDialog() {
+        if (_uiState.value.cartItems.isEmpty()) {
+            setError(UiText.DynamicString("Keranjang belanja kosong."))
+            return
+        }
+        _uiState.update { it.copy(isQrisDialogOpen = true, selectedPaymentMethod = PaymentMethod.QRIS) }
+    }
+
+    fun dismissQrisDialog() {
+        _uiState.update { it.copy(isQrisDialogOpen = false) }
+    }
+
+    fun confirmQrisPayment() {
+        val total = _uiState.value.finalTotal
+        _uiState.update { it.copy(isQrisDialogOpen = false, selectedPaymentMethod = PaymentMethod.QRIS) }
+        prepareCheckout(PaymentMethod.QRIS, total)
+    }
+
+    fun openCameraScanner() {
+        _uiState.update { it.copy(isCameraScannerOpen = true) }
+    }
+
+    fun dismissCameraScanner() {
+        _uiState.update { it.copy(isCameraScannerOpen = false) }
+    }
+
     fun selectPaymentMethod(paymentMethod: PaymentMethod) {
         _uiState.update { state ->
             state.copy(
@@ -1079,10 +1277,21 @@ class CheckoutViewModel(
     }
 
     private fun checkoutCustomerNote(typedCustomerName: String): String? {
-        val customerName = _uiState.value.selectedCustomer?.name
+        val state = _uiState.value
+        val customerName = state.selectedCustomer?.name
             ?: typedCustomerName.takeIf(String::isNotBlank)
 
-        return customerName?.let { name -> "Pelanggan: $name" }
+        val parts = mutableListOf<String>()
+        customerName?.let { parts.add("Pelanggan: $it") }
+        if (state.isDeliveryEnabled) {
+            val deliveryInfo = buildString {
+                append("[PENGIRIMAN] Ongkir: Rp ${state.deliveryFee.toPlainString()}")
+                if (state.deliveryAddress.isNotBlank()) append(" | Alamat: ${state.deliveryAddress.trim()}")
+                if (state.deliveryCourier.isNotBlank()) append(" | Armada: ${state.deliveryCourier.trim()}")
+            }
+            parts.add(deliveryInfo)
+        }
+        return if (parts.isNotEmpty()) parts.joinToString(" • ") else null
     }
 
     private fun resolveAmountPaid(
@@ -1164,6 +1373,7 @@ class CheckoutViewModel(
         customers = customers,
         activeCashSession = activeCashSession,
         hasActiveCashSession = hasActiveCashSession,
+        heldCarts = heldCarts,
     )
 
     private fun RepositoryResult.Error.toUiText(): UiText {
@@ -1455,8 +1665,10 @@ private fun CheckoutUiState.hasDiscountRequest(): Boolean =
 internal fun CheckoutUiState.recalculateCheckoutState(
     items: List<CartItem>,
     discount: CheckoutDiscount?,
+    deliveryFeeAmount: BigDecimal = if (isDeliveryEnabled) deliveryFee else BigDecimal.ZERO,
 ): CheckoutUiState {
     val totals = estimateCheckoutTotals(items, discount)
+    val calculatedFinalTotal = totals.netTotal.add(deliveryFeeAmount).coerceAtLeast(BigDecimal.ZERO)
     return copy(
         cartItems = items,
         subtotal = totals.grossSubtotal,
@@ -1464,7 +1676,7 @@ internal fun CheckoutUiState.recalculateCheckoutState(
         transactionDiscount = discount,
         transactionDiscountAmount = totals.transactionDiscountAmount,
         totalDiscount = totals.totalDiscountAmount,
-        finalTotal = totals.netTotal,
+        finalTotal = calculatedFinalTotal,
         checkoutPreview = null,
         approvedManagerApprovalId = null,
         hasAmbiguousCheckout = false,
@@ -1472,7 +1684,7 @@ internal fun CheckoutUiState.recalculateCheckoutState(
         amountPaidInput = when (selectedPaymentMethod) {
             PaymentMethod.HUTANG -> "0"
             PaymentMethod.DP -> amountPaidInput
-            else -> totals.netTotal.toPlainString()
+            else -> calculatedFinalTotal.toPlainString()
         },
         errorEvent = null,
     )

@@ -88,7 +88,7 @@ class PurchaseHistoryViewModel(
         }
     }
 
-    fun dismissDetail() = _uiState.update { it.copy(selectedPurchase = null) }
+    fun dismissDetail() = _uiState.update { it.copy(selectedPurchase = null, isLoadingDetail = false) }
 
     fun previousPage() {
         val state = _uiState.value
@@ -107,6 +107,10 @@ class PurchaseHistoryViewModel(
                 else -> Unit
             }
         }
+    }
+
+    fun clearError() {
+        _uiState.update { it.copy(errorMessage = null) }
     }
 
     private fun setError(message: String, detailLoading: Boolean = _uiState.value.isLoadingDetail) {

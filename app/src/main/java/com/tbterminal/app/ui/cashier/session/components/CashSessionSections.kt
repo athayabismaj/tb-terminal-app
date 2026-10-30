@@ -336,7 +336,9 @@ fun CloseShiftSection(
     onCashChange: (String) -> Unit,
     onNotesChange: (String) -> Unit,
     onSubmit: () -> Unit,
-    isSubmitting: Boolean
+    isSubmitting: Boolean,
+    isError: Boolean = false,
+    supportingText: String? = null
 ) {
     Card(
         modifier = modifier,
@@ -382,14 +384,16 @@ fun CloseShiftSection(
                             "Rp",
                             fontSize = 20.sp,
                             fontWeight = FontWeight.ExtraBold,
-                            color = Primary,
+                            color = if (isError) ErrorColor else Primary,
                             modifier = Modifier.padding(start = 16.dp)
                         )
                     },
+                    isError = isError,
+                    supportingText = supportingText?.let {
+                        { Text(it, color = ErrorColor, fontSize = 12.sp) }
+                    },
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(72.dp),
+                    modifier = Modifier.fillMaxWidth(),
                     shape = RoundedCornerShape(16.dp),
                     textStyle = androidx.compose.ui.text.TextStyle(
                         fontSize = 20.sp,
@@ -397,10 +401,12 @@ fun CloseShiftSection(
                         color = OnSurface
                     ),
                     colors = OutlinedTextFieldDefaults.colors(
-                        focusedContainerColor = Slate50,
-                        unfocusedContainerColor = Slate50,
-                        unfocusedBorderColor = Slate100,
-                        focusedBorderColor = Primary
+                        focusedContainerColor = if (isError) ErrorLight.copy(alpha = 0.3f) else Slate50,
+                        unfocusedContainerColor = if (isError) ErrorLight.copy(alpha = 0.3f) else Slate50,
+                        unfocusedBorderColor = if (isError) ErrorColor else Slate100,
+                        focusedBorderColor = if (isError) ErrorColor else Primary,
+                        errorBorderColor = ErrorColor,
+                        errorContainerColor = ErrorLight.copy(alpha = 0.3f)
                     ),
                     singleLine = true
                 )
@@ -497,6 +503,7 @@ fun OpenShiftForm(
         Column(modifier = Modifier.padding(28.dp), verticalArrangement = Arrangement.spacedBy(18.dp)) {
             Text("Buka Sesi Harian", fontSize = 22.sp, fontWeight = FontWeight.ExtraBold, color = OnSurface)
 
+            val isOpeningError = !uiState.hasActiveSession && uiState.errorMessage != null
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 Text("MODAL AWAL", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = Slate400)
                 OutlinedTextField(
@@ -506,22 +513,26 @@ fun OpenShiftForm(
                     leadingIcon = {
                         Text(
                             "Rp",
-                            color = Primary,
+                            color = if (isOpeningError) ErrorColor else Primary,
                             fontWeight = FontWeight.Bold,
                             modifier = Modifier.padding(start = 16.dp, end = 8.dp)
                         )
                     },
+                    isError = isOpeningError,
+                    supportingText = if (isOpeningError) {
+                        { Text(uiState.errorMessage.orEmpty(), color = ErrorColor, fontSize = 12.sp) }
+                    } else null,
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(58.dp),
+                    modifier = Modifier.fillMaxWidth(),
                     singleLine = true,
                     shape = RoundedCornerShape(14.dp),
                     colors = OutlinedTextFieldDefaults.colors(
-                        focusedContainerColor = Slate50,
-                        unfocusedContainerColor = Slate50,
-                        focusedBorderColor = Primary,
-                        unfocusedBorderColor = Slate100
+                        focusedContainerColor = if (isOpeningError) ErrorLight.copy(alpha = 0.3f) else Slate50,
+                        unfocusedContainerColor = if (isOpeningError) ErrorLight.copy(alpha = 0.3f) else Slate50,
+                        focusedBorderColor = if (isOpeningError) ErrorColor else Primary,
+                        unfocusedBorderColor = if (isOpeningError) ErrorColor else Slate100,
+                        errorBorderColor = ErrorColor,
+                        errorContainerColor = ErrorLight.copy(alpha = 0.3f)
                     ),
                     textStyle = androidx.compose.ui.text.TextStyle(fontSize = 18.sp, fontWeight = FontWeight.Bold)
                 )

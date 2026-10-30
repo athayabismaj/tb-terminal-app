@@ -1,6 +1,7 @@
 package com.tbterminal.app.ui.cashdetail
 
 import androidx.compose.foundation.BorderStroke
+import com.tbterminal.app.ui.components.SkeletonBox
 import com.tbterminal.app.ui.components.TbPagination
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
@@ -42,11 +43,15 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.material.icons.outlined.Print
+import androidx.compose.material.icons.outlined.ReceiptLong
 import com.tbterminal.app.data.model.CashExpense
+import com.tbterminal.app.ui.cash.ShiftSettlementDialog
 import com.tbterminal.app.data.model.CashSession
 import com.tbterminal.app.data.model.CashTransaction
 import java.math.BigDecimal
@@ -75,11 +80,17 @@ internal fun CashReconciliationDetailScreen(
     onConfirmForceClose: (BigDecimal, String?) -> Unit = { _, _ -> }
 ) {
     val compact = androidx.compose.ui.platform.LocalConfiguration.current.screenWidthDp < 700
+    var showSettlementDialog by remember { mutableStateOf(false) }
     Column(
         modifier = modifier.fillMaxSize().background(DetailBackground)
             .verticalScroll(rememberScrollState()).padding(if (compact) 16.dp else 32.dp)
     ) {
-        DetailHeader(onOpenHistory, compact)
+        DetailHeader(
+            onOpenHistory = onOpenHistory,
+            onOpenSettlement = { showSettlementDialog = true },
+            hasSession = uiState.session != null,
+            compact = compact
+        )
 
         uiState.closeSuccessMessage?.let { successMsg ->
             Surface(
@@ -101,7 +112,7 @@ internal fun CashReconciliationDetailScreen(
 
         when {
             uiState.sessionId.isBlank() -> SelectSessionPrompt(onOpenHistory)
-            uiState.isLoading -> LoadingBox()
+            uiState.isLoading -> CashReconciliationDetailSkeleton(compact)
             uiState.errorMessage != null -> ErrorBox(uiState.errorMessage, onRetry)
             uiState.session != null -> DetailContent(
                 uiState = uiState,
@@ -122,19 +133,56 @@ internal fun CashReconciliationDetailScreen(
             onConfirm = onConfirmForceClose
         )
     }
+
+    if (showSettlementDialog && uiState.session != null) {
+        ShiftSettlementDialog(
+            session = uiState.session,
+            onDismiss = { showSettlementDialog = false }
+        )
+    }
 }
 
 @Composable
-private fun DetailHeader(onOpenHistory: () -> Unit, compact: Boolean) {
+private fun DetailHeader(
+    onOpenHistory: () -> Unit,
+    onOpenSettlement: () -> Unit,
+    hasSession: Boolean,
+    compact: Boolean
+) {
     if (compact) Column(Modifier.fillMaxWidth().padding(bottom = 16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
         Text("Detail Kas", color = DetailText, fontSize = 24.sp, fontWeight = FontWeight.ExtraBold)
-        OutlinedButton(onClick = onOpenHistory, modifier = Modifier.fillMaxWidth().height(48.dp)) { Text("Buka Riwayat Kas") }
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
+            OutlinedButton(onClick = onOpenHistory, modifier = Modifier.weight(1f).height(48.dp)) { Text("Riwayat") }
+            if (hasSession) {
+                Button(
+                    onClick = onOpenSettlement,
+                    modifier = Modifier.weight(1f).height(48.dp),
+                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF0D9488))
+                ) {
+                    Icon(Icons.Outlined.Print, null, modifier = Modifier.size(16.dp))
+                    Spacer(Modifier.width(6.dp))
+                    Text("Slip Shift")
+                }
+            }
+        }
     } else Row(Modifier.fillMaxWidth().padding(bottom = 22.dp), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
         Column {
             Text("Detail Rekonsiliasi Kas", color = DetailText, fontSize = 30.sp, fontWeight = FontWeight.ExtraBold)
             Text("Audit kas sistem, kas fisik, pengeluaran, dan transaksi pada satu shift.", color = DetailMuted, fontSize = 14.sp)
         }
-        OutlinedButton(onClick = onOpenHistory) { Text("Riwayat Kas Harian") }
+        Row(horizontalArrangement = Arrangement.spacedBy(10.dp), verticalAlignment = Alignment.CenterVertically) {
+            if (hasSession) {
+                Button(
+                    onClick = onOpenSettlement,
+                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF0D9488))
+                ) {
+                    Icon(Icons.Outlined.Print, null, modifier = Modifier.size(16.dp))
+                    Spacer(Modifier.width(6.dp))
+                    Text("Slip Tutup Shift")
+                }
+            }
+            OutlinedButton(onClick = onOpenHistory) { Text("Riwayat Kas Harian") }
+        }
     }
 }
 
@@ -430,10 +478,117 @@ private fun SelectSessionPrompt(onOpenHistory: () -> Unit) {
 }
 
 @Composable
-private fun LoadingBox() = com.tbterminal.app.ui.components.SkeletonList(
-    modifier = Modifier.fillMaxWidth().height(240.dp),
-    itemCount = 5,
-)
+private fun CashReconciliationDetailSkeleton(compact: Boolean) {
+    Column(
+        modifier = Modifier.fillMaxWidth().testTag("cash-detail-skeleton"),
+        verticalArrangement = Arrangement.spacedBy(16.dp)
+    ) {
+        Card(
+            Modifier.fillMaxWidth(),
+            colors = CardDefaults.cardColors(Color.White),
+            border = BorderStroke(1.dp, DetailBorder),
+            shape = RoundedCornerShape(12.dp)
+        ) {
+            Column(Modifier.padding(20.dp)) {
+                Row(
+                    Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Column(modifier = Modifier.weight(1f).padding(end = 12.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                        SkeletonBox(Modifier.width(130.dp).height(18.dp), shape = RoundedCornerShape(4.dp))
+                        SkeletonBox(Modifier.width(190.dp).height(12.dp), shape = RoundedCornerShape(3.dp))
+                    }
+                    SkeletonBox(Modifier.width(65.dp).height(24.dp), shape = RoundedCornerShape(6.dp))
+                }
+                Spacer(Modifier.height(18.dp))
+                if (compact) {
+                    Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        repeat(5) {
+                            Box(Modifier.fillMaxWidth().background(Color(0xFFF8FAFC), RoundedCornerShape(8.dp)).padding(12.dp)) {
+                                Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                                    SkeletonBox(Modifier.width(70.dp).height(10.dp), shape = RoundedCornerShape(3.dp))
+                                    SkeletonBox(Modifier.width(110.dp).height(16.dp), shape = RoundedCornerShape(4.dp))
+                                }
+                            }
+                        }
+                    }
+                } else {
+                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                        repeat(5) {
+                            Box(Modifier.weight(1f).background(Color(0xFFF8FAFC), RoundedCornerShape(8.dp)).padding(12.dp)) {
+                                Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                                    SkeletonBox(Modifier.width(70.dp).height(10.dp), shape = RoundedCornerShape(3.dp))
+                                    SkeletonBox(Modifier.width(100.dp).height(16.dp), shape = RoundedCornerShape(4.dp))
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        Card(
+            Modifier.fillMaxWidth(),
+            colors = CardDefaults.cardColors(Color.White),
+            border = BorderStroke(1.dp, DetailBorder),
+            shape = RoundedCornerShape(12.dp)
+        ) {
+            Column {
+                Row(
+                    modifier = Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 16.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    SkeletonBox(Modifier.width(140.dp).height(16.dp), shape = RoundedCornerShape(4.dp))
+                    SkeletonBox(Modifier.width(70.dp).height(12.dp), shape = RoundedCornerShape(3.dp))
+                }
+                HorizontalDivider(color = DetailBorder)
+                if (!compact) {
+                    Row(Modifier.fillMaxWidth().background(Color(0xFFF8FAFC)).padding(horizontal = 18.dp, vertical = 11.dp)) {
+                        Label("NO TRANSAKSI", Modifier.weight(1.5f))
+                        Label("CUSTOMER", Modifier.weight(1.4f))
+                        Label("TANGGAL", Modifier.weight(1.5f))
+                        Label("TOTAL", Modifier.weight(1f))
+                        Label("STATUS", Modifier.weight(0.8f))
+                    }
+                }
+                repeat(4) { index ->
+                    if (index > 0) HorizontalDivider(color = DetailBorder)
+                    if (compact) {
+                        Column(
+                            Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 13.dp),
+                            verticalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+                                SkeletonBox(Modifier.width(90.dp).height(13.dp), shape = RoundedCornerShape(4.dp))
+                                SkeletonBox(Modifier.width(55.dp).height(18.dp), shape = RoundedCornerShape(6.dp))
+                            }
+                            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                                SkeletonBox(Modifier.width(110.dp).height(12.dp), shape = RoundedCornerShape(3.dp))
+                                SkeletonBox(Modifier.width(80.dp).height(13.dp), shape = RoundedCornerShape(4.dp))
+                            }
+                        }
+                    } else {
+                        Row(Modifier.fillMaxWidth().padding(horizontal = 18.dp, vertical = 13.dp), verticalAlignment = Alignment.CenterVertically) {
+                            SkeletonBox(Modifier.weight(1.5f).height(13.dp), shape = RoundedCornerShape(4.dp))
+                            Spacer(Modifier.width(12.dp))
+                            SkeletonBox(Modifier.weight(1.4f).height(13.dp), shape = RoundedCornerShape(4.dp))
+                            Spacer(Modifier.width(12.dp))
+                            SkeletonBox(Modifier.weight(1.5f).height(13.dp), shape = RoundedCornerShape(4.dp))
+                            Spacer(Modifier.width(12.dp))
+                            SkeletonBox(Modifier.weight(1f).height(13.dp), shape = RoundedCornerShape(4.dp))
+                            Spacer(Modifier.width(12.dp))
+                            Box(Modifier.weight(0.8f)) {
+                                SkeletonBox(Modifier.width(55.dp).height(18.dp), shape = RoundedCornerShape(6.dp))
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
 
 @Composable
 private fun ErrorBox(message: String, onRetry: () -> Unit) {

@@ -6,6 +6,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.tbterminal.app.data.repository.UserRepository
@@ -40,13 +41,20 @@ fun OwnerUserManagementScreen(
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     var deactivatingStaff by remember { mutableStateOf<StaffMember?>(null) }
+    val configuration = LocalConfiguration.current
+    val isCompactScreen = configuration.screenWidthDp < 700
 
     AdminDashboardShell(
         onProductsClick = {},
-
         userName = name,
         role = role,
         activeDestination = AdminDestination.UserManagement,
+        topBarActions = {
+            UserHeaderAddButton(
+                compact = isCompactScreen,
+                onClick = onAddUserClick,
+            )
+        },
         onDashboardClick = onDashboardClick,
         onReportsClick = onReportsClick,
         onSyncCenterClick = onSyncCenterClick,
@@ -69,31 +77,31 @@ fun OwnerUserManagementScreen(
             modifier = contentModifier,
         ) {
             UserManagementContent(
-            modifier = Modifier,
-            uiState = uiState,
-            onAddUserClick = onAddUserClick,
-            onRetry = viewModel::refresh,
-            onEditUserClick = { staff ->
-                viewModel.clearActionMessages()
-                onEditUserClick(staff.id)
-            },
-            onChangePasswordClick = { staff ->
-                viewModel.clearActionMessages()
-                onChangePasswordClick(staff.id)
-            },
-            onChangePinClick = { staff ->
-                viewModel.clearActionMessages()
-                onChangePinClick(staff.id)
-            },
-            onDeactivateUserClick = { staff ->
-                viewModel.clearActionMessages()
-                deactivatingStaff = staff
-            },
-            onActivateUserClick = { staff ->
-                viewModel.clearActionMessages()
-                viewModel.activateUser(staff)
-            },
-            onDismissActionMessage = viewModel::clearActionMessages
+                modifier = Modifier,
+                uiState = uiState,
+                onAddUserClick = onAddUserClick,
+                onRetry = viewModel::refresh,
+                onEditUserClick = { staff ->
+                    viewModel.clearActionMessages()
+                    onEditUserClick(staff.id)
+                },
+                onChangePasswordClick = { staff ->
+                    viewModel.clearActionMessages()
+                    onChangePasswordClick(staff.id)
+                },
+                onChangePinClick = { staff ->
+                    viewModel.clearActionMessages()
+                    onChangePinClick(staff.id)
+                },
+                onDeactivateUserClick = { staff ->
+                    viewModel.clearActionMessages()
+                    deactivatingStaff = staff
+                },
+                onActivateUserClick = { staff ->
+                    viewModel.clearActionMessages()
+                    viewModel.activateUser(staff)
+                },
+                onDismissActionMessage = viewModel::clearActionMessages
             )
         }
     }

@@ -289,13 +289,14 @@ internal fun OpeningReceivableDialog(
                 }
 
                 // 2. Nominal Piutang
+                val isAmountError = uiState.errorMessage != null
                 Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
                     FieldLabel("Nominal Piutang", required = true)
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .background(Color.White, RoundedCornerShape(12.dp))
-                            .border(1.5.dp, Brand.copy(alpha = 0.35f), RoundedCornerShape(12.dp))
+                            .background(if (isAmountError) MaterialTheme.colorScheme.error.copy(alpha = 0.05f) else Color.White, RoundedCornerShape(12.dp))
+                            .border(1.5.dp, if (isAmountError) MaterialTheme.colorScheme.error else Brand.copy(alpha = 0.35f), RoundedCornerShape(12.dp))
                             .padding(horizontal = 14.dp, vertical = 11.dp),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
@@ -303,7 +304,7 @@ internal fun OpeningReceivableDialog(
                             text = "Rp",
                             fontWeight = FontWeight.Bold,
                             fontSize = 17.sp,
-                            color = Brand
+                            color = if (isAmountError) MaterialTheme.colorScheme.error else Brand
                         )
                         Spacer(modifier = Modifier.width(10.dp))
                         BasicTextField(
@@ -335,6 +336,15 @@ internal fun OpeningReceivableDialog(
                                 Icon(Icons.Default.Close, contentDescription = "Clear", tint = Gray400, modifier = Modifier.size(16.dp))
                             }
                         }
+                    }
+                    if (isAmountError) {
+                        Text(
+                            text = uiState.errorMessage,
+                            color = MaterialTheme.colorScheme.error,
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.Medium,
+                            modifier = Modifier.padding(start = 4.dp, top = 2.dp)
+                        )
                     }
                 }
 
@@ -666,10 +676,6 @@ internal fun OpeningReceivableDialog(
                             }
                         )
                     }
-                }
-
-                uiState.errorMessage?.let {
-                    Text(it, color = MaterialTheme.colorScheme.error, fontSize = 12.sp, fontWeight = FontWeight.Medium)
                 }
             }
 

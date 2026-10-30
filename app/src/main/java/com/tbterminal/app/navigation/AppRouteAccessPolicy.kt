@@ -171,7 +171,8 @@ internal object AppRouteAccessPolicy {
                 value.matchesRoute(AppRoute.EditUser.route) || value.matchesRoute(AppRoute.ChangeUserPassword.route) ||
                 value.matchesRoute(AppRoute.ChangeUserPin.route) -> AppCapability.USER_MANAGEMENT
             value == AppRoute.SecurityLog.route -> AppCapability.SECURITY_SETTINGS
-            value == AppRoute.AdminSettings.route -> AppCapability.STORE_SETTINGS
+            value == AppRoute.AdminSettings.route || value == AppRoute.AdminStoreSettings.route -> AppCapability.STORE_SETTINGS
+            value == AppRoute.AdminDeviceSettings.route -> AppCapability.DEVICE_SETTINGS
             value == AppRoute.CashierSettings.route -> AppCapability.DEVICE_SETTINGS
             value == AppRoute.AdminProfile.route || value == AppRoute.AdminEditProfile.route ||
                 value == AppRoute.CashierProfile.route || value == AppRoute.CashierEditProfile.route -> AppCapability.ACCOUNT

@@ -80,6 +80,7 @@ fun CashierSettingsScreen(
             onScanPrinters = { viewModel.scanPrinters(context) },
             onTestPrint = { viewModel.testPrint(context) },
             onTestCashDrawer = { viewModel.testCashDrawer(context) },
+            onDismissMessage = viewModel::clearMessage,
             modifier = contentModifier
         )
     }

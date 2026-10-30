@@ -48,6 +48,7 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.zIndex
 import com.tbterminal.app.data.local.dao.OfflineCashReportRow
 import com.tbterminal.app.data.local.dao.OfflineExpenseReportRow
 import com.tbterminal.app.data.local.dao.OfflineReceivableReportRow
@@ -61,6 +62,7 @@ import com.tbterminal.app.ui.components.TbMobileSheetDoneButton
 import com.tbterminal.app.ui.components.TbMobileSummaryButton
 import com.tbterminal.app.ui.components.TbPagination
 import com.tbterminal.app.ui.components.TbPeriodFilterRow
+import com.tbterminal.app.ui.components.TopFloatingCapsule
 import com.tbterminal.app.ui.theme.TbGreenDark
 import com.tbterminal.app.ui.theme.TbGreenLight
 import com.tbterminal.app.ui.theme.TbOutline
@@ -149,8 +151,6 @@ fun OfflineReportScreen(
                     }
                 }
 
-                uiState.errorMessage?.let { message -> item { MessageCard(message) } }
-
                 if (uiState.isLoading && !hasSnapshot) {
                     item { OfflineReportSkeleton(compact = compact) }
                 } else {
@@ -231,6 +231,15 @@ fun OfflineReportScreen(
                     )
                 }
             }
+
+            TopFloatingCapsule(
+                message = null,
+                error = uiState.errorMessage,
+                modifier = Modifier
+                    .align(Alignment.TopCenter)
+                    .padding(top = 16.dp, start = 20.dp, end = 20.dp)
+                    .zIndex(99f),
+            )
         }
     }
 }

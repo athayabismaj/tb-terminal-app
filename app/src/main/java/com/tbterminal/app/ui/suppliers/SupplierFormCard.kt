@@ -17,10 +17,12 @@ import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -37,6 +39,13 @@ internal fun SupplierFormCard(
     onSave: () -> Unit,
     onCancelEdit: () -> Unit
 ) {
+    val isErrorMessage = uiState.message?.let {
+        it.contains("gagal", ignoreCase = true) ||
+        it.contains("tidak", ignoreCase = true) ||
+        it.contains("kosong", ignoreCase = true)
+    } == true
+    val isNameError = isErrorMessage && (uiState.message?.contains("nama", ignoreCase = true) == true || uiState.nameInput.isBlank())
+
     Card(
         modifier = modifier.testTag("supplier-form"),
         colors = CardDefaults.cardColors(containerColor = SupplierSurface),
@@ -44,7 +53,14 @@ internal fun SupplierFormCard(
         border = BorderStroke(1.dp, SupplierSlate200.copy(alpha = 0.85f))
     ) {
         Column(modifier = Modifier.padding(20.dp)) {
-            SupplierField("Nama supplier", uiState.nameInput, onNameChanged, "Contoh: PT Sumber Bangunan")
+            SupplierField(
+                label = "Nama supplier",
+                value = uiState.nameInput,
+                onValueChanged = onNameChanged,
+                placeholder = "Contoh: PT Sumber Bangunan",
+                isError = isNameError,
+                supportingText = if (isNameError) uiState.message else null,
+            )
             Spacer(modifier = Modifier.height(16.dp))
             SupplierField("Nomor telepon", uiState.phoneInput, onPhoneChanged, "Contoh: 081234567890")
             Spacer(modifier = Modifier.height(16.dp))
@@ -57,15 +73,46 @@ internal fun SupplierFormCard(
 }
 
 @Composable
-private fun SupplierField(label: String, value: String, onValueChanged: (String) -> Unit, placeholder: String) {
-    Text(label, color = SupplierSlate500, fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
+private fun SupplierField(
+    label: String,
+    value: String,
+    onValueChanged: (String) -> Unit,
+    placeholder: String,
+    isError: Boolean = false,
+    supportingText: String? = null,
+) {
+    Text(
+        text = label,
+        color = if (isError) Color(0xFFDC2626) else SupplierSlate500,
+        fontSize = 12.sp,
+        fontWeight = FontWeight.SemiBold
+    )
     Spacer(modifier = Modifier.height(6.dp))
     OutlinedTextField(
         value = value,
         onValueChange = onValueChanged,
         placeholder = { Text(placeholder, color = SupplierSlate400) },
         modifier = Modifier.fillMaxWidth(),
-        colors = supplierTextFieldColors(),
+        isError = isError,
+        supportingText = supportingText?.let { text ->
+            {
+                Text(
+                    text = text,
+                    color = Color(0xFFDC2626),
+                    fontSize = 11.sp,
+                    fontWeight = FontWeight.Medium,
+                )
+            }
+        },
+        colors = OutlinedTextFieldDefaults.colors(
+            focusedBorderColor = if (isError) Color(0xFFDC2626) else SupplierEmerald600,
+            unfocusedBorderColor = if (isError) Color(0xFFDC2626) else SupplierSlate200,
+            focusedContainerColor = if (isError) Color(0xFFFFF5F5) else Color.White,
+            unfocusedContainerColor = if (isError) Color(0xFFFFF5F5) else Color.White,
+            cursorColor = if (isError) Color(0xFFDC2626) else SupplierEmerald600,
+            errorBorderColor = Color(0xFFDC2626),
+            errorContainerColor = Color(0xFFFFF5F5),
+        ),
         shape = RoundedCornerShape(14.dp),
         singleLine = true
     )

@@ -62,6 +62,8 @@ class BackofficeNavigationTest {
     @Test
     fun `technical destinations stay highlighted under their work section`() {
         assertEquals(BackofficeSection.TRANSACTIONS, AdminDestination.PurchaseHistory.backofficeSection())
+        assertEquals(BackofficeSection.TRANSACTIONS, AdminDestination.IncomingGoods.backofficeSection())
+        assertEquals(BackofficeSection.TRANSACTIONS, AdminDestination.IncomingGoodsForm.backofficeSection())
         assertEquals(BackofficeSection.FINANCE, AdminDestination.SupplierDebts.backofficeSection())
         assertEquals(BackofficeSection.FINANCE, AdminDestination.CashExpenses.backofficeSection())
         assertEquals(BackofficeSection.STOCK, AdminDestination.StockOpname.backofficeSection())

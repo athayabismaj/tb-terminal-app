@@ -135,6 +135,8 @@ internal fun AdminDestination.adminRouteOrNull(role: String?): String? {
         AdminDestination.SecurityLog -> AppRoute.SecurityLog.route
         AdminDestination.Profile -> if (isCashier) AppRoute.CashierProfile.route else AppRoute.AdminProfile.route
         AdminDestination.Settings -> if (isCashier) AppRoute.CashierSettings.route else AppRoute.AdminSettings.route
+        AdminDestination.StoreSettings -> AppRoute.AdminStoreSettings.route
+        AdminDestination.DeviceSettings -> if (isCashier) AppRoute.CashierSettings.route else AppRoute.AdminDeviceSettings.route
         else -> null
     }
 }

@@ -80,17 +80,22 @@ internal fun stockHubContent(role: String?): BackofficeHubContent = hubContent(
     primary = BackofficeHubAction.INCOMING_GOODS,
     groups = listOf(
         BackofficeHubGroup(
-            R.string.hub_group_stock,
+            R.string.hub_group_stock_catalog,
             listOf(
                 BackofficeHubAction.PRODUCTS_STOCK,
-                BackofficeHubAction.ADJUST_STOCK,
+                BackofficeHubAction.PRODUCT_PRICES,
+            ),
+        ),
+        BackofficeHubGroup(
+            R.string.hub_group_stock_audit,
+            listOf(
                 BackofficeHubAction.STOCK_CARD,
+                BackofficeHubAction.ADJUST_STOCK,
             ),
         ),
         BackofficeHubGroup(
             R.string.hub_group_product_settings,
             listOf(
-                BackofficeHubAction.PRODUCT_PRICES,
                 BackofficeHubAction.CATEGORIES,
                 BackofficeHubAction.UNITS,
             ),

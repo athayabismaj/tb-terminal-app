@@ -48,6 +48,7 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import com.tbterminal.app.ui.components.TopFloatingCapsule
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -106,19 +107,27 @@ fun CashierDashboardScreen(
         onSettingsClick = onSettingsClick,
         onLogout = onLogout
     ) { contentModifier ->
-        RefreshableContent(
-            isRefreshing = uiState.isLoading && (uiState.activeSession != null || uiState.recentTransactions.isNotEmpty()),
-            onRefresh = viewModel::loadDashboardData,
-            modifier = contentModifier,
-        ) {
-            CashierDashboardContent(
-                uiState = uiState,
-                onPosClick = onPosClick,
-                onCashSessionClick = onCashSessionClick,
-                onTransactionHistoryClick = onTransactionHistoryClick,
-                onReceivablesClick = onReceivablesClick,
-                modifier = Modifier,
+        Box(modifier = contentModifier.fillMaxSize()) {
+            TopFloatingCapsule(
+                message = uiState.errorMessage,
+                isError = true,
+                onDismiss = viewModel::clearErrorMessage
             )
+
+            RefreshableContent(
+                isRefreshing = uiState.isLoading && (uiState.activeSession != null || uiState.recentTransactions.isNotEmpty()),
+                onRefresh = viewModel::loadDashboardData,
+                modifier = Modifier.fillMaxSize(),
+            ) {
+                CashierDashboardContent(
+                    uiState = uiState,
+                    onPosClick = onPosClick,
+                    onCashSessionClick = onCashSessionClick,
+                    onTransactionHistoryClick = onTransactionHistoryClick,
+                    onReceivablesClick = onReceivablesClick,
+                    modifier = Modifier,
+                )
+            }
         }
     }
 }
@@ -297,12 +306,6 @@ private fun CashierDashboardContent(
                         Spacer(modifier = Modifier.width(8.dp))
                         Text("Mulai POS", fontWeight = FontWeight.Bold)
                     }
-                }
-            }
-
-            uiState.errorMessage?.let { message ->
-                Card(colors = CardDefaults.cardColors(containerColor = Color(0xFFFFF1F2))) {
-                    Text(message, modifier = Modifier.fillMaxWidth().padding(16.dp), color = Color(0xFFB42318))
                 }
             }
 

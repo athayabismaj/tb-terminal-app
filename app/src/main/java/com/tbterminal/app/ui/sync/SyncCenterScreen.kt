@@ -2,6 +2,7 @@ package com.tbterminal.app.ui.sync
 
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -16,11 +17,14 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.outlined.CheckCircleOutline
+import androidx.compose.material.icons.automirrored.outlined.FactCheck
+import androidx.compose.material.icons.outlined.Check
+import androidx.compose.material.icons.outlined.Close
 import androidx.compose.material.icons.outlined.ErrorOutline
 import androidx.compose.material.icons.outlined.ExpandLess
 import androidx.compose.material.icons.outlined.ExpandMore
@@ -29,14 +33,16 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
-import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -44,31 +50,38 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import androidx.compose.ui.zIndex
 import com.tbterminal.app.data.local.model.SyncEntityType
 import com.tbterminal.app.data.local.model.SyncStatus
 import com.tbterminal.app.data.repository.SyncQueueUiModel
 import com.tbterminal.app.data.sync.SyncErrorCategory
-import com.tbterminal.app.ui.theme.TbAmber
-import com.tbterminal.app.ui.theme.TbBackground
-import com.tbterminal.app.ui.theme.TbError
-import com.tbterminal.app.ui.theme.TbGreen
-import com.tbterminal.app.ui.theme.TbGreenDark
-import com.tbterminal.app.ui.theme.TbGreenLight
-import com.tbterminal.app.ui.theme.TbOutline
-import com.tbterminal.app.ui.theme.TbSurface
-import com.tbterminal.app.ui.theme.TbSurfaceMuted
-import com.tbterminal.app.ui.theme.TbText
-import com.tbterminal.app.ui.theme.TbTextMuted
 import com.tbterminal.app.ui.components.SkeletonBox
+import com.tbterminal.app.ui.components.TopFloatingCapsule
 import com.tbterminal.app.ui.components.SkeletonList
 import java.time.Instant
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
+
+private val BrandSage = Color(0xFF256B57)
+private val BrandSageDark = Color(0xFF1D5444)
+private val BrandSageLight = Color(0xFFE8F2EE)
+private val BackgroundSurface = Color(0xFFF8FAFC)
+private val Slate900 = Color(0xFF0F172A)
+private val Slate800 = Color(0xFF1E293B)
+private val Slate700 = Color(0xFF334155)
+private val Slate600 = Color(0xFF475569)
+private val Slate500 = Color(0xFF64748B)
+private val Slate400 = Color(0xFF94A3B8)
+private val Slate200 = Color(0xFFE2E8F0)
+private val Slate100 = Color(0xFFF1F5F9)
 
 @Composable
 fun SyncCenterScreen(
@@ -79,48 +92,360 @@ fun SyncCenterScreen(
     onRetryAllFailed: () -> Unit,
     onDismissMessage: () -> Unit,
     modifier: Modifier = Modifier,
+    showStatusSheet: Boolean = false,
+    onOpenStatusSheet: () -> Unit = {},
+    onDismissStatusSheet: () -> Unit = {},
+) {
+    BoxWithConstraints(modifier = modifier.fillMaxSize().background(BackgroundSurface)) {
+        val compact = maxWidth < 700.dp
+        LazyColumn(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(
+                    start = if (compact) 16.dp else 32.dp,
+                    end = if (compact) 16.dp else 32.dp,
+                    top = if (compact) 12.dp else 24.dp,
+                    bottom = if (compact) 16.dp else 24.dp,
+                ),
+            verticalArrangement = Arrangement.spacedBy(14.dp),
+        ) {
+            if (uiState.isInitialLoading) {
+                item { SyncOverviewSkeleton(compact) }
+                item { SkeletonList(modifier = Modifier.fillMaxWidth(), itemCount = 3) }
+            } else {
+                // Section Header on the Main Screen with FactCheck icon (like Customer & Security Log)
+                item {
+                    SyncSectionHeader(
+                        onOpenStatusSheet = onOpenStatusSheet,
+                    )
+                }
+
+                item {
+                    SyncStatusOverviewCard(
+                        uiState = uiState,
+                        onRetryAllPending = onRetryAllPending,
+                        onRetryAllFailed = onRetryAllFailed,
+                    )
+                }
+
+                item {
+                    OfflineDataQueueCard(
+                        uiState = uiState,
+                        compact = compact,
+                        onRetryItem = onRetryItem,
+                        onMarkConflictReviewed = onMarkConflictReviewed,
+                    )
+                }
+            }
+        }
+
+        if (showStatusSheet) {
+            SyncStatusBottomSheet(
+                uiState = uiState,
+                onDismiss = onDismissStatusSheet,
+                onRetryAllPending = onRetryAllPending,
+                onRetryAllFailed = onRetryAllFailed,
+            )
+        }
+
+        TopFloatingCapsule(
+            message = uiState.message,
+            error = uiState.errorMessage,
+            onDismiss = onDismissMessage,
+            modifier = Modifier
+                .align(Alignment.TopCenter)
+                .padding(top = 16.dp, start = 20.dp, end = 20.dp)
+                .zIndex(99f),
+        )
+    }
+}
+
+@Composable
+private fun SyncSectionHeader(
+    onOpenStatusSheet: () -> Unit,
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 4.dp, vertical = 2.dp),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Text(
+            text = "Status sinkronisasi",
+            fontSize = 16.sp,
+            fontWeight = FontWeight.Bold,
+            color = Slate900,
+        )
+
+        Box(
+            modifier = Modifier
+                .size(32.dp)
+                .clip(RoundedCornerShape(12.dp))
+                .border(1.dp, Slate200, RoundedCornerShape(12.dp))
+                .background(Color.White)
+                .clickable { onOpenStatusSheet() }
+                .testTag("sync-open-status-sheet"),
+            contentAlignment = Alignment.Center,
+        ) {
+            Icon(
+                imageVector = Icons.AutoMirrored.Outlined.FactCheck,
+                contentDescription = "Rincian status sinkronisasi",
+                tint = Color(0xFF334155),
+                modifier = Modifier.size(16.dp),
+            )
+        }
+    }
+}
+
+@Composable
+private fun SyncOverviewSkeleton(compact: Boolean) {
+    Card(
+        modifier = Modifier.fillMaxWidth().testTag("sync-initial-skeleton"),
+        shape = RoundedCornerShape(14.dp),
+        colors = CardDefaults.cardColors(containerColor = Color.White),
+        border = BorderStroke(1.dp, Slate200),
+    ) {
+        Column(Modifier.padding(if (compact) 16.dp else 20.dp)) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                SkeletonBox(Modifier.width(140.dp).height(18.dp))
+                SkeletonBox(Modifier.width(70.dp).height(24.dp))
+            }
+            Spacer(Modifier.height(8.dp))
+            SkeletonBox(Modifier.width(130.dp).height(12.dp))
+            Spacer(Modifier.height(16.dp))
+            Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                SkeletonBox(Modifier.weight(1f).height(40.dp))
+                SkeletonBox(Modifier.weight(1f).height(40.dp))
+            }
+        }
+    }
+}
+
+@Composable
+private fun SyncStatusOverviewCard(
+    uiState: SyncCenterUiState,
+    onRetryAllPending: () -> Unit,
+    onRetryAllFailed: () -> Unit,
+) {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(14.dp),
+        colors = CardDefaults.cardColors(containerColor = Color.White),
+        border = BorderStroke(1.dp, Slate200),
+    ) {
+        Column(
+            modifier = Modifier.padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(14.dp),
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    ) {
+                        Text(
+                            text = "Sinkronisasi perangkat",
+                            fontSize = 14.sp,
+                            fontWeight = FontWeight.SemiBold,
+                            color = Slate900,
+                        )
+                        Surface(
+                            color = Slate100,
+                            shape = RoundedCornerShape(6.dp),
+                        ) {
+                            Text(
+                                text = "Aktif",
+                                modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
+                                fontSize = 10.sp,
+                                fontWeight = FontWeight.Medium,
+                                color = Slate700,
+                            )
+                        }
+                    }
+                    Text(
+                        text = "Terakhir sinkron: Baru saja",
+                        fontSize = 12.sp,
+                        color = Slate500,
+                    )
+                }
+
+                Text(
+                    text = "${uiState.queueItems.size} antrean",
+                    fontSize = 12.sp,
+                    fontWeight = FontWeight.Medium,
+                    color = Slate600,
+                )
+            }
+
+            // Buttons Grid
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(10.dp),
+            ) {
+                val canRetryFailed = !uiState.isRefreshing && !uiState.isRetrying && uiState.canRetry && uiState.totalFailed > 0
+                val canSync = !uiState.isRefreshing && !uiState.isRetrying && uiState.canRetry && (uiState.totalPending > 0 || uiState.queueItems.isNotEmpty())
+
+                OutlinedButton(
+                    onClick = onRetryAllFailed,
+                    enabled = canRetryFailed,
+                    modifier = Modifier
+                        .weight(1f)
+                        .height(40.dp)
+                        .testTag("sync-retry-failed"),
+                    shape = RoundedCornerShape(10.dp),
+                    border = BorderStroke(1.dp, if (canRetryFailed) Slate200 else Slate200.copy(alpha = 0.6f)),
+                    colors = ButtonDefaults.outlinedButtonColors(
+                        contentColor = Slate700,
+                        containerColor = Color.White,
+                        disabledContentColor = Slate400,
+                    ),
+                    contentPadding = PaddingValues(horizontal = 8.dp),
+                ) {
+                    Text(
+                        text = "Coba gagal",
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.Medium,
+                        maxLines = 1,
+                    )
+                }
+
+                Button(
+                    onClick = onRetryAllPending,
+                    enabled = canSync,
+                    modifier = Modifier
+                        .weight(1f)
+                        .height(40.dp)
+                        .testTag("sync-all-pending"),
+                    shape = RoundedCornerShape(10.dp),
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = BrandSage,
+                        disabledContainerColor = Slate200,
+                        disabledContentColor = Slate400,
+                    ),
+                    contentPadding = PaddingValues(horizontal = 8.dp),
+                ) {
+                    Icon(
+                        imageVector = Icons.Outlined.Sync,
+                        contentDescription = null,
+                        modifier = Modifier.size(16.dp),
+                    )
+                    Spacer(Modifier.width(6.dp))
+                    Text(
+                        text = "Sinkronkan",
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.SemiBold,
+                        color = Color.White,
+                        maxLines = 1,
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun OfflineDataQueueCard(
+    uiState: SyncCenterUiState,
+    compact: Boolean,
+    onRetryItem: (Long) -> Unit,
+    onMarkConflictReviewed: (Long) -> Unit,
 ) {
     val conflictItems = uiState.queueItems.filter { it.syncStatus == SyncStatus.CONFLICT }
     val groupedNonConflictItems = uiState.groupedItems
         .mapValues { (_, items) -> items.filter { it.syncStatus != SyncStatus.CONFLICT } }
         .filterValues { it.isNotEmpty() }
 
-    BoxWithConstraints(modifier = modifier.fillMaxSize().background(TbBackground)) {
-        val compact = maxWidth < 700.dp
-        LazyColumn(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(
-                    horizontal = if (compact) 16.dp else 32.dp,
-                    vertical = if (compact) 14.dp else 24.dp,
-                ),
-            verticalArrangement = Arrangement.spacedBy(if (compact) 14.dp else 18.dp),
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(14.dp),
+        colors = CardDefaults.cardColors(containerColor = Color.White),
+        border = BorderStroke(1.dp, Slate200),
+    ) {
+        Column(
+            modifier = Modifier.padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(14.dp),
         ) {
-            if (uiState.isInitialLoading) {
-                item { SyncOverviewSkeleton(compact) }
-                item { SkeletonList(modifier = Modifier.fillMaxWidth(), itemCount = 3) }
-            } else {
-                item {
-                    SyncOverviewCard(
-                        uiState = uiState,
-                        compact = compact,
-                        onRetryAllPending = onRetryAllPending,
-                        onRetryAllFailed = onRetryAllFailed,
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(bottom = 2.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text(
+                    text = "Antrean data offline",
+                    fontSize = 14.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    color = Slate900,
+                )
+                Surface(
+                    color = Slate100,
+                    shape = RoundedCornerShape(6.dp),
+                ) {
+                    Text(
+                        text = "${uiState.queueItems.size} data",
+                        modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.Medium,
+                        color = Slate600,
                     )
                 }
-                uiState.errorMessage?.let { message ->
-                    item { MessageCard(message, isError = true, onDismissMessage) }
-                }
-                uiState.message?.let { message ->
-                    item { MessageCard(message, isError = false, onDismissMessage) }
-                }
+            }
 
-                if (uiState.queueItems.isEmpty()) {
-                    item { EmptyState() }
-                } else {
+            HorizontalDivider(color = Slate100, thickness = 1.dp)
+
+            if (uiState.queueItems.isEmpty()) {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(vertical = 28.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .size(44.dp)
+                            .background(Slate100, CircleShape),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        Icon(
+                            imageVector = Icons.Outlined.Check,
+                            contentDescription = null,
+                            tint = BrandSage,
+                            modifier = Modifier.size(22.dp),
+                        )
+                    }
+                    Text(
+                        text = "Semua data sudah tersinkron",
+                        fontSize = 14.sp,
+                        fontWeight = FontWeight.SemiBold,
+                        color = Slate800,
+                        textAlign = TextAlign.Center,
+                    )
+                    Text(
+                        text = "Antrean data offline akan tampil di halaman ini saat transaksi diproses tanpa internet.",
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.Normal,
+                        color = Slate500,
+                        textAlign = TextAlign.Center,
+                        modifier = Modifier.widthIn(max = 280.dp),
+                        lineHeight = 16.sp,
+                    )
+                }
+            } else {
+                Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
                     if (conflictItems.isNotEmpty()) {
-                        item { QueueSectionTitle("Perlu ditinjau", conflictItems.size) }
-                        items(conflictItems, key = { it.localId }) { item ->
+                        QueueSectionTitle("Perlu ditinjau", conflictItems.size)
+                        conflictItems.forEach { item ->
                             SyncQueueCard(
                                 item = item,
                                 compact = compact,
@@ -135,8 +460,8 @@ fun SyncCenterScreen(
                     entityOrder(groupedNonConflictItems.keys).forEach { entityType ->
                         val entries = groupedNonConflictItems[entityType].orEmpty()
                         if (entries.isNotEmpty()) {
-                            item { QueueSectionTitle(entityType.sectionTitle(), entries.size) }
-                            items(entries, key = { it.localId }) { item ->
+                            QueueSectionTitle(entityType.sectionTitle(), entries.size)
+                            entries.forEach { item ->
                                 SyncQueueCard(
                                     item = item,
                                     compact = compact,
@@ -154,169 +479,222 @@ fun SyncCenterScreen(
     }
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun SyncOverviewSkeleton(compact: Boolean) {
-    Card(
-        modifier = Modifier.fillMaxWidth().testTag("sync-initial-skeleton"),
-        shape = RoundedCornerShape(18.dp),
-        colors = CardDefaults.cardColors(containerColor = TbSurface),
-        border = BorderStroke(1.dp, TbOutline),
-        elevation = CardDefaults.cardElevation(defaultElevation = 1.dp),
-    ) {
-        Column(Modifier.padding(if (compact) 16.dp else 18.dp)) {
-            SkeletonBox(Modifier.fillMaxWidth(if (compact) 0.54f else 0.24f).height(18.dp))
-            Spacer(Modifier.height(8.dp))
-            SkeletonBox(Modifier.fillMaxWidth(if (compact) 0.78f else 0.38f).height(12.dp))
-            Spacer(Modifier.height(16.dp))
-            if (compact) {
-                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    repeat(2) {
-                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                            SkeletonBox(Modifier.weight(1f).height(60.dp))
-                            SkeletonBox(Modifier.weight(1f).height(60.dp))
-                        }
-                    }
-                    SkeletonBox(Modifier.fillMaxWidth().height(60.dp))
-                }
-            } else {
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    repeat(5) { SkeletonBox(Modifier.weight(1f).height(60.dp)) }
-                }
-            }
-            Spacer(Modifier.height(14.dp))
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                SkeletonBox(Modifier.weight(1f).height(48.dp))
-                SkeletonBox(Modifier.weight(1f).height(48.dp))
-            }
-        }
-    }
-}
-
-@Composable
-private fun SyncOverviewCard(
+fun SyncStatusBottomSheet(
     uiState: SyncCenterUiState,
-    compact: Boolean,
+    onDismiss: () -> Unit,
     onRetryAllPending: () -> Unit,
     onRetryAllFailed: () -> Unit,
 ) {
-    Card(
-        modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(18.dp),
-        colors = CardDefaults.cardColors(containerColor = TbSurface),
-        border = BorderStroke(1.dp, TbOutline),
-        elevation = CardDefaults.cardElevation(defaultElevation = 1.dp),
+    ModalBottomSheet(
+        onDismissRequest = onDismiss,
+        sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
+        containerColor = Color.White,
+        shape = RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp),
+        dragHandle = {
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(top = 10.dp, bottom = 6.dp),
+                contentAlignment = Alignment.Center,
+            ) {
+                Box(
+                    modifier = Modifier
+                        .size(width = 40.dp, height = 4.dp)
+                        .background(Color(0xFFCBD5E1), RoundedCornerShape(999.dp)),
+                )
+            }
+        },
+        tonalElevation = 0.dp,
     ) {
-        Column(Modifier.padding(if (compact) 16.dp else 18.dp)) {
-            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                Column(Modifier.fillMaxWidth()) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 20.dp)
+                .padding(bottom = 20.dp)
+                .testTag("sync-status-sheet"),
+            verticalArrangement = Arrangement.spacedBy(14.dp),
+        ) {
+            // Sheet Header
+            Row(
+                modifier = Modifier.fillMaxWidth().padding(top = 2.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.Top,
+            ) {
+                Column(
+                    modifier = Modifier.weight(1f),
+                    verticalArrangement = Arrangement.spacedBy(2.dp),
+                ) {
                     Text(
-                        text = "Status sinkronisasi",
-                        color = TbText,
-                        style = MaterialTheme.typography.titleMedium,
+                        text = "Rincian Sinkronisasi",
+                        fontSize = 18.sp,
                         fontWeight = FontWeight.Bold,
+                        color = Slate900,
+                        lineHeight = 24.sp,
                     )
                     Text(
-                        text = "Pantau antrean data perangkat ke server.",
-                        color = TbTextMuted,
-                        style = MaterialTheme.typography.bodySmall,
+                        text = "Pantau status dan antrean data perangkat",
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.Normal,
+                        color = Slate500,
+                    )
+                }
+                IconButton(
+                    onClick = onDismiss,
+                    modifier = Modifier
+                        .size(32.dp)
+                        .background(Slate100, CircleShape),
+                ) {
+                    Icon(
+                        imageVector = Icons.Outlined.Close,
+                        contentDescription = "Tutup",
+                        tint = Slate500,
+                        modifier = Modifier.size(16.dp),
                     )
                 }
             }
-            Spacer(Modifier.height(14.dp))
-            SyncMetrics(uiState, compact)
-            if (uiState.canRetry) {
-                Spacer(Modifier.height(14.dp))
-                SyncBatchActions(
-                    compact = compact,
-                    enabled = !uiState.isRefreshing && !uiState.isRetrying,
-                    hasFailed = uiState.totalFailed > 0,
-                    hasPending = uiState.totalPending > 0,
-                    onRetryFailed = onRetryAllFailed,
-                    onSyncPending = onRetryAllPending,
+
+            HorizontalDivider(color = Slate100, thickness = 1.dp)
+
+            // Minimalist Clean Key-Value Rows (Polos, no AI slop)
+            Column(modifier = Modifier.fillMaxWidth()) {
+                SyncStatusMetricRow(
+                    label = "Menunggu",
+                    value = uiState.totalPending,
+                    dotColor = Color(0xFFD97706),
+                )
+                HorizontalDivider(color = Slate100, thickness = 1.dp)
+
+                SyncStatusMetricRow(
+                    label = "Diproses",
+                    value = uiState.totalSyncing,
+                    dotColor = Color(0xFF0284C7),
+                )
+                HorizontalDivider(color = Slate100, thickness = 1.dp)
+
+                SyncStatusMetricRow(
+                    label = "Gagal",
+                    value = uiState.totalFailed,
+                    dotColor = Color(0xFFE11D48),
+                )
+                HorizontalDivider(color = Slate100, thickness = 1.dp)
+
+                SyncStatusMetricRow(
+                    label = "Konflik",
+                    value = uiState.totalConflict,
+                    dotColor = Color(0xFF9333EA),
+                )
+                HorizontalDivider(color = Slate100, thickness = 1.dp)
+
+                SyncStatusMetricRow(
+                    label = "Berhasil hari ini",
+                    value = uiState.totalSyncedToday,
+                    dotColor = BrandSage,
                 )
             }
+
+            HorizontalDivider(color = Slate100, thickness = 1.dp)
+
+            // Action Buttons
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(10.dp),
+            ) {
+                val canRetryFailed = !uiState.isRefreshing && !uiState.isRetrying && uiState.canRetry && uiState.totalFailed > 0
+                val canSync = !uiState.isRefreshing && !uiState.isRetrying && uiState.canRetry && (uiState.totalPending > 0 || uiState.queueItems.isNotEmpty())
+
+                OutlinedButton(
+                    onClick = onRetryAllFailed,
+                    enabled = canRetryFailed,
+                    modifier = Modifier
+                        .weight(1f)
+                        .height(42.dp),
+                    shape = RoundedCornerShape(10.dp),
+                    border = BorderStroke(1.dp, if (canRetryFailed) Slate200 else Slate200.copy(alpha = 0.6f)),
+                    colors = ButtonDefaults.outlinedButtonColors(
+                        contentColor = Slate700,
+                        containerColor = Color.White,
+                        disabledContentColor = Slate400,
+                    ),
+                    contentPadding = PaddingValues(horizontal = 8.dp),
+                ) {
+                    Text(
+                        text = "Coba gagal",
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.Medium,
+                        maxLines = 1,
+                    )
+                }
+
+                Button(
+                    onClick = onRetryAllPending,
+                    enabled = canSync,
+                    modifier = Modifier
+                        .weight(1f)
+                        .height(42.dp),
+                    shape = RoundedCornerShape(10.dp),
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = BrandSage,
+                        disabledContainerColor = Slate200,
+                        disabledContentColor = Slate400,
+                    ),
+                    contentPadding = PaddingValues(horizontal = 8.dp),
+                ) {
+                    Icon(
+                        imageVector = Icons.Outlined.Sync,
+                        contentDescription = null,
+                        modifier = Modifier.size(16.dp),
+                    )
+                    Spacer(Modifier.width(6.dp))
+                    Text(
+                        text = "Sinkronkan",
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.SemiBold,
+                        color = Color.White,
+                        maxLines = 1,
+                    )
+                }
+            }
         }
     }
 }
 
 @Composable
-private fun SyncMetrics(uiState: SyncCenterUiState, compact: Boolean) {
-    if (compact) {
-        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                SyncMetric("Menunggu", uiState.totalPending, TbAmber, Modifier.weight(1f))
-                SyncMetric("Diproses", uiState.totalSyncing, TbGreenDark, Modifier.weight(1f))
-            }
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                SyncMetric("Gagal", uiState.totalFailed, TbError, Modifier.weight(1f))
-                SyncMetric("Konflik", uiState.totalConflict, TbError, Modifier.weight(1f))
-            }
-            SyncMetric("Berhasil hari ini", uiState.totalSyncedToday, TbGreenDark, Modifier.fillMaxWidth())
-        }
-    } else {
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            SyncMetric("Menunggu", uiState.totalPending, TbAmber, Modifier.weight(1f))
-            SyncMetric("Diproses", uiState.totalSyncing, TbGreenDark, Modifier.weight(1f))
-            SyncMetric("Gagal", uiState.totalFailed, TbError, Modifier.weight(1f))
-            SyncMetric("Konflik", uiState.totalConflict, TbError, Modifier.weight(1f))
-            SyncMetric("Berhasil hari ini", uiState.totalSyncedToday, TbGreenDark, Modifier.weight(1f))
-        }
-    }
-}
-
-@Composable
-private fun SyncMetric(label: String, value: Int, accent: Color, modifier: Modifier) {
-    Surface(modifier = modifier, color = TbSurfaceMuted, shape = RoundedCornerShape(12.dp)) {
-        Column(Modifier.padding(horizontal = 12.dp, vertical = 10.dp)) {
-            Text(
-                text = value.toString(),
-                color = if (value == 0) TbTextMuted else accent,
-                style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.Bold,
+private fun SyncStatusMetricRow(
+    label: String,
+    value: Int,
+    dotColor: Color,
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(vertical = 12.dp),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            Box(
+                modifier = Modifier
+                    .size(8.dp)
+                    .background(dotColor, CircleShape)
             )
             Text(
                 text = label,
-                color = TbTextMuted,
-                style = MaterialTheme.typography.labelSmall,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
+                fontSize = 13.sp,
+                fontWeight = FontWeight.Normal,
+                color = Slate600,
             )
         }
-    }
-}
-
-@Composable
-private fun SyncBatchActions(
-    compact: Boolean,
-    enabled: Boolean,
-    hasFailed: Boolean,
-    hasPending: Boolean,
-    onRetryFailed: () -> Unit,
-    onSyncPending: () -> Unit,
-) {
-    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-        val buttonModifier = if (compact) Modifier.weight(1f) else Modifier.width(210.dp)
-        OutlinedButton(
-            onClick = onRetryFailed,
-            enabled = enabled && hasFailed,
-            modifier = buttonModifier.height(48.dp),
-            shape = RoundedCornerShape(14.dp),
-            contentPadding = PaddingValues(horizontal = 10.dp),
-        ) {
-            Text(if (compact) "Coba gagal" else "Coba lagi yang gagal", maxLines = 1)
-        }
-        Button(
-            onClick = onSyncPending,
-            enabled = enabled && hasPending,
-            modifier = buttonModifier.height(48.dp),
-            shape = RoundedCornerShape(14.dp),
-            colors = ButtonDefaults.buttonColors(containerColor = TbGreen),
-            contentPadding = PaddingValues(horizontal = 10.dp),
-        ) {
-            Icon(Icons.Outlined.Sync, contentDescription = null, modifier = Modifier.size(18.dp))
-            Spacer(Modifier.width(6.dp))
-            Text(if (compact) "Sinkronkan" else "Sinkronkan data", maxLines = 1)
-        }
+        Text(
+            text = value.toString(),
+            fontSize = 15.sp,
+            fontWeight = FontWeight.Bold,
+            color = Slate900,
+        )
     }
 }
 
@@ -329,17 +707,17 @@ private fun QueueSectionTitle(title: String, count: Int) {
         Text(
             text = title,
             modifier = Modifier.weight(1f),
-            color = TbText,
-            style = MaterialTheme.typography.titleMedium,
+            color = Slate900,
+            fontSize = 14.sp,
             fontWeight = FontWeight.SemiBold,
         )
-        Surface(color = TbSurfaceMuted, shape = RoundedCornerShape(999.dp)) {
+        Surface(color = Slate100, shape = RoundedCornerShape(6.dp)) {
             Text(
                 text = count.toString(),
-                modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp),
-                color = TbTextMuted,
-                style = MaterialTheme.typography.labelMedium,
-                fontWeight = FontWeight.SemiBold,
+                modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
+                color = Slate600,
+                fontSize = 11.sp,
+                fontWeight = FontWeight.Medium,
             )
         }
     }
@@ -357,12 +735,11 @@ private fun SyncQueueCard(
     var expanded by rememberSaveable(item.localId) { mutableStateOf(false) }
     Card(
         modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(16.dp),
-        colors = CardDefaults.cardColors(containerColor = TbSurface),
-        border = BorderStroke(1.dp, TbOutline),
-        elevation = CardDefaults.cardElevation(defaultElevation = 1.dp),
+        shape = RoundedCornerShape(12.dp),
+        colors = CardDefaults.cardColors(containerColor = Color.White),
+        border = BorderStroke(1.dp, Slate200),
     ) {
-        Column(Modifier.padding(16.dp)) {
+        Column(Modifier.padding(14.dp)) {
             if (compact) CompactQueueHeader(item) else ExpandedQueueHeader(item)
 
             if (item.lastError != null) {
@@ -393,25 +770,33 @@ private fun SyncQueueCard(
 private fun CompactQueueHeader(item: SyncQueueUiModel) {
     Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
         QueueIcon()
-        Column(Modifier.weight(1f).padding(horizontal = 12.dp)) {
+        Column(Modifier.weight(1f).padding(horizontal = 10.dp)) {
             Text(
                 text = item.entityType.displayName(),
-                color = TbText,
-                style = MaterialTheme.typography.bodyLarge,
+                color = Slate900,
+                fontSize = 13.sp,
                 fontWeight = FontWeight.SemiBold,
             )
-            Text("Data lokal #${item.entityId}", color = TbTextMuted, style = MaterialTheme.typography.bodySmall)
+            Text(
+                text = "Data lokal #${item.entityId}",
+                color = Slate500,
+                fontSize = 11.sp,
+            )
         }
         StatusBadge(item.syncStatus)
     }
-    Row(Modifier.fillMaxWidth().padding(top = 10.dp), verticalAlignment = Alignment.CenterVertically) {
+    Row(Modifier.fillMaxWidth().padding(top = 8.dp), verticalAlignment = Alignment.CenterVertically) {
         Text(
             text = item.updatedAt.formatDateTime(),
             modifier = Modifier.weight(1f),
-            color = TbTextMuted,
-            style = MaterialTheme.typography.labelMedium,
+            color = Slate500,
+            fontSize = 11.sp,
         )
-        Text("Percobaan ${item.retryCount}", color = TbTextMuted, style = MaterialTheme.typography.labelMedium)
+        Text(
+            text = "Percobaan ${item.retryCount}",
+            color = Slate500,
+            fontSize = 11.sp,
+        )
     }
 }
 
@@ -422,16 +807,20 @@ private fun ExpandedQueueHeader(item: SyncQueueUiModel) {
         Column(Modifier.weight(1f).padding(horizontal = 12.dp)) {
             Text(
                 text = item.entityType.displayName(),
-                color = TbText,
-                style = MaterialTheme.typography.bodyLarge,
+                color = Slate900,
+                fontSize = 14.sp,
                 fontWeight = FontWeight.SemiBold,
             )
-            Text("Data lokal #${item.entityId}", color = TbTextMuted, style = MaterialTheme.typography.bodySmall)
+            Text(
+                text = "Data lokal #${item.entityId}",
+                color = Slate500,
+                fontSize = 12.sp,
+            )
         }
         StatusBadge(item.syncStatus)
-        Column(Modifier.padding(start = 24.dp), horizontalAlignment = Alignment.End) {
-            Text(item.updatedAt.formatDateTime(), color = TbTextMuted, style = MaterialTheme.typography.bodySmall)
-            Text("Percobaan ${item.retryCount}", color = TbTextMuted, style = MaterialTheme.typography.labelSmall)
+        Column(Modifier.padding(start = 20.dp), horizontalAlignment = Alignment.End) {
+            Text(item.updatedAt.formatDateTime(), color = Slate500, fontSize = 11.sp)
+            Text("Percobaan ${item.retryCount}", color = Slate500, fontSize = 11.sp)
         }
     }
 }
@@ -439,42 +828,44 @@ private fun ExpandedQueueHeader(item: SyncQueueUiModel) {
 @Composable
 private fun QueueIcon() {
     Box(
-        modifier = Modifier.size(42.dp).background(TbGreenLight, RoundedCornerShape(13.dp)),
+        modifier = Modifier.size(36.dp).background(Slate100, RoundedCornerShape(8.dp)),
         contentAlignment = Alignment.Center,
     ) {
-        Icon(Icons.Outlined.Sync, contentDescription = null, tint = TbGreenDark, modifier = Modifier.size(22.dp))
+        Icon(Icons.Outlined.Sync, contentDescription = null, tint = Slate700, modifier = Modifier.size(18.dp))
     }
 }
 
 @Composable
 private fun ErrorDisclosure(expanded: Boolean, isConflict: Boolean, onClick: () -> Unit) {
+    val errorColor = Color(0xFFEF4444)
     Surface(
         modifier = Modifier.fillMaxWidth().clickable(onClick = onClick),
-        color = if (isConflict) TbError.copy(alpha = 0.07f) else TbSurfaceMuted,
-        shape = RoundedCornerShape(12.dp),
+        color = if (isConflict) errorColor.copy(alpha = 0.06f) else Slate100,
+        shape = RoundedCornerShape(8.dp),
     ) {
         Row(
-            modifier = Modifier.fillMaxWidth().padding(start = 12.dp, end = 4.dp, top = 4.dp, bottom = 4.dp),
+            modifier = Modifier.fillMaxWidth().padding(start = 10.dp, end = 4.dp, top = 2.dp, bottom = 2.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Icon(
                 Icons.Outlined.ErrorOutline,
                 contentDescription = null,
-                tint = if (isConflict) TbError else TbTextMuted,
-                modifier = Modifier.size(19.dp),
+                tint = if (isConflict) errorColor else Slate500,
+                modifier = Modifier.size(16.dp),
             )
             Text(
                 text = if (isConflict) "Periksa konflik data" else "Lihat kendala sinkronisasi",
-                modifier = Modifier.weight(1f).padding(horizontal = 10.dp),
-                color = if (isConflict) TbError else TbText,
-                style = MaterialTheme.typography.bodySmall,
+                modifier = Modifier.weight(1f).padding(horizontal = 8.dp),
+                color = if (isConflict) errorColor else Slate700,
+                fontSize = 12.sp,
                 fontWeight = FontWeight.Medium,
             )
-            IconButton(onClick = onClick, modifier = Modifier.size(40.dp)) {
+            IconButton(onClick = onClick, modifier = Modifier.size(36.dp)) {
                 Icon(
                     if (expanded) Icons.Outlined.ExpandLess else Icons.Outlined.ExpandMore,
                     contentDescription = if (expanded) "Tutup detail" else "Buka detail",
-                    tint = TbTextMuted,
+                    tint = Slate500,
+                    modifier = Modifier.size(18.dp),
                 )
             }
         }
@@ -483,28 +874,29 @@ private fun ErrorDisclosure(expanded: Boolean, isConflict: Boolean, onClick: () 
 
 @Composable
 private fun ErrorDetails(item: SyncQueueUiModel) {
-    Spacer(Modifier.height(10.dp))
-    HorizontalDivider(color = TbOutline)
-    Column(Modifier.padding(top = 10.dp)) {
+    val errorColor = Color(0xFFEF4444)
+    Spacer(Modifier.height(8.dp))
+    HorizontalDivider(color = Slate200)
+    Column(Modifier.padding(top = 8.dp)) {
         Text(
             text = item.lastError.orEmpty(),
-            color = TbText,
-            style = MaterialTheme.typography.bodySmall,
+            color = Slate800,
+            fontSize = 12.sp,
             fontWeight = FontWeight.Medium,
         )
         if (item.syncStatus == SyncStatus.CONFLICT) {
             Text(
                 text = "Jenis kendala: ${item.errorCategory.displayName()}",
-                color = TbText,
-                style = MaterialTheme.typography.labelMedium,
+                color = errorColor,
+                fontSize = 11.sp,
                 fontWeight = FontWeight.SemiBold,
-                modifier = Modifier.padding(top = 8.dp),
+                modifier = Modifier.padding(top = 6.dp),
             )
             Text(
                 text = item.recommendation,
-                color = TbTextMuted,
-                style = MaterialTheme.typography.bodySmall,
-                modifier = Modifier.padding(top = 3.dp),
+                color = Slate500,
+                fontSize = 11.sp,
+                modifier = Modifier.padding(top = 2.dp),
             )
         }
     }
@@ -522,24 +914,26 @@ private fun QueueActions(
         modifier = Modifier.fillMaxWidth(),
         horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.End),
     ) {
-        val actionModifier = if (compact) Modifier.weight(1f) else Modifier.width(170.dp)
+        val actionModifier = if (compact) Modifier.weight(1f) else Modifier.width(160.dp)
         OutlinedButton(
             onClick = onRetry,
             enabled = enabled,
-            modifier = actionModifier.height(48.dp),
-            shape = RoundedCornerShape(13.dp),
-            contentPadding = PaddingValues(horizontal = 10.dp),
+            modifier = actionModifier.height(40.dp),
+            shape = RoundedCornerShape(8.dp),
+            border = BorderStroke(1.dp, Slate200),
+            colors = ButtonDefaults.outlinedButtonColors(contentColor = Slate700),
+            contentPadding = PaddingValues(horizontal = 8.dp),
         ) {
-            Text("Coba lagi", maxLines = 1)
+            Text("Coba lagi", fontSize = 12.sp, maxLines = 1)
         }
         if (item.syncStatus == SyncStatus.CONFLICT) {
             TextButton(
                 onClick = onMarkReviewed,
                 enabled = enabled,
-                modifier = actionModifier.height(48.dp),
-                contentPadding = PaddingValues(horizontal = 10.dp),
+                modifier = actionModifier.height(40.dp),
+                contentPadding = PaddingValues(horizontal = 8.dp),
             ) {
-                Text("Tandai ditinjau", maxLines = 1)
+                Text("Tandai ditinjau", fontSize = 12.sp, maxLines = 1)
             }
         }
     }
@@ -548,18 +942,18 @@ private fun QueueActions(
 @Composable
 private fun StatusBadge(status: SyncStatus) {
     val (background, foreground) = when (status) {
-        SyncStatus.PENDING -> TbAmber.copy(alpha = 0.12f) to TbAmber
-        SyncStatus.SYNCING -> TbGreenLight to TbGreenDark
-        SyncStatus.FAILED, SyncStatus.CONFLICT -> TbError.copy(alpha = 0.10f) to TbError
-        SyncStatus.SYNCED -> TbGreenLight to TbGreenDark
+        SyncStatus.PENDING -> Color(0xFFFEF3C7) to Color(0xFFD97706)
+        SyncStatus.SYNCING -> Slate100 to Slate700
+        SyncStatus.FAILED, SyncStatus.CONFLICT -> Color(0xFFFFE4E6) to Color(0xFFE11D48)
+        SyncStatus.SYNCED -> Color(0xFFECFDF5) to Color(0xFF047857)
     }
-    Surface(color = background, shape = RoundedCornerShape(999.dp)) {
+    Surface(color = background, shape = RoundedCornerShape(6.dp)) {
         Text(
             text = status.displayName(),
-            modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp),
+            modifier = Modifier.padding(horizontal = 7.dp, vertical = 2.dp),
             color = foreground,
-            style = MaterialTheme.typography.labelSmall,
-            fontWeight = FontWeight.SemiBold,
+            fontSize = 11.sp,
+            fontWeight = FontWeight.Medium,
             maxLines = 1,
         )
     }
@@ -567,65 +961,25 @@ private fun StatusBadge(status: SyncStatus) {
 
 @Composable
 private fun MessageCard(message: String, isError: Boolean, onDismiss: () -> Unit) {
+    val errorColor = Color(0xFFEF4444)
     Surface(
         modifier = Modifier.fillMaxWidth(),
-        color = if (isError) TbError.copy(alpha = 0.08f) else TbGreenLight,
-        shape = RoundedCornerShape(14.dp),
-        border = BorderStroke(1.dp, if (isError) TbError.copy(alpha = 0.22f) else TbOutline),
+        color = if (isError) errorColor.copy(alpha = 0.06f) else Slate100,
+        shape = RoundedCornerShape(10.dp),
+        border = BorderStroke(1.dp, if (isError) errorColor.copy(alpha = 0.2f) else Slate200),
     ) {
         Row(
-            modifier = Modifier.fillMaxWidth().padding(start = 14.dp, end = 6.dp, top = 6.dp, bottom = 6.dp),
+            modifier = Modifier.fillMaxWidth().padding(start = 12.dp, end = 4.dp, top = 4.dp, bottom = 4.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Text(
                 text = message,
-                modifier = Modifier.weight(1f).padding(vertical = 6.dp),
-                color = if (isError) TbError else TbGreenDark,
-                style = MaterialTheme.typography.bodySmall,
+                modifier = Modifier.weight(1f).padding(vertical = 4.dp),
+                color = if (isError) errorColor else Slate800,
+                fontSize = 12.sp,
                 fontWeight = FontWeight.Medium,
             )
-            TextButton(onClick = onDismiss) { Text("Tutup") }
-        }
-    }
-}
-
-@Composable
-private fun EmptyState() {
-    Card(
-        modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(18.dp),
-        colors = CardDefaults.cardColors(containerColor = TbSurface),
-        border = BorderStroke(1.dp, TbOutline),
-        elevation = CardDefaults.cardElevation(defaultElevation = 1.dp),
-    ) {
-        Column(
-            modifier = Modifier.fillMaxWidth().padding(horizontal = 24.dp, vertical = 32.dp),
-            horizontalAlignment = Alignment.CenterHorizontally,
-        ) {
-            Box(
-                modifier = Modifier.size(48.dp).background(TbGreenLight, RoundedCornerShape(16.dp)),
-                contentAlignment = Alignment.Center,
-            ) {
-                Icon(
-                    Icons.Outlined.CheckCircleOutline,
-                    contentDescription = null,
-                    tint = TbGreenDark,
-                    modifier = Modifier.size(26.dp),
-                )
-            }
-            Text(
-                text = "Semua data sudah tersinkron",
-                color = TbText,
-                style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.SemiBold,
-                modifier = Modifier.padding(top = 14.dp),
-            )
-            Text(
-                text = "Antrean data offline akan tampil di halaman ini.",
-                color = TbTextMuted,
-                style = MaterialTheme.typography.bodySmall,
-                modifier = Modifier.padding(top = 4.dp),
-            )
+            TextButton(onClick = onDismiss) { Text("Tutup", fontSize = 12.sp) }
         }
     }
 }

@@ -23,6 +23,8 @@ import androidx.compose.material.icons.outlined.Group
 import androidx.compose.material.icons.outlined.Groups
 import androidx.compose.material.icons.outlined.Lock
 import androidx.compose.material.icons.outlined.Person
+import androidx.compose.material.icons.outlined.Print
+import androidx.compose.material.icons.outlined.Storefront
 import androidx.compose.material.icons.outlined.Security
 import androidx.compose.material.icons.outlined.Settings
 import androidx.compose.material.icons.outlined.Summarize
@@ -171,6 +173,8 @@ private fun MoreMenuAction.icon(): ImageVector = when (this) {
     MoreMenuAction.ACTIVITY -> Icons.Outlined.Security
     MoreMenuAction.SECURITY_LOG -> Icons.Outlined.Lock
     MoreMenuAction.BACKUP -> Icons.Outlined.Backup
+    MoreMenuAction.STORE_SETTINGS -> Icons.Outlined.Storefront
+    MoreMenuAction.DEVICE_SETTINGS -> Icons.Outlined.Print
     MoreMenuAction.SETTINGS -> Icons.Outlined.Settings
     MoreMenuAction.SYNC -> Icons.Outlined.Sync
     MoreMenuAction.LOGOUT -> Icons.AutoMirrored.Outlined.Logout

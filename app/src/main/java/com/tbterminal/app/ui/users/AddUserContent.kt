@@ -61,6 +61,8 @@ import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.zIndex
+import com.tbterminal.app.ui.components.TopFloatingCapsule
 import com.tbterminal.app.data.model.UserRole
 import com.tbterminal.app.ui.components.TbMobileControlSheet
 import com.tbterminal.app.ui.components.TbMobileSheetDoneButton
@@ -109,23 +111,33 @@ fun AddUserContent(
     val compact = androidx.compose.ui.platform.LocalConfiguration.current.screenWidthDp < 700
     var showAccessDetails by remember { mutableStateOf(false) }
     val selectedRole = uiState.roles.firstOrNull { role -> role.id == uiState.selectedRoleId }
-    Column(
-        modifier = modifier
-            .fillMaxSize()
-            .background(AddUserSurface)
-            .padding(horizontal = if (compact) 16.dp else 32.dp, vertical = if (compact) 16.dp else 28.dp)
-            .verticalScroll(rememberScrollState())
-    ) {
-        Box(modifier = Modifier.fillMaxWidth(), contentAlignment = Alignment.TopCenter) {
-            AddUserFormCard(
-                uiState = uiState, onFullNameChange = onFullNameChange, onEmailChange = onEmailChange,
-                onUsernameChange = onUsernameChange, onPasswordChange = onPasswordChange, onPinChange = onPinChange,
-                onRoleChange = onRoleChange, onRetryRoles = onRetryRoles, onCancel = onCancel, onSubmit = onSubmit,
-                onShowAccessDetails = { showAccessDetails = true },
-                modifier = Modifier.fillMaxWidth().widthIn(max = 860.dp),
-                compact = compact,
-            )
+    Box(modifier = modifier.fillMaxSize().background(AddUserSurface)) {
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(horizontal = if (compact) 16.dp else 32.dp, vertical = if (compact) 16.dp else 28.dp)
+                .verticalScroll(rememberScrollState())
+        ) {
+            Box(modifier = Modifier.fillMaxWidth(), contentAlignment = Alignment.TopCenter) {
+                AddUserFormCard(
+                    uiState = uiState, onFullNameChange = onFullNameChange, onEmailChange = onEmailChange,
+                    onUsernameChange = onUsernameChange, onPasswordChange = onPasswordChange, onPinChange = onPinChange,
+                    onRoleChange = onRoleChange, onRetryRoles = onRetryRoles, onCancel = onCancel, onSubmit = onSubmit,
+                    onShowAccessDetails = { showAccessDetails = true },
+                    modifier = Modifier.fillMaxWidth().widthIn(max = 860.dp),
+                    compact = compact,
+                )
+            }
         }
+
+        TopFloatingCapsule(
+            message = null,
+            error = uiState.errorMessage,
+            modifier = Modifier
+                .align(Alignment.TopCenter)
+                .padding(top = 16.dp, start = 20.dp, end = 20.dp)
+                .zIndex(99f),
+        )
     }
 
     if (showAccessDetails) {
@@ -159,16 +171,37 @@ private fun AddUserFormCard(
         shape = RoundedCornerShape(20.dp),
         border = BorderStroke(1.dp, AddUserSlate200)
     ) {
+        val isFullNameError = uiState.errorMessage?.contains("nama", ignoreCase = true) == true
+        val isEmailError = uiState.errorMessage?.contains("email", ignoreCase = true) == true
+        val isUsernameError = uiState.errorMessage?.contains("username", ignoreCase = true) == true
+        val isPasswordError = uiState.errorMessage?.contains("password", ignoreCase = true) == true || uiState.errorMessage?.contains("sandi", ignoreCase = true) == true
+        val isPinError = uiState.errorMessage?.contains("pin", ignoreCase = true) == true
+
         Column(modifier = Modifier.padding(if (compact) 16.dp else 28.dp)) {
-            if (uiState.errorMessage != null) {
-                AddUserErrorBanner(message = uiState.errorMessage)
-                Spacer(modifier = Modifier.height(20.dp))
-            }
             AddUserSectionTitle("Informasi pengguna")
             Spacer(modifier = Modifier.height(14.dp))
             if (compact) Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
-                AddUserInputField(label = "Nama lengkap", value = uiState.fullName, onValueChange = onFullNameChange, icon = Icons.Outlined.Person, placeholder = "Contoh: Budi Santoso", modifier = Modifier.fillMaxWidth())
-                AddUserInputField(label = "Alamat email", value = uiState.email, onValueChange = onEmailChange, icon = Icons.Outlined.Email, placeholder = "contoh@email.com", modifier = Modifier.fillMaxWidth(), keyboardType = KeyboardType.Email)
+                AddUserInputField(
+                    label = "Nama lengkap",
+                    value = uiState.fullName,
+                    onValueChange = onFullNameChange,
+                    icon = Icons.Outlined.Person,
+                    placeholder = "Contoh: Budi Santoso",
+                    modifier = Modifier.fillMaxWidth(),
+                    isError = isFullNameError,
+                    supportingText = if (isFullNameError) uiState.errorMessage else null,
+                )
+                AddUserInputField(
+                    label = "Alamat email",
+                    value = uiState.email,
+                    onValueChange = onEmailChange,
+                    icon = Icons.Outlined.Email,
+                    placeholder = "contoh@email.com",
+                    modifier = Modifier.fillMaxWidth(),
+                    keyboardType = KeyboardType.Email,
+                    isError = isEmailError,
+                    supportingText = if (isEmailError) uiState.errorMessage else null,
+                )
             } else Row(horizontalArrangement = Arrangement.spacedBy(20.dp)) {
                 AddUserInputField(
                     modifier = Modifier.weight(1f),
@@ -176,7 +209,9 @@ private fun AddUserFormCard(
                     value = uiState.fullName,
                     onValueChange = onFullNameChange,
                     icon = Icons.Outlined.Person,
-                    placeholder = "Contoh: Budi Santoso"
+                    placeholder = "Contoh: Budi Santoso",
+                    isError = isFullNameError,
+                    supportingText = if (isFullNameError) uiState.errorMessage else null,
                 )
                 AddUserInputField(
                     modifier = Modifier.weight(1f),
@@ -185,16 +220,48 @@ private fun AddUserFormCard(
                     onValueChange = onEmailChange,
                     icon = Icons.Outlined.Email,
                     placeholder = "contoh@email.com",
-                    keyboardType = KeyboardType.Email
+                    keyboardType = KeyboardType.Email,
+                    isError = isEmailError,
+                    supportingText = if (isEmailError) uiState.errorMessage else null,
                 )
             }
             Spacer(modifier = Modifier.height(26.dp))
             AddUserSectionTitle("Akses masuk")
             Spacer(modifier = Modifier.height(14.dp))
             if (compact) Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
-                AddUserInputField(label = "Username", value = uiState.username, onValueChange = onUsernameChange, icon = Icons.Outlined.AlternateEmail, placeholder = "budisan88", modifier = Modifier.fillMaxWidth())
-                AddUserInputField(label = "Password", value = uiState.password, onValueChange = onPasswordChange, icon = Icons.Outlined.Lock, placeholder = "Minimal 6 karakter", modifier = Modifier.fillMaxWidth(), isPassword = true)
-                AddUserInputField(label = "PIN akses", value = uiState.pin, onValueChange = onPinChange, icon = Icons.Outlined.Lock, placeholder = "6 digit PIN", modifier = Modifier.fillMaxWidth(), isPassword = true, keyboardType = KeyboardType.NumberPassword)
+                AddUserInputField(
+                    label = "Username",
+                    value = uiState.username,
+                    onValueChange = onUsernameChange,
+                    icon = Icons.Outlined.AlternateEmail,
+                    placeholder = "budisan88",
+                    modifier = Modifier.fillMaxWidth(),
+                    isError = isUsernameError,
+                    supportingText = if (isUsernameError) uiState.errorMessage else null,
+                )
+                AddUserInputField(
+                    label = "Password",
+                    value = uiState.password,
+                    onValueChange = onPasswordChange,
+                    icon = Icons.Outlined.Lock,
+                    placeholder = "Minimal 6 karakter",
+                    modifier = Modifier.fillMaxWidth(),
+                    isPassword = true,
+                    isError = isPasswordError,
+                    supportingText = if (isPasswordError) uiState.errorMessage else null,
+                )
+                AddUserInputField(
+                    label = "PIN akses",
+                    value = uiState.pin,
+                    onValueChange = onPinChange,
+                    icon = Icons.Outlined.Lock,
+                    placeholder = "6 digit PIN",
+                    modifier = Modifier.fillMaxWidth(),
+                    isPassword = true,
+                    keyboardType = KeyboardType.NumberPassword,
+                    isError = isPinError,
+                    supportingText = if (isPinError) uiState.errorMessage else null,
+                )
             } else Row(horizontalArrangement = Arrangement.spacedBy(20.dp)) {
                 AddUserInputField(
                     modifier = Modifier.weight(1f),
@@ -202,7 +269,9 @@ private fun AddUserFormCard(
                     value = uiState.username,
                     onValueChange = onUsernameChange,
                     icon = Icons.Outlined.AlternateEmail,
-                    placeholder = "budisan88"
+                    placeholder = "budisan88",
+                    isError = isUsernameError,
+                    supportingText = if (isUsernameError) uiState.errorMessage else null,
                 )
                 AddUserInputField(
                     modifier = Modifier.weight(1f),
@@ -212,6 +281,8 @@ private fun AddUserFormCard(
                     icon = Icons.Outlined.Lock,
                     placeholder = "Minimal 6 karakter",
                     isPassword = true,
+                    isError = isPasswordError,
+                    supportingText = if (isPasswordError) uiState.errorMessage else null,
                 )
             }
             if (!compact) {
@@ -225,6 +296,8 @@ private fun AddUserFormCard(
                     placeholder = "6 digit PIN",
                     isPassword = true,
                     keyboardType = KeyboardType.NumberPassword,
+                    isError = isPinError,
+                    supportingText = if (isPinError) uiState.errorMessage else null,
                 )
             }
 
@@ -312,12 +385,14 @@ private fun AddUserInputField(
     placeholder: String,
     modifier: Modifier = Modifier,
     isPassword: Boolean = false,
-    keyboardType: KeyboardType = KeyboardType.Text
+    keyboardType: KeyboardType = KeyboardType.Text,
+    isError: Boolean = false,
+    supportingText: String? = null,
 ) {
     Column(modifier = modifier) {
         Text(
             text = label,
-            color = AddUserSlate600,
+            color = if (isError) AddUserError else AddUserSlate600,
             fontSize = 12.sp,
             fontWeight = FontWeight.Bold
         )
@@ -326,16 +401,29 @@ private fun AddUserInputField(
             value = value,
             onValueChange = onValueChange,
             placeholder = { Text(text = placeholder, color = AddUserSlate400) },
-            leadingIcon = { Icon(imageVector = icon, contentDescription = null, tint = AddUserSlate400) },
+            leadingIcon = { Icon(imageVector = icon, contentDescription = null, tint = if (isError) AddUserError else AddUserSlate400) },
             visualTransformation = if (isPassword) PasswordVisualTransformation() else VisualTransformation.None,
             keyboardOptions = KeyboardOptions(keyboardType = keyboardType),
             modifier = Modifier.fillMaxWidth(),
             shape = RoundedCornerShape(14.dp),
+            isError = isError,
+            supportingText = supportingText?.let { text ->
+                {
+                    Text(
+                        text = text,
+                        color = AddUserError,
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.Medium,
+                    )
+                }
+            },
             colors = OutlinedTextFieldDefaults.colors(
-                unfocusedContainerColor = AddUserSurfaceContainerLow,
-                focusedContainerColor = AddUserSurfaceContainerLow,
-                unfocusedBorderColor = AddUserSlate200,
-                focusedBorderColor = AddUserPrimary
+                unfocusedContainerColor = if (isError) Color(0xFFFFF5F5) else AddUserSurfaceContainerLow,
+                focusedContainerColor = if (isError) Color(0xFFFFF5F5) else AddUserSurfaceContainerLow,
+                unfocusedBorderColor = if (isError) AddUserError else AddUserSlate200,
+                focusedBorderColor = if (isError) AddUserError else AddUserPrimary,
+                errorBorderColor = AddUserError,
+                errorContainerColor = Color(0xFFFFF5F5),
             ),
             singleLine = true
         )

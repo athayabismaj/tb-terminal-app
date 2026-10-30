@@ -14,7 +14,7 @@ class OwnerMenuModelTest {
         val actions = groups.flatMap { it.actions }
 
         assertEquals(3, groups.size)
-        assertEquals(10, actions.size)
+        assertEquals(11, actions.size)
         assertEquals(actions.size, actions.distinctBy { it.destination }.size)
         assertTrue(AdminDestination.Profile !in actions.map { it.destination })
     }

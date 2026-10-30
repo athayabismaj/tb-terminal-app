@@ -13,6 +13,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
@@ -51,6 +52,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import com.tbterminal.app.data.remote.CashierSalesSummaryDto
 import com.tbterminal.app.data.remote.PaymentMethodSummaryDto
 import com.tbterminal.app.data.remote.SalesReceivableSummaryDto
@@ -135,55 +137,112 @@ fun CompactBusinessSummary(
         report == null -> SalesReportEmptyCard()
         else -> Surface(
             modifier = Modifier.fillMaxWidth(),
-            color = ReportColors.Surface,
-            shape = RoundedCornerShape(18.dp),
+            color = Color.White,
+            shape = RoundedCornerShape(16.dp),
             border = BorderStroke(1.dp, ReportColors.OutlineSoft),
         ) {
-            Column(Modifier.padding(horizontal = 16.dp, vertical = 14.dp)) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
-                        Text("Omzet", style = MaterialTheme.typography.labelMedium, color = ReportColors.Outline)
-                        Text(
-                            report.totals.grossRevenue.toReportCurrency(),
-                            style = MaterialTheme.typography.titleLarge,
-                            color = ReportColors.PrimaryDark,
-                            fontWeight = FontWeight.Bold,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis,
-                        )
-                    }
-                    Surface(color = ReportColors.PrimarySoft, shape = RoundedCornerShape(999.dp)) {
-                        Text(
-                            "${report.totals.transactionCount} transaksi",
-                            modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
-                            style = MaterialTheme.typography.labelMedium,
-                            color = ReportColors.PrimaryDark,
-                            fontWeight = FontWeight.SemiBold,
-                        )
-                    }
+            Column(Modifier.padding(horizontal = 20.dp, vertical = 16.dp)) {
+                // Hero Total Omzet
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(bottom = 12.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                ) {
+                    Text(
+                        text = "TOTAL OMZET BISNIS",
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = Color(0xFF94A3B8),
+                        letterSpacing = 0.6.sp,
+                    )
+                    Spacer(Modifier.height(4.dp))
+                    Text(
+                        text = report.totals.grossRevenue.toReportCurrency(),
+                        fontSize = 26.sp,
+                        fontWeight = FontWeight.ExtraBold,
+                        color = ReportColors.Primary,
+                        letterSpacing = (-0.5).sp,
+                    )
                 }
-                HorizontalDivider(Modifier.padding(vertical = 12.dp), color = ReportColors.OutlineSoft)
-                CompactSummaryRow("Diterima", report.totals.paidAmount.toReportCurrency(), ReportColors.Primary)
-                CompactSummaryRow("Piutang", report.totals.outstandingAmount.toReportCurrency(), ReportColors.Error)
-                CompactSummaryRow("Laba kotor", report.totals.grossProfit.toReportCurrency(), ReportColors.OnSurface)
+
+                HorizontalDivider(color = ReportColors.Slate100, thickness = 1.dp)
+
+                CompactSummaryRow(
+                    label = "Total Transaksi",
+                    value = "${report.totals.transactionCount} Transaksi",
+                    valueColor = ReportColors.OnSurface,
+                    icon = Icons.AutoMirrored.Outlined.ReceiptLong,
+                    iconTint = Color(0xFF2563EB),
+                )
+                HorizontalDivider(color = ReportColors.Slate100, thickness = 1.dp)
+                CompactSummaryRow(
+                    label = "Uang Diterima",
+                    value = report.totals.paidAmount.toReportCurrency(),
+                    valueColor = Color(0xFF059669),
+                    icon = Icons.Outlined.AccountBalanceWallet,
+                    iconTint = Color(0xFF059669),
+                )
+                HorizontalDivider(color = ReportColors.Slate100, thickness = 1.dp)
+                CompactSummaryRow(
+                    label = "Sisa Piutang",
+                    value = report.totals.outstandingAmount.toReportCurrency(),
+                    valueColor = if (report.totals.outstandingAmount.signum() > 0) ReportColors.Error else ReportColors.OnSurface,
+                    icon = Icons.Outlined.PendingActions,
+                    iconTint = ReportColors.Error,
+                )
+                HorizontalDivider(color = ReportColors.Slate100, thickness = 1.dp)
+                CompactSummaryRow(
+                    label = "Laba Kotor",
+                    value = "${report.totals.grossProfit.toReportCurrency()} (${report.grossMarginText()})",
+                    valueColor = Color(0xFF7C3AED),
+                    icon = Icons.Outlined.Savings,
+                    iconTint = Color(0xFF7C3AED),
+                )
             }
         }
     }
 }
 
 @Composable
-private fun CompactSummaryRow(label: String, value: String, valueColor: Color) {
+private fun CompactSummaryRow(
+    label: String,
+    value: String,
+    valueColor: Color,
+    icon: ImageVector,
+    iconTint: Color,
+) {
     Row(
-        modifier = Modifier.fillMaxWidth().heightIn(min = 42.dp),
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(vertical = 12.dp),
         horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Text(label, style = MaterialTheme.typography.bodyMedium, color = ReportColors.Outline)
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(10.dp),
+        ) {
+            Box(
+                modifier = Modifier
+                    .size(32.dp)
+                    .background(iconTint.copy(alpha = 0.1f), RoundedCornerShape(8.dp)),
+                contentAlignment = Alignment.Center,
+            ) {
+                Icon(icon, null, tint = iconTint, modifier = Modifier.size(16.dp))
+            }
+            Text(
+                text = label,
+                fontSize = 14.sp,
+                fontWeight = FontWeight.Medium,
+                color = ReportColors.Outline,
+            )
+        }
         Text(
-            value,
-            style = MaterialTheme.typography.bodyMedium,
+            text = value,
+            fontSize = 14.sp,
+            fontWeight = FontWeight.Bold,
             color = valueColor,
-            fontWeight = FontWeight.SemiBold,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
         )
@@ -193,12 +252,12 @@ private fun CompactSummaryRow(label: String, value: String, valueColor: Color) {
 @Composable
 private fun PrimaryKpiSection(report: SalesReportResponseDto, useGrid: Boolean) {
     val firstRow: @Composable RowScope.() -> Unit = {
-        KpiCard("Omzet", report.totals.grossRevenue.toReportCurrency(), "${report.totals.transactionCount} transaksi", Icons.AutoMirrored.Outlined.ReceiptLong, ReportColors.Primary, ReportColors.PrimarySoft, Modifier.weight(1f))
-        KpiCard("Diterima", report.totals.paidAmount.toReportCurrency(), "Pembayaran masuk", Icons.Outlined.AccountBalanceWallet, ReportColors.Secondary, ReportColors.BlueSoft, Modifier.weight(1f))
+        KpiCard("Omzet", report.totals.grossRevenue.toReportCurrency(), "${report.totals.transactionCount} transaksi", Icons.AutoMirrored.Outlined.ReceiptLong, ReportColors.Primary, Modifier.weight(1f))
+        KpiCard("Diterima", report.totals.paidAmount.toReportCurrency(), "Pembayaran masuk", Icons.Outlined.AccountBalanceWallet, Color(0xFF059669), Modifier.weight(1f))
     }
     val secondRow: @Composable RowScope.() -> Unit = {
-        KpiCard("Piutang", report.totals.outstandingAmount.toReportCurrency(), "Belum diterima", Icons.Outlined.PendingActions, ReportColors.Error, ReportColors.ErrorSoft, Modifier.weight(1f))
-        KpiCard("Laba kotor", report.totals.grossProfit.toReportCurrency(), report.grossMarginText(), Icons.Outlined.Savings, ReportColors.Purple, ReportColors.PurpleSoft, Modifier.weight(1f))
+        KpiCard("Piutang", report.totals.outstandingAmount.toReportCurrency(), "Belum diterima", Icons.Outlined.PendingActions, ReportColors.Error, Modifier.weight(1f))
+        KpiCard("Laba kotor", report.totals.grossProfit.toReportCurrency(), report.grossMarginText(), Icons.Outlined.Savings, Color(0xFF7C3AED), Modifier.weight(1f))
     }
     if (useGrid) {
         Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
@@ -220,57 +279,62 @@ private fun KpiCard(
     supporting: String,
     icon: ImageVector,
     color: Color,
-    background: Color,
     modifier: Modifier = Modifier
 ) {
     Card(
-        modifier = modifier,
-        colors = CardDefaults.cardColors(containerColor = ReportColors.Surface),
+        modifier = modifier.heightIn(min = 112.dp),
+        colors = CardDefaults.cardColors(containerColor = Color.White),
         shape = RoundedCornerShape(16.dp),
-        border = BorderStroke(1.dp, ReportColors.Slate100)
+        border = BorderStroke(1.dp, ReportColors.OutlineSoft),
+        elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
     ) {
-        Column(modifier = Modifier.heightIn(min = 112.dp).padding(14.dp)) {
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(16.dp),
+            verticalArrangement = Arrangement.SpaceBetween,
+        ) {
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 Text(
-                    text = title,
-                    style = MaterialTheme.typography.labelMedium,
+                    text = title.uppercase(),
+                    fontSize = 11.sp,
                     color = ReportColors.Outline,
-                    fontWeight = FontWeight.SemiBold,
+                    fontWeight = FontWeight.Bold,
+                    letterSpacing = 0.5.sp,
                     maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.weight(1f),
                 )
-                Box(
-                    modifier = Modifier
-                        .size(30.dp)
-                        .background(background, RoundedCornerShape(9.dp)),
-                    contentAlignment = Alignment.Center
+                Surface(
+                    color = color.copy(alpha = 0.12f),
+                    shape = RoundedCornerShape(8.dp),
                 ) {
                     Icon(
                         imageVector = icon,
                         contentDescription = null,
                         tint = color,
-                        modifier = Modifier.size(18.dp)
+                        modifier = Modifier
+                            .padding(6.dp)
+                            .size(18.dp),
                     )
                 }
             }
             Text(
                 text = value,
-                style = MaterialTheme.typography.titleMedium.copy(
-                    color = color,
-                    fontWeight = FontWeight.ExtraBold
-                ),
-                modifier = Modifier.padding(top = 10.dp, bottom = 3.dp),
+                fontSize = 20.sp,
+                fontWeight = FontWeight.ExtraBold,
+                color = ReportColors.OnSurface,
                 maxLines = 1,
-                overflow = TextOverflow.Ellipsis
+                overflow = TextOverflow.Ellipsis,
             )
             Text(
                 text = supporting,
-                style = MaterialTheme.typography.labelSmall,
-                color = ReportColors.Slate400,
+                fontSize = 11.sp,
+                color = ReportColors.Outline,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
             )
@@ -282,17 +346,25 @@ private fun KpiCard(
 private fun ReportDetailsDisclosure(expanded: Boolean, onClick: () -> Unit) {
     Surface(
         onClick = onClick,
-        modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp).testTag("report-details-toggle"),
-        color = ReportColors.Surface,
-        shape = RoundedCornerShape(14.dp),
-        border = BorderStroke(1.dp, ReportColors.OutlineSoft),
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(44.dp)
+            .testTag("report-details-toggle"),
+        color = Color.White,
+        shape = RoundedCornerShape(12.dp),
+        border = BorderStroke(1.dp, Color(0xFFCBD5E1)),
     ) {
         Row(
-            modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp),
+            modifier = Modifier.padding(horizontal = 16.dp),
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            Text("Rincian lainnya", color = ReportColors.OnSurface, fontWeight = FontWeight.SemiBold)
+            Text(
+                text = if (expanded) "Sembunyikan rincian analisis" else "Tampilkan rincian analisis",
+                fontSize = 13.sp,
+                color = ReportColors.OnSurface,
+                fontWeight = FontWeight.SemiBold,
+            )
             Icon(
                 imageVector = if (expanded) Icons.Outlined.ExpandLess else Icons.Outlined.ExpandMore,
                 contentDescription = if (expanded) "Sembunyikan rincian" else "Tampilkan rincian",
@@ -448,7 +520,7 @@ private fun BaseCard(
         modifier = modifier.fillMaxWidth(),
         colors = CardDefaults.cardColors(containerColor = ReportColors.Surface),
         shape = RoundedCornerShape(16.dp),
-        border = BorderStroke(1.dp, ReportColors.Slate100)
+        border = BorderStroke(1.dp, ReportColors.OutlineSoft)
     ) {
         Column {
             Row(

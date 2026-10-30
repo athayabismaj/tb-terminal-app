@@ -7,7 +7,7 @@ class SettingsVisibilityTest {
     @Test
     fun ownerSeesStoreReceiptAndDeviceSettings() {
         assertEquals(
-            listOf(SettingsPage.STORE, SettingsPage.RECEIPT, SettingsPage.DEVICE),
+            listOf(SettingsPage.STORE, SettingsPage.DEVICE),
             visibleSettingsPages("OWNER"),
         )
     }
@@ -15,7 +15,7 @@ class SettingsVisibilityTest {
     @Test
     fun adminSeesStoreReceiptAndDeviceSettings() {
         assertEquals(
-            listOf(SettingsPage.STORE, SettingsPage.RECEIPT, SettingsPage.DEVICE),
+            listOf(SettingsPage.STORE, SettingsPage.DEVICE),
             visibleSettingsPages("admin"),
         )
     }

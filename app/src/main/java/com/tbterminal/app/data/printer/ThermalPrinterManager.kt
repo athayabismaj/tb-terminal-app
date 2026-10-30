@@ -77,6 +77,18 @@ class ThermalPrinterManager(
         sendDataToConfiguredPrinter(context, prefs.printerConnectionType, prefs.printerBluetoothAddress, pulseBytes)
     }
 
+    suspend fun printCustomBytes(context: Context, data: ByteArray): PrinterResult = withContext(Dispatchers.IO) {
+        val prefs = localAppSettingsDataSource.getDevicePreferences()
+        if (prefs.printerConnectionType == "SYSTEM") {
+            return@withContext PrinterResult.Error("Pencetakan label / slip thermal membutuhkan printer Bluetooth atau USB.")
+        }
+        sendDataToConfiguredPrinter(context, prefs.printerConnectionType, prefs.printerBluetoothAddress, data)
+    }
+
+    suspend fun getPaperSize(): String = withContext(Dispatchers.IO) {
+        localAppSettingsDataSource.getDevicePreferences().paperSize
+    }
+
     private suspend fun sendDataToConfiguredPrinter(
         context: Context,
         connectionType: String,

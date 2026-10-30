@@ -86,6 +86,7 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.zIndex
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.tbterminal.app.data.model.Customer
@@ -104,6 +105,7 @@ import com.tbterminal.app.ui.components.TbMobileControlSheet
 import com.tbterminal.app.ui.components.TbMobileFilterButton
 import com.tbterminal.app.ui.components.TbMobileSheetDoneButton
 import com.tbterminal.app.ui.components.TbPagination
+import com.tbterminal.app.ui.components.TopFloatingCapsule
 import com.tbterminal.app.navigation.AppAccessPolicy
 import com.tbterminal.app.navigation.AppCapability
 import java.math.BigDecimal
@@ -396,7 +398,6 @@ internal fun CustomerListContent(
                 .padding(horizontal = if (compact) 16.dp else 32.dp, vertical = if (compact) 14.dp else 24.dp),
             verticalArrangement = Arrangement.spacedBy(if (compact) 12.dp else 18.dp)
         ) {
-        CustomerMessage(uiState.errorMessage, isError = true, onDismissMessage)
         CustomerTableCard(
             modifier = Modifier.fillMaxWidth(),
             uiState = uiState,
@@ -412,10 +413,14 @@ internal fun CustomerListContent(
             compact = compact
             )
         }
-        AppSnackbar(
+        TopFloatingCapsule(
             message = uiState.message,
+            error = uiState.errorMessage,
             onDismiss = onDismissMessage,
-            modifier = Modifier.align(Alignment.BottomCenter).padding(16.dp),
+            modifier = Modifier
+                .align(Alignment.TopCenter)
+                .padding(top = 16.dp, start = 20.dp, end = 20.dp)
+                .zIndex(99f),
         )
     }
 }
@@ -439,7 +444,6 @@ private fun CustomerFormContent(
                 .imePadding(),
             verticalArrangement = Arrangement.spacedBy(14.dp),
         ) {
-        CustomerMessage(uiState.errorMessage, isError = true, onDismiss = {})
         Card(
             colors = CardDefaults.cardColors(containerColor = CustomerSurface),
             shape = RoundedCornerShape(18.dp),
@@ -524,6 +528,15 @@ private fun CustomerFormContent(
             }
         }
     }
+
+    TopFloatingCapsule(
+        message = null,
+        error = uiState.errorMessage,
+        modifier = Modifier
+            .align(Alignment.TopCenter)
+            .padding(top = 16.dp, start = 20.dp, end = 20.dp)
+            .zIndex(99f),
+    )
 }
 }
 

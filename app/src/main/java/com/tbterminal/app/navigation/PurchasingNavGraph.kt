@@ -166,6 +166,15 @@ internal fun NavGraphBuilder.purchasingGraph(navController: NavHostController, s
                             launchSingleTop = true
                         }
                     },
+                    onBack = {
+                        if (!navController.popBackStack(AppRoute.BackofficeTransactions.route, false)) {
+                            if (!navController.popBackStack()) {
+                                navController.navigate(AppRoute.BackofficeTransactions.route) {
+                                    launchSingleTop = true
+                                }
+                            }
+                        }
+                    },
                     onLogout = {
                         sessionManager.logout()
                         navController.navigate(AppRoute.Login.route) {
@@ -262,8 +271,10 @@ internal fun NavGraphBuilder.purchasingGraph(navController: NavHostController, s
                         }
                     },
                     onIncomingGoodsClick = {
-                        navController.navigate(AppRoute.IncomingGoods.route) {
-                            launchSingleTop = true
+                        if (!navController.popBackStack(AppRoute.IncomingGoods.route, false)) {
+                            navController.navigate(AppRoute.IncomingGoods.route) {
+                                launchSingleTop = true
+                            }
                         }
                     },
                     onIncomingGoodsFormClick = {},
@@ -295,6 +306,15 @@ internal fun NavGraphBuilder.purchasingGraph(navController: NavHostController, s
                     onSettingsClick = {
                         navController.navigate(AppRoute.AdminSettings.route) {
                             launchSingleTop = true
+                        }
+                    },
+                    onBack = {
+                        if (!navController.popBackStack(AppRoute.IncomingGoods.route, false)) {
+                            if (!navController.popBackStack()) {
+                                navController.navigate(AppRoute.IncomingGoods.route) {
+                                    launchSingleTop = true
+                                }
+                            }
                         }
                     },
                     onLogout = {

@@ -5,34 +5,36 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.MoreVert
+import androidx.compose.material.icons.outlined.Close
 import androidx.compose.material.icons.outlined.DeleteOutline
 import androidx.compose.material.icons.outlined.Edit
 import androidx.compose.material.icons.outlined.Search
+import androidx.compose.material.icons.outlined.Straighten
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
-import androidx.compose.material3.FilledIconButton
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
-import androidx.compose.material3.IconButtonDefaults
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextField
-import androidx.compose.material3.TextFieldDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -40,14 +42,26 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.tbterminal.app.data.model.ProductUnit
+import com.tbterminal.app.ui.components.SkeletonBox
 import com.tbterminal.app.ui.products.components.MasterDataPagination
+import com.tbterminal.app.ui.products.components.formatMasterDate
+
+private val BrandGreen = Color(0xFF256B57)
+private val TextPrimary = Color(0xFF0F172A)
+private val TextSecondary = Color(0xFF64748B)
+private val TextMuted = Color(0xFF94A3B8)
+private val BorderSlate200 = Color(0xFFE2E8F0)
+private val BorderSlate300 = Color(0xFFCBD5E1)
 
 @Composable
 internal fun ProductUnitListCard(
@@ -62,17 +76,26 @@ internal fun ProductUnitListCard(
     onPreviousPage: () -> Unit,
     onNextPage: () -> Unit,
 ) {
-    Column(modifier.fillMaxWidth()) {
-        UnitToolbar(uiState.searchQuery, compact, onSearchChanged, onAdd)
-        Spacer(Modifier.height(if (compact) 14.dp else 18.dp))
+    Column(
+        modifier = modifier.fillMaxWidth(),
+        verticalArrangement = Arrangement.spacedBy(if (compact) 12.dp else 16.dp),
+    ) {
+        UnitToolbar(
+            query = uiState.searchQuery,
+            compact = compact,
+            isLoading = uiState.isLoading && uiState.units.isEmpty(),
+            onQuery = onSearchChanged,
+            onAdd = onAdd,
+        )
+
         when {
-            uiState.isLoading && uiState.units.isEmpty() -> ProductLoadingState(Modifier.height(360.dp))
-            uiState.units.isEmpty() -> ProductEmptyMasterState("Belum ada satuan yang cocok.")
+            uiState.isLoading && uiState.units.isEmpty() -> UnitLoading(compact = compact)
+            uiState.units.isEmpty() -> UnitEmpty(query = uiState.searchQuery)
             compact -> UnitMobileList(uiState.units, onEdit, onDelete)
             else -> UnitTable(uiState.units, onEdit, onDelete)
         }
+
         if (!uiState.isLoading && uiState.units.isNotEmpty()) {
-            Spacer(Modifier.height(8.dp))
             MasterDataPagination(
                 itemLabel = "satuan",
                 total = uiState.totalUnits,
@@ -82,142 +105,485 @@ internal fun ProductUnitListCard(
                 isLoading = uiState.isLoading,
                 onPreviousPage = onPreviousPage,
                 onNextPage = onNextPage,
+                compact = compact,
             )
         }
     }
 }
 
 @Composable
-private fun UnitToolbar(query: String, compact: Boolean, onQuery: (String) -> Unit, onAdd: () -> Unit) {
+private fun UnitToolbar(
+    query: String,
+    compact: Boolean,
+    isLoading: Boolean,
+    onQuery: (String) -> Unit,
+    onAdd: () -> Unit,
+) {
+    if (isLoading) {
+        Row(
+            modifier = Modifier.fillMaxWidth().testTag("unit-toolbar"),
+            horizontalArrangement = Arrangement.spacedBy(10.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            SkeletonBox(
+                modifier = Modifier.weight(1f).height(if (compact) 42.dp else 48.dp),
+                shape = RoundedCornerShape(if (compact) 12.dp else 14.dp),
+            )
+            SkeletonBox(
+                modifier = Modifier.width(if (compact) 96.dp else 164.dp).height(if (compact) 42.dp else 48.dp),
+                shape = RoundedCornerShape(if (compact) 12.dp else 14.dp),
+            )
+        }
+        return
+    }
+
     Row(
-        Modifier.fillMaxWidth().testTag("unit-toolbar"),
+        modifier = Modifier.fillMaxWidth().testTag("unit-toolbar"),
         horizontalArrangement = Arrangement.spacedBy(10.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        TextField(
+        UnitSearchField(
             value = query,
             onValueChange = onQuery,
-            modifier = Modifier.weight(1f).height(52.dp).testTag("unit-search"),
-            placeholder = { Text("Cari satuan") },
-            leadingIcon = { Icon(Icons.Outlined.Search, "Cari satuan", Modifier.size(21.dp)) },
-            singleLine = true,
-            shape = RoundedCornerShape(16.dp),
-            colors = TextFieldDefaults.colors(
-                focusedContainerColor = UnitWhite,
-                unfocusedContainerColor = UnitWhite,
-                focusedIndicatorColor = Color.Transparent,
-                unfocusedIndicatorColor = Color.Transparent,
-                cursorColor = UnitEmerald700,
-            ),
+            modifier = Modifier.weight(1f),
+            compact = compact,
         )
-        if (compact) {
-            FilledIconButton(
-                onClick = onAdd,
-                modifier = Modifier.size(52.dp).testTag("unit-add"),
-                shape = RoundedCornerShape(16.dp),
-                colors = IconButtonDefaults.filledIconButtonColors(
-                    containerColor = Color.White,
-                    contentColor = UnitEmerald600,
-                ),
-            ) { Icon(Icons.Default.Add, "Tambah satuan", Modifier.size(22.dp)) }
-        } else {
-            Button(
-                onClick = onAdd,
-                modifier = Modifier.height(52.dp).testTag("unit-add"),
-                shape = RoundedCornerShape(16.dp),
-                colors = ButtonDefaults.buttonColors(containerColor = UnitEmerald600),
-            ) {
-                Icon(Icons.Default.Add, null, Modifier.size(20.dp))
-                Spacer(Modifier.width(7.dp))
-                Text("Tambah satuan", fontWeight = FontWeight.SemiBold)
+        Button(
+            onClick = onAdd,
+            modifier = Modifier
+                .height(if (compact) 42.dp else 48.dp)
+                .testTag("unit-add"),
+            shape = RoundedCornerShape(if (compact) 12.dp else 14.dp),
+            colors = ButtonDefaults.buttonColors(containerColor = BrandGreen),
+            contentPadding = PaddingValues(horizontal = if (compact) 14.dp else 18.dp),
+            elevation = ButtonDefaults.buttonElevation(defaultElevation = 0.dp),
+        ) {
+            Icon(Icons.Default.Add, contentDescription = null, modifier = Modifier.size(18.dp), tint = Color.White)
+            Spacer(Modifier.width(if (compact) 6.dp else 8.dp))
+            Text(
+                text = if (compact) "Tambah" else "Tambah satuan",
+                fontSize = if (compact) 13.sp else 14.sp,
+                fontWeight = FontWeight.SemiBold,
+                color = Color.White,
+            )
+        }
+    }
+}
+
+@Composable
+private fun UnitSearchField(
+    value: String,
+    onValueChange: (String) -> Unit,
+    modifier: Modifier,
+    compact: Boolean = false,
+) {
+    Surface(
+        modifier = modifier
+            .height(if (compact) 42.dp else 48.dp)
+            .testTag("unit-search"),
+        color = Color.White,
+        shape = RoundedCornerShape(if (compact) 12.dp else 14.dp),
+        border = BorderStroke(1.dp, BorderSlate300),
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(start = 12.dp, end = 6.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Icon(
+                Icons.Outlined.Search,
+                contentDescription = null,
+                tint = TextMuted,
+                modifier = Modifier.size(18.dp),
+            )
+            Spacer(Modifier.width(10.dp))
+            Box(modifier = Modifier.weight(1f), contentAlignment = Alignment.CenterStart) {
+                if (value.isEmpty()) {
+                    Text(
+                        text = "Cari satuan...",
+                        fontSize = 14.sp,
+                        color = TextMuted,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                }
+                BasicTextField(
+                    value = value,
+                    onValueChange = onValueChange,
+                    singleLine = true,
+                    textStyle = TextStyle(
+                        color = TextPrimary,
+                        fontSize = 14.sp,
+                    ),
+                    modifier = Modifier.fillMaxWidth(),
+                )
+            }
+            if (value.isNotEmpty()) {
+                IconButton(onClick = { onValueChange("") }, modifier = Modifier.size(36.dp)) {
+                    Icon(
+                        Icons.Outlined.Close,
+                        contentDescription = "Hapus pencarian",
+                        tint = TextSecondary,
+                        modifier = Modifier.size(16.dp),
+                    )
+                }
             }
         }
     }
 }
 
 @Composable
-private fun UnitMobileList(items: List<ProductUnit>, onEdit: (ProductUnit) -> Unit, onDelete: (ProductUnit) -> Unit) {
-    Column(Modifier.fillMaxWidth().testTag("unit-card-list"), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-        items.forEach { unit ->
-            Surface(
-                modifier = Modifier.fillMaxWidth().testTag("unit-card-${unit.id}"),
-                color = UnitWhite,
-                shape = RoundedCornerShape(18.dp),
-                border = BorderStroke(1.dp, UnitSlate200.copy(alpha = 0.85f)),
-                tonalElevation = 1.dp,
-            ) {
-                Row(Modifier.fillMaxWidth().padding(start = 16.dp, top = 14.dp, bottom = 14.dp, end = 8.dp), verticalAlignment = Alignment.CenterVertically) {
-                    MasterAvatar(unit.initial(), UnitEmerald600, UnitEmerald50)
+private fun UnitMobileList(
+    items: List<ProductUnit>,
+    onEdit: (ProductUnit) -> Unit,
+    onDelete: (ProductUnit) -> Unit,
+) {
+    Surface(
+        modifier = Modifier.fillMaxWidth().testTag("unit-card-list"),
+        shape = RoundedCornerShape(16.dp),
+        color = Color.White,
+        border = BorderStroke(1.dp, BorderSlate200),
+    ) {
+        Column {
+            items.forEachIndexed { index, unit ->
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .testTag("unit-card-${unit.id}")
+                        .padding(horizontal = 16.dp, vertical = 12.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .size(36.dp)
+                            .clip(RoundedCornerShape(10.dp))
+                            .background(BrandGreen.copy(alpha = 0.1f)),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        Text(
+                            text = unit.initial(),
+                            color = BrandGreen,
+                            fontSize = 14.sp,
+                            fontWeight = FontWeight.Bold,
+                        )
+                    }
                     Spacer(Modifier.width(12.dp))
-                    Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(5.dp)) {
-                        Text(unit.name, color = UnitSlate900, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                        Surface(color = UnitSlate50, shape = RoundedCornerShape(8.dp)) {
-                            Text(unit.symbol, Modifier.padding(horizontal = 9.dp, vertical = 3.dp), color = UnitSlate600, fontSize = 11.sp, fontWeight = FontWeight.SemiBold)
+                    Column(
+                        modifier = Modifier.weight(1f),
+                        verticalArrangement = Arrangement.spacedBy(4.dp),
+                    ) {
+                        Text(
+                            text = unit.name,
+                            color = TextPrimary,
+                            fontWeight = FontWeight.SemiBold,
+                            fontSize = 14.sp,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                        )
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(6.dp),
+                        ) {
+                            Surface(
+                                color = Color(0xFFF1F5F9),
+                                shape = RoundedCornerShape(6.dp),
+                                border = BorderStroke(1.dp, Color(0xFFE2E8F0)),
+                            ) {
+                                Text(
+                                    text = unit.symbol,
+                                    modifier = Modifier.padding(horizontal = 7.dp, vertical = 2.dp),
+                                    color = Color(0xFF334155),
+                                    fontSize = 11.sp,
+                                    fontWeight = FontWeight.SemiBold,
+                                )
+                            }
+                            Text(
+                                text = "· Dibuat ${unit.createdAt.formatMasterDate()}",
+                                color = TextSecondary,
+                                fontSize = 12.sp,
+                            )
                         }
                     }
                     UnitActions(unit, onEdit, onDelete)
                 }
+                if (index < items.lastIndex) {
+                    HorizontalDivider(color = Color(0xFFF1F5F9))
+                }
             }
         }
     }
 }
 
 @Composable
-private fun UnitTable(items: List<ProductUnit>, onEdit: (ProductUnit) -> Unit, onDelete: (ProductUnit) -> Unit) {
+private fun UnitTable(
+    items: List<ProductUnit>,
+    onEdit: (ProductUnit) -> Unit,
+    onDelete: (ProductUnit) -> Unit,
+) {
     Surface(
-        Modifier.fillMaxWidth().testTag("unit-table"),
-        color = UnitWhite,
-        shape = RoundedCornerShape(20.dp),
-        border = BorderStroke(1.dp, UnitSlate200.copy(alpha = 0.8f)),
-        tonalElevation = 1.dp,
+        modifier = Modifier.fillMaxWidth().testTag("unit-table"),
+        shape = RoundedCornerShape(16.dp),
+        color = Color.White,
+        border = BorderStroke(1.dp, BorderSlate200),
     ) {
         Column {
-            Row(Modifier.fillMaxWidth().background(UnitSlate50.copy(alpha = 0.6f)).padding(horizontal = 24.dp, vertical = 13.dp)) {
-                MasterHeader("Satuan", Modifier.weight(1f))
-                MasterHeader("Simbol", Modifier.weight(0.35f))
-                MasterHeader("Tanggal dibuat", Modifier.weight(0.45f))
-                MasterHeader("Aksi", Modifier.weight(0.18f), Alignment.End)
+            // Table Header (Light Gray Background #F8FAFC)
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .background(Color(0xFFF8FAFC))
+                    .padding(horizontal = 24.dp, vertical = 14.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text(
+                    text = "SATUAN",
+                    modifier = Modifier.weight(1f),
+                    color = TextSecondary,
+                    fontSize = 11.sp,
+                    fontWeight = FontWeight.Bold,
+                    letterSpacing = 0.5.sp,
+                )
+                Text(
+                    text = "SIMBOL",
+                    modifier = Modifier.weight(0.35f),
+                    color = TextSecondary,
+                    fontSize = 11.sp,
+                    fontWeight = FontWeight.Bold,
+                    letterSpacing = 0.5.sp,
+                )
+                Text(
+                    text = "TANGGAL DIBUAT",
+                    modifier = Modifier.weight(0.45f),
+                    color = TextSecondary,
+                    fontSize = 11.sp,
+                    fontWeight = FontWeight.Bold,
+                    letterSpacing = 0.5.sp,
+                )
+                Text(
+                    text = "AKSI",
+                    modifier = Modifier.width(60.dp),
+                    color = TextSecondary,
+                    fontSize = 11.sp,
+                    fontWeight = FontWeight.Bold,
+                    letterSpacing = 0.5.sp,
+                    textAlign = TextAlign.End,
+                )
             }
+            HorizontalDivider(color = BorderSlate200)
+
+            // Table Rows
             items.forEachIndexed { index, unit ->
                 Row(
-                    Modifier.fillMaxWidth().testTag("unit-card-${unit.id}")
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .testTag("unit-card-${unit.id}")
                         .padding(horizontal = 24.dp, vertical = 14.dp),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
-                    Row(Modifier.weight(1f), verticalAlignment = Alignment.CenterVertically) {
-                        MasterAvatar(unit.initial(), UnitEmerald600, UnitEmerald50)
+                    Row(
+                        modifier = Modifier.weight(1f),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .size(36.dp)
+                                .clip(RoundedCornerShape(10.dp))
+                                .background(BrandGreen.copy(alpha = 0.1f)),
+                            contentAlignment = Alignment.Center,
+                        ) {
+                            Text(
+                                text = unit.initial(),
+                                color = BrandGreen,
+                                fontSize = 14.sp,
+                                fontWeight = FontWeight.Bold,
+                            )
+                        }
                         Spacer(Modifier.width(12.dp))
-                        Text(unit.name, color = UnitSlate900, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                        Text(
+                            text = unit.name,
+                            color = TextPrimary,
+                            fontSize = 14.sp,
+                            fontWeight = FontWeight.SemiBold,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                        )
                     }
-                    Text(unit.symbol, Modifier.weight(0.35f), color = UnitSlate600, fontSize = 13.sp, fontWeight = FontWeight.Medium)
-                    Text(unit.createdAt.substringBefore("T"), Modifier.weight(0.45f), color = UnitSlate500, fontSize = 13.sp)
-                    Box(Modifier.weight(0.18f), contentAlignment = Alignment.CenterEnd) { UnitActions(unit, onEdit, onDelete) }
+                    Box(modifier = Modifier.weight(0.35f)) {
+                        Surface(
+                            color = Color(0xFFF1F5F9),
+                            shape = RoundedCornerShape(6.dp),
+                            border = BorderStroke(1.dp, Color(0xFFE2E8F0)),
+                        ) {
+                            Text(
+                                text = unit.symbol,
+                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp),
+                                color = Color(0xFF334155),
+                                fontSize = 12.sp,
+                                fontWeight = FontWeight.SemiBold,
+                            )
+                        }
+                    }
+                    Text(
+                        text = unit.createdAt.formatMasterDate(),
+                        modifier = Modifier.weight(0.45f),
+                        color = Color(0xFF475569),
+                        fontSize = 13.sp,
+                    )
+                    Box(modifier = Modifier.width(60.dp), contentAlignment = Alignment.CenterEnd) {
+                        UnitActions(unit, onEdit, onDelete)
+                    }
                 }
-                if (index < items.lastIndex) HorizontalDivider(Modifier.padding(start = 24.dp), color = UnitSlate200.copy(alpha = 0.55f))
+                if (index < items.lastIndex) {
+                    HorizontalDivider(color = Color(0xFFF1F5F9))
+                }
             }
         }
     }
 }
 
 @Composable
-private fun UnitActions(item: ProductUnit, onEdit: (ProductUnit) -> Unit, onDelete: (ProductUnit) -> Unit) {
+private fun UnitActions(
+    item: ProductUnit,
+    onEdit: (ProductUnit) -> Unit,
+    onDelete: (ProductUnit) -> Unit,
+) {
     var expanded by remember { mutableStateOf(false) }
     Box {
-        IconButton(onClick = { expanded = true }, modifier = Modifier.size(48.dp).testTag("unit-actions-${item.id}")) {
-            Icon(Icons.Default.MoreVert, "Aksi satuan", Modifier.size(20.dp), tint = UnitSlate500)
+        IconButton(
+            onClick = { expanded = true },
+            modifier = Modifier.size(36.dp).testTag("unit-actions-${item.id}"),
+        ) {
+            Icon(Icons.Default.MoreVert, "Aksi satuan", Modifier.size(18.dp), tint = TextMuted)
         }
-        DropdownMenu(expanded, { expanded = false }, modifier = Modifier.background(UnitWhite, RoundedCornerShape(14.dp))) {
+        DropdownMenu(
+            expanded = expanded,
+            onDismissRequest = { expanded = false },
+            modifier = Modifier
+                .background(Color.White, RoundedCornerShape(14.dp)),
+            shape = RoundedCornerShape(14.dp),
+            border = BorderStroke(1.dp, BorderSlate200),
+        ) {
             DropdownMenuItem(
-                text = { Text("Edit satuan") },
-                leadingIcon = { Icon(Icons.Outlined.Edit, null, Modifier.size(19.dp)) },
+                text = { Text("Edit satuan", fontSize = 13.sp, fontWeight = FontWeight.Medium) },
+                leadingIcon = { Icon(Icons.Outlined.Edit, null, Modifier.size(18.dp), tint = TextSecondary) },
                 onClick = { expanded = false; onEdit(item) },
-                modifier = Modifier.heightIn(min = 48.dp),
+                modifier = Modifier.heightIn(min = 44.dp),
             )
             DropdownMenuItem(
-                text = { Text("Hapus satuan", color = ProductDanger) },
-                leadingIcon = { Icon(Icons.Outlined.DeleteOutline, null, Modifier.size(19.dp), tint = ProductDanger) },
+                text = { Text("Hapus satuan", color = ProductDanger, fontSize = 13.sp, fontWeight = FontWeight.Medium) },
+                leadingIcon = { Icon(Icons.Outlined.DeleteOutline, null, Modifier.size(18.dp), tint = ProductDanger) },
                 onClick = { expanded = false; onDelete(item) },
-                modifier = Modifier.heightIn(min = 48.dp),
+                modifier = Modifier.heightIn(min = 44.dp),
+            )
+        }
+    }
+}
+
+@Composable
+private fun UnitLoading(compact: Boolean) {
+    Surface(
+        modifier = Modifier.fillMaxWidth().testTag("unit-skeleton"),
+        shape = RoundedCornerShape(16.dp),
+        color = Color.White,
+        border = BorderStroke(1.dp, BorderSlate200),
+    ) {
+        Column {
+            if (!compact) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .background(Color(0xFFF8FAFC))
+                        .padding(horizontal = 24.dp, vertical = 14.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    SkeletonBox(Modifier.width(90.dp).height(12.dp))
+                    Spacer(Modifier.weight(1f))
+                    SkeletonBox(Modifier.width(60.dp).height(12.dp))
+                    Spacer(Modifier.weight(0.35f))
+                    SkeletonBox(Modifier.width(100.dp).height(12.dp))
+                    Spacer(Modifier.weight(0.45f))
+                    SkeletonBox(Modifier.width(40.dp).height(12.dp))
+                }
+                HorizontalDivider(color = BorderSlate200)
+            }
+
+            repeat(if (compact) 4 else 5) { index ->
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = if (compact) 16.dp else 24.dp, vertical = 13.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    SkeletonBox(Modifier.size(36.dp), shape = RoundedCornerShape(10.dp))
+                    Spacer(Modifier.width(12.dp))
+                    Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                        SkeletonBox(Modifier.fillMaxWidth(if (compact) 0.65f else 0.4f).height(14.dp))
+                        if (compact) {
+                            SkeletonBox(Modifier.width(110.dp).height(11.dp))
+                        }
+                    }
+                    if (!compact) {
+                        SkeletonBox(Modifier.weight(0.35f).height(18.dp))
+                        SkeletonBox(Modifier.weight(0.45f).height(13.dp))
+                        SkeletonBox(Modifier.size(24.dp))
+                    } else {
+                        SkeletonBox(Modifier.size(24.dp))
+                    }
+                }
+                if (index < (if (compact) 3 else 4)) {
+                    HorizontalDivider(color = Color(0xFFF1F5F9))
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun UnitEmpty(query: String) {
+    Surface(
+        modifier = Modifier.fillMaxWidth().testTag("unit-empty"),
+        shape = RoundedCornerShape(16.dp),
+        color = Color.White,
+        border = BorderStroke(1.dp, BorderSlate200),
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 24.dp, vertical = 40.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            Box(
+                modifier = Modifier
+                    .size(48.dp)
+                    .clip(CircleShape)
+                    .background(Color(0xFFF1F5F9)),
+                contentAlignment = Alignment.Center,
+            ) {
+                Icon(
+                    imageVector = Icons.Outlined.Straighten,
+                    contentDescription = null,
+                    tint = TextMuted,
+                    modifier = Modifier.size(24.dp),
+                )
+            }
+            Spacer(Modifier.height(4.dp))
+            Text(
+                text = "Belum ada satuan",
+                fontSize = 15.sp,
+                fontWeight = FontWeight.SemiBold,
+                color = TextPrimary,
+            )
+            Text(
+                text = if (query.isNotBlank()) {
+                    "Tidak ada satuan yang cocok dengan \"$query\"."
+                } else {
+                    "Mulai tambahkan satuan produk untuk menentukan takaran atau ukuran barang."
+                },
+                fontSize = 13.sp,
+                color = TextSecondary,
+                textAlign = TextAlign.Center,
             )
         }
     }

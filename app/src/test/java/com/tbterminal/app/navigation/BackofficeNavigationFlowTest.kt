@@ -46,5 +46,7 @@ class BackofficeNavigationFlowTest {
         assertEquals(R.string.owner_menu_device_reports, backofficeRouteTitleRes(AppRoute.OfflineReports.route, "OWNER"))
         assertEquals(R.string.owner_menu_backup, backofficeRouteTitleRes(AppRoute.BackupRestore.route, "OWNER"))
         assertEquals(R.string.owner_menu_settings, backofficeRouteTitleRes(AppRoute.AdminSettings.route, "OWNER"))
+        assertEquals(R.string.owner_menu_store_settings, backofficeRouteTitleRes(AppRoute.AdminStoreSettings.route, "OWNER"))
+        assertEquals(R.string.owner_menu_device_settings, backofficeRouteTitleRes(AppRoute.AdminDeviceSettings.route, "OWNER"))
     }
 }

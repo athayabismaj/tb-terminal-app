@@ -57,10 +57,6 @@ private fun ProductLoadedForm(
     val input = uiState.input
 
     Column(verticalArrangement = Arrangement.spacedBy(if (compact) 12.dp else 16.dp)) {
-        if (uiState.errorMessage != null) {
-            ProductFormError(message = uiState.errorMessage)
-        }
-
         if (compact) {
             BasicInfoSection(uiState = uiState, input = input, onInputChanged = onInputChanged, compact = true)
             UnitSection(uiState = uiState, input = input, onInputChanged = onInputChanged, compact = true)

@@ -5,8 +5,10 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
@@ -15,9 +17,12 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.MoreVert
+import androidx.compose.material.icons.outlined.Category
+import androidx.compose.material.icons.outlined.Close
 import androidx.compose.material.icons.outlined.DeleteOutline
 import androidx.compose.material.icons.outlined.Edit
 import androidx.compose.material.icons.outlined.Search
@@ -25,15 +30,11 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
-import androidx.compose.material3.FilledIconButton
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
-import androidx.compose.material3.IconButtonDefaults
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextField
-import androidx.compose.material3.TextFieldDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -44,12 +45,23 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.tbterminal.app.data.model.ProductCategory
+import com.tbterminal.app.ui.components.SkeletonBox
 import com.tbterminal.app.ui.products.components.MasterDataPagination
+import com.tbterminal.app.ui.products.components.formatMasterDate
+
+private val BrandGreen = Color(0xFF256B57)
+private val TextPrimary = Color(0xFF0F172A)
+private val TextSecondary = Color(0xFF64748B)
+private val TextMuted = Color(0xFF94A3B8)
+private val BorderSlate200 = Color(0xFFE2E8F0)
+private val BorderSlate300 = Color(0xFFCBD5E1)
 
 @Composable
 internal fun ProductCategoryListCard(
@@ -64,17 +76,26 @@ internal fun ProductCategoryListCard(
     onPreviousPage: () -> Unit,
     onNextPage: () -> Unit,
 ) {
-    Column(modifier.fillMaxWidth()) {
-        CategoryToolbar(uiState.searchQuery, compact, onSearchChanged, onAdd)
-        Spacer(Modifier.height(if (compact) 14.dp else 18.dp))
+    Column(
+        modifier = modifier.fillMaxWidth(),
+        verticalArrangement = Arrangement.spacedBy(if (compact) 12.dp else 16.dp),
+    ) {
+        CategoryToolbar(
+            query = uiState.searchQuery,
+            compact = compact,
+            isLoading = uiState.isLoading && uiState.categories.isEmpty(),
+            onQuery = onSearchChanged,
+            onAdd = onAdd,
+        )
+
         when {
-            uiState.isLoading && uiState.categories.isEmpty() -> ProductLoadingState(Modifier.height(360.dp))
-            uiState.categories.isEmpty() -> ProductEmptyMasterState("Belum ada kategori yang cocok.")
+            uiState.isLoading && uiState.categories.isEmpty() -> CategoryLoading(compact = compact)
+            uiState.categories.isEmpty() -> CategoryEmpty(query = uiState.searchQuery)
             compact -> CategoryMobileList(uiState.categories, onEdit, onDelete)
             else -> CategoryTable(uiState.categories, onEdit, onDelete)
         }
+
         if (!uiState.isLoading && uiState.categories.isNotEmpty()) {
-            Spacer(Modifier.height(8.dp))
             MasterDataPagination(
                 itemLabel = "kategori",
                 total = uiState.totalCategories,
@@ -84,163 +105,442 @@ internal fun ProductCategoryListCard(
                 isLoading = uiState.isLoading,
                 onPreviousPage = onPreviousPage,
                 onNextPage = onNextPage,
+                compact = compact,
             )
         }
     }
 }
 
 @Composable
-private fun CategoryToolbar(query: String, compact: Boolean, onQuery: (String) -> Unit, onAdd: () -> Unit) {
+private fun CategoryToolbar(
+    query: String,
+    compact: Boolean,
+    isLoading: Boolean,
+    onQuery: (String) -> Unit,
+    onAdd: () -> Unit,
+) {
+    if (isLoading) {
+        Row(
+            modifier = Modifier.fillMaxWidth().testTag("category-toolbar"),
+            horizontalArrangement = Arrangement.spacedBy(10.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            SkeletonBox(
+                modifier = Modifier.weight(1f).height(if (compact) 42.dp else 48.dp),
+                shape = RoundedCornerShape(if (compact) 12.dp else 14.dp),
+            )
+            SkeletonBox(
+                modifier = Modifier.width(if (compact) 96.dp else 164.dp).height(if (compact) 42.dp else 48.dp),
+                shape = RoundedCornerShape(if (compact) 12.dp else 14.dp),
+            )
+        }
+        return
+    }
+
     Row(
-        Modifier.fillMaxWidth().testTag("category-toolbar"),
+        modifier = Modifier.fillMaxWidth().testTag("category-toolbar"),
         horizontalArrangement = Arrangement.spacedBy(10.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        TextField(
+        CategorySearchField(
             value = query,
             onValueChange = onQuery,
-            modifier = Modifier.weight(1f).height(52.dp).testTag("category-search"),
-            placeholder = { Text("Cari kategori") },
-            leadingIcon = { Icon(Icons.Outlined.Search, "Cari kategori", Modifier.size(21.dp)) },
-            singleLine = true,
-            shape = RoundedCornerShape(16.dp),
-            colors = TextFieldDefaults.colors(
-                focusedContainerColor = CategoryWhite,
-                unfocusedContainerColor = CategoryWhite,
-                focusedIndicatorColor = Color.Transparent,
-                unfocusedIndicatorColor = Color.Transparent,
-                cursorColor = CategoryEmerald700,
-            ),
+            modifier = Modifier.weight(1f),
+            compact = compact,
         )
-        MasterAddButton(compact, "Tambah kategori", onAdd)
-    }
-}
-
-@Composable
-private fun MasterAddButton(compact: Boolean, label: String, onClick: () -> Unit) {
-    if (compact) {
-        FilledIconButton(
-            onClick = onClick,
-            modifier = Modifier.size(52.dp).testTag("category-add"),
-            shape = RoundedCornerShape(16.dp),
-            colors = IconButtonDefaults.filledIconButtonColors(
-                containerColor = Color.White,
-                contentColor = CategoryEmerald600,
-            ),
-        ) { Icon(Icons.Default.Add, label, Modifier.size(22.dp)) }
-    } else {
         Button(
-            onClick = onClick,
-            modifier = Modifier.height(52.dp).testTag("category-add"),
-            shape = RoundedCornerShape(16.dp),
-            colors = ButtonDefaults.buttonColors(containerColor = CategoryEmerald600),
+            onClick = onAdd,
+            modifier = Modifier
+                .height(if (compact) 42.dp else 48.dp)
+                .testTag("category-add"),
+            shape = RoundedCornerShape(if (compact) 12.dp else 14.dp),
+            colors = ButtonDefaults.buttonColors(containerColor = BrandGreen),
+            contentPadding = PaddingValues(horizontal = if (compact) 14.dp else 18.dp),
+            elevation = ButtonDefaults.buttonElevation(defaultElevation = 0.dp),
         ) {
-            Icon(Icons.Default.Add, null, Modifier.size(20.dp))
-            Spacer(Modifier.width(7.dp))
-            Text(label, fontWeight = FontWeight.SemiBold)
+            Icon(Icons.Default.Add, contentDescription = null, modifier = Modifier.size(18.dp), tint = Color.White)
+            Spacer(Modifier.width(if (compact) 6.dp else 8.dp))
+            Text(
+                text = if (compact) "Tambah" else "Tambah kategori",
+                fontSize = if (compact) 13.sp else 14.sp,
+                fontWeight = FontWeight.SemiBold,
+                color = Color.White,
+            )
         }
     }
 }
 
 @Composable
-private fun CategoryMobileList(items: List<ProductCategory>, onEdit: (ProductCategory) -> Unit, onDelete: (ProductCategory) -> Unit) {
-    Column(Modifier.fillMaxWidth().testTag("category-card-list"), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-        items.forEach { category ->
-            Surface(
-                modifier = Modifier.fillMaxWidth().testTag("category-card-${category.id}"),
-                color = CategoryWhite,
-                shape = RoundedCornerShape(18.dp),
-                border = BorderStroke(1.dp, CategorySlate200.copy(alpha = 0.85f)),
-                tonalElevation = 1.dp,
-            ) {
-                Row(Modifier.fillMaxWidth().padding(start = 16.dp, top = 14.dp, bottom = 14.dp, end = 8.dp), verticalAlignment = Alignment.CenterVertically) {
-                    MasterAvatar(category.initial(), CategoryEmerald600, CategoryEmerald50)
+private fun CategorySearchField(
+    value: String,
+    onValueChange: (String) -> Unit,
+    modifier: Modifier,
+    compact: Boolean = false,
+) {
+    Surface(
+        modifier = modifier
+            .height(if (compact) 42.dp else 48.dp)
+            .testTag("category-search"),
+        color = Color.White,
+        shape = RoundedCornerShape(if (compact) 12.dp else 14.dp),
+        border = BorderStroke(1.dp, BorderSlate300),
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(start = 12.dp, end = 6.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Icon(
+                Icons.Outlined.Search,
+                contentDescription = null,
+                tint = TextMuted,
+                modifier = Modifier.size(18.dp),
+            )
+            Spacer(Modifier.width(10.dp))
+            Box(modifier = Modifier.weight(1f), contentAlignment = Alignment.CenterStart) {
+                if (value.isEmpty()) {
+                    Text(
+                        text = "Cari kategori...",
+                        fontSize = 14.sp,
+                        color = TextMuted,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                }
+                BasicTextField(
+                    value = value,
+                    onValueChange = onValueChange,
+                    singleLine = true,
+                    textStyle = TextStyle(
+                        color = TextPrimary,
+                        fontSize = 14.sp,
+                    ),
+                    modifier = Modifier.fillMaxWidth(),
+                )
+            }
+            if (value.isNotEmpty()) {
+                IconButton(onClick = { onValueChange("") }, modifier = Modifier.size(36.dp)) {
+                    Icon(
+                        Icons.Outlined.Close,
+                        contentDescription = "Hapus pencarian",
+                        tint = TextSecondary,
+                        modifier = Modifier.size(16.dp),
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun CategoryMobileList(
+    items: List<ProductCategory>,
+    onEdit: (ProductCategory) -> Unit,
+    onDelete: (ProductCategory) -> Unit,
+) {
+    Surface(
+        modifier = Modifier.fillMaxWidth().testTag("category-card-list"),
+        shape = RoundedCornerShape(16.dp),
+        color = Color.White,
+        border = BorderStroke(1.dp, BorderSlate200),
+    ) {
+        Column {
+            items.forEachIndexed { index, category ->
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .testTag("category-card-${category.id}")
+                        .padding(horizontal = 16.dp, vertical = 12.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .size(36.dp)
+                            .clip(RoundedCornerShape(10.dp))
+                            .background(BrandGreen.copy(alpha = 0.1f)),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        Text(
+                            text = category.initial(),
+                            color = BrandGreen,
+                            fontSize = 14.sp,
+                            fontWeight = FontWeight.Bold,
+                        )
+                    }
                     Spacer(Modifier.width(12.dp))
-                    Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
-                        Text(category.name, color = CategorySlate900, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                        Text("Dibuat ${category.createdAt.substringBefore("T")}", color = CategorySlate500, fontSize = 12.sp)
+                    Column(
+                        modifier = Modifier.weight(1f),
+                        verticalArrangement = Arrangement.spacedBy(2.dp),
+                    ) {
+                        Text(
+                            text = category.name,
+                            color = TextPrimary,
+                            fontWeight = FontWeight.SemiBold,
+                            fontSize = 14.sp,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                        )
+                        Text(
+                            text = "Dibuat ${category.createdAt.formatMasterDate()}",
+                            color = TextSecondary,
+                            fontSize = 12.sp,
+                        )
                     }
                     CategoryActions(category, onEdit, onDelete)
                 }
+                if (index < items.lastIndex) {
+                    HorizontalDivider(color = Color(0xFFF1F5F9))
+                }
             }
         }
     }
 }
 
 @Composable
-private fun CategoryTable(items: List<ProductCategory>, onEdit: (ProductCategory) -> Unit, onDelete: (ProductCategory) -> Unit) {
+private fun CategoryTable(
+    items: List<ProductCategory>,
+    onEdit: (ProductCategory) -> Unit,
+    onDelete: (ProductCategory) -> Unit,
+) {
     Surface(
-        Modifier.fillMaxWidth().testTag("category-table"),
-        color = CategoryWhite,
-        shape = RoundedCornerShape(20.dp),
-        border = BorderStroke(1.dp, CategorySlate200.copy(alpha = 0.8f)),
-        tonalElevation = 1.dp,
+        modifier = Modifier.fillMaxWidth().testTag("category-table"),
+        shape = RoundedCornerShape(16.dp),
+        color = Color.White,
+        border = BorderStroke(1.dp, BorderSlate200),
     ) {
         Column {
-            Row(Modifier.fillMaxWidth().background(CategorySlate50.copy(alpha = 0.6f)).padding(horizontal = 24.dp, vertical = 13.dp)) {
-                MasterHeader("Kategori", Modifier.weight(1f))
-                MasterHeader("Tanggal dibuat", Modifier.weight(0.45f))
-                MasterHeader("Aksi", Modifier.weight(0.18f), Alignment.End)
+            // Table Header (Light Gray Background #F8FAFC)
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .background(Color(0xFFF8FAFC))
+                    .padding(horizontal = 24.dp, vertical = 14.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text(
+                    text = "KATEGORI",
+                    modifier = Modifier.weight(1f),
+                    color = TextSecondary,
+                    fontSize = 11.sp,
+                    fontWeight = FontWeight.Bold,
+                    letterSpacing = 0.5.sp,
+                )
+                Text(
+                    text = "TANGGAL DIBUAT",
+                    modifier = Modifier.weight(0.45f),
+                    color = TextSecondary,
+                    fontSize = 11.sp,
+                    fontWeight = FontWeight.Bold,
+                    letterSpacing = 0.5.sp,
+                )
+                Text(
+                    text = "AKSI",
+                    modifier = Modifier.width(60.dp),
+                    color = TextSecondary,
+                    fontSize = 11.sp,
+                    fontWeight = FontWeight.Bold,
+                    letterSpacing = 0.5.sp,
+                    textAlign = TextAlign.End,
+                )
             }
+            HorizontalDivider(color = BorderSlate200)
+
+            // Table Rows
             items.forEachIndexed { index, category ->
                 Row(
-                    Modifier.fillMaxWidth().testTag("category-card-${category.id}")
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .testTag("category-card-${category.id}")
                         .padding(horizontal = 24.dp, vertical = 14.dp),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
-                    Row(Modifier.weight(1f), verticalAlignment = Alignment.CenterVertically) {
-                        MasterAvatar(category.initial(), CategoryEmerald600, CategoryEmerald50)
+                    Row(
+                        modifier = Modifier.weight(1f),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .size(36.dp)
+                                .clip(RoundedCornerShape(10.dp))
+                                .background(BrandGreen.copy(alpha = 0.1f)),
+                            contentAlignment = Alignment.Center,
+                        ) {
+                            Text(
+                                text = category.initial(),
+                                color = BrandGreen,
+                                fontSize = 14.sp,
+                                fontWeight = FontWeight.Bold,
+                            )
+                        }
                         Spacer(Modifier.width(12.dp))
-                        Text(category.name, color = CategorySlate900, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                        Text(
+                            text = category.name,
+                            color = TextPrimary,
+                            fontSize = 14.sp,
+                            fontWeight = FontWeight.SemiBold,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                        )
                     }
-                    Text(category.createdAt.substringBefore("T"), Modifier.weight(0.45f), color = CategorySlate500, fontSize = 13.sp)
-                    Box(Modifier.weight(0.18f), contentAlignment = Alignment.CenterEnd) { CategoryActions(category, onEdit, onDelete) }
+                    Text(
+                        text = category.createdAt.formatMasterDate(),
+                        modifier = Modifier.weight(0.45f),
+                        color = Color(0xFF475569),
+                        fontSize = 13.sp,
+                    )
+                    Box(modifier = Modifier.width(60.dp), contentAlignment = Alignment.CenterEnd) {
+                        CategoryActions(category, onEdit, onDelete)
+                    }
                 }
-                if (index < items.lastIndex) HorizontalDivider(Modifier.padding(start = 24.dp), color = CategorySlate200.copy(alpha = 0.55f))
+                if (index < items.lastIndex) {
+                    HorizontalDivider(color = Color(0xFFF1F5F9))
+                }
             }
         }
     }
 }
 
 @Composable
-private fun CategoryActions(item: ProductCategory, onEdit: (ProductCategory) -> Unit, onDelete: (ProductCategory) -> Unit) {
+private fun CategoryActions(
+    item: ProductCategory,
+    onEdit: (ProductCategory) -> Unit,
+    onDelete: (ProductCategory) -> Unit,
+) {
     var expanded by remember { mutableStateOf(false) }
     Box {
-        IconButton(onClick = { expanded = true }, modifier = Modifier.size(48.dp).testTag("category-actions-${item.id}")) {
-            Icon(Icons.Default.MoreVert, "Aksi kategori", Modifier.size(20.dp), tint = CategorySlate500)
+        IconButton(
+            onClick = { expanded = true },
+            modifier = Modifier.size(36.dp).testTag("category-actions-${item.id}"),
+        ) {
+            Icon(Icons.Default.MoreVert, "Aksi kategori", Modifier.size(18.dp), tint = TextMuted)
         }
-        DropdownMenu(expanded, { expanded = false }, modifier = Modifier.background(CategoryWhite, RoundedCornerShape(14.dp))) {
+        DropdownMenu(
+            expanded = expanded,
+            onDismissRequest = { expanded = false },
+            modifier = Modifier
+                .background(Color.White, RoundedCornerShape(14.dp)),
+            shape = RoundedCornerShape(14.dp),
+            border = BorderStroke(1.dp, BorderSlate200),
+        ) {
             DropdownMenuItem(
-                text = { Text("Edit kategori") },
-                leadingIcon = { Icon(Icons.Outlined.Edit, null, Modifier.size(19.dp)) },
+                text = { Text("Edit kategori", fontSize = 13.sp, fontWeight = FontWeight.Medium) },
+                leadingIcon = { Icon(Icons.Outlined.Edit, null, Modifier.size(18.dp), tint = TextSecondary) },
                 onClick = { expanded = false; onEdit(item) },
-                modifier = Modifier.heightIn(min = 48.dp),
+                modifier = Modifier.heightIn(min = 44.dp),
             )
             DropdownMenuItem(
-                text = { Text("Hapus kategori", color = ProductDanger) },
-                leadingIcon = { Icon(Icons.Outlined.DeleteOutline, null, Modifier.size(19.dp), tint = ProductDanger) },
+                text = { Text("Hapus kategori", color = ProductDanger, fontSize = 13.sp, fontWeight = FontWeight.Medium) },
+                leadingIcon = { Icon(Icons.Outlined.DeleteOutline, null, Modifier.size(18.dp), tint = ProductDanger) },
                 onClick = { expanded = false; onDelete(item) },
-                modifier = Modifier.heightIn(min = 48.dp),
+                modifier = Modifier.heightIn(min = 44.dp),
             )
         }
     }
 }
 
 @Composable
-internal fun MasterAvatar(text: String, tint: Color, background: Color) {
-    Box(Modifier.size(42.dp).clip(CircleShape).background(background), contentAlignment = Alignment.Center) {
-        Text(text, color = tint, fontWeight = FontWeight.Bold)
+private fun CategoryLoading(compact: Boolean) {
+    Surface(
+        modifier = Modifier.fillMaxWidth().testTag("category-skeleton"),
+        shape = RoundedCornerShape(16.dp),
+        color = Color.White,
+        border = BorderStroke(1.dp, BorderSlate200),
+    ) {
+        Column {
+            if (!compact) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .background(Color(0xFFF8FAFC))
+                        .padding(horizontal = 24.dp, vertical = 14.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    SkeletonBox(Modifier.width(90.dp).height(12.dp))
+                    Spacer(Modifier.weight(1f))
+                    SkeletonBox(Modifier.width(120.dp).height(12.dp))
+                    Spacer(Modifier.weight(0.45f))
+                    SkeletonBox(Modifier.width(40.dp).height(12.dp))
+                }
+                HorizontalDivider(color = BorderSlate200)
+            }
+
+            repeat(if (compact) 4 else 5) { index ->
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = if (compact) 16.dp else 24.dp, vertical = 13.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    SkeletonBox(Modifier.size(36.dp), shape = RoundedCornerShape(10.dp))
+                    Spacer(Modifier.width(12.dp))
+                    Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                        SkeletonBox(Modifier.fillMaxWidth(if (compact) 0.65f else 0.4f).height(14.dp))
+                        if (compact) {
+                            SkeletonBox(Modifier.width(100.dp).height(11.dp))
+                        }
+                    }
+                    if (!compact) {
+                        SkeletonBox(Modifier.weight(0.45f).height(13.dp))
+                        SkeletonBox(Modifier.size(24.dp))
+                    } else {
+                        SkeletonBox(Modifier.size(24.dp))
+                    }
+                }
+                if (index < (if (compact) 3 else 4)) {
+                    HorizontalDivider(color = Color(0xFFF1F5F9))
+                }
+            }
+        }
     }
 }
 
 @Composable
-internal fun MasterHeader(text: String, modifier: Modifier, alignment: Alignment.Horizontal = Alignment.Start) {
-    Column(modifier, horizontalAlignment = alignment) { Text(text, color = CategorySlate500, fontSize = 11.sp, fontWeight = FontWeight.SemiBold) }
-}
-
-@Composable
-internal fun ProductEmptyMasterState(message: String) {
-    Surface(Modifier.fillMaxWidth(), color = CategoryWhite, shape = RoundedCornerShape(18.dp), border = BorderStroke(1.dp, CategorySlate200)) {
-        Box(Modifier.fillMaxWidth().height(180.dp), contentAlignment = Alignment.Center) { Text(message, color = CategorySlate500) }
+private fun CategoryEmpty(query: String) {
+    Surface(
+        modifier = Modifier.fillMaxWidth().testTag("category-empty"),
+        shape = RoundedCornerShape(16.dp),
+        color = Color.White,
+        border = BorderStroke(1.dp, BorderSlate200),
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 24.dp, vertical = 40.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            Box(
+                modifier = Modifier
+                    .size(48.dp)
+                    .clip(CircleShape)
+                    .background(Color(0xFFF1F5F9)),
+                contentAlignment = Alignment.Center,
+            ) {
+                Icon(
+                    imageVector = Icons.Outlined.Category,
+                    contentDescription = null,
+                    tint = TextMuted,
+                    modifier = Modifier.size(24.dp),
+                )
+            }
+            Spacer(Modifier.height(4.dp))
+            Text(
+                text = "Belum ada kategori",
+                fontSize = 15.sp,
+                fontWeight = FontWeight.SemiBold,
+                color = TextPrimary,
+            )
+            Text(
+                text = if (query.isNotBlank()) {
+                    "Tidak ada kategori yang cocok dengan \"$query\"."
+                } else {
+                    "Mulai tambahkan kategori produk untuk mengelompokkan barang dagangan."
+                },
+                fontSize = 13.sp,
+                color = TextSecondary,
+                textAlign = TextAlign.Center,
+            )
+        }
     }
 }

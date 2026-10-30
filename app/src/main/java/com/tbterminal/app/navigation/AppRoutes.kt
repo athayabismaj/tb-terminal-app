@@ -83,6 +83,14 @@ sealed interface AppRoute {
         override val route = "admin/settings"
     }
 
+    data object AdminStoreSettings : AppRoute {
+        override val route = "admin/settings/store"
+    }
+
+    data object AdminDeviceSettings : AppRoute {
+        override val route = "admin/settings/device"
+    }
+
     data object CashierPos : AppRoute {
         override val route = "cashier/pos"
     }

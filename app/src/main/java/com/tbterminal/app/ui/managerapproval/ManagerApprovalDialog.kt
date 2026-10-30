@@ -103,6 +103,10 @@ fun ManagerApprovalDialog(
                         fontWeight = FontWeight.SemiBold,
                     )
                 }
+                val currentError = state.errorMessage
+                val isUsernameError = currentError != null && (currentError.contains("akun", ignoreCase = true) || currentError.contains("username", ignoreCase = true) || (currentError.contains("manager", ignoreCase = true) && !currentError.contains("PIN", ignoreCase = true)))
+                val isPinError = currentError != null && !isUsernameError
+
                 OutlinedTextField(
                     value = state.approverUsername,
                     onValueChange = viewModel::onUsernameChanged,
@@ -110,6 +114,10 @@ fun ManagerApprovalDialog(
                     label = { Text("Akun manager") },
                     leadingIcon = { Icon(Icons.Outlined.Person, contentDescription = null) },
                     singleLine = true,
+                    isError = isUsernameError,
+                    supportingText = if (isUsernameError) {
+                        { Text(currentError.orEmpty(), color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall) }
+                    } else null,
                     keyboardOptions = KeyboardOptions(imeAction = ImeAction.Next),
                     keyboardActions = KeyboardActions(onNext = { pinFocus.requestFocus() }),
                     modifier = Modifier.fillMaxWidth().focusRequester(usernameFocus),
@@ -123,6 +131,10 @@ fun ManagerApprovalDialog(
                     leadingIcon = { Icon(Icons.Outlined.Lock, contentDescription = null) },
                     singleLine = true,
                     visualTransformation = PasswordVisualTransformation(),
+                    isError = isPinError,
+                    supportingText = if (isPinError) {
+                        { Text(currentError.orEmpty(), color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall) }
+                    } else null,
                     keyboardOptions = KeyboardOptions(
                         keyboardType = KeyboardType.NumberPassword,
                         imeAction = ImeAction.Done,
@@ -134,13 +146,6 @@ fun ManagerApprovalDialog(
                     modifier = Modifier.fillMaxWidth().focusRequester(pinFocus),
                     shape = RoundedCornerShape(14.dp),
                 )
-                state.errorMessage?.let { message ->
-                    Text(
-                        text = message,
-                        color = MaterialTheme.colorScheme.error,
-                        style = MaterialTheme.typography.bodySmall,
-                    )
-                }
                 Text(
                     text = "PIN hanya digunakan untuk verifikasi dan tidak disimpan pada perangkat.",
                     color = MaterialTheme.colorScheme.onSurfaceVariant,

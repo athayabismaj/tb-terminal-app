@@ -24,6 +24,7 @@ import com.tbterminal.app.ui.cashier.session.components.CloseShiftSection
 import com.tbterminal.app.ui.cashier.session.components.LocalCashSessionBadges
 import com.tbterminal.app.ui.cashier.session.components.OpenShiftForm
 import com.tbterminal.app.ui.cashier.session.components.SessionSummarySection
+import com.tbterminal.app.ui.components.TopFloatingCapsule
 
 @Composable
 fun CashierCashSessionScreen(
@@ -35,79 +36,95 @@ fun CashierCashSessionScreen(
     onClosingNotesChanged: (String) -> Unit,
     onCloseSession: () -> Unit,
     onShowExpenseDialog: () -> Unit,
-    onTransactionHistoryClick: () -> Unit
+    onTransactionHistoryClick: () -> Unit,
+    onClearMessage: () -> Unit = {}
 ) {
-    BoxWithConstraints(
-        modifier = modifier
-            .fillMaxSize()
-            .background(Color.White)
-    ) {
-        val isDesktop = maxWidth > 900.dp
+    val isClosingError = uiState.hasActiveSession && !uiState.isExpenseDialogOpen && uiState.errorMessage != null
+    val closingErrorText = if (isClosingError) uiState.errorMessage else null
 
-        Column(
+    Box(modifier = modifier.fillMaxSize()) {
+        TopFloatingCapsule(
+            message = uiState.message ?: uiState.errorMessage,
+            isError = uiState.errorMessage != null,
+            onDismiss = onClearMessage
+        )
+
+        BoxWithConstraints(
             modifier = Modifier
                 .fillMaxSize()
-                .verticalScroll(rememberScrollState())
-                .padding(24.dp),
-            verticalArrangement = Arrangement.spacedBy(24.dp)
+                .background(Color.White)
         ) {
-            CashSessionHeader()
-            LocalCashSessionBadges(uiState = uiState)
+            val isDesktop = maxWidth > 900.dp
 
-            if (uiState.isLoading && !uiState.isSubmitting) {
-                com.tbterminal.app.ui.components.SkeletonList(
-                    modifier = Modifier.fillMaxWidth().height(300.dp),
-                    itemCount = 6,
-                )
-            } else if (!uiState.hasActiveSession) {
-                OpenShiftForm(
-                    modifier = Modifier.fillMaxWidth(),
-                    uiState = uiState,
-                    onOpeningCashChanged = onOpeningCashChanged,
-                    onOpenSession = onOpenSession
-                )
-            } else {
-                if (isDesktop) {
-                    Row(
-                        horizontalArrangement = Arrangement.spacedBy(24.dp),
-                        modifier = Modifier.fillMaxWidth()
-                    ) {
-                        SessionSummarySection(
-                            modifier = Modifier.weight(7f),
-                            uiState = uiState,
-                            onShowExpenseDialog = onShowExpenseDialog,
-                            onTransactionHistoryClick = onTransactionHistoryClick
-                        )
-                        CloseShiftSection(
-                            modifier = Modifier.weight(5f),
-                            cashAmount = uiState.closingCashInput,
-                            notes = uiState.closingNotesInput,
-                            onCashChange = onClosingCashChanged,
-                            onNotesChange = onClosingNotesChanged,
-                            onSubmit = onCloseSession,
-                            isSubmitting = uiState.isSubmitting
-                        )
-                    }
+            Column(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .verticalScroll(rememberScrollState())
+                    .padding(24.dp),
+                verticalArrangement = Arrangement.spacedBy(24.dp)
+            ) {
+                CashSessionHeader()
+                LocalCashSessionBadges(uiState = uiState)
+
+                if (uiState.isLoading && !uiState.isSubmitting) {
+                    com.tbterminal.app.ui.components.SkeletonList(
+                        modifier = Modifier.fillMaxWidth().height(300.dp),
+                        itemCount = 6,
+                    )
+                } else if (!uiState.hasActiveSession) {
+                    OpenShiftForm(
+                        modifier = Modifier.fillMaxWidth(),
+                        uiState = uiState,
+                        onOpeningCashChanged = onOpeningCashChanged,
+                        onOpenSession = onOpenSession
+                    )
                 } else {
-                    Column(
-                        verticalArrangement = Arrangement.spacedBy(24.dp),
-                        modifier = Modifier.fillMaxWidth()
-                    ) {
-                        SessionSummarySection(
-                            modifier = Modifier.fillMaxWidth(),
-                            uiState = uiState,
-                            onShowExpenseDialog = onShowExpenseDialog,
-                            onTransactionHistoryClick = onTransactionHistoryClick
-                        )
-                        CloseShiftSection(
-                            modifier = Modifier.fillMaxWidth(),
-                            cashAmount = uiState.closingCashInput,
-                            notes = uiState.closingNotesInput,
-                            onCashChange = onClosingCashChanged,
-                            onNotesChange = onClosingNotesChanged,
-                            onSubmit = onCloseSession,
-                            isSubmitting = uiState.isSubmitting
-                        )
+                    if (isDesktop) {
+                        Row(
+                            horizontalArrangement = Arrangement.spacedBy(24.dp),
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            SessionSummarySection(
+                                modifier = Modifier.weight(7f),
+                                uiState = uiState,
+                                onShowExpenseDialog = onShowExpenseDialog,
+                                onTransactionHistoryClick = onTransactionHistoryClick
+                            )
+                            CloseShiftSection(
+                                modifier = Modifier.weight(5f),
+                                cashAmount = uiState.closingCashInput,
+                                notes = uiState.closingNotesInput,
+                                onCashChange = onClosingCashChanged,
+                                onNotesChange = onClosingNotesChanged,
+                                onSubmit = onCloseSession,
+                                isSubmitting = uiState.isSubmitting,
+                                isError = isClosingError,
+                                supportingText = closingErrorText
+                            )
+                        }
+                    } else {
+                        Column(
+                            verticalArrangement = Arrangement.spacedBy(24.dp),
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            SessionSummarySection(
+                                modifier = Modifier.fillMaxWidth(),
+                                uiState = uiState,
+                                onShowExpenseDialog = onShowExpenseDialog,
+                                onTransactionHistoryClick = onTransactionHistoryClick
+                            )
+                            CloseShiftSection(
+                                modifier = Modifier.fillMaxWidth(),
+                                cashAmount = uiState.closingCashInput,
+                                notes = uiState.closingNotesInput,
+                                onCashChange = onClosingCashChanged,
+                                onNotesChange = onClosingNotesChanged,
+                                onSubmit = onCloseSession,
+                                isSubmitting = uiState.isSubmitting,
+                                isError = isClosingError,
+                                supportingText = closingErrorText
+                            )
+                        }
                     }
                 }
             }

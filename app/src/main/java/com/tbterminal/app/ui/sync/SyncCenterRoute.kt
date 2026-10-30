@@ -2,6 +2,9 @@ package com.tbterminal.app.ui.sync
 
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.tbterminal.app.data.repository.SyncMonitoringRepository
@@ -48,12 +51,15 @@ fun SyncCenterRoute(
     )
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+    var showStatusSheet by rememberSaveable { mutableStateOf(false) }
 
     AdminDashboardShell(
         userName = name,
         role = role,
         activeDestination = AdminDestination.SyncCenter,
+        pageTitle = "Sinkronisasi",
         onBack = onBackToPrevious,
+        showPageHeader = true,
         onDashboardClick = onDashboardClick,
         onProductsClick = onProductsClick,
         onAddProductClick = onAddProductClick,
@@ -90,6 +96,9 @@ fun SyncCenterRoute(
                 onRetryAllPending = viewModel::retryAllPending,
                 onRetryAllFailed = viewModel::retryAllFailed,
                 onDismissMessage = viewModel::clearMessage,
+                showStatusSheet = showStatusSheet,
+                onOpenStatusSheet = { showStatusSheet = true },
+                onDismissStatusSheet = { showStatusSheet = false },
             )
         }
     }

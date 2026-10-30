@@ -20,8 +20,9 @@ class BackofficeMoreMenuTest {
         assertFalse(MoreMenuAction.SECURITY_LOG in actions)
         assertFalse(MoreMenuAction.BACKUP in actions)
         assertTrue(MoreMenuAction.ACTIVITY in actions)
-        assertTrue(MoreMenuAction.SETTINGS in actions)
-        assertEquals(9, actions.size)
+        assertTrue(MoreMenuAction.STORE_SETTINGS in actions)
+        assertTrue(MoreMenuAction.DEVICE_SETTINGS in actions)
+        assertEquals(10, actions.size)
     }
 
     @Test

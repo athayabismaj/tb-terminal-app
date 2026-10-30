@@ -531,22 +531,24 @@ private fun SessionListSection(
                 color = Slate900,
                 fontWeight = FontWeight.Bold,
             )
-            Box(
-                modifier = Modifier
-                    .size(32.dp)
-                    .clip(RoundedCornerShape(12.dp))
-                    .border(1.dp, Color(0xFFE2E8F0), RoundedCornerShape(12.dp))
-                    .background(Color.White)
-                    .clickable(onClick = onOpenMobileOverview)
-                    .testTag("cash-session-open-overview"),
-                contentAlignment = Alignment.Center,
-            ) {
-                Icon(
-                    Icons.Outlined.FactCheck,
-                    contentDescription = "Ringkasan",
-                    tint = Color(0xFF334155),
-                    modifier = Modifier.size(16.dp),
-                )
+            if (visibleSessions.isNotEmpty()) {
+                Box(
+                    modifier = Modifier
+                        .size(32.dp)
+                        .clip(RoundedCornerShape(12.dp))
+                        .border(1.dp, Color(0xFFE2E8F0), RoundedCornerShape(12.dp))
+                        .background(Color.White)
+                        .clickable(onClick = onOpenMobileOverview)
+                        .testTag("cash-session-open-overview"),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Icon(
+                        Icons.Outlined.FactCheck,
+                        contentDescription = "Ringkasan",
+                        tint = Color(0xFF334155),
+                        modifier = Modifier.size(16.dp),
+                    )
+                }
             }
         }
         when {
@@ -1254,12 +1256,136 @@ private fun SessionPagination(
 
 @Composable
 private fun SessionRowsSkeleton(compact: Boolean) {
+    if (compact) {
+        Surface(
+            modifier = Modifier
+                .fillMaxWidth()
+                .testTag("cash-session-rows-skeleton"),
+            shape = RoundedCornerShape(16.dp),
+            color = Color.White,
+            border = BorderStroke(1.dp, Color(0xFFE2E8F0)),
+        ) {
+            Column {
+                repeat(3) { index ->
+                    if (index > 0) HorizontalDivider(color = Color(0xFFF1F5F9))
+                    SessionMobileItemSkeleton()
+                }
+            }
+        }
+    } else {
+        Box(modifier = Modifier.fillMaxWidth().testTag("cash-session-rows-skeleton")) {
+            SessionDesktopTableSkeleton()
+        }
+    }
+}
+
+@Composable
+private fun SessionMobileItemSkeleton() {
     Column(
-        modifier = Modifier.fillMaxWidth().testTag("cash-session-rows-skeleton"),
-        verticalArrangement = Arrangement.spacedBy(10.dp),
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(16.dp),
     ) {
-        repeat(if (compact) 3 else 5) {
-            SkeletonBox(Modifier.fillMaxWidth().height(if (compact) 180.dp else 64.dp))
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.SpaceBetween,
+        ) {
+            Row(
+                modifier = Modifier.weight(1f),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                SkeletonBox(Modifier.size(40.dp), shape = RoundedCornerShape(12.dp))
+                Spacer(Modifier.width(12.dp))
+                Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                    SkeletonBox(Modifier.width(110.dp).height(14.dp), shape = RoundedCornerShape(4.dp))
+                    SkeletonBox(Modifier.width(140.dp).height(11.dp), shape = RoundedCornerShape(3.dp))
+                }
+            }
+            Spacer(Modifier.width(8.dp))
+            SkeletonBox(Modifier.size(16.dp), shape = CircleShape)
+        }
+
+        Spacer(Modifier.height(10.dp))
+        HorizontalDivider(color = Color(0xFFF1F5F9))
+        Spacer(Modifier.height(10.dp))
+
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Column(verticalArrangement = Arrangement.spacedBy(3.dp)) {
+                SkeletonBox(Modifier.width(65.dp).height(10.dp), shape = RoundedCornerShape(3.dp))
+                SkeletonBox(Modifier.width(95.dp).height(15.dp), shape = RoundedCornerShape(4.dp))
+            }
+            Column(horizontalAlignment = Alignment.End, verticalArrangement = Arrangement.spacedBy(3.dp)) {
+                SkeletonBox(Modifier.width(50.dp).height(10.dp), shape = RoundedCornerShape(3.dp))
+                SkeletonBox(Modifier.width(80.dp).height(15.dp), shape = RoundedCornerShape(4.dp))
+            }
+        }
+
+        Spacer(Modifier.height(8.dp))
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            SkeletonBox(Modifier.width(62.dp).height(20.dp), shape = RoundedCornerShape(6.dp))
+            SkeletonBox(Modifier.width(120.dp).height(11.dp), shape = RoundedCornerShape(3.dp))
+        }
+    }
+}
+
+@Composable
+private fun SessionDesktopTableSkeleton() {
+    Surface(
+        modifier = Modifier.fillMaxWidth(),
+        color = Color.White,
+        shape = RoundedCornerShape(16.dp),
+        border = BorderStroke(1.dp, Slate200),
+        shadowElevation = 1.dp,
+    ) {
+        Column {
+            SessionHeader()
+            repeat(5) { index ->
+                if (index > 0) HorizontalDivider(color = Slate200.copy(alpha = 0.7f))
+                Row(
+                    Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 18.dp, vertical = 13.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Row(Modifier.weight(1.35f), verticalAlignment = Alignment.CenterVertically) {
+                        SkeletonBox(Modifier.size(36.dp), shape = CircleShape)
+                        Spacer(Modifier.width(10.dp))
+                        Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                            SkeletonBox(Modifier.width(90.dp).height(14.dp), shape = RoundedCornerShape(4.dp))
+                            SkeletonBox(Modifier.width(60.dp).height(11.dp), shape = RoundedCornerShape(3.dp))
+                        }
+                    }
+                    Column(Modifier.weight(1.4f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
+                        SkeletonBox(Modifier.width(100.dp).height(13.dp), shape = RoundedCornerShape(4.dp))
+                        SkeletonBox(Modifier.width(80.dp).height(11.dp), shape = RoundedCornerShape(3.dp))
+                    }
+                    Box(Modifier.weight(1.1f), contentAlignment = Alignment.CenterEnd) {
+                        SkeletonBox(Modifier.width(75.dp).height(14.dp), shape = RoundedCornerShape(4.dp))
+                    }
+                    Box(Modifier.weight(1.1f), contentAlignment = Alignment.CenterEnd) {
+                        SkeletonBox(Modifier.width(75.dp).height(14.dp), shape = RoundedCornerShape(4.dp))
+                    }
+                    Box(Modifier.weight(1.1f), contentAlignment = Alignment.CenterEnd) {
+                        SkeletonBox(Modifier.width(75.dp).height(14.dp), shape = RoundedCornerShape(4.dp))
+                    }
+                    Box(Modifier.weight(1f), contentAlignment = Alignment.CenterEnd) {
+                        SkeletonBox(Modifier.width(70.dp).height(14.dp), shape = RoundedCornerShape(4.dp))
+                    }
+                    Box(Modifier.weight(0.9f), contentAlignment = Alignment.Center) {
+                        SkeletonBox(Modifier.width(60.dp).height(22.dp), shape = RoundedCornerShape(6.dp))
+                    }
+                    Spacer(Modifier.width(44.dp))
+                }
+            }
         }
     }
 }
@@ -1270,18 +1396,16 @@ private fun CashHistorySkeleton(compact: Boolean) {
         modifier = Modifier.fillMaxWidth().testTag("cash-session-skeleton"),
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
-        SkeletonBox(Modifier.fillMaxWidth().height(if (compact) 42.dp else 48.dp))
+        SkeletonBox(Modifier.fillMaxWidth().height(if (compact) 42.dp else 48.dp), shape = RoundedCornerShape(12.dp))
         Row(
             modifier = Modifier.fillMaxWidth().padding(horizontal = 2.dp),
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            SkeletonBox(Modifier.width(110.dp).height(22.dp))
-            SkeletonBox(Modifier.size(32.dp))
+            SkeletonBox(Modifier.width(110.dp).height(22.dp), shape = RoundedCornerShape(4.dp))
+            SkeletonBox(Modifier.size(32.dp), shape = CircleShape)
         }
-        repeat(if (compact) 3 else 5) {
-            SkeletonBox(Modifier.fillMaxWidth().height(if (compact) 180.dp else 64.dp))
-        }
+        SessionRowsSkeleton(compact)
     }
 }
 

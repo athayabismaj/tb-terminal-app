@@ -1,11 +1,17 @@
 package com.tbterminal.app.ui.audit
 
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.zIndex
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.tbterminal.app.ui.dashboard.admin.AdminDashboardShell
 import com.tbterminal.app.ui.dashboard.admin.AdminDestination
 import com.tbterminal.app.ui.components.RefreshableContent
+import com.tbterminal.app.ui.components.TopFloatingCapsule
 
 @Composable
 fun AdminOperationalAuditRoute(
@@ -67,20 +73,30 @@ fun AdminOperationalAuditRoute(
         onSettingsClick = onSettingsClick,
         onLogout = onLogout
     ) { contentModifier ->
-        RefreshableContent(
-            isRefreshing = uiState.isLoading && uiState.logs.isNotEmpty(),
-            onRefresh = viewModel::refresh,
-            modifier = contentModifier,
-        ) {
-            AdminOperationalAuditScreen(
-                uiState = uiState,
-                onActionFilterChanged = viewModel::setActionFilter,
-                onDateChanged = viewModel::setDate,
-                onDatePresetSelected = viewModel::setDatePreset,
-                onRetry = viewModel::refresh,
-                onPreviousPage = { viewModel.loadLogs(page = uiState.currentPage - 1) },
-                onNextPage = { viewModel.loadLogs(page = uiState.currentPage + 1) },
-            )
+        Box(modifier = contentModifier.fillMaxSize()) {
+            RefreshableContent(
+                isRefreshing = uiState.isLoading && uiState.logs.isNotEmpty(),
+                onRefresh = viewModel::refresh,
+                modifier = Modifier.fillMaxSize(),
+            ) {
+                AdminOperationalAuditScreen(
+                    uiState = uiState,
+                    onActionFilterChanged = viewModel::setActionFilter,
+                    onDateChanged = viewModel::setDate,
+                    onDatePresetSelected = viewModel::setDatePreset,
+                    onRetry = viewModel::refresh,
+                    onPreviousPage = { viewModel.loadLogs(page = uiState.currentPage - 1) },
+                    onNextPage = { viewModel.loadLogs(page = uiState.currentPage + 1) },
+                )
+            }
+            if (uiState.logs.isNotEmpty()) {
+                TopFloatingCapsule(
+                    message = null,
+                    error = uiState.error,
+                    onDismiss = viewModel::clearError,
+                    modifier = Modifier.align(Alignment.TopCenter).zIndex(99f)
+                )
+            }
         }
     }
 }

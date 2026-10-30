@@ -71,6 +71,17 @@ class EscPosBuilder(val paperSize: String = "58mm") {
         }
     }
 
+    /**
+     * Formats three columns with equal width, e.g. for multiple signatures.
+     */
+    fun threeColumn(col1: String, col2: String, col3: String): EscPosBuilder = apply {
+        val colWidth = maxCharsPerLine / 3
+        val f1 = col1.take(colWidth).padEnd(colWidth)
+        val f2 = col2.take(colWidth).padEnd(colWidth)
+        val f3 = col3.take(colWidth).padEnd(colWidth)
+        textLine(f1 + f2 + f3)
+    }
+
     fun feed(lines: Int = 1): EscPosBuilder = apply {
         buffer.write(byteArrayOf(0x1B, 0x64, lines.coerceIn(1, 10).toByte())) // ESC d n
     }

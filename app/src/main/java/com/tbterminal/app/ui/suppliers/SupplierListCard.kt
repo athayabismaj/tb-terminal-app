@@ -1,40 +1,45 @@
 package com.tbterminal.app.ui.suppliers
 
-import com.tbterminal.app.ui.components.TbPagination
-
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.automirrored.outlined.FactCheck
 import androidx.compose.material.icons.filled.ChevronLeft
 import androidx.compose.material.icons.filled.ChevronRight
+import androidx.compose.material.icons.outlined.Close
 import androidx.compose.material.icons.outlined.Search
-import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.FilledIconButton
+import androidx.compose.material.icons.outlined.Tune
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
-import androidx.compose.material3.IconButtonDefaults
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextField
-import androidx.compose.material3.TextFieldDefaults
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -46,81 +51,197 @@ internal fun SupplierListCard(
     uiState: SupplierUiState,
     compact: Boolean,
     onSearchChanged: (String) -> Unit,
-    onAdd: () -> Unit,
+    onStatusFilterChanged: (SupplierStatusFilter) -> Unit = {},
+    onAdd: () -> Unit = {},
     onEdit: (Supplier) -> Unit,
     onDelete: (Supplier) -> Unit,
     onPreviousPage: () -> Unit,
     onNextPage: () -> Unit,
+    onOpenSummary: () -> Unit = {},
 ) {
-    Column(modifier.fillMaxWidth()) {
-        SupplierToolbar(uiState.searchQuery, onSearchChanged, onAdd)
-        Spacer(Modifier.height(if (compact) 14.dp else 18.dp))
+    Column(
+        modifier = modifier.fillMaxWidth(),
+        verticalArrangement = Arrangement.spacedBy(if (compact) 12.dp else 16.dp),
+    ) {
+        SupplierToolbar(
+            uiState = uiState,
+            compact = compact,
+            onSearchChanged = onSearchChanged,
+            onStatusFilterChanged = onStatusFilterChanged,
+        )
+
+        SupplierSectionHeader(
+            onOpenSummary = onOpenSummary,
+        )
+
         when {
             uiState.isLoading && uiState.suppliers.isEmpty() -> SupplierLoadingState()
-            uiState.suppliers.isEmpty() -> SupplierEmptyState()
-            compact -> SupplierMobileList(uiState.suppliers, onEdit, onDelete)
-            else -> SupplierTable(uiState.suppliers, onEdit, onDelete)
+            uiState.visibleSuppliers.isEmpty() -> SupplierEmptyState(query = uiState.searchQuery)
+            compact -> SupplierMobileList(uiState.visibleSuppliers, onEdit, onDelete)
+            else -> SupplierTable(uiState.visibleSuppliers, onEdit, onDelete)
         }
-        Spacer(Modifier.height(6.dp))
-        SupplierPagination(uiState, compact, onPreviousPage, onNextPage)
+
+        if (!uiState.isLoading && uiState.visibleSuppliers.isNotEmpty()) {
+            SupplierPagination(
+                uiState = uiState,
+                compact = compact,
+                onPreviousPage = onPreviousPage,
+                onNextPage = onNextPage,
+            )
+        }
     }
 }
 
 @Composable
-private fun SupplierToolbar(searchQuery: String, onSearchChanged: (String) -> Unit, onAdd: () -> Unit) {
-    val search: @Composable (Modifier) -> Unit = { fieldModifier ->
-        androidx.compose.material3.Surface(
-            modifier = fieldModifier.height(52.dp).testTag("supplier-search"),
+private fun SupplierToolbar(
+    uiState: SupplierUiState,
+    compact: Boolean,
+    onSearchChanged: (String) -> Unit,
+    onStatusFilterChanged: (SupplierStatusFilter) -> Unit,
+) {
+    var showFilters by rememberSaveable { mutableStateOf(false) }
+
+    Row(
+        modifier = Modifier.fillMaxWidth().testTag("supplier-toolbar"),
+        horizontalArrangement = Arrangement.spacedBy(10.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        // Search bar
+        Surface(
+            modifier = Modifier
+                .weight(1f)
+                .height(if (compact) 42.dp else 48.dp)
+                .testTag("supplier-search"),
+            shape = RoundedCornerShape(if (compact) 12.dp else 14.dp),
             color = Color.White,
-            shape = RoundedCornerShape(16.dp),
-            border = androidx.compose.foundation.BorderStroke(1.dp, com.tbterminal.app.ui.theme.TbOutline.copy(alpha = 0.7f)),
+            border = BorderStroke(1.dp, SupplierSlate300),
         ) {
             Row(
-                Modifier.fillMaxWidth().padding(horizontal = 16.dp),
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(horizontal = 12.dp),
                 verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(11.dp),
             ) {
-                Icon(Icons.Outlined.Search, "Cari supplier", tint = SupplierSlate500, modifier = Modifier.size(20.dp))
-                androidx.compose.foundation.text.BasicTextField(
-                    value = searchQuery,
+                Icon(
+                    imageVector = Icons.Outlined.Search,
+                    contentDescription = null,
+                    tint = SupplierSlate400,
+                    modifier = Modifier.size(18.dp),
+                )
+                Spacer(Modifier.width(8.dp))
+                BasicTextField(
+                    value = uiState.searchQuery,
                     onValueChange = onSearchChanged,
-                    modifier = Modifier.weight(1f).fillMaxHeight(),
+                    modifier = Modifier.weight(1f),
                     singleLine = true,
-                    textStyle = androidx.compose.material3.MaterialTheme.typography.bodyMedium.copy(color = SupplierSlate900),
-                    decorationBox = @Composable { innerTextField ->
+                    textStyle = TextStyle(
+                        fontSize = 13.sp,
+                        color = SupplierSlate900,
+                        fontWeight = FontWeight.Normal,
+                    ),
+                    decorationBox = { innerTextField ->
                         Box(contentAlignment = Alignment.CenterStart) {
-                            if (searchQuery.isBlank()) {
-                                Text("Cari supplier", color = SupplierSlate500, style = androidx.compose.material3.MaterialTheme.typography.bodyMedium)
+                            if (uiState.searchQuery.isEmpty()) {
+                                Text(
+                                    text = "Cari supplier",
+                                    fontSize = 13.sp,
+                                    color = SupplierSlate400,
+                                )
                             }
                             innerTextField()
                         }
                     },
                 )
+                if (uiState.searchQuery.isNotEmpty()) {
+                    IconButton(
+                        onClick = { onSearchChanged("") },
+                        modifier = Modifier.size(24.dp),
+                    ) {
+                        Icon(
+                            imageVector = Icons.Outlined.Close,
+                            contentDescription = "Hapus pencarian",
+                            tint = SupplierSlate400,
+                            modifier = Modifier.size(16.dp),
+                        )
+                    }
+                }
+            }
+        }
+
+        // Filter button
+        val hasActiveFilter = uiState.statusFilter != SupplierStatusFilter.ALL
+        Surface(
+            modifier = Modifier
+                .size(if (compact) 42.dp else 48.dp)
+                .testTag("supplier-open-filter")
+                .clickable { showFilters = true },
+            shape = RoundedCornerShape(if (compact) 12.dp else 14.dp),
+            color = Color.White,
+            border = BorderStroke(1.dp, if (hasActiveFilter) Color(0xFF0F172A) else SupplierSlate300),
+        ) {
+            Box(contentAlignment = Alignment.Center) {
+                Icon(
+                    imageVector = Icons.Outlined.Tune,
+                    contentDescription = "Filter supplier",
+                    tint = Color(0xFF0F172A),
+                    modifier = Modifier.size(20.dp),
+                )
+                if (hasActiveFilter) {
+                    Box(
+                        modifier = Modifier
+                            .align(Alignment.TopEnd)
+                            .padding(6.dp)
+                            .size(7.dp)
+                            .background(Color(0xFFF59E0B), CircleShape),
+                    )
+                }
             }
         }
     }
-    Row(
-        Modifier.fillMaxWidth().testTag("supplier-toolbar"),
-        horizontalArrangement = Arrangement.spacedBy(10.dp),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        search(Modifier.weight(1f))
-        SupplierAddButton(onAdd)
+
+    if (showFilters) {
+        SupplierFilterSheet(
+            statusFilter = uiState.statusFilter,
+            onApplyFilter = onStatusFilterChanged,
+            onDismiss = { showFilters = false },
+        )
     }
 }
 
 @Composable
-private fun SupplierAddButton(onClick: () -> Unit) {
-    androidx.compose.material3.Surface(
-        modifier = Modifier.size(48.dp).testTag("supplier-add").clickable { onClick() },
-        shape = RoundedCornerShape(14.dp),
-        color = Color.White,
-        contentColor = com.tbterminal.app.ui.theme.TbGreenDark,
-        border = androidx.compose.foundation.BorderStroke(1.dp, com.tbterminal.app.ui.theme.TbOutline.copy(alpha = 0.7f)),
-        shadowElevation = 1.dp
+private fun SupplierSectionHeader(
+    onOpenSummary: () -> Unit,
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 4.dp, vertical = 2.dp),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically,
     ) {
-        Box(contentAlignment = Alignment.Center) {
-            Icon(Icons.Default.Add, contentDescription = "Tambah supplier", modifier = Modifier.size(24.dp))
+        Text(
+            text = "Daftar supplier",
+            fontSize = 16.sp,
+            fontWeight = FontWeight.Bold,
+            color = SupplierSlate900,
+        )
+
+        Box(
+            modifier = Modifier
+                .size(32.dp)
+                .clip(RoundedCornerShape(12.dp))
+                .border(1.dp, SupplierSlate200, RoundedCornerShape(12.dp))
+                .background(Color.White)
+                .clickable { onOpenSummary() }
+                .testTag("supplier-open-summary"),
+            contentAlignment = Alignment.Center,
+        ) {
+            Icon(
+                imageVector = Icons.AutoMirrored.Outlined.FactCheck,
+                contentDescription = "Rincian",
+                tint = Color(0xFF334155),
+                modifier = Modifier.size(16.dp),
+            )
         }
     }
 }
@@ -132,15 +253,83 @@ private fun SupplierPagination(
     onPreviousPage: () -> Unit,
     onNextPage: () -> Unit,
 ) {
-    val start = if (uiState.totalSuppliers == 0L) 0 else (uiState.page - 1L) * uiState.pageSize + 1
-    val end = minOf(uiState.page.toLong() * uiState.pageSize, uiState.totalSuppliers)
-    TbPagination(
-        currentPage = uiState.page,
-        totalPages = uiState.totalPages,
-        onPreviousPage = onPreviousPage,
-        onNextPage = onNextPage,
-        supportingText = "$start-$end dari ${uiState.totalSuppliers} supplier",
-        isLoading = uiState.isLoading,
-        testTag = "supplier-pagination",
-    )
+    val totalCount = uiState.visibleSuppliers.size.toLong()
+    val start = if (totalCount == 0L) 0 else (uiState.page - 1L) * uiState.pageSize + 1
+    val end = minOf(uiState.page.toLong() * uiState.pageSize, if (uiState.statusFilter == SupplierStatusFilter.ALL) uiState.totalSuppliers else totalCount)
+    val totalDisplay = if (uiState.statusFilter == SupplierStatusFilter.ALL) uiState.totalSuppliers else totalCount
+    val safePage = uiState.page.coerceAtLeast(1)
+    val safeTotalPages = uiState.totalPages.coerceAtLeast(1)
+
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(top = 4.dp)
+            .testTag("supplier-pagination"),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        // Range Pill
+        Surface(
+            shape = RoundedCornerShape(999.dp),
+            color = Color.White,
+            border = BorderStroke(1.dp, SupplierSlate200),
+        ) {
+            Text(
+                text = "$start-$end dari $totalDisplay supplier",
+                modifier = Modifier.padding(horizontal = 14.dp, vertical = 6.dp),
+                fontSize = 12.sp,
+                fontWeight = FontWeight.Medium,
+                color = SupplierSlate600,
+            )
+        }
+
+        // Navigation Pill
+        Surface(
+            shape = RoundedCornerShape(999.dp),
+            color = Color.White,
+            border = BorderStroke(1.dp, SupplierSlate200),
+        ) {
+            Row(
+                modifier = Modifier.padding(horizontal = 4.dp, vertical = 2.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                val canPrev = safePage > 1 && !uiState.isLoading
+                val canNext = safePage < safeTotalPages && !uiState.isLoading
+
+                IconButton(
+                    onClick = onPreviousPage,
+                    enabled = canPrev,
+                    modifier = Modifier.size(28.dp),
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.ChevronLeft,
+                        contentDescription = "Halaman sebelumnya",
+                        modifier = Modifier.size(16.dp),
+                        tint = if (canPrev) SupplierSlate700 else SupplierSlate300,
+                    )
+                }
+
+                Text(
+                    text = "$safePage / $safeTotalPages",
+                    fontSize = 12.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    color = SupplierSlate800,
+                    modifier = Modifier.padding(horizontal = 6.dp),
+                )
+
+                IconButton(
+                    onClick = onNextPage,
+                    enabled = canNext,
+                    modifier = Modifier.size(28.dp),
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.ChevronRight,
+                        contentDescription = "Halaman berikutnya",
+                        modifier = Modifier.size(16.dp),
+                        tint = if (canNext) SupplierSlate700 else SupplierSlate300,
+                    )
+                }
+            }
+        }
+    }
 }

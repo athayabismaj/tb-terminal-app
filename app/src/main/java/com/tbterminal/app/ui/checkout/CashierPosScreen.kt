@@ -35,6 +35,7 @@ import com.tbterminal.app.ui.common.UiText
 import com.tbterminal.app.ui.checkout.components.ProductCardGrid
 import com.tbterminal.app.ui.checkout.components.ProductErrorState
 import com.tbterminal.app.ui.checkout.components.ProductPaginationBar
+import com.tbterminal.app.ui.checkout.components.MaterialEstimatorDialog
 import java.math.BigDecimal
 import java.text.NumberFormat
 import java.util.Locale
@@ -85,9 +86,13 @@ fun CashierPosScreen(
     onNavigateToCart: () -> Unit,
     onScanBarcode: (String) -> Unit = {},
     onClearScanNotification: () -> Unit = {},
+    onOpenHoldCartDialog: () -> Unit = {},
+    onOpenHeldCarts: () -> Unit = {},
+    onLockScreen: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     var showCameraScanner by remember { mutableStateOf(false) }
+    var showMaterialEstimator by remember { mutableStateOf(false) }
     val allCategory = "Semua kategori"
     val categories = listOf(allCategory) + state.products.map { it.categoryName }.filter { it.isNotBlank() }.distinct()
     var selectedCategory by remember { mutableStateOf(allCategory) }
@@ -156,12 +161,89 @@ fun CashierPosScreen(
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Text(
-                    text = "Kasir POS",
-                    color = OnSurface,
-                    fontSize = if (compact) 24.sp else 28.sp,
-                    fontWeight = FontWeight.ExtraBold
-                )
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text(
+                        text = "Kasir POS",
+                        color = OnSurface,
+                        fontSize = if (compact) 24.sp else 28.sp,
+                        fontWeight = FontWeight.ExtraBold
+                    )
+                    if (state.heldCarts.isNotEmpty()) {
+                        Spacer(Modifier.width(12.dp))
+                        Surface(
+                            onClick = onOpenHeldCarts,
+                            shape = RoundedCornerShape(20.dp),
+                            color = Color(0xFFFEF3C7),
+                            border = BorderStroke(1.dp, Color(0xFFF59E0B))
+                        ) {
+                            Row(
+                                modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Icon(
+                                    Icons.Outlined.PauseCircleOutline,
+                                    contentDescription = null,
+                                    tint = Color(0xFFB45309),
+                                    modifier = Modifier.size(16.dp)
+                                )
+                                Spacer(Modifier.width(6.dp))
+                                Text(
+                                    text = "Parkir (${state.heldCarts.size})",
+                                    color = Color(0xFFB45309),
+                                    fontWeight = FontWeight.Bold,
+                                    fontSize = 12.sp
+                                )
+                            }
+                        }
+                    }
+                }
+
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    if (cartItemCount > 0) {
+                        OutlinedButton(
+                            onClick = onOpenHoldCartDialog,
+                            shape = RoundedCornerShape(12.dp),
+                            border = BorderStroke(1.dp, Color(0xFFD97706)),
+                            colors = ButtonDefaults.outlinedButtonColors(contentColor = Color(0xFFD97706)),
+                            contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp)
+                        ) {
+                            Icon(Icons.Outlined.BookmarkAdd, null, modifier = Modifier.size(16.dp))
+                            Spacer(Modifier.width(4.dp))
+                            Text("Parkir", fontWeight = FontWeight.Bold, fontSize = 13.sp)
+                        }
+                    }
+                    IconButton(
+                        onClick = { showMaterialEstimator = true },
+                        modifier = Modifier
+                            .size(38.dp)
+                            .clip(CircleShape)
+                            .background(Color(0xFFE2E8F0))
+                    ) {
+                        Icon(
+                            Icons.Outlined.Calculate,
+                            contentDescription = "Kalkulator Bahan Bangunan",
+                            tint = Color(0xFF256B57),
+                            modifier = Modifier.size(20.dp)
+                        )
+                    }
+                    IconButton(
+                        onClick = onLockScreen,
+                        modifier = Modifier
+                            .size(38.dp)
+                            .clip(CircleShape)
+                            .background(Color(0xFFF1F5F9))
+                    ) {
+                        Icon(
+                            Icons.Outlined.Lock,
+                            contentDescription = "Kunci Layar",
+                            tint = Color(0xFF475569),
+                            modifier = Modifier.size(18.dp)
+                        )
+                    }
+                }
             }
 
             // 1. Search & Filter
@@ -301,6 +383,13 @@ fun CashierPosScreen(
                 showCameraScanner = false
                 onScanBarcode(barcode)
             }
+        )
+    }
+
+    if (showMaterialEstimator) {
+        MaterialEstimatorDialog(
+            onDismiss = { showMaterialEstimator = false },
+            onApplySearchQuery = { query -> onSearchChanged(query) }
         )
     }
 }
@@ -750,21 +839,26 @@ private fun CustomerPicker(
             }
 
             if (selectedCustomer == null) {
+                val isCustomerError = error != null
                 OutlinedTextField(
                     value = query,
                     onValueChange = onQueryChanged,
                     placeholder = { Text("Ketik nama pelanggan...", color = Outline) },
-                    leadingIcon = { Icon(Icons.Outlined.Person, contentDescription = null, tint = Outline) },
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(56.dp),
+                    leadingIcon = { Icon(Icons.Outlined.Person, contentDescription = null, tint = if (isCustomerError) Error else Outline) },
+                    isError = isCustomerError,
+                    supportingText = error?.let {
+                        { Text(it.message(), color = Error, fontSize = 12.sp) }
+                    },
+                    modifier = Modifier.fillMaxWidth(),
                     shape = RoundedCornerShape(14.dp),
                     singleLine = true,
                     colors = OutlinedTextFieldDefaults.colors(
-                        unfocusedContainerColor = Color.White,
-                        focusedContainerColor = Color.White,
-                        unfocusedBorderColor = OutlineVariant,
-                        focusedBorderColor = Primary
+                        unfocusedContainerColor = if (isCustomerError) Error.copy(alpha = 0.05f) else Color.White,
+                        focusedContainerColor = if (isCustomerError) Error.copy(alpha = 0.05f) else Color.White,
+                        unfocusedBorderColor = if (isCustomerError) Error else OutlineVariant,
+                        focusedBorderColor = if (isCustomerError) Error else Primary,
+                        errorBorderColor = Error,
+                        errorContainerColor = Error.copy(alpha = 0.05f)
                     )
                 )
 
@@ -774,10 +868,6 @@ private fun CustomerPicker(
                         color = Outline,
                         fontSize = 12.sp
                     )
-                }
-
-                error?.let {
-                    Text(it.message(), color = Error, fontSize = 12.sp)
                 }
 
                 customers
@@ -946,29 +1036,36 @@ private fun CashSessionGate(
             }
 
             if (!hasActiveCashSession) {
+                val isCashError = error != null
                 Row(
                     horizontalArrangement = Arrangement.spacedBy(8.dp),
-                    verticalAlignment = Alignment.CenterVertically
+                    verticalAlignment = Alignment.Top
                 ) {
                     OutlinedTextField(
                         value = startingCashInput,
                         onValueChange = onStartingCashChanged,
                         placeholder = { Text("Modal awal", color = Outline, fontSize = 12.sp) },
+                        isError = isCashError,
+                        supportingText = error?.let {
+                            { Text(it.message(), color = Error, fontSize = 11.sp) }
+                        },
                         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                        modifier = Modifier.weight(1f).height(48.dp),
+                        modifier = Modifier.weight(1f),
                         singleLine = true,
                         shape = RoundedCornerShape(10.dp),
                         colors = OutlinedTextFieldDefaults.colors(
-                            unfocusedContainerColor = Color.White,
-                            focusedContainerColor = Color.White,
-                            unfocusedBorderColor = OutlineVariant,
-                            focusedBorderColor = Primary
+                            unfocusedContainerColor = if (isCashError) Error.copy(alpha = 0.05f) else Color.White,
+                            focusedContainerColor = if (isCashError) Error.copy(alpha = 0.05f) else Color.White,
+                            unfocusedBorderColor = if (isCashError) Error else OutlineVariant,
+                            focusedBorderColor = if (isCashError) Error else Primary,
+                            errorBorderColor = Error,
+                            errorContainerColor = Error.copy(alpha = 0.05f)
                         )
                     )
                     Button(
                         onClick = onOpenCashSession,
                         enabled = startingCashInput.isNotBlank() && !isOpeningCashSession && !isCashSessionLoading,
-                        modifier = Modifier.height(48.dp),
+                        modifier = Modifier.height(52.dp),
                         shape = RoundedCornerShape(10.dp),
                         colors = ButtonDefaults.buttonColors(containerColor = Primary)
                     ) {
@@ -978,10 +1075,6 @@ private fun CashSessionGate(
                             Text("Buka Sesi", fontWeight = FontWeight.Bold, fontSize = 12.sp)
                         }
                     }
-                }
-
-                error?.let {
-                    Text(it.message(), color = Error, fontSize = 12.sp)
                 }
             }
         }

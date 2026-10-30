@@ -27,6 +27,7 @@ import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.Pin
 import androidx.compose.material.icons.outlined.MailOutline
+import androidx.compose.material.icons.outlined.ErrorOutline
 import androidx.compose.material.icons.outlined.Lock
 import androidx.compose.material.icons.outlined.Password
 import androidx.compose.material.icons.outlined.Edit
@@ -35,6 +36,7 @@ import androidx.compose.material.icons.outlined.VisibilityOff
 import androidx.compose.material.icons.automirrored.outlined.Logout
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
@@ -64,6 +66,8 @@ import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.graphics.vector.path
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.zIndex
+import com.tbterminal.app.ui.components.TopFloatingCapsule
 import androidx.compose.foundation.interaction.collectIsFocusedAsState
 import androidx.compose.foundation.border
 
@@ -106,11 +110,9 @@ fun SharedProfileScreen(
         ) {
             if (showHeader) ProfileScreenHeader()
 
-            uiState.error?.let {
-                MessageCard(it, isError = true, onClearMessage)
-                Button(onClick = onReload, enabled = !uiState.isLoading) { Text("Coba lagi") }
+            if (uiState.error != null && uiState.profile == null && !uiState.isLoading) {
+                OutlinedButton(onClick = onReload) { Text("Coba lagi") }
             }
-            uiState.message?.let { MessageCard(it, isError = false, onClearMessage) }
 
             when {
                 uiState.isLoading && uiState.profile == null -> ProfileLoadingState(compact)
@@ -134,6 +136,16 @@ fun SharedProfileScreen(
                 AccountLogoutButton(!uiState.isSaving) { confirmLogout = true }
             }
         }
+
+        TopFloatingCapsule(
+            message = uiState.message,
+            error = uiState.error,
+            onDismiss = onClearMessage,
+            modifier = Modifier
+                .align(Alignment.TopCenter)
+                .padding(top = 16.dp, start = 20.dp, end = 20.dp)
+                .zIndex(99f),
+        )
     }
 
     if (confirmLogout && onLogout != null) {
@@ -643,22 +655,6 @@ private fun String.toProfileRoleLabel(): String = when (lowercase(Locale.ROOT)) 
     else -> replaceFirstChar { it.titlecase(Locale.ROOT) }
 }
 
-@Composable
-private fun MessageCard(message: String, isError: Boolean, onDismiss: () -> Unit) {
-    val contentColor = if (isError) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.primary
-    val containerColor = if (isError) MaterialTheme.colorScheme.errorContainer else MaterialTheme.colorScheme.primaryContainer
-    Surface(color = containerColor, shape = RoundedCornerShape(16.dp)) {
-        Row(
-            modifier = Modifier.fillMaxWidth().padding(14.dp),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Text(message, color = contentColor, modifier = Modifier.weight(1f))
-            TextButton(onClick = onDismiss) { Text("Tutup") }
-        }
-    }
-}
-
 private enum class CredentialDialog { PASSWORD, PIN }
 
 
@@ -683,9 +679,17 @@ private fun CredentialChangeDialog(
     val confirmationLabel = if (isPin) "Ulangi PIN" else "Ulangi kata sandi"
     val formReady = oldValue.isNotBlank() && newValue.isNotBlank() && confirmation.isNotBlank()
 
-    
-
-    
+    val isOldValueError = errorMessage?.let {
+        it.contains("lama", ignoreCase = true) || it.contains("saat ini", ignoreCase = true)
+    } == true
+    val isNewValueError = errorMessage?.let {
+        (it.contains("baru", ignoreCase = true) && !it.contains("konfirmasi", ignoreCase = true) && !it.contains("sama", ignoreCase = true)) ||
+        it.contains("minimal", ignoreCase = true) || it.contains("digit", ignoreCase = true) || it.contains("karakter", ignoreCase = true)
+    } == true
+    val isConfirmationError = errorMessage?.let {
+        it.contains("konfirmasi", ignoreCase = true) || it.contains("tidak sama", ignoreCase = true) || it.contains("tidak cocok", ignoreCase = true)
+    } == true
+    val isGeneralError = errorMessage != null && !isOldValueError && !isNewValueError && !isConfirmationError
 
     ModalBottomSheet(
         onDismissRequest = onDismiss,
@@ -738,6 +742,8 @@ private fun CredentialChangeDialog(
                     keyboardType = keyboard,
                     enabled = !isSaving,
                     testTag = "credential-current",
+                    isError = isOldValueError,
+                    supportingText = if (isOldValueError) errorMessage else null,
                 )
                 CredentialField(
                     placeholder = newLabel,
@@ -749,6 +755,8 @@ private fun CredentialChangeDialog(
                     keyboardType = keyboard,
                     enabled = !isSaving,
                     testTag = "credential-new",
+                    isError = isNewValueError,
+                    supportingText = if (isNewValueError) errorMessage else null,
                 )
                 CredentialField(
                     placeholder = confirmationLabel,
@@ -760,20 +768,30 @@ private fun CredentialChangeDialog(
                     keyboardType = keyboard,
                     enabled = !isSaving,
                     testTag = "credential-confirmation",
+                    isError = isConfirmationError,
+                    supportingText = if (isConfirmationError) errorMessage else null,
                 )
             }
 
-            if (errorMessage != null) {
-                Surface(
-                    color = MaterialTheme.colorScheme.errorContainer,
-                    shape = RoundedCornerShape(12.dp),
-                    modifier = Modifier.padding(top = 16.dp)
+            if (isGeneralError) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(top = 10.dp),
+                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                    verticalAlignment = Alignment.CenterVertically,
                 ) {
+                    Icon(
+                        imageVector = Icons.Outlined.ErrorOutline,
+                        contentDescription = null,
+                        tint = Color(0xFFDC2626),
+                        modifier = Modifier.size(16.dp),
+                    )
                     Text(
                         text = errorMessage,
-                        modifier = Modifier.fillMaxWidth().padding(horizontal = 14.dp, vertical = 10.dp),
-                        color = MaterialTheme.colorScheme.onErrorContainer,
-                        style = MaterialTheme.typography.bodySmall,
+                        color = Color(0xFFDC2626),
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.Medium,
                     )
                 }
             }
@@ -825,66 +843,87 @@ private fun CredentialField(
     keyboardType: KeyboardType,
     enabled: Boolean,
     testTag: String,
+    isError: Boolean = false,
+    supportingText: String? = null,
 ) {
     var visible by remember { mutableStateOf(false) }
     
     val interactionSource = remember { androidx.compose.foundation.interaction.MutableInteractionSource() }
     val isFocused by interactionSource.collectIsFocusedAsState()
     
-    val bgColor = if (isFocused) Color.White else Color(0xFFFAFAFA)
-    val borderColor = if (isFocused) Color(0xFF256B57) else Color(0xFFD1D5DB) // gray-300
-    val borderWidth = if (isFocused) 1.5.dp else 1.dp
+    val bgColor = when {
+        isError -> Color(0xFFFFF5F5)
+        isFocused -> Color.White
+        else -> Color(0xFFFAFAFA)
+    }
+    val borderColor = when {
+        isError -> Color(0xFFEF4444)
+        isFocused -> Color(0xFF256B57)
+        else -> Color(0xFFD1D5DB) // gray-300
+    }
+    val borderWidth = if (isFocused || isError) 1.5.dp else 1.dp
     
-    Box(
-        modifier = Modifier
-            .fillMaxWidth()
-            .height(52.dp)
-            .border(borderWidth, borderColor, RoundedCornerShape(12.dp))
-            .background(bgColor, RoundedCornerShape(12.dp)),
-        contentAlignment = Alignment.CenterStart
-    ) {
-        Row(
-            modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp),
-            verticalAlignment = Alignment.CenterVertically
+    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(52.dp)
+                .border(borderWidth, borderColor, RoundedCornerShape(12.dp))
+                .background(bgColor, RoundedCornerShape(12.dp)),
+            contentAlignment = Alignment.CenterStart
         ) {
-            androidx.compose.foundation.text.BasicTextField(
-                value = value,
-                onValueChange = onValueChange,
-                enabled = enabled,
-                modifier = Modifier.weight(1f).testTag(testTag),
-                textStyle = androidx.compose.ui.text.TextStyle(
-                    fontSize = 14.sp,
-                    color = Color(0xFF1F2937) // gray-800
-                ),
-                keyboardOptions = KeyboardOptions(keyboardType = keyboardType),
-                visualTransformation = if (visible) VisualTransformation.None else PasswordVisualTransformation(),
-                singleLine = true,
-                interactionSource = interactionSource,
-                cursorBrush = androidx.compose.ui.graphics.SolidColor(Color(0xFF256B57)),
-                decorationBox = { innerTextField ->
-                    if (value.isEmpty()) {
-                        Text(
-                            text = placeholder,
-                            fontSize = 14.sp,
-                            color = Color(0xFF6B7280) // gray-500
-                        )
-                    }
-                    innerTextField()
-                }
-            )
-            
-            IconButton(
-                onClick = { visible = !visible }, 
-                enabled = enabled,
-                modifier = Modifier.size(24.dp).padding(end = 4.dp)
+            Row(
+                modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp),
+                verticalAlignment = Alignment.CenterVertically
             ) {
-                Icon(
-                    imageVector = if (visible) Icons.Outlined.VisibilityOff else Icons.Outlined.Visibility,
-                    contentDescription = if (visible) "Sembunyikan" else "Tampilkan",
-                    tint = Color(0xFF9CA3AF), // gray-400
-                    modifier = Modifier.size(20.dp)
+                androidx.compose.foundation.text.BasicTextField(
+                    value = value,
+                    onValueChange = onValueChange,
+                    enabled = enabled,
+                    modifier = Modifier.weight(1f).testTag(testTag),
+                    textStyle = androidx.compose.ui.text.TextStyle(
+                        fontSize = 14.sp,
+                        color = Color(0xFF1F2937) // gray-800
+                    ),
+                    keyboardOptions = KeyboardOptions(keyboardType = keyboardType),
+                    visualTransformation = if (visible) VisualTransformation.None else PasswordVisualTransformation(),
+                    singleLine = true,
+                    interactionSource = interactionSource,
+                    cursorBrush = androidx.compose.ui.graphics.SolidColor(if (isError) Color(0xFFDC2626) else Color(0xFF256B57)),
+                    decorationBox = { innerTextField ->
+                        if (value.isEmpty()) {
+                            Text(
+                                text = placeholder,
+                                fontSize = 14.sp,
+                                color = if (isError) Color(0xFFDC2626).copy(alpha = 0.7f) else Color(0xFF6B7280) // gray-500
+                            )
+                        }
+                        innerTextField()
+                    }
                 )
+                
+                IconButton(
+                    onClick = { visible = !visible }, 
+                    enabled = enabled,
+                    modifier = Modifier.size(24.dp).padding(end = 4.dp)
+                ) {
+                    Icon(
+                        imageVector = if (visible) Icons.Outlined.VisibilityOff else Icons.Outlined.Visibility,
+                        contentDescription = if (visible) "Sembunyikan" else "Tampilkan",
+                        tint = if (isError) Color(0xFFDC2626) else Color(0xFF9CA3AF), // gray-400
+                        modifier = Modifier.size(20.dp)
+                    )
+                }
             }
+        }
+        if (supportingText != null) {
+            Text(
+                text = supportingText,
+                fontSize = 11.sp,
+                fontWeight = FontWeight.Medium,
+                color = Color(0xFFDC2626),
+                modifier = Modifier.padding(start = 4.dp),
+            )
         }
     }
 }

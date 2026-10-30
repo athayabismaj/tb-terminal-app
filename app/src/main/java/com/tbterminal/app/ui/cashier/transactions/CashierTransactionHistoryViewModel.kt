@@ -784,6 +784,10 @@ class CashierTransactionHistoryViewModel(
         }
     }
 
+    fun clearFeedback() {
+        _uiState.update { it.copy(errorMessage = null, receiptMessage = null) }
+    }
+
     companion object {
         fun factory(
             repository: CashReconciliationRepository,

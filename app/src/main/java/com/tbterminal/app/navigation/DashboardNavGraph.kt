@@ -60,6 +60,7 @@ import com.tbterminal.app.ui.settings.CashierProfileScreen
 import com.tbterminal.app.ui.settings.CashierSettingsScreen
 import com.tbterminal.app.ui.settings.AdminProfileScreen
 import com.tbterminal.app.ui.settings.AdminSettingsScreen
+import com.tbterminal.app.ui.settings.SettingsPage
 import com.tbterminal.app.ui.stockopname.AdminStockOpnameFormScreen
 import com.tbterminal.app.ui.stockopname.AdminStockOpnameScreen
 import com.tbterminal.app.ui.stockreport.AdminStockReportScreen
@@ -98,6 +99,7 @@ internal fun NavGraphBuilder.dashboardGraph(navController: NavHostController, se
                             name = sessionUser.name,
                             role = sessionUser.role,
                             analyticsRepository = appContainer.analyticsRepository,
+                            cashReconciliationRepository = appContainer.cashReconciliationRepository,
                             offlineDashboardRepository = appContainer.offlineDashboardRepository,
                             onSalesTransactionsClick = {
                                 navController.navigate(AppRoute.SalesTransactions.route) { launchSingleTop = true }
@@ -177,6 +179,7 @@ internal fun NavGraphBuilder.dashboardGraph(navController: NavHostController, se
                             name = sessionUser.name,
                             role = sessionUser.role,
                             analyticsRepository = appContainer.analyticsRepository,
+                            cashReconciliationRepository = appContainer.cashReconciliationRepository,
                             offlineDashboardRepository = appContainer.offlineDashboardRepository,
                             onProductsClick = {
                                 navController.navigate(AppRoute.Products.route) {
@@ -422,6 +425,7 @@ internal fun NavGraphBuilder.dashboardGraph(navController: NavHostController, se
                             name = sessionUser.name,
                             role = sessionUser.role,
                             section = section,
+                            inventoryRepository = appContainer.inventoryRepository,
                             onLogout = logout,
                             onUserManagementClick = {
                                 navController.navigate(AppRoute.UserManagement.route) { launchSingleTop = true }
@@ -677,7 +681,7 @@ internal fun NavGraphBuilder.dashboardGraph(navController: NavHostController, se
             }
         }
 
-        composable(AppRoute.AdminSettings.route) {
+        val renderAdminSettings: @Composable (SettingsPage?) -> Unit = { initialPage ->
             val sessionUser = sessionManager.readSessionUser()
 
             if (sessionUser == null) {
@@ -700,6 +704,8 @@ internal fun NavGraphBuilder.dashboardGraph(navController: NavHostController, se
                     role = sessionUser.role,
                     systemRepository = appContainer.systemRepository,
                     localAppSettingsDataSource = appContainer.localAppSettingsDataSource,
+                    initialPage = initialPage,
+                    onBackToPrevious = { navController.popBackStack() },
                     onDashboardClick = { navigate(AppRoute.Dashboard.route) },
                     onProductsClick = { navigate(AppRoute.Products.route) },
                     onAddProductClick = { navigate(AppRoute.AddProduct.route) },
@@ -737,6 +743,18 @@ internal fun NavGraphBuilder.dashboardGraph(navController: NavHostController, se
                     }
                 )
             }
+        }
+
+        composable(AppRoute.AdminSettings.route) {
+            renderAdminSettings(null)
+        }
+
+        composable(AppRoute.AdminStoreSettings.route) {
+            renderAdminSettings(SettingsPage.STORE)
+        }
+
+        composable(AppRoute.AdminDeviceSettings.route) {
+            renderAdminSettings(SettingsPage.DEVICE)
         }
 
         composable(AppRoute.Suppliers.route) {

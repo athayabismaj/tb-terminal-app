@@ -94,6 +94,10 @@ class CashierDashboardViewModel(
         }
     }
 
+    fun clearErrorMessage() {
+        _uiState.update { it.copy(errorMessage = null) }
+    }
+
     companion object {
         fun factory(repository: CashReconciliationRepository): ViewModelProvider.Factory {
             return viewModelFactory {

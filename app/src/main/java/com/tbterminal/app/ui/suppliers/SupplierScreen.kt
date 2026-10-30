@@ -18,13 +18,16 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.zIndex
 import com.tbterminal.app.data.model.Supplier
+import com.tbterminal.app.ui.components.TopFloatingCapsule
 
 @Composable
 internal fun SupplierScreen(
     modifier: Modifier,
     uiState: SupplierUiState,
     onSearchChanged: (String) -> Unit,
+    onStatusFilterChanged: (SupplierStatusFilter) -> Unit = {},
     onAdd: () -> Unit,
     onEdit: (Supplier) -> Unit,
     onDelete: (Supplier) -> Unit,
@@ -33,6 +36,7 @@ internal fun SupplierScreen(
     onDismissMessage: () -> Unit,
 ) {
     var deleteTargetId by rememberSaveable { mutableStateOf<String?>(null) }
+    var showSummarySheet by rememberSaveable { mutableStateOf(false) }
     val supplierToDelete = uiState.suppliers.firstOrNull { it.id == deleteTargetId }
 
     BoxWithConstraints(modifier.fillMaxSize().background(SupplierBackground)) {
@@ -43,22 +47,46 @@ internal fun SupplierScreen(
                 .widthIn(max = 1120.dp)
                 .fillMaxWidth()
                 .verticalScroll(rememberScrollState())
-                .padding(horizontal = if (compact) 16.dp else 32.dp, vertical = if (compact) 14.dp else 24.dp),
+                .padding(horizontal = if (compact) 16.dp else 32.dp, vertical = if (compact) 12.dp else 24.dp),
             verticalArrangement = Arrangement.spacedBy(if (compact) 12.dp else 18.dp),
         ) {
-            uiState.message?.let { SupplierMessage(it, onDismissMessage) }
             SupplierListCard(
                 modifier = Modifier.fillMaxWidth(),
                 uiState = uiState,
                 compact = compact,
                 onSearchChanged = onSearchChanged,
+                onStatusFilterChanged = onStatusFilterChanged,
                 onAdd = onAdd,
                 onEdit = onEdit,
                 onDelete = { deleteTargetId = it.id },
                 onPreviousPage = onPreviousPage,
                 onNextPage = onNextPage,
+                onOpenSummary = { showSummarySheet = true },
             )
         }
+
+        val isErrorMessage = uiState.message?.let {
+            it.contains("gagal", ignoreCase = true) ||
+            it.contains("tidak", ignoreCase = true) ||
+            it.contains("kosong", ignoreCase = true)
+        } == true
+
+        TopFloatingCapsule(
+            message = if (!isErrorMessage) uiState.message else null,
+            error = if (isErrorMessage) uiState.message else null,
+            onDismiss = onDismissMessage,
+            modifier = Modifier
+                .align(Alignment.TopCenter)
+                .padding(top = 16.dp, start = 20.dp, end = 20.dp)
+                .zIndex(99f),
+        )
+    }
+
+    if (showSummarySheet) {
+        SupplierSummarySheet(
+            uiState = uiState,
+            onDismiss = { showSummarySheet = false },
+        )
     }
 
     supplierToDelete?.let { supplier ->
@@ -96,7 +124,6 @@ internal fun SupplierFormScreen(
                 .padding(horizontal = if (compact) 16.dp else 32.dp, vertical = if (compact) 14.dp else 24.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
-            uiState.message?.let { SupplierMessage(it, onDismissMessage) }
             SupplierFormCard(
                 modifier = Modifier.fillMaxWidth(),
                 uiState = uiState,
@@ -108,5 +135,21 @@ internal fun SupplierFormScreen(
                 onCancelEdit = onCancel,
             )
         }
+
+        val isErrorMessage = uiState.message?.let {
+            it.contains("gagal", ignoreCase = true) ||
+            it.contains("tidak", ignoreCase = true) ||
+            it.contains("kosong", ignoreCase = true)
+        } == true
+
+        TopFloatingCapsule(
+            message = if (!isErrorMessage) uiState.message else null,
+            error = if (isErrorMessage) uiState.message else null,
+            onDismiss = onDismissMessage,
+            modifier = Modifier
+                .align(Alignment.TopCenter)
+                .padding(top = 16.dp, start = 20.dp, end = 20.dp)
+                .zIndex(99f),
+        )
     }
 }

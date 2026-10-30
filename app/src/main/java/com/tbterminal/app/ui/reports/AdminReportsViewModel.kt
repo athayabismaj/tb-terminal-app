@@ -199,6 +199,10 @@ class AdminReportsViewModel(
         _uiState.value = _uiState.value.copy(exportMessage = null)
     }
 
+    fun clearErrors() {
+        _uiState.value = _uiState.value.copy(error = null, exportMessage = null)
+    }
+
     companion object {
         fun factory(
             analyticsRepository: AnalyticsRepository,

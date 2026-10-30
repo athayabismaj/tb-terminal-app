@@ -12,11 +12,13 @@ import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -34,6 +36,7 @@ internal fun SupplierPaymentDialog(
     onDismiss: () -> Unit,
     onSubmit: () -> Unit
 ) {
+    val isAmountError = uiState.errorMessage != null
     AlertDialog(
         onDismissRequest = onDismiss,
         title = { Text("Bayar Utang Supplier", color = DebtText, fontWeight = FontWeight.ExtraBold) },
@@ -44,7 +47,9 @@ internal fun SupplierPaymentDialog(
                     value = uiState.paymentAmountInput,
                     onValueChange = onAmountChanged,
                     label = "Nominal pembayaran",
-                    prefix = "Rp"
+                    prefix = "Rp",
+                    isError = isAmountError,
+                    supportingText = if (isAmountError) uiState.errorMessage else null,
                 )
                 PaymentMethodCards(uiState.paymentMethod, onMethodChanged)
                 PaymentInputField(
@@ -82,20 +87,40 @@ private fun PaymentInputField(
     onValueChange: (String) -> Unit,
     label: String,
     prefix: String? = null,
-    minLines: Int = 1
+    minLines: Int = 1,
+    isError: Boolean = false,
+    supportingText: String? = null,
 ) {
     OutlinedTextField(
         value = value,
         onValueChange = onValueChange,
         label = { Text(label) },
         leadingIcon = prefix?.let {
-            { Text(it, color = DebtMuted, modifier = Modifier.padding(start = 12.dp)) }
+            { Text(it, color = if (isError) Color(0xFFDC2626) else DebtMuted, modifier = Modifier.padding(start = 12.dp)) }
         },
         modifier = Modifier.fillMaxWidth(),
         singleLine = minLines == 1,
         minLines = minLines,
         shape = RoundedCornerShape(12.dp),
-        colors = debtTextFieldColors()
+        isError = isError,
+        supportingText = supportingText?.let { text ->
+            {
+                Text(
+                    text = text,
+                    color = Color(0xFFDC2626),
+                    fontSize = 11.sp,
+                    fontWeight = FontWeight.Medium,
+                )
+            }
+        },
+        colors = OutlinedTextFieldDefaults.colors(
+            focusedBorderColor = if (isError) Color(0xFFDC2626) else DebtPrimaryDark,
+            unfocusedBorderColor = if (isError) Color(0xFFDC2626) else DebtLine,
+            focusedContainerColor = if (isError) Color(0xFFFFF5F5) else DebtSoft,
+            unfocusedContainerColor = if (isError) Color(0xFFFFF5F5) else DebtSoft,
+            errorBorderColor = Color(0xFFDC2626),
+            errorContainerColor = Color(0xFFFFF5F5),
+        )
     )
 }
 

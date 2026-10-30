@@ -73,6 +73,14 @@ class CustomerListViewModel(
         _uiState.update { it.copy(categoryFilter = filter) }
     }
 
+    fun onStatusFilterChanged(status: CustomerStatusFilter) {
+        _uiState.update { it.copy(statusFilter = status) }
+    }
+
+    fun onFilterApplied(category: CustomerCategoryFilter, status: CustomerStatusFilter) {
+        _uiState.update { it.copy(categoryFilter = category, statusFilter = status) }
+    }
+
     fun previousPage() {
         val previous = (_uiState.value.page - 1).coerceAtLeast(1)
         if (previous != _uiState.value.page) loadCustomers(previous)

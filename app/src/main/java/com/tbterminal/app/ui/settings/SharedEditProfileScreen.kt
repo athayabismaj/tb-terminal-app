@@ -47,7 +47,9 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.zIndex
 import com.tbterminal.app.ui.components.SkeletonBox
+import com.tbterminal.app.ui.components.TopFloatingCapsule
 
 @Composable
 fun SharedEditProfileScreen(
@@ -114,13 +116,29 @@ fun SharedEditProfileScreen(
                             )
                             Spacer(Modifier.height(20.dp))
                             
+                            val isNameError = (name.isNotBlank() && name.trim().length < 2) || uiState.error?.contains("nama", ignoreCase = true) == true
+                            val nameSupporting = if (name.isNotBlank() && name.trim().length < 2) {
+                                "Nama minimal 2 karakter"
+                            } else if (uiState.error?.contains("nama", ignoreCase = true) == true) {
+                                uiState.error
+                            } else null
+
+                            val isEmailError = (email.isNotBlank() && !email.trim().matches(Regex("^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$"))) || uiState.error?.contains("email", ignoreCase = true) == true
+                            val emailSupporting = if (email.isNotBlank() && !email.trim().matches(Regex("^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$"))) {
+                                "Format email tidak valid"
+                            } else if (uiState.error?.contains("email", ignoreCase = true) == true) {
+                                uiState.error
+                            } else null
+
                             Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
                                 ProfileInputField(
                                     label = "Nama lengkap",
                                     value = name,
                                     onValueChange = { name = it.take(100); onClearMessage() },
                                     enabled = !uiState.isSaving,
-                                    testTag = "edit-profile-name"
+                                    testTag = "edit-profile-name",
+                                    isError = isNameError,
+                                    supportingText = nameSupporting,
                                 )
                                 ProfileInputField(
                                     label = "Email (opsional)",
@@ -128,7 +146,9 @@ fun SharedEditProfileScreen(
                                     onValueChange = { email = it.take(150); onClearMessage() },
                                     enabled = !uiState.isSaving,
                                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email),
-                                    testTag = "edit-profile-email"
+                                    testTag = "edit-profile-email",
+                                    isError = isEmailError,
+                                    supportingText = emailSupporting,
                                 )
                                 ProfileReadonlyField(
                                     label = "Username",
@@ -140,15 +160,6 @@ fun SharedEditProfileScreen(
                         }
                     }
 
-                    uiState.error?.let {
-                        Text(
-                            text = it,
-                            color = MaterialTheme.colorScheme.error,
-                            style = MaterialTheme.typography.bodyMedium,
-                            modifier = Modifier.testTag("edit-profile-error"),
-                        )
-                    }
-                    
                     // Action Button
                     Button(
                         onClick = { onSave(name, email.takeIf(String::isNotBlank)) },
@@ -175,6 +186,16 @@ fun SharedEditProfileScreen(
                     Text("Profil tidak tersedia.", color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
             }
+
+            TopFloatingCapsule(
+                message = uiState.message,
+                error = uiState.error,
+                onDismiss = onClearMessage,
+                modifier = Modifier
+                    .align(Alignment.TopCenter)
+                    .padding(top = 16.dp, start = 20.dp, end = 20.dp)
+                    .zIndex(99f),
+            )
         }
     }
 }
@@ -186,40 +207,58 @@ private fun ProfileInputField(
     onValueChange: (String) -> Unit,
     enabled: Boolean,
     testTag: String,
-    keyboardOptions: KeyboardOptions = KeyboardOptions.Default
+    keyboardOptions: KeyboardOptions = KeyboardOptions.Default,
+    isError: Boolean = false,
+    supportingText: String? = null,
 ) {
     val interactionSource = remember { MutableInteractionSource() }
     val isFocused by interactionSource.collectIsFocusedAsState()
-    val borderColor = if (isFocused) Color(0xFF256B57) else Color(0xFFCBD5E1)
+    val borderColor = when {
+        isError -> Color(0xFFEF4444)
+        isFocused -> Color(0xFF256B57)
+        else -> Color(0xFFCBD5E1)
+    }
+    val bgColor = if (isError) Color(0xFFFFF5F5) else Color.White
     
-    Box(
-        modifier = Modifier
-            .fillMaxWidth()
-            .border(if (isFocused) 1.5.dp else 1.dp, borderColor, RoundedCornerShape(12.dp))
-            .background(Color.White, RoundedCornerShape(12.dp))
-    ) {
-        Column(modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 6.dp)) {
+    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .border(if (isFocused || isError) 1.5.dp else 1.dp, borderColor, RoundedCornerShape(12.dp))
+                .background(bgColor, RoundedCornerShape(12.dp))
+        ) {
+            Column(modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 6.dp)) {
+                Text(
+                    text = label.uppercase(),
+                    fontSize = 11.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    color = if (isError) Color(0xFFDC2626) else Color(0xFF64748B),
+                    letterSpacing = 0.5.sp
+                )
+                BasicTextField(
+                    value = value,
+                    onValueChange = onValueChange,
+                    enabled = enabled,
+                    modifier = Modifier.fillMaxWidth().padding(top = 2.dp, bottom = 4.dp).testTag(testTag),
+                    textStyle = TextStyle(
+                        fontSize = 14.sp,
+                        fontWeight = FontWeight.Medium,
+                        color = Color(0xFF0F172A)
+                    ),
+                    keyboardOptions = keyboardOptions,
+                    singleLine = true,
+                    interactionSource = interactionSource,
+                    cursorBrush = SolidColor(if (isError) Color(0xFFDC2626) else Color(0xFF256B57))
+                )
+            }
+        }
+        if (supportingText != null) {
             Text(
-                text = label.uppercase(),
+                text = supportingText,
                 fontSize = 11.sp,
-                fontWeight = FontWeight.SemiBold,
-                color = Color(0xFF64748B),
-                letterSpacing = 0.5.sp
-            )
-            BasicTextField(
-                value = value,
-                onValueChange = onValueChange,
-                enabled = enabled,
-                modifier = Modifier.fillMaxWidth().padding(top = 2.dp, bottom = 4.dp).testTag(testTag),
-                textStyle = TextStyle(
-                    fontSize = 14.sp,
-                    fontWeight = FontWeight.Medium,
-                    color = Color(0xFF0F172A)
-                ),
-                keyboardOptions = keyboardOptions,
-                singleLine = true,
-                interactionSource = interactionSource,
-                cursorBrush = SolidColor(Color(0xFF256B57))
+                fontWeight = FontWeight.Medium,
+                color = Color(0xFFDC2626),
+                modifier = Modifier.padding(start = 4.dp),
             )
         }
     }
