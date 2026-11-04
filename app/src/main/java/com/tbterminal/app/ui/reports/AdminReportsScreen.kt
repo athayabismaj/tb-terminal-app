@@ -26,11 +26,13 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.FactCheck
 import androidx.compose.material.icons.outlined.CalendarMonth
+import androidx.compose.material.icons.outlined.Description
 import androidx.compose.material.icons.outlined.Tune
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -109,12 +111,60 @@ fun AdminReportsScreen(
     onLogout: () -> Unit,
     onDismissFeedback: () -> Unit = {},
 ) {
+    val todayStr = LocalDate.now().toString()
+    val isFiltered = uiState.startDate != todayStr || uiState.endDate != todayStr
+    var showFilterPopup by rememberSaveable { mutableStateOf(false) }
+    var showSummaryPopup by rememberSaveable { mutableStateOf(false) }
+
     AdminDashboardShell(
         userName = name,
         role = role,
         activeDestination = AdminDestination.Reports,
         pageTitle = stringResource(R.string.owner_menu_reports),
         onBack = onBackToPrevious,
+        showPageHeader = true,
+        topBarActions = {
+            // Button 1: Filter [ 🎛️ ]
+            Box(
+                modifier = Modifier.size(36.dp),
+                contentAlignment = Alignment.Center
+            ) {
+                IconButton(
+                    onClick = { showFilterPopup = true },
+                    modifier = Modifier.size(36.dp).testTag("reports-open-filter")
+                ) {
+                    Icon(
+                        imageVector = Icons.Outlined.Tune,
+                        contentDescription = "Filter laporan",
+                        tint = if (isFiltered) Color(0xFF256B57) else Color(0xFF475569),
+                        modifier = Modifier.size(20.dp)
+                    )
+                }
+                if (isFiltered) {
+                    Box(
+                        modifier = Modifier
+                            .align(Alignment.TopEnd)
+                            .padding(top = 6.dp, end = 6.dp)
+                            .size(8.dp)
+                            .background(Color(0xFFF59E0B), CircleShape)
+                            .border(1.5.dp, Color.White, CircleShape)
+                    )
+                }
+            }
+
+            // Button 2: Ringkasan [ 📑 ]
+            IconButton(
+                onClick = { showSummaryPopup = true },
+                modifier = Modifier.size(36.dp).testTag("reports-open-summary")
+            ) {
+                Icon(
+                    imageVector = Icons.Outlined.Description,
+                    contentDescription = "Ringkasan laporan",
+                    tint = Color(0xFF475569),
+                    modifier = Modifier.size(20.dp)
+                )
+            }
+        },
         onDashboardClick = onDashboardClick,
         onProductsClick = onProductsClick,
         onAddProductClick = onAddProductClick,
@@ -146,6 +196,10 @@ fun AdminReportsScreen(
             ) {
                 AdminReportsContent(
                     uiState = uiState,
+                    showFilterPopup = showFilterPopup,
+                    onDismissFilter = { showFilterPopup = false },
+                    showSummaryPopup = showSummaryPopup,
+                    onDismissSummary = { showSummaryPopup = false },
                     onDateRangeChanged = onDateRangeChanged,
                     onRetry = onRetry,
                     onSalesReportRetry = onSalesReportRetry,
@@ -169,6 +223,10 @@ fun AdminReportsScreen(
 @Composable
 fun AdminReportsContent(
     uiState: AdminReportsUiState,
+    showFilterPopup: Boolean = false,
+    onDismissFilter: () -> Unit = {},
+    showSummaryPopup: Boolean = false,
+    onDismissSummary: () -> Unit = {},
     onDateRangeChanged: (LocalDate, LocalDate) -> Unit,
     onRetry: () -> Unit,
     onSalesReportRetry: () -> Unit,
@@ -201,88 +259,54 @@ fun AdminReportsContent(
                     if (compact) {
                         val todayStr = LocalDate.now().toString()
                         val isFiltered = uiState.startDate != todayStr || uiState.endDate != todayStr
+                        // Active filter chips row on compact screen
                         Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.spacedBy(10.dp),
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = 4.dp),
                             verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
                         ) {
+                            Text(
+                                text = "Filter:",
+                                fontSize = 12.sp,
+                                color = Color(0xFF64748B),
+                                fontWeight = FontWeight.Medium
+                            )
+
                             Surface(
-                                onClick = { showMobileControls = true },
-                                modifier = Modifier
-                                    .weight(1f)
-                                    .height(42.dp),
-                                color = Color.White,
-                                shape = RoundedCornerShape(12.dp),
-                                border = BorderStroke(1.dp, Color(0xFFCBD5E1)),
+                                shape = RoundedCornerShape(8.dp),
+                                color = Color(0xFFEAF3EF),
+                                border = BorderStroke(1.dp, Color(0xFF256B57).copy(alpha = 0.3f))
                             ) {
                                 Row(
-                                    modifier = Modifier
-                                        .fillMaxSize()
-                                        .padding(horizontal = 14.dp),
-                                    horizontalArrangement = Arrangement.spacedBy(10.dp),
+                                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
                                     verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(4.dp)
                                 ) {
-                                    Icon(
-                                        Icons.Outlined.CalendarMonth,
-                                        contentDescription = null,
-                                        tint = ReportColors.Primary,
-                                        modifier = Modifier.size(18.dp),
+                                    Text(
+                                        text = reportsCompactRangeLabel(uiState.startDate, uiState.endDate),
+                                        fontSize = 11.sp,
+                                        fontWeight = FontWeight.SemiBold,
+                                        color = Color(0xFF256B57)
                                     )
-                                    Row(
-                                        modifier = Modifier.weight(1f),
-                                        verticalAlignment = Alignment.CenterVertically,
-                                        horizontalArrangement = Arrangement.spacedBy(6.dp),
-                                    ) {
-                                        Text(
-                                            text = "Transaksi",
-                                            fontSize = 13.sp,
-                                            fontWeight = FontWeight.Bold,
-                                            color = ReportColors.OnSurface,
-                                        )
-                                        Text(
-                                            text = "•",
-                                            fontSize = 12.sp,
-                                            color = Color(0xFFCBD5E1),
-                                        )
-                                        Text(
-                                            text = reportsCompactRangeLabel(uiState.startDate, uiState.endDate),
-                                            fontSize = 12.sp,
-                                            fontWeight = FontWeight.Medium,
-                                            color = ReportColors.Outline,
-                                            maxLines = 1,
-                                            overflow = TextOverflow.Ellipsis,
-                                        )
-                                    }
                                 }
                             }
 
-                            Surface(
-                                onClick = { showMobileControls = true },
-                                modifier = Modifier
-                                    .size(42.dp)
-                                    .testTag("reports-open-controls"),
-                                shape = RoundedCornerShape(12.dp),
-                                color = Color.White,
-                                border = BorderStroke(1.dp, if (isFiltered) Color(0xFF0F172A) else Color(0xFFCBD5E1)),
-                                contentColor = Color(0xFF0F172A),
-                            ) {
-                                Box(contentAlignment = Alignment.Center) {
-                                    Icon(
-                                        Icons.Outlined.Tune,
-                                        contentDescription = "Atur periode dan ekspor",
-                                        modifier = Modifier.size(18.dp),
-                                        tint = Color(0xFF0F172A),
-                                    )
-                                    if (isFiltered) {
-                                        Box(
-                                            modifier = Modifier
-                                                .align(Alignment.TopEnd)
-                                                .padding(6.dp)
-                                                .size(7.dp)
-                                                .background(Color(0xFFF59E0B), CircleShape),
-                                        )
-                                    }
-                                }
+                            if (isFiltered) {
+                                Text(
+                                    text = "Reset",
+                                    fontSize = 11.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = Color(0xFFEF4444),
+                                    modifier = Modifier
+                                        .clip(RoundedCornerShape(6.dp))
+                                        .clickable {
+                                            val now = LocalDate.now()
+                                            onDateRangeChanged(now, now)
+                                        }
+                                        .padding(horizontal = 4.dp, vertical = 2.dp)
+                                )
                             }
                         }
                     } else {
@@ -413,11 +437,14 @@ fun AdminReportsContent(
             }
         }
 
-        if (showMobileControls) {
+        if (compact && (showMobileControls || showFilterPopup)) {
             TbMobileControlSheet(
                 title = "Filter laporan",
                 subtitle = "Atur periode dan ekspor data",
-                onDismiss = { showMobileControls = false },
+                onDismiss = {
+                    showMobileControls = false
+                    onDismissFilter()
+                },
                 testTag = "reports-control-sheet",
             ) {
                 Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
@@ -450,6 +477,7 @@ fun AdminReportsContent(
                         isExporting = uiState.isExporting,
                         onExport = {
                             showMobileControls = false
+                            onDismissFilter()
                             onExportCsv(it)
                         },
                         modifier = Modifier.fillMaxWidth(),
@@ -460,7 +488,10 @@ fun AdminReportsContent(
 
                 Spacer(Modifier.height(4.dp))
                 Button(
-                    onClick = { showMobileControls = false },
+                    onClick = {
+                        showMobileControls = false
+                        onDismissFilter()
+                    },
                     modifier = Modifier
                         .fillMaxWidth()
                         .height(48.dp)
@@ -482,13 +513,14 @@ fun AdminReportsContent(
             }
         }
 
-        if (compact && showMobileSummary) {
+        if (compact && (showMobileSummary || showSummaryPopup)) {
             TbMobileControlSheet(
                 title = "Ringkasan bisnis",
                 subtitle = reportsCompactRangeLabel(uiState.startDate, uiState.endDate),
                 onDismiss = {
                     detailsExpanded = false
                     showMobileSummary = false
+                    onDismissSummary()
                 },
                 testTag = "reports-summary-sheet",
             ) {
@@ -534,6 +566,7 @@ fun AdminReportsContent(
                     onClick = {
                         detailsExpanded = false
                         showMobileSummary = false
+                        onDismissSummary()
                     },
                     modifier = Modifier
                         .fillMaxWidth()

@@ -3,6 +3,7 @@ package com.tbterminal.app.ui.suppliers
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.ui.draw.clip
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -19,8 +20,10 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.rounded.Add
+import androidx.compose.material.icons.outlined.Check
 import androidx.compose.material.icons.outlined.CheckCircle
 import androidx.compose.material.icons.outlined.Close
+import androidx.compose.material.icons.outlined.Description
 import androidx.compose.material.icons.outlined.ExpandMore
 import androidx.compose.material.icons.outlined.Inventory2
 import androidx.compose.material.icons.outlined.SearchOff
@@ -33,6 +36,7 @@ import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.ModalBottomSheet
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.rememberModalBottomSheetState
@@ -218,48 +222,17 @@ fun SupplierHeaderAddButton(
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    if (compact) {
-        IconButton(
-            onClick = onClick,
-            modifier = modifier
-                .padding(end = 4.dp)
-                .testTag("supplier-add"),
-        ) {
-            Icon(
-                imageVector = Icons.Rounded.Add,
-                contentDescription = "Tambah supplier",
-                tint = Color(0xFF1E293B),
-                modifier = Modifier.size(26.dp),
-            )
-        }
-        return
-    }
-    Button(
+    IconButton(
         onClick = onClick,
         modifier = modifier
-            .padding(end = 12.dp)
-            .height(42.dp)
+            .size(36.dp)
             .testTag("supplier-add"),
-        shape = RoundedCornerShape(12.dp),
-        colors = ButtonDefaults.buttonColors(
-            containerColor = SupplierEmerald100,
-            contentColor = SupplierEmerald700,
-        ),
-        border = BorderStroke(1.dp, SupplierEmeraldBorder),
-        contentPadding = PaddingValues(horizontal = 14.dp, vertical = 0.dp),
     ) {
         Icon(
             imageVector = Icons.Default.Add,
-            contentDescription = null,
-            modifier = Modifier.size(18.dp),
-            tint = SupplierEmerald700,
-        )
-        Spacer(Modifier.width(6.dp))
-        Text(
-            text = "Tambah Supplier",
-            color = SupplierEmerald700,
-            fontSize = 13.sp,
-            fontWeight = FontWeight.SemiBold,
+            contentDescription = "Tambah supplier",
+            tint = Color(0xFF1E293B),
+            modifier = Modifier.size(22.dp),
         )
     }
 }
@@ -272,8 +245,7 @@ internal fun SupplierFilterSheet(
     onDismiss: () -> Unit,
 ) {
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
-    var tempStatusFilter by remember(statusFilter) { mutableStateOf(statusFilter) }
-    var statusExpanded by remember { mutableStateOf(false) }
+    var tempStatus by remember(statusFilter) { mutableStateOf(statusFilter) }
 
     ModalBottomSheet(
         onDismissRequest = onDismiss,
@@ -285,161 +257,166 @@ internal fun SupplierFilterSheet(
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(top = 10.dp, bottom = 6.dp),
-                contentAlignment = Alignment.Center,
+                contentAlignment = Alignment.Center
             ) {
                 Box(
                     modifier = Modifier
-                        .size(width = 48.dp, height = 4.dp)
-                        .background(Color(0xFFCBD5E1), RoundedCornerShape(999.dp)),
+                        .size(width = 40.dp, height = 4.dp)
+                        .background(Color(0xFFCBD5E1), RoundedCornerShape(999.dp))
                 )
             }
         },
-        tonalElevation = 0.dp,
+        tonalElevation = 0.dp
     ) {
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 20.dp)
-                .padding(bottom = 12.dp)
-                .testTag("supplier-filter-sheet"),
-            verticalArrangement = Arrangement.spacedBy(20.dp),
+                .padding(horizontal = 24.dp)
+                .padding(bottom = 24.dp),
+            verticalArrangement = Arrangement.spacedBy(20.dp)
         ) {
-            // Header: Title, Description, and Close Button
+            // Header
             Row(
-                modifier = Modifier.fillMaxWidth().padding(top = 2.dp),
+                modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.Top,
+                verticalAlignment = Alignment.CenterVertically
             ) {
-                Column(
-                    modifier = Modifier.weight(1f),
-                    verticalArrangement = Arrangement.spacedBy(4.dp),
-                ) {
+                Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
                     Text(
                         text = "Filter Supplier",
-                        fontSize = 20.sp,
+                        fontSize = 18.sp,
                         fontWeight = FontWeight.Bold,
-                        color = Color(0xFF1E293B),
-                        lineHeight = 24.sp,
+                        color = Color(0xFF0F172A)
                     )
                     Text(
-                        text = "Atur status supplier",
+                        text = "Sesuaikan kriteria daftar supplier",
                         fontSize = 12.sp,
-                        fontWeight = FontWeight.Normal,
-                        color = Color(0xFF64748B),
+                        color = Color(0xFF64748B)
                     )
                 }
-                IconButton(
-                    onClick = onDismiss,
-                    modifier = Modifier.size(32.dp),
+                Box(
+                    modifier = Modifier
+                        .size(32.dp)
+                        .clip(CircleShape)
+                        .background(Color(0xFFF1F5F9))
+                        .clickable(onClick = onDismiss),
+                    contentAlignment = Alignment.Center
                 ) {
                     Icon(
                         imageVector = Icons.Outlined.Close,
-                        contentDescription = "Tutup filter",
-                        tint = Color(0xFF94A3B8),
-                        modifier = Modifier.size(20.dp),
+                        contentDescription = "Tutup",
+                        tint = Color(0xFF64748B),
+                        modifier = Modifier.size(16.dp)
                     )
                 }
             }
 
-            // Filter Options Section: STATUS
+            // Status Section
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 Text(
-                    text = "STATUS",
+                    text = "STATUS SUPPLIER",
                     fontSize = 11.sp,
-                    fontWeight = FontWeight.SemiBold,
+                    fontWeight = FontWeight.Bold,
                     letterSpacing = 0.5.sp,
-                    color = Color(0xFF94A3B8),
+                    color = Color(0xFF64748B)
                 )
+                SupplierFilterOptionCard(
+                    title = "Semua Status",
+                    selected = tempStatus == SupplierStatusFilter.ALL,
+                    onClick = { tempStatus = SupplierStatusFilter.ALL },
+                    testTag = "supplier-status-option-ALL"
+                )
+                SupplierFilterOptionCard(
+                    title = "Aktif",
+                    selected = tempStatus == SupplierStatusFilter.ACTIVE,
+                    onClick = { tempStatus = SupplierStatusFilter.ACTIVE },
+                    testTag = "supplier-status-option-ACTIVE"
+                )
+                SupplierFilterOptionCard(
+                    title = "Nonaktif",
+                    selected = tempStatus == SupplierStatusFilter.INACTIVE,
+                    onClick = { tempStatus = SupplierStatusFilter.INACTIVE },
+                    testTag = "supplier-status-option-INACTIVE"
+                )
+            }
 
-                Box(modifier = Modifier.fillMaxWidth()) {
-                    Surface(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .clickable { statusExpanded = true },
-                        shape = RoundedCornerShape(12.dp),
-                        color = Color.White,
-                        border = BorderStroke(1.dp, Color(0xFFE2E8F0)),
-                    ) {
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(horizontal = 16.dp, vertical = 12.dp),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.CenterVertically,
-                        ) {
-                            Text(
-                                text = tempStatusFilter.label,
-                                fontSize = 14.sp,
-                                fontWeight = FontWeight.Medium,
-                                color = Color(0xFF334155),
-                            )
-                            Icon(
-                                imageVector = Icons.Outlined.ExpandMore,
-                                contentDescription = null,
-                                modifier = Modifier.size(18.dp),
-                                tint = Color(0xFF94A3B8),
-                            )
-                        }
-                    }
-                    DropdownMenu(
-                        expanded = statusExpanded,
-                        onDismissRequest = { statusExpanded = false },
-                        shape = RoundedCornerShape(12.dp),
-                        containerColor = Color.White,
-                    ) {
-                        SupplierStatusFilter.entries.forEach { statusOption ->
-                            DropdownMenuItem(
-                                text = {
-                                    Text(
-                                        text = statusOption.label,
-                                        fontSize = 13.sp,
-                                        fontWeight = if (tempStatusFilter == statusOption) FontWeight.Bold else FontWeight.Normal,
-                                        color = if (tempStatusFilter == statusOption) SupplierEmerald600 else Color(0xFF1E293B),
-                                    )
-                                },
-                                onClick = {
-                                    tempStatusFilter = statusOption
-                                    statusExpanded = false
-                                },
-                                modifier = Modifier.testTag("supplier-status-option-${statusOption.name}")
-                            )
-                        }
-                    }
+            // Sticky footer buttons
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                OutlinedButton(
+                    onClick = {
+                        tempStatus = SupplierStatusFilter.ALL
+                        onApplyFilter(SupplierStatusFilter.ALL)
+                        onDismiss()
+                    },
+                    modifier = Modifier
+                        .weight(1f)
+                        .height(48.dp),
+                    shape = RoundedCornerShape(12.dp),
+                    border = BorderStroke(1.dp, Color(0xFFE2E8F0))
+                ) {
+                    Text("Reset", color = Color(0xFF64748B), fontWeight = FontWeight.SemiBold)
+                }
+                Button(
+                    onClick = {
+                        onApplyFilter(tempStatus)
+                        onDismiss()
+                    },
+                    modifier = Modifier
+                        .weight(1f)
+                        .height(48.dp)
+                        .testTag("supplier-filter-done"),
+                    shape = RoundedCornerShape(12.dp),
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = Color(0xFF256B57),
+                        contentColor = Color.White
+                    )
+                ) {
+                    Text("Terapkan", fontWeight = FontWeight.Bold)
                 }
             }
+        }
+    }
+}
 
-            // Action Button: Terapkan
-            Button(
-                onClick = {
-                    onApplyFilter(tempStatusFilter)
-                    onDismiss()
-                },
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(48.dp)
-                    .testTag("supplier-filter-done"),
-                shape = RoundedCornerShape(12.dp),
-                colors = ButtonDefaults.buttonColors(containerColor = SupplierEmerald700),
-            ) {
-                Text(
-                    text = "Terapkan",
-                    fontSize = 14.sp,
-                    fontWeight = FontWeight.SemiBold,
-                    color = Color.White,
-                )
-            }
-
-            // iOS Home Indicator Pill
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(top = 4.dp, bottom = 4.dp),
-                contentAlignment = Alignment.Center,
-            ) {
-                Box(
-                    modifier = Modifier
-                        .size(width = 128.dp, height = 4.dp)
-                        .background(Color(0xFF0F172A), RoundedCornerShape(999.dp)),
+@Composable
+private fun SupplierFilterOptionCard(
+    title: String,
+    selected: Boolean,
+    onClick: () -> Unit,
+    testTag: String = ""
+) {
+    Surface(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(12.dp))
+            .clickable(onClick = onClick)
+            .then(if (testTag.isNotEmpty()) Modifier.testTag(testTag) else Modifier),
+        shape = RoundedCornerShape(12.dp),
+        color = if (selected) Color(0xFFEAF3EF) else Color(0xFFF8FAFC),
+        border = BorderStroke(1.dp, if (selected) Color(0xFF256B57) else Color(0xFFE2E8F0))
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 16.dp, vertical = 14.dp),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text(
+                text = title,
+                fontSize = 14.sp,
+                fontWeight = if (selected) FontWeight.Bold else FontWeight.Medium,
+                color = if (selected) Color(0xFF256B57) else Color(0xFF334155)
+            )
+            if (selected) {
+                Icon(
+                    imageVector = Icons.Outlined.Check,
+                    contentDescription = null,
+                    tint = Color(0xFF256B57),
+                    modifier = Modifier.size(18.dp)
                 )
             }
         }
@@ -466,114 +443,120 @@ internal fun SupplierSummarySheet(
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(top = 10.dp, bottom = 6.dp),
-                contentAlignment = Alignment.Center,
+                contentAlignment = Alignment.Center
             ) {
                 Box(
                     modifier = Modifier
                         .size(width = 40.dp, height = 4.dp)
-                        .background(Color(0xFFCBD5E1), RoundedCornerShape(999.dp)),
+                        .background(Color(0xFFCBD5E1), RoundedCornerShape(999.dp))
                 )
             }
         },
-        tonalElevation = 0.dp,
+        tonalElevation = 0.dp
     ) {
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 20.dp)
-                .padding(bottom = 12.dp)
+                .padding(horizontal = 24.dp)
+                .padding(bottom = 24.dp)
                 .testTag("supplier-summary-sheet"),
-            verticalArrangement = Arrangement.spacedBy(16.dp),
+            verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
-            // Sheet Header with Title, Description, and Close Button
+            // Header
             Row(
-                modifier = Modifier.fillMaxWidth().padding(top = 2.dp),
+                modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.Top,
+                verticalAlignment = Alignment.CenterVertically
             ) {
-                Column(
-                    modifier = Modifier.weight(1f),
-                    verticalArrangement = Arrangement.spacedBy(2.dp),
-                ) {
-                    Text(
-                        text = "Ringkasan Supplier",
-                        fontSize = 18.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = Color(0xFF0F172A),
-                        lineHeight = 24.sp,
-                    )
-                    Text(
-                        text = "Rincian data dan status supplier",
-                        fontSize = 12.sp,
-                        fontWeight = FontWeight.Normal,
-                        color = Color(0xFF64748B),
-                    )
-                }
-                IconButton(
-                    onClick = onDismiss,
-                    modifier = Modifier.size(32.dp),
+                Text(
+                    text = "Ringkasan Supplier",
+                    fontSize = 18.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = Color(0xFF0F172A)
+                )
+                Box(
+                    modifier = Modifier
+                        .size(32.dp)
+                        .clip(CircleShape)
+                        .background(Color(0xFFF1F5F9))
+                        .clickable(onClick = onDismiss),
+                    contentAlignment = Alignment.Center
                 ) {
                     Icon(
                         imageVector = Icons.Outlined.Close,
-                        contentDescription = "Tutup Ringkasan",
-                        tint = Color(0xFF94A3B8),
-                        modifier = Modifier.size(20.dp),
+                        contentDescription = "Tutup ringkasan",
+                        tint = Color(0xFF64748B),
+                        modifier = Modifier.size(16.dp)
                     )
                 }
             }
 
-            // Metrics List: divide-y divide-slate-100 (simpel tanpa card)
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .testTag("metrics-summary-grid"),
+            // Hero Card
+            Surface(
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(16.dp),
+                color = Color(0xFFF8FAFC),
+                border = BorderStroke(1.dp, Color(0xFFE2E8F0))
             ) {
-                SupplierSummaryRow(
-                    label = "Total Supplier",
-                    value = uiState.totalSuppliers.toString(),
-                )
-                HorizontalDivider(color = Color(0xFFF1F5F9), thickness = 1.dp)
-                SupplierSummaryRow(
-                    label = "Supplier Aktif",
-                    value = activeCount.toString(),
-                )
-                HorizontalDivider(color = Color(0xFFF1F5F9), thickness = 1.dp)
-                SupplierSummaryRow(
-                    label = "Supplier Nonaktif",
-                    value = inactiveCount.toString(),
-                )
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(vertical = 18.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.spacedBy(4.dp)
+                ) {
+                    Text(
+                        text = "TOTAL SUPPLIER",
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.Bold,
+                        letterSpacing = 0.5.sp,
+                        color = Color(0xFF64748B)
+                    )
+                    Text(
+                        text = "${uiState.totalSuppliers} Supplier",
+                        fontSize = 28.sp,
+                        fontWeight = FontWeight.ExtraBold,
+                        color = Color(0xFF256B57)
+                    )
+                }
             }
 
-            // Primary Action: Button Selesai
+            // Metrics
+            Row(
+                modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text("Supplier Aktif", fontSize = 14.sp, fontWeight = FontWeight.Medium, color = Color(0xFF64748B))
+                Text("$activeCount Supplier", fontSize = 14.sp, fontWeight = FontWeight.SemiBold, color = Color(0xFF0F172A))
+            }
+            HorizontalDivider(color = Color(0xFFF1F5F9), thickness = 1.dp)
+
+            Row(
+                modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text("Supplier Nonaktif", fontSize = 14.sp, fontWeight = FontWeight.Medium, color = Color(0xFF64748B))
+                Text("$inactiveCount Supplier", fontSize = 14.sp, fontWeight = FontWeight.SemiBold, color = Color(0xFF0F172A))
+            }
+
+            Spacer(Modifier.height(8.dp))
+
             Button(
                 onClick = onDismiss,
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(48.dp)
                     .testTag("mobile-sheet-done"),
-                shape = RoundedCornerShape(14.dp),
-                colors = ButtonDefaults.buttonColors(containerColor = SupplierEmerald700),
+                shape = RoundedCornerShape(12.dp),
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = Color(0xFF256B57),
+                    contentColor = Color.White
+                ),
+                elevation = ButtonDefaults.buttonElevation(defaultElevation = 2.dp)
             ) {
-                Text(
-                    text = "Selesai",
-                    fontSize = 14.sp,
-                    fontWeight = FontWeight.SemiBold,
-                    color = Color.White,
-                )
-            }
-
-            // Bottom Home Indicator Bar (iOS style)
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(top = 10.dp, bottom = 4.dp),
-                contentAlignment = Alignment.Center,
-            ) {
-                Box(
-                    modifier = Modifier
-                        .size(width = 128.dp, height = 4.dp)
-                        .background(Color(0xFF1E293B).copy(alpha = 0.6f), RoundedCornerShape(999.dp)),
-                )
+                Text("Selesai", fontSize = 14.sp, fontWeight = FontWeight.Bold)
             }
         }
     }

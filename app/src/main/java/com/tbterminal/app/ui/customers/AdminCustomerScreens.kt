@@ -1,6 +1,12 @@
 package com.tbterminal.app.ui.customers
 
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.expandVertically
+import androidx.compose.animation.shrinkVertically
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.border
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -38,6 +44,10 @@ import androidx.compose.material.icons.outlined.Person
 import androidx.compose.material.icons.outlined.Phone
 import androidx.compose.material.icons.outlined.Place
 import androidx.compose.material.icons.outlined.Search
+import androidx.compose.material.icons.outlined.Tune
+import androidx.compose.material.icons.outlined.Description
+import androidx.compose.material.icons.outlined.Close
+import androidx.compose.material.icons.outlined.Check
 import androidx.compose.material.icons.outlined.Warning
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material3.Button
@@ -47,6 +57,7 @@ import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.FilledIconButton
@@ -54,6 +65,8 @@ import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.IconButtonDefaults
+import androidx.compose.material3.ModalBottomSheet
+import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Switch
@@ -148,6 +161,12 @@ fun AdminCustomerListScreen(
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     var customerToDeactivate by remember { mutableStateOf<Customer?>(null) }
     var wasDisplayed by rememberSaveable { mutableStateOf(false) }
+    var isSearchExpanded by rememberSaveable { mutableStateOf(false) }
+    var showFilterPopup by rememberSaveable { mutableStateOf(false) }
+    var showSummaryPopup by rememberSaveable { mutableStateOf(false) }
+    val canManage = AppAccessPolicy.can(role, AppCapability.MANAGE_CUSTOMERS)
+    val isFiltered = uiState.categoryFilter != CustomerCategoryFilter.ALL || uiState.statusFilter != CustomerStatusFilter.ALL
+
     LaunchedEffect(viewModel) {
         // Owner navigation reuses the list entry; show edits made in a child page on return.
         if (isOwnerPersona(role) && wasDisplayed) viewModel.refresh()
@@ -161,6 +180,76 @@ fun AdminCustomerListScreen(
         pageTitle = "Pelanggan",
         onBack = onBackToPrevious,
         showPageHeader = true,
+        topBarActions = {
+            // Button 1: Search [ 🔍 ]
+            IconButton(
+                onClick = { isSearchExpanded = !isSearchExpanded },
+                modifier = Modifier.size(36.dp).testTag("customer-toggle-search")
+            ) {
+                Icon(
+                    imageVector = Icons.Outlined.Search,
+                    contentDescription = "Cari pelanggan",
+                    tint = if (isSearchExpanded || uiState.searchQuery.isNotEmpty()) Color(0xFF256B57) else Color(0xFF475569),
+                    modifier = Modifier.size(20.dp)
+                )
+            }
+
+            // Button 2: Filter [ 🎛️ ]
+            Box(
+                modifier = Modifier.size(36.dp),
+                contentAlignment = Alignment.Center
+            ) {
+                IconButton(
+                    onClick = { showFilterPopup = true },
+                    modifier = Modifier.size(36.dp).testTag("customer-open-filters")
+                ) {
+                    Icon(
+                        imageVector = Icons.Outlined.Tune,
+                        contentDescription = "Filter pelanggan",
+                        tint = if (isFiltered) Color(0xFF256B57) else Color(0xFF475569),
+                        modifier = Modifier.size(20.dp)
+                    )
+                }
+                if (isFiltered) {
+                    Box(
+                        modifier = Modifier
+                            .align(Alignment.TopEnd)
+                            .padding(top = 4.dp, end = 4.dp)
+                            .size(8.dp)
+                            .background(Color(0xFFE5A93C), CircleShape)
+                            .border(1.5.dp, Color.White, CircleShape)
+                    )
+                }
+            }
+
+            // Button 3: Ringkasan [ 📑 ]
+            IconButton(
+                onClick = { showSummaryPopup = true },
+                modifier = Modifier.size(36.dp).testTag("customer-summary")
+            ) {
+                Icon(
+                    imageVector = Icons.Outlined.Description,
+                    contentDescription = "Tampilkan ringkasan pelanggan",
+                    tint = Color(0xFF475569),
+                    modifier = Modifier.size(20.dp)
+                )
+            }
+
+            // Button 4: Tambah [ ➕ ]
+            if (canManage) {
+                IconButton(
+                    onClick = onAddCustomerClick,
+                    modifier = Modifier.size(36.dp).testTag("customer-header-add")
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Add,
+                        contentDescription = "Tambah pelanggan",
+                        tint = Color(0xFF1E293B),
+                        modifier = Modifier.size(22.dp)
+                    )
+                }
+            }
+        },
         onDashboardClick = onDashboardClick,
         onProductsClick = onProductsClick,
         onAddProductClick = onAddProductClick,
@@ -188,18 +277,25 @@ fun AdminCustomerListScreen(
             modifier = contentModifier,
         ) {
             CustomerListContent(
-            modifier = Modifier,
-            uiState = uiState,
-            canManage = AppAccessPolicy.can(role, AppCapability.MANAGE_CUSTOMERS),
-            onSearchChanged = viewModel::onSearchChanged,
-            onCategoryFilterChanged = viewModel::onCategoryFilterChanged,
-            onAddCustomerClick = onAddCustomerClick,
-            onEditCustomerClick = onEditCustomerClick,
-            onCustomerDetailClick = onCustomerDetailClick,
-            onDeactivateClick = { customerToDeactivate = it },
-            onPreviousPage = viewModel::previousPage,
-            onNextPage = viewModel::nextPage,
-            onDismissMessage = viewModel::clearMessage
+                modifier = Modifier,
+                uiState = uiState,
+                canManage = canManage,
+                isSearchExpanded = isSearchExpanded,
+                onToggleSearch = { isSearchExpanded = !isSearchExpanded },
+                showFilterPopup = showFilterPopup,
+                onDismissFilter = { showFilterPopup = false },
+                showSummaryPopup = showSummaryPopup,
+                onDismissSummary = { showSummaryPopup = false },
+                onSearchChanged = viewModel::onSearchChanged,
+                onCategoryFilterChanged = viewModel::onCategoryFilterChanged,
+                onFilterApplied = viewModel::onFilterApplied,
+                onAddCustomerClick = onAddCustomerClick,
+                onEditCustomerClick = onEditCustomerClick,
+                onCustomerDetailClick = onCustomerDetailClick,
+                onDeactivateClick = { customerToDeactivate = it },
+                onPreviousPage = viewModel::previousPage,
+                onNextPage = viewModel::nextPage,
+                onDismissMessage = viewModel::clearMessage
             )
         }
     }
@@ -376,8 +472,15 @@ internal fun CustomerListContent(
     modifier: Modifier,
     uiState: CustomerListUiState,
     canManage: Boolean,
+    isSearchExpanded: Boolean = false,
+    onToggleSearch: () -> Unit = {},
+    showFilterPopup: Boolean = false,
+    onDismissFilter: () -> Unit = {},
+    showSummaryPopup: Boolean = false,
+    onDismissSummary: () -> Unit = {},
     onSearchChanged: (String) -> Unit,
     onCategoryFilterChanged: (CustomerCategoryFilter) -> Unit,
+    onFilterApplied: (CustomerCategoryFilter, CustomerStatusFilter) -> Unit = { _, _ -> },
     onAddCustomerClick: () -> Unit,
     onEditCustomerClick: (String) -> Unit,
     onCustomerDetailClick: (String) -> Unit,
@@ -398,19 +501,22 @@ internal fun CustomerListContent(
                 .padding(horizontal = if (compact) 16.dp else 32.dp, vertical = if (compact) 14.dp else 24.dp),
             verticalArrangement = Arrangement.spacedBy(if (compact) 12.dp else 18.dp)
         ) {
-        CustomerTableCard(
-            modifier = Modifier.fillMaxWidth(),
-            uiState = uiState,
-            onSearchChanged = onSearchChanged,
-            onCategoryFilterChanged = onCategoryFilterChanged,
-            canManage = canManage,
-            onEditCustomerClick = onEditCustomerClick,
-            onCustomerDetailClick = onCustomerDetailClick,
-            onDeactivateClick = onDeactivateClick,
-            onPreviousPage = onPreviousPage,
-            onNextPage = onNextPage,
-            onAddCustomerClick = onAddCustomerClick,
-            compact = compact
+            CustomerTableCard(
+                modifier = Modifier.fillMaxWidth(),
+                uiState = uiState,
+                isSearchExpanded = isSearchExpanded,
+                onToggleSearch = onToggleSearch,
+                onSearchChanged = onSearchChanged,
+                onCategoryFilterChanged = onCategoryFilterChanged,
+                onFilterApplied = onFilterApplied,
+                canManage = canManage,
+                onEditCustomerClick = onEditCustomerClick,
+                onCustomerDetailClick = onCustomerDetailClick,
+                onDeactivateClick = onDeactivateClick,
+                onPreviousPage = onPreviousPage,
+                onNextPage = onNextPage,
+                onAddCustomerClick = onAddCustomerClick,
+                compact = compact
             )
         }
         TopFloatingCapsule(
@@ -422,6 +528,21 @@ internal fun CustomerListContent(
                 .padding(top = 16.dp, start = 20.dp, end = 20.dp)
                 .zIndex(99f),
         )
+
+        if (showFilterPopup) {
+            CustomerFilterBottomSheet(
+                uiState = uiState,
+                onDismiss = onDismissFilter,
+                onApply = onFilterApplied
+            )
+        }
+
+        if (showSummaryPopup) {
+            CustomerSummaryBottomSheet(
+                uiState = uiState,
+                onDismiss = onDismissSummary
+            )
+        }
     }
 }
 
@@ -564,8 +685,11 @@ private fun CustomerDetailContent(
 private fun CustomerTableCard(
     modifier: Modifier,
     uiState: CustomerListUiState,
+    isSearchExpanded: Boolean = false,
+    onToggleSearch: () -> Unit = {},
     onSearchChanged: (String) -> Unit,
     onCategoryFilterChanged: (CustomerCategoryFilter) -> Unit,
+    onFilterApplied: (CustomerCategoryFilter, CustomerStatusFilter) -> Unit = { _, _ -> },
     canManage: Boolean,
     onEditCustomerClick: (String) -> Unit,
     onCustomerDetailClick: (String) -> Unit,
@@ -575,14 +699,184 @@ private fun CustomerTableCard(
     onAddCustomerClick: () -> Unit,
     compact: Boolean
 ) {
+    val isFiltered = uiState.categoryFilter != CustomerCategoryFilter.ALL || uiState.statusFilter != CustomerStatusFilter.ALL
+    val isSearchActive = isSearchExpanded || uiState.searchQuery.isNotEmpty()
+
     Column(modifier = modifier.fillMaxWidth()) {
-        CustomerTableToolbar(
-            uiState = uiState,
-            onSearchChanged = onSearchChanged,
-            onCategoryFilterChanged = onCategoryFilterChanged,
-            canManage = canManage,
-            onAddCustomerClick = onAddCustomerClick,
-        )
+        if (compact) {
+            // Expandable Search Bar (Riwayat Pembelian style)
+            AnimatedVisibility(
+                visible = isSearchActive,
+                enter = expandVertically() + fadeIn(),
+                exit = shrinkVertically() + fadeOut()
+            ) {
+                Surface(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(44.dp),
+                    color = Color.White,
+                    shape = RoundedCornerShape(12.dp),
+                    border = BorderStroke(1.dp, Color(0xFF256B57).copy(alpha = 0.5f)),
+                    shadowElevation = 1.dp
+                ) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .padding(horizontal = 12.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Outlined.Search,
+                            contentDescription = null,
+                            tint = Color(0xFF256B57),
+                            modifier = Modifier.size(18.dp)
+                        )
+                        androidx.compose.foundation.text.BasicTextField(
+                            value = uiState.searchQuery,
+                            onValueChange = onSearchChanged,
+                            modifier = Modifier
+                                .weight(1f)
+                                .testTag("customer-search-input"),
+                            singleLine = true,
+                            textStyle = androidx.compose.ui.text.TextStyle(
+                                color = Color(0xFF1E293B),
+                                fontSize = 13.sp
+                            ),
+                            decorationBox = { innerTextField ->
+                                if (uiState.searchQuery.isEmpty()) {
+                                    Text(
+                                        text = "Cari nama, kontak, atau alamat...",
+                                        color = Color(0xFF94A3B8),
+                                        fontSize = 13.sp
+                                    )
+                                }
+                                innerTextField()
+                            }
+                        )
+                        if (uiState.searchQuery.isNotEmpty()) {
+                            IconButton(
+                                onClick = { onSearchChanged("") },
+                                modifier = Modifier.size(24.dp)
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Outlined.Close,
+                                    contentDescription = "Hapus",
+                                    tint = Color(0xFF64748B),
+                                    modifier = Modifier.size(16.dp)
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+
+            // Active Filter Chips
+            if (isFiltered) {
+                Spacer(Modifier.height(8.dp))
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 4.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    Text(
+                        text = "Filter:",
+                        fontSize = 12.sp,
+                        color = Color(0xFF64748B),
+                        fontWeight = FontWeight.Medium
+                    )
+
+                    if (uiState.categoryFilter != CustomerCategoryFilter.ALL) {
+                        Surface(
+                            shape = RoundedCornerShape(8.dp),
+                            color = Color(0xFFEAF3EF),
+                            border = BorderStroke(1.dp, Color(0xFF256B57).copy(alpha = 0.3f))
+                        ) {
+                            Row(
+                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(4.dp)
+                            ) {
+                                Text(
+                                    text = when (uiState.categoryFilter) {
+                                        CustomerCategoryFilter.GENERAL -> "Umum"
+                                        CustomerCategoryFilter.CONTRACTOR -> "Kontraktor"
+                                        else -> ""
+                                    },
+                                    fontSize = 11.sp,
+                                    fontWeight = FontWeight.SemiBold,
+                                    color = Color(0xFF256B57)
+                                )
+                                Box(
+                                    modifier = Modifier
+                                        .size(16.dp)
+                                        .clip(CircleShape)
+                                        .clickable { onCategoryFilterChanged(CustomerCategoryFilter.ALL) },
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Icon(Icons.Outlined.Close, null, tint = Color(0xFF94A3B8), modifier = Modifier.size(11.dp))
+                                }
+                            }
+                        }
+                    }
+
+                    if (uiState.statusFilter != CustomerStatusFilter.ALL) {
+                        Surface(
+                            shape = RoundedCornerShape(8.dp),
+                            color = Color(0xFFEAF3EF),
+                            border = BorderStroke(1.dp, Color(0xFF256B57).copy(alpha = 0.3f))
+                        ) {
+                            Row(
+                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(4.dp)
+                            ) {
+                                Text(
+                                    text = when (uiState.statusFilter) {
+                                        CustomerStatusFilter.ACTIVE -> "Aktif"
+                                        CustomerStatusFilter.INACTIVE -> "Nonaktif"
+                                        else -> ""
+                                    },
+                                    fontSize = 11.sp,
+                                    fontWeight = FontWeight.SemiBold,
+                                    color = Color(0xFF256B57)
+                                )
+                                Box(
+                                    modifier = Modifier
+                                        .size(16.dp)
+                                        .clip(CircleShape)
+                                        .clickable { onFilterApplied(uiState.categoryFilter, CustomerStatusFilter.ALL) },
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Icon(Icons.Outlined.Close, null, tint = Color(0xFF94A3B8), modifier = Modifier.size(11.dp))
+                                }
+                            }
+                        }
+                    }
+
+                    Text(
+                        text = "Reset",
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.SemiBold,
+                        color = Color(0xFFEF4444),
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(6.dp))
+                            .clickable { onFilterApplied(CustomerCategoryFilter.ALL, CustomerStatusFilter.ALL) }
+                            .padding(horizontal = 6.dp, vertical = 4.dp)
+                    )
+                }
+            }
+        } else {
+            CustomerTableToolbar(
+                uiState = uiState,
+                onSearchChanged = onSearchChanged,
+                onCategoryFilterChanged = onCategoryFilterChanged,
+                canManage = canManage,
+                onAddCustomerClick = onAddCustomerClick,
+            )
+        }
         Spacer(modifier = Modifier.height(if (compact) 14.dp else 18.dp))
         when {
             uiState.isLoading && uiState.customers.isEmpty() -> CustomerListLoading(compact = compact)
@@ -619,6 +913,387 @@ private fun CustomerTableCard(
         }
         Spacer(modifier = Modifier.height(6.dp))
         CustomerPagination(uiState, compact, onPreviousPage, onNextPage)
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+internal fun CustomerFilterBottomSheet(
+    uiState: CustomerListUiState,
+    onDismiss: () -> Unit,
+    onApply: (CustomerCategoryFilter, CustomerStatusFilter) -> Unit,
+) {
+    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+    var selectedCategory by remember(uiState.categoryFilter) { mutableStateOf(uiState.categoryFilter) }
+    var selectedStatus by remember(uiState.statusFilter) { mutableStateOf(uiState.statusFilter) }
+
+    ModalBottomSheet(
+        onDismissRequest = onDismiss,
+        sheetState = sheetState,
+        containerColor = Color.White,
+        shape = RoundedCornerShape(topStart = 32.dp, topEnd = 32.dp),
+        dragHandle = {
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(top = 12.dp, bottom = 4.dp),
+                contentAlignment = Alignment.Center
+            ) {
+                Box(
+                    modifier = Modifier
+                        .size(width = 40.dp, height = 4.dp)
+                        .background(Color(0xFFCBD5E1), RoundedCornerShape(2.dp))
+                )
+            }
+        }
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 24.dp)
+                .padding(bottom = 24.dp),
+            verticalArrangement = Arrangement.spacedBy(18.dp)
+        ) {
+            // Header
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Column {
+                    Text(
+                        text = "Filter Pelanggan",
+                        fontSize = 18.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = Color(0xFF0F172A)
+                    )
+                    Text(
+                        text = "Atur tipe dan status pelanggan",
+                        fontSize = 12.sp,
+                        color = Color(0xFF64748B)
+                    )
+                }
+                Box(
+                    modifier = Modifier
+                        .size(32.dp)
+                        .clip(CircleShape)
+                        .background(Color(0xFFF1F5F9))
+                        .clickable(onClick = onDismiss),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(
+                        imageVector = Icons.Outlined.Close,
+                        contentDescription = "Tutup filter",
+                        tint = Color(0xFF64748B),
+                        modifier = Modifier.size(16.dp)
+                    )
+                }
+            }
+
+            // Section 1: TIPE PELANGGAN
+            Text(
+                text = "TIPE PELANGGAN",
+                fontSize = 11.sp,
+                fontWeight = FontWeight.Bold,
+                letterSpacing = 0.5.sp,
+                color = Color(0xFF64748B)
+            )
+
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                CustomerFilterOptionCard(
+                    label = "Semua Tipe",
+                    isSelected = selectedCategory == CustomerCategoryFilter.ALL,
+                    onClick = { selectedCategory = CustomerCategoryFilter.ALL },
+                    modifier = Modifier.weight(1f)
+                )
+                CustomerFilterOptionCard(
+                    label = "Umum",
+                    isSelected = selectedCategory == CustomerCategoryFilter.GENERAL,
+                    onClick = { selectedCategory = CustomerCategoryFilter.GENERAL },
+                    modifier = Modifier.weight(1f)
+                )
+                CustomerFilterOptionCard(
+                    label = "Kontraktor",
+                    isSelected = selectedCategory == CustomerCategoryFilter.CONTRACTOR,
+                    onClick = { selectedCategory = CustomerCategoryFilter.CONTRACTOR },
+                    modifier = Modifier.weight(1f)
+                )
+            }
+
+            // Section 2: STATUS PELANGGAN
+            Text(
+                text = "STATUS PELANGGAN",
+                fontSize = 11.sp,
+                fontWeight = FontWeight.Bold,
+                letterSpacing = 0.5.sp,
+                color = Color(0xFF64748B)
+            )
+
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                CustomerFilterOptionCard(
+                    label = "Semua Status",
+                    isSelected = selectedStatus == CustomerStatusFilter.ALL,
+                    onClick = { selectedStatus = CustomerStatusFilter.ALL },
+                    modifier = Modifier.weight(1f)
+                )
+                CustomerFilterOptionCard(
+                    label = "Aktif",
+                    isSelected = selectedStatus == CustomerStatusFilter.ACTIVE,
+                    onClick = { selectedStatus = CustomerStatusFilter.ACTIVE },
+                    modifier = Modifier.weight(1f)
+                )
+                CustomerFilterOptionCard(
+                    label = "Nonaktif",
+                    isSelected = selectedStatus == CustomerStatusFilter.INACTIVE,
+                    onClick = { selectedStatus = CustomerStatusFilter.INACTIVE },
+                    modifier = Modifier.weight(1f)
+                )
+            }
+
+            Spacer(Modifier.height(8.dp))
+
+            // Footer Buttons
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                Button(
+                    onClick = {
+                        selectedCategory = CustomerCategoryFilter.ALL
+                        selectedStatus = CustomerStatusFilter.ALL
+                        onApply(CustomerCategoryFilter.ALL, CustomerStatusFilter.ALL)
+                        onDismiss()
+                    },
+                    modifier = Modifier
+                        .weight(1f)
+                        .height(48.dp),
+                    shape = RoundedCornerShape(12.dp),
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = Color.White,
+                        contentColor = Color(0xFF256B57)
+                    ),
+                    border = BorderStroke(1.dp, Color(0xFF256B57))
+                ) {
+                    Text("Reset", fontSize = 14.sp, fontWeight = FontWeight.SemiBold)
+                }
+
+                Button(
+                    onClick = {
+                        onApply(selectedCategory, selectedStatus)
+                        onDismiss()
+                    },
+                    modifier = Modifier
+                        .weight(1f)
+                        .height(48.dp),
+                    shape = RoundedCornerShape(12.dp),
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = Color(0xFF256B57),
+                        contentColor = Color.White
+                    ),
+                    elevation = ButtonDefaults.buttonElevation(defaultElevation = 2.dp)
+                ) {
+                    Text("Terapkan", fontSize = 14.sp, fontWeight = FontWeight.Bold)
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun CustomerFilterOptionCard(
+    label: String,
+    isSelected: Boolean,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    Surface(
+        onClick = onClick,
+        modifier = modifier.height(44.dp),
+        shape = RoundedCornerShape(12.dp),
+        color = if (isSelected) Color(0xFFEAF3EF) else Color.White,
+        border = BorderStroke(
+            1.dp,
+            if (isSelected) Color(0xFF256B57) else Color(0xFFE2E8F0)
+        )
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(horizontal = 8.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.Center
+        ) {
+            Text(
+                text = label,
+                fontSize = 12.sp,
+                fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
+                color = if (isSelected) Color(0xFF256B57) else Color(0xFF1E293B),
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+            )
+            if (isSelected) {
+                Spacer(Modifier.width(4.dp))
+                Icon(
+                    imageVector = Icons.Outlined.Check,
+                    contentDescription = null,
+                    tint = Color(0xFF256B57),
+                    modifier = Modifier.size(14.dp)
+                )
+            }
+        }
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+internal fun CustomerSummaryBottomSheet(
+    uiState: CustomerListUiState,
+    onDismiss: () -> Unit
+) {
+    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+    val totalCount = uiState.totalCustomers.coerceAtLeast(uiState.customers.size.toLong())
+    val generalCount = uiState.customers.count { !it.isContractor }
+    val contractorCount = uiState.contractorCount
+
+    ModalBottomSheet(
+        onDismissRequest = onDismiss,
+        sheetState = sheetState,
+        containerColor = Color.White,
+        shape = RoundedCornerShape(topStart = 32.dp, topEnd = 32.dp),
+        dragHandle = {
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(top = 12.dp, bottom = 4.dp),
+                contentAlignment = Alignment.Center
+            ) {
+                Box(
+                    modifier = Modifier
+                        .size(width = 40.dp, height = 4.dp)
+                        .background(Color(0xFFCBD5E1), RoundedCornerShape(2.dp))
+                )
+            }
+        }
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 24.dp)
+                .padding(bottom = 24.dp),
+            verticalArrangement = Arrangement.spacedBy(16.dp)
+        ) {
+            // Header
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = "Ringkasan Pelanggan",
+                    fontSize = 18.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = Color(0xFF0F172A)
+                )
+                Box(
+                    modifier = Modifier
+                        .size(32.dp)
+                        .clip(CircleShape)
+                        .background(Color(0xFFF1F5F9))
+                        .clickable(onClick = onDismiss),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(
+                        imageVector = Icons.Outlined.Close,
+                        contentDescription = "Tutup ringkasan",
+                        tint = Color(0xFF64748B),
+                        modifier = Modifier.size(16.dp)
+                    )
+                }
+            }
+
+            // Hero Card
+            Surface(
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(16.dp),
+                color = Color(0xFFF8FAFC),
+                border = BorderStroke(1.dp, Color(0xFFE2E8F0))
+            ) {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(vertical = 18.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.spacedBy(4.dp)
+                ) {
+                    Text(
+                        text = "TOTAL PELANGGAN",
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.Bold,
+                        letterSpacing = 0.5.sp,
+                        color = Color(0xFF64748B)
+                    )
+                    Text(
+                        text = "$totalCount Pelanggan",
+                        fontSize = 28.sp,
+                        fontWeight = FontWeight.ExtraBold,
+                        color = Color(0xFF256B57)
+                    )
+                }
+            }
+
+            // Metrics rows
+            Row(
+                modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text("Pelanggan Umum", fontSize = 14.sp, fontWeight = FontWeight.Medium, color = Color(0xFF64748B))
+                Text("$generalCount Pelanggan", fontSize = 14.sp, fontWeight = FontWeight.SemiBold, color = Color(0xFF0F172A))
+            }
+            HorizontalDivider(color = Color(0xFFF1F5F9), thickness = 1.dp)
+
+            Row(
+                modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text("Pelanggan Kontraktor", fontSize = 14.sp, fontWeight = FontWeight.Medium, color = Color(0xFF64748B))
+                Text("$contractorCount Pelanggan", fontSize = 14.sp, fontWeight = FontWeight.SemiBold, color = Color(0xFF0F172A))
+            }
+            HorizontalDivider(color = Color(0xFFF1F5F9), thickness = 1.dp)
+
+            Row(
+                modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text("Total Limit Kredit", fontSize = 14.sp, fontWeight = FontWeight.Medium, color = Color(0xFF64748B))
+                Text(uiState.totalCreditLimit.currencyText(), fontSize = 14.sp, fontWeight = FontWeight.Bold, color = Color(0xFF256B57))
+            }
+
+            Spacer(Modifier.height(8.dp))
+
+            Button(
+                onClick = onDismiss,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(48.dp),
+                shape = RoundedCornerShape(12.dp),
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = Color(0xFF256B57),
+                    contentColor = Color.White
+                ),
+                elevation = ButtonDefaults.buttonElevation(defaultElevation = 2.dp)
+            ) {
+                Text("Selesai", fontSize = 14.sp, fontWeight = FontWeight.Bold)
+            }
+        }
     }
 }
 

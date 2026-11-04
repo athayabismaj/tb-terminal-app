@@ -113,11 +113,13 @@ fun SyncCenterScreen(
                 item { SyncOverviewSkeleton(compact) }
                 item { SkeletonList(modifier = Modifier.fillMaxWidth(), itemCount = 3) }
             } else {
-                // Section Header on the Main Screen with FactCheck icon (like Customer & Security Log)
-                item {
-                    SyncSectionHeader(
-                        onOpenStatusSheet = onOpenStatusSheet,
-                    )
+                // Section Header on the Main Screen with FactCheck icon (desktop only; mobile has header action)
+                if (!compact) {
+                    item {
+                        SyncSectionHeader(
+                            onOpenStatusSheet = onOpenStatusSheet,
+                        )
+                    }
                 }
 
                 item {

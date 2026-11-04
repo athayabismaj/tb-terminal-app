@@ -2,6 +2,11 @@ package com.tbterminal.app.ui.suppliers
 
 import com.tbterminal.app.ui.components.TbPagination
 
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.expandVertically
+import androidx.compose.animation.shrinkVertically
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -52,6 +57,8 @@ internal fun SupplierListCard(
     modifier: Modifier,
     uiState: SupplierUiState,
     compact: Boolean,
+    isSearchExpanded: Boolean = false,
+    onToggleSearch: () -> Unit = {},
     onSearchChanged: (String) -> Unit,
     onStatusFilterChanged: (SupplierStatusFilter) -> Unit = {},
     onAdd: () -> Unit = {},
@@ -61,20 +68,154 @@ internal fun SupplierListCard(
     onNextPage: () -> Unit,
     onOpenSummary: () -> Unit = {},
 ) {
+    val isFiltered = uiState.statusFilter != SupplierStatusFilter.ALL
+    val isSearchActive = isSearchExpanded || uiState.searchQuery.isNotEmpty()
+
     Column(
         modifier = modifier.fillMaxWidth(),
         verticalArrangement = Arrangement.spacedBy(if (compact) 12.dp else 16.dp),
     ) {
-        SupplierToolbar(
-            uiState = uiState,
-            compact = compact,
-            onSearchChanged = onSearchChanged,
-            onStatusFilterChanged = onStatusFilterChanged,
-        )
+        if (compact) {
+            // Expandable Search Bar on Compact Screen
+            AnimatedVisibility(
+                visible = isSearchActive,
+                enter = expandVertically() + fadeIn(),
+                exit = shrinkVertically() + fadeOut()
+            ) {
+                Surface(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(44.dp)
+                        .testTag("supplier-search-expandable"),
+                    color = Color.White,
+                    shape = RoundedCornerShape(12.dp),
+                    border = BorderStroke(1.dp, Color(0xFF256B57).copy(alpha = 0.5f)),
+                    shadowElevation = 1.dp
+                ) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .padding(horizontal = 12.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Outlined.Search,
+                            contentDescription = null,
+                            tint = Color(0xFF256B57),
+                            modifier = Modifier.size(18.dp)
+                        )
+                        BasicTextField(
+                            value = uiState.searchQuery,
+                            onValueChange = onSearchChanged,
+                            modifier = Modifier
+                                .weight(1f)
+                                .testTag("supplier-search-input"),
+                            singleLine = true,
+                            textStyle = TextStyle(
+                                color = Color(0xFF1E293B),
+                                fontSize = 13.sp
+                            ),
+                            decorationBox = { innerTextField ->
+                                if (uiState.searchQuery.isEmpty()) {
+                                    Text(
+                                        text = "Cari supplier...",
+                                        color = Color(0xFF94A3B8),
+                                        fontSize = 13.sp
+                                    )
+                                }
+                                innerTextField()
+                            }
+                        )
+                        if (uiState.searchQuery.isNotEmpty()) {
+                            IconButton(
+                                onClick = { onSearchChanged("") },
+                                modifier = Modifier.size(24.dp)
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Outlined.Close,
+                                    contentDescription = "Hapus pencarian",
+                                    tint = Color(0xFF64748B),
+                                    modifier = Modifier.size(16.dp)
+                                )
+                            }
+                        }
+                    }
+                }
+            }
 
-        SupplierSectionHeader(
-            onOpenSummary = onOpenSummary,
-        )
+            // Active Filter Chips on Compact Screen
+            if (isFiltered) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 4.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    Text(
+                        text = "Filter:",
+                        fontSize = 12.sp,
+                        color = Color(0xFF64748B),
+                        fontWeight = FontWeight.Medium
+                    )
+
+                    Surface(
+                        shape = RoundedCornerShape(8.dp),
+                        color = Color(0xFFEAF3EF),
+                        border = BorderStroke(1.dp, Color(0xFF256B57).copy(alpha = 0.3f))
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(4.dp)
+                        ) {
+                            Text(
+                                text = when (uiState.statusFilter) {
+                                    SupplierStatusFilter.ACTIVE -> "Aktif"
+                                    SupplierStatusFilter.INACTIVE -> "Nonaktif"
+                                    else -> ""
+                                },
+                                fontSize = 11.sp,
+                                fontWeight = FontWeight.SemiBold,
+                                color = Color(0xFF256B57)
+                            )
+                            Box(
+                                modifier = Modifier
+                                    .size(16.dp)
+                                    .clip(CircleShape)
+                                    .clickable { onStatusFilterChanged(SupplierStatusFilter.ALL) },
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Icon(Icons.Outlined.Close, null, tint = Color(0xFF94A3B8), modifier = Modifier.size(11.dp))
+                            }
+                        }
+                    }
+
+                    Text(
+                        text = "Reset",
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = Color(0xFFEF4444),
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(6.dp))
+                            .clickable { onStatusFilterChanged(SupplierStatusFilter.ALL) }
+                            .padding(horizontal = 4.dp, vertical = 2.dp)
+                    )
+                }
+            }
+        } else {
+            SupplierToolbar(
+                uiState = uiState,
+                compact = compact,
+                onSearchChanged = onSearchChanged,
+                onStatusFilterChanged = onStatusFilterChanged,
+            )
+
+            SupplierSectionHeader(
+                onOpenSummary = onOpenSummary,
+            )
+        }
 
         when {
             uiState.isLoading && uiState.suppliers.isEmpty() -> SupplierLoadingState()

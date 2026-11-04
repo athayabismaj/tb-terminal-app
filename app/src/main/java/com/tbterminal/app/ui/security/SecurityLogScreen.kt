@@ -2,6 +2,11 @@ package com.tbterminal.app.ui.security
 
 import com.tbterminal.app.ui.components.TbPagination
 
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.expandVertically
+import androidx.compose.animation.shrinkVertically
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -33,6 +38,7 @@ import androidx.compose.material.icons.outlined.BarChart
 import androidx.compose.material.icons.outlined.CalendarMonth
 import androidx.compose.material.icons.outlined.CalendarToday
 import androidx.compose.material.icons.outlined.Check
+import androidx.compose.material.icons.outlined.Description
 import com.tbterminal.app.ui.components.HistoryDatePickerDialog
 import androidx.compose.material.icons.outlined.ChevronRight
 import androidx.compose.material.icons.outlined.Close
@@ -70,6 +76,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -139,6 +146,10 @@ fun OwnerSecurityLogScreen(
     ),
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+    var isSearchExpanded by rememberSaveable { mutableStateOf(false) }
+    var showFilterPopup by rememberSaveable { mutableStateOf(false) }
+    var showSummaryPopup by rememberSaveable { mutableStateOf(false) }
+    val isFiltered = uiState.selectedPreset != null || uiState.activityFilter != SecurityActivityFilter.All
 
     AdminDashboardShell(
         onProductsClick = {},
@@ -148,6 +159,61 @@ fun OwnerSecurityLogScreen(
         pageTitle = "Log Keamanan",
         onBack = onBackToPrevious,
         showPageHeader = true,
+        topBarActions = {
+            // Button 1: Search [ 🔍 ]
+            IconButton(
+                onClick = { isSearchExpanded = !isSearchExpanded },
+                modifier = Modifier.size(36.dp).testTag("security-toggle-search")
+            ) {
+                Icon(
+                    imageVector = Icons.Outlined.Search,
+                    contentDescription = "Cari log keamanan",
+                    tint = if (isSearchExpanded || uiState.searchQuery.isNotEmpty()) Color(0xFF256B57) else Color(0xFF475569),
+                    modifier = Modifier.size(20.dp)
+                )
+            }
+
+            // Button 2: Filter [ 🎛️ ]
+            Box(
+                modifier = Modifier.size(36.dp),
+                contentAlignment = Alignment.Center
+            ) {
+                IconButton(
+                    onClick = { showFilterPopup = true },
+                    modifier = Modifier.size(36.dp).testTag("security-open-filter")
+                ) {
+                    Icon(
+                        imageVector = Icons.Outlined.Tune,
+                        contentDescription = "Filter log keamanan",
+                        tint = if (isFiltered) Color(0xFF256B57) else Color(0xFF475569),
+                        modifier = Modifier.size(20.dp)
+                    )
+                }
+                if (isFiltered) {
+                    Box(
+                        modifier = Modifier
+                            .align(Alignment.TopEnd)
+                            .padding(top = 6.dp, end = 6.dp)
+                            .size(8.dp)
+                            .background(Color(0xFFF59E0B), CircleShape)
+                            .border(1.5.dp, Color.White, CircleShape)
+                    )
+                }
+            }
+
+            // Button 3: Ringkasan [ 📑 ]
+            IconButton(
+                onClick = { showSummaryPopup = true },
+                modifier = Modifier.size(36.dp).testTag("security-open-summary")
+            ) {
+                Icon(
+                    imageVector = Icons.Outlined.Description,
+                    contentDescription = "Ringkasan log keamanan",
+                    tint = Color(0xFF475569),
+                    modifier = Modifier.size(20.dp)
+                )
+            }
+        },
         onDashboardClick = onDashboardClick,
         onReportsClick = onReportsClick,
         onSyncCenterClick = onSyncCenterClick,
@@ -169,6 +235,12 @@ fun OwnerSecurityLogScreen(
             ) {
                 SecurityLogContent(
                     uiState = uiState,
+                    isSearchExpanded = isSearchExpanded,
+                    onToggleSearch = { isSearchExpanded = !isSearchExpanded },
+                    showFilterPopup = showFilterPopup,
+                    onDismissFilter = { showFilterPopup = false },
+                    showSummaryPopup = showSummaryPopup,
+                    onDismissSummary = { showSummaryPopup = false },
                     onSearchQueryChange = viewModel::updateSearchQuery,
                     onDateFilterChange = { viewModel.updateDateFilter(it, null) },
                     onCustomDateFilterChange = viewModel::updateDateFilter,
@@ -198,6 +270,12 @@ fun OwnerSecurityLogScreen(
 @Composable
 internal fun SecurityLogContent(
     uiState: SecurityLogUiState,
+    isSearchExpanded: Boolean = false,
+    onToggleSearch: () -> Unit = {},
+    showFilterPopup: Boolean = false,
+    onDismissFilter: () -> Unit = {},
+    showSummaryPopup: Boolean = false,
+    onDismissSummary: () -> Unit = {},
     onSearchQueryChange: (String) -> Unit,
     onDateFilterChange: (SecurityDateFilter) -> Unit,
     onActivityFilterChange: (SecurityActivityFilter) -> Unit,
@@ -215,6 +293,8 @@ internal fun SecurityLogContent(
 ) {
     var showMobileFilters by remember { mutableStateOf(false) }
     var showMobileOverview by remember { mutableStateOf(false) }
+    val isFiltered = uiState.selectedPreset != null || uiState.activityFilter != SecurityActivityFilter.All
+    val isSearchActive = isSearchExpanded || uiState.searchQuery.isNotEmpty()
 
     BoxWithConstraints(
         modifier = modifier.fillMaxSize().background(BackgroundSurface),
@@ -232,20 +312,182 @@ internal fun SecurityLogContent(
             verticalArrangement = Arrangement.spacedBy(if (compact) 12.dp else 16.dp),
         ) {
             item {
-                SecurityFilterToolbar(
-                    searchQuery = uiState.searchQuery,
-                    dateFilter = uiState.dateFilter,
-                    selectedPreset = uiState.selectedPreset,
-                    startDate = uiState.startDate,
-                    endDate = uiState.endDate,
-                    customDate = uiState.customDate,
-                    activityFilter = uiState.activityFilter,
-                    onSearchQueryChange = onSearchQueryChange,
-                    onDateFilterChange = onDateFilterChange,
-                    onActivityFilterChange = onActivityFilterChange,
-                    compact = compact,
-                    onOpenMobileFilters = { showMobileFilters = true },
-                )
+                if (compact) {
+                    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        AnimatedVisibility(
+                            visible = isSearchActive,
+                            enter = expandVertically() + fadeIn(),
+                            exit = shrinkVertically() + fadeOut()
+                        ) {
+                            Surface(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .height(44.dp)
+                                    .testTag("security-search-expandable"),
+                                color = Color.White,
+                                shape = RoundedCornerShape(12.dp),
+                                border = BorderStroke(1.dp, BrandSage.copy(alpha = 0.5f)),
+                                shadowElevation = 1.dp
+                            ) {
+                                Row(
+                                    modifier = Modifier
+                                        .fillMaxSize()
+                                        .padding(horizontal = 12.dp),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Outlined.Search,
+                                        contentDescription = null,
+                                        tint = BrandSage,
+                                        modifier = Modifier.size(18.dp)
+                                    )
+                                    BasicTextField(
+                                        value = uiState.searchQuery,
+                                        onValueChange = onSearchQueryChange,
+                                        modifier = Modifier
+                                            .weight(1f)
+                                            .testTag("security-search-input"),
+                                        singleLine = true,
+                                        textStyle = TextStyle(
+                                            color = Color(0xFF1E293B),
+                                            fontSize = 13.sp
+                                        ),
+                                        decorationBox = { innerTextField ->
+                                            if (uiState.searchQuery.isEmpty()) {
+                                                Text(
+                                                    text = "Cari log keamanan...",
+                                                    color = Slate400,
+                                                    fontSize = 13.sp
+                                                )
+                                            }
+                                            innerTextField()
+                                        }
+                                    )
+                                    if (uiState.searchQuery.isNotEmpty()) {
+                                        IconButton(
+                                            onClick = { onSearchQueryChange("") },
+                                            modifier = Modifier.size(24.dp)
+                                        ) {
+                                            Icon(
+                                                imageVector = Icons.Outlined.Close,
+                                                contentDescription = "Hapus pencarian",
+                                                tint = Slate400,
+                                                modifier = Modifier.size(16.dp)
+                                            )
+                                        }
+                                    }
+                                }
+                            }
+                        }
+
+                        if (isFiltered) {
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(horizontal = 4.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                            ) {
+                                Text(
+                                    text = "Filter:",
+                                    fontSize = 12.sp,
+                                    color = Color(0xFF64748B),
+                                    fontWeight = FontWeight.Medium
+                                )
+
+                                if (uiState.selectedPreset != null) {
+                                    Surface(
+                                        shape = RoundedCornerShape(8.dp),
+                                        color = BrandSageLight,
+                                        border = BorderStroke(1.dp, BrandSage.copy(alpha = 0.3f))
+                                    ) {
+                                        Row(
+                                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+                                            verticalAlignment = Alignment.CenterVertically,
+                                            horizontalArrangement = Arrangement.spacedBy(4.dp)
+                                        ) {
+                                            Text(
+                                                text = when (uiState.selectedPreset) {
+                                                    "today" -> "Hari Ini"
+                                                    "7days" -> "7 Hari"
+                                                    "30days" -> "30 Hari"
+                                                    else -> uiState.selectedPreset ?: ""
+                                                },
+                                                fontSize = 11.sp,
+                                                fontWeight = FontWeight.SemiBold,
+                                                color = BrandSage
+                                            )
+                                        }
+                                    }
+                                }
+
+                                if (uiState.activityFilter != SecurityActivityFilter.All) {
+                                    Surface(
+                                        shape = RoundedCornerShape(8.dp),
+                                        color = BrandSageLight,
+                                        border = BorderStroke(1.dp, BrandSage.copy(alpha = 0.3f))
+                                    ) {
+                                        Row(
+                                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+                                            verticalAlignment = Alignment.CenterVertically,
+                                            horizontalArrangement = Arrangement.spacedBy(4.dp)
+                                        ) {
+                                            Text(
+                                                text = uiState.activityFilter.label,
+                                                fontSize = 11.sp,
+                                                fontWeight = FontWeight.SemiBold,
+                                                color = BrandSage
+                                            )
+                                            Box(
+                                                modifier = Modifier
+                                                    .size(16.dp)
+                                                    .clip(CircleShape)
+                                                    .clickable { onActivityFilterChange(SecurityActivityFilter.All) },
+                                                contentAlignment = Alignment.Center
+                                            ) {
+                                                Icon(Icons.Outlined.Close, null, tint = Color(0xFF94A3B8), modifier = Modifier.size(11.dp))
+                                            }
+                                        }
+                                    }
+                                }
+
+                                Text(
+                                    text = "Reset",
+                                    fontSize = 11.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = Color(0xFFEF4444),
+                                    modifier = Modifier
+                                        .clip(RoundedCornerShape(6.dp))
+                                        .clickable {
+                                            if (onApplyFilters != null) {
+                                                onApplyFilters(null, null, null, SecurityActivityFilter.All)
+                                            } else {
+                                                onActivityFilterChange(SecurityActivityFilter.All)
+                                                onDateFilterChange(SecurityDateFilter.All)
+                                            }
+                                        }
+                                        .padding(horizontal = 4.dp, vertical = 2.dp)
+                                )
+                            }
+                        }
+                    }
+                } else {
+                    SecurityFilterToolbar(
+                        searchQuery = uiState.searchQuery,
+                        dateFilter = uiState.dateFilter,
+                        selectedPreset = uiState.selectedPreset,
+                        startDate = uiState.startDate,
+                        endDate = uiState.endDate,
+                        customDate = uiState.customDate,
+                        activityFilter = uiState.activityFilter,
+                        onSearchQueryChange = onSearchQueryChange,
+                        onDateFilterChange = onDateFilterChange,
+                        onActivityFilterChange = onActivityFilterChange,
+                        compact = compact,
+                        onOpenMobileFilters = { showMobileFilters = true },
+                    )
+                }
             }
 
             when {
@@ -324,7 +566,7 @@ internal fun SecurityLogContent(
         }
     }
 
-    if (showMobileFilters) {
+    if (showMobileFilters || showFilterPopup) {
         SecurityFilterSheet(
             currentDateFilter = uiState.dateFilter,
             currentStartDate = uiState.startDate,
@@ -336,27 +578,34 @@ internal fun SecurityLogContent(
                 if (onApplyFilters != null) {
                     onApplyFilters(start, end, preset, act)
                 } else {
-                if (onCustomDateFilterChange != null) {
-                    if (onDateRangeFilterChange != null) {
-                        onDateRangeFilterChange(start, end, preset)
+                    if (onCustomDateFilterChange != null) {
+                        if (onDateRangeFilterChange != null) {
+                            onDateRangeFilterChange(start, end, preset)
+                        } else {
+                            onCustomDateFilterChange(date, start)
+                        }
                     } else {
-                        onCustomDateFilterChange(date, start)
+                        onDateFilterChange(date)
                     }
-                } else {
-                    onDateFilterChange(date)
-                }
-                onActivityFilterChange(act)
+                    onActivityFilterChange(act)
                 }
                 showMobileFilters = false
+                onDismissFilter()
             },
-            onDismiss = { showMobileFilters = false },
+            onDismiss = {
+                showMobileFilters = false
+                onDismissFilter()
+            },
         )
     }
 
-    if (showMobileOverview) {
+    if (showMobileOverview || showSummaryPopup) {
         SecurityOverviewSheet(
             uiState = uiState,
-            onDismiss = { showMobileOverview = false },
+            onDismiss = {
+                showMobileOverview = false
+                onDismissSummary()
+            },
         )
     }
 
@@ -697,7 +946,7 @@ private fun SecurityOverviewSheet(
         onDismissRequest = onDismiss,
         sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
         containerColor = Color.White,
-        shape = RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp),
+        shape = RoundedCornerShape(topStart = 32.dp, topEnd = 32.dp),
         dragHandle = {
             Box(
                 modifier = Modifier
@@ -717,86 +966,106 @@ private fun SecurityOverviewSheet(
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 20.dp)
-                .padding(bottom = 16.dp)
+                .padding(horizontal = 24.dp)
+                .padding(bottom = 24.dp)
                 .testTag("security-overview-sheet"),
             verticalArrangement = Arrangement.spacedBy(16.dp),
         ) {
-            // Sheet Header with Title, Description, and Close Button
+            // Header
             Row(
-                modifier = Modifier.fillMaxWidth().padding(top = 2.dp),
+                modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.Top,
+                verticalAlignment = Alignment.CenterVertically,
             ) {
-                Column(
-                    modifier = Modifier.weight(1f),
-                    verticalArrangement = Arrangement.spacedBy(2.dp),
-                ) {
-                    Text(
-                        text = "Ringkasan Log Keamanan",
-                        fontSize = 18.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = Color(0xFF0F172A),
-                        lineHeight = 24.sp,
-                    )
-                    Text(
-                        text = "Rincian data dan aktivitas keamanan",
-                        fontSize = 12.sp,
-                        fontWeight = FontWeight.Normal,
-                        color = Color(0xFF64748B),
-                    )
-                }
-                IconButton(
-                    onClick = onDismiss,
-                    modifier = Modifier.size(32.dp),
+                Text(
+                    text = "Ringkasan Log Keamanan",
+                    fontSize = 18.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = Color(0xFF0F172A),
+                )
+                Box(
+                    modifier = Modifier
+                        .size(32.dp)
+                        .clip(CircleShape)
+                        .background(Color(0xFFF1F5F9))
+                        .clickable(onClick = onDismiss),
+                    contentAlignment = Alignment.Center,
                 ) {
                     Icon(
                         imageVector = Icons.Outlined.Close,
-                        contentDescription = "Tutup Ringkasan",
-                        tint = Color(0xFF94A3B8),
-                        modifier = Modifier.size(20.dp),
+                        contentDescription = "Tutup ringkasan",
+                        tint = Color(0xFF64748B),
+                        modifier = Modifier.size(16.dp),
                     )
                 }
             }
 
-            // Metrics List: divide-y divide-slate-100 without cards (like CustomerSummarySheet)
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .testTag("security-summary-grid"),
+            // Hero Card
+            Surface(
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(16.dp),
+                color = Color(0xFFF8FAFC),
+                border = BorderStroke(1.dp, Color(0xFFE2E8F0)),
             ) {
-                SecuritySummaryRow(
-                    label = "Total Log",
-                    value = uiState.totalLogs.toString(),
-                )
-                HorizontalDivider(color = Color(0xFFF1F5F9), thickness = 1.dp)
-                SecuritySummaryRow(
-                    label = "Perubahan Data",
-                    value = uiState.updateCount.toString(),
-                )
-                HorizontalDivider(color = Color(0xFFF1F5F9), thickness = 1.dp)
-                SecuritySummaryRow(
-                    label = "Aktivitas Terakhir",
-                    value = uiState.latestRelativeTime,
-                )
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(vertical = 18.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.spacedBy(4.dp),
+                ) {
+                    Text(
+                        text = "TOTAL LOG KEAMANAN",
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.Bold,
+                        letterSpacing = 0.5.sp,
+                        color = Color(0xFF64748B),
+                    )
+                    Text(
+                        text = "${uiState.totalLogs} Log",
+                        fontSize = 28.sp,
+                        fontWeight = FontWeight.ExtraBold,
+                        color = BrandSage,
+                    )
+                }
             }
 
-            // Primary Action: Button Selesai
+            // Metrics
+            Row(
+                modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text("Perubahan Data", fontSize = 14.sp, fontWeight = FontWeight.Medium, color = Color(0xFF64748B))
+                Text("${uiState.updateCount} Aktivitas", fontSize = 14.sp, fontWeight = FontWeight.SemiBold, color = Color(0xFF0F172A))
+            }
+            HorizontalDivider(color = Color(0xFFF1F5F9), thickness = 1.dp)
+
+            Row(
+                modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text("Aktivitas Terakhir", fontSize = 14.sp, fontWeight = FontWeight.Medium, color = Color(0xFF64748B))
+                Text(uiState.latestRelativeTime, fontSize = 14.sp, fontWeight = FontWeight.SemiBold, color = Color(0xFF0F172A))
+            }
+
+            Spacer(Modifier.height(8.dp))
+
             Button(
                 onClick = onDismiss,
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(48.dp)
                     .testTag("security-overview-done"),
-                shape = RoundedCornerShape(14.dp),
-                colors = ButtonDefaults.buttonColors(containerColor = BrandSageDark),
+                shape = RoundedCornerShape(12.dp),
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = BrandSage,
+                    contentColor = Color.White,
+                ),
+                elevation = ButtonDefaults.buttonElevation(defaultElevation = 2.dp),
             ) {
-                Text(
-                    text = "Selesai",
-                    fontSize = 14.sp,
-                    fontWeight = FontWeight.SemiBold,
-                    color = Color.White,
-                )
+                Text("Selesai", fontSize = 14.sp, fontWeight = FontWeight.Bold)
             }
         }
     }

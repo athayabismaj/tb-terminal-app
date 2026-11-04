@@ -1,5 +1,10 @@
 package com.tbterminal.app.ui.users
 
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.expandVertically
+import androidx.compose.animation.shrinkVertically
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -31,6 +36,7 @@ import androidx.compose.material.icons.filled.ChevronLeft
 import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material.icons.outlined.BarChart
 import androidx.compose.material.icons.outlined.Block
+import androidx.compose.material.icons.outlined.Check
 import androidx.compose.material.icons.outlined.CheckCircle
 import androidx.compose.material.icons.outlined.Close
 import androidx.compose.material.icons.outlined.Dialpad
@@ -116,13 +122,13 @@ private val RoleAdminText = Color(0xFF256B57)
 private val RoleKasirBg = Color(0xFFF1F5F9)
 private val RoleKasirText = Color(0xFF334155)
 
-private enum class UserStatusFilter(val label: String) {
+enum class UserStatusFilter(val label: String) {
     All("Semua status"),
     Active("Aktif"),
     Inactive("Nonaktif"),
 }
 
-private enum class UserRoleFilter(val label: String) {
+enum class UserRoleFilter(val label: String) {
     All("Semua"),
     Owner("Owner"),
     Admin("Admin"),
@@ -133,6 +139,18 @@ private enum class UserRoleFilter(val label: String) {
 fun UserManagementContent(
     modifier: Modifier = Modifier,
     uiState: UserManagementUiState,
+    searchQuery: String = "",
+    onSearchQueryChanged: (String) -> Unit = {},
+    statusFilter: UserStatusFilter = UserStatusFilter.All,
+    onStatusFilterChanged: (UserStatusFilter) -> Unit = {},
+    roleFilter: UserRoleFilter = UserRoleFilter.All,
+    onRoleFilterChanged: (UserRoleFilter) -> Unit = {},
+    isSearchExpanded: Boolean = false,
+    onToggleSearch: () -> Unit = {},
+    showFilterPopup: Boolean = false,
+    onDismissFilter: () -> Unit = {},
+    showSummaryPopup: Boolean = false,
+    onDismissSummary: () -> Unit = {},
     onAddUserClick: () -> Unit = {},
     onRetry: () -> Unit = {},
     onEditUserClick: (StaffMember) -> Unit = {},
@@ -142,14 +160,12 @@ fun UserManagementContent(
     onActivateUserClick: (StaffMember) -> Unit = {},
     onDismissActionMessage: () -> Unit = {},
 ) {
-    var searchQuery by rememberSaveable { mutableStateOf("") }
-    var statusFilter by rememberSaveable { mutableStateOf(UserStatusFilter.All) }
-    var roleFilter by rememberSaveable { mutableStateOf(UserRoleFilter.All) }
     var showFilters by rememberSaveable { mutableStateOf(false) }
     var showSummary by rememberSaveable { mutableStateOf(false) }
     var currentPage by rememberSaveable { mutableIntStateOf(1) }
 
     val hasActiveFilter = statusFilter != UserStatusFilter.All || roleFilter != UserRoleFilter.All
+    val isSearchActive = isSearchExpanded || searchQuery.isNotEmpty()
 
     val filteredStaff = remember(uiState.staffMembers, searchQuery, statusFilter, roleFilter) {
         uiState.staffMembers.filter { staff ->
@@ -197,20 +213,182 @@ fun UserManagementContent(
                 ),
             verticalArrangement = Arrangement.spacedBy(if (compact) 12.dp else 16.dp),
         ) {
-            // ── 1. SEARCH & ACTIONS TOOLBAR ──
-            UserToolbar(
-                searchQuery = searchQuery,
-                onSearchQueryChanged = { searchQuery = it },
-                hasActiveFilter = hasActiveFilter,
-                compact = compact,
-                onOpenFilters = { showFilters = true },
-            )
+            if (compact) {
+                // Expandable Search Bar on Compact Screen
+                AnimatedVisibility(
+                    visible = isSearchActive,
+                    enter = expandVertically() + fadeIn(),
+                    exit = shrinkVertically() + fadeOut()
+                ) {
+                    Surface(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(44.dp)
+                            .testTag("user-search-expandable"),
+                        color = Color.White,
+                        shape = RoundedCornerShape(12.dp),
+                        border = BorderStroke(1.dp, BrandSage.copy(alpha = 0.5f)),
+                        shadowElevation = 1.dp
+                    ) {
+                        Row(
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .padding(horizontal = 12.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Outlined.Search,
+                                contentDescription = null,
+                                tint = BrandSage,
+                                modifier = Modifier.size(18.dp)
+                            )
+                            BasicTextField(
+                                value = searchQuery,
+                                onValueChange = onSearchQueryChanged,
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .testTag("user-search-input"),
+                                singleLine = true,
+                                textStyle = TextStyle(
+                                    color = Color(0xFF1E293B),
+                                    fontSize = 13.sp
+                                ),
+                                decorationBox = { innerTextField ->
+                                    if (searchQuery.isEmpty()) {
+                                        Text(
+                                            text = "Cari nama atau username...",
+                                            color = Slate400,
+                                            fontSize = 13.sp
+                                        )
+                                    }
+                                    innerTextField()
+                                }
+                            )
+                            if (searchQuery.isNotEmpty()) {
+                                IconButton(
+                                    onClick = { onSearchQueryChanged("") },
+                                    modifier = Modifier.size(24.dp)
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Outlined.Close,
+                                        contentDescription = "Hapus pencarian",
+                                        tint = Slate400,
+                                        modifier = Modifier.size(16.dp)
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
 
-            // ── 2. SECTION HEADER (DAFTAR PENGGUNA & RINCIAN) ──
-            UserSectionHeader(
-                compact = compact,
-                onOpenSummary = { showSummary = true },
-            )
+                // Active Filter Chips on Compact Screen
+                if (hasActiveFilter) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 4.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        Text(
+                            text = "Filter:",
+                            fontSize = 12.sp,
+                            color = Color(0xFF64748B),
+                            fontWeight = FontWeight.Medium
+                        )
+
+                        if (roleFilter != UserRoleFilter.All) {
+                            Surface(
+                                shape = RoundedCornerShape(8.dp),
+                                color = BrandSageLight,
+                                border = BorderStroke(1.dp, BrandSage.copy(alpha = 0.3f))
+                            ) {
+                                Row(
+                                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(4.dp)
+                                ) {
+                                    Text(
+                                        text = roleFilter.label,
+                                        fontSize = 11.sp,
+                                        fontWeight = FontWeight.SemiBold,
+                                        color = BrandSage
+                                    )
+                                    Box(
+                                        modifier = Modifier
+                                            .size(16.dp)
+                                            .clip(CircleShape)
+                                            .clickable { onRoleFilterChanged(UserRoleFilter.All) },
+                                        contentAlignment = Alignment.Center
+                                    ) {
+                                        Icon(Icons.Outlined.Close, null, tint = Color(0xFF94A3B8), modifier = Modifier.size(11.dp))
+                                    }
+                                }
+                            }
+                        }
+
+                        if (statusFilter != UserStatusFilter.All) {
+                            Surface(
+                                shape = RoundedCornerShape(8.dp),
+                                color = BrandSageLight,
+                                border = BorderStroke(1.dp, BrandSage.copy(alpha = 0.3f))
+                            ) {
+                                Row(
+                                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(4.dp)
+                                ) {
+                                    Text(
+                                        text = statusFilter.label,
+                                        fontSize = 11.sp,
+                                        fontWeight = FontWeight.SemiBold,
+                                        color = BrandSage
+                                    )
+                                    Box(
+                                        modifier = Modifier
+                                            .size(16.dp)
+                                            .clip(CircleShape)
+                                            .clickable { onStatusFilterChanged(UserStatusFilter.All) },
+                                        contentAlignment = Alignment.Center
+                                    ) {
+                                        Icon(Icons.Outlined.Close, null, tint = Color(0xFF94A3B8), modifier = Modifier.size(11.dp))
+                                    }
+                                }
+                            }
+                        }
+
+                        Text(
+                            text = "Reset",
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = Color(0xFFEF4444),
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(6.dp))
+                                .clickable {
+                                    onRoleFilterChanged(UserRoleFilter.All)
+                                    onStatusFilterChanged(UserStatusFilter.All)
+                                }
+                                .padding(horizontal = 4.dp, vertical = 2.dp)
+                        )
+                    }
+                }
+            } else {
+                // ── 1. SEARCH & ACTIONS TOOLBAR ──
+                UserToolbar(
+                    searchQuery = searchQuery,
+                    onSearchQueryChanged = onSearchQueryChanged,
+                    hasActiveFilter = hasActiveFilter,
+                    compact = compact,
+                    onOpenFilters = { showFilters = true },
+                )
+
+                // ── 2. SECTION HEADER (DAFTAR PENGGUNA & RINCIAN) ──
+                UserSectionHeader(
+                    compact = compact,
+                    onOpenSummary = { showSummary = true },
+                )
+            }
 
             // ── 3. USER LIST / UNIFIED CARD ──
             when {
@@ -329,23 +507,29 @@ fun UserManagementContent(
         )
 
         // ── FILTER BOTTOM SHEET ──
-        if (showFilters) {
+        if (showFilters || showFilterPopup) {
             UserFilterSheet(
                 roleFilter = roleFilter,
                 statusFilter = statusFilter,
                 onApplyFilter = { r, s ->
-                    roleFilter = r
-                    statusFilter = s
+                    onRoleFilterChanged(r)
+                    onStatusFilterChanged(s)
                 },
-                onDismiss = { showFilters = false },
+                onDismiss = {
+                    showFilters = false
+                    onDismissFilter()
+                },
             )
         }
 
         // ── SUMMARY BOTTOM SHEET ──
-        if (showSummary) {
+        if (showSummary || showSummaryPopup) {
             UserSummarySheet(
                 uiState = uiState,
-                onDismiss = { showSummary = false },
+                onDismiss = {
+                    showSummary = false
+                    onDismissSummary()
+                },
             )
         }
     }
@@ -357,48 +541,17 @@ fun UserHeaderAddButton(
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    if (compact) {
-        IconButton(
-            onClick = onClick,
-            modifier = modifier
-                .padding(end = 4.dp)
-                .testTag("add-user"),
-        ) {
-            Icon(
-                imageVector = Icons.Rounded.Add,
-                contentDescription = "Tambah pengguna",
-                tint = Color(0xFF1E293B),
-                modifier = Modifier.size(26.dp),
-            )
-        }
-        return
-    }
-    Button(
+    IconButton(
         onClick = onClick,
         modifier = modifier
-            .padding(end = 12.dp)
-            .height(42.dp)
+            .size(36.dp)
             .testTag("add-user"),
-        shape = RoundedCornerShape(12.dp),
-        colors = ButtonDefaults.buttonColors(
-            containerColor = BrandSageLight,
-            contentColor = BrandSageDark,
-        ),
-        border = BorderStroke(1.dp, BrandSageBorder),
-        contentPadding = PaddingValues(horizontal = 14.dp, vertical = 0.dp),
     ) {
         Icon(
             imageVector = Icons.Default.Add,
-            contentDescription = null,
-            modifier = Modifier.size(18.dp),
-            tint = BrandSageDark,
-        )
-        Spacer(Modifier.width(6.dp))
-        Text(
-            text = "Tambah Pengguna",
-            color = BrandSageDark,
-            fontSize = 13.sp,
-            fontWeight = FontWeight.SemiBold,
+            contentDescription = "Tambah pengguna",
+            tint = Color(0xFF1E293B),
+            modifier = Modifier.size(22.dp),
         )
     }
 }
@@ -1004,7 +1157,6 @@ private fun UserFilterSheet(
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     var tempRoleFilter by remember(roleFilter) { mutableStateOf(roleFilter) }
     var tempStatusFilter by remember(statusFilter) { mutableStateOf(statusFilter) }
-    var statusExpanded by remember { mutableStateOf(false) }
 
     ModalBottomSheet(
         onDismissRequest = onDismiss,
@@ -1020,7 +1172,7 @@ private fun UserFilterSheet(
             ) {
                 Box(
                     modifier = Modifier
-                        .size(width = 48.dp, height = 4.dp)
+                        .size(width = 40.dp, height = 4.dp)
                         .background(Color(0xFFCBD5E1), RoundedCornerShape(999.dp)),
                 )
             }
@@ -1030,228 +1182,191 @@ private fun UserFilterSheet(
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 20.dp)
-                .padding(bottom = 12.dp)
+                .padding(horizontal = 24.dp)
+                .padding(bottom = 24.dp)
                 .testTag("user-filter-sheet"),
             verticalArrangement = Arrangement.spacedBy(20.dp),
         ) {
-            // Header: Title, Description, and Close Button
+            // Header
             Row(
-                modifier = Modifier.fillMaxWidth().padding(top = 2.dp),
+                modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.Top,
+                verticalAlignment = Alignment.CenterVertically,
             ) {
-                Column(
-                    modifier = Modifier.weight(1f),
-                    verticalArrangement = Arrangement.spacedBy(4.dp),
-                ) {
+                Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
                     Text(
                         text = "Filter Pengguna",
-                        fontSize = 20.sp,
+                        fontSize = 18.sp,
                         fontWeight = FontWeight.Bold,
-                        color = Color(0xFF1E293B),
-                        lineHeight = 24.sp,
+                        color = Color(0xFF0F172A),
                     )
                     Text(
                         text = "Atur peran dan status akun pengguna",
                         fontSize = 12.sp,
-                        fontWeight = FontWeight.Normal,
                         color = Color(0xFF64748B),
                     )
                 }
-                IconButton(
-                    onClick = onDismiss,
-                    modifier = Modifier.size(32.dp),
+                Box(
+                    modifier = Modifier
+                        .size(32.dp)
+                        .clip(CircleShape)
+                        .background(Color(0xFFF1F5F9))
+                        .clickable(onClick = onDismiss),
+                    contentAlignment = Alignment.Center,
                 ) {
                     Icon(
                         imageVector = Icons.Outlined.Close,
                         contentDescription = "Tutup filter",
-                        tint = Color(0xFF94A3B8),
-                        modifier = Modifier.size(20.dp),
+                        tint = Color(0xFF64748B),
+                        modifier = Modifier.size(16.dp),
                     )
                 }
             }
 
-            // Filter Options Section
-            Column(
-                modifier = Modifier.fillMaxWidth(),
-                verticalArrangement = Arrangement.spacedBy(16.dp),
-            ) {
-                // Group 1: PERAN PENGGUNA (Segmented Pill Control)
-                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Text(
-                        text = "PERAN PENGGUNA",
-                        fontSize = 11.sp,
-                        fontWeight = FontWeight.SemiBold,
-                        letterSpacing = 0.5.sp,
-                        color = Color(0xFF94A3B8),
-                    )
-
-                    // Segmented Pill Control
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .background(Color(0xFFF1F5F9), RoundedCornerShape(12.dp))
-                            .padding(4.dp)
-                            .testTag("user-filter"),
-                        horizontalArrangement = Arrangement.spacedBy(4.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                    ) {
-                        UserRoleFilter.entries.forEach { filter ->
-                            val isSelected = filter == tempRoleFilter
-                            if (isSelected) {
-                                Surface(
-                                    modifier = Modifier
-                                        .weight(1f)
-                                        .clickable { tempRoleFilter = filter }
-                                        .testTag("user-role-filter-${filter.name}"),
-                                    shape = RoundedCornerShape(8.dp),
-                                    color = Color.White,
-                                    shadowElevation = 1.dp,
-                                ) {
-                                    Text(
-                                        text = filter.label,
-                                        modifier = Modifier
-                                            .fillMaxWidth()
-                                            .padding(vertical = 8.dp),
-                                        fontSize = 12.sp,
-                                        fontWeight = FontWeight.SemiBold,
-                                        color = Color(0xFF1E293B),
-                                        textAlign = TextAlign.Center,
-                                    )
-                                }
-                            } else {
-                                Box(
-                                    modifier = Modifier
-                                        .weight(1f)
-                                        .clip(RoundedCornerShape(8.dp))
-                                        .clickable { tempRoleFilter = filter }
-                                        .padding(vertical = 8.dp)
-                                        .testTag("user-role-filter-${filter.name}"),
-                                    contentAlignment = Alignment.Center,
-                                ) {
-                                    Text(
-                                        text = filter.label,
-                                        fontSize = 12.sp,
-                                        fontWeight = FontWeight.Medium,
-                                        color = Color(0xFF64748B),
-                                        textAlign = TextAlign.Center,
-                                    )
-                                }
-                            }
-                        }
-                    }
-                }
-
-                // Group 2: STATUS AKUN (Dropdown Selector)
-                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Text(
-                        text = "STATUS AKUN",
-                        fontSize = 11.sp,
-                        fontWeight = FontWeight.SemiBold,
-                        letterSpacing = 0.5.sp,
-                        color = Color(0xFF94A3B8),
-                    )
-
-                    Box(modifier = Modifier.fillMaxWidth()) {
+            // Group 1: PERAN PENGGUNA
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Text(
+                    text = "PERAN PENGGUNA",
+                    fontSize = 11.sp,
+                    fontWeight = FontWeight.Bold,
+                    letterSpacing = 0.5.sp,
+                    color = Color(0xFF64748B),
+                )
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .background(Color(0xFFF1F5F9), RoundedCornerShape(12.dp))
+                        .padding(4.dp)
+                        .testTag("user-filter"),
+                    horizontalArrangement = Arrangement.spacedBy(4.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    UserRoleFilter.entries.forEach { filter ->
+                        val isSelected = filter == tempRoleFilter
                         Surface(
                             modifier = Modifier
-                                .fillMaxWidth()
-                                .clickable { statusExpanded = true },
-                            shape = RoundedCornerShape(12.dp),
-                            color = Color.White,
-                            border = BorderStroke(1.dp, Color(0xFFE2E8F0)),
+                                .weight(1f)
+                                .clickable { tempRoleFilter = filter }
+                                .testTag("user-role-filter-${filter.name}"),
+                            shape = RoundedCornerShape(8.dp),
+                            color = if (isSelected) Color.White else Color.Transparent,
+                            shadowElevation = if (isSelected) 1.dp else 0.dp,
                         ) {
-                            Row(
+                            Text(
+                                text = filter.label,
                                 modifier = Modifier
                                     .fillMaxWidth()
-                                    .padding(horizontal = 16.dp, vertical = 12.dp),
-                                horizontalArrangement = Arrangement.SpaceBetween,
-                                verticalAlignment = Alignment.CenterVertically,
-                            ) {
-                                Text(
-                                    text = tempStatusFilter.label,
-                                    fontSize = 14.sp,
-                                    fontWeight = FontWeight.Medium,
-                                    color = Color(0xFF334155),
-                                )
-                                Icon(
-                                    imageVector = Icons.Outlined.ExpandMore,
-                                    contentDescription = null,
-                                    modifier = Modifier.size(18.dp),
-                                    tint = Color(0xFF94A3B8),
-                                )
-                            }
-                        }
-                        DropdownMenu(
-                            expanded = statusExpanded,
-                            onDismissRequest = { statusExpanded = false },
-                            shape = RoundedCornerShape(12.dp),
-                            containerColor = Color.White,
-                        ) {
-                            UserStatusFilter.entries.forEach { statusOption ->
-                                DropdownMenuItem(
-                                    text = {
-                                        Text(
-                                            text = statusOption.label,
-                                            fontSize = 13.sp,
-                                            fontWeight = if (tempStatusFilter == statusOption) FontWeight.Bold else FontWeight.Normal,
-                                            color = if (tempStatusFilter == statusOption) BrandSage else Color(0xFF1E293B),
-                                        )
-                                    },
-                                    onClick = {
-                                        tempStatusFilter = statusOption
-                                        statusExpanded = false
-                                    },
-                                    modifier = Modifier.testTag("user-status-option-${statusOption.name}")
-                                )
-                            }
+                                    .padding(vertical = 8.dp),
+                                fontSize = 12.sp,
+                                fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
+                                color = if (isSelected) Color(0xFF1E293B) else Color(0xFF64748B),
+                                textAlign = TextAlign.Center,
+                            )
                         }
                     }
                 }
             }
 
-            // Action Button: Terapkan
-            Button(
-                onClick = {
-                    onApplyFilter(tempRoleFilter, tempStatusFilter)
-                    onDismiss()
-                },
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(48.dp)
-                    .testTag("user-filter-done"),
-                shape = RoundedCornerShape(12.dp),
-                colors = ButtonDefaults.buttonColors(containerColor = BrandSageDark),
-            ) {
+            // Group 2: STATUS AKUN
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 Text(
-                    text = "Terapkan",
-                    fontSize = 14.sp,
-                    fontWeight = FontWeight.SemiBold,
-                    color = Color.White,
+                    text = "STATUS AKUN",
+                    fontSize = 11.sp,
+                    fontWeight = FontWeight.Bold,
+                    letterSpacing = 0.5.sp,
+                    color = Color(0xFF64748B),
                 )
+                UserStatusFilter.entries.forEach { statusOption ->
+                    UserFilterOptionCard(
+                        title = statusOption.label,
+                        selected = tempStatusFilter == statusOption,
+                        onClick = { tempStatusFilter = statusOption },
+                        testTag = "user-status-option-${statusOption.name}"
+                    )
+                }
             }
 
-            // iOS Home Indicator Pill
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(top = 4.dp, bottom = 4.dp),
-                contentAlignment = Alignment.Center,
+            // Sticky footer buttons
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
             ) {
-                Box(
+                OutlinedButton(
+                    onClick = {
+                        tempRoleFilter = UserRoleFilter.All
+                        tempStatusFilter = UserStatusFilter.All
+                        onApplyFilter(UserRoleFilter.All, UserStatusFilter.All)
+                        onDismiss()
+                    },
                     modifier = Modifier
-                        .size(width = 128.dp, height = 4.dp)
-                        .background(Color(0xFF0F172A), RoundedCornerShape(999.dp)),
+                        .weight(1f)
+                        .height(48.dp),
+                    shape = RoundedCornerShape(12.dp),
+                    border = BorderStroke(1.dp, Color(0xFFE2E8F0)),
+                ) {
+                    Text("Reset", color = Color(0xFF64748B), fontWeight = FontWeight.SemiBold)
+                }
+                Button(
+                    onClick = {
+                        onApplyFilter(tempRoleFilter, tempStatusFilter)
+                        onDismiss()
+                    },
+                    modifier = Modifier
+                        .weight(1f)
+                        .height(48.dp)
+                        .testTag("user-filter-done"),
+                    shape = RoundedCornerShape(12.dp),
+                    colors = ButtonDefaults.buttonColors(containerColor = BrandSage),
+                ) {
+                    Text("Terapkan", fontWeight = FontWeight.Bold)
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun UserFilterOptionCard(
+    title: String,
+    selected: Boolean,
+    onClick: () -> Unit,
+    testTag: String = "",
+) {
+    Surface(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(12.dp))
+            .clickable(onClick = onClick)
+            .then(if (testTag.isNotEmpty()) Modifier.testTag(testTag) else Modifier),
+        shape = RoundedCornerShape(12.dp),
+        color = if (selected) BrandSageLight else Color(0xFFF8FAFC),
+        border = BorderStroke(1.dp, if (selected) BrandSage else Color(0xFFE2E8F0)),
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 16.dp, vertical = 14.dp),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Text(
+                text = title,
+                fontSize = 14.sp,
+                fontWeight = if (selected) FontWeight.Bold else FontWeight.Medium,
+                color = if (selected) BrandSage else Color(0xFF334155),
+            )
+            if (selected) {
+                Icon(
+                    imageVector = Icons.Outlined.Check,
+                    contentDescription = null,
+                    tint = BrandSage,
+                    modifier = Modifier.size(18.dp),
                 )
             }
         }
     }
 }
 
-// ═════════════════════════════════════════════════════════════════════════════
-// SUMMARY MODAL BOTTOM SHEET (MATCHES CUSTOMER SUMMARY SHEET DESIGN)
-// ═════════════════════════════════════════════════════════════════════════════
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun UserSummarySheet(
@@ -1285,100 +1400,106 @@ private fun UserSummarySheet(
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 20.dp)
-                .padding(bottom = 12.dp)
+                .padding(horizontal = 24.dp)
+                .padding(bottom = 24.dp)
                 .testTag("user-summary-sheet"),
             verticalArrangement = Arrangement.spacedBy(16.dp),
         ) {
-            // Sheet Header with Title, Description, and Close Button
+            // Header
             Row(
-                modifier = Modifier.fillMaxWidth().padding(top = 2.dp),
+                modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.Top,
+                verticalAlignment = Alignment.CenterVertically,
             ) {
-                Column(
-                    modifier = Modifier.weight(1f),
-                    verticalArrangement = Arrangement.spacedBy(2.dp),
-                ) {
-                    Text(
-                        text = "Ringkasan Pengguna",
-                        fontSize = 18.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = Color(0xFF0F172A),
-                        lineHeight = 24.sp,
-                    )
-                    Text(
-                        text = "Rincian data dan status akun pengguna",
-                        fontSize = 12.sp,
-                        fontWeight = FontWeight.Normal,
-                        color = Color(0xFF64748B),
-                    )
-                }
-                IconButton(
-                    onClick = onDismiss,
-                    modifier = Modifier.size(32.dp),
+                Text(
+                    text = "Ringkasan Pengguna",
+                    fontSize = 18.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = Color(0xFF0F172A),
+                )
+                Box(
+                    modifier = Modifier
+                        .size(32.dp)
+                        .clip(CircleShape)
+                        .background(Color(0xFFF1F5F9))
+                        .clickable(onClick = onDismiss),
+                    contentAlignment = Alignment.Center,
                 ) {
                     Icon(
                         imageVector = Icons.Outlined.Close,
-                        contentDescription = "Tutup Ringkasan",
-                        tint = Color(0xFF94A3B8),
-                        modifier = Modifier.size(20.dp),
+                        contentDescription = "Tutup ringkasan",
+                        tint = Color(0xFF64748B),
+                        modifier = Modifier.size(16.dp),
                     )
                 }
             }
 
-            // Metrics List: divide-y divide-slate-100 (simpel tanpa card)
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .testTag("metrics-summary-grid"),
+            // Hero Card
+            Surface(
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(16.dp),
+                color = Color(0xFFF8FAFC),
+                border = BorderStroke(1.dp, Color(0xFFE2E8F0))
             ) {
-                UserSummaryRow(
-                    label = "Total Pengguna",
-                    value = if (uiState.isLoading) "—" else uiState.totalStaff.toString(),
-                )
-                HorizontalDivider(color = Color(0xFFF1F5F9), thickness = 1.dp)
-                UserSummaryRow(
-                    label = "Pengguna Aktif",
-                    value = if (uiState.isLoading) "—" else uiState.activeStaff.toString(),
-                )
-                HorizontalDivider(color = Color(0xFFF1F5F9), thickness = 1.dp)
-                UserSummaryRow(
-                    label = "Dinonaktifkan",
-                    value = if (uiState.isLoading) "—" else inactive.toString(),
-                )
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(vertical = 18.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.spacedBy(4.dp)
+                ) {
+                    Text(
+                        text = "TOTAL PENGGUNA",
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.Bold,
+                        letterSpacing = 0.5.sp,
+                        color = Color(0xFF64748B),
+                    )
+                    Text(
+                        text = if (uiState.isLoading) "—" else "${uiState.totalStaff} Pengguna",
+                        fontSize = 28.sp,
+                        fontWeight = FontWeight.ExtraBold,
+                        color = BrandSage,
+                    )
+                }
             }
 
-            // Primary Action: Button Selesai
+            // Metrics
+            Row(
+                modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text("Pengguna Aktif", fontSize = 14.sp, fontWeight = FontWeight.Medium, color = Color(0xFF64748B))
+                Text(if (uiState.isLoading) "—" else "${uiState.activeStaff} Pengguna", fontSize = 14.sp, fontWeight = FontWeight.SemiBold, color = Color(0xFF0F172A))
+            }
+            HorizontalDivider(color = Color(0xFFF1F5F9), thickness = 1.dp)
+
+            Row(
+                modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text("Dinonaktifkan", fontSize = 14.sp, fontWeight = FontWeight.Medium, color = Color(0xFF64748B))
+                Text(if (uiState.isLoading) "—" else "$inactive Pengguna", fontSize = 14.sp, fontWeight = FontWeight.SemiBold, color = Color(0xFF0F172A))
+            }
+
+            Spacer(Modifier.height(8.dp))
+
             Button(
                 onClick = onDismiss,
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(48.dp)
                     .testTag("mobile-sheet-done"),
-                shape = RoundedCornerShape(14.dp),
-                colors = ButtonDefaults.buttonColors(containerColor = BrandSageDark),
+                shape = RoundedCornerShape(12.dp),
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = BrandSage,
+                    contentColor = Color.White,
+                ),
+                elevation = ButtonDefaults.buttonElevation(defaultElevation = 2.dp),
             ) {
-                Text(
-                    text = "Selesai",
-                    fontSize = 14.sp,
-                    fontWeight = FontWeight.SemiBold,
-                    color = Color.White,
-                )
-            }
-
-            // Bottom Home Indicator Bar (iOS style)
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(top = 10.dp, bottom = 4.dp),
-                contentAlignment = Alignment.Center,
-            ) {
-                Box(
-                    modifier = Modifier
-                        .size(width = 128.dp, height = 4.dp)
-                        .background(Color(0xFF1E293B).copy(alpha = 0.6f), RoundedCornerShape(999.dp)),
-                )
+                Text("Selesai", fontSize = 14.sp, fontWeight = FontWeight.Bold)
             }
         }
     }

@@ -2,6 +2,8 @@ package com.tbterminal.app.ui.offlinereports
 
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
+import androidx.compose.ui.draw.clip
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -48,6 +50,7 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.compose.ui.zIndex
 import com.tbterminal.app.data.local.dao.OfflineCashReportRow
 import com.tbterminal.app.data.local.dao.OfflineExpenseReportRow
@@ -80,6 +83,10 @@ import java.util.Locale
 @Composable
 fun OfflineReportScreen(
     uiState: OfflineReportUiState,
+    showFilterPopup: Boolean = false,
+    onDismissFilter: () -> Unit = {},
+    showSummaryPopup: Boolean = false,
+    onDismissSummary: () -> Unit = {},
     onPresetSelected: (OfflineReportPreset) -> Unit,
     onCustomStartChanged: (String) -> Unit,
     onCustomEndChanged: (String) -> Unit,
@@ -132,12 +139,72 @@ fun OfflineReportScreen(
             ) {
                 item {
                     if (compact) {
-                        MobilePeriodToolbar(
-                            startDate = uiState.startDate,
-                            endDate = uiState.endDate,
-                            selectedSection = selectedSection,
-                            onOpenFilters = { showMobileFilters = true },
-                        )
+                        val isFiltered = uiState.selectedPreset != OfflineReportPreset.Today
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = 4.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            Text(
+                                text = "Filter:",
+                                fontSize = 12.sp,
+                                color = Color(0xFF64748B),
+                                fontWeight = FontWeight.Medium
+                            )
+
+                            Surface(
+                                shape = RoundedCornerShape(8.dp),
+                                color = Color(0xFFEAF3EF),
+                                border = BorderStroke(1.dp, Color(0xFF256B57).copy(alpha = 0.3f))
+                            ) {
+                                Row(
+                                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(4.dp)
+                                ) {
+                                    Text(
+                                        text = selectedSection.label,
+                                        fontSize = 11.sp,
+                                        fontWeight = FontWeight.SemiBold,
+                                        color = Color(0xFF256B57)
+                                    )
+                                }
+                            }
+
+                            Surface(
+                                shape = RoundedCornerShape(8.dp),
+                                color = Color(0xFFEAF3EF),
+                                border = BorderStroke(1.dp, Color(0xFF256B57).copy(alpha = 0.3f))
+                            ) {
+                                Row(
+                                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(4.dp)
+                                ) {
+                                    Text(
+                                        text = compactRangeLabel(uiState.startDate, uiState.endDate),
+                                        fontSize = 11.sp,
+                                        fontWeight = FontWeight.SemiBold,
+                                        color = Color(0xFF256B57)
+                                    )
+                                }
+                            }
+
+                            if (isFiltered) {
+                                Text(
+                                    text = "Reset",
+                                    fontSize = 11.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = Color(0xFFEF4444),
+                                    modifier = Modifier
+                                        .clip(RoundedCornerShape(6.dp))
+                                        .clickable { onPresetSelected(OfflineReportPreset.Today) }
+                                        .padding(horizontal = 4.dp, vertical = 2.dp)
+                                )
+                            }
+                        }
                     } else {
                         OfflineReportFilter(
                             uiState = uiState,
@@ -193,11 +260,14 @@ fun OfflineReportScreen(
                 }
             }
 
-            if (compact && showMobileFilters) {
+            if (compact && (showMobileFilters || showFilterPopup)) {
                 TbMobileControlSheet(
                     title = "Filter laporan",
                     subtitle = "Pilih jenis laporan dan periode data",
-                    onDismiss = { showMobileFilters = false },
+                    onDismiss = {
+                        showMobileFilters = false
+                        onDismissFilter()
+                    },
                     testTag = "offline-report-filter-sheet",
                 ) {
                     OfflineReportFilter(
@@ -211,22 +281,31 @@ fun OfflineReportScreen(
                         embedded = true,
                     )
                     TbMobileSheetDoneButton(
-                        onClick = { showMobileFilters = false },
+                        onClick = {
+                            showMobileFilters = false
+                            onDismissFilter()
+                        },
                         testTag = "offline-report-filter-done",
                     )
                 }
             }
 
-            if (compact && showMobileSummary) {
+            if (compact && (showMobileSummary || showSummaryPopup)) {
                 TbMobileControlSheet(
                     title = "Ringkasan perangkat",
                     subtitle = compactRangeLabel(uiState.startDate, uiState.endDate),
-                    onDismiss = { showMobileSummary = false },
+                    onDismiss = {
+                        showMobileSummary = false
+                        onDismissSummary()
+                    },
                     testTag = "offline-report-summary-sheet",
                 ) {
                     OfflineKpiGrid(uiState = uiState, compact = true)
                     TbMobileSheetDoneButton(
-                        onClick = { showMobileSummary = false },
+                        onClick = {
+                            showMobileSummary = false
+                            onDismissSummary()
+                        },
                         testTag = "offline-report-summary-done",
                     )
                 }

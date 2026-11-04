@@ -26,6 +26,12 @@ import com.tbterminal.app.ui.components.TopFloatingCapsule
 internal fun SupplierScreen(
     modifier: Modifier,
     uiState: SupplierUiState,
+    isSearchExpanded: Boolean = false,
+    onToggleSearch: () -> Unit = {},
+    showFilterPopup: Boolean = false,
+    onDismissFilter: () -> Unit = {},
+    showSummaryPopup: Boolean = false,
+    onDismissSummary: () -> Unit = {},
     onSearchChanged: (String) -> Unit,
     onStatusFilterChanged: (SupplierStatusFilter) -> Unit = {},
     onAdd: () -> Unit,
@@ -36,7 +42,7 @@ internal fun SupplierScreen(
     onDismissMessage: () -> Unit,
 ) {
     var deleteTargetId by rememberSaveable { mutableStateOf<String?>(null) }
-    var showSummarySheet by rememberSaveable { mutableStateOf(false) }
+    var localSummarySheet by rememberSaveable { mutableStateOf(false) }
     val supplierToDelete = uiState.suppliers.firstOrNull { it.id == deleteTargetId }
 
     BoxWithConstraints(modifier.fillMaxSize().background(SupplierBackground)) {
@@ -54,6 +60,8 @@ internal fun SupplierScreen(
                 modifier = Modifier.fillMaxWidth(),
                 uiState = uiState,
                 compact = compact,
+                isSearchExpanded = isSearchExpanded,
+                onToggleSearch = onToggleSearch,
                 onSearchChanged = onSearchChanged,
                 onStatusFilterChanged = onStatusFilterChanged,
                 onAdd = onAdd,
@@ -61,7 +69,7 @@ internal fun SupplierScreen(
                 onDelete = { deleteTargetId = it.id },
                 onPreviousPage = onPreviousPage,
                 onNextPage = onNextPage,
-                onOpenSummary = { showSummarySheet = true },
+                onOpenSummary = { localSummarySheet = true },
             )
         }
 
@@ -82,10 +90,21 @@ internal fun SupplierScreen(
         )
     }
 
-    if (showSummarySheet) {
+    if (showFilterPopup) {
+        SupplierFilterSheet(
+            statusFilter = uiState.statusFilter,
+            onApplyFilter = onStatusFilterChanged,
+            onDismiss = onDismissFilter,
+        )
+    }
+
+    if (showSummaryPopup || localSummarySheet) {
         SupplierSummarySheet(
             uiState = uiState,
-            onDismiss = { showSummarySheet = false },
+            onDismiss = {
+                onDismissSummary()
+                localSummarySheet = false
+            },
         )
     }
 
