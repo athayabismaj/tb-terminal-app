@@ -128,12 +128,6 @@ fun OwnerUserManagementScreen(
                     modifier = Modifier.size(20.dp)
                 )
             }
-
-            // Button 4: Tambah [ ➕ ]
-            UserHeaderAddButton(
-                compact = isCompactScreen,
-                onClick = onAddUserClick,
-            )
         },
         onDashboardClick = onDashboardClick,
         onReportsClick = onReportsClick,

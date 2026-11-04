@@ -128,15 +128,6 @@ fun AdminSupplierScreen(
                     modifier = Modifier.size(20.dp)
                 )
             }
-
-            // Button 4: Tambah [ ➕ ]
-            SupplierHeaderAddButton(
-                compact = isCompactScreen,
-                onClick = {
-                    viewModel.cancelEdit()
-                    onAddSupplierClick()
-                },
-            )
         },
         onDashboardClick = onDashboardClick,
         onProductsClick = onProductsClick,

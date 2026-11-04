@@ -382,13 +382,12 @@ fun UserManagementContent(
                     compact = compact,
                     onOpenFilters = { showFilters = true },
                 )
-
-                // ── 2. SECTION HEADER (DAFTAR PENGGUNA & RINCIAN) ──
-                UserSectionHeader(
-                    compact = compact,
-                    onOpenSummary = { showSummary = true },
-                )
             }
+
+            // ── 2. SECTION HEADER (DAFTAR PENGGUNA & TOMBOL TAMBAH) ──
+            UserSectionHeader(
+                onAddUserClick = onAddUserClick,
+            )
 
             // ── 3. USER LIST / UNIFIED CARD ──
             when {
@@ -664,19 +663,18 @@ private fun UserToolbar(
 }
 
 // ═════════════════════════════════════════════════════════════════════════════
-// SECTION HEADER (DAFTAR PENGGUNA & RINCIAN)
+// SECTION HEADER (DAFTAR PENGGUNA & TOMBOL TAMBAH)
 // ═════════════════════════════════════════════════════════════════════════════
 @Composable
 private fun UserSectionHeader(
-    compact: Boolean,
-    onOpenSummary: () -> Unit,
+    onAddUserClick: () -> Unit,
 ) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
             .padding(horizontal = 4.dp, vertical = 2.dp),
-        horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
     ) {
         Text(
             text = "Daftar pengguna",
@@ -685,22 +683,32 @@ private fun UserSectionHeader(
             color = Slate900,
         )
 
-        Box(
-            modifier = Modifier
-                .size(32.dp)
-                .clip(RoundedCornerShape(12.dp))
-                .border(1.dp, Slate200, RoundedCornerShape(12.dp))
-                .background(Color.White)
-                .clickable { onOpenSummary() }
-                .testTag("user-open-summary"),
-            contentAlignment = Alignment.Center,
+        Surface(
+            onClick = onAddUserClick,
+            shape = RoundedCornerShape(8.dp),
+            color = Color(0xFF256B57),
+            contentColor = Color.White,
+            shadowElevation = 0.5.dp,
+            modifier = Modifier.testTag("add-user"),
         ) {
-            Icon(
-                imageVector = Icons.AutoMirrored.Outlined.FactCheck,
-                contentDescription = "Rincian",
-                tint = Color(0xFF334155),
-                modifier = Modifier.size(16.dp),
-            )
+            Row(
+                modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(4.dp),
+            ) {
+                Icon(
+                    imageVector = Icons.Default.Add,
+                    contentDescription = "Tambah pengguna",
+                    tint = Color.White,
+                    modifier = Modifier.size(14.dp),
+                )
+                Text(
+                    text = "Tambah",
+                    fontSize = 11.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    color = Color.White,
+                )
+            }
         }
     }
 }

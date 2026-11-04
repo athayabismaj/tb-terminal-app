@@ -234,21 +234,6 @@ fun AdminCustomerListScreen(
                     modifier = Modifier.size(20.dp)
                 )
             }
-
-            // Button 4: Tambah [ ➕ ]
-            if (canManage) {
-                IconButton(
-                    onClick = onAddCustomerClick,
-                    modifier = Modifier.size(36.dp).testTag("customer-header-add")
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.Add,
-                        contentDescription = "Tambah pelanggan",
-                        tint = Color(0xFF1E293B),
-                        modifier = Modifier.size(22.dp)
-                    )
-                }
-            }
         },
         onDashboardClick = onDashboardClick,
         onProductsClick = onProductsClick,
@@ -877,7 +862,12 @@ private fun CustomerTableCard(
                 onAddCustomerClick = onAddCustomerClick,
             )
         }
-        Spacer(modifier = Modifier.height(if (compact) 14.dp else 18.dp))
+        Spacer(modifier = Modifier.height(if (compact) 10.dp else 16.dp))
+        CustomerSectionHeader(
+            canManage = canManage,
+            onAddCustomerClick = onAddCustomerClick,
+        )
+        Spacer(modifier = Modifier.height(if (compact) 8.dp else 12.dp))
         when {
             uiState.isLoading && uiState.customers.isEmpty() -> CustomerListLoading(compact = compact)
             uiState.errorMessage != null && uiState.customers.isEmpty() -> CustomerEmpty("Pelanggan gagal dimuat.")
@@ -1351,7 +1341,6 @@ private fun CustomerTableToolbar(
                 contentDescription = "Filter pelanggan",
                 testTag = "customer-open-filter",
             )
-            if (canManage) CustomerAddButton(compact = compactActions, onClick = onAddCustomerClick)
         }
 
         if (showFilters) {
@@ -1369,6 +1358,56 @@ private fun CustomerTableToolbar(
                     onClick = { showFilters = false },
                     testTag = "customer-filter-done",
                 )
+            }
+        }
+    }
+}
+
+@Composable
+private fun CustomerSectionHeader(
+    canManage: Boolean,
+    onAddCustomerClick: () -> Unit,
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 4.dp, vertical = 2.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        Text(
+            text = "Daftar pelanggan",
+            fontSize = 16.sp,
+            fontWeight = FontWeight.Bold,
+            color = Color(0xFF0F172A),
+        )
+        if (canManage) {
+            Surface(
+                onClick = onAddCustomerClick,
+                shape = RoundedCornerShape(8.dp),
+                color = Color(0xFF256B57),
+                contentColor = Color.White,
+                shadowElevation = 0.5.dp,
+                modifier = Modifier.testTag("customer-add"),
+            ) {
+                Row(
+                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(4.dp),
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Add,
+                        contentDescription = "Tambah pelanggan",
+                        tint = Color.White,
+                        modifier = Modifier.size(14.dp),
+                    )
+                    Text(
+                        text = "Tambah",
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.SemiBold,
+                        color = Color.White,
+                    )
+                }
             }
         }
     }

@@ -27,6 +27,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.FactCheck
+import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.ChevronLeft
 import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material.icons.outlined.Close
@@ -211,11 +212,11 @@ internal fun SupplierListCard(
                 onSearchChanged = onSearchChanged,
                 onStatusFilterChanged = onStatusFilterChanged,
             )
-
-            SupplierSectionHeader(
-                onOpenSummary = onOpenSummary,
-            )
         }
+
+        SupplierSectionHeader(
+            onAdd = onAdd,
+        )
 
         when {
             uiState.isLoading && uiState.suppliers.isEmpty() -> SupplierLoadingState()
@@ -353,14 +354,14 @@ private fun SupplierToolbar(
 
 @Composable
 private fun SupplierSectionHeader(
-    onOpenSummary: () -> Unit,
+    onAdd: () -> Unit,
 ) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
             .padding(horizontal = 4.dp, vertical = 2.dp),
-        horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
     ) {
         Text(
             text = "Daftar supplier",
@@ -369,22 +370,32 @@ private fun SupplierSectionHeader(
             color = SupplierSlate900,
         )
 
-        Box(
-            modifier = Modifier
-                .size(32.dp)
-                .clip(RoundedCornerShape(12.dp))
-                .border(1.dp, SupplierSlate200, RoundedCornerShape(12.dp))
-                .background(Color.White)
-                .clickable { onOpenSummary() }
-                .testTag("supplier-open-summary"),
-            contentAlignment = Alignment.Center,
+        Surface(
+            onClick = onAdd,
+            shape = RoundedCornerShape(8.dp),
+            color = Color(0xFF256B57),
+            contentColor = Color.White,
+            shadowElevation = 0.5.dp,
+            modifier = Modifier.testTag("supplier-add"),
         ) {
-            Icon(
-                imageVector = Icons.AutoMirrored.Outlined.FactCheck,
-                contentDescription = "Rincian",
-                tint = Color(0xFF334155),
-                modifier = Modifier.size(16.dp),
-            )
+            Row(
+                modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(4.dp),
+            ) {
+                Icon(
+                    imageVector = Icons.Default.Add,
+                    contentDescription = "Tambah supplier",
+                    tint = Color.White,
+                    modifier = Modifier.size(14.dp),
+                )
+                Text(
+                    text = "Tambah",
+                    fontSize = 11.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    color = Color.White,
+                )
+            }
         }
     }
 }
