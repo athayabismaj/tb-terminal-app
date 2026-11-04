@@ -426,6 +426,9 @@ internal fun NavGraphBuilder.dashboardGraph(navController: NavHostController, se
                             role = sessionUser.role,
                             section = section,
                             inventoryRepository = appContainer.inventoryRepository,
+                            cashReconciliationRepository = appContainer.cashReconciliationRepository,
+                            receivableRepository = appContainer.receivableRepository,
+                            purchasingRepository = appContainer.purchasingRepository,
                             onLogout = logout,
                             onUserManagementClick = {
                                 navController.navigate(AppRoute.UserManagement.route) { launchSingleTop = true }

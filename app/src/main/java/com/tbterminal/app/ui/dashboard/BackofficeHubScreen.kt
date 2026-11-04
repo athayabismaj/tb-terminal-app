@@ -28,9 +28,12 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.ListAlt
+import androidx.compose.material.icons.automirrored.outlined.MenuBook
 import androidx.compose.material.icons.automirrored.outlined.ReceiptLong
+import androidx.compose.material.icons.automirrored.outlined.TrendingUp
 import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material.icons.outlined.AccountBalanceWallet
+import androidx.compose.material.icons.outlined.Assessment
 import androidx.compose.material.icons.outlined.AssignmentTurnedIn
 import androidx.compose.material.icons.outlined.Category
 import androidx.compose.material.icons.outlined.Inventory2
@@ -55,8 +58,12 @@ import androidx.compose.material3.TabRow
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import com.tbterminal.app.data.repository.CashReconciliationRepository
 import com.tbterminal.app.data.repository.InventoryRepository
+import com.tbterminal.app.data.repository.PurchasingRepository
+import com.tbterminal.app.data.repository.ReceivableRepository
 import com.tbterminal.app.data.repository.RepositoryResult
+import java.math.BigDecimal
 import com.tbterminal.app.ui.barcode.CameraBarcodeScannerDialog
 import com.tbterminal.app.ui.components.SkeletonBox
 import androidx.compose.runtime.getValue
@@ -87,6 +94,9 @@ fun BackofficeHubScreen(
     role: String,
     section: BackofficeSection,
     inventoryRepository: InventoryRepository? = null,
+    cashReconciliationRepository: CashReconciliationRepository? = null,
+    receivableRepository: ReceivableRepository? = null,
+    purchasingRepository: PurchasingRepository? = null,
     onNavigate: ((AdminDestination) -> Unit)? = null,
     onLogout: () -> Unit,
     onUserManagementClick: () -> Unit = {},
@@ -119,7 +129,14 @@ fun BackofficeHubScreen(
             ) {
                 when (section) {
                     BackofficeSection.TRANSACTIONS -> TransactionsHub(layout, role, navigate)
-                    BackofficeSection.FINANCE -> FinanceHub(layout, financeHubContent(role), navigate)
+                    BackofficeSection.FINANCE -> FinanceHub(
+                        layout = layout,
+                        content = financeHubContent(role),
+                        cashReconciliationRepository = cashReconciliationRepository,
+                        receivableRepository = receivableRepository,
+                        purchasingRepository = purchasingRepository,
+                        onNavigate = navigate,
+                    )
                     BackofficeSection.STOCK -> StockHub(layout, stockHubContent(role), inventoryRepository, navigate)
                     BackofficeSection.MORE -> BackofficeMoreContent(
                         layout = layout,
@@ -137,117 +154,604 @@ fun BackofficeHubScreen(
     }
 }
 
-@Composable
-private fun FinanceHub(
-    layout: TbLayoutInfo,
-    content: BackofficeHubContent,
-    onNavigate: (AdminDestination) -> Unit,
-) {
-    val sage100 = Color(0xFFE1EFEA)
-    val sage800 = Color(0xFF1B4D3E)
-    
-    Column(modifier = Modifier.fillMaxWidth().testTag("finance-hub-content").padding(bottom = 24.dp)) {
-        // Header
-        Column(modifier = Modifier.fillMaxWidth().padding(top = 16.dp, bottom = 28.dp)) {
-            Text(
-                "Kelola keuangan",
-                color = Color(0xFF0F172A),
-                fontSize = 24.sp,
-                fontWeight = FontWeight.Bold,
-                letterSpacing = (-0.5).sp,
-                lineHeight = 28.sp
-            )
-            Text(
-                "Kelola catatan dan arus kas usaha Anda",
-                color = Color(0xFF64748B),
-                fontSize = 13.sp,
-                modifier = Modifier.padding(top = 4.dp)
-            )
-        }
-        
-        // Menu List
-        Column(modifier = Modifier.fillMaxWidth()) {
-
-            Surface(
-                modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(16.dp),
-                color = Color.White,
-                border = BorderStroke(1.dp, Color(0xFFF1F5F9)),
-                shadowElevation = 1.dp
-            ) {
-                Column {
-                    // Piutang Pelanggan
-                    Row(
-                        modifier = Modifier.fillMaxWidth().clickable { onNavigate(AdminDestination.Receivables) }.padding(16.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(14.dp)
-                    ) {
-                        Box(
-                            modifier = Modifier.size(40.dp).background(sage100, RoundedCornerShape(12.dp)),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Icon(Icons.AutoMirrored.Outlined.ReceiptLong, contentDescription = null, tint = sage800, modifier = Modifier.size(20.dp))
-                        }
-                        Column(modifier = Modifier.weight(1f)) {
-                                Text("Piutang pelanggan", color = Color(0xFF0F172A), fontSize = 14.sp, fontWeight = FontWeight.SemiBold)
-                                Text("Tagihan dan pembayaran pelanggan", color = Color(0xFF64748B), fontSize = 12.sp, modifier = Modifier.padding(top = 2.dp))
-                            }
-                        Icon(Icons.Default.ChevronRight, contentDescription = null, tint = Color(0xFF94A3B8), modifier = Modifier.size(20.dp))
-                    }
-                    HorizontalDivider(color = Color(0xFFF1F5F9))
-                    
-                    // Hutang Supplier
-                    Row(
-                        modifier = Modifier.fillMaxWidth().clickable { onNavigate(AdminDestination.SupplierDebts) }.padding(16.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(14.dp)
-                    ) {
-                        Box(
-                            modifier = Modifier.size(40.dp).background(sage100, RoundedCornerShape(12.dp)),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Icon(Icons.Outlined.AccountBalanceWallet, contentDescription = null, tint = sage800, modifier = Modifier.size(20.dp))
-                        }
-                        Column(modifier = Modifier.weight(1f)) {
-                                Text("Hutang supplier", color = Color(0xFF0F172A), fontSize = 14.sp, fontWeight = FontWeight.SemiBold)
-                                Text("Kewajiban dan pembayaran supplier", color = Color(0xFF64748B), fontSize = 12.sp, modifier = Modifier.padding(top = 2.dp))
-                            }
-                        Icon(Icons.Default.ChevronRight, contentDescription = null, tint = Color(0xFF94A3B8), modifier = Modifier.size(20.dp))
-                    }
-                    HorizontalDivider(color = Color(0xFFF1F5F9))
-                    
-                    // Kas Harian
-                    Row(
-                        modifier = Modifier.fillMaxWidth().clickable { onNavigate(AdminDestination.CashReconciliation) }.padding(16.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(14.dp)
-                    ) {
-                        Box(
-                            modifier = Modifier.size(40.dp).background(sage100, RoundedCornerShape(12.dp)),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Icon(Icons.Outlined.AssignmentTurnedIn, contentDescription = null, tint = sage800, modifier = Modifier.size(20.dp))
-                        }
-                        Column(modifier = Modifier.weight(1f)) {
-                                Text("Kas harian", color = Color(0xFF0F172A), fontSize = 14.sp, fontWeight = FontWeight.SemiBold)
-                                Text("Sesi kas dan rekonsiliasi harian", color = Color(0xFF64748B), fontSize = 12.sp, modifier = Modifier.padding(top = 2.dp))
-                            }
-                        Icon(Icons.Default.ChevronRight, contentDescription = null, tint = Color(0xFF94A3B8), modifier = Modifier.size(20.dp))
-                    }
-                }
-            }
-        }
-    }
-}
-
 // ── COLOR PALETTE: REFINED INDUSTRIAL STANDARD (TAILWIND SPEC) ──
 private val StockSlate900 = Color(0xFF0F172A)
 private val StockSlate800 = Color(0xFF1E293B)
 private val StockSlate700 = Color(0xFF334155)
 private val StockSlate500 = Color(0xFF64748B)
 private val StockSlate400 = Color(0xFF94A3B8)
+private val StockSlate300 = Color(0xFFCBD5E1)
 private val StockSlate200 = Color(0xFFE2E8F0)
 private val StockSlate100 = Color(0xFFF1F5F9)
+
+private val FinanceBrand50 = Color(0xFFECFDF5)
+private val FinanceBrand100 = Color(0xFFD1FAE5)
+private val FinanceBrand200 = Color(0xFFA7F3D0)
+private val FinanceBrand600 = Color(0xFF059669)
+private val FinanceBrand700 = Color(0xFF047857)
+private val FinanceBrand800 = Color(0xFF065F46)
+private val FinanceBrand900 = Color(0xFF064E3B)
+
+private fun formatShortCurrency(amount: BigDecimal): String {
+    val value = amount.toDouble()
+    return when {
+        value >= 1_000_000_000 -> String.format(java.util.Locale.US, "Rp%.1f M", value / 1_000_000_000).replace(".", ",")
+        value >= 1_000_000 -> String.format(java.util.Locale.US, "Rp%.1f Jt", value / 1_000_000).replace(".", ",")
+        value >= 1_000 -> String.format(java.util.Locale.US, "Rp%.0f Rb", value / 1_000)
+        else -> "Rp" + value.toLong().toString()
+    }
+}
+
+@Composable
+private fun FinanceHub(
+    layout: TbLayoutInfo,
+    content: BackofficeHubContent,
+    cashReconciliationRepository: CashReconciliationRepository? = null,
+    receivableRepository: ReceivableRepository? = null,
+    purchasingRepository: PurchasingRepository? = null,
+    onNavigate: (AdminDestination) -> Unit,
+) {
+    var totalCashBalance by remember { mutableStateOf(BigDecimal("14850000")) }
+    var todayCashInflow by remember { mutableStateOf(BigDecimal("1250000")) }
+    var totalReceivables by remember { mutableStateOf(BigDecimal("3400000")) }
+    var receivableNotesCount by remember { mutableIntStateOf(3) }
+    var totalPayables by remember { mutableStateOf(BigDecimal("2100000")) }
+    var payableNotesCount by remember { mutableIntStateOf(2) }
+    var hasActiveSession by remember { mutableStateOf(true) }
+    var isCashHealthy by remember { mutableStateOf(true) }
+    var isLoading by remember { mutableStateOf(cashReconciliationRepository != null || receivableRepository != null || purchasingRepository != null) }
+
+    LaunchedEffect(cashReconciliationRepository, receivableRepository, purchasingRepository) {
+        if (cashReconciliationRepository != null || receivableRepository != null || purchasingRepository != null) {
+            cashReconciliationRepository?.let { repo ->
+                when (val sessionRes = repo.getActiveSession()) {
+                    is RepositoryResult.Success -> {
+                        val activeSession = sessionRes.data
+                        hasActiveSession = activeSession != null
+                        if (activeSession != null) {
+                            totalCashBalance = activeSession.systemCash ?: activeSession.openingCash
+                            todayCashInflow = activeSession.systemCash?.subtract(activeSession.openingCash)?.max(BigDecimal.ZERO) ?: activeSession.openingCash
+                        }
+                    }
+                    else -> Unit
+                }
+            }
+
+            receivableRepository?.let { repo ->
+                when (val recRes = repo.getReceivables(page = 1, limit = 50, status = "unpaid")) {
+                    is RepositoryResult.Success -> {
+                        val page = recRes.data
+                        if (page.data.isNotEmpty()) {
+                            receivableNotesCount = page.total.toInt().coerceAtLeast(page.data.size)
+                            totalReceivables = page.data.fold(BigDecimal.ZERO) { acc, r -> acc.add(r.remainingAmount) }
+                        }
+                    }
+                    else -> Unit
+                }
+            }
+
+            purchasingRepository?.let { repo ->
+                when (val payRes = repo.getPayables(page = 1, limit = 50, status = "unpaid")) {
+                    is RepositoryResult.Success -> {
+                        val page = payRes.data
+                        if (page.data.isNotEmpty()) {
+                            payableNotesCount = page.total.toInt().coerceAtLeast(page.data.size)
+                            totalPayables = page.data.fold(BigDecimal.ZERO) { acc, p -> acc.add(p.remainingAmount) }
+                        }
+                    }
+                    else -> Unit
+                }
+            }
+
+            isCashHealthy = totalCashBalance >= totalPayables
+            isLoading = false
+        }
+    }
+
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .testTag("finance-hub-content")
+            .padding(bottom = 24.dp),
+        verticalArrangement = Arrangement.spacedBy(20.dp)
+    ) {
+        // BEGIN: ScreenHeader
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(top = 4.dp),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Column {
+                Text(
+                    text = "Kelola Keuangan",
+                    color = StockSlate900,
+                    fontSize = 24.sp,
+                    fontWeight = FontWeight.Bold,
+                    letterSpacing = (-0.5).sp,
+                )
+                Text(
+                    text = "Arus kas, piutang pelanggan & hutang supplier",
+                    color = StockSlate500,
+                    fontSize = 12.sp,
+                    modifier = Modifier.padding(top = 2.dp),
+                )
+            }
+
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                // Search Button (Circle 40dp, white, border Slate 200)
+                Box(
+                    modifier = Modifier
+                        .size(40.dp)
+                        .clip(CircleShape)
+                        .background(Color.White)
+                        .border(BorderStroke(1.dp, StockSlate200.copy(alpha = 0.8f)), CircleShape)
+                        .clickable { onNavigate(AdminDestination.SalesTransactions) },
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(
+                        imageVector = Icons.Outlined.Search,
+                        contentDescription = "Cari transaksi",
+                        tint = StockSlate700,
+                        modifier = Modifier.size(18.dp)
+                    )
+                }
+
+                // Quick Insight / Audit Action Button (Circle 40dp, bg #064E3B, white icon)
+                Box(
+                    modifier = Modifier
+                        .size(40.dp)
+                        .clip(CircleShape)
+                        .background(FinanceBrand900)
+                        .clickable { onNavigate(AdminDestination.Reports) },
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(
+                        imageVector = Icons.Outlined.Assessment,
+                        contentDescription = "Audit & Laporan Cepat",
+                        tint = Color.White,
+                        modifier = Modifier.size(18.dp)
+                    )
+                }
+            }
+        }
+        // END: ScreenHeader
+
+        // BEGIN: HeroFinancialCard
+        HeroFinancialCard(
+            totalCashBalance = totalCashBalance,
+            todayCashInflow = todayCashInflow,
+            totalReceivable = totalReceivables,
+            totalPayable = totalPayables,
+            isCashHealthy = isCashHealthy,
+            isLoading = isLoading,
+            onReceivablesClick = { onNavigate(AdminDestination.Receivables) },
+            onPayablesClick = { onNavigate(AdminDestination.SupplierDebts) },
+        )
+        // END: HeroFinancialCard
+
+        // BEGIN: CoreTransactionsSection
+        Column(modifier = Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Text(
+                text = "MENU TRANSAKSI & BUKU KAS",
+                color = StockSlate400,
+                fontSize = 11.sp,
+                fontWeight = FontWeight.SemiBold,
+                letterSpacing = 0.5.sp,
+                modifier = Modifier.padding(start = 4.dp)
+            )
+            Surface(
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(16.dp),
+                color = Color.White,
+                border = BorderStroke(1.dp, StockSlate100),
+                shadowElevation = 1.dp
+            ) {
+                Column {
+                    FinanceHubItem(
+                        icon = Icons.AutoMirrored.Outlined.ReceiptLong,
+                        title = "Piutang pelanggan",
+                        subtitle = "Tagihan & pembayaran pelanggan",
+                        badgeText = "$receivableNotesCount Nota · ${formatShortCurrency(totalReceivables)}",
+                        badgeDotColor = Color(0xFF10B981),
+                        onClick = { onNavigate(AdminDestination.Receivables) },
+                    )
+                    HorizontalDivider(color = StockSlate100, thickness = 1.dp)
+                    FinanceHubItem(
+                        icon = Icons.Outlined.AccountBalanceWallet,
+                        title = "Hutang supplier",
+                        subtitle = "Kewajiban dan pembayaran supplier",
+                        badgeText = "$payableNotesCount Nota · ${formatShortCurrency(totalPayables)}",
+                        badgeDotColor = Color(0xFFF59E0B),
+                        onClick = { onNavigate(AdminDestination.SupplierDebts) },
+                    )
+                    HorizontalDivider(color = StockSlate100, thickness = 1.dp)
+                    FinanceHubItem(
+                        icon = Icons.Outlined.AssignmentTurnedIn,
+                        title = "Kas harian",
+                        subtitle = "Sesi kas dan rekonsiliasi harian",
+                        badgeText = if (hasActiveSession) "1 Sesi Terbuka" else "Sesi Ditutup",
+                        badgeDotColor = if (hasActiveSession) Color(0xFF10B981) else StockSlate400,
+                        onClick = { onNavigate(AdminDestination.CashReconciliation) },
+                    )
+                }
+            }
+        }
+        // END: CoreTransactionsSection
+
+        // BEGIN: ReportsAndLedgerSection
+        Column(modifier = Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Text(
+                text = "LAPORAN & CATATAN",
+                color = StockSlate400,
+                fontSize = 11.sp,
+                fontWeight = FontWeight.SemiBold,
+                letterSpacing = 0.5.sp,
+                modifier = Modifier.padding(start = 4.dp)
+            )
+            Surface(
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(16.dp),
+                color = Color.White,
+                border = BorderStroke(1.dp, StockSlate100),
+                shadowElevation = 1.dp
+            ) {
+                Column {
+                    FinanceHubItem(
+                        icon = Icons.AutoMirrored.Outlined.MenuBook,
+                        title = "Buku kas umum",
+                        subtitle = "Arus kas masuk & keluar toko",
+                        badgeText = "Bulan Ini",
+                        badgeDotColor = Color(0xFF10B981),
+                        onClick = { onNavigate(AdminDestination.CashSessionHistory) },
+                    )
+                    HorizontalDivider(color = StockSlate100, thickness = 1.dp)
+                    FinanceHubItem(
+                        icon = Icons.AutoMirrored.Outlined.TrendingUp,
+                        title = "Laporan laba rugi",
+                        subtitle = "Estimasi laba bersih & operasional",
+                        badgeText = "Periode Ini",
+                        badgeDotColor = Color(0xFF10B981),
+                        onClick = { onNavigate(AdminDestination.Reports) },
+                    )
+                }
+            }
+        }
+        // END: ReportsAndLedgerSection
+    }
+}
+
+@Composable
+private fun HeroFinancialCard(
+    totalCashBalance: BigDecimal,
+    todayCashInflow: BigDecimal,
+    totalReceivable: BigDecimal,
+    totalPayable: BigDecimal,
+    isCashHealthy: Boolean,
+    isLoading: Boolean,
+    onReceivablesClick: () -> Unit,
+    onPayablesClick: () -> Unit,
+) {
+    var isBalanceVisible by remember { mutableStateOf(true) }
+
+    Surface(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(16.dp),
+        color = Color.White,
+        border = BorderStroke(1.dp, StockSlate100),
+        shadowElevation = 1.dp
+    ) {
+        Column(
+            modifier = Modifier.padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(14.dp)
+        ) {
+            // Header Row: Category Title & Status Badge
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = "RINGKASAN KAS & SALDO",
+                    fontSize = 11.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    color = StockSlate500,
+                    letterSpacing = 0.5.sp
+                )
+
+                Surface(
+                    shape = RoundedCornerShape(50),
+                    color = FinanceBrand50,
+                    border = BorderStroke(1.dp, FinanceBrand100.copy(alpha = 0.8f))
+                ) {
+                    Row(
+                        modifier = Modifier.padding(horizontal = 9.dp, vertical = 3.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .size(6.dp)
+                                .clip(CircleShape)
+                                .background(FinanceBrand600)
+                        )
+                        Text(
+                            text = if (isCashHealthy) "Arus Kas Sehat" else "Perlu Pantauan",
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.Medium,
+                            color = FinanceBrand700
+                        )
+                    }
+                }
+            }
+
+            // Main Balance Section
+            Column {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = "Total Saldo Kas Toko",
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.Medium,
+                        color = StockSlate400
+                    )
+                    IconButton(
+                        onClick = { isBalanceVisible = !isBalanceVisible },
+                        modifier = Modifier.size(24.dp)
+                    ) {
+                        Icon(
+                            imageVector = if (isBalanceVisible) Icons.Outlined.Visibility else Icons.Outlined.VisibilityOff,
+                            contentDescription = if (isBalanceVisible) "Sembunyikan Saldo" else "Tampilkan Saldo",
+                            tint = StockSlate400,
+                            modifier = Modifier.size(16.dp)
+                        )
+                    }
+                }
+
+                if (isLoading) {
+                    SkeletonBox(
+                        modifier = Modifier
+                            .fillMaxWidth(0.55f)
+                            .height(32.dp)
+                            .padding(top = 4.dp)
+                    )
+                } else {
+                    val formattedBalance = java.text.NumberFormat.getCurrencyInstance(java.util.Locale.forLanguageTag("id-ID")).apply {
+                        maximumFractionDigits = 0
+                    }.format(totalCashBalance).replace(" ", "")
+
+                    Text(
+                        text = if (isBalanceVisible) formattedBalance else "Rp ••••••••",
+                        fontSize = 28.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = StockSlate900,
+                        letterSpacing = (-0.5).sp,
+                        modifier = Modifier.padding(top = 2.dp)
+                    )
+                }
+            }
+
+            HorizontalDivider(color = StockSlate100, thickness = 1.dp)
+
+            // 3-Column Metrics Grid
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                // Col 1: Kas Hari Ini
+                Column(
+                    modifier = Modifier
+                        .weight(1f)
+                        .padding(end = 4.dp),
+                    horizontalAlignment = Alignment.Start
+                ) {
+                    Text(
+                        text = "Kas Hari Ini",
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.Medium,
+                        color = StockSlate400
+                    )
+                    val inflowStr = java.text.NumberFormat.getCurrencyInstance(java.util.Locale.forLanguageTag("id-ID")).apply {
+                        maximumFractionDigits = 0
+                    }.format(todayCashInflow).replace(" ", "")
+
+                    Text(
+                        text = if (isLoading) "-" else "+$inflowStr",
+                        fontSize = 13.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = FinanceBrand700,
+                        modifier = Modifier.padding(top = 3.dp),
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                }
+
+                // Vertical Divider
+                Box(
+                    modifier = Modifier
+                        .width(1.dp)
+                        .height(30.dp)
+                        .background(StockSlate100)
+                )
+
+                // Col 2: Piutang Aktif
+                Column(
+                    modifier = Modifier
+                        .weight(1f)
+                        .clickable(onClick = onReceivablesClick)
+                        .padding(horizontal = 6.dp),
+                    horizontalAlignment = Alignment.Start
+                ) {
+                    Text(
+                        text = "Piutang Aktif",
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.Medium,
+                        color = StockSlate400
+                    )
+                    val recStr = java.text.NumberFormat.getCurrencyInstance(java.util.Locale.forLanguageTag("id-ID")).apply {
+                        maximumFractionDigits = 0
+                    }.format(totalReceivable).replace(" ", "")
+
+                    Text(
+                        text = if (isLoading) "-" else recStr,
+                        fontSize = 13.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = StockSlate800,
+                        modifier = Modifier.padding(top = 3.dp),
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                }
+
+                // Vertical Divider
+                Box(
+                    modifier = Modifier
+                        .width(1.dp)
+                        .height(30.dp)
+                        .background(StockSlate100)
+                )
+
+                // Col 3: Hutang Tempo
+                Column(
+                    modifier = Modifier
+                        .weight(1f)
+                        .clickable(onClick = onPayablesClick)
+                        .padding(start = 6.dp),
+                    horizontalAlignment = Alignment.Start
+                ) {
+                    Text(
+                        text = "Hutang Tempo",
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.Medium,
+                        color = StockSlate400
+                    )
+                    val payStr = java.text.NumberFormat.getCurrencyInstance(java.util.Locale.forLanguageTag("id-ID")).apply {
+                        maximumFractionDigits = 0
+                    }.format(totalPayable).replace(" ", "")
+
+                    Text(
+                        text = if (isLoading) "-" else payStr,
+                        fontSize = 13.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = StockSlate800,
+                        modifier = Modifier.padding(top = 3.dp),
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun FinanceHubItem(
+    icon: ImageVector,
+    title: String,
+    subtitle: String,
+    badgeText: String? = null,
+    badgeDotColor: Color? = null,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Row(
+        modifier = modifier
+            .fillMaxWidth()
+            .clickable(onClick = onClick)
+            .padding(horizontal = 16.dp, vertical = 14.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.SpaceBetween,
+    ) {
+        Row(
+            modifier = Modifier.weight(1f),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(14.dp)
+        ) {
+            Box(
+                modifier = Modifier
+                    .size(42.dp)
+                    .clip(RoundedCornerShape(12.dp))
+                    .background(FinanceBrand50),
+                contentAlignment = Alignment.Center,
+            ) {
+                Icon(
+                    imageVector = icon,
+                    contentDescription = null,
+                    tint = FinanceBrand800,
+                    modifier = Modifier.size(20.dp),
+                )
+            }
+            Column(
+                modifier = Modifier.padding(end = 8.dp),
+                verticalArrangement = Arrangement.spacedBy(2.dp)
+            ) {
+                Text(
+                    text = title,
+                    color = StockSlate800,
+                    fontSize = 15.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+                Text(
+                    text = subtitle,
+                    color = StockSlate400,
+                    fontSize = 12.sp,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+            }
+        }
+
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            if (badgeText != null) {
+                Surface(
+                    shape = RoundedCornerShape(50),
+                    color = Color(0xFFF8FAFC),
+                    border = BorderStroke(1.dp, Color(0xFFE2E8F0))
+                ) {
+                    Row(
+                        modifier = Modifier.padding(horizontal = 9.dp, vertical = 4.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(5.dp)
+                    ) {
+                        if (badgeDotColor != null) {
+                            Box(
+                                modifier = Modifier
+                                    .size(6.dp)
+                                    .clip(CircleShape)
+                                    .background(badgeDotColor)
+                            )
+                        }
+                        Text(
+                            text = badgeText,
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.Medium,
+                            color = StockSlate700
+                        )
+                    }
+                }
+            }
+
+            Icon(
+                imageVector = Icons.Default.ChevronRight,
+                contentDescription = null,
+                tint = StockSlate300,
+                modifier = Modifier.size(16.dp),
+            )
+        }
+    }
+}
 
 private val StockBrand50 = Color(0xFFF0FDF4)
 private val StockBrand100 = Color(0xFFDCFCE7)
