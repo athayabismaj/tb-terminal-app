@@ -233,30 +233,12 @@ internal fun StockOpnameTableCard(
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.SpaceBetween,
         ) {
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-            ) {
-                Text(
-                    text = "Daftar produk",
-                    color = TextPrimary,
-                    fontSize = 15.sp,
-                    fontWeight = FontWeight.Bold,
-                )
-                Surface(
-                    shape = CircleShape,
-                    color = Color.White,
-                    border = BorderStroke(1.dp, BorderSlate200),
-                ) {
-                    Text(
-                        text = "${uiState.totalTableProducts} produk",
-                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 3.dp),
-                        fontSize = 11.sp,
-                        fontWeight = FontWeight.SemiBold,
-                        color = TextSecondary,
-                    )
-                }
-            }
+            Text(
+                text = "Daftar produk",
+                color = TextPrimary,
+                fontSize = 16.sp,
+                fontWeight = FontWeight.Bold,
+            )
         }
 
         Surface(

@@ -292,30 +292,12 @@ internal fun StockReportScreen(
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.SpaceBetween,
                 ) {
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(8.dp)
-                    ) {
-                        Text(
-                            text = "Daftar stok",
-                            color = TextPrimary,
-                            fontSize = 15.sp,
-                            fontWeight = FontWeight.Bold,
-                        )
-                        Surface(
-                            shape = CircleShape,
-                            color = Color.White,
-                            border = BorderStroke(1.dp, BorderSlate200),
-                        ) {
-                            Text(
-                                text = "${uiState.totalProducts} produk",
-                                modifier = Modifier.padding(horizontal = 10.dp, vertical = 3.dp),
-                                fontSize = 11.sp,
-                                fontWeight = FontWeight.SemiBold,
-                                color = TextSecondary,
-                            )
-                        }
-                    }
+                    Text(
+                        text = "Daftar stok",
+                        color = TextPrimary,
+                        fontSize = 16.sp,
+                        fontWeight = FontWeight.Bold,
+                    )
                 }
 
                 StockTableCard(
@@ -1238,18 +1220,22 @@ private fun StockMobileRow(stock: ProductStock, onProductSelected: (String) -> U
         modifier = Modifier
             .fillMaxWidth()
             .clickable { onProductSelected(stock.productId) }
-            .padding(horizontal = 16.dp, vertical = 13.dp)
+            .padding(horizontal = 16.dp, vertical = 14.dp)
             .testTag("stock-report-product-${stock.productId}"),
-        verticalArrangement = Arrangement.spacedBy(8.dp),
+        verticalArrangement = Arrangement.spacedBy(10.dp),
     ) {
-        Row(verticalAlignment = Alignment.Top, horizontalArrangement = Arrangement.SpaceBetween) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.SpaceBetween
+        ) {
             Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
                 Text(
                     text = stock.productName,
                     color = TextPrimary,
                     fontWeight = FontWeight.SemiBold,
                     fontSize = 14.sp,
-                    maxLines = 2,
+                    maxLines = 1,
                     overflow = TextOverflow.Ellipsis
                 )
                 Text(
@@ -1260,18 +1246,30 @@ private fun StockMobileRow(stock: ProductStock, onProductSelected: (String) -> U
                     overflow = TextOverflow.Ellipsis
                 )
             }
-            Box(modifier = Modifier.padding(top = 2.dp, start = 12.dp)) {
-                StockStatusBadge(status.first, status.second, showChevron = true)
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(6.dp)
+            ) {
+                StockStatusBadge(status.first, status.second)
+                Icon(
+                    imageVector = Icons.Default.ChevronRight,
+                    contentDescription = null,
+                    tint = TextMuted,
+                    modifier = Modifier.size(16.dp)
+                )
             }
         }
+
+        HorizontalDivider(color = Color(0xFFF1F5F9), thickness = 1.dp)
+
         Row(
-            modifier = Modifier.fillMaxWidth().padding(top = 2.dp),
+            modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.spacedBy(8.dp),
-            verticalAlignment = Alignment.Bottom
+            verticalAlignment = Alignment.CenterVertically
         ) {
-            StockValue("Stok", "${formatQuantity(stock.quantity)} ${stock.unitName}", Modifier.weight(4f))
-            StockValue("Minimum", formatQuantity(stock.minStock), Modifier.weight(3f), Alignment.CenterHorizontally)
-            StockValue("Nilai stok", formatCurrency(stock.quantity.multiply(stock.priceBuy)), Modifier.weight(5f), Alignment.End)
+            StockValue("Stok", "${formatQuantity(stock.quantity)} ${stock.unitName}", Modifier.weight(1f))
+            StockValue("Minimum", "${formatQuantity(stock.minStock)} ${stock.unitName}", Modifier.weight(1f), Alignment.CenterHorizontally)
+            StockValue("Nilai stok", formatCurrency(stock.quantity.multiply(stock.priceBuy)), Modifier.weight(1.2f), Alignment.End)
         }
     }
 }
@@ -1388,26 +1386,24 @@ private fun StockLoadingCard(compact: Boolean) {
 }
 
 @Composable
-private fun StockStatusBadge(label: String, color: Color, showChevron: Boolean = false) {
+private fun StockStatusBadge(label: String, color: Color) {
+    val (bgColor, textColor) = when (label.lowercase()) {
+        "habis" -> Color(0xFFFEE2E2) to Color(0xFFB91C1C)
+        "menipis" -> Color(0xFFFEF3C7) to Color(0xFFB45309)
+        "aman" -> Color(0xFFEAF3EF) to Color(0xFF256B57)
+        else -> Color(0xFFF1F5F9) to Color(0xFF475569)
+    }
     Surface(
-        color = color.copy(alpha = 0.11f),
-        shape = RoundedCornerShape(999.dp)
+        color = bgColor,
+        shape = RoundedCornerShape(6.dp)
     ) {
-        Row(
-            modifier = Modifier.padding(start = 12.dp, end = if (showChevron) 8.dp else 12.dp, top = 4.dp, bottom = 4.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(4.dp)
-        ) {
-            Text(label, color = color, fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
-            if (showChevron) {
-                Icon(
-                    Icons.AutoMirrored.Outlined.KeyboardArrowRight,
-                    contentDescription = null,
-                    tint = color.copy(alpha = 0.6f),
-                    modifier = Modifier.size(14.dp)
-                )
-            }
-        }
+        Text(
+            text = label,
+            modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp),
+            color = textColor,
+            fontSize = 11.sp,
+            fontWeight = FontWeight.SemiBold
+        )
     }
 }
 
@@ -1448,7 +1444,7 @@ private fun StockRow(stock: ProductStock, onProductSelected: (String) -> Unit) {
         Text(formatCurrency(stock.quantity.multiply(stock.priceBuy)), Modifier.weight(1.2f), color = TextPrimary, fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
         val status = stockStatus(stock)
         Box(modifier = Modifier.weight(1.25f), contentAlignment = Alignment.CenterStart) {
-            StockStatusBadge(status.first, status.second, showChevron = true)
+            StockStatusBadge(status.first, status.second)
         }
     }
 }
