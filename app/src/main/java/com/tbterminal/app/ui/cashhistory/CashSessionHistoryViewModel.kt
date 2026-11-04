@@ -156,6 +156,39 @@ class CashSessionHistoryViewModel(
         setDateRange(start, end, preset)
     }
 
+    fun applyFilter(status: String, startDateStr: String?, endDateStr: String?, preset: String?) {
+        val start = startDateStr?.let { runCatching { LocalDate.parse(it) }.getOrNull() }
+        val end = endDateStr?.let { runCatching { LocalDate.parse(it) }.getOrNull() }
+        val resolvedPreset = if (status == "Semua" && preset == "Semua") "Semua" else preset
+        _uiState.update {
+            it.copy(
+                statusFilter = status,
+                selectedDate = end?.toString() ?: it.selectedDate,
+                startDate = start?.toString(),
+                endDate = end?.toString(),
+                selectedPreset = resolvedPreset,
+                page = 1
+            )
+        }
+        loadSessions()
+    }
+
+    fun resetAllFilters() {
+        val today = LocalDate.now()
+        _uiState.update {
+            it.copy(
+                statusFilter = "Semua",
+                selectedDate = today.toString(),
+                startDate = today.toString(),
+                endDate = today.toString(),
+                selectedPreset = "Hari ini",
+                searchQuery = "",
+                page = 1
+            )
+        }
+        loadSessions()
+    }
+
     private fun currentDateRange(): Pair<LocalDate, LocalDate> {
         val state = _uiState.value
         val endDate = (state.endDate ?: state.selectedDate)?.let(LocalDate::parse) ?: LocalDate.now()

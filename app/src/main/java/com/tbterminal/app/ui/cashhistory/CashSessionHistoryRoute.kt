@@ -164,7 +164,9 @@ fun AdminCashSessionHistoryScreen(
                 onShowDetail = onShowDetail,
                 onPreviousPage = viewModel::previousPage,
                 onNextPage = viewModel::nextPage,
-                onDateRangeChanged = viewModel::setDateRange
+                onDateRangeChanged = viewModel::setDateRange,
+                onApplyFilter = viewModel::applyFilter,
+                onResetAllFilters = viewModel::resetAllFilters
             )
         }
     }

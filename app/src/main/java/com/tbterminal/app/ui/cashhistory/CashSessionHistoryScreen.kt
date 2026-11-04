@@ -34,6 +34,8 @@ import androidx.compose.material.icons.filled.ChevronLeft
 import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material.icons.outlined.AccountBalanceWallet
 import androidx.compose.material.icons.outlined.ChevronRight
+import androidx.compose.material.icons.outlined.CalendarMonth
+import androidx.compose.material.icons.outlined.Check
 import androidx.compose.material.icons.outlined.Close
 import androidx.compose.material.icons.outlined.ExpandMore
 import androidx.compose.material.icons.outlined.FactCheck
@@ -43,18 +45,22 @@ import androidx.compose.material.icons.outlined.Search
 import androidx.compose.material.icons.outlined.Tune
 import androidx.compose.material.icons.outlined.Visibility
 import androidx.compose.ui.draw.clip
+import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LocalTextStyle
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -91,6 +97,7 @@ import com.tbterminal.app.ui.theme.TbText
 import com.tbterminal.app.ui.theme.TbTextMuted
 import java.math.BigDecimal
 import java.text.NumberFormat
+import java.time.DayOfWeek
 import java.time.LocalDate
 import java.time.OffsetDateTime
 import java.time.ZoneId
@@ -144,6 +151,18 @@ internal fun CashSessionHistoryScreen(
     onPreviousPage: () -> Unit,
     onNextPage: () -> Unit,
     onDateRangeChanged: (String, String, String?) -> Unit = { _, _, _ -> },
+    onApplyFilter: (String, String?, String?, String?) -> Unit = { status, start, end, preset ->
+        onStatusFilterChanged(status)
+        if (start != null && end != null) {
+            onDateRangeChanged(start, end, preset)
+        } else if (preset != null) {
+            onDatePresetSelected(preset)
+        }
+    },
+    onResetAllFilters: () -> Unit = {
+        onStatusFilterChanged("Semua")
+        onDatePresetSelected("Hari ini")
+    },
 ) {
     var showDatePicker by remember { mutableStateOf(false) }
     var showMobileFilters by remember { mutableStateOf(false) }
@@ -185,66 +204,38 @@ internal fun CashSessionHistoryScreen(
     }
 
     if (showMobileFilters || showFilterPopup) {
-        TbMobileControlSheet(
-            title = "Filter sesi",
-            subtitle = "Atur periode dan status sesi kas",
+        CashSessionFilterBottomSheet(
+            uiState = uiState,
             onDismiss = {
                 showMobileFilters = false
                 onDismissFilter()
             },
-            testTag = "cash-session-filter-sheet",
-        ) {
-            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                Text("Periode", style = MaterialTheme.typography.labelLarge, color = SessionText, fontWeight = FontWeight.SemiBold)
-                SessionPeriodSelector(
-                    selectedPreset = uiState.selectedPreset,
-                    dateLabel = uiState.compactDateRangeLabel(),
-                    onSelected = onDatePresetSelected,
-                    onCalendarClick = {
-                        showMobileFilters = false
-                        onDismissFilter()
-                        showDatePicker = true
-                    },
-                    modifier = Modifier.fillMaxWidth(),
-                )
+            onApplyFilter = { status, start, end, preset ->
+                onApplyFilter(status, start, end, preset)
+                showMobileFilters = false
+                onDismissFilter()
+            },
+            onResetAllFilters = {
+                onResetAllFilters()
+                showMobileFilters = false
+                onDismissFilter()
+            },
+            onOpenDatePicker = {
+                showMobileFilters = false
+                onDismissFilter()
+                showDatePicker = true
             }
-            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                Text("Status", style = MaterialTheme.typography.labelLarge, color = SessionText, fontWeight = FontWeight.SemiBold)
-                SessionStatusSelector(
-                    selectedStatus = uiState.statusFilter,
-                    onSelected = onStatusFilterChanged,
-                )
-            }
-            TbMobileSheetDoneButton(
-                onClick = {
-                    showMobileFilters = false
-                    onDismissFilter()
-                },
-                testTag = "cash-session-filter-done",
-            )
-        }
+        )
     }
 
     if (showMobileOverview || showSummaryPopup) {
-        TbMobileControlSheet(
-            title = "Ringkasan kas",
-            subtitle = uiState.fullDateRangeLabel(),
+        CashSessionSummaryBottomSheet(
+            uiState = uiState,
             onDismiss = {
                 showMobileOverview = false
                 onDismissSummary()
-            },
-            testTag = "cash-session-overview-sheet",
-        ) {
-            SessionOverview(uiState = uiState, compact = true)
-            TbMobileSheetDoneButton(
-                onClick = {
-                    showMobileOverview = false
-                    onDismissSummary()
-                },
-                label = "Tutup",
-                testTag = "cash-session-overview-done",
-            )
-        }
+            }
+        )
     }
 
     if (showDatePicker) {
@@ -256,19 +247,19 @@ internal fun CashSessionHistoryScreen(
         HistoryDatePickerDialog(
             currentDate = uiState.startDate ?: uiState.selectedDate,
             initialMode = activeMode,
-            onDismiss = { showDatePicker = false },
-            onConfirmRange = { newStartStr, newEndStr, mode ->
-                val preset = when (mode) {
-                    "Bulan" -> "Bulan ini"
-                    "Minggu" -> "Minggu ini"
-                    else -> "Hari ini"
-                }
-                onDateRangeChanged(newStartStr, newEndStr, preset)
+            onDismiss = {
                 showDatePicker = false
+                showMobileFilters = true
+            },
+            onConfirmRange = { newStartStr, newEndStr, mode ->
+                onDateRangeChanged(newStartStr, newEndStr, "Kustom")
+                showDatePicker = false
+                showMobileFilters = true
             },
             onConfirm = {
                 onDateChanged(it)
                 showDatePicker = false
+                showMobileFilters = true
             },
         )
     }
@@ -1566,3 +1557,649 @@ private fun String.asDateTimeShort(): String = runCatching {
     }
     zonedDateTime.format(DateTimeFormatter.ofPattern("dd MMM, HH:mm", Locale.forLanguageTag("id-ID")))
 }.getOrDefault(this)
+
+private fun formatCashSummaryCurrency(amount: BigDecimal?): String {
+    if (amount == null) return "Rp 0"
+    val formatter = NumberFormat.getCurrencyInstance(Locale.forLanguageTag("id-ID")).apply {
+        maximumFractionDigits = 0
+        minimumFractionDigits = 0
+    }
+    return formatter.format(amount).replace("IDR", "Rp").replace(",00", "").trim()
+}
+
+@Composable
+private fun CashFilterOptionCard(
+    label: String,
+    isSelected: Boolean,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+    testTag: String? = null,
+    isCentered: Boolean = false,
+    icon: ImageVector? = null,
+) {
+    Surface(
+        onClick = onClick,
+        modifier = modifier
+            .height(46.dp)
+            .then(if (testTag != null) Modifier.testTag(testTag) else Modifier),
+        shape = RoundedCornerShape(12.dp),
+        color = Color.White,
+        border = BorderStroke(
+            if (isSelected) 1.5.dp else 1.dp,
+            if (isSelected) Color(0xFF256B57) else Color(0xFFE2E8F0)
+        ),
+        shadowElevation = if (isSelected) 0.5.dp else 0.dp
+    ) {
+        if (isCentered) {
+            Row(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(horizontal = 12.dp),
+                horizontalArrangement = Arrangement.Center,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                if (icon != null) {
+                    Icon(
+                        imageVector = icon,
+                        contentDescription = null,
+                        tint = if (isSelected) Color(0xFF256B57) else Color(0xFF64748B),
+                        modifier = Modifier.size(16.dp)
+                    )
+                    Spacer(Modifier.width(8.dp))
+                }
+                Text(
+                    text = label,
+                    fontSize = 13.5.sp,
+                    fontWeight = if (isSelected) FontWeight.SemiBold else FontWeight.Medium,
+                    color = if (isSelected) Color(0xFF256B57) else Color(0xFF334155),
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+            }
+        } else {
+            Row(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(horizontal = 14.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = label,
+                    fontSize = 14.sp,
+                    fontWeight = if (isSelected) FontWeight.SemiBold else FontWeight.Medium,
+                    color = if (isSelected) Color(0xFF256B57) else Color(0xFF334155),
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+                if (isSelected) {
+                    Icon(
+                        imageVector = Icons.Outlined.Check,
+                        contentDescription = null,
+                        tint = Color(0xFF256B57),
+                        modifier = Modifier.size(16.dp)
+                    )
+                }
+            }
+        }
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun CashSessionFilterBottomSheet(
+    uiState: CashSessionHistoryUiState,
+    onDismiss: () -> Unit,
+    onApplyFilter: (status: String, startDate: String?, endDate: String?, preset: String?) -> Unit,
+    onResetAllFilters: () -> Unit,
+    onOpenDatePicker: () -> Unit,
+) {
+    val zone = remember { ZoneId.of("Asia/Jakarta") }
+    val today = remember { LocalDate.now(zone) }
+    var selectedPreset by remember { mutableStateOf(uiState.selectedPreset ?: "Hari ini") }
+    val initialStart = remember(uiState.startDate) {
+        uiState.startDate?.take(10)?.let { runCatching { LocalDate.parse(it) }.getOrNull() } ?: today
+    }
+    val initialEnd = remember(uiState.endDate) {
+        uiState.endDate?.take(10)?.let { runCatching { LocalDate.parse(it) }.getOrNull() } ?: today
+    }
+    var startDate by remember { mutableStateOf<LocalDate?>(if (uiState.selectedPreset == "Semua") null else initialStart) }
+    var endDate by remember { mutableStateOf<LocalDate?>(if (uiState.selectedPreset == "Semua") null else initialEnd) }
+    var selectedStatus by remember { mutableStateOf(uiState.statusFilter) }
+    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+
+    ModalBottomSheet(
+        onDismissRequest = onDismiss,
+        sheetState = sheetState,
+        containerColor = Color.White,
+        shape = RoundedCornerShape(topStart = 32.dp, topEnd = 32.dp),
+        dragHandle = {
+            Box(
+                modifier = Modifier
+                    .padding(top = 12.dp, bottom = 4.dp)
+                    .width(40.dp)
+                    .height(5.dp)
+                    .background(Color(0xFFCBD5E1), CircleShape)
+            )
+        },
+        modifier = Modifier.testTag("cash-session-filter-sheet")
+    ) {
+        Column(
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            // Modal Header
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(start = 24.dp, end = 20.dp, top = 4.dp, bottom = 12.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.Top
+            ) {
+                Column(modifier = Modifier.weight(1f).padding(end = 12.dp)) {
+                    Text(
+                        text = "Filter Sesi Kas",
+                        fontSize = 20.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = Color(0xFF0F172A),
+                        letterSpacing = (-0.3).sp,
+                    )
+                    Spacer(Modifier.height(2.dp))
+                    Text(
+                        text = "Atur periode waktu dan status sesi kas kasir",
+                        fontSize = 13.sp,
+                        color = Color(0xFF64748B),
+                        lineHeight = 17.sp,
+                    )
+                }
+                Box(
+                    modifier = Modifier
+                        .size(32.dp)
+                        .clip(CircleShape)
+                        .background(Color(0xFFF1F5F9))
+                        .clickable(onClick = onDismiss),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Icon(
+                        imageVector = Icons.Outlined.Close,
+                        contentDescription = "Tutup Filter",
+                        tint = Color(0xFF64748B),
+                        modifier = Modifier.size(16.dp),
+                    )
+                }
+            }
+
+            HorizontalDivider(color = Color(0xFFF1F5F9), thickness = 1.dp)
+
+            // Scrollable Filter Content
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .weight(1f, fill = false)
+                    .verticalScroll(rememberScrollState())
+                    .padding(horizontal = 24.dp, vertical = 18.dp),
+                verticalArrangement = Arrangement.spacedBy(22.dp)
+            ) {
+                // Section 1: PERIODE WAKTU
+                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                    Text(
+                        text = "PERIODE WAKTU",
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = Color(0xFF64748B),
+                        letterSpacing = 0.8.sp,
+                    )
+
+                    val periodOptions = listOf(
+                        listOf("Semua" to "Semua", "Hari ini" to "Hari Ini"),
+                        listOf("Minggu ini" to "Minggu Ini", "Bulan ini" to "Bulan Ini")
+                    )
+
+                    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                        periodOptions.forEach { rowPairs ->
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.spacedBy(10.dp)
+                            ) {
+                                rowPairs.forEach { (key, label) ->
+                                    val isSelected = selectedPreset == key
+                                    CashFilterOptionCard(
+                                        label = label,
+                                        isSelected = isSelected,
+                                        onClick = {
+                                            selectedPreset = key
+                                            when (key) {
+                                                "Semua" -> {
+                                                    startDate = null
+                                                    endDate = null
+                                                }
+                                                "Hari ini" -> {
+                                                    startDate = today
+                                                    endDate = today
+                                                }
+                                                "Minggu ini" -> {
+                                                    startDate = today.with(DayOfWeek.MONDAY)
+                                                    endDate = today.with(DayOfWeek.SUNDAY)
+                                                }
+                                                "Bulan ini" -> {
+                                                    startDate = today.withDayOfMonth(1)
+                                                    endDate = today.withDayOfMonth(today.lengthOfMonth())
+                                                }
+                                            }
+                                        },
+                                        modifier = Modifier.weight(1f),
+                                        testTag = "cash-session-filter-period-$key"
+                                    )
+                                }
+                            }
+                        }
+                    }
+
+                    // Custom Date Range Button
+                    Surface(
+                        onClick = onOpenDatePicker,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(44.dp)
+                            .testTag("cash-session-custom-date-btn"),
+                        shape = RoundedCornerShape(12.dp),
+                        color = Color(0xFFF8FAFC),
+                        border = BorderStroke(1.dp, Color(0xFFCBD5E1))
+                    ) {
+                        Row(
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .padding(horizontal = 14.dp),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Outlined.CalendarMonth,
+                                    contentDescription = null,
+                                    tint = if (selectedPreset == "Kustom") Color(0xFF256B57) else Color(0xFF64748B),
+                                    modifier = Modifier.size(16.dp)
+                                )
+                                val customText = if (selectedPreset == "Kustom" && startDate != null && endDate != null) {
+                                    if (startDate == endDate) {
+                                        startDate!!.format(DateTimeFormatter.ofPattern("dd/MM/yyyy"))
+                                    } else {
+                                        "${startDate!!.format(DateTimeFormatter.ofPattern("dd/MM"))} - ${endDate!!.format(DateTimeFormatter.ofPattern("dd/MM"))}"
+                                    }
+                                } else {
+                                    "Pilih Tanggal Kustom"
+                                }
+                                Text(
+                                    text = customText,
+                                    fontSize = 13.sp,
+                                    fontWeight = if (selectedPreset == "Kustom") FontWeight.SemiBold else FontWeight.Medium,
+                                    color = if (selectedPreset == "Kustom") Color(0xFF256B57) else Color(0xFF475569)
+                                )
+                            }
+                            Text(
+                                text = "Atur >",
+                                fontSize = 12.sp,
+                                fontWeight = FontWeight.SemiBold,
+                                color = Color(0xFF256B57)
+                            )
+                        }
+                    }
+                }
+
+                // Section 2: STATUS SESI KAS
+                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                    Text(
+                        text = "STATUS SESI KAS",
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = Color(0xFF64748B),
+                        letterSpacing = 0.8.sp,
+                    )
+
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(10.dp)
+                    ) {
+                        val isAll = selectedStatus.equals("Semua", ignoreCase = true)
+                        CashFilterOptionCard(
+                            label = "Semua Status",
+                            isSelected = isAll,
+                            onClick = { selectedStatus = "Semua" },
+                            modifier = Modifier.weight(1f),
+                            testTag = "cash-session-filter-status-all"
+                        )
+                        val isOpen = selectedStatus.equals("OPEN", ignoreCase = true)
+                        CashFilterOptionCard(
+                            label = "Terbuka (OPEN)",
+                            isSelected = isOpen,
+                            onClick = { selectedStatus = "OPEN" },
+                            modifier = Modifier.weight(1f),
+                            testTag = "cash-session-filter-status-open"
+                        )
+                    }
+
+                    val isClosed = selectedStatus.equals("CLOSED", ignoreCase = true)
+                    CashFilterOptionCard(
+                        label = "Ditutup (CLOSED)",
+                        isSelected = isClosed,
+                        onClick = { selectedStatus = "CLOSED" },
+                        modifier = Modifier.fillMaxWidth(),
+                        isCentered = true,
+                        testTag = "cash-session-filter-status-closed"
+                    )
+                }
+            }
+
+            HorizontalDivider(color = Color(0xFFF1F5F9), thickness = 1.dp)
+
+            // Sticky Footer Actions (Reset 2/5 + Terapkan 3/5)
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 20.dp, vertical = 14.dp),
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                // Reset Button
+                Surface(
+                    onClick = {
+                        selectedPreset = "Hari ini"
+                        startDate = today
+                        endDate = today
+                        selectedStatus = "Semua"
+                        onResetAllFilters()
+                        onDismiss()
+                    },
+                    modifier = Modifier
+                        .weight(2f)
+                        .height(48.dp)
+                        .testTag("cash-session-filter-reset"),
+                    shape = RoundedCornerShape(12.dp),
+                    color = Color.White,
+                    border = BorderStroke(1.5.dp, Color(0xFF256B57))
+                ) {
+                    Box(
+                        modifier = Modifier.fillMaxSize(),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text(
+                            text = "Reset",
+                            fontSize = 15.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = Color(0xFF256B57)
+                        )
+                    }
+                }
+
+                // Terapkan Button
+                Button(
+                    onClick = {
+                        val startStr = if (selectedPreset == "Semua") null else startDate?.toString()
+                        val endStr = if (selectedPreset == "Semua") null else endDate?.toString()
+                        onApplyFilter(selectedStatus, startStr, endStr, selectedPreset)
+                        onDismiss()
+                    },
+                    modifier = Modifier
+                        .weight(3f)
+                        .height(48.dp)
+                        .testTag("cash-session-filter-apply"),
+                    shape = RoundedCornerShape(12.dp),
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = Color(0xFF256B57),
+                        contentColor = Color.White
+                    ),
+                    elevation = ButtonDefaults.buttonElevation(defaultElevation = 2.dp)
+                ) {
+                    Text(
+                        text = "Terapkan",
+                        fontSize = 15.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = Color.White
+                    )
+                }
+            }
+        }
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun CashSessionSummaryBottomSheet(
+    uiState: CashSessionHistoryUiState,
+    onDismiss: () -> Unit,
+) {
+    val totalSystemCash = remember(uiState.sessions) {
+        uiState.sessions.fold(BigDecimal.ZERO) { total, item ->
+            total + (item.systemCash ?: item.openingCash)
+        }
+    }
+    val totalExpenses = remember(uiState.sessions) {
+        uiState.sessions.fold(BigDecimal.ZERO) { total, item ->
+            total + item.totalExpenses
+        }
+    }
+    val difference = remember(uiState.sessions) {
+        uiState.sessions.fold(BigDecimal.ZERO) { total, item ->
+            total + (item.difference ?: BigDecimal.ZERO)
+        }
+    }
+    val openCount = remember(uiState.sessions) {
+        uiState.sessions.count { it.status.equals("OPEN", ignoreCase = true) }
+    }
+    val totalSessions = if (uiState.totalSessions > 0) uiState.totalSessions else uiState.sessions.size.toLong()
+    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+
+    ModalBottomSheet(
+        onDismissRequest = onDismiss,
+        sheetState = sheetState,
+        containerColor = Color.White,
+        shape = RoundedCornerShape(topStart = 32.dp, topEnd = 32.dp),
+        dragHandle = {
+            Box(
+                modifier = Modifier
+                    .padding(top = 12.dp, bottom = 4.dp)
+                    .width(48.dp)
+                    .height(6.dp)
+                    .background(Color(0xFFE2E8F0), CircleShape)
+            )
+        },
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .testTag("cash-session-summary-sheet")
+                .padding(start = 24.dp, end = 24.dp, top = 4.dp, bottom = 32.dp),
+        ) {
+            // Sheet Header
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(bottom = 12.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text(
+                    text = "Ringkasan Kas",
+                    fontSize = 18.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = Color(0xFF1E293B),
+                    letterSpacing = (-0.3).sp,
+                )
+                Box(
+                    modifier = Modifier
+                        .size(32.dp)
+                        .clip(CircleShape)
+                        .clickable(onClick = onDismiss),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Icon(
+                        imageVector = Icons.Outlined.Close,
+                        contentDescription = "Tutup ringkasan",
+                        tint = Color(0xFF94A3B8),
+                        modifier = Modifier.size(20.dp),
+                    )
+                }
+            }
+
+            // Summary Metrics: Hero
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(top = 4.dp, bottom = 12.dp),
+                horizontalAlignment = Alignment.CenterHorizontally,
+            ) {
+                Text(
+                    text = "TOTAL KAS SISTEM",
+                    fontSize = 12.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    color = Color(0xFF94A3B8),
+                    letterSpacing = 0.5.sp,
+                )
+                Spacer(Modifier.height(4.dp))
+                Text(
+                    text = formatCashSummaryCurrency(totalSystemCash),
+                    fontSize = 28.sp,
+                    fontWeight = FontWeight.ExtraBold,
+                    color = Color(0xFF256B57),
+                    letterSpacing = (-0.5).sp,
+                )
+            }
+
+            HorizontalDivider(color = Color(0xFFF1F5F9), thickness = 1.dp)
+
+            // Metrics List
+            // 1. Total Sesi
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(vertical = 12.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text(
+                    text = "Total Sesi",
+                    fontSize = 14.sp,
+                    fontWeight = FontWeight.Medium,
+                    color = Color(0xFF64748B),
+                )
+                Text(
+                    text = "$totalSessions Sesi",
+                    fontSize = 14.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = Color(0xFF1E293B),
+                )
+            }
+
+            HorizontalDivider(color = Color(0xFFF1F5F9), thickness = 1.dp)
+
+            // 2. Sesi Terbuka (Active)
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(vertical = 12.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text(
+                    text = "Sesi Aktif (OPEN)",
+                    fontSize = 14.sp,
+                    fontWeight = FontWeight.Medium,
+                    color = Color(0xFF64748B),
+                )
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .size(8.dp)
+                            .background(Color(0xFF059669), CircleShape)
+                    )
+                    Text(
+                        text = "$openCount Sesi",
+                        fontSize = 14.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = Color(0xFF059669),
+                    )
+                }
+            }
+
+            HorizontalDivider(color = Color(0xFFF1F5F9), thickness = 1.dp)
+
+            // 3. Total Pengeluaran Kas
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(vertical = 12.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text(
+                    text = "Pengeluaran Kas",
+                    fontSize = 14.sp,
+                    fontWeight = FontWeight.Medium,
+                    color = Color(0xFF64748B),
+                )
+                Text(
+                    text = formatCashSummaryCurrency(totalExpenses),
+                    fontSize = 14.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    color = if (totalExpenses.compareTo(BigDecimal.ZERO) > 0) Color(0xFFDC2626) else Color(0xFF64748B),
+                )
+            }
+
+            HorizontalDivider(color = Color(0xFFF1F5F9), thickness = 1.dp)
+
+            // 4. Selisih Kas
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(vertical = 12.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text(
+                    text = "Selisih Kas",
+                    fontSize = 14.sp,
+                    fontWeight = FontWeight.Medium,
+                    color = Color(0xFF64748B),
+                )
+                Text(
+                    text = formatCashSummaryCurrency(difference),
+                    fontSize = 14.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = when {
+                        difference.compareTo(BigDecimal.ZERO) < 0 -> Color(0xFFDC2626)
+                        difference.compareTo(BigDecimal.ZERO) > 0 -> Color(0xFF059669)
+                        else -> Color(0xFF64748B)
+                    },
+                )
+            }
+
+            Spacer(Modifier.height(16.dp))
+
+            // Action Button Footer
+            Button(
+                onClick = onDismiss,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(48.dp),
+                shape = RoundedCornerShape(12.dp),
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = Color(0xFF256B57),
+                    contentColor = Color.White,
+                ),
+                elevation = ButtonDefaults.buttonElevation(defaultElevation = 2.dp),
+            ) {
+                Text(
+                    text = "Selesai",
+                    fontSize = 14.sp,
+                    fontWeight = FontWeight.Bold,
+                    letterSpacing = 0.3.sp,
+                )
+            }
+        }
+    }
+}
