@@ -1,5 +1,10 @@
 package com.tbterminal.app.ui.cashhistory
 
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.expandVertically
+import androidx.compose.animation.shrinkVertically
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -164,6 +169,7 @@ internal fun CashSessionHistoryScreen(
                     SessionListSection(
                         uiState = uiState,
                         compact = compact,
+                        isSearchExpanded = isSearchExpanded,
                         onSearchChanged = onSearchChanged,
                         onStatusFilterChanged = onStatusFilterChanged,
                         onRefresh = onRefresh,
@@ -511,6 +517,7 @@ private fun OverviewDivider() {
 private fun SessionListSection(
     uiState: CashSessionHistoryUiState,
     compact: Boolean,
+    isSearchExpanded: Boolean = false,
     onSearchChanged: (String) -> Unit,
     onStatusFilterChanged: (String) -> Unit,
     onRefresh: () -> Unit,
@@ -529,20 +536,86 @@ private fun SessionListSection(
         modifier = Modifier.fillMaxWidth().testTag("cash-session-list"),
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
-        SessionToolbar(
-            searchQuery = uiState.searchQuery,
-            selectedStatus = uiState.statusFilter,
-            isFiltered = isFiltered,
-            onSearchChanged = onSearchChanged,
-            onStatusFilterChanged = onStatusFilterChanged,
-            compact = compact,
-            onOpenMobileFilters = onOpenMobileFilters,
-        )
+        if (compact) {
+            // Expandable Search Bar for mobile
+            AnimatedVisibility(
+                visible = isSearchExpanded || uiState.searchQuery.isNotEmpty(),
+                enter = expandVertically() + fadeIn(),
+                exit = shrinkVertically() + fadeOut()
+            ) {
+                Surface(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(42.dp),
+                    color = Color.White,
+                    shape = RoundedCornerShape(12.dp),
+                    border = BorderStroke(1.dp, Color(0xFFCBD5E1)),
+                ) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .padding(horizontal = 12.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Icon(
+                            Icons.Outlined.Search,
+                            contentDescription = null,
+                            tint = Color(0xFF94A3B8),
+                            modifier = Modifier.size(18.dp),
+                        )
+                        Spacer(Modifier.width(8.dp))
+                        Box(modifier = Modifier.weight(1f), contentAlignment = Alignment.CenterStart) {
+                            if (uiState.searchQuery.isEmpty()) {
+                                Text(
+                                    text = "Cari kasir atau nomor sesi...",
+                                    fontSize = 13.sp,
+                                    color = Color(0xFF94A3B8),
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis,
+                                )
+                            }
+                            BasicTextField(
+                                value = uiState.searchQuery,
+                                onValueChange = onSearchChanged,
+                                singleLine = true,
+                                textStyle = TextStyle(
+                                    color = Color(0xFF0F172A),
+                                    fontSize = 13.sp,
+                                ),
+                                modifier = Modifier.fillMaxWidth().testTag("cash-session-search-input"),
+                            )
+                        }
+                        if (uiState.searchQuery.isNotEmpty()) {
+                            IconButton(
+                                onClick = { onSearchChanged("") },
+                                modifier = Modifier.size(36.dp),
+                            ) {
+                                Icon(
+                                    Icons.Outlined.Close,
+                                    contentDescription = "Hapus pencarian",
+                                    tint = Color(0xFF64748B),
+                                    modifier = Modifier.size(16.dp),
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+        } else {
+            SessionToolbar(
+                searchQuery = uiState.searchQuery,
+                selectedStatus = uiState.statusFilter,
+                isFiltered = isFiltered,
+                onSearchChanged = onSearchChanged,
+                onStatusFilterChanged = onStatusFilterChanged,
+                compact = false,
+                onOpenMobileFilters = onOpenMobileFilters,
+            )
+        }
         Row(
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(horizontal = 2.dp, vertical = 2.dp),
-            horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Text(
@@ -551,25 +624,6 @@ private fun SessionListSection(
                 color = Slate900,
                 fontWeight = FontWeight.Bold,
             )
-            if (visibleSessions.isNotEmpty()) {
-                Box(
-                    modifier = Modifier
-                        .size(32.dp)
-                        .clip(RoundedCornerShape(12.dp))
-                        .border(1.dp, Color(0xFFE2E8F0), RoundedCornerShape(12.dp))
-                        .background(Color.White)
-                        .clickable(onClick = onOpenMobileOverview)
-                        .testTag("cash-session-open-overview"),
-                    contentAlignment = Alignment.Center,
-                ) {
-                    Icon(
-                        Icons.Outlined.FactCheck,
-                        contentDescription = "Ringkasan",
-                        tint = Color(0xFF334155),
-                        modifier = Modifier.size(16.dp),
-                    )
-                }
-            }
         }
         when {
             uiState.isLoading -> SessionRowsSkeleton(compact)
@@ -1354,14 +1408,14 @@ private fun CashHistorySkeleton(compact: Boolean) {
         modifier = Modifier.fillMaxWidth().testTag("cash-session-skeleton"),
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
-        SkeletonBox(Modifier.fillMaxWidth().height(if (compact) 42.dp else 48.dp), shape = RoundedCornerShape(12.dp))
+        if (!compact) {
+            SkeletonBox(Modifier.fillMaxWidth().height(48.dp), shape = RoundedCornerShape(14.dp))
+        }
         Row(
             modifier = Modifier.fillMaxWidth().padding(horizontal = 2.dp),
-            horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically,
         ) {
             SkeletonBox(Modifier.width(110.dp).height(22.dp), shape = RoundedCornerShape(4.dp))
-            SkeletonBox(Modifier.size(32.dp), shape = CircleShape)
         }
         SessionRowsSkeleton(compact)
     }

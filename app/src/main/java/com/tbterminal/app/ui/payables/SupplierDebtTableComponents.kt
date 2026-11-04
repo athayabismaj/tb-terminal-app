@@ -1,5 +1,11 @@
 package com.tbterminal.app.ui.payables
 
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.expandVertically
+import androidx.compose.animation.shrinkVertically
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.material.icons.outlined.Close
 import com.tbterminal.app.ui.components.TbPagination
 
 import androidx.compose.foundation.BorderStroke
@@ -84,95 +90,75 @@ internal fun SupplierDebtTableCard(
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
             if (uiState.isLoading && uiState.payables.isEmpty()) {
-                // Search and Action Row Skeleton
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    SkeletonBox(Modifier.weight(1f).height(40.dp), shape = RoundedCornerShape(12.dp))
-                    SkeletonBox(Modifier.size(40.dp), shape = RoundedCornerShape(12.dp))
-                }
-
                 // Section Header Skeleton (Text di atas card)
                 Row(
                     modifier = Modifier.fillMaxWidth().padding(top = 4.dp, bottom = 2.dp),
-                    horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     SkeletonBox(Modifier.width(110.dp).height(20.dp), shape = RoundedCornerShape(4.dp))
-                    SkeletonBox(Modifier.size(32.dp), shape = RoundedCornerShape(12.dp))
                 }
 
                 // Cards Skeleton
                 SupplierDebtLoading(Modifier, compact = true)
             } else {
-                // Search and Action Row
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                // Expandable Search Bar (When Search is open in top bar or query is present)
+                AnimatedVisibility(
+                    visible = isSearchExpanded || uiState.searchQuery.isNotEmpty(),
+                    enter = expandVertically() + fadeIn(),
+                    exit = shrinkVertically() + fadeOut()
                 ) {
-                    BasicTextField(
-                        value = uiState.searchQuery,
-                        onValueChange = onSearchChanged,
-                        modifier = Modifier
-                            .weight(1f)
-                            .height(40.dp)
-                            .background(Color.White, RoundedCornerShape(12.dp))
-                            .border(1.dp, Color(0xFFE2E8F0).copy(alpha = 0.8f), RoundedCornerShape(12.dp)),
-                        textStyle = LocalTextStyle.current.copy(fontSize = 12.sp, color = Color(0xFF1E293B)),
-                        singleLine = true,
-                        decorationBox = { innerTextField ->
-                            Row(
-                                modifier = Modifier.fillMaxSize().padding(horizontal = 12.dp),
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                Icon(
-                                    Icons.Outlined.Search,
-                                    contentDescription = null,
-                                    tint = Color(0xFF94A3B8),
-                                    modifier = Modifier.size(16.dp)
-                                )
-                                Spacer(Modifier.width(8.dp))
-                                Box(Modifier.weight(1f)) {
-                                    if (uiState.searchQuery.isEmpty()) {
-                                        Text(
-                                            "Cari supplier atau nomor nota...",
-                                            color = Color(0xFF94A3B8),
-                                            fontSize = 12.sp
-                                        )
-                                    }
-                                    innerTextField()
-                                }
-                            }
-                        }
-                    )
-
                     Surface(
-                        onClick = { showMobileFilters = true },
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(42.dp),
                         color = Color.White,
                         shape = RoundedCornerShape(12.dp),
-                        border = BorderStroke(1.dp, Color(0xFFE2E8F0).copy(alpha = 0.8f)),
-                        modifier = Modifier.size(40.dp).testTag("supplier-debt-open-filters")
+                        border = BorderStroke(1.dp, Color(0xFFCBD5E1)),
                     ) {
-                        Box(contentAlignment = Alignment.Center) {
+                        Row(
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .padding(horizontal = 12.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
                             Icon(
-                                Icons.Outlined.Tune,
-                                contentDescription = "Filter",
-                                tint = Color(0xFF334155),
+                                Icons.Outlined.Search,
+                                contentDescription = null,
+                                tint = Color(0xFF94A3B8),
                                 modifier = Modifier.size(16.dp)
                             )
-                            if (uiState.statusFilter != SupplierDebtStatusFilter.All) {
+                            Spacer(Modifier.width(8.dp))
+                            Box(Modifier.weight(1f)) {
+                                if (uiState.searchQuery.isEmpty()) {
+                                    Text(
+                                        "Cari supplier atau nomor nota...",
+                                        color = Color(0xFF94A3B8),
+                                        fontSize = 12.sp
+                                    )
+                                }
+                                BasicTextField(
+                                    value = uiState.searchQuery,
+                                    onValueChange = onSearchChanged,
+                                    singleLine = true,
+                                    textStyle = LocalTextStyle.current.copy(fontSize = 12.sp, color = Color(0xFF1E293B)),
+                                    modifier = Modifier.fillMaxWidth().testTag("supplier-debt-search-input")
+                                )
+                            }
+                            if (uiState.searchQuery.isNotEmpty()) {
                                 Box(
                                     modifier = Modifier
-                                        .align(Alignment.TopEnd)
-                                        .padding(8.dp)
-                                        .size(8.dp)
-                                        .background(Color(0xFF256B57), CircleShape)
-                                        .border(2.dp, Color.White, CircleShape)
-                                        .testTag("supplier-debt-filter-dot")
-                                )
+                                        .size(20.dp)
+                                        .clip(CircleShape)
+                                        .clickable { onSearchChanged("") },
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Icon(
+                                        Icons.Outlined.Close,
+                                        contentDescription = "Hapus",
+                                        tint = Color(0xFF94A3B8),
+                                        modifier = Modifier.size(14.dp)
+                                    )
+                                }
                             }
                         }
                     }
@@ -181,7 +167,6 @@ internal fun SupplierDebtTableCard(
                 // Section Header
                 Row(
                     modifier = Modifier.fillMaxWidth().padding(top = 4.dp, bottom = 2.dp),
-                    horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Text(
@@ -190,23 +175,6 @@ internal fun SupplierDebtTableCard(
                         fontWeight = FontWeight.Bold,
                         color = Color(0xFF0F172A)
                     )
-                    Box(
-                        modifier = Modifier
-                            .size(32.dp)
-                            .clip(RoundedCornerShape(12.dp))
-                            .border(1.dp, Color(0xFFE2E8F0), RoundedCornerShape(12.dp))
-                            .clickable { onOpenMobileOverview() }
-                            .background(Color.White)
-                            .testTag("supplier-debt-open-overview"),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Icon(
-                            Icons.Outlined.FactCheck,
-                            contentDescription = "Ringkasan",
-                            tint = Color(0xFF334155),
-                            modifier = Modifier.size(16.dp)
-                        )
-                    }
                 }
 
                 // Cards Area
