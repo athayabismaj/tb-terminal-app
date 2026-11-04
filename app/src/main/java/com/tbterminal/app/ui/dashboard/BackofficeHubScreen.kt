@@ -39,10 +39,15 @@ import androidx.compose.material.icons.outlined.Inventory
 import androidx.compose.material.icons.outlined.LocalShipping
 import androidx.compose.material.icons.outlined.Payments
 import androidx.compose.material.icons.outlined.PointOfSale
+import androidx.compose.material.icons.outlined.QrCodeScanner
+import androidx.compose.material.icons.outlined.Search
 import androidx.compose.material.icons.outlined.Straighten
 import androidx.compose.material.icons.outlined.Tune
+import androidx.compose.material.icons.outlined.Visibility
+import androidx.compose.material.icons.outlined.VisibilityOff
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Tab
@@ -52,6 +57,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import com.tbterminal.app.data.repository.InventoryRepository
 import com.tbterminal.app.data.repository.RepositoryResult
+import com.tbterminal.app.ui.barcode.CameraBarcodeScannerDialog
 import com.tbterminal.app.ui.components.SkeletonBox
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
@@ -234,15 +240,21 @@ private fun FinanceHub(
     }
 }
 
-// ── COLOR PALETTE: REFINED INDUSTRIAL STANDARD ──
+// ── COLOR PALETTE: REFINED INDUSTRIAL STANDARD (TAILWIND SPEC) ──
 private val StockSlate900 = Color(0xFF0F172A)
+private val StockSlate800 = Color(0xFF1E293B)
 private val StockSlate700 = Color(0xFF334155)
 private val StockSlate500 = Color(0xFF64748B)
 private val StockSlate400 = Color(0xFF94A3B8)
 private val StockSlate200 = Color(0xFFE2E8F0)
 private val StockSlate100 = Color(0xFFF1F5F9)
-private val StockBrandSage = Color(0xFF256B57)
-private val StockBrandSageLight = Color(0xFFEAF3EF)
+
+private val StockBrand50 = Color(0xFFF0FDF4)
+private val StockBrand100 = Color(0xFFDCFCE7)
+private val StockBrand500 = Color(0xFF16A34A)
+private val StockBrand600 = Color(0xFF15803D)
+private val StockBrand700 = Color(0xFF166534)
+private val StockBrand800 = Color(0xFF14532D)
 
 @Composable
 private fun StockHub(
@@ -251,197 +263,19 @@ private fun StockHub(
     inventoryRepository: InventoryRepository? = null,
     onNavigate: (AdminDestination) -> Unit,
 ) {
-    Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .testTag("stock-hub-content")
-            .padding(bottom = 24.dp)
-    ) {
-        // Page Header
-        Column(modifier = Modifier.fillMaxWidth().padding(top = 12.dp, bottom = 18.dp)) {
-            Text(
-                text = "Manajemen Stok",
-                color = StockSlate900,
-                fontSize = 22.sp,
-                fontWeight = FontWeight.Bold,
-                letterSpacing = (-0.5).sp,
-            )
-            Text(
-                text = "Pusat katalog produk, valuasi aset gudang, dan audit mutasi fisik",
-                color = StockSlate500,
-                fontSize = 12.sp,
-                modifier = Modifier.padding(top = 4.dp),
-            )
-        }
+    var showBarcodeScanner by remember { mutableStateOf(false) }
 
-        // Executive Inventory Summary Banner (Ringkasan Aset & Peringatan Stok)
-        StockExecutiveBanner(
-            inventoryRepository = inventoryRepository,
-            onLowStockClick = { onNavigate(AdminDestination.Products) }
-        )
-
-        // Grup 1: Katalog & Harga Produk
-        Column(modifier = Modifier.fillMaxWidth().padding(bottom = 20.dp)) {
-            Text(
-                text = "KATALOG & HARGA PRODUK",
-                color = StockSlate500,
-                fontSize = 11.sp,
-                fontWeight = FontWeight.Bold,
-                letterSpacing = 0.5.sp,
-                modifier = Modifier.padding(start = 2.dp, bottom = 8.dp)
-            )
-            Surface(
-                modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(16.dp),
-                color = Color.White,
-                border = BorderStroke(1.dp, StockSlate200),
-            ) {
-                Column {
-                    StockHubItem(
-                        icon = Icons.Outlined.Inventory2,
-                        title = "Daftar produk",
-                        subtitle = "Katalog seluruh produk, stok fisik toko, & status aktif",
-                        onClick = { onNavigate(AdminDestination.Products) },
-                    )
-                    HorizontalDivider(color = StockSlate100, thickness = 1.dp)
-                    StockHubItem(
-                        icon = Icons.Outlined.LocalOffer,
-                        title = "Harga & margin produk",
-                        subtitle = "Kelola harga jual toko, harga modal (HPP), & margin keuntungan",
-                        onClick = { onNavigate(AdminDestination.PriceManagement) },
-                    )
-                }
+    if (showBarcodeScanner) {
+        CameraBarcodeScannerDialog(
+            onDismissRequest = { showBarcodeScanner = false },
+            onBarcodeScanned = { _ ->
+                showBarcodeScanner = false
+                onNavigate(AdminDestination.Products)
             }
-        }
-
-        // Grup 2: Mutasi & Audit Stok
-        Column(modifier = Modifier.fillMaxWidth().padding(bottom = 20.dp)) {
-            Text(
-                text = "MUTASI & AUDIT STOK",
-                color = StockSlate500,
-                fontSize = 11.sp,
-                fontWeight = FontWeight.Bold,
-                letterSpacing = 0.5.sp,
-                modifier = Modifier.padding(start = 2.dp, bottom = 8.dp)
-            )
-            Surface(
-                modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(16.dp),
-                color = Color.White,
-                border = BorderStroke(1.dp, StockSlate200),
-            ) {
-                Column {
-                    StockHubItem(
-                        icon = Icons.AutoMirrored.Outlined.ListAlt,
-                        title = "Kartu stok",
-                        subtitle = "Riwayat mutasi keluar-masuk barang & log audit transaksi",
-                        onClick = { onNavigate(AdminDestination.StockReport) },
-                    )
-                    HorizontalDivider(color = StockSlate100, thickness = 1.dp)
-                    StockHubItem(
-                        icon = Icons.Outlined.Tune,
-                        title = "Sesuaikan stok (opname)",
-                        subtitle = "Koreksi pencocokan fisik gudang vs sistem & rekonsiliasi selisih",
-                        onClick = { onNavigate(AdminDestination.StockOpname) },
-                    )
-                }
-            }
-        }
-
-        // Grup 3: Master Data & Atribut
-        Column(modifier = Modifier.fillMaxWidth()) {
-            Text(
-                text = "PENGATURAN MASTER PRODUK",
-                color = StockSlate500,
-                fontSize = 11.sp,
-                fontWeight = FontWeight.Bold,
-                letterSpacing = 0.5.sp,
-                modifier = Modifier.padding(start = 2.dp, bottom = 8.dp)
-            )
-            Surface(
-                modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(16.dp),
-                color = Color.White,
-                border = BorderStroke(1.dp, StockSlate200),
-            ) {
-                Column {
-                    StockHubItem(
-                        icon = Icons.Outlined.Category,
-                        title = "Kategori produk",
-                        subtitle = "Pengelompokan produk berdasarkan jenis etalase & penataan rak",
-                        onClick = { onNavigate(AdminDestination.ProductCategories) },
-                    )
-                    HorizontalDivider(color = StockSlate100, thickness = 1.dp)
-                    StockHubItem(
-                        icon = Icons.Outlined.Straighten,
-                        title = "Satuan produk",
-                        subtitle = "Pengaturan unit ukuran barang (sak, batang, dus, meter, pcs)",
-                        onClick = { onNavigate(AdminDestination.ProductUnits) },
-                    )
-                }
-            }
-        }
-    }
-}
-
-@Composable
-private fun StockHubItem(
-    icon: androidx.compose.ui.graphics.vector.ImageVector,
-    title: String,
-    subtitle: String,
-    onClick: () -> Unit,
-    modifier: Modifier = Modifier,
-) {
-    Row(
-        modifier = modifier
-            .fillMaxWidth()
-            .clickable(onClick = onClick)
-            .padding(horizontal = 16.dp, vertical = 14.dp),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(14.dp),
-    ) {
-        Box(
-            modifier = Modifier
-                .size(38.dp)
-                .clip(RoundedCornerShape(10.dp))
-                .background(StockBrandSageLight),
-            contentAlignment = Alignment.Center,
-        ) {
-            Icon(
-                imageVector = icon,
-                contentDescription = null,
-                tint = StockBrandSage,
-                modifier = Modifier.size(20.dp),
-            )
-        }
-        Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
-            Text(
-                text = title,
-                color = StockSlate900,
-                fontSize = 14.sp,
-                fontWeight = FontWeight.SemiBold,
-            )
-            Text(
-                text = subtitle,
-                color = StockSlate500,
-                fontSize = 12.sp,
-                lineHeight = 16.sp,
-            )
-        }
-        Icon(
-            imageVector = Icons.Default.ChevronRight,
-            contentDescription = null,
-            tint = StockSlate400,
-            modifier = Modifier.size(18.dp),
         )
     }
-}
 
-@Composable
-private fun StockExecutiveBanner(
-    inventoryRepository: InventoryRepository?,
-    onLowStockClick: () -> Unit
-) {
+    // Load inventory valuation and stats
     var valuationSummary by remember { mutableStateOf<com.tbterminal.app.data.costing.InventoryValuationSummary?>(null) }
     var lowStockCount by remember { mutableIntStateOf(0) }
     var totalProductsCount by remember { mutableIntStateOf(0) }
@@ -460,48 +294,233 @@ private fun StockExecutiveBanner(
         }
     }
 
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .testTag("stock-hub-content")
+            .padding(bottom = 24.dp),
+        verticalArrangement = Arrangement.spacedBy(20.dp)
+    ) {
+        // BEGIN: PageHeader
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(top = 4.dp),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Column {
+                Text(
+                    text = "Manajemen Stok",
+                    color = StockSlate900,
+                    fontSize = 24.sp,
+                    fontWeight = FontWeight.Bold,
+                    letterSpacing = (-0.5).sp,
+                )
+                Text(
+                    text = "Inventaris & Valuasi Gudang",
+                    color = StockSlate500,
+                    fontSize = 12.sp,
+                    modifier = Modifier.padding(top = 2.dp),
+                )
+            }
+
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                // Search Button (Circle 40dp, white, border Slate 200)
+                Box(
+                    modifier = Modifier
+                        .size(40.dp)
+                        .clip(CircleShape)
+                        .background(Color.White)
+                        .border(BorderStroke(1.dp, StockSlate200.copy(alpha = 0.8f)), CircleShape)
+                        .clickable { onNavigate(AdminDestination.Products) },
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(
+                        imageVector = Icons.Outlined.Search,
+                        contentDescription = "Cari Produk",
+                        tint = StockSlate700,
+                        modifier = Modifier.size(18.dp)
+                    )
+                }
+
+                // Barcode Scan Button (Circle 40dp, emerald 800, white icon)
+                Box(
+                    modifier = Modifier
+                        .size(40.dp)
+                        .clip(CircleShape)
+                        .background(StockBrand800)
+                        .clickable { showBarcodeScanner = true },
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(
+                        imageVector = Icons.Outlined.QrCodeScanner,
+                        contentDescription = "Scan Barcode",
+                        tint = Color.White,
+                        modifier = Modifier.size(18.dp)
+                    )
+                }
+            }
+        }
+        // END: PageHeader
+
+        // BEGIN: ValuationDashboardCard
+        StockValuationDashboardCard(
+            valuationSummary = valuationSummary,
+            totalProductsCount = totalProductsCount,
+            lowStockCount = lowStockCount,
+            isLoading = isLoading,
+            onLowStockClick = { onNavigate(AdminDestination.Products) }
+        )
+        // END: ValuationDashboardCard
+
+        // BEGIN: SectionCatalogPricing
+        Column(modifier = Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Text(
+                text = "KATALOG & HARGA",
+                color = StockSlate500,
+                fontSize = 11.sp,
+                fontWeight = FontWeight.SemiBold,
+                letterSpacing = 0.5.sp,
+                modifier = Modifier.padding(start = 4.dp)
+            )
+            Surface(
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(16.dp),
+                color = Color.White,
+                border = BorderStroke(1.dp, StockSlate200.copy(alpha = 0.8f)),
+            ) {
+                Column {
+                    StockHubItem(
+                        icon = Icons.Outlined.Inventory2,
+                        title = "Daftar Produk",
+                        subtitle = if (totalProductsCount > 0) "$totalProductsCount produk terdaftar" else "Katalog seluruh produk, stok fisik toko, & status aktif",
+                        onClick = { onNavigate(AdminDestination.Products) },
+                    )
+                    HorizontalDivider(color = StockSlate100, thickness = 1.dp)
+                    StockHubItem(
+                        icon = Icons.Outlined.LocalOffer,
+                        title = "Harga & Margin",
+                        subtitle = "Kelola margin keuntungan & HPP",
+                        onClick = { onNavigate(AdminDestination.PriceManagement) },
+                    )
+                }
+            }
+        }
+        // END: SectionCatalogPricing
+
+        // BEGIN: SectionMutationAudit
+        Column(modifier = Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Text(
+                text = "MUTASI & AUDIT STOK",
+                color = StockSlate500,
+                fontSize = 11.sp,
+                fontWeight = FontWeight.SemiBold,
+                letterSpacing = 0.5.sp,
+                modifier = Modifier.padding(start = 4.dp)
+            )
+            Surface(
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(16.dp),
+                color = Color.White,
+                border = BorderStroke(1.dp, StockSlate200.copy(alpha = 0.8f)),
+            ) {
+                Column {
+                    StockHubItem(
+                        icon = Icons.AutoMirrored.Outlined.ListAlt,
+                        title = "Kartu Stok",
+                        subtitle = "Riwayat & log arus keluar-masuk",
+                        onClick = { onNavigate(AdminDestination.StockReport) },
+                    )
+                    HorizontalDivider(color = StockSlate100, thickness = 1.dp)
+                    StockHubItem(
+                        icon = Icons.Outlined.Tune,
+                        title = "Stok Opname",
+                        subtitle = "Pencocokan & selisih fisik",
+                        onClick = { onNavigate(AdminDestination.StockOpname) },
+                    )
+                }
+            }
+        }
+        // END: SectionMutationAudit
+
+        // BEGIN: SectionMasterData
+        Column(modifier = Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Text(
+                text = "MASTER DATA",
+                color = StockSlate500,
+                fontSize = 11.sp,
+                fontWeight = FontWeight.SemiBold,
+                letterSpacing = 0.5.sp,
+                modifier = Modifier.padding(start = 4.dp)
+            )
+            Surface(
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(16.dp),
+                color = Color.White,
+                border = BorderStroke(1.dp, StockSlate200.copy(alpha = 0.8f)),
+            ) {
+                Column {
+                    StockHubItem(
+                        icon = Icons.Outlined.Category,
+                        title = "Kategori Produk",
+                        subtitle = "Kelompok & rak etalase",
+                        onClick = { onNavigate(AdminDestination.ProductCategories) },
+                    )
+                    HorizontalDivider(color = StockSlate100, thickness = 1.dp)
+                    StockHubItem(
+                        icon = Icons.Outlined.Straighten,
+                        title = "Satuan Ukuran",
+                        subtitle = "Pcs, sak, batang, dus, meter",
+                        onClick = { onNavigate(AdminDestination.ProductUnits) },
+                    )
+                }
+            }
+        }
+        // END: SectionMasterData
+    }
+}
+
+@Composable
+private fun StockValuationDashboardCard(
+    valuationSummary: com.tbterminal.app.data.costing.InventoryValuationSummary?,
+    totalProductsCount: Int,
+    lowStockCount: Int,
+    isLoading: Boolean,
+    onLowStockClick: () -> Unit,
+) {
+    var isValuationVisible by remember { mutableStateOf(true) }
+
     Surface(
-        modifier = Modifier.fillMaxWidth().padding(bottom = 20.dp),
+        modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(16.dp),
         color = Color.White,
-        border = BorderStroke(1.dp, StockSlate200),
+        border = BorderStroke(1.dp, StockSlate200.copy(alpha = 0.8f)),
     ) {
-        Column(modifier = Modifier.padding(16.dp)) {
+        Column(
+            modifier = Modifier.padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(14.dp)
+        ) {
+            // Header Row: "VALUASI STOK TOKO" and Status Pill
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    Box(
-                        modifier = Modifier
-                            .size(24.dp)
-                            .clip(RoundedCornerShape(6.dp))
-                            .background(StockBrandSageLight),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Icon(
-                            imageVector = Icons.Outlined.Inventory2,
-                            contentDescription = null,
-                            tint = StockBrandSage,
-                            modifier = Modifier.size(14.dp)
-                        )
-                    }
-                    Text(
-                        text = "RINGKASAN ASET & GUDANG",
-                        fontSize = 11.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = StockSlate500,
-                        letterSpacing = 0.5.sp
-                    )
-                }
+                Text(
+                    text = "VALUASI STOK TOKO",
+                    fontSize = 11.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    color = StockSlate400,
+                    letterSpacing = 0.5.sp
+                )
 
                 if (!isLoading && lowStockCount > 0) {
                     Surface(
-                        shape = RoundedCornerShape(6.dp),
+                        shape = RoundedCornerShape(50),
                         color = Color(0xFFFEF3C7),
                         border = BorderStroke(1.dp, Color(0xFFFDE68A)),
                         modifier = Modifier.clickable(onClick = onLowStockClick)
@@ -509,133 +528,250 @@ private fun StockExecutiveBanner(
                         Row(
                             modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp),
                             verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(5.dp)
+                            horizontalArrangement = Arrangement.spacedBy(6.dp)
                         ) {
                             Box(modifier = Modifier.size(6.dp).clip(CircleShape).background(Color(0xFFD97706)))
                             Text(
-                                text = "$lowStockCount butuh restok",
+                                text = "$lowStockCount Perlu Restok",
                                 fontSize = 11.sp,
-                                fontWeight = FontWeight.SemiBold,
+                                fontWeight = FontWeight.Medium,
                                 color = Color(0xFFB45309)
                             )
                         }
                     }
                 } else if (!isLoading) {
                     Surface(
-                        shape = RoundedCornerShape(6.dp),
-                        color = StockBrandSageLight,
-                        border = BorderStroke(1.dp, StockBrandSage.copy(alpha = 0.2f))
+                        shape = RoundedCornerShape(50),
+                        color = StockBrand50,
+                        border = BorderStroke(1.dp, StockBrand100)
                     ) {
                         Row(
                             modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp),
                             verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(5.dp)
+                            horizontalArrangement = Arrangement.spacedBy(6.dp)
                         ) {
-                            Box(modifier = Modifier.size(6.dp).clip(CircleShape).background(StockBrandSage))
+                            Box(modifier = Modifier.size(6.dp).clip(CircleShape).background(StockBrand500))
                             Text(
-                                text = "Stok aman",
+                                text = "Stok Aman",
                                 fontSize = 11.sp,
-                                fontWeight = FontWeight.SemiBold,
-                                color = StockBrandSage
+                                fontWeight = FontWeight.Medium,
+                                color = StockBrand700
                             )
                         }
                     }
                 }
             }
 
-            Spacer(Modifier.height(14.dp))
-
-            if (isLoading) {
-                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                    SkeletonBox(Modifier.weight(1.3f).height(44.dp))
-                    SkeletonBox(Modifier.weight(1f).height(44.dp))
-                }
-            } else {
+            // Asset Value Row
+            Column {
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Column(modifier = Modifier.weight(1.3f)) {
-                        Text(
-                            text = "Total Valuasi Stok (HPP)",
-                            fontSize = 11.sp,
-                            fontWeight = FontWeight.Medium,
-                            color = StockSlate500
-                        )
-                        Spacer(Modifier.height(2.dp))
-                        val valText = valuationSummary?.totalValuation?.let {
-                            java.text.NumberFormat.getCurrencyInstance(java.util.Locale.forLanguageTag("id-ID")).apply {
-                                maximumFractionDigits = 0
-                            }.format(it).replace(" ", "")
-                        } ?: "Rp0"
-                        Text(
-                            text = valText,
-                            fontSize = 20.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = StockSlate900,
-                            letterSpacing = (-0.5).sp
-                        )
-                    }
-
-                    Box(
-                        modifier = Modifier
-                            .width(1.dp)
-                            .height(36.dp)
-                            .background(StockSlate200)
+                    Text(
+                        text = "Total Nilai Aset (HPP)",
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.Medium,
+                        color = StockSlate500
                     )
-
-                    Column(
-                        modifier = Modifier
-                            .weight(1f)
-                            .padding(start = 16.dp),
-                        horizontalAlignment = Alignment.Start
+                    IconButton(
+                        onClick = { isValuationVisible = !isValuationVisible },
+                        modifier = Modifier.size(24.dp)
                     ) {
-                        Text(
-                            text = "Katalog Aktif",
-                            fontSize = 11.sp,
-                            fontWeight = FontWeight.Medium,
-                            color = StockSlate500
-                        )
-                        Spacer(Modifier.height(2.dp))
-                        Text(
-                            text = "$totalProductsCount Produk",
-                            fontSize = 16.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = StockSlate900
+                        Icon(
+                            imageVector = if (isValuationVisible) Icons.Outlined.Visibility else Icons.Outlined.VisibilityOff,
+                            contentDescription = if (isValuationVisible) "Sembunyikan nilai aset" else "Tampilkan nilai aset",
+                            tint = StockSlate400,
+                            modifier = Modifier.size(16.dp)
                         )
                     }
                 }
 
-                if (lowStockCount > 0) {
-                    HorizontalDivider(
-                        color = StockSlate100,
-                        thickness = 1.dp,
-                        modifier = Modifier.padding(top = 12.dp, bottom = 8.dp)
+                if (isLoading) {
+                    SkeletonBox(
+                        modifier = Modifier
+                            .fillMaxWidth(0.5f)
+                            .height(28.dp)
+                            .padding(top = 4.dp)
+                    )
+                } else {
+                    val formattedValuation = valuationSummary?.totalValuation?.let {
+                        java.text.NumberFormat.getCurrencyInstance(java.util.Locale.forLanguageTag("id-ID")).apply {
+                            maximumFractionDigits = 0
+                        }.format(it).replace(" ", "")
+                    } ?: "Rp0"
+
+                    Text(
+                        text = if (isValuationVisible) formattedValuation else "Rp ••••••••",
+                        fontSize = 24.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = StockSlate900,
+                        letterSpacing = (-0.5).sp,
+                        modifier = Modifier.padding(top = 2.dp)
+                    )
+                }
+            }
+
+            HorizontalDivider(color = StockSlate100, thickness = 1.dp)
+
+            // 3-Column Split Grid
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                // Column 1: Katalog Aktif
+                Column(
+                    modifier = Modifier.weight(1f),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.Center
+                ) {
+                    Text(
+                        text = "Katalog Aktif",
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.Medium,
+                        color = StockSlate400
+                    )
+                    Text(
+                        text = if (isLoading) "-" else "$totalProductsCount Item",
+                        fontSize = 14.sp,
+                        fontWeight = FontWeight.SemiBold,
+                        color = StockSlate800,
+                        modifier = Modifier.padding(top = 4.dp)
+                    )
+                }
+
+                // Vertical Divider
+                Box(
+                    modifier = Modifier
+                        .width(1.dp)
+                        .height(30.dp)
+                        .background(StockSlate100)
+                )
+
+                // Column 2: Perlu Restok
+                Column(
+                    modifier = Modifier
+                        .weight(1f)
+                        .clickable(enabled = lowStockCount > 0, onClick = onLowStockClick),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.Center
+                ) {
+                    Text(
+                        text = "Perlu Restok",
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.Medium,
+                        color = StockSlate400
+                    )
+                    Text(
+                        text = if (isLoading) "-" else "$lowStockCount Item",
+                        fontSize = 14.sp,
+                        fontWeight = FontWeight.SemiBold,
+                        color = if (lowStockCount > 0) Color(0xFFB45309) else StockSlate800,
+                        modifier = Modifier.padding(top = 4.dp)
+                    )
+                }
+
+                // Vertical Divider
+                Box(
+                    modifier = Modifier
+                        .width(1.dp)
+                        .height(30.dp)
+                        .background(StockSlate100)
+                )
+
+                // Column 3: Status Sync
+                Column(
+                    modifier = Modifier.weight(1f),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.Center
+                ) {
+                    Text(
+                        text = "Status Sync",
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.Medium,
+                        color = StockSlate400
                     )
                     Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .clickable(onClick = onLowStockClick),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
+                        modifier = Modifier.padding(top = 4.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(6.dp)
                     ) {
-                        Text(
-                            text = "Tinjau $lowStockCount produk yang stoknya menipis",
-                            fontSize = 12.sp,
-                            fontWeight = FontWeight.Medium,
-                            color = Color(0xFFB45309)
+                        Box(
+                            modifier = Modifier
+                                .size(6.dp)
+                                .clip(CircleShape)
+                                .background(StockBrand500)
                         )
-                        Icon(
-                            imageVector = Icons.Default.ChevronRight,
-                            contentDescription = null,
-                            tint = Color(0xFFB45309),
-                            modifier = Modifier.size(16.dp)
+                        Text(
+                            text = "Tersinkron",
+                            fontSize = 14.sp,
+                            fontWeight = FontWeight.SemiBold,
+                            color = StockSlate800
                         )
                     }
                 }
             }
         }
+    }
+}
+
+@Composable
+private fun StockHubItem(
+    icon: ImageVector,
+    title: String,
+    subtitle: String,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Row(
+        modifier = modifier
+            .fillMaxWidth()
+            .clickable(onClick = onClick)
+            .padding(horizontal = 14.dp, vertical = 14.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.SpaceBetween,
+    ) {
+        Row(
+            modifier = Modifier.weight(1f),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(14.dp)
+        ) {
+            Box(
+                modifier = Modifier
+                    .size(40.dp)
+                    .clip(RoundedCornerShape(12.dp))
+                    .background(StockBrand50),
+                contentAlignment = Alignment.Center,
+            ) {
+                Icon(
+                    imageVector = icon,
+                    contentDescription = null,
+                    tint = StockBrand700,
+                    modifier = Modifier.size(20.dp),
+                )
+            }
+            Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                Text(
+                    text = title,
+                    color = StockSlate800,
+                    fontSize = 14.sp,
+                    fontWeight = FontWeight.SemiBold,
+                )
+                Text(
+                    text = subtitle,
+                    color = StockSlate500,
+                    fontSize = 12.sp,
+                    lineHeight = 16.sp,
+                )
+            }
+        }
+        Icon(
+            imageVector = Icons.Default.ChevronRight,
+            contentDescription = null,
+            tint = StockSlate400,
+            modifier = Modifier.size(16.dp),
+        )
     }
 }
 
