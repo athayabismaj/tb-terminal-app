@@ -14,6 +14,25 @@ import com.tbterminal.app.ui.dashboard.admin.AdminDashboardShell
 import com.tbterminal.app.ui.dashboard.admin.AdminDestination
 import com.tbterminal.app.ui.components.RefreshableContent
 import com.tbterminal.app.ui.components.TopFloatingCapsule
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.Search
+import androidx.compose.material.icons.outlined.Tune
+import androidx.compose.material.icons.outlined.Description
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.padding
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.platform.testTag
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.runtime.saveable.rememberSaveable
+
 
 @Composable
 fun AdminPurchaseHistoryScreen(
@@ -42,6 +61,11 @@ fun AdminPurchaseHistoryScreen(
     viewModel: PurchaseHistoryViewModel = viewModel(factory = PurchaseHistoryViewModel.factory(purchasingRepository))
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+    var isSearchExpanded by rememberSaveable { mutableStateOf(false) }
+    var showFilterPopup by remember { mutableStateOf(false) }
+    var showSummaryPopup by rememberSaveable { mutableStateOf(false) }
+
+    val isFiltered = uiState.isFiltered
 
     AdminDashboardShell(
         userName = name,
@@ -49,6 +73,61 @@ fun AdminPurchaseHistoryScreen(
         activeDestination = AdminDestination.PurchaseHistory,
         pageTitle = "Riwayat Pembelian",
         showPageHeader = true,
+        topBarActions = {
+            // Button 1: Search [ 🔍 ]
+            IconButton(
+                onClick = { isSearchExpanded = !isSearchExpanded },
+                modifier = Modifier.size(36.dp).testTag("purchase-history-toggle-search")
+            ) {
+                Icon(
+                    imageVector = Icons.Outlined.Search,
+                    contentDescription = "Cari transaksi",
+                    tint = if (isSearchExpanded || uiState.searchQuery.isNotEmpty()) Color(0xFF256B57) else Color(0xFF475569),
+                    modifier = Modifier.size(20.dp)
+                )
+            }
+
+            // Button 2: Filter [ ⚙️ ]
+            Box(
+                modifier = Modifier.size(36.dp),
+                contentAlignment = Alignment.Center
+            ) {
+                IconButton(
+                    onClick = { showFilterPopup = true },
+                    modifier = Modifier.size(36.dp).testTag("purchase-history-open-filters")
+                ) {
+                    Icon(
+                        imageVector = Icons.Outlined.Tune,
+                        contentDescription = "Filter transaksi",
+                        tint = if (isFiltered) Color(0xFF256B57) else Color(0xFF475569),
+                        modifier = Modifier.size(20.dp)
+                    )
+                }
+                if (isFiltered) {
+                    Box(
+                        modifier = Modifier
+                            .align(Alignment.TopEnd)
+                            .padding(top = 4.dp, end = 4.dp)
+                            .size(8.dp)
+                            .background(Color(0xFFE5A93C), CircleShape)
+                            .border(1.5.dp, Color.White, CircleShape)
+                    )
+                }
+            }
+
+            // Button 3: Rekap / Ringkasan [ 📑 ]
+            IconButton(
+                onClick = { showSummaryPopup = true },
+                modifier = Modifier.size(36.dp).testTag("purchase-history-summary")
+            ) {
+                Icon(
+                    imageVector = Icons.Outlined.Description,
+                    contentDescription = "Tampilkan rekap nota",
+                    tint = Color(0xFF475569),
+                    modifier = Modifier.size(20.dp)
+                )
+            }
+        },
         onDashboardClick = onDashboardClick,
         onProductsClick = onProductsClick,
         onAddProductClick = onAddProductClick,
@@ -78,13 +157,23 @@ fun AdminPurchaseHistoryScreen(
                 PurchaseHistoryScreen(
                     modifier = Modifier,
                     uiState = uiState,
-                    onFilterApplied = viewModel::onFilterApplied,
+                    isSearchExpanded = isSearchExpanded,
+                    onToggleSearch = { isSearchExpanded = !isSearchExpanded },
+                    showFilterPopup = showFilterPopup,
+                    onDismissFilter = { showFilterPopup = false },
+                    showSummaryPopup = showSummaryPopup,
+                    onDismissSummary = { showSummaryPopup = false },
+                    onFilterApplied = { supplierId, startDate, endDate, periodType, sortOrder ->
+                        viewModel.onFilterApplied(supplierId, startDate, endDate, periodType, sortOrder)
+                    },
+                    onResetAllFilters = viewModel::onResetFilters,
                     onSearchChanged = viewModel::onSearchChanged,
                     onRefresh = viewModel::refresh,
                     onShowDetail = viewModel::showDetail,
                     onDismissDetail = viewModel::dismissDetail,
                     onPreviousPage = viewModel::previousPage,
-                    onNextPage = viewModel::nextPage
+                    onNextPage = viewModel::nextPage,
+                    onAddPurchase = onIncomingGoodsFormClick
                 )
             }
             if (uiState.purchases.isNotEmpty()) {

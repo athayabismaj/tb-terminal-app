@@ -71,6 +71,16 @@ interface PurchasingApi {
     suspend fun createSupplierPayment(
         @Body request: SupplierPaymentRequestDto
     ): Response<ApiResponse<SupplierPaymentResponseDto>>
+
+    @POST("/api/purchasing/payables/opening-balance")
+    suspend fun createOpeningBalance(
+        @Body request: CreateStandalonePayableRequestDto
+    ): Response<ApiResponse<PayableResponseDto>>
+
+    @POST("/api/purchasing/payables/adjustment")
+    suspend fun createAdjustment(
+        @Body request: CreateStandalonePayableRequestDto
+    ): Response<ApiResponse<PayableResponseDto>>
 }
 
 @Serializable
@@ -181,4 +191,15 @@ data class SupplierPaymentResponseDto(
     val paidAt: String,
     val payableStatus: String,
     @Serializable(with = BigDecimalStringSerializer::class) val payableRemainingAmount: BigDecimal
+)
+
+@Serializable
+data class CreateStandalonePayableRequestDto(
+    val supplierId: String,
+    @Serializable(with = BigDecimalStringSerializer::class) val amount: BigDecimal,
+    val debtDate: String,
+    val dueDate: String,
+    val legacyInvoiceNumber: String? = null,
+    val source: String = "OPENING_BALANCE",
+    val notes: String? = null
 )

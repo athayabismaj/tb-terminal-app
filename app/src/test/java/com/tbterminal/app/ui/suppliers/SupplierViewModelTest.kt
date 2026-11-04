@@ -161,5 +161,11 @@ class SupplierViewModelTest {
 
         override suspend fun createSupplierPayment(command: CreateSupplierPaymentCommand): RepositoryResult<SupplierPaymentReceipt> =
             RepositoryResult.Error(code = "ERR", message = "Not implemented")
+
+        override suspend fun createOpeningBalance(command: com.tbterminal.app.data.model.CreateOpeningPayableCommand): RepositoryResult<SupplierPayable> =
+            RepositoryResult.Error(code = "ERR", message = "Not implemented")
+
+        override suspend fun createAdjustment(command: com.tbterminal.app.data.model.CreatePayableAdjustmentCommand): RepositoryResult<SupplierPayable> =
+            RepositoryResult.Error(code = "ERR", message = "Not implemented")
     }
 }

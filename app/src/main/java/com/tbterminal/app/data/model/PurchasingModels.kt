@@ -113,6 +113,24 @@ data class CreateSupplierPaymentCommand(
     val notes: String?
 )
 
+data class CreateOpeningPayableCommand(
+    val supplierId: String,
+    val amount: BigDecimal,
+    val debtDate: String,
+    val dueDate: String,
+    val legacyInvoiceNumber: String?,
+    val notes: String?
+)
+
+data class CreatePayableAdjustmentCommand(
+    val supplierId: String,
+    val amount: BigDecimal,
+    val debtDate: String,
+    val dueDate: String,
+    val reference: String,
+    val reason: String
+)
+
 data class SupplierPaymentReceipt(
     val id: String,
     val payableId: String,

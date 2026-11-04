@@ -154,7 +154,7 @@ class SecurityLogViewModel(
             val todayStr = LocalDate.now(WIB_ZONE).toString()
             val isSingleToday = current.selectedPreset == "Hari" ||
                 current.selectedPreset == "Hari ini" ||
-                (current.startDate == todayStr && current.endDate == todayStr)
+                (current.selectedPreset == null && current.startDate == todayStr && current.endDate == todayStr)
 
             val rangeQuery = when {
                 isSingleToday -> "today"

@@ -11,6 +11,8 @@ data class IncomingGoodsUiState(
     val selectedSupplier: Supplier? = null,
     val productSearchQuery: String = "",
     val categoryFilter: String? = null,
+    val stockStatusFilter: IncomingStockStatusFilter = IncomingStockStatusFilter.ALL,
+    val sortOrder: IncomingProductSortOrder = IncomingProductSortOrder.NEWEST,
     val currentPage: Int = 1,
     val newSupplierNameInput: String = "",
     val invoiceNoInput: String = "",
@@ -90,9 +92,28 @@ data class IncomingGoodsUiState(
         get() = products.map(ProductStock::categoryName).distinct().sorted()
 
     val tableProducts: List<ProductStock>
-        get() = products.filter { product ->
-            categoryFilter == null || product.categoryName == categoryFilter
+        get() {
+            var filtered = products.filter { product ->
+                categoryFilter == null || product.categoryName.equals(categoryFilter, ignoreCase = true)
+            }
+            when (stockStatusFilter) {
+                IncomingStockStatusFilter.ALL -> Unit
+                IncomingStockStatusFilter.SAFE -> filtered = filtered.filter { it.quantity > it.minStock }
+                IncomingStockStatusFilter.LOW -> filtered = filtered.filter { it.quantity > BigDecimal.ZERO && it.quantity <= it.minStock }
+                IncomingStockStatusFilter.OUT_OF_STOCK -> filtered = filtered.filter { it.quantity <= BigDecimal.ZERO }
+            }
+            return when (sortOrder) {
+                IncomingProductSortOrder.NEWEST -> filtered
+                IncomingProductSortOrder.NAME_ASC -> filtered.sortedBy { it.productName.lowercase() }
+                IncomingProductSortOrder.STOCK_DESC -> filtered.sortedByDescending { it.quantity }
+                IncomingProductSortOrder.PRICE_ASC -> filtered.sortedBy { it.priceBuy }
+            }
         }
+
+    val isFiltered: Boolean
+        get() = categoryFilter != null ||
+            stockStatusFilter != IncomingStockStatusFilter.ALL ||
+            sortOrder != IncomingProductSortOrder.NEWEST
 
     val tablePage: Int
         get() = currentPage.coerceIn(1, totalTablePages)
@@ -149,4 +170,19 @@ internal fun String.decimalInput(): String {
 
 internal fun BigDecimal.toInputText(): String {
     return stripTrailingZeros().toPlainString()
+}
+
+
+enum class IncomingStockStatusFilter(val label: String) {
+    ALL("Semua"),
+    SAFE("Aman"),
+    LOW("Menipis"),
+    OUT_OF_STOCK("Habis");
+}
+
+enum class IncomingProductSortOrder(val label: String) {
+    NEWEST("Terbaru"),
+    NAME_ASC("Nama (A–Z)"),
+    STOCK_DESC("Stok Terbanyak"),
+    PRICE_ASC("Harga Terendah");
 }

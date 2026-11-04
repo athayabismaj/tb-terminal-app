@@ -121,6 +121,13 @@ private val SessionDanger = TbError
 internal fun CashSessionHistoryScreen(
     modifier: Modifier,
     uiState: CashSessionHistoryUiState,
+    isSearchExpanded: Boolean = false,
+    showFilterPopup: Boolean = false,
+    showSummaryPopup: Boolean = false,
+    onDismissFilter: () -> Unit = {},
+    onDismissSummary: () -> Unit = {},
+    onOpenFilter: () -> Unit = {},
+    onOpenSummary: () -> Unit = {},
     onSearchChanged: (String) -> Unit,
     onStatusFilterChanged: (String) -> Unit,
     onRefresh: () -> Unit,
@@ -171,11 +178,14 @@ internal fun CashSessionHistoryScreen(
         }
     }
 
-    if (showMobileFilters) {
+    if (showMobileFilters || showFilterPopup) {
         TbMobileControlSheet(
             title = "Filter sesi",
             subtitle = "Atur periode dan status sesi kas",
-            onDismiss = { showMobileFilters = false },
+            onDismiss = {
+                showMobileFilters = false
+                onDismissFilter()
+            },
             testTag = "cash-session-filter-sheet",
         ) {
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -186,6 +196,7 @@ internal fun CashSessionHistoryScreen(
                     onSelected = onDatePresetSelected,
                     onCalendarClick = {
                         showMobileFilters = false
+                        onDismissFilter()
                         showDatePicker = true
                     },
                     modifier = Modifier.fillMaxWidth(),
@@ -199,22 +210,31 @@ internal fun CashSessionHistoryScreen(
                 )
             }
             TbMobileSheetDoneButton(
-                onClick = { showMobileFilters = false },
+                onClick = {
+                    showMobileFilters = false
+                    onDismissFilter()
+                },
                 testTag = "cash-session-filter-done",
             )
         }
     }
 
-    if (showMobileOverview) {
+    if (showMobileOverview || showSummaryPopup) {
         TbMobileControlSheet(
             title = "Ringkasan kas",
             subtitle = uiState.fullDateRangeLabel(),
-            onDismiss = { showMobileOverview = false },
+            onDismiss = {
+                showMobileOverview = false
+                onDismissSummary()
+            },
             testTag = "cash-session-overview-sheet",
         ) {
             SessionOverview(uiState = uiState, compact = true)
             TbMobileSheetDoneButton(
-                onClick = { showMobileOverview = false },
+                onClick = {
+                    showMobileOverview = false
+                    onDismissSummary()
+                },
                 label = "Tutup",
                 testTag = "cash-session-overview-done",
             )
@@ -1173,85 +1193,23 @@ private fun SessionPagination(
         visibleCount.toLong()
     }
 
-    if (compact) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(top = 14.dp, bottom = 4.dp)
-                .testTag("cash-session-pagination"),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Surface(
-                shape = CircleShape,
-                color = Color.White,
-                border = BorderStroke(1.dp, Color(0xFFE2E8F0)),
-            ) {
-                Text(
-                    text = "$effectiveTotal data",
-                    modifier = Modifier.padding(horizontal = 14.dp, vertical = 6.dp),
-                    fontSize = 12.sp,
-                    fontWeight = FontWeight.SemiBold,
-                    color = Color(0xFF475569),
-                )
-            }
-
-            Surface(
-                shape = CircleShape,
-                color = Color.White,
-                border = BorderStroke(1.dp, Color(0xFFE2E8F0)),
-            ) {
-                Row(
-                    modifier = Modifier.padding(horizontal = 6.dp, vertical = 3.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    val canPrev = uiState.page > 1 && !uiState.isLoading
-                    val canNext = uiState.page < uiState.totalPages && !uiState.isLoading
-                    IconButton(
-                        onClick = onPreviousPage,
-                        enabled = canPrev,
-                        modifier = Modifier.size(28.dp),
-                    ) {
-                        Icon(
-                            Icons.Default.ChevronLeft,
-                            contentDescription = "Halaman sebelumnya",
-                            tint = if (canPrev) Color(0xFF475569) else Color(0xFFCBD5E1),
-                            modifier = Modifier.size(16.dp),
-                        )
-                    }
-                    Text(
-                        text = "${uiState.page} / ${uiState.totalPages.coerceAtLeast(1)}",
-                        modifier = Modifier.padding(horizontal = 8.dp),
-                        fontSize = 12.sp,
-                        fontWeight = FontWeight.Medium,
-                        color = Color(0xFF334155),
-                    )
-                    IconButton(
-                        onClick = onNextPage,
-                        enabled = canNext,
-                        modifier = Modifier.size(28.dp),
-                    ) {
-                        Icon(
-                            Icons.Default.ChevronRight,
-                            contentDescription = "Halaman berikutnya",
-                            tint = if (canNext) Color(0xFF475569) else Color(0xFFCBD5E1),
-                            modifier = Modifier.size(16.dp),
-                        )
-                    }
-                }
-            }
-        }
+    val supportingText = if (compact) {
+        val totalSessions = if (uiState.totalSessions > 0) uiState.totalSessions else uiState.sessions.size
+        "${uiState.sessions.size} dari $totalSessions sesi"
     } else {
-        TbPagination(
-            currentPage = uiState.page,
-            totalPages = uiState.totalPages,
-            onPreviousPage = onPreviousPage,
-            onNextPage = onNextPage,
-            supportingText = "Menampilkan $currentStart–$currentEnd dari $effectiveTotal",
-            isLoading = uiState.isLoading,
-            testTag = "cash-session-pagination",
-        )
+        "Menampilkan $currentStart–$currentEnd dari $effectiveTotal"
     }
+
+    TbPagination(
+        currentPage = uiState.page,
+        totalPages = uiState.totalPages,
+        onPreviousPage = onPreviousPage,
+        onNextPage = onNextPage,
+        supportingText = supportingText,
+        isLoading = uiState.isLoading,
+        compact = compact,
+        testTag = "cash-session-pagination",
+    )
 }
 
 @Composable

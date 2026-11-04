@@ -85,6 +85,32 @@ class IncomingGoodsViewModel(
         _uiState.update { it.copy(categoryFilter = categoryName, currentPage = 1) }
     }
 
+    fun onApplyFilters(
+        categoryName: String?,
+        stockStatus: IncomingStockStatusFilter,
+        sortOrder: IncomingProductSortOrder
+    ) {
+        _uiState.update {
+            it.copy(
+                categoryFilter = categoryName,
+                stockStatusFilter = stockStatus,
+                sortOrder = sortOrder,
+                currentPage = 1
+            )
+        }
+    }
+
+    fun onResetFilters() {
+        _uiState.update {
+            it.copy(
+                categoryFilter = null,
+                stockStatusFilter = IncomingStockStatusFilter.ALL,
+                sortOrder = IncomingProductSortOrder.NEWEST,
+                currentPage = 1
+            )
+        }
+    }
+
     fun nextPage() {
         _uiState.update { state ->
             state.copy(currentPage = (state.tablePage + 1).coerceAtMost(state.totalTablePages))

@@ -30,6 +30,12 @@ import java.time.temporal.ChronoUnit
 
 private val WIB_ZONE = ZoneId.of("Asia/Jakarta")
 
+enum class SalesSortOrder(val label: String) {
+    Newest("Waktu Terbaru"),
+    HighestAmount("Nominal Terbesar"),
+    ReceiptAsc("No. Struk / Nota (A–Z)")
+}
+
 data class AdminTransactionHistoryUiState(
     val transactions: List<CashTransaction> = emptyList(),
     val localPendingTransactions: List<LocalPendingTransactionUi> = emptyList(),
@@ -38,6 +44,7 @@ data class AdminTransactionHistoryUiState(
     val query: String = "",
     val statusFilter: String = "Semua", // Semua, Lunas, DP, Hutang
     val paymentMethodFilter: String = "Semua",
+    val sortOrder: SalesSortOrder = SalesSortOrder.Newest,
     val selectedDate: String? = LocalDate.now(WIB_ZONE).toString(),
     val startDate: String? = LocalDate.now(WIB_ZONE).toString(),
     val endDate: String? = LocalDate.now(WIB_ZONE).toString(),
@@ -90,16 +97,34 @@ class AdminTransactionHistoryViewModel(
         }
     }
 
+    private fun sortTransactions(list: List<CashTransaction>, order: SalesSortOrder): List<CashTransaction> {
+        return when (order) {
+            SalesSortOrder.Newest -> list.sortedByDescending { it.createdAt }
+            SalesSortOrder.HighestAmount -> list.sortedByDescending { it.total }
+            SalesSortOrder.ReceiptAsc -> list.sortedBy { it.receiptNumber().lowercase() }
+        }
+    }
+
     fun loadTransactions(page: Int = 1) {
         viewModelScope.launch {
             _uiState.update { it.copy(isLoading = true, error = null) }
             
-            // Untuk Admin, kita pass sessionId = null agar menarik semua transaksi
-            val statusParam = if (_uiState.value.statusFilter == "Semua") null else _uiState.value.statusFilter
+            val statusParam = when (_uiState.value.statusFilter.lowercase()) {
+                "semua" -> null
+                "belum lunas" -> "hutang"
+                "dibatalkan" -> "voided"
+                else -> _uiState.value.statusFilter
+            }
             val searchParam = _uiState.value.query.takeIf { it.isNotBlank() }
 
-            val startOfDay = _uiState.value.startDate ?: _uiState.value.selectedDate
-            val endOfDay = _uiState.value.endDate ?: _uiState.value.selectedDate
+            val isAllPreset = _uiState.value.selectedPreset == "Semua"
+            val startOfDay = if (isAllPreset) null else (_uiState.value.startDate ?: _uiState.value.selectedDate)
+            val endOfDay = if (isAllPreset) null else (_uiState.value.endDate ?: _uiState.value.selectedDate)
+            val paymentParam = when (_uiState.value.paymentMethodFilter.lowercase()) {
+                "semua" -> null
+                "cash" -> "tunai"
+                else -> _uiState.value.paymentMethodFilter
+            }
 
             when (
                 val result = repository.getTransactions(
@@ -107,7 +132,7 @@ class AdminTransactionHistoryViewModel(
                     limit = 50,
                     sessionId = null,
                     search = searchParam,
-                    paymentMethod = _uiState.value.paymentMethodFilter.takeUnless { it == "Semua" },
+                    paymentMethod = paymentParam,
                     status = statusParam,
                     startDate = startOfDay,
                     endDate = endOfDay
@@ -121,13 +146,14 @@ class AdminTransactionHistoryViewModel(
                         } else {
                             data
                         }
-                        val currentStart = if (mergedData.isEmpty()) 0 else (result.data.page - 1) * 50 + 1
-                        val currentEnd = currentStart + mergedData.size - 1
+                        val sortedData = sortTransactions(mergedData, it.sortOrder)
+                        val currentStart = if (sortedData.isEmpty()) 0 else (result.data.page - 1) * 50 + 1
+                        val currentEnd = currentStart + sortedData.size - 1
                         it.copy(
-                            transactions = mergedData,
+                            transactions = sortedData,
                             page = result.data.page,
                             totalPages = result.data.totalPages,
-                            total = maxOf(result.data.total, mergedData.size.toLong()),
+                            total = maxOf(result.data.total, sortedData.size.toLong()),
                             currentStart = currentStart,
                             currentEnd = currentEnd,
                             hasMorePages = result.data.page < result.data.totalPages,
@@ -160,6 +186,38 @@ class AdminTransactionHistoryViewModel(
     }
 
     fun refresh() = loadTransactions(_uiState.value.page)
+
+    fun applyFilters(
+        status: String,
+        paymentMethod: String,
+        startDateStr: String?,
+        endDateStr: String?,
+        preset: String?,
+        sortOrder: SalesSortOrder = _uiState.value.sortOrder
+    ) {
+        val start = startDateStr?.take(10)
+        val end = endDateStr?.take(10)
+        _uiState.update {
+            it.copy(
+                statusFilter = status,
+                paymentMethodFilter = paymentMethod,
+                startDate = start,
+                endDate = end,
+                selectedDate = end ?: it.selectedDate,
+                selectedPreset = preset,
+                sortOrder = sortOrder,
+                page = 1
+            )
+        }
+        loadTransactions(page = 1)
+    }
+
+    fun updateSortOrder(order: SalesSortOrder) {
+        _uiState.update { state ->
+            val sorted = sortTransactions(state.transactions, order)
+            state.copy(sortOrder = order, transactions = sorted)
+        }
+    }
 
     fun updatePaymentMethodFilter(method: String) {
         _uiState.update { it.copy(paymentMethodFilter = method, page = 1) }
@@ -212,10 +270,9 @@ class AdminTransactionHistoryViewModel(
         if (activeTransactions.isEmpty()) return remoteTransactions
 
         val state = _uiState.value
-        return (activeTransactions.filter { it.matchesCurrentFilter(state) } + remoteTransactions)
+        val merged = (activeTransactions.filter { it.matchesCurrentFilter(state) } + remoteTransactions)
             .distinctBy { it.id }
-            .sortedByDescending { it.createdAt }
-            .take(50)
+        return sortTransactions(merged, state.sortOrder).take(50)
     }
 
     private fun CashTransaction.matchesCurrentFilter(state: AdminTransactionHistoryUiState): Boolean {
@@ -233,19 +290,34 @@ class AdminTransactionHistoryViewModel(
             val matchesStatus = normalizedStatus == targetStatus ||
                 (targetStatus == "lunas" && normalizedStatus in listOf("lunas", "paid", "success", "completed")) ||
                 (targetStatus == "dp" && normalizedStatus in listOf("dp", "partial")) ||
-                (targetStatus == "hutang" && normalizedStatus in listOf("hutang", "unpaid"))
+                (targetStatus in listOf("hutang", "tempo", "belum lunas") && normalizedStatus in listOf("hutang", "tempo", "unpaid", "belum lunas")) ||
+                (targetStatus in listOf("voided", "void", "dibatalkan", "cancelled") && normalizedStatus in listOf("voided", "void", "dibatalkan", "cancelled"))
             if (!matchesStatus) return false
         }
-        if (state.paymentMethodFilter != "Semua" &&
-            paymentMethods.none { it.equals(state.paymentMethodFilter, true) }
-        ) return false
+        if (state.paymentMethodFilter != "Semua") {
+            val targetMethod = state.paymentMethodFilter.lowercase()
+            val matchesMethod = paymentMethods.any { method ->
+                val m = method.lowercase()
+                when (targetMethod) {
+                    "tunai", "cash" -> m in listOf("tunai", "cash")
+                    "transfer" -> m in listOf("transfer", "bank", "transfer bank", "bank_transfer")
+                    "qris" -> m == "qris"
+                    "hutang" -> m in listOf("hutang", "tempo", "credit")
+                    "dp" -> m in listOf("dp", "down_payment")
+                    else -> m == targetMethod
+                }
+            }
+            if (!matchesMethod) return false
+        }
 
-        val start = (state.startDate ?: state.selectedDate)?.let(LocalDate::parse)
-        val end = (state.endDate ?: state.selectedDate)?.let(LocalDate::parse)
-        if (start != null || end != null) {
-            val transactionDate = createdAt.toTransactionLocalDate() ?: return false
-            if (start != null && transactionDate.isBefore(start)) return false
-            if (end != null && transactionDate.isAfter(end)) return false
+        if (state.selectedPreset != "Semua") {
+            val start = (state.startDate ?: state.selectedDate)?.let { runCatching { LocalDate.parse(it) }.getOrNull() }
+            val end = (state.endDate ?: state.selectedDate)?.let { runCatching { LocalDate.parse(it) }.getOrNull() }
+            if (start != null || end != null) {
+                val transactionDate = createdAt.toTransactionLocalDate() ?: return false
+                if (start != null && transactionDate.isBefore(start)) return false
+                if (end != null && transactionDate.isAfter(end)) return false
+            }
         }
 
         return true

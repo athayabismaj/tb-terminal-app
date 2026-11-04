@@ -73,10 +73,15 @@ internal class SupplierDebtDetailViewModel(
             )
 
             if (directResult is RepositoryResult.Success && directResult.data.data.isNotEmpty()) {
+                val sorted = directResult.data.data.sortedWith(
+                    compareByDescending<SupplierPayable> { it.dueDate }
+                        .thenByDescending { it.createdAt }
+                        .thenByDescending { it.id }
+                )
                 _uiState.update {
                     it.copy(
                         isLoading = false,
-                        payables = directResult.data.data
+                        payables = sorted
                     )
                 }
             } else {
@@ -89,11 +94,20 @@ internal class SupplierDebtDetailViewModel(
                     val filtered = allResult.data.data.filter {
                         it.supplierId.equals(supplierId, ignoreCase = true) ||
                             it.supplierName.equals(supplierId, ignoreCase = true)
-                    }
+                    }.sortedWith(
+                        compareByDescending<SupplierPayable> { it.dueDate }
+                            .thenByDescending { it.createdAt }
+                            .thenByDescending { it.id }
+                    )
+                    val fallback = (directResult as? RepositoryResult.Success)?.data?.data.orEmpty().sortedWith(
+                        compareByDescending<SupplierPayable> { it.dueDate }
+                            .thenByDescending { it.createdAt }
+                            .thenByDescending { it.id }
+                    )
                     _uiState.update {
                         it.copy(
                             isLoading = false,
-                            payables = if (filtered.isNotEmpty()) filtered else (directResult as? RepositoryResult.Success)?.data?.data.orEmpty()
+                            payables = if (filtered.isNotEmpty()) filtered else fallback
                         )
                     }
                 } else {

@@ -417,6 +417,9 @@ internal fun NavGraphBuilder.salesGraph(navController: NavHostController, sessio
                     onReceiptClick = { transactionId ->
                         navController.navigate(AppRoute.AdminReceiptDetail.createRoute(transactionId)) { launchSingleTop = true }
                     },
+                    onNewTransactionClick = {
+                        navController.navigate(AppRoute.CashierPos.route) { launchSingleTop = true }
+                    },
                     onBack = {
                         if (!navController.popBackStack()) {
                             navController.navigate(AppRoute.Dashboard.route) { launchSingleTop = true }

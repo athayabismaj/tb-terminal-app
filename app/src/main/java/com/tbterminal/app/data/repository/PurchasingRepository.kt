@@ -1,6 +1,9 @@
 package com.tbterminal.app.data.repository
 
 import com.tbterminal.app.data.model.CreatePurchaseCommand
+import com.tbterminal.app.data.model.CreateOpeningPayableCommand
+import com.tbterminal.app.data.model.CreatePayableAdjustmentCommand
+import com.tbterminal.app.data.remote.CreateStandalonePayableRequestDto
 import com.tbterminal.app.data.model.CreateSupplierPaymentCommand
 import com.tbterminal.app.data.model.PurchaseItemCommand
 import com.tbterminal.app.data.model.PurchaseDetail
@@ -73,6 +76,14 @@ interface PurchasingRepository {
     suspend fun createSupplierPayment(
         command: CreateSupplierPaymentCommand
     ): RepositoryResult<SupplierPaymentReceipt>
+
+    suspend fun createOpeningBalance(
+        command: CreateOpeningPayableCommand
+    ): RepositoryResult<SupplierPayable>
+
+    suspend fun createAdjustment(
+        command: CreatePayableAdjustmentCommand
+    ): RepositoryResult<SupplierPayable>
 }
 
 class RemotePurchasingRepository(
@@ -297,6 +308,60 @@ class RemotePurchasingRepository(
                     )
                 } else {
                     RepositoryResult.Success(payment.toSupplierPaymentReceipt())
+                }
+            }
+    }
+
+    override suspend fun createOpeningBalance(
+        command: CreateOpeningPayableCommand
+    ): RepositoryResult<SupplierPayable> {
+        val request = CreateStandalonePayableRequestDto(
+            supplierId = command.supplierId,
+            amount = command.amount,
+            debtDate = command.debtDate,
+            dueDate = command.dueDate,
+            legacyInvoiceNumber = command.legacyInvoiceNumber?.takeIf(String::isNotBlank),
+            source = "OPENING_BALANCE",
+            notes = command.notes?.takeIf(String::isNotBlank)
+        )
+
+        return safeApiCall { purchasingApi.createOpeningBalance(request) }
+            .toRepositoryResult { response ->
+                val payable = response.data
+                if (!response.success || payable == null) {
+                    RepositoryResult.Error(
+                        code = response.code ?: "CREATE_OPENING_BALANCE_FAILED",
+                        message = response.message ?: response.error ?: "Saldo awal hutang gagal disimpan."
+                    )
+                } else {
+                    RepositoryResult.Success(payable.toSupplierPayable())
+                }
+            }
+    }
+
+    override suspend fun createAdjustment(
+        command: CreatePayableAdjustmentCommand
+    ): RepositoryResult<SupplierPayable> {
+        val request = CreateStandalonePayableRequestDto(
+            supplierId = command.supplierId,
+            amount = command.amount,
+            debtDate = command.debtDate,
+            dueDate = command.dueDate,
+            legacyInvoiceNumber = command.reference?.takeIf(String::isNotBlank),
+            source = "ADJUSTMENT",
+            notes = command.reason.takeIf(String::isNotBlank)
+        )
+
+        return safeApiCall { purchasingApi.createAdjustment(request) }
+            .toRepositoryResult { response ->
+                val payable = response.data
+                if (!response.success || payable == null) {
+                    RepositoryResult.Error(
+                        code = response.code ?: "CREATE_PAYABLE_ADJUSTMENT_FAILED",
+                        message = response.message ?: response.error ?: "Penyesuaian hutang gagal disimpan."
+                    )
+                } else {
+                    RepositoryResult.Success(payable.toSupplierPayable())
                 }
             }
     }

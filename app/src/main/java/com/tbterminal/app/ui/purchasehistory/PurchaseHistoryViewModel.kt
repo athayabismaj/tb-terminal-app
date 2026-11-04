@@ -28,13 +28,15 @@ class PurchaseHistoryViewModel(
             val state = _uiState.value
             val safePage = page.coerceAtLeast(1)
             _uiState.update { it.copy(isLoading = true, page = safePage, errorMessage = null) }
+            val startParam = if (state.selectedPeriodType == "Semua") null else state.startDate
+            val endParam = if (state.selectedPeriodType == "Semua") null else state.endDate
             when (
                 val result = purchasingRepository.getPurchases(
                     page = safePage,
                     limit = state.pageSize,
                     supplierId = state.selectedSupplierId,
-                    startDate = state.startDate,
-                    endDate = state.endDate
+                    startDate = startParam,
+                    endDate = endParam
                 )
             ) {
                 is RepositoryResult.Success -> {
@@ -57,16 +59,40 @@ class PurchaseHistoryViewModel(
 
     fun refresh() = loadPurchases(_uiState.value.page)
 
-    fun onFilterApplied(supplierId: String?, startDate: String?, endDate: String?, periodType: String) {
+    fun onFilterApplied(
+        supplierId: String?, 
+        startDate: String?, 
+        endDate: String?, 
+        periodType: String,
+        sortOrder: PurchaseSortOrder = _uiState.value.sortOrder
+    ) {
         _uiState.update { 
             it.copy(
                 selectedSupplierId = supplierId, 
                 startDate = startDate, 
                 endDate = endDate,
                 selectedPeriodType = periodType,
+                sortOrder = sortOrder,
                 page = 1, 
                 errorMessage = null
             ) 
+        }
+        loadPurchases(page = 1)
+    }
+
+    fun onResetFilters() {
+        val today = todayPurchaseDateString()
+        _uiState.update {
+            it.copy(
+                selectedSupplierId = null,
+                startDate = today,
+                endDate = today,
+                selectedPeriodType = "Hari Ini",
+                sortOrder = PurchaseSortOrder.NEWEST,
+                searchQuery = "",
+                page = 1,
+                errorMessage = null
+            )
         }
         loadPurchases(page = 1)
     }
