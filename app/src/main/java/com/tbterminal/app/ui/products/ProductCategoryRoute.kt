@@ -76,19 +76,6 @@ fun AdminProductCategoriesScreen(
                         modifier = Modifier.size(20.dp)
                     )
                 }
-
-                // Button 2: Tambah [ ➕ ]
-                IconButton(
-                    onClick = viewModel::openAddForm,
-                    modifier = Modifier.size(36.dp).testTag("category-header-add")
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.Add,
-                        contentDescription = "Tambah kategori",
-                        tint = Color(0xFF1E293B),
-                        modifier = Modifier.size(22.dp)
-                    )
-                }
             }
         },
         onDashboardClick = onDashboardClick,

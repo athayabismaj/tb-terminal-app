@@ -76,19 +76,6 @@ fun AdminProductUnitsScreen(
                         modifier = Modifier.size(20.dp)
                     )
                 }
-
-                // Button 2: Tambah [ ➕ ]
-                IconButton(
-                    onClick = viewModel::openAddForm,
-                    modifier = Modifier.size(36.dp).testTag("unit-header-add")
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.Add,
-                        contentDescription = "Tambah satuan",
-                        tint = Color(0xFF1E293B),
-                        modifier = Modifier.size(22.dp)
-                    )
-                }
             }
         },
         onDashboardClick = onDashboardClick,

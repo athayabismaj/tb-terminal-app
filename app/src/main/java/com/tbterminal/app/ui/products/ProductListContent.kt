@@ -251,6 +251,7 @@ internal fun ProductListContent(
                 onPreviousPage = onPreviousPage,
                 onNextPage = onNextPage,
                 compact = compact,
+                onAddProductClick = onAddProductClick,
             )
         }
 

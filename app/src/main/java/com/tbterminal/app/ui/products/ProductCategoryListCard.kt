@@ -172,6 +172,10 @@ internal fun ProductCategoryListCard(
             )
         }
 
+        ProductCategorySectionHeader(
+            onAdd = onAdd,
+        )
+
         when {
             uiState.isLoading && uiState.categories.isEmpty() -> CategoryLoading(compact = compact)
             uiState.categories.isEmpty() -> CategoryEmpty(query = uiState.searchQuery)
@@ -191,6 +195,48 @@ internal fun ProductCategoryListCard(
                 onNextPage = onNextPage,
                 compact = compact,
             )
+        }
+    }
+}
+
+@Composable
+private fun ProductCategorySectionHeader(
+    onAdd: () -> Unit,
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 4.dp, vertical = 2.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.SpaceBetween,
+    ) {
+        Text(
+            text = "Daftar kategori",
+            fontSize = 16.sp,
+            fontWeight = FontWeight.Bold,
+            color = Color(0xFF0F172A),
+        )
+        Surface(
+            onClick = onAdd,
+            shape = RoundedCornerShape(8.dp),
+            color = Color.White,
+            border = BorderStroke(1.dp, Color(0xFF256B57)),
+            contentColor = Color(0xFF256B57),
+            modifier = Modifier
+                .size(32.dp)
+                .testTag("category-add"),
+        ) {
+            Box(
+                modifier = Modifier.fillMaxSize(),
+                contentAlignment = Alignment.Center,
+            ) {
+                Icon(
+                    imageVector = Icons.Default.Add,
+                    contentDescription = "Tambah kategori",
+                    tint = Color(0xFF256B57),
+                    modifier = Modifier.size(18.dp),
+                )
+            }
         }
     }
 }

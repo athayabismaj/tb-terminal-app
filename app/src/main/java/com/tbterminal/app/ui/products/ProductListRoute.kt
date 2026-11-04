@@ -153,19 +153,6 @@ fun AdminProductListScreen(
                     modifier = Modifier.size(20.dp)
                 )
             }
-
-            // Button 4: Tambah [ ➕ ]
-            IconButton(
-                onClick = onAddProductClick,
-                modifier = Modifier.size(36.dp).testTag("product-header-add")
-            ) {
-                Icon(
-                    imageVector = Icons.Default.Add,
-                    contentDescription = "Tambah produk",
-                    tint = Color(0xFF1E293B),
-                    modifier = Modifier.size(22.dp)
-                )
-            }
         },
         onDashboardClick = onDashboardClick,
         onProductsClick = onProductsClick,
