@@ -1,6 +1,25 @@
 @file:OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class)
 package com.tbterminal.app.ui.purchasehistory
 
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.expandVertically
+import androidx.compose.animation.shrinkVertically
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.material.icons.outlined.Tune
+import androidx.compose.material.icons.outlined.Check
+import androidx.compose.material.icons.outlined.Schedule
+import androidx.compose.material.icons.automirrored.outlined.Sort
+import androidx.compose.material.icons.outlined.Search
+import androidx.compose.material.icons.outlined.Add
+import androidx.compose.material.icons.outlined.CalendarMonth
+import androidx.compose.material.icons.outlined.ReceiptLong
+import androidx.compose.material.icons.outlined.Store
+import androidx.compose.material.icons.outlined.Paid
+import androidx.compose.material.icons.automirrored.outlined.KeyboardArrowRight
+import androidx.compose.material.icons.filled.ChevronLeft
+import androidx.compose.material.icons.filled.ChevronRight
+
 import androidx.compose.foundation.BorderStroke
 import com.tbterminal.app.ui.components.SkeletonBox
 import androidx.compose.foundation.border
@@ -26,6 +45,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
@@ -35,6 +55,8 @@ import androidx.compose.material.icons.automirrored.outlined.KeyboardArrowRight
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.ArrowDropDown
 import androidx.compose.material3.Button
+import androidx.compose.material3.ModalBottomSheet
+import androidx.compose.material3.rememberModalBottomSheetState
 
 import androidx.compose.material.icons.filled.ChevronLeft
 import androidx.compose.material.icons.filled.ChevronRight
@@ -53,6 +75,9 @@ import androidx.compose.material.icons.filled.ArrowDropDown
 import androidx.compose.material.icons.outlined.Paid
 import androidx.compose.material.icons.outlined.Store
 import androidx.compose.material.icons.outlined.Tune
+import androidx.compose.material.icons.outlined.Check
+import androidx.compose.material.icons.outlined.Schedule
+import androidx.compose.material.icons.automirrored.outlined.Sort
 import androidx.compose.material.icons.outlined.ReceiptLong
 import androidx.compose.material3.Surface
 import androidx.compose.ui.draw.drawBehind
@@ -62,7 +87,10 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.material.icons.outlined.Visibility
+import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.ModalBottomSheet
+import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
@@ -95,6 +123,7 @@ import androidx.compose.ui.window.Dialog
 import com.tbterminal.app.data.model.PurchaseDetail
 import com.tbterminal.app.data.model.PurchaseSummary
 import com.tbterminal.app.ui.components.HistoryDatePickerDialog
+import com.tbterminal.app.ui.components.TbPagination
 import com.tbterminal.app.ui.theme.TbBackground
 import java.math.BigDecimal
 import java.text.NumberFormat
@@ -105,7 +134,7 @@ import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 import java.util.Locale
 
-private val PurchaseBackground = TbBackground
+private val PurchaseBackground = Color(0xFFF6F8F7)
 private val PurchaseBorder = Color(0xFFE2E8F0)
 private val PurchaseText = Color(0xFF0F172A)
 private val PurchaseMuted = Color(0xFF64748B)
@@ -116,24 +145,48 @@ private val PurchaseSoft = Color(0xFFF8FAFC)
 internal fun PurchaseHistoryScreen(
     modifier: Modifier,
     uiState: PurchaseHistoryUiState,
-    onFilterApplied: (String?, String?, String?, String) -> Unit,
+    isSearchExpanded: Boolean = false,
+    onToggleSearch: () -> Unit = {},
+    showFilterPopup: Boolean = false,
+    onDismissFilter: () -> Unit = {},
+    showSummaryPopup: Boolean = false,
+    onDismissSummary: () -> Unit = {},
+    onFilterApplied: (String?, String?, String?, String, PurchaseSortOrder) -> Unit,
+    onResetAllFilters: () -> Unit = {},
     onSearchChanged: (String) -> Unit,
     onRefresh: () -> Unit,
     onShowDetail: (String) -> Unit,
     onDismissDetail: () -> Unit,
     onPreviousPage: () -> Unit,
-    onNextPage: () -> Unit
+    onNextPage: () -> Unit,
+    onAddPurchase: () -> Unit = {}
 ) {
-    var showFilterPopup by remember { mutableStateOf(false) }
     BoxWithConstraints(modifier.fillMaxSize().background(PurchaseBackground)) {
         val compact = maxWidth < 700.dp
         Column(
             modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState())
                 .padding(horizontal = if (compact) 16.dp else 28.dp, vertical = if (compact) 12.dp else 20.dp),
-            verticalArrangement = Arrangement.spacedBy(if (compact) 12.dp else 16.dp)
+            verticalArrangement = Arrangement.spacedBy(if (compact) 10.dp else 16.dp)
         ) {
-            // PurchaseSummaryCards moved
-            PurchaseToolbar(uiState, compact, { showFilterPopup = true }, onSearchChanged)
+            PurchaseHeaderToolbar(
+                uiState = uiState,
+                compact = compact,
+                isSearchExpanded = isSearchExpanded,
+                onToggleSearch = onToggleSearch,
+                onSearchChanged = onSearchChanged,
+                onAddPurchase = onAddPurchase,
+                onClearSupplierFilter = {
+                    onFilterApplied(null, uiState.startDate, uiState.endDate, uiState.selectedPeriodType, uiState.sortOrder)
+                },
+                onClearDateFilter = {
+                    val today = todayPurchaseDateString()
+                    onFilterApplied(uiState.selectedSupplierId, today, today, "Hari Ini", uiState.sortOrder)
+                },
+                onClearSortFilter = {
+                    onFilterApplied(uiState.selectedSupplierId, uiState.startDate, uiState.endDate, uiState.selectedPeriodType, PurchaseSortOrder.NEWEST)
+                },
+                onResetAllFilters = onResetAllFilters
+            )
             PurchaseTable(uiState, compact, onRefresh, onShowDetail, onPreviousPage, onNextPage)
         }
     }
@@ -141,13 +194,18 @@ internal fun PurchaseHistoryScreen(
     if (showFilterPopup) {
         PurchaseFilterBottomSheet(
             uiState = uiState,
-            onDismiss = { showFilterPopup = false },
-            onApplyFilter = { supplierId, start, end, periodType ->
-                onFilterApplied(supplierId, start, end, periodType)
-            }
+            onDismiss = onDismissFilter,
+            onApplyFilter = onFilterApplied
         )
     }
-    
+
+    if (showSummaryPopup) {
+        PurchaseSummaryBottomSheet(
+            uiState = uiState,
+            onDismiss = onDismissSummary
+        )
+    }
+
     if (uiState.isLoadingDetail || uiState.selectedPurchase != null) {
         PurchaseDetailDialog(
             detail = uiState.selectedPurchase,
@@ -156,7 +214,6 @@ internal fun PurchaseHistoryScreen(
         )
     }
 }
-
 @Composable
 private fun PurchaseHeader() {
     Text("Nota Pembelian", fontSize = 28.sp, fontWeight = FontWeight.Medium, color = PurchaseText)
@@ -201,47 +258,14 @@ private fun PurchaseTable(
     onPreviousPage: () -> Unit,
     onNextPage: () -> Unit
 ) {
-    var showSummaryPopup by remember { mutableStateOf(false) }
-
     Column(Modifier.fillMaxWidth()) {
         if (compact) {
-            // Header for List
-            Row(
-                modifier = Modifier.fillMaxWidth().padding(horizontal = 2.dp),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                if (uiState.isLoading && uiState.purchases.isEmpty()) {
-                    SkeletonBox(Modifier.width(110.dp).height(20.dp), shape = RoundedCornerShape(4.dp))
-                    SkeletonBox(Modifier.size(32.dp), shape = RoundedCornerShape(12.dp))
-                } else {
-                    Text("Pembelian", fontSize = 16.sp, fontWeight = FontWeight.Bold, color = Color(0xFF0F172A))
-                    if (uiState.visiblePurchases.isNotEmpty()) {
-                        Box(
-                            modifier = Modifier
-                                .size(32.dp)
-                                .clip(RoundedCornerShape(12.dp))
-                                .border(1.dp, Color(0xFFE2E8F0), RoundedCornerShape(12.dp))
-                                .clickable { showSummaryPopup = true }
-                                .background(Color.White),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Icon(
-                                Icons.Outlined.FactCheck,
-                                contentDescription = "Ringkasan",
-                                tint = Color(0xFF334155),
-                                modifier = Modifier.size(16.dp),
-                            )
-                        }
-                    }
-                }
-            }
-            Spacer(Modifier.height(12.dp))
             androidx.compose.material3.Surface(
                 modifier = Modifier.fillMaxWidth(),
                 shape = RoundedCornerShape(16.dp),
                 color = Color.White,
                 border = BorderStroke(1.dp, Color(0xFFE2E8F0)),
+                shadowElevation = 1.dp
             ) {
                 when {
                     uiState.isLoading && uiState.purchases.isEmpty() -> PurchaseMobileSkeleton()
@@ -254,252 +278,6 @@ private fun PurchaseTable(
                                 if (index < uiState.visiblePurchases.lastIndex) {
                                     HorizontalDivider(color = Color(0xFFF1F5F9))
                                 }
-                            }
-                        }
-                    }
-                }
-            }
-            
-            if (showSummaryPopup) {
-                @OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class)
-                androidx.compose.material3.ModalBottomSheet(
-                    onDismissRequest = { showSummaryPopup = false },
-                    containerColor = Color.White,
-                    dragHandle = {
-                        Column(
-                            modifier = Modifier.fillMaxWidth().padding(top = 12.dp, bottom = 4.dp),
-                            horizontalAlignment = Alignment.CenterHorizontally
-                        ) {
-                            Box(modifier = Modifier.width(40.dp).height(4.dp).background(Color(0xFFE2E8F0), CircleShape))
-                        }
-                    },
-                    shape = RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp)
-                ) {
-                    Column(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(bottom = 28.dp)
-                    ) {
-                        // Modal Header
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(horizontal = 24.dp, vertical = 8.dp),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Text(
-                                text = "Ringkasan Pembelian",
-                                fontSize = 18.sp,
-                                fontWeight = FontWeight.Bold,
-                                color = Color(0xFF0F172A),
-                                letterSpacing = (-0.3).sp
-                            )
-                            Box(
-                                modifier = Modifier
-                                    .size(32.dp)
-                                    .clip(CircleShape)
-                                    .clickable { showSummaryPopup = false },
-                                contentAlignment = Alignment.Center
-                            ) {
-                                Icon(
-                                    Icons.Outlined.Close,
-                                    contentDescription = "Tutup ringkasan modal",
-                                    tint = Color(0xFF94A3B8),
-                                    modifier = Modifier.size(20.dp)
-                                )
-                            }
-                        }
-
-                        Spacer(Modifier.height(4.dp))
-
-                        // Key-Value Metric Rows
-                        Column(modifier = Modifier.fillMaxWidth()) {
-                            // Total Nota Row
-                            Row(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .padding(horizontal = 24.dp, vertical = 14.dp),
-                                horizontalArrangement = Arrangement.SpaceBetween,
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                Row(
-                                    verticalAlignment = Alignment.CenterVertically,
-                                    horizontalArrangement = Arrangement.spacedBy(10.dp)
-                                ) {
-                                    Box(
-                                        modifier = Modifier
-                                            .size(32.dp)
-                                            .background(Color(0xFFF1F5F9), RoundedCornerShape(8.dp)),
-                                        contentAlignment = Alignment.Center
-                                    ) {
-                                        Icon(
-                                            Icons.Outlined.Description,
-                                            contentDescription = null,
-                                            tint = Color(0xFF64748B),
-                                            modifier = Modifier.size(16.dp)
-                                        )
-                                    }
-                                    Text(
-                                        text = "Total nota",
-                                        fontSize = 14.sp,
-                                        fontWeight = FontWeight.Medium,
-                                        color = Color(0xFF475569)
-                                    )
-                                }
-                                Row(
-                                    verticalAlignment = Alignment.Bottom,
-                                    horizontalArrangement = Arrangement.spacedBy(3.dp)
-                                ) {
-                                    Text(
-                                        text = uiState.effectiveTotalPurchases.toString(),
-                                        fontSize = 16.sp,
-                                        fontWeight = FontWeight.Bold,
-                                        color = Color(0xFF0F172A)
-                                    )
-                                    Text(
-                                        text = "Nota",
-                                        fontSize = 12.sp,
-                                        fontWeight = FontWeight.Medium,
-                                        color = Color(0xFF64748B),
-                                        modifier = Modifier.padding(bottom = 1.dp)
-                                    )
-                                }
-                            }
-
-                            HorizontalDivider(color = Color(0xFFF1F5F9), thickness = 1.dp)
-
-                            // Nilai Halaman Ini Row
-                            Row(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .background(Color(0xFFF4F9F7))
-                                    .padding(horizontal = 24.dp, vertical = 12.dp),
-                                horizontalArrangement = Arrangement.SpaceBetween,
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                Row(
-                                    verticalAlignment = Alignment.CenterVertically,
-                                    horizontalArrangement = Arrangement.spacedBy(10.dp)
-                                ) {
-                                    Box(
-                                        modifier = Modifier
-                                            .size(32.dp)
-                                            .background(Color(0xFFEBF4F1), RoundedCornerShape(8.dp)),
-                                        contentAlignment = Alignment.Center
-                                    ) {
-                                        Icon(
-                                            Icons.Outlined.Paid,
-                                            contentDescription = null,
-                                            tint = Color(0xFF256B57),
-                                            modifier = Modifier.size(16.dp)
-                                        )
-                                    }
-                                    Column {
-                                        Text(
-                                            text = "Nilai halaman ini",
-                                            fontSize = 14.sp,
-                                            fontWeight = FontWeight.SemiBold,
-                                            color = Color(0xFF334155),
-                                            lineHeight = 18.sp
-                                        )
-                                        Text(
-                                            text = "Maksimal ${uiState.pageSize} nota",
-                                            fontSize = 11.sp,
-                                            fontWeight = FontWeight.Normal,
-                                            color = Color(0xFF94A3B8)
-                                        )
-                                    }
-                                }
-                                Text(
-                                    text = uiState.pageTotal.asCurrencyNoDecimals(),
-                                    fontSize = 18.sp,
-                                    fontWeight = FontWeight.Bold,
-                                    color = Color(0xFF256B57),
-                                    letterSpacing = (-0.3).sp
-                                )
-                            }
-
-                            HorizontalDivider(color = Color(0xFFF1F5F9), thickness = 1.dp)
-
-                            // Supplier Aktif Row
-                            val activeSupplierCount = when {
-                                uiState.selectedSupplierId != null -> 1
-                                uiState.purchases.isNotEmpty() -> uiState.purchases.map { it.supplierName }.distinct().size
-                                else -> uiState.suppliers.size
-                            }
-                            Row(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .padding(horizontal = 24.dp, vertical = 14.dp),
-                                horizontalArrangement = Arrangement.SpaceBetween,
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                Row(
-                                    verticalAlignment = Alignment.CenterVertically,
-                                    horizontalArrangement = Arrangement.spacedBy(10.dp)
-                                ) {
-                                    Box(
-                                        modifier = Modifier
-                                            .size(32.dp)
-                                            .background(Color(0xFFFEF3C7), RoundedCornerShape(8.dp)),
-                                        contentAlignment = Alignment.Center
-                                    ) {
-                                        Icon(
-                                            Icons.Outlined.Store,
-                                            contentDescription = null,
-                                            tint = Color(0xFFD97706),
-                                            modifier = Modifier.size(16.dp)
-                                        )
-                                    }
-                                    Text(
-                                        text = "Supplier aktif",
-                                        fontSize = 14.sp,
-                                        fontWeight = FontWeight.Medium,
-                                        color = Color(0xFF475569)
-                                    )
-                                }
-                                Row(
-                                    verticalAlignment = Alignment.Bottom,
-                                    horizontalArrangement = Arrangement.spacedBy(3.dp)
-                                ) {
-                                    Text(
-                                        text = activeSupplierCount.toString(),
-                                        fontSize = 16.sp,
-                                        fontWeight = FontWeight.Bold,
-                                        color = Color(0xFF0F172A)
-                                    )
-                                    Text(
-                                        text = "Supplier",
-                                        fontSize = 12.sp,
-                                        fontWeight = FontWeight.Medium,
-                                        color = Color(0xFF64748B),
-                                        modifier = Modifier.padding(bottom = 1.dp)
-                                    )
-                                }
-                            }
-                        }
-
-                        // Action Button
-                        Spacer(Modifier.height(24.dp))
-                        Box(modifier = Modifier.fillMaxWidth().padding(horizontal = 24.dp)) {
-                            Button(
-                                onClick = { showSummaryPopup = false },
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .height(50.dp),
-                                shape = RoundedCornerShape(16.dp),
-                                colors = ButtonDefaults.buttonColors(
-                                    containerColor = Color(0xFF256B57),
-                                    contentColor = Color.White
-                                ),
-                                elevation = ButtonDefaults.buttonElevation(defaultElevation = 0.dp)
-                            ) {
-                                Text(
-                                    text = "Selesai",
-                                    fontSize = 15.sp,
-                                    fontWeight = FontWeight.SemiBold
-                                )
                             }
                         }
                     }
@@ -532,131 +310,326 @@ private fun PurchaseTable(
         }
     }
 }
+private fun formatPeriodDisplayDate(
+    startDateStr: String?,
+    endDateStr: String?,
+    periodType: String
+): String {
+    if (periodType == "Semua") return "Semua"
+    if (startDateStr == null) return periodType
+    val start = runCatching { LocalDate.parse(startDateStr.take(10)) }.getOrNull()
+    val end = runCatching { LocalDate.parse(endDateStr?.take(10).orEmpty()) }.getOrNull() ?: start
+    if (start == null) return periodType
+
+    val idLocale = Locale.forLanguageTag("id-ID")
+    val dayMonth = DateTimeFormatter.ofPattern("d MMM", idLocale)
+    val dayMonthYear = DateTimeFormatter.ofPattern("d MMM yyyy", idLocale)
+    val monthYear = DateTimeFormatter.ofPattern("MMMM yyyy", idLocale)
+    val today = LocalDate.now(ZoneId.of("Asia/Jakarta"))
+
+    return when (periodType) {
+        "Hari", "Hari Ini" -> {
+            if (start == today) {
+                "Hari Ini (${start.format(dayMonth)})"
+            } else {
+                start.format(dayMonthYear)
+            }
+        }
+        "Minggu", "Minggu Ini" -> {
+            if (end != null && start != end) {
+                if (start.month == end.month && start.year == end.year) {
+                    "${start.dayOfMonth} - ${end.format(dayMonthYear)}"
+                } else {
+                    "${start.format(dayMonth)} - ${end.format(dayMonthYear)}"
+                }
+            } else {
+                start.format(dayMonthYear)
+            }
+        }
+        "Bulan", "Bulan Ini" -> {
+            start.format(monthYear)
+        }
+        else -> {
+            if (end != null && start != end) {
+                if (start.month == end.month && start.year == end.year) {
+                    "${start.dayOfMonth} - ${end.format(dayMonthYear)}"
+                } else {
+                    "${start.format(dayMonth)} - ${end.format(dayMonthYear)}"
+                }
+            } else {
+                start.format(dayMonthYear)
+            }
+        }
+    }
+}
 
 @Composable
-private fun PurchaseToolbar(
+private fun PurchaseHeaderToolbar(
     uiState: PurchaseHistoryUiState,
     compact: Boolean,
-    onFilterClick: () -> Unit,
-    onSearchChanged: (String) -> Unit
+    isSearchExpanded: Boolean,
+    onToggleSearch: () -> Unit,
+    onSearchChanged: (String) -> Unit,
+    onAddPurchase: () -> Unit,
+    onClearSupplierFilter: () -> Unit,
+    onClearDateFilter: () -> Unit,
+    onClearSortFilter: () -> Unit,
+    onResetAllFilters: () -> Unit,
 ) {
-    if (uiState.isLoading && uiState.purchases.isEmpty()) {
+    val todayStr = remember { todayPurchaseDateString() }
+    val hasSupplierFilter = uiState.selectedSupplierId != null
+    val hasDateFilter = when (uiState.selectedPeriodType) {
+        "Semua" -> true
+        "Hari Ini", "Hari" -> uiState.startDate != todayStr || uiState.endDate != todayStr
+        else -> true
+    }
+    val hasSortFilter = uiState.sortOrder != PurchaseSortOrder.NEWEST
+    val isFiltered = uiState.isFiltered
+    val isSearchActive = isSearchExpanded || uiState.searchQuery.isNotEmpty()
+
+    Column(
+        modifier = Modifier.fillMaxWidth(),
+        verticalArrangement = Arrangement.spacedBy(10.dp)
+    ) {
+        // Expandable Search Bar (When Search is open or query is present)
+        AnimatedVisibility(
+            visible = isSearchActive,
+            enter = expandVertically() + fadeIn(),
+            exit = shrinkVertically() + fadeOut()
+        ) {
+            Surface(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(44.dp),
+                color = Color.White,
+                shape = RoundedCornerShape(12.dp),
+                border = BorderStroke(1.dp, Color(0xFF256B57).copy(alpha = 0.5f)),
+                shadowElevation = 1.dp
+            ) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(start = 12.dp, end = 6.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Icon(
+                        Icons.Outlined.Search,
+                        contentDescription = null,
+                        tint = Color(0xFF256B57),
+                        modifier = Modifier.size(18.dp),
+                    )
+                    Spacer(Modifier.width(10.dp))
+                    Box(modifier = Modifier.weight(1f), contentAlignment = Alignment.CenterStart) {
+                        if (uiState.searchQuery.isEmpty()) {
+                            Text(
+                                "Cari nomor nota atau supplier...",
+                                fontSize = 13.sp,
+                                color = Color(0xFF94A3B8),
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                            )
+                        }
+                        BasicTextField(
+                            value = uiState.searchQuery,
+                            onValueChange = onSearchChanged,
+                            singleLine = true,
+                            textStyle = TextStyle(
+                                color = Color(0xFF0F172A),
+                                fontSize = 13.sp,
+                                fontWeight = FontWeight.Medium
+                            ),
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .testTag("purchase-history-search"),
+                        )
+                    }
+                    IconButton(
+                        onClick = {
+                            if (uiState.searchQuery.isNotEmpty()) {
+                                onSearchChanged("")
+                            } else {
+                                onToggleSearch()
+                            }
+                        },
+                        modifier = Modifier.size(32.dp)
+                    ) {
+                        Icon(
+                            Icons.Outlined.Close,
+                            contentDescription = "Tutup pencarian",
+                            tint = Color(0xFF64748B),
+                            modifier = Modifier.size(16.dp),
+                        )
+                    }
+                }
+            }
+        }
+
+        // 1. Active Filters Row (jika filter aktif)
+        if (isFiltered) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .horizontalScroll(rememberScrollState()),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(6.dp)
+            ) {
+                Text(
+                    text = "Filter:",
+                    fontSize = 12.sp,
+                    fontWeight = FontWeight.Medium,
+                    color = Color(0xFF64748B)
+                )
+                if (hasSupplierFilter) {
+                    val supplierName = uiState.suppliers.firstOrNull { it.id == uiState.selectedSupplierId }?.name ?: "Supplier"
+                    Surface(
+                        shape = RoundedCornerShape(100.dp),
+                        color = Color(0xFFF1F5F9),
+                        border = BorderStroke(1.dp, Color(0xFFCBD5E1))
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(start = 10.dp, end = 6.dp, top = 4.dp, bottom = 4.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(4.dp)
+                        ) {
+                            Icon(Icons.Outlined.Business, null, tint = Color(0xFF64748B), modifier = Modifier.size(13.dp))
+                            Text(
+                                text = supplierName,
+                                fontSize = 11.sp,
+                                fontWeight = FontWeight.Medium,
+                                color = Color(0xFF334155),
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                                modifier = Modifier.widthIn(max = 120.dp)
+                            )
+                            Box(
+                                modifier = Modifier
+                                    .size(16.dp)
+                                    .clip(CircleShape)
+                                    .clickable(onClick = onClearSupplierFilter),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Icon(Icons.Outlined.Close, null, tint = Color(0xFF94A3B8), modifier = Modifier.size(11.dp))
+                            }
+                        }
+                    }
+                }
+                if (hasDateFilter) {
+                    val periodLabel = formatPeriodDisplayDate(uiState.startDate, uiState.endDate, uiState.selectedPeriodType)
+                    Surface(
+                        shape = RoundedCornerShape(100.dp),
+                        color = Color(0xFFF1F5F9),
+                        border = BorderStroke(1.dp, Color(0xFFCBD5E1))
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(start = 10.dp, end = 6.dp, top = 4.dp, bottom = 4.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(4.dp)
+                        ) {
+                            Icon(Icons.Outlined.CalendarMonth, null, tint = Color(0xFF64748B), modifier = Modifier.size(13.dp))
+                            Text(
+                                text = periodLabel,
+                                fontSize = 11.sp,
+                                fontWeight = FontWeight.Medium,
+                                color = Color(0xFF334155),
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis
+                            )
+                            Box(
+                                modifier = Modifier
+                                    .size(16.dp)
+                                    .clip(CircleShape)
+                                    .clickable(onClick = onClearDateFilter),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Icon(Icons.Outlined.Close, null, tint = Color(0xFF94A3B8), modifier = Modifier.size(11.dp))
+                            }
+                        }
+                    }
+                }
+                if (hasSortFilter) {
+                    Surface(
+                        shape = RoundedCornerShape(100.dp),
+                        color = Color(0xFFF1F5F9),
+                        border = BorderStroke(1.dp, Color(0xFFCBD5E1))
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(start = 10.dp, end = 6.dp, top = 4.dp, bottom = 4.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(4.dp)
+                        ) {
+                            Icon(Icons.AutoMirrored.Outlined.Sort, null, tint = Color(0xFF64748B), modifier = Modifier.size(13.dp))
+                            Text(
+                                text = uiState.sortOrder.label,
+                                fontSize = 11.sp,
+                                fontWeight = FontWeight.Medium,
+                                color = Color(0xFF334155),
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis
+                            )
+                            Box(
+                                modifier = Modifier
+                                    .size(16.dp)
+                                    .clip(CircleShape)
+                                    .clickable(onClick = onClearSortFilter),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Icon(Icons.Outlined.Close, null, tint = Color(0xFF94A3B8), modifier = Modifier.size(11.dp))
+                            }
+                        }
+                    }
+                }
+                Text(
+                    text = "Reset",
+                    fontSize = 11.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    color = Color(0xFFEF4444),
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(6.dp))
+                        .clickable(onClick = onResetAllFilters)
+                        .padding(horizontal = 6.dp, vertical = 4.dp)
+                )
+            }
+        }
+
+        // 2. Title & Action Row (selalu tampil)
         Row(
-            modifier = Modifier.fillMaxWidth().padding(horizontal = 4.dp),
-            horizontalArrangement = Arrangement.spacedBy(10.dp),
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically
         ) {
-            SkeletonBox(
-                modifier = Modifier.weight(1f).height(if (compact) 42.dp else 48.dp),
-                shape = RoundedCornerShape(if (compact) 12.dp else 14.dp),
+            Text(
+                text = "Daftar Pembelian",
+                fontSize = 15.sp,
+                fontWeight = FontWeight.Bold,
+                color = Color(0xFF0F172A)
             )
-            SkeletonBox(
-                modifier = Modifier.size(if (compact) 42.dp else 48.dp),
-                shape = RoundedCornerShape(if (compact) 12.dp else 14.dp),
-            )
-        }
-        return
-    }
 
-    val isFiltered = uiState.selectedSupplierId != null || (uiState.startDate != null && uiState.selectedPeriodType != "Hari")
-    Row(
-        modifier = Modifier.fillMaxWidth().padding(horizontal = 4.dp),
-        horizontalArrangement = Arrangement.spacedBy(10.dp),
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        PurchaseSearchField(
-            value = uiState.searchQuery,
-            onValueChange = onSearchChanged,
-            modifier = Modifier.weight(1f),
-            compact = compact,
-        )
-        Surface(
-            onClick = onFilterClick,
-            modifier = Modifier
-                .size(if (compact) 42.dp else 48.dp)
-                .testTag("purchase-history-open-filters"),
-            shape = RoundedCornerShape(if (compact) 12.dp else 14.dp),
-            color = Color.White,
-            border = BorderStroke(1.dp, if (isFiltered) Color(0xFF0F172A) else Color(0xFFCBD5E1)),
-            contentColor = Color(0xFF0F172A),
-        ) {
-            Box(contentAlignment = Alignment.Center) {
-                Icon(
-                    Icons.Outlined.Tune,
-                    contentDescription = "Filter nota pembelian",
-                    modifier = Modifier.size(18.dp),
-                    tint = Color(0xFF0F172A),
-                )
-                if (isFiltered) {
-                    Box(
-                        modifier = Modifier
-                            .align(Alignment.TopEnd)
-                            .padding(6.dp)
-                            .size(8.dp)
-                            .background(Color(0xFFF59E0B), CircleShape)
-                    )
-                }
-            }
-        }
-    }
-}
-
-@Composable
-private fun PurchaseSearchField(
-    value: String,
-    onValueChange: (String) -> Unit,
-    modifier: Modifier,
-    compact: Boolean = false,
-) {
-    Surface(
-        modifier = modifier
-            .height(if (compact) 42.dp else 48.dp)
-            .testTag("purchase-history-search"),
-        color = Color.White,
-        shape = RoundedCornerShape(if (compact) 12.dp else 14.dp),
-        border = BorderStroke(1.dp, Color(0xFFCBD5E1)),
-    ) {
-        Row(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(start = 12.dp, end = 6.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Icon(
-                Icons.Outlined.Search,
-                contentDescription = null,
-                tint = Color(0xFF94A3B8),
-                modifier = Modifier.size(18.dp),
-            )
-            Spacer(Modifier.width(10.dp))
-            Box(modifier = Modifier.weight(1f), contentAlignment = Alignment.CenterStart) {
-                if (value.isEmpty()) {
-                    Text(
-                        "Cari nomor nota atau supplier",
-                        fontSize = 14.sp,
-                        color = Color(0xFF94A3B8),
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                    )
-                }
-                BasicTextField(
-                    value = value,
-                    onValueChange = onValueChange,
-                    singleLine = true,
-                    textStyle = TextStyle(
-                        color = Color(0xFF0F172A),
-                        fontSize = 14.sp,
-                    ),
-                    modifier = Modifier.fillMaxWidth(),
-                )
-            }
-            if (value.isNotEmpty()) {
-                IconButton(onClick = { onValueChange("") }, modifier = Modifier.size(36.dp)) {
+            // Right: Tombol Catat (Sage Green Brand)
+            Surface(
+                onClick = onAddPurchase,
+                modifier = Modifier
+                    .height(36.dp)
+                    .testTag("purchase-history-add"),
+                shape = RoundedCornerShape(12.dp),
+                color = Color(0xFF256B57),
+                contentColor = Color.White,
+                shadowElevation = 2.dp
+            ) {
+                Row(
+                    modifier = Modifier.padding(horizontal = 14.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                ) {
                     Icon(
-                        Icons.Outlined.Close,
-                        contentDescription = "Hapus pencarian",
-                        tint = Color(0xFF64748B),
-                        modifier = Modifier.size(16.dp),
+                        imageVector = Icons.Outlined.Add,
+                        contentDescription = null,
+                        modifier = Modifier.size(14.dp)
+                    )
+                    Text(
+                        text = "Catat",
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.SemiBold,
+                        color = Color.White
                     )
                 }
             }
@@ -664,37 +637,11 @@ private fun PurchaseSearchField(
     }
 }
 
-@OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class)
 @Composable
-private fun PurchaseFilterBottomSheet(
+private fun PurchaseSummaryBottomSheet(
     uiState: PurchaseHistoryUiState,
-    onDismiss: () -> Unit,
-    onApplyFilter: (String?, String?, String?, String) -> Unit
+    onDismiss: () -> Unit
 ) {
-    val today = remember { LocalDate.now(ZoneId.of("Asia/Jakarta")) }
-    var selectedSupplierId by remember { mutableStateOf(uiState.selectedSupplierId) }
-    var selectedPeriod by remember { mutableStateOf(uiState.selectedPeriodType.ifBlank { "Hari" }) }
-
-    val initialStart = remember(uiState.startDate) {
-        uiState.startDate?.take(10)?.let { runCatching { LocalDate.parse(it) }.getOrNull() } ?: today
-    }
-    val initialEnd = remember(uiState.endDate) {
-        uiState.endDate?.take(10)?.let { runCatching { LocalDate.parse(it) }.getOrNull() } ?: today
-    }
-
-    var startDate by remember { mutableStateOf(initialStart) }
-    var endDate by remember { mutableStateOf(initialEnd) }
-    var showDatePicker by remember { mutableStateOf(false) }
-
-    val displayDate = when (selectedPeriod) {
-        "Hari" -> startDate.format(DateTimeFormatter.ofPattern("dd/MM"))
-        "Minggu" -> "${startDate.format(DateTimeFormatter.ofPattern("dd/MM"))} - ${endDate.format(DateTimeFormatter.ofPattern("dd/MM"))}"
-        "Bulan" -> "${startDate.format(DateTimeFormatter.ofPattern("dd/MM"))} - ${endDate.format(DateTimeFormatter.ofPattern("dd/MM"))}"
-        else -> if (startDate == endDate) startDate.format(DateTimeFormatter.ofPattern("dd/MM")) else "${startDate.format(DateTimeFormatter.ofPattern("dd/MM"))} - ${endDate.format(DateTimeFormatter.ofPattern("dd/MM"))}"
-    }
-
-    var supplierExpanded by remember { mutableStateOf(false) }
-
     androidx.compose.material3.ModalBottomSheet(
         onDismissRequest = onDismiss,
         containerColor = Color.White,
@@ -706,7 +653,262 @@ private fun PurchaseFilterBottomSheet(
                 Box(modifier = Modifier.width(40.dp).height(4.dp).background(Color(0xFFE2E8F0), CircleShape))
             }
         },
-        shape = RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp)
+        shape = RoundedCornerShape(topStart = 32.dp, topEnd = 32.dp)
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(bottom = 16.dp)
+        ) {
+            // Modal Header
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 24.dp, vertical = 8.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Column {
+                    Text(
+                        text = "Ringkasan Pembelian",
+                        fontSize = 18.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = Color(0xFF0F172A),
+                        letterSpacing = (-0.3).sp
+                    )
+                    Spacer(Modifier.height(2.dp))
+                    Text(
+                        text = "Informasi ringkas transaksi periode berjalan",
+                        fontSize = 12.sp,
+                        color = Color(0xFF64748B)
+                    )
+                }
+                Box(
+                    modifier = Modifier
+                        .size(32.dp)
+                        .clip(CircleShape)
+                        .background(Color(0xFFF1F5F9))
+                        .clickable { onDismiss() },
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(
+                        Icons.Outlined.Close,
+                        contentDescription = "Tutup ringkasan modal",
+                        tint = Color(0xFF94A3B8),
+                        modifier = Modifier.size(16.dp)
+                    )
+                }
+            }
+
+            HorizontalDivider(color = Color(0xFFF1F5F9), thickness = 1.dp)
+
+            // Content Metrics List (Clean & Minimalist Row Design)
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 24.dp, vertical = 4.dp)
+            ) {
+                // Row 1: Total Nilai (Featured Highlight)
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(vertical = 16.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                        Text(
+                            text = "Total Nilai",
+                            fontSize = 14.sp,
+                            fontWeight = FontWeight.Medium,
+                            color = Color(0xFF334155)
+                        )
+                        Text(
+                            text = "Maksimal ${uiState.pageSize} nota",
+                            fontSize = 12.sp,
+                            color = Color(0xFF94A3B8)
+                        )
+                    }
+                    Text(
+                        text = uiState.pageTotal.asCurrencyNoDecimals(),
+                        fontSize = 24.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = Color(0xFF256B57),
+                        letterSpacing = (-0.5).sp
+                    )
+                }
+
+                HorizontalDivider(color = Color(0xFFF1F5F9), thickness = 1.dp)
+
+                // Row 2: Total Nota
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(vertical = 16.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                        Text(
+                            text = "Total nota",
+                            fontSize = 14.sp,
+                            fontWeight = FontWeight.Medium,
+                            color = Color(0xFF475569)
+                        )
+                        Text(
+                            text = "Keseluruhan input",
+                            fontSize = 12.sp,
+                            color = Color(0xFF94A3B8)
+                        )
+                    }
+                    Row(
+                        verticalAlignment = Alignment.Bottom,
+                        horizontalArrangement = Arrangement.spacedBy(3.dp)
+                    ) {
+                        Text(
+                            text = uiState.effectiveTotalPurchases.toString(),
+                            fontSize = 16.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = Color(0xFF0F172A)
+                        )
+                        Text(
+                            text = "Nota",
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.Medium,
+                            color = Color(0xFF64748B),
+                            modifier = Modifier.padding(bottom = 1.dp)
+                        )
+                    }
+                }
+
+                HorizontalDivider(color = Color(0xFFF1F5F9), thickness = 1.dp)
+
+                // Row 3: Supplier Aktif
+                val activeSupplierCount = when {
+                    uiState.selectedSupplierId != null -> 1
+                    uiState.purchases.isNotEmpty() -> uiState.purchases.map { it.supplierName }.distinct().size
+                    else -> uiState.suppliers.size
+                }
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(vertical = 16.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                        Text(
+                            text = "Supplier aktif",
+                            fontSize = 14.sp,
+                            fontWeight = FontWeight.Medium,
+                            color = Color(0xFF475569)
+                        )
+                        Text(
+                            text = "Mitra terhubung",
+                            fontSize = 12.sp,
+                            color = Color(0xFF94A3B8)
+                        )
+                    }
+                    Row(
+                        verticalAlignment = Alignment.Bottom,
+                        horizontalArrangement = Arrangement.spacedBy(3.dp)
+                    ) {
+                        Text(
+                            text = activeSupplierCount.toString(),
+                            fontSize = 16.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = Color(0xFF0F172A)
+                        )
+                        Text(
+                            text = "Supplier",
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.Medium,
+                            color = Color(0xFF64748B),
+                            modifier = Modifier.padding(bottom = 1.dp)
+                        )
+                    }
+                }
+            }
+
+            // Action Button Area
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 24.dp, vertical = 12.dp)
+            ) {
+                Button(
+                    onClick = onDismiss,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(48.dp),
+                    shape = RoundedCornerShape(12.dp),
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = Color(0xFF256B57),
+                        contentColor = Color.White
+                    ),
+                    elevation = ButtonDefaults.buttonElevation(defaultElevation = 0.dp)
+                ) {
+                    Text(
+                        text = "Selesai",
+                        fontSize = 16.sp,
+                        fontWeight = FontWeight.SemiBold
+                    )
+                }
+            }
+            Spacer(Modifier.height(8.dp))
+        }
+    }
+}
+
+@OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class)
+@Composable
+private fun PurchaseFilterBottomSheet(
+    uiState: PurchaseHistoryUiState,
+    onDismiss: () -> Unit,
+    onApplyFilter: (String?, String?, String?, String, PurchaseSortOrder) -> Unit
+) {
+    val today = remember { LocalDate.now(ZoneId.of("Asia/Jakarta")) }
+    var selectedPeriod by remember { 
+        mutableStateOf(
+            when (uiState.selectedPeriodType) {
+                "Hari" -> "Hari Ini"
+                "Minggu" -> "Minggu Ini"
+                "Bulan" -> "Bulan Ini"
+                else -> uiState.selectedPeriodType.ifBlank { "Hari Ini" }
+            }
+        ) 
+    }
+    var selectedSupplierId by remember { mutableStateOf(uiState.selectedSupplierId) }
+    var selectedSortOrder by remember { mutableStateOf(uiState.sortOrder) }
+
+    val initialStart = remember(uiState.startDate) {
+        uiState.startDate?.take(10)?.let { runCatching { LocalDate.parse(it) }.getOrNull() } ?: today
+    }
+    val initialEnd = remember(uiState.endDate) {
+        uiState.endDate?.take(10)?.let { runCatching { LocalDate.parse(it) }.getOrNull() } ?: today
+    }
+
+    var startDate by remember { mutableStateOf(initialStart) }
+    var endDate by remember { mutableStateOf(initialEnd) }
+    var showDatePicker by remember { mutableStateOf(false) }
+    var supplierSearchQuery by remember { mutableStateOf("") }
+    var isSupplierSearchVisible by remember { mutableStateOf(false) }
+    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+
+    ModalBottomSheet(
+        onDismissRequest = onDismiss,
+        sheetState = sheetState,
+        containerColor = Color.White,
+        shape = RoundedCornerShape(topStart = 32.dp, topEnd = 32.dp),
+        dragHandle = {
+            Box(
+                modifier = Modifier
+                    .padding(top = 12.dp, bottom = 4.dp)
+                    .width(40.dp)
+                    .height(5.dp)
+                    .background(Color(0xFFCBD5E1), CircleShape)
+            )
+        },
     ) {
         Column(
             modifier = Modifier.fillMaxWidth()
@@ -715,23 +917,24 @@ private fun PurchaseFilterBottomSheet(
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(horizontal = 20.dp, vertical = 12.dp),
+                    .padding(start = 24.dp, end = 20.dp, top = 4.dp, bottom = 12.dp),
                 horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically,
+                verticalAlignment = Alignment.Top
             ) {
-                Column {
+                Column(modifier = Modifier.weight(1f).padding(end = 12.dp)) {
                     Text(
                         text = "Filter Pembelian",
-                        fontSize = 18.sp,
+                        fontSize = 20.sp,
                         fontWeight = FontWeight.Bold,
                         color = Color(0xFF0F172A),
-                        letterSpacing = (-0.3).sp,
+                        letterSpacing = (-0.3).sp
                     )
                     Spacer(Modifier.height(2.dp))
                     Text(
-                        text = "Atur periode waktu dan supplier",
-                        fontSize = 12.sp,
+                        text = "Atur periode waktu dan supplier pembelian",
+                        fontSize = 13.sp,
                         color = Color(0xFF64748B),
+                        lineHeight = 17.sp
                     )
                 }
                 Box(
@@ -740,241 +943,513 @@ private fun PurchaseFilterBottomSheet(
                         .clip(CircleShape)
                         .background(Color(0xFFF1F5F9))
                         .clickable(onClick = onDismiss),
-                    contentAlignment = Alignment.Center,
+                    contentAlignment = Alignment.Center
                 ) {
                     Icon(
                         Icons.Outlined.Close,
                         contentDescription = "Tutup filter",
-                        tint = Color(0xFF94A3B8),
-                        modifier = Modifier.size(18.dp),
+                        tint = Color(0xFF64748B),
+                        modifier = Modifier.size(16.dp)
                     )
                 }
             }
 
             HorizontalDivider(color = Color(0xFFF1F5F9), thickness = 1.dp)
 
-            // Body
+            // Scrollable Content
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(start = 20.dp, end = 20.dp, top = 14.dp, bottom = 28.dp),
-                verticalArrangement = Arrangement.spacedBy(14.dp),
+                    .weight(1f, fill = false)
+                    .verticalScroll(rememberScrollState())
+                    .padding(horizontal = 24.dp, vertical = 18.dp),
+                verticalArrangement = Arrangement.spacedBy(22.dp)
             ) {
-                // Section: PERIODE
-                Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                // Section 1: Periode Waktu
+                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                     Text(
-                        text = "PERIODE",
-                        fontSize = 11.sp,
+                        text = "PERIODE WAKTU",
+                        fontSize = 12.sp,
                         fontWeight = FontWeight.Bold,
-                        color = Color(0xFF94A3B8),
-                        letterSpacing = 0.8.sp,
+                        color = Color(0xFF64748B),
+                        letterSpacing = 0.8.sp
                     )
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(8.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                    ) {
-                        // Segmented control
+
+                    // 2x2 Grid: [Semua, Hari Ini], [Minggu Ini, Bulan Ini]
+                    val periods = listOf(
+                        listOf("Semua" to "Semua", "Hari Ini" to "Hari Ini"),
+                        listOf("Minggu Ini" to "Minggu Ini", "Bulan Ini" to "Bulan Ini")
+                    )
+                    periods.forEach { rowItems ->
                         Row(
-                            modifier = Modifier
-                                .weight(1f)
-                                .height(40.dp)
-                                .background(Color(0xFFF1F5F9), RoundedCornerShape(12.dp))
-                                .padding(2.dp),
-                            horizontalArrangement = Arrangement.spacedBy(4.dp),
-                            verticalAlignment = Alignment.CenterVertically,
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(10.dp)
                         ) {
-                            listOf(
-                                "Hari" to "Hari",
-                                "Minggu" to "Minggu",
-                                "Bulan" to "Bulan",
-                            ).forEach { (key, label) ->
+                            rowItems.forEach { (key, label) ->
                                 val isSelected = selectedPeriod == key
-                                Box(
-                                    modifier = Modifier
-                                        .weight(1f)
-                                        .fillMaxHeight()
-                                        .clip(RoundedCornerShape(8.dp))
-                                        .then(
-                                            if (isSelected) {
-                                                Modifier
-                                                    .shadow(elevation = 1.dp, shape = RoundedCornerShape(8.dp))
-                                                    .background(Color.White)
-                                            } else {
-                                                Modifier
+                                Surface(
+                                    onClick = {
+                                        selectedPeriod = key
+                                        when (key) {
+                                            "Semua" -> Unit
+                                            "Hari Ini" -> {
+                                                startDate = today
+                                                endDate = today
                                             }
-                                        )
-                                        .clickable {
-                                            selectedPeriod = key
-                                            when (key) {
-                                                "Hari" -> {
-                                                    startDate = today
-                                                    endDate = today
-                                                }
-                                                "Minggu" -> {
-                                                    startDate = today.with(DayOfWeek.MONDAY)
-                                                    endDate = today.with(DayOfWeek.SUNDAY)
-                                                }
-                                                "Bulan" -> {
-                                                    startDate = today.withDayOfMonth(1)
-                                                    endDate = today.withDayOfMonth(today.lengthOfMonth())
-                                                }
+                                            "Minggu Ini" -> {
+                                                startDate = today.with(DayOfWeek.MONDAY)
+                                                endDate = today.with(DayOfWeek.SUNDAY)
                                             }
-                                        },
-                                    contentAlignment = Alignment.Center,
+                                            "Bulan Ini" -> {
+                                                startDate = today.withDayOfMonth(1)
+                                                endDate = today.withDayOfMonth(today.lengthOfMonth())
+                                            }
+                                        }
+                                    },
+                                    modifier = Modifier.weight(1f).height(46.dp),
+                                    shape = RoundedCornerShape(12.dp),
+                                    color = Color.White,
+                                    border = BorderStroke(
+                                        if (isSelected) 1.5.dp else 1.dp,
+                                        if (isSelected) Color(0xFF256B57) else Color(0xFFE2E8F0)
+                                    ),
+                                    shadowElevation = 0.dp
                                 ) {
-                                    Text(
-                                        text = label,
-                                        fontSize = 12.sp,
-                                        fontWeight = if (isSelected) FontWeight.SemiBold else FontWeight.Medium,
-                                        color = if (isSelected) Color(0xFF0F172A) else Color(0xFF64748B),
-                                        textAlign = TextAlign.Center,
-                                    )
+                                    Row(
+                                        modifier = Modifier.fillMaxSize().padding(horizontal = 14.dp),
+                                        horizontalArrangement = Arrangement.SpaceBetween,
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        Text(
+                                            text = label,
+                                            fontSize = 14.sp,
+                                            fontWeight = if (isSelected) FontWeight.SemiBold else FontWeight.Medium,
+                                            color = if (isSelected) Color(0xFF256B57) else Color(0xFF334155)
+                                        )
+                                        if (isSelected) {
+                                            Icon(
+                                                Icons.Outlined.Check,
+                                                contentDescription = null,
+                                                tint = Color(0xFF256B57),
+                                                modifier = Modifier.size(16.dp)
+                                            )
+                                        }
+                                    }
                                 }
                             }
                         }
+                    }
 
-                        // Date button
-                        Box(
-                            modifier = Modifier
-                                .height(40.dp)
-                                .clip(RoundedCornerShape(12.dp))
-                                .background(Color(0xFFE8F2EE))
-                                .border(
-                                    BorderStroke(1.dp, Color(0xFFB8D8CD).copy(alpha = 0.6f)),
-                                    RoundedCornerShape(12.dp),
-                                )
-                                .clickable(onClick = { showDatePicker = true })
-                                .padding(horizontal = 12.dp),
-                            contentAlignment = Alignment.Center,
+                    // Pilih Tanggal Kustom Button
+                    val isCustom = selectedPeriod == "Kustom"
+                    val customText = if (isCustom) {
+                        val df = DateTimeFormatter.ofPattern("d MMM yyyy", Locale.forLanguageTag("id-ID"))
+                        if (startDate == endDate) startDate.format(df) else "${startDate.format(df)} - ${endDate.format(df)}"
+                    } else {
+                        "Pilih Tanggal Kustom"
+                    }
+                    Surface(
+                        onClick = { showDatePicker = true },
+                        modifier = Modifier.fillMaxWidth().height(46.dp),
+                        shape = RoundedCornerShape(12.dp),
+                        color = Color(0xFFF8FAFC),
+                        border = BorderStroke(
+                            if (isCustom) 1.5.dp else 1.dp,
+                            if (isCustom) Color(0xFF256B57) else Color(0xFFCBD5E1)
+                        )
+                    ) {
+                        Row(
+                            modifier = Modifier.fillMaxSize().padding(horizontal = 14.dp),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
                         ) {
                             Row(
                                 verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.spacedBy(6.dp),
+                                horizontalArrangement = Arrangement.spacedBy(8.dp)
                             ) {
                                 Icon(
                                     Icons.Outlined.CalendarMonth,
-                                    contentDescription = "Pilih tanggal",
-                                    tint = Color(0xFF256B57),
-                                    modifier = Modifier.size(15.dp),
+                                    contentDescription = null,
+                                    tint = if (isCustom) Color(0xFF256B57) else Color(0xFF64748B),
+                                    modifier = Modifier.size(16.dp)
                                 )
                                 Text(
-                                    text = displayDate,
-                                    fontSize = 12.sp,
-                                    fontWeight = FontWeight.SemiBold,
-                                    color = Color(0xFF256B57),
+                                    text = customText,
+                                    fontSize = 13.5.sp,
+                                    fontWeight = if (isCustom) FontWeight.SemiBold else FontWeight.Medium,
+                                    color = if (isCustom) Color(0xFF256B57) else Color(0xFF475569)
                                 )
                             }
+                            Text(
+                                text = "Atur >",
+                                fontSize = 12.sp,
+                                fontWeight = FontWeight.SemiBold,
+                                color = Color(0xFF256B57)
+                            )
                         }
                     }
                 }
 
-                // Section: SUPPLIER
-                Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                    Text(
-                        text = "SUPPLIER",
-                        fontSize = 11.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = Color(0xFF94A3B8),
-                        letterSpacing = 0.8.sp,
-                    )
-                    Box(modifier = Modifier.fillMaxWidth()) {
-                        Box(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .height(48.dp)
-                                .clip(RoundedCornerShape(12.dp))
-                                .background(Color(0xFFF8FAF9))
-                                .border(BorderStroke(1.dp, Color(0xFFE2E8F0)), RoundedCornerShape(12.dp))
-                                .clickable { supplierExpanded = true }
-                                .padding(horizontal = 14.dp),
-                            contentAlignment = Alignment.CenterStart,
+                // Section 2: Supplier
+                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            text = "SUPPLIER",
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = Color(0xFF64748B),
+                            letterSpacing = 0.8.sp
+                        )
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            Text(
+                                text = "${uiState.suppliers.size} Terdaftar",
+                                fontSize = 12.sp,
+                                fontWeight = FontWeight.Medium,
+                                color = Color(0xFF94A3B8)
+                            )
+                            Box(
+                                modifier = Modifier
+                                    .size(28.dp)
+                                    .clip(CircleShape)
+                                    .background(if (isSupplierSearchVisible || supplierSearchQuery.isNotEmpty()) Color(0xFFE2E8F0) else Color(0xFFF1F5F9))
+                                    .clickable {
+                                        isSupplierSearchVisible = !isSupplierSearchVisible
+                                        if (!isSupplierSearchVisible) {
+                                            supplierSearchQuery = ""
+                                        }
+                                    }
+                                    .testTag("purchase-filter-toggle-supplier-search"),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Outlined.Search,
+                                    contentDescription = "Cari supplier",
+                                    tint = if (isSupplierSearchVisible || supplierSearchQuery.isNotEmpty()) Color(0xFF256B57) else Color(0xFF64748B),
+                                    modifier = Modifier.size(16.dp)
+                                )
+                            }
+                        }
+                    }
+
+                    // Mini Search bar for supplier
+                    AnimatedVisibility(
+                        visible = isSupplierSearchVisible || supplierSearchQuery.isNotEmpty(),
+                        enter = expandVertically() + fadeIn(),
+                        exit = shrinkVertically() + fadeOut()
+                    ) {
+                        Surface(
+                            modifier = Modifier.fillMaxWidth().height(42.dp),
+                            shape = RoundedCornerShape(12.dp),
+                            color = Color(0xFFF8FAFC),
+                            border = BorderStroke(1.dp, Color(0xFFE2E8F0))
                         ) {
                             Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.SpaceBetween,
+                                modifier = Modifier.fillMaxSize().padding(horizontal = 12.dp),
                                 verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(8.dp)
                             ) {
-                                Text(
-                                    text = uiState.suppliers.firstOrNull { it.id == selectedSupplierId }?.name ?: "Semua Supplier",
-                                    fontSize = 13.sp,
-                                    fontWeight = FontWeight.Medium,
-                                    color = Color(0xFF0F172A),
-                                )
                                 Icon(
-                                    Icons.Outlined.ExpandMore,
-                                    contentDescription = "Pilih supplier",
+                                    Icons.Outlined.Search,
+                                    contentDescription = null,
                                     tint = Color(0xFF94A3B8),
-                                    modifier = Modifier.size(18.dp),
+                                    modifier = Modifier.size(18.dp)
                                 )
+                                Box(modifier = Modifier.weight(1f), contentAlignment = Alignment.CenterStart) {
+                                    if (supplierSearchQuery.isEmpty()) {
+                                        Text(
+                                            "Cari supplier...",
+                                            fontSize = 13.sp,
+                                            color = Color(0xFF94A3B8)
+                                        )
+                                    }
+                                    BasicTextField(
+                                        value = supplierSearchQuery,
+                                        onValueChange = { supplierSearchQuery = it },
+                                        singleLine = true,
+                                        textStyle = TextStyle(
+                                            color = Color(0xFF0F172A),
+                                            fontSize = 13.sp,
+                                            fontWeight = FontWeight.Medium
+                                        ),
+                                        modifier = Modifier.fillMaxWidth()
+                                    )
+                                }
+                                if (supplierSearchQuery.isNotEmpty()) {
+                                    Box(
+                                        modifier = Modifier
+                                            .size(20.dp)
+                                            .clip(CircleShape)
+                                            .clickable { supplierSearchQuery = "" },
+                                        contentAlignment = Alignment.Center
+                                    ) {
+                                        Icon(
+                                            Icons.Outlined.Close,
+                                            contentDescription = "Hapus",
+                                            tint = Color(0xFF94A3B8),
+                                            modifier = Modifier.size(14.dp)
+                                        )
+                                    }
+                                }
                             }
                         }
+                    }
 
-                        DropdownMenu(
-                            expanded = supplierExpanded,
-                            onDismissRequest = { supplierExpanded = false },
-                            modifier = Modifier.fillMaxWidth(0.9f).background(Color.White),
+                    // Scrollable supplier list
+                    val filteredSuppliers = remember(uiState.suppliers, supplierSearchQuery) {
+                        if (supplierSearchQuery.isBlank()) uiState.suppliers
+                        else uiState.suppliers.filter { it.name.contains(supplierSearchQuery, ignoreCase = true) }
+                    }
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .heightIn(max = 200.dp)
+                    ) {
+                        Column(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .verticalScroll(rememberScrollState()),
+                            verticalArrangement = Arrangement.spacedBy(8.dp)
                         ) {
-                            DropdownMenuItem(
-                                text = {
-                                    Text(
-                                        "Semua Supplier",
-                                        fontSize = 13.sp,
-                                        fontWeight = if (selectedSupplierId == null) FontWeight.Bold else FontWeight.Normal,
-                                        color = if (selectedSupplierId == null) Color(0xFF256B57) else Color(0xFF0F172A),
-                                    )
-                                },
-                                onClick = {
-                                    selectedSupplierId = null
-                                    supplierExpanded = false
-                                }
-                            )
-                            uiState.suppliers.forEach { supplier ->
-                                DropdownMenuItem(
-                                    text = {
+                            if (supplierSearchQuery.isBlank() || "semua supplier".contains(supplierSearchQuery, ignoreCase = true)) {
+                                val isAllSelected = selectedSupplierId == null
+                                Surface(
+                                    onClick = { selectedSupplierId = null },
+                                    modifier = Modifier.fillMaxWidth().height(46.dp),
+                                    shape = RoundedCornerShape(12.dp),
+                                    color = Color.White,
+                                    border = BorderStroke(
+                                        if (isAllSelected) 1.5.dp else 1.dp,
+                                        if (isAllSelected) Color(0xFF256B57) else Color(0xFFE2E8F0)
+                                    ),
+                                    shadowElevation = 0.dp
+                                ) {
+                                    Row(
+                                        modifier = Modifier.fillMaxSize().padding(horizontal = 14.dp),
+                                        horizontalArrangement = Arrangement.SpaceBetween,
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
                                         Text(
-                                            supplier.name,
-                                            fontSize = 13.sp,
-                                            fontWeight = if (selectedSupplierId == supplier.id) FontWeight.Bold else FontWeight.Normal,
-                                            color = if (selectedSupplierId == supplier.id) Color(0xFF256B57) else Color(0xFF0F172A),
+                                            text = "Semua Supplier",
+                                            fontSize = 13.5.sp,
+                                            fontWeight = if (isAllSelected) FontWeight.SemiBold else FontWeight.Medium,
+                                            color = if (isAllSelected) Color(0xFF256B57) else Color(0xFF334155)
                                         )
-                                    },
-                                    onClick = {
-                                        selectedSupplierId = supplier.id
-                                        supplierExpanded = false
+                                        if (isAllSelected) {
+                                            Icon(
+                                                Icons.Outlined.Check,
+                                                contentDescription = null,
+                                                tint = Color(0xFF256B57),
+                                                modifier = Modifier.size(16.dp)
+                                            )
+                                        }
                                     }
-                                )
+                                }
+                            }
+
+                            filteredSuppliers.forEach { supplier ->
+                                val isSelected = selectedSupplierId == supplier.id
+                                Surface(
+                                    onClick = { selectedSupplierId = supplier.id },
+                                    modifier = Modifier.fillMaxWidth().height(46.dp),
+                                    shape = RoundedCornerShape(12.dp),
+                                    color = Color.White,
+                                    border = BorderStroke(
+                                        if (isSelected) 1.5.dp else 1.dp,
+                                        if (isSelected) Color(0xFF256B57) else Color(0xFFE2E8F0)
+                                    ),
+                                    shadowElevation = 0.dp
+                                ) {
+                                    Row(
+                                        modifier = Modifier.fillMaxSize().padding(horizontal = 14.dp),
+                                        horizontalArrangement = Arrangement.SpaceBetween,
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        Text(
+                                            text = supplier.name,
+                                            fontSize = 13.5.sp,
+                                            fontWeight = if (isSelected) FontWeight.SemiBold else FontWeight.Medium,
+                                            color = if (isSelected) Color(0xFF256B57) else Color(0xFF334155),
+                                            maxLines = 1,
+                                            overflow = TextOverflow.Ellipsis,
+                                            modifier = Modifier.weight(1f, fill = false)
+                                        )
+                                        if (isSelected) {
+                                            Icon(
+                                                Icons.Outlined.Check,
+                                                contentDescription = null,
+                                                tint = Color(0xFF256B57),
+                                                modifier = Modifier.size(16.dp)
+                                            )
+                                        }
+                                    }
+                                }
                             }
                         }
                     }
                 }
 
-                Spacer(Modifier.height(4.dp))
+                // Section 3: Urutkan Berdasarkan
+                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                    Text(
+                        text = "URUTKAN BERDASARKAN",
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = Color(0xFF64748B),
+                        letterSpacing = 0.8.sp
+                    )
+                    val sortRows = listOf(
+                        listOf(PurchaseSortOrder.NEWEST to Icons.Outlined.Schedule, PurchaseSortOrder.NAME_ASC to Icons.AutoMirrored.Outlined.Sort),
+                        listOf(PurchaseSortOrder.HIGHEST_AMOUNT to Icons.Outlined.Paid, PurchaseSortOrder.DUE_NEAREST to Icons.Outlined.CalendarMonth)
+                    )
+                    sortRows.forEach { rowItems ->
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(10.dp)
+                        ) {
+                            rowItems.forEach { (order, icon) ->
+                                val isSelected = selectedSortOrder == order
+                                Surface(
+                                    onClick = { selectedSortOrder = order },
+                                    modifier = Modifier.weight(1f).height(46.dp),
+                                    shape = RoundedCornerShape(12.dp),
+                                    color = Color.White,
+                                    border = BorderStroke(
+                                        if (isSelected) 1.5.dp else 1.dp,
+                                        if (isSelected) Color(0xFF256B57) else Color(0xFFE2E8F0)
+                                    ),
+                                    shadowElevation = 0.dp
+                                ) {
+                                    Row(
+                                        modifier = Modifier.fillMaxSize().padding(horizontal = 14.dp),
+                                        horizontalArrangement = Arrangement.SpaceBetween,
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        Row(
+                                            verticalAlignment = Alignment.CenterVertically,
+                                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                            modifier = Modifier.weight(1f, fill = false)
+                                        ) {
+                                            Icon(
+                                                icon,
+                                                contentDescription = null,
+                                                tint = if (isSelected) Color(0xFF256B57) else Color(0xFF64748B),
+                                                modifier = Modifier.size(16.dp)
+                                            )
+                                            Text(
+                                                text = order.label,
+                                                fontSize = 13.5.sp,
+                                                fontWeight = if (isSelected) FontWeight.SemiBold else FontWeight.Medium,
+                                                color = if (isSelected) Color(0xFF256B57) else Color(0xFF334155),
+                                                maxLines = 1,
+                                                overflow = TextOverflow.Ellipsis
+                                            )
+                                        }
+                                        if (isSelected) {
+                                            Icon(
+                                                Icons.Outlined.Check,
+                                                contentDescription = null,
+                                                tint = Color(0xFF256B57),
+                                                modifier = Modifier.size(16.dp)
+                                            )
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
 
-                // Action Button (Selesai)
-                Button(
-                    onClick = {
-                        val startIso = "${startDate}T00:00:00Z"
-                        val endIso = "${endDate}T23:59:59Z"
-                        onApplyFilter(selectedSupplierId, startIso, endIso, selectedPeriod)
-                        onDismiss()
-                    },
+            // Sticky Footer Actions
+            Column(modifier = Modifier.fillMaxWidth()) {
+                HorizontalDivider(color = Color(0xFFF1F5F9), thickness = 1.dp)
+                Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .height(48.dp)
-                        .testTag("purchase-history-filter-done"),
-                    shape = RoundedCornerShape(12.dp),
-                    colors = ButtonDefaults.buttonColors(
-                        containerColor = Color(0xFF256B57),
-                        contentColor = Color.White,
-                    ),
-                    elevation = ButtonDefaults.buttonElevation(defaultElevation = 1.dp),
+                        .padding(horizontal = 20.dp, vertical = 14.dp),
+                    horizontalArrangement = Arrangement.spacedBy(12.dp),
+                    verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Text(
-                        text = "Selesai",
-                        fontSize = 14.sp,
-                        fontWeight = FontWeight.Bold,
-                        letterSpacing = 0.3.sp,
+                    // Reset Button (2/5 width)
+                    Surface(
+                        onClick = {
+                            selectedPeriod = "Hari Ini"
+                            startDate = today
+                            endDate = today
+                            selectedSupplierId = null
+                            selectedSortOrder = PurchaseSortOrder.NEWEST
+                            supplierSearchQuery = ""
+                            isSupplierSearchVisible = false
+                        },
+                        modifier = Modifier
+                            .weight(2f)
+                            .height(48.dp)
+                            .testTag("purchase-history-filter-reset"),
+                        shape = RoundedCornerShape(12.dp),
+                        color = Color.White,
+                        border = BorderStroke(1.5.dp, Color(0xFF256B57))
+                    ) {
+                        Box(
+                            modifier = Modifier.fillMaxSize(),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Text(
+                                text = "Reset",
+                                fontSize = 15.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = Color(0xFF256B57)
+                            )
+                        }
+                    }
+
+                    // Terapkan Button (3/5 width)
+                    Button(
+                        onClick = {
+                            val (startIso, endIso) = when (selectedPeriod) {
+                                "Semua" -> null to null
+                                else -> "${startDate}T00:00:00Z" to "${endDate}T23:59:59Z"
+                            }
+                            onApplyFilter(selectedSupplierId, startIso, endIso, selectedPeriod, selectedSortOrder)
+                            onDismiss()
+                        },
+                        modifier = Modifier
+                            .weight(3f)
+                            .height(48.dp)
+                            .testTag("purchase-history-filter-done"),
+                        shape = RoundedCornerShape(12.dp),
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = Color(0xFF256B57),
+                            contentColor = Color.White
+                        ),
+                        elevation = ButtonDefaults.buttonElevation(defaultElevation = 1.dp)
+                    ) {
+                        Text(
+                            text = "Terapkan",
+                            fontSize = 15.sp,
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
+                }
+
+                // iOS home bar pill
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(bottom = 8.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .width(128.dp)
+                            .height(4.dp)
+                            .background(Color(0xFFCBD5E1), CircleShape)
                     )
                 }
             }
@@ -984,36 +1459,24 @@ private fun PurchaseFilterBottomSheet(
     if (showDatePicker) {
         HistoryDatePickerDialog(
             currentDate = startDate.toString(),
-            initialMode = selectedPeriod,
+            initialMode = if (selectedPeriod in listOf("Hari Ini", "Hari", "Minggu Ini", "Minggu", "Bulan Ini", "Bulan")) selectedPeriod else "Kustom",
             onDismiss = { showDatePicker = false },
             onConfirmRange = { newStartStr, newEndStr, mode ->
                 startDate = LocalDate.parse(newStartStr)
                 endDate = LocalDate.parse(newEndStr)
-                selectedPeriod = mode
+                selectedPeriod = "Kustom"
                 showDatePicker = false
             },
             onConfirm = { dateStr ->
                 val date = LocalDate.parse(dateStr)
-                when (selectedPeriod) {
-                    "Hari" -> {
-                        startDate = date
-                        endDate = date
-                    }
-                    "Minggu" -> {
-                        startDate = date.with(DayOfWeek.MONDAY)
-                        endDate = date.with(DayOfWeek.SUNDAY)
-                    }
-                    "Bulan" -> {
-                        startDate = date.withDayOfMonth(1)
-                        endDate = date.withDayOfMonth(date.lengthOfMonth())
-                    }
-                }
+                startDate = date
+                endDate = date
+                selectedPeriod = "Kustom"
                 showDatePicker = false
             }
         )
     }
 }
-
 
 @Composable
 private fun PurchaseMobileRow(purchase: PurchaseSummary, onShowDetail: (String) -> Unit) {
@@ -1021,127 +1484,106 @@ private fun PurchaseMobileRow(purchase: PurchaseSummary, onShowDetail: (String) 
         modifier = Modifier
             .fillMaxWidth()
             .clickable { onShowDetail(purchase.id) }
-            .padding(16.dp)
+            .padding(14.dp)
     ) {
         Row(
             modifier = Modifier.fillMaxWidth(),
-            verticalAlignment = Alignment.CenterVertically,
+            verticalAlignment = Alignment.Top,
             horizontalArrangement = Arrangement.SpaceBetween
         ) {
             Row(
                 modifier = Modifier.weight(1f),
-                verticalAlignment = Alignment.CenterVertically
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
+                verticalAlignment = Alignment.Top
             ) {
+                // 40x40 icon container with Sage Green receipt icon
                 Surface(
-                    modifier = Modifier.size(40.dp),
                     shape = RoundedCornerShape(12.dp),
                     color = Color.White,
                     border = BorderStroke(1.dp, Color(0xFFE2E8F0)),
+                    modifier = Modifier.size(40.dp)
                 ) {
                     Box(contentAlignment = Alignment.Center) {
                         Icon(
-                            Icons.Outlined.Description,
+                            imageVector = Icons.Outlined.ReceiptLong,
                             contentDescription = null,
-                            tint = Color(0xFF1E293B),
-                            modifier = Modifier.size(20.dp),
+                            tint = Color(0xFF256B57),
+                            modifier = Modifier.size(20.dp)
                         )
                     }
                 }
-                Spacer(Modifier.width(12.dp))
-                Column(
-                    modifier = Modifier.weight(1f),
-                ) {
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = purchase.supplierName.ifBlank { "Tanpa Supplier" },
+                        fontSize = 14.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = Color(0xFF0F172A),
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                    Spacer(Modifier.height(3.dp))
                     Text(
                         text = purchase.invoiceNo ?: "Tanpa nomor nota",
                         fontSize = 12.sp,
-                        fontWeight = FontWeight.SemiBold,
-                        color = Color(0xFF0F172A),
+                        fontWeight = FontWeight.Medium,
+                        color = Color(0xFF475569),
                         maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
+                        overflow = TextOverflow.Ellipsis
                     )
-                    Spacer(Modifier.height(2.dp))
+                    Spacer(Modifier.height(4.dp))
                     Row(
-                        modifier = Modifier.fillMaxWidth(),
                         verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(6.dp)
                     ) {
                         Text(
-                            text = purchase.supplierName,
+                            text = "Lunas",
                             fontSize = 11.sp,
-                            fontWeight = FontWeight.Medium,
-                            color = Color(0xFF334155),
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis,
-                            modifier = Modifier.weight(1f, fill = false),
+                            fontWeight = FontWeight.SemiBold,
+                            color = Color(0xFF256B57)
                         )
-                        Text(
-                            text = " • ",
-                            fontSize = 11.sp,
-                            fontWeight = FontWeight.Normal,
-                            color = Color(0xFFCBD5E1),
+                        Box(
+                            modifier = Modifier
+                                .size(3.dp)
+                                .background(Color(0xFFCBD5E1), CircleShape)
                         )
                         Text(
                             text = if (purchase.invoiceNo != null) "Pembelian" else "Nota Manual",
                             fontSize = 11.sp,
-                            fontWeight = FontWeight.Normal,
-                            color = Color(0xFF64748B),
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis,
+                            color = Color(0xFF64748B)
                         )
                     }
                 }
             }
-            Spacer(Modifier.width(8.dp))
             Icon(
-                Icons.AutoMirrored.Outlined.KeyboardArrowRight,
+                imageVector = Icons.AutoMirrored.Outlined.KeyboardArrowRight,
                 contentDescription = null,
-                tint = Color(0xFF94A3B8),
-                modifier = Modifier.size(16.dp),
+                tint = Color(0xFFCBD5E1),
+                modifier = Modifier.size(20.dp)
             )
         }
-
         Spacer(Modifier.height(10.dp))
-        HorizontalDivider(color = Color(0xFFF1F5F9))
-        Spacer(Modifier.height(10.dp))
-
+        HorizontalDivider(
+            color = Color(0xFFF1F5F9),
+            thickness = 1.dp
+        )
+        Spacer(Modifier.height(8.dp))
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically,
+            verticalAlignment = Alignment.CenterVertically
         ) {
-            Column {
-                Text(
-                    text = "TANGGAL MASUK",
-                    fontSize = 10.sp,
-                    fontWeight = FontWeight.Medium,
-                    letterSpacing = 0.5.sp,
-                    color = Color(0xFF94A3B8),
-                )
-                Spacer(Modifier.height(2.dp))
-                Text(
-                    text = purchase.receivedAt.asDisplayDate(),
-                    fontSize = 14.sp,
-                    fontWeight = FontWeight.SemiBold,
-                    color = Color(0xFF1E293B),
-                )
-            }
-            Column(horizontalAlignment = Alignment.End) {
-                Text(
-                    text = "TOTAL",
-                    fontSize = 10.sp,
-                    fontWeight = FontWeight.Medium,
-                    letterSpacing = 0.5.sp,
-                    color = Color(0xFF94A3B8),
-                    textAlign = TextAlign.End,
-                )
-                Spacer(Modifier.height(2.dp))
-                Text(
-                    text = purchase.total.asCurrency(),
-                    fontSize = 14.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = Color(0xFF256B57),
-                    textAlign = TextAlign.End,
-                )
-            }
+            Text(
+                text = purchase.receivedAt.asDisplayDate(),
+                fontSize = 12.sp,
+                color = Color(0xFF64748B),
+                fontWeight = FontWeight.Medium
+            )
+            Text(
+                text = purchase.total.asCurrency(),
+                fontSize = 14.sp,
+                fontWeight = FontWeight.Bold,
+                color = Color(0xFF0F172A)
+            )
         }
     }
 }
@@ -1191,98 +1633,23 @@ private fun PurchasePagination(
     onPreviousPage: () -> Unit,
     onNextPage: () -> Unit
 ) {
-    if (compact) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(top = 14.dp, bottom = 4.dp),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            val countText = if (uiState.effectiveTotalPurchases == 0L) {
-                "0 nota"
-            } else if (uiState.visiblePurchases.size.toLong() >= uiState.effectiveTotalPurchases) {
-                "${uiState.effectiveTotalPurchases} nota"
-            } else {
-                "${uiState.visiblePurchases.size} dari ${uiState.effectiveTotalPurchases} nota"
-            }
-            Surface(
-                shape = CircleShape,
-                color = Color.White,
-                border = BorderStroke(1.dp, Color(0xFFE2E8F0)),
-            ) {
-                Text(
-                    text = countText,
-                    modifier = Modifier.padding(horizontal = 14.dp, vertical = 6.dp),
-                    fontSize = 12.sp,
-                    fontWeight = FontWeight.SemiBold,
-                    color = Color(0xFF475569)
-                )
-            }
-            Surface(
-                shape = CircleShape,
-                color = Color.White,
-                border = BorderStroke(1.dp, Color(0xFFE2E8F0)),
-            ) {
-                Row(
-                    modifier = Modifier.padding(horizontal = 6.dp, vertical = 3.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    val canPrev = uiState.page > 1 && !uiState.isLoading
-                    val canNext = uiState.page < uiState.totalPages && !uiState.isLoading
-                    IconButton(
-                        onClick = onPreviousPage,
-                        enabled = canPrev,
-                        modifier = Modifier.size(28.dp)
-                    ) {
-                        Icon(
-                            Icons.Default.ChevronLeft,
-                            contentDescription = "Halaman sebelumnya",
-                            tint = if (canPrev) Color(0xFF475569) else Color(0xFFCBD5E1),
-                            modifier = Modifier.size(16.dp)
-                        )
-                    }
-                    Text(
-                        text = "${uiState.page} / ${uiState.totalPages.coerceAtLeast(1)}",
-                        modifier = Modifier.padding(horizontal = 8.dp),
-                        fontSize = 12.sp,
-                        fontWeight = FontWeight.Medium,
-                        color = Color(0xFF334155)
-                    )
-                    IconButton(
-                        onClick = onNextPage,
-                        enabled = canNext,
-                        modifier = Modifier.size(28.dp)
-                    ) {
-                        Icon(
-                            Icons.Default.ChevronRight,
-                            contentDescription = "Halaman berikutnya",
-                            tint = if (canNext) Color(0xFF475569) else Color(0xFFCBD5E1),
-                            modifier = Modifier.size(16.dp)
-                        )
-                    }
-                }
-            }
-        }
+    val countText = if (uiState.effectiveTotalPurchases == 0L) {
+        "0 nota"
+    } else if (uiState.visiblePurchases.size.toLong() >= uiState.effectiveTotalPurchases) {
+        "${uiState.effectiveTotalPurchases} nota"
     } else {
-        Row(
-            Modifier.fillMaxWidth().padding(top = 16.dp),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            val desktopText = if (uiState.effectiveTotalPurchases == 0L) {
-                "Menampilkan 0 nota"
-            } else {
-                "Menampilkan ${uiState.pageStartIndex}-${uiState.pageEndIndex} dari ${uiState.effectiveTotalPurchases} nota"
-            }
-            Text(desktopText, color = PurchaseMuted, fontSize = 12.sp)
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
-                IconButton(onClick = onPreviousPage, enabled = uiState.page > 1) { Icon(Icons.Default.ChevronLeft, "Sebelumnya") }
-                Text("${uiState.page} / ${uiState.totalPages.coerceAtLeast(1)}", fontWeight = FontWeight.Bold)
-                IconButton(onClick = onNextPage, enabled = uiState.page < uiState.totalPages) { Icon(Icons.Default.ChevronRight, "Berikutnya") }
-            }
-        }
+        "${uiState.visiblePurchases.size} dari ${uiState.effectiveTotalPurchases} nota"
     }
+    TbPagination(
+        currentPage = uiState.page,
+        totalPages = uiState.totalPages,
+        onPreviousPage = onPreviousPage,
+        onNextPage = onNextPage,
+        supportingText = countText,
+        isLoading = uiState.isLoading,
+        compact = compact,
+        testTag = "purchase-history-pagination"
+    )
 }
 
 @Composable
@@ -1752,8 +2119,44 @@ private fun PurchaseDetailSkeletonContent(onDismiss: () -> Unit) {
 }
 
 @Composable
-private fun EmptyBox(searchQuery: String) = Box(Modifier.fillMaxWidth().height(180.dp), contentAlignment = Alignment.Center) {
-    Text(if (searchQuery.isBlank()) "Belum ada nota pembelian." else "Nota pembelian tidak ditemukan.", color = PurchaseMuted)
+private fun EmptyBox(searchQuery: String) {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(vertical = 36.dp, horizontal = 20.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(8.dp)
+    ) {
+        Box(
+            modifier = Modifier
+                .size(48.dp)
+                .background(Color(0xFFF1F5F9), CircleShape),
+            contentAlignment = Alignment.Center
+        ) {
+            Icon(
+                imageVector = if (searchQuery.isNotBlank()) Icons.Outlined.Search else Icons.Outlined.ReceiptLong,
+                contentDescription = null,
+                tint = Color(0xFF94A3B8),
+                modifier = Modifier.size(24.dp)
+            )
+        }
+        Text(
+            text = if (searchQuery.isNotBlank()) "Nota tidak ditemukan" else "Belum ada nota pembelian",
+            fontSize = 15.sp,
+            fontWeight = FontWeight.SemiBold,
+            color = Color(0xFF334155),
+            textAlign = TextAlign.Center
+        )
+        Text(
+            text = if (searchQuery.isNotBlank()) 
+                "Coba cari nomor nota atau nama supplier yang berbeda." 
+            else 
+                "Gunakan tombol Catat di atas untuk mencatat nota pembelian baru.",
+            fontSize = 13.sp,
+            color = Color(0xFF94A3B8),
+            textAlign = TextAlign.Center
+        )
+    }
 }
 
 @Composable

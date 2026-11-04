@@ -1,5 +1,18 @@
 package com.tbterminal.app.ui.incominggoods
 
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.expandVertically
+import androidx.compose.animation.shrinkVertically
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import com.tbterminal.app.ui.components.TbPagination
+import androidx.compose.ui.platform.testTag
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.material.icons.outlined.Check
+import androidx.compose.material.icons.outlined.Schedule
+import androidx.compose.material.icons.automirrored.outlined.Sort
+
 import androidx.compose.foundation.BorderStroke
 import com.tbterminal.app.ui.components.SkeletonBox
 import androidx.compose.foundation.background
@@ -36,6 +49,7 @@ import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.ModalBottomSheet
+import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
@@ -69,14 +83,23 @@ internal fun ProductSelectorCard(
     modifier: Modifier,
     uiState: IncomingGoodsUiState,
     compact: Boolean = false,
+    isSearchExpanded: Boolean = false,
+    onToggleSearch: () -> Unit = {},
+    showFilterPopup: Boolean = false,
+    onDismissFilter: () -> Unit = {},
+    showSummaryPopup: Boolean = false,
+    onDismissSummary: () -> Unit = {},
     onSearchChanged: (String) -> Unit,
     onCategoryFilterChanged: (String?) -> Unit,
+    onApplyFilters: (String?, IncomingStockStatusFilter, IncomingProductSortOrder) -> Unit = { _, _, _ -> },
+    onResetFilters: () -> Unit = {},
     onOpenForm: () -> Unit = {},
     onSelectProduct: (ProductStock) -> Unit,
     onPreviousPage: () -> Unit,
     onNextPage: () -> Unit
 ) {
-    var showSummaryPopup by remember { mutableStateOf(false) }
+    var localShowSummaryPopup by remember { mutableStateOf(false) }
+    val isSummaryOpen = showSummaryPopup || localShowSummaryPopup
 
     Column(
         modifier = modifier.fillMaxWidth(),
@@ -85,23 +108,29 @@ internal fun ProductSelectorCard(
         ProductToolbar(
             uiState = uiState,
             compact = compact,
+            isSearchExpanded = isSearchExpanded,
+            onToggleSearch = onToggleSearch,
+            showFilterPopup = showFilterPopup,
+            onDismissFilter = onDismissFilter,
             onSearchChanged = onSearchChanged,
             onCategoryFilterChanged = onCategoryFilterChanged,
+            onApplyFilters = onApplyFilters,
+            onResetFilters = onResetFilters,
             onOpenForm = onOpenForm,
         )
         if (compact) {
             ProductMobileHeader(
                 isLoading = uiState.isLoadingProducts && uiState.products.isEmpty(),
-                onShowSummaryClick = { showSummaryPopup = true }
+                onShowSummaryClick = { localShowSummaryPopup = true }
             )
             ProductMobileList(uiState, onSelectProduct)
             if (!uiState.isLoadingProducts || uiState.products.isNotEmpty()) {
                 ProductMobilePagination(uiState, onPreviousPage, onNextPage)
             }
-            if (showSummaryPopup) {
+            if (isSummaryOpen) {
                 @OptIn(ExperimentalMaterial3Api::class)
                 ModalBottomSheet(
-                    onDismissRequest = { showSummaryPopup = false },
+                    onDismissRequest = { localShowSummaryPopup = false; onDismissSummary() },
                     containerColor = Color.White,
                     dragHandle = {
                         Box(
@@ -143,7 +172,7 @@ internal fun ProductSelectorCard(
                                 letterSpacing = (-0.4).sp
                             )
                             IconButton(
-                                onClick = { showSummaryPopup = false },
+                                onClick = { localShowSummaryPopup = false; onDismissSummary() },
                                 modifier = Modifier.size(36.dp)
                             ) {
                                 Icon(
@@ -271,7 +300,7 @@ internal fun ProductSelectorCard(
                         // Action Button: Selesai
                         Spacer(modifier = Modifier.height(24.dp))
                         Button(
-                            onClick = { showSummaryPopup = false },
+                            onClick = { localShowSummaryPopup = false; onDismissSummary() },
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .height(52.dp),
@@ -307,8 +336,14 @@ internal fun ProductSelectorCard(
 private fun ProductToolbar(
     uiState: IncomingGoodsUiState,
     compact: Boolean,
+    isSearchExpanded: Boolean = false,
+    onToggleSearch: () -> Unit = {},
+    showFilterPopup: Boolean = false,
+    onDismissFilter: () -> Unit = {},
     onSearchChanged: (String) -> Unit,
     onCategoryFilterChanged: (String?) -> Unit,
+    onApplyFilters: (String?, IncomingStockStatusFilter, IncomingProductSortOrder) -> Unit = { _, _, _ -> },
+    onResetFilters: () -> Unit = {},
     onOpenForm: () -> Unit = {}
 ) {
     val isCompact = compact || LocalConfiguration.current.screenWidthDp < 700
@@ -338,44 +373,39 @@ private fun ProductToolbar(
     }
     
     if (isCompact) {
-        var showMobileFilters by remember { mutableStateOf(false) }
-        val isFiltered = uiState.categoryFilter != null
+        var localShowFilters by remember { mutableStateOf(false) }
+        val isFilterOpen = showFilterPopup || localShowFilters
         
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(10.dp),
-            verticalAlignment = Alignment.CenterVertically,
+        androidx.compose.animation.AnimatedVisibility(
+            visible = isSearchExpanded || uiState.productSearchQuery.isNotEmpty(),
+            enter = androidx.compose.animation.expandVertically() + androidx.compose.animation.fadeIn(),
+            exit = androidx.compose.animation.shrinkVertically() + androidx.compose.animation.fadeOut()
         ) {
             IncomingSearchField(
                 value = uiState.productSearchQuery,
                 onValueChange = onSearchChanged,
-                modifier = Modifier.weight(1f),
+                modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp),
                 compact = true,
             )
-            Surface(
-                onClick = { showMobileFilters = true },
-                modifier = Modifier.size(42.dp),
-                shape = RoundedCornerShape(12.dp),
-                color = Color.White,
-                border = BorderStroke(1.dp, if (isFiltered) Color(0xFF0F172A) else Color(0xFFCBD5E1)),
-                contentColor = Color(0xFF0F172A),
-            ) {
-                Box(contentAlignment = Alignment.Center) {
-                    Icon(
-                        Icons.Outlined.Tune,
-                        contentDescription = "Filter produk",
-                        modifier = Modifier.size(18.dp),
-                        tint = Color(0xFF0F172A),
-                    )
-                }
-            }
         }
-        if (showMobileFilters) {
+        if (isFilterOpen) {
             IncomingCategoryFilterBottomSheet(
-                selectedCategory = uiState.categoryFilter,
+                uiState = uiState,
                 categories = uiState.categoryOptions,
-                onCategoryFilterChanged = onCategoryFilterChanged,
-                onDismiss = { showMobileFilters = false },
+                onApplyFilters = { cat, stat, sort ->
+                    onApplyFilters(cat, stat, sort)
+                    localShowFilters = false
+                    onDismissFilter()
+                },
+                onResetFilters = {
+                    onResetFilters()
+                    localShowFilters = false
+                    onDismissFilter()
+                },
+                onDismiss = {
+                    localShowFilters = false
+                    onDismissFilter()
+                },
             )
         }
     } else {
@@ -544,49 +574,65 @@ private fun IncomingCategoryFilterDropdown(
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun IncomingCategoryFilterBottomSheet(
-    selectedCategory: String?,
+    uiState: IncomingGoodsUiState,
     categories: List<String>,
-    onCategoryFilterChanged: (String?) -> Unit,
+    onApplyFilters: (String?, IncomingStockStatusFilter, IncomingProductSortOrder) -> Unit,
+    onResetFilters: () -> Unit,
     onDismiss: () -> Unit,
 ) {
+    var selectedCategory by remember { mutableStateOf(uiState.categoryFilter) }
+    var selectedStockStatus by remember { mutableStateOf(uiState.stockStatusFilter) }
+    var selectedSortOrder by remember { mutableStateOf(uiState.sortOrder) }
+    var categoryQuery by remember { mutableStateOf("") }
+    var isCategorySearchVisible by remember { mutableStateOf(false) }
+    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+
+    val filteredCategories = remember(categories, categoryQuery) {
+        if (categoryQuery.isBlank()) categories
+        else categories.filter { it.contains(categoryQuery, ignoreCase = true) }
+    }
+
     ModalBottomSheet(
         onDismissRequest = onDismiss,
+        sheetState = sheetState,
         containerColor = Color.White,
-        shape = RoundedCornerShape(topStart = 30.dp, topEnd = 30.dp),
+        shape = RoundedCornerShape(topStart = 32.dp, topEnd = 32.dp),
         dragHandle = {
             Box(
                 modifier = Modifier
-                    .padding(top = 10.dp, bottom = 4.dp)
+                    .padding(top = 12.dp, bottom = 4.dp)
                     .width(40.dp)
-                    .height(4.dp)
+                    .height(5.dp)
                     .background(Color(0xFFCBD5E1), CircleShape)
             )
         },
+        modifier = Modifier.testTag("incoming-filter-sheet")
     ) {
         Column(
-            modifier = Modifier.fillMaxWidth(),
+            modifier = Modifier.fillMaxWidth()
         ) {
-            // Header
+            // Sheet Header
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(horizontal = 20.dp, vertical = 12.dp),
+                    .padding(start = 24.dp, end = 20.dp, top = 4.dp, bottom = 12.dp),
                 horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically,
+                verticalAlignment = Alignment.Top
             ) {
-                Column {
+                Column(modifier = Modifier.weight(1f).padding(end = 12.dp)) {
                     Text(
                         text = "Filter Produk",
-                        fontSize = 18.sp,
+                        fontSize = 20.sp,
                         fontWeight = FontWeight.Bold,
                         color = Color(0xFF0F172A),
-                        letterSpacing = (-0.3).sp,
+                        letterSpacing = (-0.3).sp
                     )
                     Spacer(Modifier.height(2.dp))
                     Text(
-                        text = "Pilih kategori untuk memfilter produk",
-                        fontSize = 12.sp,
+                        text = "Pilih kategori dan urutkan produk barang masuk",
+                        fontSize = 13.sp,
                         color = Color(0xFF64748B),
+                        lineHeight = 17.sp
                     )
                 }
                 Box(
@@ -595,153 +641,414 @@ private fun IncomingCategoryFilterBottomSheet(
                         .clip(CircleShape)
                         .background(Color(0xFFF1F5F9))
                         .clickable(onClick = onDismiss),
-                    contentAlignment = Alignment.Center,
+                    contentAlignment = Alignment.Center
                 ) {
                     Icon(
-                        Icons.Outlined.Close,
+                        imageVector = Icons.Outlined.Close,
                         contentDescription = "Tutup filter",
-                        tint = Color(0xFF94A3B8),
-                        modifier = Modifier.size(18.dp),
+                        tint = Color(0xFF64748B),
+                        modifier = Modifier.size(16.dp)
                     )
                 }
             }
 
             HorizontalDivider(color = Color(0xFFF1F5F9), thickness = 1.dp)
 
-            // Body
+            // Scrollable Content
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(start = 20.dp, end = 20.dp, top = 14.dp, bottom = 28.dp),
-                verticalArrangement = Arrangement.spacedBy(14.dp),
+                    .weight(1f, fill = false)
+                    .verticalScroll(rememberScrollState())
+                    .padding(horizontal = 24.dp, vertical = 18.dp),
+                verticalArrangement = Arrangement.spacedBy(22.dp)
             ) {
-                // Section: KATEGORI
-                Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                    Text(
-                        text = "KATEGORI",
-                        fontSize = 11.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = Color(0xFF94A3B8),
-                        letterSpacing = 0.8.sp,
-                    )
-                    IncomingCategoryDropdownField(
-                        selectedValue = selectedCategory,
-                        options = categories,
-                        onSelected = onCategoryFilterChanged,
-                    )
+                // SECTION 1: KATEGORI PRODUK
+                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            text = "KATEGORI PRODUK",
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = Color(0xFF64748B),
+                            letterSpacing = 0.8.sp
+                        )
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            Text(
+                                text = "${categories.size} Kategori",
+                                fontSize = 12.sp,
+                                fontWeight = FontWeight.Medium,
+                                color = Color(0xFF94A3B8)
+                            )
+                            Box(
+                                modifier = Modifier
+                                    .size(28.dp)
+                                    .clip(CircleShape)
+                                    .background(if (isCategorySearchVisible || categoryQuery.isNotEmpty()) Color(0xFFE2E8F0) else Color(0xFFF1F5F9))
+                                    .clickable {
+                                        isCategorySearchVisible = !isCategorySearchVisible
+                                        if (!isCategorySearchVisible) {
+                                            categoryQuery = ""
+                                        }
+                                    }
+                                    .testTag("incoming-filter-toggle-category-search"),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Outlined.Search,
+                                    contentDescription = "Cari kategori",
+                                    tint = if (isCategorySearchVisible || categoryQuery.isNotEmpty()) Color(0xFF256B57) else Color(0xFF64748B),
+                                    modifier = Modifier.size(16.dp)
+                                )
+                            }
+                        }
+                    }
+
+                    // Search input
+                    AnimatedVisibility(
+                        visible = isCategorySearchVisible || categoryQuery.isNotEmpty(),
+                        enter = expandVertically() + fadeIn(),
+                        exit = shrinkVertically() + fadeOut()
+                    ) {
+                        Surface(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(42.dp),
+                            shape = RoundedCornerShape(12.dp),
+                            color = Color(0xFFF8FAFC),
+                            border = BorderStroke(1.dp, Color(0xFFE2E8F0))
+                        ) {
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxSize()
+                                    .padding(horizontal = 12.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Outlined.Search,
+                                    contentDescription = null,
+                                    tint = Color(0xFF94A3B8),
+                                    modifier = Modifier.size(18.dp)
+                                )
+                                Box(modifier = Modifier.weight(1f), contentAlignment = Alignment.CenterStart) {
+                                    if (categoryQuery.isEmpty()) {
+                                        Text(
+                                            text = "Cari kategori...",
+                                            fontSize = 13.sp,
+                                            color = Color(0xFF94A3B8)
+                                        )
+                                    }
+                                    BasicTextField(
+                                        value = categoryQuery,
+                                        onValueChange = { categoryQuery = it },
+                                        singleLine = true,
+                                        textStyle = TextStyle(
+                                            fontSize = 13.sp,
+                                            color = Color(0xFF0F172A),
+                                            fontWeight = FontWeight.Medium
+                                        ),
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .testTag("incoming-filter-category-search")
+                                    )
+                                }
+                                if (categoryQuery.isNotEmpty()) {
+                                    Box(
+                                        modifier = Modifier
+                                            .size(20.dp)
+                                            .clip(CircleShape)
+                                            .clickable { categoryQuery = "" },
+                                        contentAlignment = Alignment.Center
+                                    ) {
+                                        Icon(
+                                            imageVector = Icons.Outlined.Close,
+                                            contentDescription = "Hapus teks",
+                                            tint = Color(0xFF94A3B8),
+                                            modifier = Modifier.size(14.dp)
+                                        )
+                                    }
+                                }
+                            }
+                        }
+                    }
+
+                    // Grid categories
+                    val allCategoryItems: List<String?> = listOf<String?>(null) + filteredCategories
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .heightIn(max = 200.dp)
+                            .verticalScroll(rememberScrollState())
+                    ) {
+                        Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                            allCategoryItems.chunked(2).forEach { pair ->
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.spacedBy(10.dp)
+                                ) {
+                                    pair.forEach { cat ->
+                                        val isSelected = if (cat == null) selectedCategory == null else selectedCategory.equals(cat, ignoreCase = true)
+                                        IncomingFilterCard(
+                                            label = cat ?: "Semua Kategori",
+                                            isSelected = isSelected,
+                                            onClick = { selectedCategory = cat },
+                                            modifier = Modifier.weight(1f),
+                                            testTag = "incoming-filter-category-${cat ?: "all"}"
+                                        )
+                                    }
+                                    if (pair.size == 1) {
+                                        Spacer(Modifier.weight(1f))
+                                    }
+                                }
+                            }
+                        }
+                    }
                 }
 
-                Spacer(Modifier.height(4.dp))
+                // SECTION 2: STATUS STOK
+                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                    Text(
+                        text = "STATUS STOK",
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = Color(0xFF64748B),
+                        letterSpacing = 0.8.sp
+                    )
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(10.dp)
+                    ) {
+                        IncomingFilterCard(
+                            label = "Semua",
+                            isSelected = selectedStockStatus == IncomingStockStatusFilter.ALL,
+                            onClick = { selectedStockStatus = IncomingStockStatusFilter.ALL },
+                            modifier = Modifier.weight(1f),
+                            testTag = "incoming-filter-stock-all"
+                        )
+                        IncomingFilterCard(
+                            label = "Aman",
+                            isSelected = selectedStockStatus == IncomingStockStatusFilter.SAFE,
+                            onClick = { selectedStockStatus = IncomingStockStatusFilter.SAFE },
+                            modifier = Modifier.weight(1f),
+                            testTag = "incoming-filter-stock-safe"
+                        )
+                    }
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(10.dp)
+                    ) {
+                        IncomingFilterCard(
+                            label = "Menipis",
+                            isSelected = selectedStockStatus == IncomingStockStatusFilter.LOW,
+                            onClick = { selectedStockStatus = IncomingStockStatusFilter.LOW },
+                            modifier = Modifier.weight(1f),
+                            testTag = "incoming-filter-stock-low"
+                        )
+                        IncomingFilterCard(
+                            label = "Habis",
+                            isSelected = selectedStockStatus == IncomingStockStatusFilter.OUT_OF_STOCK,
+                            onClick = { selectedStockStatus = IncomingStockStatusFilter.OUT_OF_STOCK },
+                            modifier = Modifier.weight(1f),
+                            testTag = "incoming-filter-stock-out"
+                        )
+                    }
+                }
 
-                // Action Button (Selesai)
-                Button(
-                    onClick = onDismiss,
+                // SECTION 3: URUTKAN BERDASARKAN
+                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                    Text(
+                        text = "URUTKAN BERDASARKAN",
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = Color(0xFF64748B),
+                        letterSpacing = 0.8.sp
+                    )
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(10.dp)
+                    ) {
+                        IncomingFilterCard(
+                            label = "Terbaru",
+                            isSelected = selectedSortOrder == IncomingProductSortOrder.NEWEST,
+                            onClick = { selectedSortOrder = IncomingProductSortOrder.NEWEST },
+                            icon = Icons.Outlined.Schedule,
+                            modifier = Modifier.weight(1f),
+                            testTag = "incoming-filter-sort-newest"
+                        )
+                        IncomingFilterCard(
+                            label = "Nama (A–Z)",
+                            isSelected = selectedSortOrder == IncomingProductSortOrder.NAME_ASC,
+                            onClick = { selectedSortOrder = IncomingProductSortOrder.NAME_ASC },
+                            icon = Icons.AutoMirrored.Outlined.Sort,
+                            modifier = Modifier.weight(1f),
+                            testTag = "incoming-filter-sort-name"
+                        )
+                    }
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(10.dp)
+                    ) {
+                        IncomingFilterCard(
+                            label = "Stok Terbanyak",
+                            isSelected = selectedSortOrder == IncomingProductSortOrder.STOCK_DESC,
+                            onClick = { selectedSortOrder = IncomingProductSortOrder.STOCK_DESC },
+                            modifier = Modifier.weight(1f),
+                            testTag = "incoming-filter-sort-stock"
+                        )
+                        IncomingFilterCard(
+                            label = "Harga Terendah",
+                            isSelected = selectedSortOrder == IncomingProductSortOrder.PRICE_ASC,
+                            onClick = { selectedSortOrder = IncomingProductSortOrder.PRICE_ASC },
+                            modifier = Modifier.weight(1f),
+                            testTag = "incoming-filter-sort-price"
+                        )
+                    }
+                }
+            }
+
+            // Sticky Footer Action Buttons
+            HorizontalDivider(color = Color(0xFFF1F5F9), thickness = 1.dp)
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 20.dp, vertical = 14.dp),
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                // Reset Button (2/5)
+                Surface(
+                    onClick = {
+                        selectedCategory = null
+                        selectedStockStatus = IncomingStockStatusFilter.ALL
+                        selectedSortOrder = IncomingProductSortOrder.NEWEST
+                        categoryQuery = ""
+                        isCategorySearchVisible = false
+                        onResetFilters()
+                        onDismiss()
+                    },
                     modifier = Modifier
-                        .fillMaxWidth()
-                        .height(48.dp),
+                        .weight(2f)
+                        .height(48.dp)
+                        .testTag("incoming-filter-reset"),
+                    shape = RoundedCornerShape(12.dp),
+                    color = Color.White,
+                    border = BorderStroke(1.5.dp, Color(0xFF256B57))
+                ) {
+                    Box(contentAlignment = Alignment.Center) {
+                        Text(
+                            text = "Reset",
+                            fontSize = 15.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = Color(0xFF256B57)
+                        )
+                    }
+                }
+
+                // Terapkan Button (3/5)
+                Button(
+                    onClick = {
+                        onApplyFilters(selectedCategory, selectedStockStatus, selectedSortOrder)
+                        onDismiss()
+                    },
+                    modifier = Modifier
+                        .weight(3f)
+                        .height(48.dp)
+                        .testTag("incoming-filter-apply"),
                     shape = RoundedCornerShape(12.dp),
                     colors = ButtonDefaults.buttonColors(
                         containerColor = Color(0xFF256B57),
-                        contentColor = Color.White,
+                        contentColor = Color.White
                     ),
-                    elevation = ButtonDefaults.buttonElevation(defaultElevation = 1.dp),
+                    elevation = ButtonDefaults.buttonElevation(defaultElevation = 1.dp)
                 ) {
                     Text(
-                        text = "Selesai",
-                        fontSize = 14.sp,
-                        fontWeight = FontWeight.Bold,
-                        letterSpacing = 0.3.sp,
+                        text = "Terapkan",
+                        fontSize = 15.sp,
+                        fontWeight = FontWeight.Bold
                     )
                 }
+            }
+
+            // Bottom Home Bar Indicator
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(bottom = 8.dp),
+                contentAlignment = Alignment.Center
+            ) {
+                Box(
+                    modifier = Modifier
+                        .width(128.dp)
+                        .height(4.dp)
+                        .background(Color(0xFFCBD5E1), CircleShape)
+                )
             }
         }
     }
 }
 
 @Composable
-private fun IncomingCategoryDropdownField(
-    selectedValue: String?,
-    options: List<String>,
-    onSelected: (String?) -> Unit,
+private fun IncomingFilterCard(
+    label: String,
+    isSelected: Boolean,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+    icon: androidx.compose.ui.graphics.vector.ImageVector? = null,
+    testTag: String = "",
 ) {
-    var expanded by remember { mutableStateOf(false) }
-
-    Box(modifier = Modifier.fillMaxWidth()) {
-        Box(
+    Surface(
+        onClick = onClick,
+        shape = RoundedCornerShape(12.dp),
+        color = Color.White,
+        border = if (isSelected) BorderStroke(1.5.dp, Color(0xFF256B57)) else BorderStroke(1.dp, Color(0xFFE2E8F0)),
+        shadowElevation = 0.dp,
+        modifier = modifier
+            .height(46.dp)
+            .then(if (testTag.isNotEmpty()) Modifier.testTag(testTag) else Modifier),
+    ) {
+        Row(
             modifier = Modifier
-                .fillMaxWidth()
-                .height(48.dp)
-                .clip(RoundedCornerShape(12.dp))
-                .background(Color(0xFFF8FAF9))
-                .border(BorderStroke(1.dp, Color(0xFFE2E8F0)), RoundedCornerShape(12.dp))
-                .clickable { expanded = true }
+                .fillMaxSize()
                 .padding(horizontal = 14.dp),
-            contentAlignment = Alignment.CenterStart,
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.SpaceBetween,
         ) {
             Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                modifier = Modifier.weight(1f, fill = false)
             ) {
+                if (icon != null) {
+                    Icon(
+                        imageVector = icon,
+                        contentDescription = null,
+                        tint = if (isSelected) Color(0xFF256B57) else Color(0xFF64748B),
+                        modifier = Modifier.size(16.dp),
+                    )
+                }
                 Text(
-                    text = selectedValue ?: "Semua Kategori",
-                    fontSize = 14.sp,
-                    fontWeight = FontWeight.Medium,
-                    color = Color(0xFF1E293B),
+                    text = label,
+                    fontSize = 13.5.sp,
+                    fontWeight = if (isSelected) FontWeight.SemiBold else FontWeight.Medium,
+                    color = if (isSelected) Color(0xFF256B57) else Color(0xFF334155),
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
-                    modifier = Modifier.weight(1f),
-                )
-                Icon(
-                    Icons.Outlined.ExpandMore,
-                    contentDescription = "Pilih kategori",
-                    tint = Color(0xFF94A3B8),
-                    modifier = Modifier.size(20.dp),
                 )
             }
-        }
-
-        DropdownMenu(
-            expanded = expanded,
-            onDismissRequest = { expanded = false },
-            modifier = Modifier
-                .fillMaxWidth(0.85f)
-                .heightIn(max = 300.dp)
-                .background(Color.White, RoundedCornerShape(12.dp))
-                .border(BorderStroke(1.dp, Color(0xFFE2E8F0)), RoundedCornerShape(12.dp)),
-            shape = RoundedCornerShape(12.dp),
-            containerColor = Color.White,
-        ) {
-            val isAll = selectedValue == null
-            DropdownMenuItem(
-                text = {
-                    Text(
-                        text = "Semua Kategori",
-                        fontSize = 14.sp,
-                        fontWeight = if (isAll) FontWeight.SemiBold else FontWeight.Normal,
-                        color = if (isAll) Color(0xFF256B57) else Color(0xFF1E293B),
-                    )
-                },
-                onClick = {
-                    expanded = false
-                    onSelected(null)
-                },
-            )
-            options.forEach { category ->
-                val isSelected = selectedValue == category
-                DropdownMenuItem(
-                    text = {
-                        Text(
-                            text = category,
-                            fontSize = 14.sp,
-                            fontWeight = if (isSelected) FontWeight.SemiBold else FontWeight.Normal,
-                            color = if (isSelected) Color(0xFF256B57) else Color(0xFF1E293B),
-                        )
-                    },
-                    onClick = {
-                        expanded = false
-                        onSelected(category)
-                    },
+            if (isSelected) {
+                Icon(
+                    imageVector = Icons.Outlined.Check,
+                    contentDescription = null,
+                    tint = Color(0xFF256B57),
+                    modifier = Modifier.size(16.dp),
                 )
             }
         }
@@ -868,43 +1175,17 @@ private fun ProductPagination(
     onPreviousPage: () -> Unit,
     onNextPage: () -> Unit
 ) {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .background(IncomingSoft.copy(alpha = 0.7f))
-            .padding(horizontal = 20.dp, vertical = 14.dp),
-        horizontalArrangement = Arrangement.SpaceBetween,
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        Column {
-            Text(
-                "Menampilkan ${uiState.tableStartIndex}-${uiState.tableEndIndex} dari ${uiState.totalTableProducts} produk",
-                color = IncomingText,
-                fontSize = 13.sp,
-                fontWeight = FontWeight.Medium
-            )
-            Text(
-                "Maksimal $INCOMING_GOODS_TABLE_PAGE_SIZE produk per halaman",
-                color = IncomingMuted,
-                fontSize = 11.sp,
-                modifier = Modifier.padding(top = 2.dp)
-            )
-        }
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
-            ProductPageButton(uiState.tablePage > 1 && !uiState.isLoadingProducts, onPreviousPage, Icons.Default.ChevronLeft)
-            Box(
-                modifier = Modifier
-                    .size(34.dp)
-                    .clip(RoundedCornerShape(8.dp))
-                    .background(IncomingPrimaryDark),
-                contentAlignment = Alignment.Center
-            ) {
-                Text("${uiState.tablePage}", color = IncomingSurface, fontWeight = FontWeight.Bold)
-            }
-            Text("/ ${uiState.totalTablePages}", color = IncomingMuted, fontWeight = FontWeight.SemiBold)
-            ProductPageButton(uiState.tablePage < uiState.totalTablePages && !uiState.isLoadingProducts, onNextPage, Icons.Default.ChevronRight)
-        }
-    }
+    val supportingText = "Menampilkan ${uiState.tableStartIndex}–${uiState.tableEndIndex} dari ${uiState.totalTableProducts} produk"
+    TbPagination(
+        currentPage = uiState.tablePage,
+        totalPages = uiState.totalTablePages,
+        onPreviousPage = onPreviousPage,
+        onNextPage = onNextPage,
+        supportingText = supportingText,
+        isLoading = uiState.isLoadingProducts,
+        compact = false,
+        testTag = "incoming-goods-pagination",
+    )
 }
 
 @Composable
@@ -929,18 +1210,16 @@ private fun ProductPageButton(
 @Composable
 private fun ProductMobileHeader(
     isLoading: Boolean = false,
-    onShowSummaryClick: () -> Unit,
+    onShowSummaryClick: () -> Unit = {},
 ) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
             .padding(horizontal = 2.dp),
-        horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.CenterVertically
     ) {
         if (isLoading) {
             SkeletonBox(Modifier.width(120.dp).height(20.dp), shape = RoundedCornerShape(4.dp))
-            SkeletonBox(Modifier.size(32.dp), shape = RoundedCornerShape(12.dp))
         } else {
             androidx.compose.material3.Text(
                 text = "Barang Masuk",
@@ -948,22 +1227,6 @@ private fun ProductMobileHeader(
                 fontWeight = FontWeight.Bold,
                 color = Color(0xFF0F172A),
             )
-            Box(
-                modifier = Modifier
-                    .size(32.dp)
-                    .clip(RoundedCornerShape(12.dp))
-                    .border(1.dp, Color(0xFFE2E8F0), RoundedCornerShape(12.dp))
-                    .clickable { onShowSummaryClick() }
-                    .background(Color.White),
-                contentAlignment = Alignment.Center
-            ) {
-                Icon(
-                    Icons.Outlined.FactCheck,
-                    contentDescription = "Ringkasan",
-                    tint = Color(0xFF334155),
-                    modifier = Modifier.size(16.dp)
-                )
-            }
         }
     }
 }
@@ -1132,73 +1395,18 @@ private fun ProductMobilePagination(
     onPreviousPage: () -> Unit,
     onNextPage: () -> Unit
 ) {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(top = 14.dp, bottom = 4.dp),
-        horizontalArrangement = Arrangement.SpaceBetween,
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        val totalProducts = uiState.totalTableProducts
-        Surface(
-            shape = CircleShape,
-            color = Color.White,
-            border = BorderStroke(1.dp, Color(0xFFE2E8F0)),
-        ) {
-            androidx.compose.material3.Text(
-                text = "${uiState.tablePageProducts.size} dari $totalProducts produk",
-                modifier = Modifier.padding(horizontal = 14.dp, vertical = 6.dp),
-                fontSize = 12.sp,
-                fontWeight = FontWeight.SemiBold,
-                color = Color(0xFF475569)
-            )
-        }
-
-        Surface(
-            shape = CircleShape,
-            color = Color.White,
-            border = BorderStroke(1.dp, Color(0xFFE2E8F0)),
-        ) {
-            Row(
-                modifier = Modifier.padding(horizontal = 6.dp, vertical = 3.dp),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                val hasPrevious = uiState.tablePage > 1 && !uiState.isLoadingProducts
-                val hasNext = uiState.tablePage < uiState.totalTablePages && !uiState.isLoadingProducts
-                androidx.compose.material3.IconButton(
-                    onClick = onPreviousPage,
-                    enabled = hasPrevious,
-                    modifier = Modifier.size(28.dp)
-                ) {
-                    Icon(
-                        Icons.Default.ChevronLeft,
-                        contentDescription = "Halaman sebelumnya",
-                        tint = if (hasPrevious) Color(0xFF475569) else Color(0xFFCBD5E1),
-                        modifier = Modifier.size(16.dp)
-                    )
-                }
-                androidx.compose.material3.Text(
-                    text = "${uiState.tablePage} / ${uiState.totalTablePages.coerceAtLeast(1)}",
-                    modifier = Modifier.padding(horizontal = 8.dp),
-                    fontSize = 12.sp,
-                    fontWeight = FontWeight.Medium,
-                    color = Color(0xFF334155)
-                )
-                androidx.compose.material3.IconButton(
-                    onClick = onNextPage,
-                    enabled = hasNext,
-                    modifier = Modifier.size(28.dp)
-                ) {
-                    Icon(
-                        Icons.Default.ChevronRight,
-                        contentDescription = "Halaman berikutnya",
-                        tint = if (hasNext) Color(0xFF475569) else Color(0xFFCBD5E1),
-                        modifier = Modifier.size(16.dp)
-                    )
-                }
-            }
-        }
-    }
+    val totalProducts = uiState.totalTableProducts
+    val supportingText = "${uiState.tablePageProducts.size} dari $totalProducts produk"
+    TbPagination(
+        currentPage = uiState.tablePage,
+        totalPages = uiState.totalTablePages,
+        onPreviousPage = onPreviousPage,
+        onNextPage = onNextPage,
+        supportingText = supportingText,
+        isLoading = uiState.isLoadingProducts,
+        compact = true,
+        testTag = "incoming-goods-mobile-pagination",
+    )
 }
 
 @Composable

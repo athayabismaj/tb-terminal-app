@@ -20,22 +20,31 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.saveable.rememberSaveable
 
+import androidx.compose.foundation.border
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material.icons.outlined.Description
+import androidx.compose.material.icons.outlined.Search
+import androidx.compose.material.icons.outlined.Tune
 import androidx.compose.material.icons.outlined.Warning
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.zIndex
@@ -90,6 +99,11 @@ fun AdminIncomingGoodsScreen(
     )
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+    var isSearchExpanded by rememberSaveable { mutableStateOf(false) }
+    var showFilterPopup by remember { mutableStateOf(false) }
+    var showSummaryPopup by rememberSaveable { mutableStateOf(false) }
+
+    val isFiltered = uiState.isFiltered
 
     BackHandler(onBack = onBack)
 
@@ -97,6 +111,50 @@ fun AdminIncomingGoodsScreen(
         userName = name,
         role = role,
         activeDestination = AdminDestination.IncomingGoods,
+        pageTitle = "Barang Masuk",
+        showPageHeader = true,
+        topBarActions = {
+            // Button 1: Search [ 🔍 ]
+            IconButton(
+                onClick = { isSearchExpanded = !isSearchExpanded },
+                modifier = Modifier.size(36.dp).testTag("incoming-goods-toggle-search")
+            ) {
+                Icon(
+                    imageVector = Icons.Outlined.Search,
+                    contentDescription = "Cari produk",
+                    tint = if (isSearchExpanded || uiState.productSearchQuery.isNotEmpty()) Color(0xFF256B57) else Color(0xFF475569),
+                    modifier = Modifier.size(20.dp)
+                )
+            }
+
+            // Button 2: Filter [ ⚙️ ]
+            Box(
+                modifier = Modifier.size(36.dp),
+                contentAlignment = Alignment.Center
+            ) {
+                IconButton(
+                    onClick = { showFilterPopup = true },
+                    modifier = Modifier.size(36.dp).testTag("incoming-goods-open-filters")
+                ) {
+                    Icon(
+                        imageVector = Icons.Outlined.Tune,
+                        contentDescription = "Filter kategori",
+                        tint = if (isFiltered) Color(0xFF256B57) else Color(0xFF475569),
+                        modifier = Modifier.size(20.dp)
+                    )
+                }
+                if (isFiltered) {
+                    Box(
+                        modifier = Modifier
+                            .align(Alignment.TopEnd)
+                            .padding(top = 4.dp, end = 4.dp)
+                            .size(8.dp)
+                            .background(Color(0xFFE5A93C), CircleShape)
+                            .border(1.5.dp, Color.White, CircleShape)
+                    )
+                }
+            }
+        },
         onDashboardClick = onDashboardClick,
         onProductsClick = onProductsClick,
         onAddProductClick = onAddProductClick,
@@ -122,8 +180,16 @@ fun AdminIncomingGoodsScreen(
         IncomingGoodsListContent(
             modifier = contentModifier,
             uiState = uiState,
+            isSearchExpanded = isSearchExpanded,
+            onToggleSearch = { isSearchExpanded = !isSearchExpanded },
+            showFilterPopup = showFilterPopup,
+            onDismissFilter = { showFilterPopup = false },
+            showSummaryPopup = showSummaryPopup,
+            onDismissSummary = { showSummaryPopup = false },
             onSearchChanged = viewModel::onProductSearchChanged,
             onCategoryFilterChanged = viewModel::onCategoryFilterChanged,
+            onApplyFilters = viewModel::onApplyFilters,
+            onResetFilters = viewModel::onResetFilters,
             onOpenForm = { onIncomingGoodsFormClick(null) },
             onSelectProduct = { product -> onIncomingGoodsFormClick(product.productId) },
             onPreviousPage = viewModel::previousPage,
@@ -227,8 +293,16 @@ fun AdminIncomingGoodsFormScreen(
 private fun IncomingGoodsListContent(
     modifier: Modifier,
     uiState: IncomingGoodsUiState,
+    isSearchExpanded: Boolean,
+    onToggleSearch: () -> Unit,
+    showFilterPopup: Boolean,
+    onDismissFilter: () -> Unit,
+    showSummaryPopup: Boolean,
+    onDismissSummary: () -> Unit,
     onSearchChanged: (String) -> Unit,
     onCategoryFilterChanged: (String?) -> Unit,
+    onApplyFilters: (String?, IncomingStockStatusFilter, IncomingProductSortOrder) -> Unit = { _, _, _ -> },
+    onResetFilters: () -> Unit = {},
     onOpenForm: () -> Unit,
     onSelectProduct: (ProductStock) -> Unit,
     onPreviousPage: () -> Unit,
@@ -249,8 +323,16 @@ private fun IncomingGoodsListContent(
                     modifier = Modifier.fillMaxWidth(),
                     uiState = uiState,
                     compact = compact,
+                    isSearchExpanded = isSearchExpanded,
+                    onToggleSearch = onToggleSearch,
+                    showFilterPopup = showFilterPopup,
+                    onDismissFilter = onDismissFilter,
+                    showSummaryPopup = showSummaryPopup,
+                    onDismissSummary = onDismissSummary,
                     onSearchChanged = onSearchChanged,
                     onCategoryFilterChanged = onCategoryFilterChanged,
+                    onApplyFilters = onApplyFilters,
+                    onResetFilters = onResetFilters,
                     onOpenForm = onOpenForm,
                     onSelectProduct = onSelectProduct,
                     onPreviousPage = onPreviousPage,
