@@ -674,7 +674,7 @@ private fun UserSectionHeader(
             .fillMaxWidth()
             .padding(horizontal = 4.dp, vertical = 2.dp),
         verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        horizontalArrangement = Arrangement.SpaceBetween,
     ) {
         Text(
             text = "Daftar pengguna",
@@ -686,27 +686,22 @@ private fun UserSectionHeader(
         Surface(
             onClick = onAddUserClick,
             shape = RoundedCornerShape(8.dp),
-            color = Color(0xFF256B57),
-            contentColor = Color.White,
-            shadowElevation = 0.5.dp,
-            modifier = Modifier.testTag("add-user"),
+            color = Color.White,
+            border = BorderStroke(1.dp, Color(0xFF256B57)),
+            contentColor = Color(0xFF256B57),
+            modifier = Modifier
+                .size(32.dp)
+                .testTag("add-user"),
         ) {
-            Row(
-                modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(4.dp),
+            Box(
+                modifier = Modifier.fillMaxSize(),
+                contentAlignment = Alignment.Center,
             ) {
                 Icon(
                     imageVector = Icons.Default.Add,
                     contentDescription = "Tambah pengguna",
-                    tint = Color.White,
-                    modifier = Modifier.size(14.dp),
-                )
-                Text(
-                    text = "Tambah",
-                    fontSize = 11.sp,
-                    fontWeight = FontWeight.SemiBold,
-                    color = Color.White,
+                    tint = Color(0xFF256B57),
+                    modifier = Modifier.size(18.dp),
                 )
             }
         }

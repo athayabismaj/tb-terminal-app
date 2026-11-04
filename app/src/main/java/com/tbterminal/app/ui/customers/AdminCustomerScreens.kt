@@ -853,6 +853,9 @@ private fun CustomerTableCard(
                     )
                 }
             }
+            if (isSearchActive || isFiltered) {
+                Spacer(modifier = Modifier.height(10.dp))
+            }
         } else {
             CustomerTableToolbar(
                 uiState = uiState,
@@ -861,8 +864,8 @@ private fun CustomerTableCard(
                 canManage = canManage,
                 onAddCustomerClick = onAddCustomerClick,
             )
+            Spacer(modifier = Modifier.height(16.dp))
         }
-        Spacer(modifier = Modifier.height(if (compact) 10.dp else 16.dp))
         CustomerSectionHeader(
             canManage = canManage,
             onAddCustomerClick = onAddCustomerClick,
@@ -1380,7 +1383,7 @@ private fun CustomerSectionHeader(
             .fillMaxWidth()
             .padding(horizontal = 4.dp, vertical = 2.dp),
         verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        horizontalArrangement = Arrangement.SpaceBetween,
     ) {
         Text(
             text = "Daftar pelanggan",
@@ -1392,27 +1395,22 @@ private fun CustomerSectionHeader(
             Surface(
                 onClick = onAddCustomerClick,
                 shape = RoundedCornerShape(8.dp),
-                color = Color(0xFF256B57),
-                contentColor = Color.White,
-                shadowElevation = 0.5.dp,
-                modifier = Modifier.testTag("customer-add"),
+                color = Color.White,
+                border = BorderStroke(1.dp, Color(0xFF256B57)),
+                contentColor = Color(0xFF256B57),
+                modifier = Modifier
+                    .size(32.dp)
+                    .testTag("customer-add"),
             ) {
-                Row(
-                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(4.dp),
+                Box(
+                    modifier = Modifier.fillMaxSize(),
+                    contentAlignment = Alignment.Center,
                 ) {
                     Icon(
                         imageVector = Icons.Default.Add,
                         contentDescription = "Tambah pelanggan",
-                        tint = Color.White,
-                        modifier = Modifier.size(14.dp),
-                    )
-                    Text(
-                        text = "Tambah",
-                        fontSize = 11.sp,
-                        fontWeight = FontWeight.SemiBold,
-                        color = Color.White,
+                        tint = Color(0xFF256B57),
+                        modifier = Modifier.size(18.dp),
                     )
                 }
             }
