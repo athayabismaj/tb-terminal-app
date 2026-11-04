@@ -1,5 +1,10 @@
 package com.tbterminal.app.ui.products
 
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.expandVertically
+import androidx.compose.animation.shrinkVertically
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
@@ -68,6 +73,8 @@ internal fun ProductUnitListCard(
     modifier: Modifier,
     uiState: ProductUnitUiState,
     compact: Boolean,
+    isSearchExpanded: Boolean = false,
+    onToggleSearch: () -> Unit = {},
     onSearchChanged: (String) -> Unit,
     onAdd: () -> Unit,
     onEdit: (ProductUnit) -> Unit,
@@ -76,17 +83,88 @@ internal fun ProductUnitListCard(
     onPreviousPage: () -> Unit,
     onNextPage: () -> Unit,
 ) {
+    val isSearchActive = isSearchExpanded || uiState.searchQuery.isNotEmpty()
+
     Column(
         modifier = modifier.fillMaxWidth(),
         verticalArrangement = Arrangement.spacedBy(if (compact) 12.dp else 16.dp),
     ) {
-        UnitToolbar(
-            query = uiState.searchQuery,
-            compact = compact,
-            isLoading = uiState.isLoading && uiState.units.isEmpty(),
-            onQuery = onSearchChanged,
-            onAdd = onAdd,
-        )
+        if (compact) {
+            // Expandable Search Bar (Riwayat Pembelian style)
+            AnimatedVisibility(
+                visible = isSearchActive,
+                enter = expandVertically() + fadeIn(),
+                exit = shrinkVertically() + fadeOut()
+            ) {
+                Surface(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(44.dp),
+                    color = Color.White,
+                    shape = RoundedCornerShape(12.dp),
+                    border = BorderStroke(1.dp, Color(0xFF256B57).copy(alpha = 0.5f)),
+                    shadowElevation = 1.dp
+                ) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .padding(horizontal = 12.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Outlined.Search,
+                            contentDescription = null,
+                            tint = Color(0xFF256B57),
+                            modifier = Modifier.size(18.dp)
+                        )
+                        BasicTextField(
+                            value = uiState.searchQuery,
+                            onValueChange = onSearchChanged,
+                            modifier = Modifier
+                                .weight(1f)
+                                .testTag("unit-search-input"),
+                            singleLine = true,
+                            textStyle = TextStyle(
+                                color = Color(0xFF1E293B),
+                                fontSize = 13.sp
+                            ),
+                            decorationBox = { innerTextField ->
+                                if (uiState.searchQuery.isEmpty()) {
+                                    Text(
+                                        text = "Cari satuan atau simbol...",
+                                        color = Color(0xFF94A3B8),
+                                        fontSize = 13.sp
+                                    )
+                                }
+                                innerTextField()
+                            }
+                        )
+                        if (uiState.searchQuery.isNotEmpty()) {
+                            IconButton(
+                                onClick = { onSearchChanged("") },
+                                modifier = Modifier.size(24.dp)
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Outlined.Close,
+                                    contentDescription = "Hapus",
+                                    tint = Color(0xFF64748B),
+                                    modifier = Modifier.size(16.dp)
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+        } else {
+            UnitToolbar(
+                query = uiState.searchQuery,
+                compact = compact,
+                isLoading = uiState.isLoading && uiState.units.isEmpty(),
+                onQuery = onSearchChanged,
+                onAdd = onAdd,
+            )
+        }
 
         when {
             uiState.isLoading && uiState.units.isEmpty() -> UnitLoading(compact = compact)

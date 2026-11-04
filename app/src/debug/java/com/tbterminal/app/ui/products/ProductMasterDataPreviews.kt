@@ -83,12 +83,39 @@ private fun UnitFormPreview() {
 
 @Composable
 private fun CategoryPreviewContent(modifier: Modifier, state: ProductCategoryUiState) {
-    ProductCategoryContent(modifier, state, {}, {}, {}, {}, {}, {}, {}, {}, {}, {})
+    ProductCategoryContent(
+        modifier = modifier,
+        uiState = state,
+        onNameChanged = {},
+        onSave = {},
+        onAdd = {},
+        onEdit = {},
+        onCancelEdit = {},
+        onDelete = {},
+        onRetry = {},
+        onSearchChanged = {},
+        onPreviousPage = {},
+        onNextPage = {}
+    )
 }
 
 @Composable
 private fun UnitPreviewContent(modifier: Modifier, state: ProductUnitUiState) {
-    ProductUnitContent(modifier, state, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {})
+    ProductUnitContent(
+        modifier = modifier,
+        uiState = state,
+        onNameChanged = {},
+        onSymbolChanged = {},
+        onSearchChanged = {},
+        onSave = {},
+        onAdd = {},
+        onEdit = {},
+        onCancelEdit = {},
+        onDelete = {},
+        onRetry = {},
+        onPreviousPage = {},
+        onNextPage = {}
+    )
 }
 
 internal fun categoryPreviewState() = ProductCategoryUiState(

@@ -1,8 +1,21 @@
 package com.tbterminal.app.ui.products
 
 import androidx.activity.compose.BackHandler
+import androidx.compose.foundation.layout.size
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.outlined.Search
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.tbterminal.app.data.repository.InventoryRepository
@@ -41,12 +54,43 @@ fun AdminProductCategoriesScreen(
     )
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+    var isSearchExpanded by rememberSaveable { mutableStateOf(false) }
     BackHandler(enabled = uiState.isFormVisible) { viewModel.cancelEdit() }
 
     AdminDashboardShell(
         userName = name,
         role = role,
         activeDestination = AdminDestination.ProductCategories,
+        showPageHeader = true,
+        topBarActions = {
+            if (!uiState.isFormVisible) {
+                // Button 1: Search [ 🔍 ]
+                IconButton(
+                    onClick = { isSearchExpanded = !isSearchExpanded },
+                    modifier = Modifier.size(36.dp).testTag("category-toggle-search")
+                ) {
+                    Icon(
+                        imageVector = Icons.Outlined.Search,
+                        contentDescription = "Cari kategori",
+                        tint = if (isSearchExpanded || uiState.searchQuery.isNotEmpty()) Color(0xFF256B57) else Color(0xFF475569),
+                        modifier = Modifier.size(20.dp)
+                    )
+                }
+
+                // Button 2: Tambah [ ➕ ]
+                IconButton(
+                    onClick = viewModel::openAddForm,
+                    modifier = Modifier.size(36.dp).testTag("category-header-add")
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Add,
+                        contentDescription = "Tambah kategori",
+                        tint = Color(0xFF1E293B),
+                        modifier = Modifier.size(22.dp)
+                    )
+                }
+            }
+        },
         onDashboardClick = onDashboardClick,
         onProductsClick = onProductsClick,
         onAddProductClick = onAddProductClick,
@@ -78,6 +122,8 @@ fun AdminProductCategoriesScreen(
             ProductCategoryContent(
                 modifier = contentModifier,
                 uiState = uiState,
+                isSearchExpanded = false,
+                onToggleSearch = {},
                 onNameChanged = viewModel::onNameChanged,
                 onSave = viewModel::save,
                 onAdd = viewModel::openAddForm,
@@ -98,6 +144,8 @@ fun AdminProductCategoriesScreen(
                 ProductCategoryContent(
                     modifier = androidx.compose.ui.Modifier,
                     uiState = uiState,
+                    isSearchExpanded = isSearchExpanded,
+                    onToggleSearch = { isSearchExpanded = !isSearchExpanded },
                     onNameChanged = viewModel::onNameChanged,
                     onSave = viewModel::save,
                     onAdd = viewModel::openAddForm,

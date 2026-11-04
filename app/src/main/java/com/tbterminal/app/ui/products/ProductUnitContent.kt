@@ -23,6 +23,8 @@ import com.tbterminal.app.ui.components.TopFloatingCapsule
 internal fun ProductUnitContent(
     modifier: Modifier,
     uiState: ProductUnitUiState,
+    isSearchExpanded: Boolean = false,
+    onToggleSearch: () -> Unit = {},
     onNameChanged: (String) -> Unit,
     onSymbolChanged: (String) -> Unit,
     onSearchChanged: (String) -> Unit,
@@ -70,6 +72,8 @@ internal fun ProductUnitContent(
                         modifier = Modifier.fillMaxWidth(),
                         uiState = uiState,
                         compact = compact,
+                        isSearchExpanded = isSearchExpanded,
+                        onToggleSearch = onToggleSearch,
                         onSearchChanged = onSearchChanged,
                         onAdd = onAdd,
                         onEdit = onEdit,

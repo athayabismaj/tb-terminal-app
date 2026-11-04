@@ -1,5 +1,10 @@
 package com.tbterminal.app.ui.products
 
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.expandVertically
+import androidx.compose.animation.shrinkVertically
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
@@ -68,6 +73,8 @@ internal fun ProductCategoryListCard(
     modifier: Modifier,
     uiState: ProductCategoryUiState,
     compact: Boolean,
+    isSearchExpanded: Boolean = false,
+    onToggleSearch: () -> Unit = {},
     onSearchChanged: (String) -> Unit,
     onAdd: () -> Unit,
     onEdit: (ProductCategory) -> Unit,
@@ -76,17 +83,94 @@ internal fun ProductCategoryListCard(
     onPreviousPage: () -> Unit,
     onNextPage: () -> Unit,
 ) {
+    val isSearchActive = isSearchExpanded || uiState.searchQuery.isNotEmpty()
+
     Column(
         modifier = modifier.fillMaxWidth(),
         verticalArrangement = Arrangement.spacedBy(if (compact) 12.dp else 16.dp),
     ) {
-        CategoryToolbar(
-            query = uiState.searchQuery,
-            compact = compact,
-            isLoading = uiState.isLoading && uiState.categories.isEmpty(),
-            onQuery = onSearchChanged,
-            onAdd = onAdd,
-        )
+        if (compact) {
+            // Expandable Search Bar (Riwayat Pembelian style)
+            AnimatedVisibility(
+                visible = isSearchActive,
+                enter = expandVertically() + fadeIn(),
+                exit = shrinkVertically() + fadeOut()
+            ) {
+                Surface(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(44.dp),
+                    color = Color.White,
+                    shape = RoundedCornerShape(12.dp),
+                    border = BorderStroke(1.dp, Color(0xFF256B57).copy(alpha = 0.5f)),
+                    shadowElevation = 1.dp
+                ) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .padding(start = 12.dp, end = 6.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Icon(
+                            Icons.Outlined.Search,
+                            contentDescription = null,
+                            tint = Color(0xFF256B57),
+                            modifier = Modifier.size(18.dp),
+                        )
+                        Spacer(Modifier.width(10.dp))
+                        Box(modifier = Modifier.weight(1f), contentAlignment = Alignment.CenterStart) {
+                            if (uiState.searchQuery.isEmpty()) {
+                                Text(
+                                    "Cari nama kategori...",
+                                    fontSize = 13.sp,
+                                    color = Color(0xFF94A3B8),
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis,
+                                )
+                            }
+                            BasicTextField(
+                                value = uiState.searchQuery,
+                                onValueChange = onSearchChanged,
+                                singleLine = true,
+                                textStyle = TextStyle(
+                                    color = Color(0xFF0F172A),
+                                    fontSize = 13.sp,
+                                    fontWeight = FontWeight.Medium
+                                ),
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .testTag("category-search"),
+                            )
+                        }
+                        IconButton(
+                            onClick = {
+                                if (uiState.searchQuery.isNotEmpty()) {
+                                    onSearchChanged("")
+                                } else {
+                                    onToggleSearch()
+                                }
+                            },
+                            modifier = Modifier.size(32.dp)
+                        ) {
+                            Icon(
+                                Icons.Outlined.Close,
+                                contentDescription = "Tutup pencarian",
+                                tint = Color(0xFF64748B),
+                                modifier = Modifier.size(16.dp),
+                            )
+                        }
+                    }
+                }
+            }
+        } else {
+            CategoryToolbar(
+                query = uiState.searchQuery,
+                compact = compact,
+                isLoading = uiState.isLoading && uiState.categories.isEmpty(),
+                onQuery = onSearchChanged,
+                onAdd = onAdd,
+            )
+        }
 
         when {
             uiState.isLoading && uiState.categories.isEmpty() -> CategoryLoading(compact = compact)

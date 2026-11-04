@@ -23,6 +23,10 @@ import com.tbterminal.app.ui.components.TopFloatingCapsule
 internal fun StockOpnameListScreen(
     modifier: Modifier,
     uiState: StockOpnameUiState,
+    isSearchExpanded: Boolean = false,
+    onToggleSearch: () -> Unit = {},
+    showFilterPopup: Boolean = false,
+    onDismissFilter: () -> Unit = {},
     onSearchChanged: (String) -> Unit,
     onCategoryFilterChanged: (String?) -> Unit,
     onOpenForm: () -> Unit,
@@ -52,6 +56,10 @@ internal fun StockOpnameListScreen(
                 StockOpnameTableCard(
                     modifier = Modifier.fillMaxWidth(),
                     uiState = uiState,
+                    isSearchExpanded = isSearchExpanded,
+                    onToggleSearch = onToggleSearch,
+                    showFilterPopup = showFilterPopup,
+                    onDismissFilter = onDismissFilter,
                     onSearchChanged = onSearchChanged,
                     onCategoryFilterChanged = onCategoryFilterChanged,
                     onSelectProduct = onSelectProduct,
