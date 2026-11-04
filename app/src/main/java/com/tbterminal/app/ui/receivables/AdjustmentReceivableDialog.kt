@@ -1,6 +1,9 @@
 package com.tbterminal.app.ui.receivables
 
 import com.tbterminal.app.ui.components.AppDatePickerDialog
+import androidx.activity.compose.BackHandler
+import androidx.compose.animation.*
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -106,8 +109,17 @@ internal fun AdjustmentReceivableDialog(
     onSubmit: () -> Unit
 ) {
     val context = LocalContext.current
-    var customerDialogOpen by remember { mutableStateOf(false) }
-    val selectedCustomer = uiState.customers.firstOrNull { it.id == uiState.adjustmentCustomerId }
+    var currentStep by remember { mutableStateOf(SheetCustomerStep.FORM) }
+    var localSelectedCustomer by remember { mutableStateOf<Customer?>(null) }
+    val effectiveCustomer = localSelectedCustomer ?: uiState.customers.firstOrNull { it.id == uiState.adjustmentCustomerId }
+
+    BackHandler(enabled = currentStep != SheetCustomerStep.FORM) {
+        currentStep = when (currentStep) {
+            SheetCustomerStep.ADD_CUSTOMER -> SheetCustomerStep.SELECT_CUSTOMER
+            SheetCustomerStep.SELECT_CUSTOMER -> SheetCustomerStep.FORM
+            SheetCustomerStep.FORM -> SheetCustomerStep.FORM
+        }
+    }
 
     val debtDate = uiState.adjustmentDebtDateInput
     val dueDate = uiState.adjustmentDueDateInput
@@ -120,19 +132,6 @@ internal fun AdjustmentReceivableDialog(
         } catch (e: Exception) {
             30L
         }
-    }
-
-    if (customerDialogOpen) {
-        CustomerSelectionDialog(
-            customerRepository = customerRepository,
-            selectedCustomerId = uiState.adjustmentCustomerId,
-            onCustomerSelected = { customer ->
-                onCustomerChanged(customer.id)
-                onCustomerSelected?.invoke(customer)
-                customerDialogOpen = false
-            },
-            onDismiss = { customerDialogOpen = false }
-        )
     }
 
     var showDebtDatePicker by remember { mutableStateOf(false) }
@@ -170,7 +169,22 @@ internal fun AdjustmentReceivableDialog(
         shape = RoundedCornerShape(topStart = 32.dp, topEnd = 32.dp),
         dragHandle = { BottomSheetDefaults.DragHandle() }
     ) {
-        Column(modifier = Modifier.fillMaxWidth()) {
+        AnimatedContent(
+            targetState = currentStep,
+            transitionSpec = {
+                if (targetState.ordinal > initialState.ordinal) {
+                    (slideInHorizontally(animationSpec = tween(280)) { width -> width } + fadeIn(animationSpec = tween(280)))
+                        .togetherWith(slideOutHorizontally(animationSpec = tween(280)) { width -> -width / 4 } + fadeOut(animationSpec = tween(200)))
+                } else {
+                    (slideInHorizontally(animationSpec = tween(280)) { width -> -width / 4 } + fadeIn(animationSpec = tween(280)))
+                        .togetherWith(slideOutHorizontally(animationSpec = tween(280)) { width -> width } + fadeOut(animationSpec = tween(200)))
+                }
+            },
+            label = "AdjustmentSheetStepTransition"
+        ) { step ->
+            when (step) {
+                SheetCustomerStep.FORM -> {
+                    Column(modifier = Modifier.fillMaxWidth()) {
             // Sheet Header with Mode Switcher & Close Button
             Column(
                 modifier = Modifier
@@ -225,67 +239,17 @@ internal fun AdjustmentReceivableDialog(
                     .padding(horizontal = 20.dp, vertical = 16.dp),
                 verticalArrangement = Arrangement.spacedBy(16.dp)
             ) {
-                // 1. Pelanggan
+                // 1. Pelanggan (In-Sheet Selection Flow - Option 2)
                 Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
                     FieldLabel("Pelanggan", required = true)
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .background(Color(0xFFF9FAFB), RoundedCornerShape(12.dp))
-                            .border(1.dp, Gray200, RoundedCornerShape(12.dp))
-                            .clickable { customerDialogOpen = true }
-                            .padding(horizontal = 14.dp, vertical = 10.dp),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(12.dp)
-                        ) {
-                            Box(
-                                modifier = Modifier
-                                    .size(34.dp)
-                                    .background(Brand100, CircleShape)
-                                    .border(1.dp, Brand.copy(alpha = 0.2f), CircleShape),
-                                contentAlignment = Alignment.Center
-                            ) {
-                                Text(
-                                    text = selectedCustomer?.name?.take(2)?.uppercase() ?: "BP",
-                                    color = Brand,
-                                    fontSize = 12.sp,
-                                    fontWeight = FontWeight.Bold
-                                )
-                            }
-                            Column {
-                                Text(
-                                    text = selectedCustomer?.name ?: "Pilih Pelanggan",
-                                    fontSize = 13.sp,
-                                    fontWeight = FontWeight.Bold,
-                                    color = Gray900
-                                )
-                                val detailText = if (selectedCustomer != null) {
-                                    val phoneOrAddress = selectedCustomer.phone?.takeIf(String::isNotBlank)
-                                        ?: selectedCustomer.address?.takeIf(String::isNotBlank)
-                                    if (phoneOrAddress != null) "ID: ${selectedCustomer.id.take(8)} • $phoneOrAddress"
-                                    else "ID: ${selectedCustomer.id.take(8)}"
-                                } else {
-                                    "Ketuk untuk memilih pelanggan"
-                                }
-                                Text(
-                                    text = detailText,
-                                    fontSize = 11.sp,
-                                    color = Gray500
-                                )
-                            }
+                    CustomerCardSelector(
+                        selectedCustomer = effectiveCustomer,
+                        onOpenPicker = { currentStep = SheetCustomerStep.SELECT_CUSTOMER },
+                        onClearCustomer = {
+                            localSelectedCustomer = null
+                            onCustomerChanged("")
                         }
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(2.dp)
-                        ) {
-                            Text("Ganti", fontSize = 12.sp, fontWeight = FontWeight.Medium, color = Gray400)
-                            Icon(Icons.Default.ExpandMore, contentDescription = null, tint = Gray400, modifier = Modifier.size(16.dp))
-                        }
-                    }
+                    )
                 }
 
                 // 2. Nominal Piutang
@@ -736,5 +700,36 @@ internal fun AdjustmentReceivableDialog(
             }
         }
     }
+    SheetCustomerStep.SELECT_CUSTOMER -> {
+        CustomerPickerSheetView(
+            customerRepository = customerRepository,
+            selectedCustomerId = uiState.adjustmentCustomerId,
+            onBackToForm = { currentStep = SheetCustomerStep.FORM },
+            onClose = onDismiss,
+            onNavigateToAddCustomer = { currentStep = SheetCustomerStep.ADD_CUSTOMER },
+            onCustomerSelected = { customer ->
+                localSelectedCustomer = customer
+                onCustomerChanged(customer.id)
+                onCustomerSelected?.invoke(customer)
+                currentStep = SheetCustomerStep.FORM
+            }
+        )
+    }
+    SheetCustomerStep.ADD_CUSTOMER -> {
+        AddCustomerSheetView(
+            customerRepository = customerRepository,
+            onBackToPicker = { currentStep = SheetCustomerStep.SELECT_CUSTOMER },
+            onClose = onDismiss,
+            onCustomerCreated = { newCustomer ->
+                localSelectedCustomer = newCustomer
+                onCustomerChanged(newCustomer.id)
+                onCustomerSelected?.invoke(newCustomer)
+                currentStep = SheetCustomerStep.FORM
+            }
+        )
+    }
+}
+}
+}
 }
 

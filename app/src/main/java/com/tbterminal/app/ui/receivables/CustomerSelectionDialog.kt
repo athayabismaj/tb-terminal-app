@@ -81,6 +81,7 @@ fun CustomerSelectionDialog(
     customerRepository: CustomerRepository,
     selectedCustomerId: String,
     onCustomerSelected: (Customer) -> Unit,
+    onAddCustomerClick: (() -> Unit)? = null,
     onDismiss: () -> Unit
 ) {
     var searchQuery by remember { mutableStateOf("") }
@@ -94,6 +95,15 @@ fun CustomerSelectionDialog(
     var tempSelectedId by remember { mutableStateOf(selectedCustomerId) }
     var showAddCustomerDialog by remember { mutableStateOf(false) }
     var userHasScrolled by remember { mutableStateOf(false) }
+
+    val handleQuickAdd = {
+        if (onAddCustomerClick != null) {
+            onDismiss()
+            onAddCustomerClick()
+        } else {
+            showAddCustomerDialog = true
+        }
+    }
 
     val coroutineScope = rememberCoroutineScope()
     val listState = rememberLazyListState()
@@ -189,11 +199,16 @@ fun CustomerSelectionDialog(
         onDismissRequest = onDismiss,
         properties = DialogProperties(usePlatformDefaultWidth = false)
     ) {
-        Card(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 16.dp, vertical = 24.dp)
-                .fillMaxHeight(0.85f),
+        Box(
+            modifier = Modifier.fillMaxSize(),
+            contentAlignment = Alignment.Center
+        ) {
+            Card(
+                modifier = Modifier
+                    .widthIn(max = 520.dp)
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp, vertical = 24.dp)
+                    .fillMaxHeight(0.85f),
             shape = RoundedCornerShape(28.dp),
             colors = CardDefaults.cardColors(containerColor = Color.White),
             border = BorderStroke(1.dp, Slate200),
@@ -447,7 +462,7 @@ fun CustomerSelectionDialog(
                             )
                             Spacer(modifier = Modifier.height(16.dp))
                             // Quick Add Button inside empty state
-                            QuickAddButton(onClick = { showAddCustomerDialog = true })
+                            QuickAddButton(onClick = handleQuickAdd)
                         }
                     } else {
                         // LazyColumn with load on scroll
@@ -496,7 +511,7 @@ fun CustomerSelectionDialog(
                             item(key = "quick_add_button") {
                                 QuickAddButton(
                                     modifier = Modifier.padding(top = 2.dp, bottom = 8.dp),
-                                    onClick = { showAddCustomerDialog = true }
+                                    onClick = handleQuickAdd
                                 )
                             }
                         }
@@ -578,6 +593,7 @@ fun CustomerSelectionDialog(
                 // END: ModalFooter
             }
         }
+    }
     }
 }
 
@@ -761,11 +777,19 @@ private fun QuickAddCustomerDialog(
     var errorMessage by remember { mutableStateOf<String?>(null) }
     val coroutineScope = rememberCoroutineScope()
 
-    Dialog(onDismissRequest = { if (!isSaving) onDismiss() }) {
-        Card(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(16.dp),
+    Dialog(
+        onDismissRequest = { if (!isSaving) onDismiss() },
+        properties = DialogProperties(usePlatformDefaultWidth = false)
+    ) {
+        Box(
+            modifier = Modifier.fillMaxSize(),
+            contentAlignment = Alignment.Center
+        ) {
+            Card(
+                modifier = Modifier
+                    .widthIn(max = 480.dp)
+                    .fillMaxWidth()
+                    .padding(16.dp),
             shape = RoundedCornerShape(20.dp),
             colors = CardDefaults.cardColors(containerColor = Color.White),
             border = BorderStroke(1.dp, Slate200),
@@ -969,5 +993,6 @@ private fun QuickAddCustomerDialog(
                 }
             }
         }
+    }
     }
 }

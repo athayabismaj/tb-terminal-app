@@ -10,6 +10,10 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
@@ -19,11 +23,20 @@ import com.tbterminal.app.ui.components.TopFloatingCapsule
 
 @Composable
 internal fun ReceivableScreen(
-    modifier: Modifier,
+    modifier: Modifier = Modifier,
     uiState: ReceivableUiState,
+    isSearchExpanded: Boolean = false,
+    onToggleSearch: () -> Unit = {},
+    showFilterPopup: Boolean = false,
+    onDismissFilter: () -> Unit = {},
+    showSummaryPopup: Boolean = false,
+    onOpenSummary: () -> Unit = {},
+    onDismissSummary: () -> Unit = {},
+    onResetAllFilters: () -> Unit = {},
     onSearchChanged: (String) -> Unit,
     onStatusFilterChanged: (ReceivableStatusFilter) -> Unit,
     onDueFilterChanged: (ReceivableDueFilter) -> Unit,
+    onSortOrderChanged: (ReceivableSortOrder) -> Unit = {},
     canAdjust: Boolean,
     onAddOpeningBalance: () -> Unit,
     onAddAdjustment: () -> Unit,
@@ -33,6 +46,8 @@ internal fun ReceivableScreen(
     onDismissMessage: () -> Unit,
     onCustomerDetailClick: (String) -> Unit = {}
 ) {
+    var showActionBottomSheet by rememberSaveable { mutableStateOf(false) }
+
     BoxWithConstraints(modifier = modifier.fillMaxSize().background(ReceivableBackground)) {
         val compact = maxWidth < 720.dp
         val showMetrics = uiState.receivables.isNotEmpty() ||
@@ -42,17 +57,21 @@ internal fun ReceivableScreen(
                 .padding(horizontal = if (compact) 16.dp else 28.dp, vertical = if (compact) 14.dp else 20.dp),
             verticalArrangement = Arrangement.spacedBy(if (compact) 12.dp else 16.dp)
         ) {
-            if (!compact) ReceivableHeader(canAdjust, onAddOpeningBalance, onAddAdjustment, compact)
             if (showMetrics && !compact) ReceivableMetrics(uiState, compact = false)
             ReceivableTableCard(
                 canAdjust = canAdjust,
+                onOpenActionMenu = { showActionBottomSheet = true },
                 onAddOpeningBalance = onAddOpeningBalance,
                 onAddAdjustment = onAddAdjustment,
                 modifier = Modifier.fillMaxWidth(),
                 uiState = uiState,
+                isSearchExpanded = isSearchExpanded,
+                onToggleSearch = onToggleSearch,
+                onResetAllFilters = onResetAllFilters,
                 onSearchChanged = onSearchChanged,
                 onStatusFilterChanged = onStatusFilterChanged,
                 onDueFilterChanged = onDueFilterChanged,
+                onSortOrderChanged = onSortOrderChanged,
                 onPayClick = onPayClick,
                 onPreviousPage = onPreviousPage,
                 onNextPage = onNextPage,
@@ -71,5 +90,40 @@ internal fun ReceivableScreen(
                 .zIndex(99f),
         )
     }
-}
 
+    if (showActionBottomSheet) {
+        ReceivableActionBottomSheet(
+            canAdjust = canAdjust,
+            onDismiss = { showActionBottomSheet = false },
+            onAddOpeningBalance = {
+                showActionBottomSheet = false
+                onAddOpeningBalance()
+            },
+            onAddAdjustment = {
+                showActionBottomSheet = false
+                onAddAdjustment()
+            },
+            onOpenSummary = {
+                showActionBottomSheet = false
+                onOpenSummary()
+            }
+        )
+    }
+
+    if (showFilterPopup) {
+        ReceivableFilterBottomSheet(
+            uiState = uiState,
+            onDismiss = onDismissFilter,
+            onApplyStatusFilter = onStatusFilterChanged,
+            onApplyDueFilter = onDueFilterChanged,
+            onApplySortOrder = onSortOrderChanged
+        )
+    }
+
+    if (showSummaryPopup) {
+        ReceivableSummaryBottomSheet(
+            uiState = uiState,
+            onDismiss = onDismissSummary
+        )
+    }
+}

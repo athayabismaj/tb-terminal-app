@@ -158,11 +158,15 @@ enum class AdminDestination {
     PurchaseHistory,
     StockReport,
     SupplierDebts,
+    OpeningSupplierDebtForm,
+    AdjustmentSupplierDebtForm,
     CashSessionHistory,
     CashReconciliationDetail,
     CashExpenses,
     Receivables,
     ReceivablePayments,
+    OpeningReceivableForm,
+    AdjustmentReceivableForm,
     Customers,
     CustomerForm,
     OperationalAudit,
@@ -209,7 +213,11 @@ internal fun AdminDestination.backofficeSection(role: String? = null): Backoffic
     AdminDestination.FinanceHub,
     AdminDestination.Receivables,
     AdminDestination.ReceivablePayments,
+    AdminDestination.OpeningReceivableForm,
+    AdminDestination.AdjustmentReceivableForm,
     AdminDestination.SupplierDebts,
+    AdminDestination.OpeningSupplierDebtForm,
+    AdminDestination.AdjustmentSupplierDebtForm,
     AdminDestination.CashReconciliation,
     AdminDestination.CashSessionHistory,
     AdminDestination.CashReconciliationDetail,
@@ -246,8 +254,12 @@ internal fun AdminDestination.backofficePageTitle(): String? = when (this) {
     AdminDestination.SupplierForm -> "Form supplier"
     AdminDestination.Customers, AdminDestination.CustomerForm -> "Pelanggan"
     AdminDestination.Receivables -> "Piutang pelanggan"
+    AdminDestination.OpeningReceivableForm -> "Saldo awal piutang"
+    AdminDestination.AdjustmentReceivableForm -> "Penyesuaian piutang"
     AdminDestination.ReceivablePayments -> "Pembayaran piutang"
     AdminDestination.SupplierDebts -> "Hutang supplier"
+    AdminDestination.OpeningSupplierDebtForm -> "Saldo awal hutang"
+    AdminDestination.AdjustmentSupplierDebtForm -> "Penyesuaian hutang"
     AdminDestination.CashReconciliation, AdminDestination.CashierCashSession -> "Kas harian"
     AdminDestination.CashReconciliationDetail -> "Cocokkan kas"
     AdminDestination.CashSessionHistory -> "Riwayat kas"

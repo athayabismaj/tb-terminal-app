@@ -43,6 +43,9 @@ import com.tbterminal.app.ui.products.AdminProductListScreen
 import com.tbterminal.app.ui.products.AdminProductUnitsScreen
 import com.tbterminal.app.ui.receivables.AdminReceivableCustomerDetailScreen
 import com.tbterminal.app.ui.receivables.AdminReceivableScreen
+import com.tbterminal.app.ui.receivables.AdminOpeningReceivableScreen
+import com.tbterminal.app.ui.receivables.AdminAdjustmentReceivableScreen
+import com.tbterminal.app.ui.receivables.ReceivableViewModel
 import com.tbterminal.app.ui.reports.AdminReportsScreen
 import com.tbterminal.app.ui.reports.AdminReportsViewModel
 import com.tbterminal.app.ui.salestransactions.AdminReceiptDetailScreen
@@ -170,6 +173,16 @@ internal fun NavGraphBuilder.receivableGraph(navController: NavHostController, s
                             launchSingleTop = true
                         }
                     },
+                    onAddOpeningBalanceClick = {
+                        navController.navigate(AppRoute.OpeningReceivableForm.createRoute()) {
+                            launchSingleTop = true
+                        }
+                    },
+                    onAddAdjustmentClick = {
+                        navController.navigate(AppRoute.AdjustmentReceivableForm.createRoute()) {
+                            launchSingleTop = true
+                        }
+                    },
                     onBack = {
                         if (!navController.popBackStack()) {
                             navController.navigate(AppRoute.Dashboard.route) {
@@ -224,6 +237,136 @@ internal fun NavGraphBuilder.receivableGraph(navController: NavHostController, s
                     onReportsClick = { navController.navigate(AppRoute.Reports.route) { launchSingleTop = true } },
                     onOperationalAuditClick = { navController.navigate(AppRoute.OperationalAudit.route) { launchSingleTop = true } },
                     onBack = {
+                        if (!navController.popBackStack()) {
+                            navController.navigate(AppRoute.Receivables.route) { launchSingleTop = true }
+                        }
+                    },
+                    onLogout = {
+                        sessionManager.logout()
+                        navController.navigate(AppRoute.Login.route) {
+                            popUpTo(0)
+                            launchSingleTop = true
+                        }
+                    }
+                )
+            }
+        }
+
+        composable(
+            route = AppRoute.OpeningReceivableForm.route,
+            arguments = listOf(
+                navArgument(AppRoute.OpeningReceivableForm.CUSTOMER_ID_ARG) {
+                    type = NavType.StringType
+                    nullable = true
+                    defaultValue = null
+                }
+            )
+        ) { backStackEntry ->
+            val sessionUser = sessionManager.readSessionUser()
+            val customerId = backStackEntry.arguments
+                ?.getString(AppRoute.OpeningReceivableForm.CUSTOMER_ID_ARG)
+
+            if (sessionUser == null) {
+                LaunchedEffect(Unit) {
+                    sessionManager.logout()
+                    navController.navigate(AppRoute.Login.route) {
+                        popUpTo(0)
+                        launchSingleTop = true
+                    }
+                }
+            } else {
+                val viewModel: ReceivableViewModel = viewModel(
+                    factory = ReceivableViewModel.factory(
+                        appContainer.receivableRepository,
+                        appContainer.customerRepository,
+                        sessionUser.role
+                    )
+                )
+
+                AdminOpeningReceivableScreen(
+                    name = sessionUser.name,
+                    role = sessionUser.role,
+                    customerId = customerId,
+                    viewModel = viewModel,
+                    customerRepository = appContainer.customerRepository,
+                    onDashboardClick = { navController.navigate(AppRoute.Dashboard.route) { launchSingleTop = true } },
+                    onProductsClick = { navController.navigate(AppRoute.Products.route) { launchSingleTop = true } },
+                    onStockOpnameClick = { navController.navigate(AppRoute.StockOpname.route) { launchSingleTop = true } },
+                    onIncomingGoodsClick = { navController.navigate(AppRoute.IncomingGoods.route) { launchSingleTop = true } },
+                    onSupplierDebtsClick = { navController.navigate(AppRoute.SupplierDebts.route) { launchSingleTop = true } },
+                    onReceivablesClick = { navController.navigate(AppRoute.Receivables.route) { launchSingleTop = true } },
+                    onCustomersClick = { navController.navigate(AppRoute.Customers.route) { launchSingleTop = true } },
+                    onAddCustomerClick = { navController.navigate(AppRoute.AddCustomer.route) { launchSingleTop = true } },
+                    onReportsClick = { navController.navigate(AppRoute.Reports.route) { launchSingleTop = true } },
+                    onOperationalAuditClick = { navController.navigate(AppRoute.OperationalAudit.route) { launchSingleTop = true } },
+                    onProfileClick = { navController.navigate(AppRoute.AdminProfile.route) { launchSingleTop = true } },
+                    onSettingsClick = { navController.navigate(AppRoute.AdminSettings.route) { launchSingleTop = true } },
+                    onBackToReceivables = {
+                        if (!navController.popBackStack()) {
+                            navController.navigate(AppRoute.Receivables.route) { launchSingleTop = true }
+                        }
+                    },
+                    onLogout = {
+                        sessionManager.logout()
+                        navController.navigate(AppRoute.Login.route) {
+                            popUpTo(0)
+                            launchSingleTop = true
+                        }
+                    }
+                )
+            }
+        }
+
+        composable(
+            route = AppRoute.AdjustmentReceivableForm.route,
+            arguments = listOf(
+                navArgument(AppRoute.AdjustmentReceivableForm.CUSTOMER_ID_ARG) {
+                    type = NavType.StringType
+                    nullable = true
+                    defaultValue = null
+                }
+            )
+        ) { backStackEntry ->
+            val sessionUser = sessionManager.readSessionUser()
+            val customerId = backStackEntry.arguments
+                ?.getString(AppRoute.AdjustmentReceivableForm.CUSTOMER_ID_ARG)
+
+            if (sessionUser == null) {
+                LaunchedEffect(Unit) {
+                    sessionManager.logout()
+                    navController.navigate(AppRoute.Login.route) {
+                        popUpTo(0)
+                        launchSingleTop = true
+                    }
+                }
+            } else {
+                val viewModel: ReceivableViewModel = viewModel(
+                    factory = ReceivableViewModel.factory(
+                        appContainer.receivableRepository,
+                        appContainer.customerRepository,
+                        sessionUser.role
+                    )
+                )
+
+                AdminAdjustmentReceivableScreen(
+                    name = sessionUser.name,
+                    role = sessionUser.role,
+                    customerId = customerId,
+                    viewModel = viewModel,
+                    customerRepository = appContainer.customerRepository,
+                    onDashboardClick = { navController.navigate(AppRoute.Dashboard.route) { launchSingleTop = true } },
+                    onProductsClick = { navController.navigate(AppRoute.Products.route) { launchSingleTop = true } },
+                    onStockOpnameClick = { navController.navigate(AppRoute.StockOpname.route) { launchSingleTop = true } },
+                    onIncomingGoodsClick = { navController.navigate(AppRoute.IncomingGoods.route) { launchSingleTop = true } },
+                    onSupplierDebtsClick = { navController.navigate(AppRoute.SupplierDebts.route) { launchSingleTop = true } },
+                    onReceivablesClick = { navController.navigate(AppRoute.Receivables.route) { launchSingleTop = true } },
+                    onCustomersClick = { navController.navigate(AppRoute.Customers.route) { launchSingleTop = true } },
+                    onAddCustomerClick = { navController.navigate(AppRoute.AddCustomer.route) { launchSingleTop = true } },
+                    onReportsClick = { navController.navigate(AppRoute.Reports.route) { launchSingleTop = true } },
+                    onOperationalAuditClick = { navController.navigate(AppRoute.OperationalAudit.route) { launchSingleTop = true } },
+                    onProfileClick = { navController.navigate(AppRoute.AdminProfile.route) { launchSingleTop = true } },
+                    onSettingsClick = { navController.navigate(AppRoute.AdminSettings.route) { launchSingleTop = true } },
+                    onBackToReceivables = {
                         if (!navController.popBackStack()) {
                             navController.navigate(AppRoute.Receivables.route) { launchSingleTop = true }
                         }

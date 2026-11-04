@@ -122,10 +122,14 @@ internal fun AdminDestination.adminRouteOrNull(role: String?): String? {
         AdminDestination.CashReconciliation -> AppRoute.CashReconciliation.route
         AdminDestination.SalesTransactions -> AppRoute.SalesTransactions.route
         AdminDestination.SupplierDebts -> AppRoute.SupplierDebts.route
+        AdminDestination.OpeningSupplierDebtForm -> AppRoute.OpeningSupplierDebtForm.createRoute()
+        AdminDestination.AdjustmentSupplierDebtForm -> AppRoute.AdjustmentSupplierDebtForm.createRoute()
         AdminDestination.CashSessionHistory -> AppRoute.CashSessionHistory.route
         AdminDestination.CashReconciliationDetail -> AppRoute.CashReconciliationDetail.createRoute()
         AdminDestination.CashExpenses -> AppRoute.CashExpenses.route
         AdminDestination.ReceivablePayments -> AppRoute.ReceivablePayments.route
+        AdminDestination.OpeningReceivableForm -> AppRoute.OpeningReceivableForm.createRoute()
+        AdminDestination.AdjustmentReceivableForm -> AppRoute.AdjustmentReceivableForm.createRoute()
         AdminDestination.Reports -> AppRoute.Reports.route
         AdminDestination.LocalReports -> AppRoute.OfflineReports.route
         AdminDestination.OperationalAudit -> AppRoute.OperationalAudit.route

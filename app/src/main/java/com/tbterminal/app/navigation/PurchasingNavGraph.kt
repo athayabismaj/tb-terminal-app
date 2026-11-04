@@ -36,6 +36,9 @@ import com.tbterminal.app.ui.incominggoods.AdminIncomingGoodsFormScreen
 import com.tbterminal.app.ui.incominggoods.AdminIncomingGoodsScreen
 import com.tbterminal.app.ui.payables.AdminSupplierDebtDetailScreen
 import com.tbterminal.app.ui.payables.AdminSupplierDebtScreen
+import com.tbterminal.app.ui.payables.AdminOpeningSupplierDebtScreen
+import com.tbterminal.app.ui.payables.AdminAdjustmentSupplierDebtScreen
+import com.tbterminal.app.ui.payables.SupplierDebtViewModel
 import com.tbterminal.app.ui.pricemanagement.AdminPriceManagementScreen
 import com.tbterminal.app.ui.products.AdminProductCategoriesScreen
 import com.tbterminal.app.ui.products.AdminProductDetailScreen
@@ -409,6 +412,16 @@ internal fun NavGraphBuilder.purchasingGraph(navController: NavHostController, s
                         }
                     },
                     onSupplierDebtsClick = {},
+                    onAddOpeningBalanceClick = {
+                        navController.navigate(AppRoute.OpeningSupplierDebtForm.createRoute()) {
+                            launchSingleTop = true
+                        }
+                    },
+                    onAddAdjustmentClick = {
+                        navController.navigate(AppRoute.AdjustmentSupplierDebtForm.createRoute()) {
+                            launchSingleTop = true
+                        }
+                    },
                     onSupplierDetailClick = { supplierId ->
                         navController.navigate(AppRoute.SupplierDebtDetail.createRoute(supplierId)) {
                             launchSingleTop = true
@@ -505,4 +518,126 @@ internal fun NavGraphBuilder.purchasingGraph(navController: NavHostController, s
                 )
             }
         }
-}
+
+        composable(
+            route = AppRoute.OpeningSupplierDebtForm.route,
+            arguments = listOf(
+                navArgument(AppRoute.OpeningSupplierDebtForm.SUPPLIER_ID_ARG) {
+                    type = NavType.StringType
+                    nullable = true
+                    defaultValue = null
+                }
+            )
+        ) { backStackEntry ->
+            val sessionUser = sessionManager.readSessionUser()
+            val supplierId = backStackEntry.arguments
+                ?.getString(AppRoute.OpeningSupplierDebtForm.SUPPLIER_ID_ARG)
+
+            if (sessionUser == null) {
+                LaunchedEffect(Unit) {
+                    sessionManager.logout()
+                    navController.navigate(AppRoute.Login.route) {
+                        popUpTo(0)
+                        launchSingleTop = true
+                    }
+                }
+            } else {
+                val viewModel: SupplierDebtViewModel = viewModel(
+                    factory = SupplierDebtViewModel.factory(appContainer.purchasingRepository)
+                )
+
+                AdminOpeningSupplierDebtScreen(
+                    name = sessionUser.name,
+                    role = sessionUser.role,
+                    supplierId = supplierId,
+                    viewModel = viewModel,
+                    purchasingRepository = appContainer.purchasingRepository,
+                    onDashboardClick = { navController.navigate(AppRoute.Dashboard.route) { launchSingleTop = true } },
+                    onProductsClick = { navController.navigate(AppRoute.Products.route) { launchSingleTop = true } },
+                    onStockOpnameClick = { navController.navigate(AppRoute.StockOpname.route) { launchSingleTop = true } },
+                    onIncomingGoodsClick = { navController.navigate(AppRoute.IncomingGoods.route) { launchSingleTop = true } },
+                    onSupplierDebtsClick = { navController.navigate(AppRoute.SupplierDebts.route) { launchSingleTop = true } },
+                    onReceivablesClick = { navController.navigate(AppRoute.Receivables.route) { launchSingleTop = true } },
+                    onCustomersClick = { navController.navigate(AppRoute.Customers.route) { launchSingleTop = true } },
+                    onAddSupplierClick = { navController.navigate(AppRoute.SupplierForm.route) { launchSingleTop = true } },
+                    onReportsClick = { navController.navigate(AppRoute.Reports.route) { launchSingleTop = true } },
+                    onOperationalAuditClick = { navController.navigate(AppRoute.OperationalAudit.route) { launchSingleTop = true } },
+                    onProfileClick = { navController.navigate(AppRoute.AdminProfile.route) { launchSingleTop = true } },
+                    onSettingsClick = { navController.navigate(AppRoute.AdminSettings.route) { launchSingleTop = true } },
+                    onBackToSupplierDebts = {
+                        if (!navController.popBackStack()) {
+                            navController.navigate(AppRoute.SupplierDebts.route) { launchSingleTop = true }
+                        }
+                    },
+                    onLogout = {
+                        sessionManager.logout()
+                        navController.navigate(AppRoute.Login.route) {
+                            popUpTo(0)
+                            launchSingleTop = true
+                        }
+                    }
+                )
+            }
+        }
+
+        composable(
+            route = AppRoute.AdjustmentSupplierDebtForm.route,
+            arguments = listOf(
+                navArgument(AppRoute.AdjustmentSupplierDebtForm.SUPPLIER_ID_ARG) {
+                    type = NavType.StringType
+                    nullable = true
+                    defaultValue = null
+                }
+            )
+        ) { backStackEntry ->
+            val sessionUser = sessionManager.readSessionUser()
+            val supplierId = backStackEntry.arguments
+                ?.getString(AppRoute.AdjustmentSupplierDebtForm.SUPPLIER_ID_ARG)
+
+            if (sessionUser == null) {
+                LaunchedEffect(Unit) {
+                    sessionManager.logout()
+                    navController.navigate(AppRoute.Login.route) {
+                        popUpTo(0)
+                        launchSingleTop = true
+                    }
+                }
+            } else {
+                val viewModel: SupplierDebtViewModel = viewModel(
+                    factory = SupplierDebtViewModel.factory(appContainer.purchasingRepository)
+                )
+
+                AdminAdjustmentSupplierDebtScreen(
+                    name = sessionUser.name,
+                    role = sessionUser.role,
+                    supplierId = supplierId,
+                    viewModel = viewModel,
+                    purchasingRepository = appContainer.purchasingRepository,
+                    onDashboardClick = { navController.navigate(AppRoute.Dashboard.route) { launchSingleTop = true } },
+                    onProductsClick = { navController.navigate(AppRoute.Products.route) { launchSingleTop = true } },
+                    onStockOpnameClick = { navController.navigate(AppRoute.StockOpname.route) { launchSingleTop = true } },
+                    onIncomingGoodsClick = { navController.navigate(AppRoute.IncomingGoods.route) { launchSingleTop = true } },
+                    onSupplierDebtsClick = { navController.navigate(AppRoute.SupplierDebts.route) { launchSingleTop = true } },
+                    onReceivablesClick = { navController.navigate(AppRoute.Receivables.route) { launchSingleTop = true } },
+                    onCustomersClick = { navController.navigate(AppRoute.Customers.route) { launchSingleTop = true } },
+                    onAddSupplierClick = { navController.navigate(AppRoute.SupplierForm.route) { launchSingleTop = true } },
+                    onReportsClick = { navController.navigate(AppRoute.Reports.route) { launchSingleTop = true } },
+                    onOperationalAuditClick = { navController.navigate(AppRoute.OperationalAudit.route) { launchSingleTop = true } },
+                    onProfileClick = { navController.navigate(AppRoute.AdminProfile.route) { launchSingleTop = true } },
+                    onSettingsClick = { navController.navigate(AppRoute.AdminSettings.route) { launchSingleTop = true } },
+                    onBackToSupplierDebts = {
+                        if (!navController.popBackStack()) {
+                            navController.navigate(AppRoute.SupplierDebts.route) { launchSingleTop = true }
+                        }
+                    },
+                    onLogout = {
+                        sessionManager.logout()
+                        navController.navigate(AppRoute.Login.route) {
+                            popUpTo(0)
+                            launchSingleTop = true
+                        }
+                    }
+                )
+            }
+        }
+    }

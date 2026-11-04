@@ -13,6 +13,7 @@ import com.tbterminal.app.data.repository.ReceivableRepository
 import com.tbterminal.app.data.repository.RepositoryResult
 import com.tbterminal.app.ui.common.viewModelFactory
 import java.math.BigDecimal
+import java.time.LocalDate
 import java.util.UUID
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -84,6 +85,10 @@ class ReceivableViewModel(
         _uiState.update { it.copy(dueFilter = filter, page = 1) }
         loadReceivables(page = 1)
         loadCustomerSummaries()
+    }
+
+    fun onSortOrderChanged(order: ReceivableSortOrder) {
+        _uiState.update { it.copy(sortOrder = order) }
     }
 
     fun previousPage() {
@@ -167,10 +172,48 @@ class ReceivableViewModel(
         it.copy(isAdjustmentOpen = false, isSubmittingAdjustment = false)
     }
 
-    fun onAdjustmentCustomerChanged(value: String) = _uiState.update { it.copy(adjustmentCustomerId = value) }
-    fun onAdjustmentCustomerSelected(customer: Customer) = _uiState.update { state ->
-        val updated = if (state.customers.none { it.id == customer.id }) state.customers + customer else state.customers
-        state.copy(adjustmentCustomerId = customer.id, customers = updated)
+    fun onAdjustmentCustomerChanged(value: String) {
+        _uiState.update { it.copy(adjustmentCustomerId = value) }
+        loadCustomerInvoicesForAdjustment(value)
+    }
+    fun onAdjustmentCustomerSelected(customer: Customer) {
+        val updated = if (_uiState.value.customers.none { it.id == customer.id }) _uiState.value.customers + customer else _uiState.value.customers
+        _uiState.update { state ->
+            state.copy(adjustmentCustomerId = customer.id, customers = updated)
+        }
+        loadCustomerInvoicesForAdjustment(customer.id)
+    }
+    fun onSelectInvoiceForAdjustment(invoice: Receivable) {
+        val invoiceRef = invoice.legacyInvoiceNumber?.takeIf(String::isNotBlank)
+            ?: invoice.transactionId?.takeIf(String::isNotBlank)
+            ?: "NOTA-${invoice.id.takeLast(6).uppercase()}"
+
+        _uiState.update { state ->
+            state.copy(
+                adjustmentReferenceInput = invoiceRef,
+                adjustmentAmountInput = invoice.remainingAmount.toInputText(),
+                adjustmentDueDateInput = invoice.dueDate.ifBlank { state.adjustmentDueDateInput }
+            )
+        }
+    }
+    fun loadCustomerInvoicesForAdjustment(customerId: String) {
+        val cid = customerId.trim()
+        if (cid.isBlank()) {
+            _uiState.update { it.copy(customerActiveInvoices = emptyList(), isLoadingCustomerInvoices = false) }
+            return
+        }
+        viewModelScope.launch {
+            _uiState.update { it.copy(isLoadingCustomerInvoices = true) }
+            when (val result = receivableRepository.getReceivables(page = 1, limit = 50, customerId = cid)) {
+                is RepositoryResult.Success -> {
+                    val activeInvoices = result.data.data.filter { it.remainingAmount > BigDecimal.ZERO }
+                    _uiState.update { it.copy(customerActiveInvoices = activeInvoices, isLoadingCustomerInvoices = false) }
+                }
+                else -> {
+                    _uiState.update { it.copy(isLoadingCustomerInvoices = false) }
+                }
+            }
+        }
     }
     fun onAdjustmentAmountChanged(value: String) = _uiState.update { it.copy(adjustmentAmountInput = value.decimalInput()) }
     fun onAdjustmentDebtDateChanged(value: String) = _uiState.update { it.copy(adjustmentDebtDateInput = value) }
@@ -210,6 +253,7 @@ class ReceivableViewModel(
                         it.copy(
                             isAdjustmentOpen = false,
                             isSubmittingAdjustment = false,
+                            isAdjustmentSaved = true,
                             message = "Adjustment piutang ${result.data.customerName} berhasil dicatat."
                         )
                     }
@@ -263,6 +307,7 @@ class ReceivableViewModel(
                         it.copy(
                             isOpeningBalanceOpen = false,
                             isSubmittingOpeningBalance = false,
+                            isOpeningBalanceSaved = true,
                             message = "Saldo awal piutang ${result.data.customerName} berhasil dicatat."
                         )
                     }
@@ -326,6 +371,73 @@ class ReceivableViewModel(
 
                 is RepositoryResult.Error -> setActionError(result.message)
                 is RepositoryResult.Exception -> setActionError("Pembayaran gagal dicatat karena koneksi bermasalah.")
+            }
+        }
+    }
+
+    fun resetOpeningBalanceSaved() {
+        _uiState.update { it.copy(isOpeningBalanceSaved = false) }
+    }
+
+    fun resetAdjustmentSaved() {
+        _uiState.update { it.copy(isAdjustmentSaved = false) }
+    }
+
+    fun initOpeningBalanceForCustomer(customerId: String?) {
+        val cid = customerId?.trim() ?: ""
+        _uiState.update { state ->
+            state.copy(
+                isOpeningBalanceOpen = true,
+                openingCustomerId = cid,
+                openingAmountInput = "",
+                openingDebtDateInput = LocalDate.now().toString(),
+                openingDueDateInput = LocalDate.now().plusDays(30).toString(),
+                openingLegacyInvoiceInput = "",
+                openingNotesInput = "",
+                errorMessage = null,
+                isOpeningBalanceSaved = false
+            )
+        }
+        if (cid.isNotBlank()) {
+            loadSingleCustomerIfNeeded(cid)
+            loadCustomerInvoicesForAdjustment(cid)
+        } else {
+            _uiState.update { it.copy(customerActiveInvoices = emptyList(), isLoadingCustomerInvoices = false) }
+        }
+    }
+
+    fun initAdjustmentForCustomer(customerId: String?) {
+        val cid = customerId?.trim() ?: ""
+        _uiState.update { state ->
+            state.copy(
+                isAdjustmentOpen = true,
+                adjustmentCustomerId = cid,
+                adjustmentAmountInput = "",
+                adjustmentDebtDateInput = LocalDate.now().toString(),
+                adjustmentDueDateInput = LocalDate.now().plusDays(30).toString(),
+                adjustmentReferenceInput = "",
+                adjustmentReasonInput = "",
+                errorMessage = null,
+                isAdjustmentSaved = false
+            )
+        }
+        if (cid.isNotBlank()) {
+            loadSingleCustomerIfNeeded(cid)
+        }
+    }
+
+    private fun loadSingleCustomerIfNeeded(customerId: String) {
+        if (_uiState.value.customers.any { it.id == customerId }) return
+        viewModelScope.launch {
+            when (val result = customerRepository.getCustomerById(customerId)) {
+                is RepositoryResult.Success -> {
+                    _uiState.update { state ->
+                        if (state.customers.none { it.id == result.data.id }) {
+                            state.copy(customers = state.customers + result.data)
+                        } else state
+                    }
+                }
+                else -> Unit
             }
         }
     }

@@ -55,10 +55,15 @@ internal class ReceivableCustomerDetailViewModel(
                 customerId = customerId
             )
             if (receivables is RepositoryResult.Success) {
+                val sortedReceivables = receivables.data.data.sortedWith(
+                    compareByDescending<Receivable> { it.debtDate }
+                        .thenByDescending { it.createdAt }
+                        .thenByDescending { it.id }
+                )
                 _uiState.update {
                     it.copy(
                         isLoading = false,
-                        receivables = receivables.data.data,
+                        receivables = sortedReceivables,
                         payments = (payments as? RepositoryResult.Success)?.data?.data.orEmpty()
                     )
                 }

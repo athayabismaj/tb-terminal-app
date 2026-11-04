@@ -1,10 +1,21 @@
 package com.tbterminal.app.ui.payables
 
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.expandVertically
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.shrinkVertically
+import androidx.compose.ui.draw.rotate
+
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.material.icons.filled.ExpandLess
 import androidx.compose.material.icons.filled.ExpandMore
 import androidx.compose.material.icons.outlined.Receipt
+import androidx.compose.material.icons.outlined.Search
+import androidx.compose.material.icons.automirrored.outlined.ReceiptLong
+import androidx.compose.material.icons.Icons
 import androidx.compose.ui.text.withStyle
 
 import androidx.compose.runtime.remember
@@ -83,8 +94,14 @@ internal fun SupplierDebtRows(
                 modifier = modifier.fillMaxWidth(),
                 verticalArrangement = Arrangement.spacedBy(14.dp),
             ) {
-                groupedBySupplier.entries.take(SUPPLIER_DEBT_USERS_PER_PAGE).forEach { (supplierId, payables) ->
-                    SupplierDebtGroupCard(supplierId, payables, onPayClick, onSupplierDetailClick)
+                groupedBySupplier.entries.take(SUPPLIER_DEBT_USERS_PER_PAGE).forEachIndexed { index, (supplierId, payables) ->
+                    SupplierDebtGroupCard(
+                        supplierId = supplierId,
+                        payables = payables,
+                        onPayClick = onPayClick,
+                        onSupplierDetailClick = onSupplierDetailClick,
+                        defaultExpanded = false
+                    )
                 }
             }
         }
@@ -282,13 +299,12 @@ internal fun SupplierDebtLoading(modifier: Modifier, compact: Boolean) {
 
 @Composable
 private fun SupplierDebtGroupCardSkeleton() {
-    val surfaceBorder = Color(0xFFE5EBE8)
-    androidx.compose.material3.Card(
+    Surface(
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(16.dp),
-        colors = androidx.compose.material3.CardDefaults.cardColors(containerColor = Color.White),
-        border = BorderStroke(1.dp, surfaceBorder),
-        elevation = androidx.compose.material3.CardDefaults.cardElevation(defaultElevation = 2.dp)
+        color = Color.White,
+        border = BorderStroke(1.dp, Color(0xFFE2E8F0)),
+        shadowElevation = 0.5.dp
     ) {
         Column {
             Row(
@@ -301,7 +317,7 @@ private fun SupplierDebtGroupCardSkeleton() {
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
-                    SkeletonBox(Modifier.size(40.dp), shape = CircleShape)
+                    SkeletonBox(Modifier.size(44.dp), shape = CircleShape)
                     Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
                         SkeletonBox(Modifier.fillMaxWidth(0.55f).height(15.dp), shape = RoundedCornerShape(4.dp))
                         Row(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
@@ -312,24 +328,41 @@ private fun SupplierDebtGroupCardSkeleton() {
                 }
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    horizontalArrangement = Arrangement.spacedBy(6.dp)
                 ) {
                     SkeletonBox(Modifier.width(46.dp).height(14.dp), shape = RoundedCornerShape(4.dp))
-                    SkeletonBox(Modifier.size(18.dp), shape = CircleShape)
+                    SkeletonBox(Modifier.size(20.dp), shape = CircleShape)
                 }
             }
-            HorizontalDivider(color = surfaceBorder)
+            HorizontalDivider(color = Color(0xFFF1F5F9))
             Column(
-                modifier = Modifier.fillMaxWidth().padding(horizontal = 14.dp, vertical = 10.dp),
-                verticalArrangement = Arrangement.spacedBy(8.dp)
+                modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 14.dp),
+                verticalArrangement = Arrangement.spacedBy(10.dp)
             ) {
                 Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
                     SkeletonBox(Modifier.width(100.dp).height(14.dp), shape = RoundedCornerShape(4.dp))
-                    SkeletonBox(Modifier.width(64.dp).height(20.dp), shape = RoundedCornerShape(6.dp))
+                    SkeletonBox(Modifier.width(50.dp).height(14.dp), shape = RoundedCornerShape(4.dp))
                 }
+                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.Bottom) {
+                    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                        SkeletonBox(Modifier.width(70.dp).height(12.dp), shape = RoundedCornerShape(3.dp))
+                        SkeletonBox(Modifier.width(100.dp).height(18.dp), shape = RoundedCornerShape(4.dp))
+                    }
+                    Column(horizontalAlignment = Alignment.End, verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                        SkeletonBox(Modifier.width(45.dp).height(12.dp), shape = RoundedCornerShape(3.dp))
+                        SkeletonBox(Modifier.width(65.dp).height(14.dp), shape = RoundedCornerShape(4.dp))
+                    }
+                }
+                HorizontalDivider(color = Color(0xFFF1F5F9))
                 Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
-                    SkeletonBox(Modifier.width(130.dp).height(12.dp), shape = RoundedCornerShape(3.dp))
-                    SkeletonBox(Modifier.width(76.dp).height(28.dp), shape = RoundedCornerShape(8.dp))
+                    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                        SkeletonBox(Modifier.width(80.dp).height(12.dp), shape = RoundedCornerShape(3.dp))
+                        SkeletonBox(Modifier.width(90.dp).height(14.dp), shape = RoundedCornerShape(4.dp))
+                    }
+                    Column(horizontalAlignment = Alignment.End, verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                        SkeletonBox(Modifier.width(80.dp).height(12.dp), shape = RoundedCornerShape(3.dp))
+                        SkeletonBox(Modifier.width(50.dp).height(14.dp), shape = RoundedCornerShape(4.dp))
+                    }
                 }
             }
         }
@@ -386,8 +419,48 @@ private fun SupplierDebtTableDesktopSkeleton() {
 }
 
 @Composable
-internal fun SupplierDebtEmpty(modifier: Modifier) {
-    SupplierDebtFeedback(modifier, "Hutang supplier tidak ditemukan", "Coba ubah pencarian atau filter yang digunakan.", DebtText)
+internal fun SupplierDebtEmpty(modifier: Modifier = Modifier, searchQuery: String = "") {
+    Surface(
+        modifier = modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(16.dp),
+        color = Color.White,
+        border = BorderStroke(1.dp, Color(0xFFE2E8F0)),
+        shadowElevation = 1.dp
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(vertical = 36.dp, horizontal = 20.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            Box(
+                modifier = Modifier
+                    .size(48.dp)
+                    .background(Color(0xFFF1F5F9), CircleShape),
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(
+                    imageVector = if (searchQuery.isNotBlank()) Icons.Outlined.Search else Icons.AutoMirrored.Outlined.ReceiptLong,
+                    contentDescription = null,
+                    tint = Color(0xFF94A3B8),
+                    modifier = Modifier.size(24.dp)
+                )
+            }
+            Text(
+                text = if (searchQuery.isNotBlank()) "Hutang tidak ditemukan" else "Belum ada data hutang",
+                fontSize = 14.sp,
+                fontWeight = FontWeight.SemiBold,
+                color = Color(0xFF0F172A)
+            )
+            Text(
+                text = if (searchQuery.isNotBlank()) "Tidak ada hutang supplier yang cocok dengan \"$searchQuery\"" else "Data kewajiban hutang supplier akan muncul di sini setelah transaksi pembelian tempo dicatat.",
+                fontSize = 12.sp,
+                color = Color(0xFF64748B),
+                textAlign = TextAlign.Center
+            )
+        }
+    }
 }
 
 @Composable
@@ -428,64 +501,80 @@ internal fun SupplierDebtGroupCard(
     supplierId: String,
     payables: List<com.tbterminal.app.data.model.SupplierPayable>,
     onPayClick: (com.tbterminal.app.data.model.SupplierPayable) -> Unit,
-    onSupplierDetailClick: (String) -> Unit = {}
+    onSupplierDetailClick: (String) -> Unit = {},
+    defaultExpanded: Boolean = false,
 ) {
     val supplierName = payables.firstOrNull()?.supplierName ?: "Unknown"
     val totalRemaining = payables.sumOf { it.remainingAmount }
     val allPaid = totalRemaining <= java.math.BigDecimal.ZERO
-    var isExpanded by remember { mutableStateOf(false) }
+    var isExpanded by remember { mutableStateOf(defaultExpanded) }
     
-    val brand50 = Color(0xFFF0F6F3)
-    val brand100 = Color(0xFFE1ECE6)
     val brand600 = Color(0xFF256B57)
-    val brand700 = Color(0xFF1D5545)
     val slate100 = Color(0xFFF1F5F9)
     val slate200 = Color(0xFFE2E8F0)
     val slate400 = Color(0xFF94A3B8)
     val slate500 = Color(0xFF64748B)
-    val slate600 = Color(0xFF475569)
     val slate700 = Color(0xFF334155)
     val slate900 = Color(0xFF0F172A)
-    val surfaceBorder = Color(0xFFE5EBE8)
     
-    androidx.compose.material3.Card(
-        modifier = Modifier.fillMaxWidth().testTag("supplier-group-$supplierId"),
+    val rotationState by animateFloatAsState(
+        targetValue = if (isExpanded) 180f else 0f,
+        label = "chevronRotation"
+    )
+
+    Surface(
+        modifier = Modifier
+            .fillMaxWidth()
+            .testTag("supplier-group-$supplierId"),
         shape = RoundedCornerShape(16.dp),
-        colors = androidx.compose.material3.CardDefaults.cardColors(containerColor = Color.White),
-        border = androidx.compose.foundation.BorderStroke(1.dp, surfaceBorder),
-        elevation = androidx.compose.material3.CardDefaults.cardElevation(defaultElevation = 2.dp)
+        color = Color.White,
+        border = BorderStroke(1.dp, slate200),
+        shadowElevation = 0.5.dp
     ) {
         Column {
+            // Header Accordion
             Surface(
                 onClick = { isExpanded = !isExpanded },
                 color = Color.White,
             ) {
                 Row(
-                    modifier = Modifier.fillMaxWidth().padding(14.dp),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(14.dp),
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Row(
-                        modifier = Modifier.weight(1f).padding(end = 8.dp),
+                        modifier = Modifier
+                            .weight(1f)
+                            .padding(end = 8.dp),
                         verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.spacedBy(12.dp)
                     ) {
-                        val circleBg = if (allPaid) brand50 else slate100
-                        val circleBorder = if (allPaid) brand100 else slate200
-                        val circleText = if (allPaid) brand700 else slate700
-                        
+                        // Supplier Avatar Pill (44.dp x 44.dp, bg #F1F5F9, border #E2E8F0, text #334155)
                         Box(
-                            modifier = Modifier.size(40.dp).background(circleBg, CircleShape).border(1.dp, circleBorder, CircleShape),
+                            modifier = Modifier
+                                .size(44.dp)
+                                .background(slate100, CircleShape)
+                                .border(1.dp, slate200, CircleShape),
                             contentAlignment = Alignment.Center
                         ) {
-                            Text(supplierName.take(1).uppercase(), fontSize = 14.sp, fontWeight = FontWeight.Bold, color = circleText)
+                            Text(
+                                text = supplierName.take(1).uppercase(),
+                                fontSize = 14.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = slate700
+                            )
                         }
                         
-                        Column(modifier = Modifier.weight(1f)) {
+                        Column(
+                            modifier = Modifier.weight(1f),
+                            verticalArrangement = Arrangement.spacedBy(4.dp)
+                        ) {
                             Text(
                                 text = supplierName,
                                 fontSize = 14.sp,
-                                fontWeight = FontWeight.Bold,
+                                fontWeight = FontWeight.SemiBold,
                                 color = slate900,
                                 maxLines = 1,
                                 overflow = TextOverflow.Ellipsis
@@ -493,19 +582,30 @@ internal fun SupplierDebtGroupCard(
                             
                             Row(
                                 verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.spacedBy(4.dp),
-                                modifier = Modifier.padding(top = 2.dp)
+                                horizontalArrangement = Arrangement.spacedBy(6.dp)
                             ) {
-                                val amountColor = if (allPaid) brand600 else brand700
-                                Text(totalRemaining.currencyText(), fontSize = 12.sp, fontWeight = FontWeight.SemiBold, color = amountColor, maxLines = 1)
-                                Text(if (allPaid) "(Semua lunas)" else "(Belum lunas)", fontSize = 10.sp, color = slate400, maxLines = 1)
+                                Text(
+                                    text = totalRemaining.currencyText(),
+                                    fontSize = 12.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = brand600,
+                                    maxLines = 1
+                                )
+                                Text(
+                                    text = if (allPaid) "(Semua lunas)" else "(Belum lunas)",
+                                    fontSize = 12.sp,
+                                    fontWeight = FontWeight.Medium,
+                                    color = slate400,
+                                    maxLines = 1
+                                )
                             }
                         }
                     }
                     
+                    // Header Badge & Chevron Action
                     Row(
                         verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        horizontalArrangement = Arrangement.spacedBy(6.dp)
                     ) {
                         Text(
                             text = "${payables.size} Nota",
@@ -516,40 +616,63 @@ internal fun SupplierDebtGroupCard(
                             softWrap = false
                         )
                         Icon(
-                            if (isExpanded) androidx.compose.material.icons.Icons.Default.ExpandLess else androidx.compose.material.icons.Icons.Default.ExpandMore,
-                            contentDescription = null,
+                            imageVector = Icons.Default.ExpandMore,
+                            contentDescription = if (isExpanded) "Tutup nota" else "Buka nota",
                             tint = slate400,
-                            modifier = Modifier.size(24.dp)
+                            modifier = Modifier
+                                .size(20.dp)
+                                .rotate(rotationState)
                         )
                     }
                 }
             }
             
-            if (isExpanded) {
-                HorizontalDivider(color = surfaceBorder)
+            // Expanded Content
+            AnimatedVisibility(
+                visible = isExpanded,
+                enter = expandVertically() + fadeIn(),
+                exit = shrinkVertically() + fadeOut()
+            ) {
                 Column(modifier = Modifier.fillMaxWidth()) {
+                    HorizontalDivider(color = slate100)
+                    
                     val limit = 3
                     val itemsToDisplay = payables.take(limit)
                     val remainingCount = payables.size - limit
                     
                     itemsToDisplay.forEachIndexed { index, payable ->
                         if (index > 0) {
-                            HorizontalDivider(color = surfaceBorder.copy(alpha = 0.8f))
+                            HorizontalDivider(color = slate100)
                         }
-                        SupplierDebtAccordionItem(payable = payable, index = index, onPayClick = onPayClick)
+                        SupplierDebtAccordionItem(
+                            payable = payable,
+                            index = index,
+                            onPayClick = onPayClick
+                        )
                     }
                     
-                    HorizontalDivider(color = surfaceBorder)
+                    HorizontalDivider(color = slate100)
                     Surface(
                         onClick = { onSupplierDetailClick(supplierId) },
-                        color = Color(0xFFF8FAF9),
+                        color = Color.White,
                     ) {
                         Box(
-                            modifier = Modifier.fillMaxWidth().padding(12.dp),
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(vertical = 12.dp),
                             contentAlignment = Alignment.Center
                         ) {
-                            val text = if (remainingCount > 0) "Lihat $remainingCount nota lainnya & detail →" else "Lihat Detail Hutang →"
-                            Text(text, fontSize = 12.sp, fontWeight = FontWeight.SemiBold, color = brand600)
+                            val text = if (remainingCount > 0) {
+                                "Lihat $remainingCount nota lainnya & detail →"
+                            } else {
+                                "Lihat Detail Hutang →"
+                            }
+                            Text(
+                                text = text,
+                                fontSize = 12.sp,
+                                fontWeight = FontWeight.SemiBold,
+                                color = brand600
+                            )
                         }
                     }
                 }
@@ -565,85 +688,207 @@ private fun SupplierDebtAccordionItem(
     onPayClick: (com.tbterminal.app.data.model.SupplierPayable) -> Unit
 ) {
     val isPaid = payable.isPaid()
-    val brand50 = Color(0xFFF0F6F3)
     val brand600 = Color(0xFF256B57)
-    val brand700 = Color(0xFF1D5545)
+    val slate50 = Color(0xFFF8FAFC)
     val slate100 = Color(0xFFF1F5F9)
     val slate400 = Color(0xFF94A3B8)
     val slate500 = Color(0xFF64748B)
     val slate700 = Color(0xFF334155)
     val slate800 = Color(0xFF1E293B)
-    val slate900 = Color(0xFF0F172A)
+    val amber700 = Color(0xFFB45309)
+    val emerald500 = Color(0xFF10B981)
+    val emerald600 = Color(0xFF059669)
+    val red600 = Color(0xFFDC2626)
+
+    val isOverdue = remember(payable.dueDate) {
+        val date = runCatching { java.time.LocalDate.parse(payable.dueDate.take(10)) }.getOrNull()
+        if (date != null) {
+            java.time.temporal.ChronoUnit.DAYS.between(java.time.LocalDate.now(), date) < 0
+        } else false
+    }
+
+    val itemBg = if (isPaid) slate50.copy(alpha = 0.5f) else Color.White
 
     Surface(
         onClick = { if (!isPaid) onPayClick(payable) },
-        color = Color.White,
-        modifier = Modifier.testTag("supplier-debt-${payable.id}")
+        color = itemBg,
+        modifier = Modifier
+            .fillMaxWidth()
+            .testTag("supplier-debt-${payable.id}")
     ) {
-        Column(modifier = Modifier.fillMaxWidth().padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
-                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Icon(androidx.compose.material.icons.Icons.Outlined.Receipt, contentDescription = null, tint = slate400, modifier = Modifier.size(18.dp))
-                    Text(payable.purchaseId.shortId(), fontSize = 12.sp, fontWeight = FontWeight.SemiBold, color = slate900, fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace)
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 16.dp, vertical = 14.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp)
+        ) {
+            // Line 1: Nota Number / ID & Index
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    Icon(
+                        imageVector = Icons.AutoMirrored.Outlined.ReceiptLong,
+                        contentDescription = null,
+                        tint = slate400,
+                        modifier = Modifier.size(16.dp)
+                    )
+                    Text(
+                        text = payable.purchaseId.shortId(),
+                        fontSize = 14.sp,
+                        fontWeight = FontWeight.SemiBold,
+                        color = slate800,
+                        fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace
+                    )
                 }
                 Text(
                     text = "Nota ${index + 1}",
-                    fontSize = 11.sp,
+                    fontSize = 12.sp,
                     fontWeight = FontWeight.Medium,
                     color = slate500
                 )
             }
             
-            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.Bottom) {
+            // Line 2: Sisa Hutang (Left) & Status (Right)
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(top = 2.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.Bottom
+            ) {
                 Column {
-                    Text("SISA HUTANG", fontSize = 10.sp, fontWeight = FontWeight.SemiBold, color = slate400, letterSpacing = 0.5.sp)
-                    Text(payable.remainingAmount.currencyText(), fontSize = 20.sp, fontWeight = FontWeight.Black, color = if (isPaid) slate900 else brand700, modifier = Modifier.padding(top = 2.dp))
+                    Text(
+                        text = "Sisa Hutang",
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.Medium,
+                        color = slate500
+                    )
+                    Text(
+                        text = payable.remainingAmount.currencyText(),
+                        fontSize = 16.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = if (isPaid) slate700 else brand600,
+                        modifier = Modifier.padding(top = 2.dp)
+                    )
                 }
                 Column(horizontalAlignment = Alignment.End) {
-                    Text("STATUS", fontSize = 10.sp, fontWeight = FontWeight.SemiBold, color = slate400, letterSpacing = 0.5.sp)
-                    Text(if (isPaid) "Terbayar Penuh" else "Sebagian", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = if (isPaid) brand600 else slate700, modifier = Modifier.padding(top = 2.dp))
-                }
-            }
-            
-            Row(modifier = Modifier.fillMaxWidth().drawBehind {
-                drawLine(
-                    color = slate100,
-                    start = androidx.compose.ui.geometry.Offset(0f, 0f),
-                    end = androidx.compose.ui.geometry.Offset(size.width, 0f),
-                    strokeWidth = 1f,
-                    pathEffect = androidx.compose.ui.graphics.PathEffect.dashPathEffect(floatArrayOf(10f, 10f), 0f)
-                )
-            }.padding(top = 8.dp)) {
-                Column(modifier = Modifier.weight(1f)) {
-                    Text("TOTAL TAGIHAN", fontSize = 10.sp, fontWeight = FontWeight.SemiBold, color = slate400, letterSpacing = 0.5.sp)
-                    Text(payable.amount.currencyText(), fontSize = 12.sp, fontWeight = FontWeight.Bold, color = slate800, modifier = Modifier.padding(top = 2.dp))
-                }
-                Column(modifier = Modifier.weight(1f), horizontalAlignment = Alignment.End) {
-                    Text("SUDAH DIBAYAR", fontSize = 10.sp, fontWeight = FontWeight.SemiBold, color = slate400, letterSpacing = 0.5.sp)
-                    Text(payable.paidAmount.currencyText(), fontSize = 12.sp, fontWeight = FontWeight.Bold, color = if (isPaid) slate800 else brand600, modifier = Modifier.padding(top = 2.dp))
-                }
-            }
-            
-            Row(modifier = Modifier.fillMaxWidth().drawBehind {
-                drawLine(
-                    color = slate100, 
-                    start = androidx.compose.ui.geometry.Offset(0f, 0f), 
-                    end = androidx.compose.ui.geometry.Offset(size.width, 0f), 
-                    strokeWidth = 1f
-                )
-            }.padding(top = 8.dp), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
-                Text(
-                    androidx.compose.ui.text.buildAnnotatedString {
-                        withStyle(androidx.compose.ui.text.SpanStyle(color = slate500)) { append("Jatuh tempo: ") }
-                        withStyle(androidx.compose.ui.text.SpanStyle(color = slate800, fontWeight = FontWeight.SemiBold)) { append(payable.dueDate.simpleDate()) }
-                    },
-                    fontSize = 12.sp
-                )
-                if (!isPaid) {
-                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                        Box(modifier = Modifier.size(6.dp).background(brand600, CircleShape))
-                        Text("Aktif", fontSize = 12.sp, fontWeight = FontWeight.SemiBold, color = brand600)
+                    Text(
+                        text = "Status",
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.Medium,
+                        color = slate500
+                    )
+                    val (statusText, statusColor) = when {
+                        isPaid -> "Terbayar Penuh" to brand600
+                        payable.paidAmount > java.math.BigDecimal.ZERO -> "Sebagian" to amber700
+                        else -> "Belum Bayar" to red600
                     }
+                    Text(
+                        text = statusText,
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.SemiBold,
+                        color = statusColor,
+                        modifier = Modifier.padding(top = 2.dp)
+                    )
+                }
+            }
+            
+            // Line 3: Total Tagihan & Sudah Dibayar
+            HorizontalDivider(color = slate100)
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(top = 2.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = "Total Tagihan",
+                        fontSize = 12.sp,
+                        color = slate500
+                    )
+                    Text(
+                        text = payable.amount.currencyText(),
+                        fontSize = 14.sp,
+                        fontWeight = FontWeight.Medium,
+                        color = slate700,
+                        modifier = Modifier.padding(top = 2.dp)
+                    )
+                }
+                Column(
+                    modifier = Modifier.weight(1f),
+                    horizontalAlignment = Alignment.End
+                ) {
+                    Text(
+                        text = "Sudah Dibayar",
+                        fontSize = 12.sp,
+                        color = slate500
+                    )
+                    val paidColor = if (payable.paidAmount > java.math.BigDecimal.ZERO) brand600 else slate700
+                    Text(
+                        text = payable.paidAmount.currencyText(),
+                        fontSize = 14.sp,
+                        fontWeight = if (payable.paidAmount > java.math.BigDecimal.ZERO) FontWeight.SemiBold else FontWeight.Medium,
+                        color = paidColor,
+                        modifier = Modifier.padding(top = 2.dp)
+                    )
+                }
+            }
+            
+            // Line 4: Jatuh tempo & Status Dot
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(top = 2.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(4.dp)
+                ) {
+                    Text(
+                        text = "Jatuh tempo: ",
+                        fontSize = 12.sp,
+                        color = slate500
+                    )
+                    Text(
+                        text = payable.dueDate.simpleDate(),
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.Medium,
+                        color = slate700
+                    )
+                }
+                
+                val isPartial = !isPaid && (payable.paidAmount > java.math.BigDecimal.ZERO || payable.status.equals("sebagian", true) || payable.status.equals("partial", true))
+                val (dotColor, dotTextColor, dotText) = when {
+                    isPaid -> Triple(emerald500, emerald600, "Lunas")
+                    isOverdue -> Triple(red600, red600, "Lewat Jatuh Tempo")
+                    isPartial -> Triple(amber700, amber700, "Sebagian")
+                    else -> Triple(red600, red600, "Belum Lunas")
+                }
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .size(6.dp)
+                            .background(dotColor, CircleShape)
+                    )
+                    Text(
+                        text = dotText,
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.Medium,
+                        color = dotTextColor
+                    )
                 }
             }
         }

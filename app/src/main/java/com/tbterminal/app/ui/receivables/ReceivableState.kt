@@ -12,6 +12,7 @@ data class ReceivableUiState(
     val searchQuery: String = "",
     val statusFilter: ReceivableStatusFilter = ReceivableStatusFilter.All,
     val dueFilter: ReceivableDueFilter = ReceivableDueFilter.All,
+    val sortOrder: ReceivableSortOrder = ReceivableSortOrder.NearestDueDate,
     val customerSummaries: List<CustomerReceivableSummary> = emptyList(),
     val customers: List<Customer> = emptyList(),
     val page: Int = 1,
@@ -35,6 +36,7 @@ data class ReceivableUiState(
     val openingLegacyInvoiceInput: String = "",
     val openingNotesInput: String = "",
     val isSubmittingOpeningBalance: Boolean = false,
+    val isOpeningBalanceSaved: Boolean = false,
     val isAdjustmentOpen: Boolean = false,
     val adjustmentCustomerId: String = "",
     val adjustmentAmountInput: String = "",
@@ -43,18 +45,41 @@ data class ReceivableUiState(
     val adjustmentReferenceInput: String = "",
     val adjustmentReasonInput: String = "",
     val isSubmittingAdjustment: Boolean = false,
+    val isAdjustmentSaved: Boolean = false,
+    val customerActiveInvoices: List<Receivable> = emptyList(),
+    val isLoadingCustomerInvoices: Boolean = false,
     val errorMessage: String? = null,
     val message: String? = null
 ) {
     val filteredReceivables: List<Receivable>
         get() {
             val query = searchQuery.trim()
-            if (query.isBlank()) return receivables
-            return receivables.filter { receivable ->
+            val list = if (query.isBlank()) receivables else receivables.filter { receivable ->
                 receivable.customerName.contains(query, ignoreCase = true) ||
                     receivable.transactionId?.contains(query, ignoreCase = true) == true ||
                     receivable.legacyInvoiceNumber?.contains(query, ignoreCase = true) == true ||
                     receivable.status.contains(query, ignoreCase = true)
+            }
+            val today = LocalDate.now()
+            val dueFiltered = when (dueFilter) {
+                ReceivableDueFilter.All -> list
+                ReceivableDueFilter.Overdue -> list.filter { r ->
+                    val d = runCatching { LocalDate.parse(r.dueDate.take(10)) }.getOrNull()
+                    d != null && d.isBefore(today) && r.remainingAmount > BigDecimal.ZERO
+                }
+                ReceivableDueFilter.DueToday -> list.filter { r ->
+                    val d = runCatching { LocalDate.parse(r.dueDate.take(10)) }.getOrNull()
+                    d != null && d.isEqual(today) && r.remainingAmount > BigDecimal.ZERO
+                }
+                ReceivableDueFilter.Upcoming -> list.filter { r ->
+                    val d = runCatching { LocalDate.parse(r.dueDate.take(10)) }.getOrNull()
+                    d != null && d.isAfter(today) && r.remainingAmount > BigDecimal.ZERO
+                }
+            }
+            return when (sortOrder) {
+                ReceivableSortOrder.NearestDueDate -> dueFiltered.sortedBy { it.dueDate }
+                ReceivableSortOrder.HighestAmount -> dueFiltered.sortedByDescending { it.remainingAmount }
+                ReceivableSortOrder.CustomerNameAsc -> dueFiltered.sortedBy { it.customerName.lowercase() }
             }
         }
 
@@ -81,6 +106,12 @@ enum class ReceivableStatusFilter(
     Unpaid("UNPAID", "Belum lunas"),
     Partial("PARTIAL", "Sebagian"),
     Paid("PAID", "Lunas")
+}
+
+enum class ReceivableSortOrder(val label: String) {
+    NearestDueDate("Tempo Terdekat"),
+    HighestAmount("Nominal Terbesar"),
+    CustomerNameAsc("Nama Pelanggan (A–Z)")
 }
 
 enum class ReceivableDueFilter(val apiValue: String?, val label: String) {

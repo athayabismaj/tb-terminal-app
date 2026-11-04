@@ -29,3 +29,6 @@ local.properties
 /fix_*.py
 /improve_profile.py
 /patch_*.py
+/scratch/
+*.xml
+

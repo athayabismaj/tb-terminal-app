@@ -220,6 +220,32 @@ sealed interface AppRoute {
             return "admin/supplier-debts/supplier/$supplierId"
         }
     }
+    data object OpeningSupplierDebtForm : AppRoute {
+        const val SUPPLIER_ID_ARG = "supplierId"
+        override val route = "admin/supplier-debts/opening-balance?$SUPPLIER_ID_ARG={$SUPPLIER_ID_ARG}"
+
+        fun createRoute(supplierId: String? = null): String {
+            return if (supplierId.isNullOrBlank()) {
+                "admin/supplier-debts/opening-balance"
+            } else {
+                "admin/supplier-debts/opening-balance?$SUPPLIER_ID_ARG=$supplierId"
+            }
+        }
+    }
+
+    data object AdjustmentSupplierDebtForm : AppRoute {
+        const val SUPPLIER_ID_ARG = "supplierId"
+        override val route = "admin/supplier-debts/adjustment?$SUPPLIER_ID_ARG={$SUPPLIER_ID_ARG}"
+
+        fun createRoute(supplierId: String? = null): String {
+            return if (supplierId.isNullOrBlank()) {
+                "admin/supplier-debts/adjustment"
+            } else {
+                "admin/supplier-debts/adjustment?$SUPPLIER_ID_ARG=$supplierId"
+            }
+        }
+    }
+
 
     data object CashSessionHistory : AppRoute {
         override val route = "admin/cash-sessions"
@@ -244,6 +270,32 @@ sealed interface AppRoute {
 
     data object Receivables : AppRoute {
         override val route = "admin/receivables"
+    }
+
+    data object OpeningReceivableForm : AppRoute {
+        const val CUSTOMER_ID_ARG = "customerId"
+        override val route = "admin/receivables/opening-balance?$CUSTOMER_ID_ARG={$CUSTOMER_ID_ARG}"
+
+        fun createRoute(customerId: String? = null): String {
+            return if (customerId.isNullOrBlank()) {
+                "admin/receivables/opening-balance"
+            } else {
+                "admin/receivables/opening-balance?$CUSTOMER_ID_ARG=$customerId"
+            }
+        }
+    }
+
+    data object AdjustmentReceivableForm : AppRoute {
+        const val CUSTOMER_ID_ARG = "customerId"
+        override val route = "admin/receivables/adjustment?$CUSTOMER_ID_ARG={$CUSTOMER_ID_ARG}"
+
+        fun createRoute(customerId: String? = null): String {
+            return if (customerId.isNullOrBlank()) {
+                "admin/receivables/adjustment"
+            } else {
+                "admin/receivables/adjustment?$CUSTOMER_ID_ARG=$customerId"
+            }
+        }
     }
 
     data object ReceivableCustomerDetail : AppRoute {
