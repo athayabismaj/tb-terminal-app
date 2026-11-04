@@ -42,88 +42,24 @@ internal fun MasterDataPagination(
 ) {
     val safePage = page.coerceAtLeast(1)
     val safeTotalPages = totalPages.coerceAtLeast(1)
-
-    if (compact) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(top = 10.dp, bottom = 4.dp)
-                .testTag("master-data-pagination"),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Surface(
-                shape = CircleShape,
-                color = Color.White,
-                border = BorderStroke(1.dp, Color(0xFFE2E8F0)),
-            ) {
-                Text(
-                    text = "$total $itemLabel",
-                    modifier = Modifier.padding(horizontal = 14.dp, vertical = 6.dp),
-                    fontSize = 12.sp,
-                    fontWeight = FontWeight.SemiBold,
-                    color = Color(0xFF475569),
-                )
-            }
-
-            Surface(
-                shape = CircleShape,
-                color = Color.White,
-                border = BorderStroke(1.dp, Color(0xFFE2E8F0)),
-            ) {
-                Row(
-                    modifier = Modifier.padding(horizontal = 6.dp, vertical = 3.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    val canPrev = safePage > 1 && !isLoading
-                    val canNext = safePage < safeTotalPages && !isLoading
-                    IconButton(
-                        onClick = onPreviousPage,
-                        enabled = canPrev,
-                        modifier = Modifier.size(28.dp),
-                    ) {
-                        Icon(
-                            Icons.Default.ChevronLeft,
-                            contentDescription = "Halaman sebelumnya",
-                            tint = if (canPrev) Color(0xFF475569) else Color(0xFFCBD5E1),
-                            modifier = Modifier.size(16.dp),
-                        )
-                    }
-                    Text(
-                        text = "$safePage / $safeTotalPages",
-                        modifier = Modifier.padding(horizontal = 8.dp),
-                        fontSize = 12.sp,
-                        fontWeight = FontWeight.Medium,
-                        color = Color(0xFF334155),
-                    )
-                    IconButton(
-                        onClick = onNextPage,
-                        enabled = canNext,
-                        modifier = Modifier.size(28.dp),
-                    ) {
-                        Icon(
-                            Icons.Default.ChevronRight,
-                            contentDescription = "Halaman berikutnya",
-                            tint = if (canNext) Color(0xFF475569) else Color(0xFFCBD5E1),
-                            modifier = Modifier.size(16.dp),
-                        )
-                    }
-                }
-            }
-        }
+    val first = if (total == 0L) 0 else (safePage - 1L) * pageSize + 1
+    val last = minOf(safePage.toLong() * pageSize, total)
+    val text = if (compact) {
+        "$total $itemLabel"
     } else {
-        val first = if (total == 0L) 0 else (safePage - 1L) * pageSize + 1
-        val last = minOf(safePage.toLong() * pageSize, total)
-        TbPagination(
-            currentPage = safePage,
-            totalPages = safeTotalPages,
-            onPreviousPage = onPreviousPage,
-            onNextPage = onNextPage,
-            supportingText = "Menampilkan $first–$last dari $total $itemLabel",
-            isLoading = isLoading,
-            testTag = "master-data-pagination",
-        )
+        "Menampilkan $first–$last dari $total $itemLabel"
     }
+
+    TbPagination(
+        currentPage = safePage,
+        totalPages = safeTotalPages,
+        onPreviousPage = onPreviousPage,
+        onNextPage = onNextPage,
+        supportingText = text,
+        isLoading = isLoading,
+        compact = compact,
+        testTag = "master-data-pagination",
+    )
 }
 
 internal fun String.formatMasterDate(): String = runCatching {

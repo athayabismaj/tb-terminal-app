@@ -1,10 +1,30 @@
 package com.tbterminal.app.ui.receivables
 
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.ui.draw.rotate
+import androidx.compose.material.icons.automirrored.outlined.ReceiptLong
+
 import androidx.compose.ui.unit.sp
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.expandVertically
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.shrinkVertically
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.material.icons.outlined.Add
+import androidx.compose.material.icons.outlined.CalendarMonth
+import androidx.compose.material3.ModalBottomSheet
+import java.time.LocalDate
+import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.material.icons.filled.ExpandLess
 import androidx.compose.material.icons.filled.ExpandMore
 import androidx.compose.material.icons.outlined.Receipt
+import androidx.compose.material.icons.outlined.FilterList
+import androidx.compose.material.icons.automirrored.outlined.TrendingUp
+import androidx.compose.material.icons.outlined.Schedule
+import androidx.compose.material.icons.outlined.Check
 import androidx.compose.ui.text.withStyle
 
 import androidx.compose.runtime.remember
@@ -21,7 +41,9 @@ import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.outlined.Shield
 import androidx.compose.material.icons.outlined.Tune
+import androidx.compose.material.icons.outlined.Description
 import androidx.compose.material.icons.outlined.FactCheck
 import androidx.compose.material.icons.outlined.AddCircleOutline
 import androidx.compose.material.icons.outlined.AssignmentTurnedIn
@@ -85,13 +107,18 @@ import androidx.compose.runtime.LaunchedEffect
 @Composable
 internal fun ReceivableTableCard(
     canAdjust: Boolean,
-    onAddOpeningBalance: () -> Unit,
-    onAddAdjustment: () -> Unit,
+    onOpenActionMenu: () -> Unit = {},
+    onAddOpeningBalance: () -> Unit = {},
+    onAddAdjustment: () -> Unit = {},
     modifier: Modifier,
     uiState: ReceivableUiState,
+    isSearchExpanded: Boolean = false,
+    onToggleSearch: () -> Unit = {},
+    onResetAllFilters: () -> Unit = {},
     onSearchChanged: (String) -> Unit,
     onStatusFilterChanged: (ReceivableStatusFilter) -> Unit,
     onDueFilterChanged: (ReceivableDueFilter) -> Unit,
+    onSortOrderChanged: (ReceivableSortOrder) -> Unit = {},
     onPayClick: (Receivable) -> Unit,
     onPreviousPage: () -> Unit,
     onNextPage: () -> Unit,
@@ -99,7 +126,6 @@ internal fun ReceivableTableCard(
     onCustomerDetailClick: (String) -> Unit = {},
 ) {
     if (compact) {
-        var showMobileFilters by remember { mutableStateOf(false) }
         var userPage by rememberSaveable { mutableIntStateOf(1) }
 
         LaunchedEffect(uiState.searchQuery, uiState.statusFilter, uiState.dueFilter) {
@@ -109,196 +135,61 @@ internal fun ReceivableTableCard(
             modifier = modifier.fillMaxWidth().testTag("receivable-list-content"),
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
+            ReceivableHeaderToolbar(
+                uiState = uiState,
+                compact = compact,
+                onOpenActionMenu = onOpenActionMenu,
+                isSearchExpanded = isSearchExpanded,
+                onToggleSearch = onToggleSearch,
+                onSearchChanged = onSearchChanged,
+                onClearStatusFilter = { onStatusFilterChanged(ReceivableStatusFilter.All) },
+                onClearDueFilter = { onDueFilterChanged(ReceivableDueFilter.All) },
+                onClearSortFilter = { onSortOrderChanged(ReceivableSortOrder.NearestDueDate) },
+                onResetAllFilters = onResetAllFilters
+            )
+
             if (uiState.isLoading && uiState.receivables.isEmpty()) {
-                // 2. Search and Action Row Skeleton
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    SkeletonBox(Modifier.weight(1f).height(40.dp), shape = RoundedCornerShape(12.dp))
-                    SkeletonBox(Modifier.size(40.dp), shape = RoundedCornerShape(12.dp))
-                    SkeletonBox(Modifier.width(96.dp).height(40.dp), shape = RoundedCornerShape(12.dp))
-                }
-
-                // 3. Section Header Skeleton
-                Row(
-                    modifier = Modifier.fillMaxWidth().padding(top = 4.dp, bottom = 2.dp),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    SkeletonBox(Modifier.width(110.dp).height(20.dp), shape = RoundedCornerShape(4.dp))
-                    SkeletonBox(Modifier.size(32.dp), shape = RoundedCornerShape(12.dp))
-                }
-
-                // 4. Cards Skeleton
                 ReceivableLoading(compact = true)
             } else {
-                // 2. Search and Action Row
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    BasicTextField(
-                        value = uiState.searchQuery,
-                        onValueChange = onSearchChanged,
-                        modifier = Modifier.weight(1f).height(40.dp).background(Color.White, RoundedCornerShape(12.dp)).border(1.dp, Color(0xFFE2E8F0).copy(alpha = 0.8f), RoundedCornerShape(12.dp)),
-                        textStyle = LocalTextStyle.current.copy(fontSize = 12.sp, color = Color(0xFF1E293B)),
-                        singleLine = true,
-                        decorationBox = { innerTextField ->
-                            Row(modifier = Modifier.fillMaxSize().padding(horizontal = 12.dp), verticalAlignment = Alignment.CenterVertically) {
-                                Icon(androidx.compose.material.icons.Icons.Outlined.Search, contentDescription = null, tint = Color(0xFF94A3B8), modifier = Modifier.size(16.dp))
-                                Spacer(Modifier.width(8.dp))
-                                Box(Modifier.weight(1f)) {
-                                    if (uiState.searchQuery.isEmpty()) {
-                                        Text("Cari pelanggan atau nomor nota...", color = Color(0xFF94A3B8), fontSize = 12.sp)
-                                    }
-                                    innerTextField()
-                                }
-                            }
-                        }
-                    )
-                    
-                    Surface(
-                        onClick = { showMobileFilters = true },
-                        color = Color.White,
-                        shape = RoundedCornerShape(12.dp),
-                        border = BorderStroke(1.dp, Color(0xFFE2E8F0).copy(alpha = 0.8f)),
-                        modifier = Modifier.size(40.dp)
-                    ) {
-                        Box(contentAlignment = Alignment.Center) {
-                            Icon(androidx.compose.material.icons.Icons.Outlined.Tune, contentDescription = "Filter", tint = Color(0xFF334155), modifier = Modifier.size(16.dp))
-                            if (uiState.statusFilter != ReceivableStatusFilter.All || uiState.dueFilter != ReceivableDueFilter.All) {
-                                Box(modifier = Modifier.align(Alignment.TopEnd).padding(8.dp).size(8.dp).background(Color(0xFF256B57), CircleShape).border(2.dp, Color.White, CircleShape))
-                            }
-                        }
-                    }
-                    
-                    Surface(
-                        onClick = onAddOpeningBalance,
-                        color = Color(0xFF256B57),
-                        shape = RoundedCornerShape(12.dp),
-                        modifier = Modifier.height(40.dp)
-                    ) {
-                        Row(modifier = Modifier.padding(horizontal = 14.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                            Icon(androidx.compose.material.icons.Icons.Outlined.AddCircleOutline, contentDescription = null, tint = Color.White, modifier = Modifier.size(16.dp))
-                            Text("Isi Saldo", fontSize = 12.sp, fontWeight = FontWeight.SemiBold, color = Color.White)
-                        }
-                    }
-                }
-                
-                // 3. Section Header
-                Row(
-                    modifier = Modifier.fillMaxWidth().padding(top = 4.dp, bottom = 2.dp),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Text("Daftar piutang", fontSize = 14.sp, fontWeight = FontWeight.Bold, color = Color(0xFF0F172A))
-                    Box(
-                        modifier = Modifier
-                            .size(32.dp)
-                            .clip(RoundedCornerShape(12.dp))
-                            .border(1.dp, Color(0xFFE2E8F0), RoundedCornerShape(12.dp))
-                            .clickable { }
-                            .background(Color.White),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Icon(
-                            Icons.Outlined.FactCheck,
-                            contentDescription = "Ringkasan",
-                            tint = Color(0xFF334155),
-                            modifier = Modifier.size(16.dp)
-                        )
-                    }
-                }
-                
-                // 4. Cards
                 when {
                     uiState.errorMessage != null && uiState.receivables.isEmpty() -> ReceivableError()
-                    uiState.filteredReceivables.isEmpty() -> ReceivableEmpty()
-                else -> {
-                    val groupedByCustomer = remember(uiState.filteredReceivables) {
-                        uiState.filteredReceivables.groupBy { it.customerId }.toList()
-                    }
-                    val totalUsers = groupedByCustomer.size
-                    val totalUserPages = ((totalUsers + RECEIVABLE_USERS_PER_PAGE - 1) / RECEIVABLE_USERS_PER_PAGE).coerceAtLeast(1)
-                    val safeUserPage = userPage.coerceIn(1, totalUserPages)
-                    val pageCustomers = remember(groupedByCustomer, safeUserPage) {
-                        groupedByCustomer.drop((safeUserPage - 1) * RECEIVABLE_USERS_PER_PAGE).take(RECEIVABLE_USERS_PER_PAGE)
-                    }
+                    uiState.filteredReceivables.isEmpty() -> ReceivableEmpty(uiState.searchQuery)
+                    else -> {
+                        val groupedByCustomer = remember(uiState.filteredReceivables) {
+                            uiState.filteredReceivables.groupBy { it.customerId }.toList()
+                        }
+                        val totalUsers = groupedByCustomer.size
+                        val totalUserPages = ((totalUsers + RECEIVABLE_USERS_PER_PAGE - 1) / RECEIVABLE_USERS_PER_PAGE).coerceAtLeast(1)
+                        val safeUserPage = userPage.coerceIn(1, totalUserPages)
+                        val pageCustomers = remember(groupedByCustomer, safeUserPage) {
+                            groupedByCustomer.drop((safeUserPage - 1) * RECEIVABLE_USERS_PER_PAGE).take(RECEIVABLE_USERS_PER_PAGE)
+                        }
 
-                    Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
-                        pageCustomers.forEach { (customerId, customerReceivables) ->
-                            CustomerReceivableGroupCard(customerId, customerReceivables, onPayClick, { id, _ -> onCustomerDetailClick(id) })
-                        }
-                    }
-                    
-                    // 5. Pagination (Mobile Style: 5 users per page)
-                    val startUser = if (totalUsers == 0) 0 else ((safeUserPage - 1) * RECEIVABLE_USERS_PER_PAGE) + 1
-                    val endUser = minOf(safeUserPage * RECEIVABLE_USERS_PER_PAGE, totalUsers)
-                    Row(
-                        modifier = Modifier.fillMaxWidth().padding(top = 8.dp, bottom = 8.dp),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Surface(
-                            color = Color.White,
-                            shape = RoundedCornerShape(50),
-                            border = BorderStroke(1.dp, Color(0xFFE2E8F0).copy(alpha = 0.9f))
-                        ) {
-                            val userRangeText = if (totalUsers == 0) "0 pelanggan" else "$startUser-$endUser dari $totalUsers pelanggan"
-                            Text(userRangeText, fontSize = 12.sp, fontWeight = FontWeight.SemiBold, color = Color(0xFF475569), modifier = Modifier.padding(horizontal = 14.dp, vertical = 6.dp))
-                        }
-                        
-                        Surface(
-                            color = Color.White,
-                            shape = RoundedCornerShape(50),
-                            border = BorderStroke(1.dp, Color(0xFFE2E8F0).copy(alpha = 0.9f))
-                        ) {
-                            Row(modifier = Modifier.padding(horizontal = 6.dp, vertical = 4.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                                IconButton(
-                                    onClick = { userPage = (safeUserPage - 1).coerceAtLeast(1) },
-                                    modifier = Modifier.size(28.dp).background(Color.Transparent, CircleShape),
-                                    enabled = safeUserPage > 1
-                                ) {
-                                    Icon(
-                                        androidx.compose.material.icons.Icons.Default.ChevronLeft,
-                                        contentDescription = "Sebelumnya",
-                                        tint = if (safeUserPage > 1) Color(0xFF334155) else Color(0xFF94A3B8).copy(alpha = 0.5f),
-                                        modifier = Modifier.size(16.dp)
-                                    )
-                                }
-                                Text("$safeUserPage / $totalUserPages", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = Color(0xFF1E293B))
-                                IconButton(
-                                    onClick = { userPage = (safeUserPage + 1).coerceAtMost(totalUserPages) },
-                                    modifier = Modifier.size(28.dp).background(Color.Transparent, CircleShape),
-                                    enabled = safeUserPage < totalUserPages
-                                ) {
-                                    Icon(
-                                        androidx.compose.material.icons.Icons.Default.ChevronRight,
-                                        contentDescription = "Selanjutnya",
-                                        tint = if (safeUserPage < totalUserPages) Color(0xFF334155) else Color(0xFF94A3B8).copy(alpha = 0.5f),
-                                        modifier = Modifier.size(16.dp)
-                                    )
-                                }
+                        Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
+                            pageCustomers.forEach { (customerId, customerReceivables) ->
+                                CustomerReceivableGroupCard(customerId, customerReceivables, onPayClick, { id, _ -> onCustomerDetailClick(id) }, defaultExpanded = false)
                             }
                         }
+                        
+                        // Mobile Pagination
+                        val startUser = if (totalUsers == 0) 0 else ((safeUserPage - 1) * RECEIVABLE_USERS_PER_PAGE) + 1
+                        val endUser = minOf(safeUserPage * RECEIVABLE_USERS_PER_PAGE, totalUsers)
+                        val userRangeText = if (totalUsers == 0) {
+                            "0 pelanggan"
+                        } else if (totalUsers <= RECEIVABLE_USERS_PER_PAGE) {
+                            "$totalUsers pelanggan"
+                        } else {
+                            "$startUser-$endUser dari $totalUsers pelanggan"
+                        }
+                        TbPagination(
+                            currentPage = safeUserPage,
+                            totalPages = totalUserPages,
+                            onPreviousPage = { userPage = (safeUserPage - 1).coerceAtLeast(1) },
+                            onNextPage = { userPage = (safeUserPage + 1).coerceAtMost(totalUserPages) },
+                            supportingText = userRangeText,
+                            testTag = "receivable-user-pagination"
+                        )
                     }
-                }
-            }
-        }
-    }
-
-    if (showMobileFilters) {
-            TbMobileControlSheet(
-                title = "Filter piutang",
-                subtitle = "Atur status pembayaran dan jatuh tempo",
-                onDismiss = { showMobileFilters = false }
-            ) {
-                Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
-                    ReceivableToolbar(uiState, onSearchChanged, onStatusFilterChanged, onDueFilterChanged, compact = false)
-                    TbMobileSheetDoneButton(onClick = { showMobileFilters = false })
                 }
             }
         }
@@ -307,43 +198,43 @@ internal fun ReceivableTableCard(
             modifier = modifier.fillMaxWidth().testTag("receivable-list-content"),
             verticalArrangement = Arrangement.spacedBy(14.dp),
         ) {
+            ReceivableHeaderToolbar(
+                uiState = uiState,
+                compact = compact,
+                onOpenActionMenu = onOpenActionMenu,
+                isSearchExpanded = isSearchExpanded,
+                onToggleSearch = onToggleSearch,
+                onSearchChanged = onSearchChanged,
+                onClearStatusFilter = { onStatusFilterChanged(ReceivableStatusFilter.All) },
+                onClearDueFilter = { onDueFilterChanged(ReceivableDueFilter.All) },
+                onClearSortFilter = { onSortOrderChanged(ReceivableSortOrder.NearestDueDate) },
+                onResetAllFilters = onResetAllFilters
+            )
+
             if (uiState.isLoading && uiState.receivables.isEmpty()) {
-                // Skeleton Toolbar (Searchbar + Filter dropdowns)
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(10.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    SkeletonBox(Modifier.weight(1f).height(44.dp), shape = RoundedCornerShape(12.dp))
-                    SkeletonBox(Modifier.width(170.dp).height(44.dp), shape = RoundedCornerShape(12.dp))
-                    SkeletonBox(Modifier.width(170.dp).height(44.dp), shape = RoundedCornerShape(12.dp))
-                }
-
-                // Skeleton Section Header (Text di atas tabel)
-                Row(
-                    modifier = Modifier.fillMaxWidth().padding(top = 2.dp),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    SkeletonBox(Modifier.width(120.dp).height(22.dp), shape = RoundedCornerShape(4.dp))
-                    SkeletonBox(Modifier.width(90.dp).height(16.dp), shape = RoundedCornerShape(4.dp))
-                }
-
-                // Skeleton Table
                 ReceivableLoading(compact = false)
             } else {
-                ReceivableToolbar(uiState, onSearchChanged, onStatusFilterChanged, onDueFilterChanged, compact = false)
-
                 when {
                     uiState.errorMessage != null && uiState.receivables.isEmpty() -> ReceivableError()
+                    uiState.filteredReceivables.isEmpty() -> ReceivableEmpty(uiState.searchQuery)
                     else -> {
-                        ReceivableSectionHeader(uiState, compact = false)
-                        if (uiState.filteredReceivables.isEmpty()) {
-                            ReceivableEmpty()
+                        ReceivableTable(uiState.filteredReceivables, onPayClick)
+
+                        // Desktop Pagination
+                        val desktopText = if (uiState.total == 0L) {
+                            "Menampilkan 0 piutang"
                         } else {
-                            ReceivableTable(uiState.filteredReceivables, onPayClick)
-                            ReceivableFooter(uiState, onPreviousPage, onNextPage, compact = false)
+                            "Menampilkan ${uiState.currentStart}–${uiState.currentEnd} dari ${uiState.total} piutang"
                         }
+                        TbPagination(
+                            currentPage = uiState.page,
+                            totalPages = uiState.totalPages,
+                            onPreviousPage = onPreviousPage,
+                            onNextPage = onNextPage,
+                            supportingText = desktopText,
+                            isLoading = uiState.isLoading,
+                            testTag = "receivable-pagination"
+                        )
                     }
                 }
             }
@@ -352,195 +243,262 @@ internal fun ReceivableTableCard(
 }
 
 @Composable
-private fun ReceivableToolbar(
+private fun ReceivableHeaderToolbar(
     uiState: ReceivableUiState,
-    onSearchChanged: (String) -> Unit,
-    onStatusFilterChanged: (ReceivableStatusFilter) -> Unit,
-    onDueFilterChanged: (ReceivableDueFilter) -> Unit,
     compact: Boolean,
+    onOpenActionMenu: () -> Unit,
+    isSearchExpanded: Boolean,
+    onToggleSearch: () -> Unit,
+    onSearchChanged: (String) -> Unit,
+    onClearStatusFilter: () -> Unit,
+    onClearDueFilter: () -> Unit,
+    onClearSortFilter: () -> Unit = {},
+    onResetAllFilters: () -> Unit
 ) {
-    var showMobileFilters by remember { mutableStateOf(false) }
+    val hasStatusFilter = uiState.statusFilter != ReceivableStatusFilter.All
+    val hasDueFilter = uiState.dueFilter != ReceivableDueFilter.All
+    val hasSortFilter = uiState.sortOrder != ReceivableSortOrder.NearestDueDate
+    val isFiltered = hasStatusFilter || hasDueFilter || hasSortFilter
+    val isSearchActive = isSearchExpanded || uiState.searchQuery.isNotEmpty()
+
     Column(
-        modifier = Modifier.fillMaxWidth().testTag("receivable-toolbar"),
-        verticalArrangement = Arrangement.spacedBy(8.dp),
+        modifier = Modifier.fillMaxWidth(),
+        verticalArrangement = Arrangement.spacedBy(10.dp)
     ) {
-        if (compact) {
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
-                ReceivableSearchField(uiState.searchQuery, onSearchChanged, Modifier.weight(1f))
-                TbMobileFilterButton(
-                    onClick = { showMobileFilters = true },
-                    active = uiState.statusFilter != ReceivableStatusFilter.All || uiState.dueFilter != ReceivableDueFilter.All,
-                    testTag = "receivable-open-filters",
-                )
-            }
-        } else {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(10.dp),
-                verticalAlignment = Alignment.CenterVertically,
+        // 1. Expandable Search Bar (When Search is open or query is present)
+        AnimatedVisibility(
+            visible = isSearchActive,
+            enter = expandVertically() + fadeIn(),
+            exit = shrinkVertically() + fadeOut()
+        ) {
+            Surface(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(44.dp),
+                color = Color.White,
+                shape = RoundedCornerShape(12.dp),
+                border = BorderStroke(1.dp, Color(0xFF256B57).copy(alpha = 0.5f)),
+                shadowElevation = 1.dp
             ) {
-                ReceivableSearchField(uiState.searchQuery, onSearchChanged, Modifier.weight(1f))
-                ReceivableFilterDropdown(
-                    uiState.statusFilter.label,
-                    uiState.statusFilter != ReceivableStatusFilter.All,
-                    ReceivableStatusFilter.entries,
-                    { it.label },
-                    onStatusFilterChanged,
-                    "Filter status",
-                    Modifier.width(210.dp),
-                )
-                ReceivableFilterDropdown(
-                    uiState.dueFilter.compactLabel(),
-                    uiState.dueFilter != ReceivableDueFilter.All,
-                    ReceivableDueFilter.entries,
-                    { it.label },
-                    onDueFilterChanged,
-                    "Filter jatuh tempo",
-                    Modifier.width(230.dp),
-                )
-            }
-        }
-    }
-
-    if (showMobileFilters) {
-        TbMobileControlSheet(
-            title = "Filter piutang",
-            subtitle = "Atur status pembayaran dan jatuh tempo",
-            onDismiss = { showMobileFilters = false },
-            testTag = "receivable-filter-sheet",
-        ) {
-            ReceivableFilterDropdown(
-                label = uiState.statusFilter.label,
-                active = uiState.statusFilter != ReceivableStatusFilter.All,
-                entries = ReceivableStatusFilter.entries,
-                entryLabel = { it.label },
-                onSelect = onStatusFilterChanged,
-                contentDescription = "Filter status",
-                modifier = Modifier.fillMaxWidth(),
-            )
-            ReceivableFilterDropdown(
-                label = uiState.dueFilter.compactLabel(),
-                active = uiState.dueFilter != ReceivableDueFilter.All,
-                entries = ReceivableDueFilter.entries,
-                entryLabel = { it.label },
-                onSelect = onDueFilterChanged,
-                contentDescription = "Filter jatuh tempo",
-                modifier = Modifier.fillMaxWidth(),
-            )
-            TbMobileSheetDoneButton(
-                onClick = { showMobileFilters = false },
-                testTag = "receivable-filter-done",
-            )
-        }
-    }
-}
-
-@Composable
-private fun ReceivableSearchField(value: String, onValueChange: (String) -> Unit, modifier: Modifier) {
-    Surface(
-        modifier = modifier.height(50.dp).testTag("receivable-search"),
-        color = ReceivableSoft,
-        shape = RoundedCornerShape(18.dp),
-    ) {
-        Row(
-            modifier = Modifier.fillMaxSize().padding(start = 14.dp, end = 6.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Icon(Icons.Outlined.Search, null, tint = ReceivableMuted, modifier = Modifier.size(19.dp))
-            Spacer(Modifier.width(10.dp))
-            Box(modifier = Modifier.weight(1f), contentAlignment = Alignment.CenterStart) {
-                if (value.isBlank()) {
-                    Text(
-                        "Cari pelanggan atau nomor nota",
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = ReceivableMuted,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
+                Row(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(start = 12.dp, end = 6.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Icon(
+                        Icons.Outlined.Search,
+                        contentDescription = null,
+                        tint = Color(0xFF256B57),
+                        modifier = Modifier.size(18.dp),
                     )
-                }
-                BasicTextField(
-                    value = value,
-                    onValueChange = onValueChange,
-                    singleLine = true,
-                    textStyle = LocalTextStyle.current.copy(color = ReceivableText),
-                    modifier = Modifier.fillMaxWidth(),
-                )
-            }
-            if (value.isNotBlank()) {
-                IconButton(onClick = { onValueChange("") }, modifier = Modifier.size(40.dp)) {
-                    Icon(Icons.Outlined.Close, "Hapus pencarian", tint = ReceivableMuted, modifier = Modifier.size(18.dp))
+                    Spacer(Modifier.width(10.dp))
+                    Box(modifier = Modifier.weight(1f), contentAlignment = Alignment.CenterStart) {
+                        if (uiState.searchQuery.isEmpty()) {
+                            Text(
+                                "Cari pelanggan atau nomor nota...",
+                                fontSize = 13.sp,
+                                color = Color(0xFF94A3B8),
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                            )
+                        }
+                        BasicTextField(
+                            value = uiState.searchQuery,
+                            onValueChange = onSearchChanged,
+                            singleLine = true,
+                            textStyle = TextStyle(
+                                color = Color(0xFF0F172A),
+                                fontSize = 13.sp,
+                                fontWeight = FontWeight.Medium
+                            ),
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .testTag("receivable-search"),
+                        )
+                    }
+                    IconButton(
+                        onClick = {
+                            if (uiState.searchQuery.isNotEmpty()) {
+                                onSearchChanged("")
+                            } else {
+                                onToggleSearch()
+                            }
+                        },
+                        modifier = Modifier.size(32.dp)
+                    ) {
+                        Icon(
+                            Icons.Outlined.Close,
+                            contentDescription = "Tutup pencarian",
+                            tint = Color(0xFF64748B),
+                            modifier = Modifier.size(16.dp),
+                        )
+                    }
                 }
             }
         }
-    }
-}
 
-@Composable
-private fun <T> ReceivableFilterDropdown(
-    label: String,
-    active: Boolean,
-    entries: List<T>,
-    entryLabel: (T) -> String,
-    onSelect: (T) -> Unit,
-    contentDescription: String,
-    modifier: Modifier,
-) {
-    var expanded by remember { mutableStateOf(false) }
-    Box(modifier = modifier) {
-        Surface(
-            onClick = { expanded = true },
-            modifier = Modifier.fillMaxWidth().height(44.dp),
-            color = if (active) ReceivablePrimary.copy(alpha = 0.12f) else ReceivableSoft,
-            shape = RoundedCornerShape(22.dp),
-            border = if (active) BorderStroke(1.dp, ReceivablePrimary.copy(alpha = 0.28f)) else null,
-        ) {
+        // 2. Active Filters Row (jika filter aktif)
+        if (isFiltered) {
             Row(
-                modifier = Modifier.fillMaxSize().padding(horizontal = 14.dp),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .horizontalScroll(rememberScrollState()),
                 verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(6.dp)
             ) {
                 Text(
-                    label,
-                    modifier = Modifier.weight(1f),
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = ReceivableText,
-                    fontWeight = if (active) FontWeight.SemiBold else FontWeight.Medium,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
+                    text = "Filter:",
+                    fontSize = 12.sp,
+                    fontWeight = FontWeight.Medium,
+                    color = Color(0xFF64748B)
                 )
-                Icon(Icons.Outlined.ExpandMore, contentDescription, tint = ReceivableMuted, modifier = Modifier.size(20.dp))
+                if (hasStatusFilter) {
+                    Surface(
+                        shape = RoundedCornerShape(100.dp),
+                        color = Color(0xFFF1F5F9),
+                        border = BorderStroke(1.dp, Color(0xFFCBD5E1))
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(start = 10.dp, end = 6.dp, top = 4.dp, bottom = 4.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(4.dp)
+                        ) {
+                            Icon(Icons.Outlined.Receipt, null, tint = Color(0xFF64748B), modifier = Modifier.size(13.dp))
+                            Text(
+                                text = "Status: ${uiState.statusFilter.label}",
+                                fontSize = 11.sp,
+                                fontWeight = FontWeight.Medium,
+                                color = Color(0xFF334155),
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis
+                            )
+                            Box(
+                                modifier = Modifier
+                                    .size(16.dp)
+                                    .clip(CircleShape)
+                                    .clickable(onClick = onClearStatusFilter),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Icon(Icons.Outlined.Close, null, tint = Color(0xFF94A3B8), modifier = Modifier.size(11.dp))
+                            }
+                        }
+                    }
+                }
+                if (hasDueFilter) {
+                    Surface(
+                        shape = RoundedCornerShape(100.dp),
+                        color = Color(0xFFF1F5F9),
+                        border = BorderStroke(1.dp, Color(0xFFCBD5E1))
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(start = 10.dp, end = 6.dp, top = 4.dp, bottom = 4.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(4.dp)
+                        ) {
+                            Icon(Icons.Outlined.CalendarMonth, null, tint = Color(0xFF64748B), modifier = Modifier.size(13.dp))
+                            Text(
+                                text = "Jatuh Tempo: ${uiState.dueFilter.label}",
+                                fontSize = 11.sp,
+                                fontWeight = FontWeight.Medium,
+                                color = Color(0xFF334155),
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis
+                            )
+                            Box(
+                                modifier = Modifier
+                                    .size(16.dp)
+                                    .clip(CircleShape)
+                                    .clickable(onClick = onClearDueFilter),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Icon(Icons.Outlined.Close, null, tint = Color(0xFF94A3B8), modifier = Modifier.size(11.dp))
+                            }
+                        }
+                    }
+                }
+                if (hasSortFilter) {
+                    Surface(
+                        shape = RoundedCornerShape(100.dp),
+                        color = Color(0xFFF1F5F9),
+                        border = BorderStroke(1.dp, Color(0xFFCBD5E1))
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(start = 10.dp, end = 6.dp, top = 4.dp, bottom = 4.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(4.dp)
+                        ) {
+                            Icon(Icons.Outlined.FilterList, null, tint = Color(0xFF64748B), modifier = Modifier.size(13.dp))
+                            Text(
+                                text = "Urutkan: ${uiState.sortOrder.label}",
+                                fontSize = 11.sp,
+                                fontWeight = FontWeight.Medium,
+                                color = Color(0xFF334155),
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis
+                            )
+                            Box(
+                                modifier = Modifier
+                                    .size(16.dp)
+                                    .clip(CircleShape)
+                                    .clickable(onClick = onClearSortFilter),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Icon(Icons.Outlined.Close, null, tint = Color(0xFF94A3B8), modifier = Modifier.size(11.dp))
+                            }
+                        }
+                    }
+                }
+                Text(
+                    text = "Reset",
+                    fontSize = 11.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    color = Color(0xFFEF4444),
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(6.dp))
+                        .clickable(onClick = onResetAllFilters)
+                        .padding(horizontal = 6.dp, vertical = 4.dp)
+                )
             }
         }
-        DropdownMenu(
-            expanded = expanded,
-            onDismissRequest = { expanded = false },
-            modifier = Modifier.widthIn(min = 190.dp, max = 280.dp).heightIn(max = 320.dp).background(ReceivableSurface),
-            shape = RoundedCornerShape(14.dp),
-        ) {
-            entries.forEach { entry ->
-                DropdownMenuItem(
-                    text = { Text(entryLabel(entry), maxLines = 1, overflow = TextOverflow.Ellipsis) },
-                    onClick = { expanded = false; onSelect(entry) },
-                )
-            }
-        }
-    }
-}
 
-@Composable
-private fun ReceivableSectionHeader(uiState: ReceivableUiState, compact: Boolean) {
-    Row(
-        modifier = Modifier.fillMaxWidth().padding(top = 2.dp),
-        horizontalArrangement = Arrangement.SpaceBetween,
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        Text(
-            "Daftar piutang",
-            modifier = Modifier.weight(1f),
-            style = MaterialTheme.typography.titleMedium,
-            color = ReceivableText,
-            fontWeight = FontWeight.SemiBold,
-        )
-        ReceivableCustomerSummaries(uiState.customerSummaries, compact = compact)
+        // 3. Title & Action Row (selalu tampil)
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text(
+                text = "Daftar Piutang",
+                fontSize = 15.sp,
+                fontWeight = FontWeight.Bold,
+                color = Color(0xFF0F172A)
+            )
+
+            // Action Button "Kelola"
+            Surface(
+                onClick = onOpenActionMenu,
+                modifier = Modifier
+                    .height(34.dp)
+                    .testTag("receivable-manage-btn"),
+                shape = RoundedCornerShape(10.dp),
+                color = Color(0xFF256B57),
+                contentColor = Color.White,
+                shadowElevation = 1.dp
+            ) {
+                Box(
+                    modifier = Modifier.padding(horizontal = 14.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(
+                        text = "Kelola",
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.SemiBold,
+                        color = Color.White
+                    )
+                }
+            }
+        }
     }
 }
 
@@ -786,13 +744,12 @@ private fun ReceivableLoading(compact: Boolean) {
 
 @Composable
 private fun CustomerReceivableGroupCardSkeleton() {
-    val surfaceBorder = Color(0xFFE5EBE8)
-    androidx.compose.material3.Card(
+    Surface(
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(16.dp),
-        colors = androidx.compose.material3.CardDefaults.cardColors(containerColor = Color.White),
-        border = BorderStroke(1.dp, surfaceBorder),
-        elevation = androidx.compose.material3.CardDefaults.cardElevation(defaultElevation = 2.dp)
+        color = Color.White,
+        border = BorderStroke(1.dp, Color(0xFFE2E8F0)),
+        shadowElevation = 0.5.dp
     ) {
         Column {
             Row(
@@ -805,7 +762,7 @@ private fun CustomerReceivableGroupCardSkeleton() {
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
-                    SkeletonBox(Modifier.size(40.dp), shape = CircleShape)
+                    SkeletonBox(Modifier.size(44.dp), shape = CircleShape)
                     Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
                         SkeletonBox(Modifier.fillMaxWidth(0.55f).height(15.dp), shape = RoundedCornerShape(4.dp))
                         Row(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
@@ -816,24 +773,41 @@ private fun CustomerReceivableGroupCardSkeleton() {
                 }
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    horizontalArrangement = Arrangement.spacedBy(6.dp)
                 ) {
                     SkeletonBox(Modifier.width(46.dp).height(14.dp), shape = RoundedCornerShape(4.dp))
-                    SkeletonBox(Modifier.size(18.dp), shape = CircleShape)
+                    SkeletonBox(Modifier.size(20.dp), shape = CircleShape)
                 }
             }
-            HorizontalDivider(color = surfaceBorder)
+            HorizontalDivider(color = Color(0xFFF1F5F9))
             Column(
-                modifier = Modifier.fillMaxWidth().padding(horizontal = 14.dp, vertical = 10.dp),
-                verticalArrangement = Arrangement.spacedBy(8.dp)
+                modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 14.dp),
+                verticalArrangement = Arrangement.spacedBy(10.dp)
             ) {
                 Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
                     SkeletonBox(Modifier.width(100.dp).height(14.dp), shape = RoundedCornerShape(4.dp))
-                    SkeletonBox(Modifier.width(64.dp).height(20.dp), shape = RoundedCornerShape(6.dp))
+                    SkeletonBox(Modifier.width(50.dp).height(14.dp), shape = RoundedCornerShape(4.dp))
                 }
+                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.Bottom) {
+                    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                        SkeletonBox(Modifier.width(70.dp).height(12.dp), shape = RoundedCornerShape(3.dp))
+                        SkeletonBox(Modifier.width(100.dp).height(18.dp), shape = RoundedCornerShape(4.dp))
+                    }
+                    Column(horizontalAlignment = Alignment.End, verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                        SkeletonBox(Modifier.width(45.dp).height(12.dp), shape = RoundedCornerShape(3.dp))
+                        SkeletonBox(Modifier.width(65.dp).height(14.dp), shape = RoundedCornerShape(4.dp))
+                    }
+                }
+                HorizontalDivider(color = Color(0xFFF1F5F9))
                 Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
-                    SkeletonBox(Modifier.width(130.dp).height(12.dp), shape = RoundedCornerShape(3.dp))
-                    SkeletonBox(Modifier.width(76.dp).height(28.dp), shape = RoundedCornerShape(8.dp))
+                    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                        SkeletonBox(Modifier.width(80.dp).height(12.dp), shape = RoundedCornerShape(3.dp))
+                        SkeletonBox(Modifier.width(90.dp).height(14.dp), shape = RoundedCornerShape(4.dp))
+                    }
+                    Column(horizontalAlignment = Alignment.End, verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                        SkeletonBox(Modifier.width(80.dp).height(12.dp), shape = RoundedCornerShape(3.dp))
+                        SkeletonBox(Modifier.width(50.dp).height(14.dp), shape = RoundedCornerShape(4.dp))
+                    }
                 }
             }
         }
@@ -898,20 +872,46 @@ private fun ReceivableTableDesktopSkeleton() {
 }
 
 @Composable
-private fun ReceivableEmpty() {
+private fun ReceivableEmpty(searchQuery: String = "") {
     Surface(
         modifier = Modifier.fillMaxWidth(),
-        color = ReceivableSurface,
-        shape = RoundedCornerShape(18.dp),
-        border = BorderStroke(1.dp, ReceivableLine),
+        shape = RoundedCornerShape(16.dp),
+        color = Color.White,
+        border = BorderStroke(1.dp, Color(0xFFE2E8F0)),
+        shadowElevation = 1.dp
     ) {
         Column(
-            modifier = Modifier.fillMaxWidth().padding(horizontal = 24.dp, vertical = 46.dp),
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(vertical = 36.dp, horizontal = 20.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.spacedBy(6.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
-            Text("Piutang tidak ditemukan", style = MaterialTheme.typography.titleSmall, color = ReceivableText, fontWeight = FontWeight.SemiBold)
-            Text("Coba ubah pencarian atau filter yang digunakan.", style = MaterialTheme.typography.bodySmall, color = ReceivableMuted, textAlign = TextAlign.Center)
+            Box(
+                modifier = Modifier
+                    .size(48.dp)
+                    .background(Color(0xFFF1F5F9), CircleShape),
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(
+                    imageVector = if (searchQuery.isNotBlank()) Icons.Outlined.Search else Icons.Outlined.Receipt,
+                    contentDescription = null,
+                    tint = Color(0xFF94A3B8),
+                    modifier = Modifier.size(24.dp)
+                )
+            }
+            Text(
+                text = if (searchQuery.isNotBlank()) "Piutang tidak ditemukan" else "Belum ada data piutang",
+                fontSize = 14.sp,
+                fontWeight = FontWeight.SemiBold,
+                color = Color(0xFF0F172A)
+            )
+            Text(
+                text = if (searchQuery.isNotBlank()) "Tidak ada data piutang yang cocok dengan \"$searchQuery\"" else "Data piutang pelanggan akan tercatat di sini saat transaksi tempo atau saldo awal dibuat.",
+                fontSize = 12.sp,
+                color = Color(0xFF64748B),
+                textAlign = TextAlign.Center
+            )
         }
     }
 }
@@ -960,64 +960,80 @@ private fun CustomerReceivableGroupCard(
     customerId: String,
     receivables: List<Receivable>,
     onPayClick: (Receivable) -> Unit,
-    onOpenLedger: (String, String) -> Unit
+    onOpenLedger: (String, String) -> Unit,
+    defaultExpanded: Boolean = false,
 ) {
     val customerName = receivables.firstOrNull()?.customerName ?: "Unknown"
     val totalRemaining = receivables.sumOf { it.remainingAmount }
     val allPaid = totalRemaining <= java.math.BigDecimal.ZERO
-    var isExpanded by remember { mutableStateOf(false) }
+    var isExpanded by remember { mutableStateOf(defaultExpanded) }
     
-    val brand50 = Color(0xFFF0F6F3)
-    val brand100 = Color(0xFFE1ECE6)
     val brand600 = Color(0xFF256B57)
-    val brand700 = Color(0xFF1D5545)
     val slate100 = Color(0xFFF1F5F9)
     val slate200 = Color(0xFFE2E8F0)
     val slate400 = Color(0xFF94A3B8)
     val slate500 = Color(0xFF64748B)
-    val slate600 = Color(0xFF475569)
     val slate700 = Color(0xFF334155)
     val slate900 = Color(0xFF0F172A)
-    val surfaceBorder = Color(0xFFE5EBE8)
     
-    androidx.compose.material3.Card(
-        modifier = Modifier.fillMaxWidth().testTag("customer-group-$customerId"),
+    val rotationState by animateFloatAsState(
+        targetValue = if (isExpanded) 180f else 0f,
+        label = "customerChevronRotation"
+    )
+
+    Surface(
+        modifier = Modifier
+            .fillMaxWidth()
+            .testTag("customer-group-$customerId"),
         shape = RoundedCornerShape(16.dp),
-        colors = androidx.compose.material3.CardDefaults.cardColors(containerColor = Color.White),
-        border = androidx.compose.foundation.BorderStroke(1.dp, surfaceBorder),
-        elevation = androidx.compose.material3.CardDefaults.cardElevation(defaultElevation = 2.dp)
+        color = Color.White,
+        border = BorderStroke(1.dp, slate200),
+        shadowElevation = 0.5.dp
     ) {
         Column {
+            // Header Accordion
             Surface(
                 onClick = { isExpanded = !isExpanded },
                 color = Color.White,
             ) {
                 Row(
-                    modifier = Modifier.fillMaxWidth().padding(14.dp),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(14.dp),
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Row(
-                        modifier = Modifier.weight(1f).padding(end = 8.dp),
+                        modifier = Modifier
+                            .weight(1f)
+                            .padding(end = 8.dp),
                         verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.spacedBy(12.dp)
                     ) {
-                        val circleBg = if (allPaid) brand50 else slate100
-                        val circleBorder = if (allPaid) brand100 else slate200
-                        val circleText = if (allPaid) brand700 else slate700
-                        
+                        // Customer Avatar Pill (44.dp x 44.dp, bg #F1F5F9, border #E2E8F0, text #334155)
                         Box(
-                            modifier = Modifier.size(40.dp).background(circleBg, CircleShape).border(1.dp, circleBorder, CircleShape),
+                            modifier = Modifier
+                                .size(44.dp)
+                                .background(slate100, CircleShape)
+                                .border(1.dp, slate200, CircleShape),
                             contentAlignment = Alignment.Center
                         ) {
-                            Text(customerName.take(1).uppercase(), fontSize = 14.sp, fontWeight = FontWeight.Bold, color = circleText)
+                            Text(
+                                text = customerName.take(1).uppercase(),
+                                fontSize = 14.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = slate700
+                            )
                         }
                         
-                        Column(modifier = Modifier.weight(1f)) {
+                        Column(
+                            modifier = Modifier.weight(1f),
+                            verticalArrangement = Arrangement.spacedBy(4.dp)
+                        ) {
                             Text(
                                 text = customerName,
                                 fontSize = 14.sp,
-                                fontWeight = FontWeight.Bold,
+                                fontWeight = FontWeight.SemiBold,
                                 color = slate900,
                                 maxLines = 1,
                                 overflow = TextOverflow.Ellipsis
@@ -1025,19 +1041,30 @@ private fun CustomerReceivableGroupCard(
                             
                             Row(
                                 verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.spacedBy(4.dp),
-                                modifier = Modifier.padding(top = 2.dp)
+                                horizontalArrangement = Arrangement.spacedBy(6.dp)
                             ) {
-                                val amountColor = if (allPaid) brand600 else brand700
-                                Text(totalRemaining.currencyText(), fontSize = 12.sp, fontWeight = FontWeight.SemiBold, color = amountColor, maxLines = 1)
-                                Text(if (allPaid) "(Semua lunas)" else "(Belum lunas)", fontSize = 10.sp, color = slate400, maxLines = 1)
+                                Text(
+                                    text = totalRemaining.currencyText(),
+                                    fontSize = 12.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = brand600,
+                                    maxLines = 1
+                                )
+                                Text(
+                                    text = if (allPaid) "(Semua lunas)" else "(Belum lunas)",
+                                    fontSize = 12.sp,
+                                    fontWeight = FontWeight.Medium,
+                                    color = slate400,
+                                    maxLines = 1
+                                )
                             }
                         }
                     }
                     
+                    // Header Badge & Chevron Action
                     Row(
                         verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        horizontalArrangement = Arrangement.spacedBy(6.dp)
                     ) {
                         Text(
                             text = "${receivables.size} Nota",
@@ -1048,41 +1075,81 @@ private fun CustomerReceivableGroupCard(
                             softWrap = false
                         )
                         Icon(
-                            if (isExpanded) androidx.compose.material.icons.Icons.Default.ExpandLess else androidx.compose.material.icons.Icons.Default.ExpandMore,
-                            contentDescription = null,
+                            imageVector = Icons.Default.ExpandMore,
+                            contentDescription = if (isExpanded) "Tutup nota" else "Buka nota",
                             tint = slate400,
-                            modifier = Modifier.size(24.dp)
+                            modifier = Modifier
+                                .size(20.dp)
+                                .rotate(rotationState)
                         )
                     }
                 }
             }
             
-            if (isExpanded) {
-                HorizontalDivider(color = surfaceBorder)
+            // Expanded Content
+            AnimatedVisibility(
+                visible = isExpanded,
+                enter = expandVertically() + fadeIn(),
+                exit = shrinkVertically() + fadeOut()
+            ) {
                 Column(modifier = Modifier.fillMaxWidth()) {
+                    HorizontalDivider(color = slate100)
+                    
+                    val chronological = remember(receivables) {
+                        receivables.sortedWith(
+                            compareBy<Receivable> { it.debtDate }
+                                .thenBy { it.createdAt }
+                                .thenBy { it.id }
+                        )
+                    }
+                    val sortedReceivables = remember(receivables) {
+                        receivables.sortedWith(
+                            compareByDescending<Receivable> { it.debtDate }
+                                .thenByDescending { it.createdAt }
+                                .thenByDescending { it.id }
+                        )
+                    }
+
                     val limit = 3
-                    val itemsToDisplay = receivables.take(limit)
-                    val remainingCount = receivables.size - limit
+                    val itemsToDisplay = sortedReceivables.take(limit)
+                    val remainingCount = sortedReceivables.size - limit
                     
                     itemsToDisplay.forEachIndexed { index, receivable ->
                         if (index > 0) {
-                            HorizontalDivider(color = surfaceBorder.copy(alpha = 0.8f))
+                            HorizontalDivider(color = slate100)
                         }
-                        MobileReceivableAccordionItem(receivable = receivable, index = index, onPayClick = onPayClick, onOpenLedger = onOpenLedger)
+                        val cardinalNumber = chronological.indexOfFirst { it.id == receivable.id } + 1
+                        MobileReceivableAccordionItem(
+                            receivable = receivable,
+                            cardinalNumber = cardinalNumber,
+                            onPayClick = onPayClick,
+                            onOpenLedger = onOpenLedger
+                        )
                     }
                     
                     // Show "Buku Piutang" / Ledger button
-                    HorizontalDivider(color = surfaceBorder)
+                    HorizontalDivider(color = slate100)
                     Surface(
                         onClick = { onOpenLedger(customerId, customerName) },
-                        color = Color(0xFFF8FAF9),
+                        color = Color.White,
                     ) {
                         Box(
-                            modifier = Modifier.fillMaxWidth().padding(12.dp),
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(vertical = 12.dp),
                             contentAlignment = Alignment.Center
                         ) {
-                            val text = if (remainingCount > 0) "Lihat $remainingCount nota lainnya & detail →" else "Lihat Detail Piutang →"
-                            Text(text, fontSize = 12.sp, fontWeight = FontWeight.SemiBold, color = brand600)
+                            val text = if (remainingCount > 0) {
+                                "Lihat $remainingCount nota lainnya & detail →"
+                            } else {
+                                "Lihat Detail Piutang →"
+                            }
+                            Text(
+                                text = text,
+                                fontSize = 12.sp,
+                                fontWeight = FontWeight.SemiBold,
+                                color = brand600
+                            )
                         }
                     }
                 }
@@ -1094,91 +1161,1122 @@ private fun CustomerReceivableGroupCard(
 @Composable
 private fun MobileReceivableAccordionItem(
     receivable: Receivable,
-    index: Int,
+    cardinalNumber: Int,
     onPayClick: (Receivable) -> Unit,
-    onOpenLedger: (String, String) -> Unit
+    @Suppress("UNUSED_PARAMETER") onOpenLedger: (String, String) -> Unit
 ) {
     val isPaid = receivable.isPaid()
-    val brand50 = Color(0xFFF0F6F3)
     val brand600 = Color(0xFF256B57)
-    val brand700 = Color(0xFF1D5545)
+    val slate50 = Color(0xFFF8FAFC)
     val slate100 = Color(0xFFF1F5F9)
     val slate400 = Color(0xFF94A3B8)
     val slate500 = Color(0xFF64748B)
     val slate700 = Color(0xFF334155)
     val slate800 = Color(0xFF1E293B)
-    val slate900 = Color(0xFF0F172A)
+    val amber700 = Color(0xFFB45309)
+    val emerald500 = Color(0xFF10B981)
+    val emerald600 = Color(0xFF059669)
+    val red600 = Color(0xFFDC2626)
+
+    val isOverdue = remember(receivable.dueDate) {
+        val date = runCatching { java.time.LocalDate.parse(receivable.dueDate.take(10)) }.getOrNull()
+        if (date != null) {
+            java.time.temporal.ChronoUnit.DAYS.between(java.time.LocalDate.now(), date) < 0
+        } else false
+    }
+
+    val itemBg = if (isPaid) slate50.copy(alpha = 0.5f) else Color.White
 
     Surface(
-        onClick = { onPayClick(receivable) },
-        color = Color.White
+        onClick = { if (!isPaid) onPayClick(receivable) },
+        color = itemBg,
+        modifier = Modifier
+            .fillMaxWidth()
+            .testTag("receivable-item-${receivable.id}")
     ) {
-        Column(modifier = Modifier.fillMaxWidth().padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
-                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Icon(androidx.compose.material.icons.Icons.Outlined.Receipt, contentDescription = null, tint = slate400, modifier = Modifier.size(18.dp))
-                    Text(receivable.mobileReference(), fontSize = 12.sp, fontWeight = FontWeight.SemiBold, color = slate900, fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace)
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 16.dp, vertical = 14.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp)
+        ) {
+            // Line 1: Nota Number / ID & Index
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    Icon(
+                        imageVector = Icons.AutoMirrored.Outlined.ReceiptLong,
+                        contentDescription = null,
+                        tint = slate400,
+                        modifier = Modifier.size(16.dp)
+                    )
+                    Text(
+                        text = receivable.mobileReference(),
+                        fontSize = 14.sp,
+                        fontWeight = FontWeight.SemiBold,
+                        color = slate800,
+                        fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace
+                    )
                 }
                 Text(
-                    text = "Nota ${index + 1}",
-                    fontSize = 11.sp,
+                    text = "Nota $cardinalNumber",
+                    fontSize = 12.sp,
                     fontWeight = FontWeight.Medium,
                     color = slate500
                 )
             }
             
-            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.Bottom) {
+            // Line 2: Sisa Piutang (Left) & Status (Right)
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(top = 2.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.Bottom
+            ) {
                 Column {
-                    Text("SISA PIUTANG", fontSize = 10.sp, fontWeight = FontWeight.SemiBold, color = slate400, letterSpacing = 0.5.sp)
-                    Text(receivable.remainingAmount.currencyText(), fontSize = 20.sp, fontWeight = FontWeight.Black, color = if (isPaid) slate900 else brand700, modifier = Modifier.padding(top = 2.dp))
+                    Text(
+                        text = "Sisa Piutang",
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.Medium,
+                        color = slate500
+                    )
+                    Text(
+                        text = receivable.remainingAmount.currencyText(),
+                        fontSize = 16.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = if (isPaid) slate700 else brand600,
+                        modifier = Modifier.padding(top = 2.dp)
+                    )
                 }
                 Column(horizontalAlignment = Alignment.End) {
-                    Text("STATUS", fontSize = 10.sp, fontWeight = FontWeight.SemiBold, color = slate400, letterSpacing = 0.5.sp)
-                    Text(if (isPaid) "Terbayar Penuh" else "Sebagian", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = if (isPaid) brand600 else slate700, modifier = Modifier.padding(top = 2.dp))
+                    Text(
+                        text = "Status",
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.Medium,
+                        color = slate500
+                    )
+                    val (statusText, statusColor) = when {
+                        isPaid -> "Terbayar Penuh" to brand600
+                        receivable.paidAmount > java.math.BigDecimal.ZERO -> "Sebagian" to amber700
+                        else -> "Belum Bayar" to red600
+                    }
+                    Text(
+                        text = statusText,
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.SemiBold,
+                        color = statusColor,
+                        modifier = Modifier.padding(top = 2.dp)
+                    )
                 }
             }
             
-            Row(modifier = Modifier.fillMaxWidth().drawBehind {
-                drawLine(
-                    color = slate100,
-                    start = androidx.compose.ui.geometry.Offset(0f, 0f),
-                    end = androidx.compose.ui.geometry.Offset(size.width, 0f),
-                    strokeWidth = 1f,
-                    pathEffect = androidx.compose.ui.graphics.PathEffect.dashPathEffect(floatArrayOf(10f, 10f), 0f)
-                )
-            }.padding(top = 8.dp)) {
+            // Line 3: Total Tagihan & Sudah Dibayar
+            HorizontalDivider(color = slate100)
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(top = 2.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
                 Column(modifier = Modifier.weight(1f)) {
-                    Text("TOTAL TAGIHAN", fontSize = 10.sp, fontWeight = FontWeight.SemiBold, color = slate400, letterSpacing = 0.5.sp)
-                    Text(receivable.amount.currencyText(), fontSize = 12.sp, fontWeight = FontWeight.Bold, color = slate800, modifier = Modifier.padding(top = 2.dp))
+                    Text(
+                        text = "Total Tagihan",
+                        fontSize = 12.sp,
+                        color = slate500
+                    )
+                    Text(
+                        text = receivable.amount.currencyText(),
+                        fontSize = 14.sp,
+                        fontWeight = FontWeight.Medium,
+                        color = slate700,
+                        modifier = Modifier.padding(top = 2.dp)
+                    )
                 }
-                Column(modifier = Modifier.weight(1f), horizontalAlignment = Alignment.End) {
-                    Text("SUDAH DIBAYAR", fontSize = 10.sp, fontWeight = FontWeight.SemiBold, color = slate400, letterSpacing = 0.5.sp)
-                    Text(receivable.paidAmount.currencyText(), fontSize = 12.sp, fontWeight = FontWeight.Bold, color = if (isPaid) slate800 else brand600, modifier = Modifier.padding(top = 2.dp))
+                Column(
+                    modifier = Modifier.weight(1f),
+                    horizontalAlignment = Alignment.End
+                ) {
+                    Text(
+                        text = "Sudah Dibayar",
+                        fontSize = 12.sp,
+                        color = slate500
+                    )
+                    val paidColor = if (receivable.paidAmount > java.math.BigDecimal.ZERO) brand600 else slate700
+                    Text(
+                        text = receivable.paidAmount.currencyText(),
+                        fontSize = 14.sp,
+                        fontWeight = if (receivable.paidAmount > java.math.BigDecimal.ZERO) FontWeight.SemiBold else FontWeight.Medium,
+                        color = paidColor,
+                        modifier = Modifier.padding(top = 2.dp)
+                    )
                 }
             }
             
-            Row(modifier = Modifier.fillMaxWidth().drawBehind {
-                drawLine(
-                    color = slate100, 
-                    start = androidx.compose.ui.geometry.Offset(0f, 0f), 
-                    end = androidx.compose.ui.geometry.Offset(size.width, 0f), 
-                    strokeWidth = 1f
+            // Line 4: Jatuh tempo & Status Dot
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(top = 2.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(4.dp)
+                ) {
+                    Text(
+                        text = "Jatuh tempo: ",
+                        fontSize = 12.sp,
+                        color = slate500
+                    )
+                    Text(
+                        text = receivable.dueDate.simpleDate(),
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.Medium,
+                        color = slate700
+                    )
+                }
+                
+                val isPartial = !isPaid && (receivable.paidAmount > java.math.BigDecimal.ZERO || receivable.status.equals("sebagian", true) || receivable.status.equals("partial", true))
+                val (dotColor, dotTextColor, dotText) = when {
+                    isPaid -> Triple(emerald500, emerald600, "Lunas")
+                    isOverdue -> Triple(red600, red600, "Lewat Jatuh Tempo")
+                    isPartial -> Triple(amber700, amber700, "Sebagian")
+                    else -> Triple(red600, red600, "Belum Lunas")
+                }
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .size(6.dp)
+                            .background(dotColor, CircleShape)
+                    )
+                    Text(
+                        text = dotText,
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.Medium,
+                        color = dotTextColor
+                    )
+                }
+            }
+        }
+    }
+}
+
+@OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class)
+@Composable
+internal fun ReceivableFilterBottomSheet(
+    uiState: ReceivableUiState,
+    onDismiss: () -> Unit,
+    onApplyStatusFilter: (ReceivableStatusFilter) -> Unit,
+    onApplyDueFilter: (ReceivableDueFilter) -> Unit = {},
+    onApplySortOrder: (ReceivableSortOrder) -> Unit = {}
+) {
+    var selectedStatus by remember { mutableStateOf(uiState.statusFilter) }
+    var selectedDue by remember { mutableStateOf(uiState.dueFilter) }
+    var selectedSortOrder by remember { mutableStateOf(uiState.sortOrder) }
+
+    ModalBottomSheet(
+        onDismissRequest = onDismiss,
+        containerColor = Color.White,
+        dragHandle = {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(top = 10.dp, bottom = 4.dp),
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                Box(
+                    modifier = Modifier
+                        .width(40.dp)
+                        .height(4.dp)
+                        .background(Color(0xFFE2E8F0), CircleShape)
                 )
-            }.padding(top = 8.dp), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
-                Text(
-                    androidx.compose.ui.text.buildAnnotatedString {
-                        withStyle(androidx.compose.ui.text.SpanStyle(color = slate500)) { append("Jatuh tempo: ") }
-                        withStyle(androidx.compose.ui.text.SpanStyle(color = slate800, fontWeight = FontWeight.SemiBold)) { append(receivable.dueDate.simpleDate()) }
-                    },
-                    fontSize = 12.sp
-                )
-                if (!isPaid) {
-                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                        Box(modifier = Modifier.size(6.dp).background(brand600, CircleShape))
-                        Text("Aktif", fontSize = 12.sp, fontWeight = FontWeight.SemiBold, color = brand600)
+            }
+        },
+        shape = RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp)
+    ) {
+        Column(
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            // Modal Header
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 20.dp, vertical = 12.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.Top,
+            ) {
+                Column {
+                    Text(
+                        text = "Filter Piutang",
+                        fontSize = 18.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = Color(0xFF0F172A),
+                        letterSpacing = (-0.3).sp,
+                    )
+                    Spacer(Modifier.height(2.dp))
+                    Text(
+                        text = "Atur status pelunasan dan filter piutang pelanggan",
+                        fontSize = 12.sp,
+                        color = Color(0xFF64748B),
+                    )
+                }
+                Box(
+                    modifier = Modifier
+                        .size(32.dp)
+                        .clip(CircleShape)
+                        .background(Color(0xFFF1F5F9))
+                        .clickable(onClick = onDismiss),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Icon(
+                        Icons.Outlined.Close,
+                        contentDescription = "Tutup Filter",
+                        tint = Color(0xFF94A3B8),
+                        modifier = Modifier.size(18.dp),
+                    )
+                }
+            }
+
+            HorizontalDivider(color = Color(0xFFF1F5F9), thickness = 1.dp)
+
+            // Scrollable Content Body
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 20.dp, vertical = 16.dp),
+                verticalArrangement = Arrangement.spacedBy(18.dp),
+            ) {
+                // 1. Section: STATUS PELUNASAN (Grid 2x2 with white bg & green border on active)
+                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                    Text(
+                        text = "STATUS PELUNASAN",
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = Color(0xFF64748B),
+                        letterSpacing = 0.8.sp,
+                    )
+
+                    val statusPairs = listOf(
+                        listOf(ReceivableStatusFilter.All to "Semua", ReceivableStatusFilter.Unpaid to "Belum Lunas"),
+                        listOf(ReceivableStatusFilter.Partial to "Sebagian", ReceivableStatusFilter.Paid to "Lunas")
+                    )
+
+                    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                        statusPairs.forEach { rowPair ->
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.spacedBy(10.dp)
+                            ) {
+                                rowPair.forEach { (status, label) ->
+                                    val isSelected = selectedStatus == status
+                                    Surface(
+                                        modifier = Modifier
+                                            .weight(1f)
+                                            .height(46.dp)
+                                            .clickable { selectedStatus = status },
+                                        shape = RoundedCornerShape(12.dp),
+                                        color = Color.White,
+                                        border = BorderStroke(1.dp, if (isSelected) Color(0xFF256B57) else Color(0xFFE2E8F0)),
+                                        shadowElevation = if (isSelected) 0.5.dp else 0.dp
+                                    ) {
+                                        Row(
+                                            modifier = Modifier
+                                                .fillMaxSize()
+                                                .padding(horizontal = 14.dp),
+                                            horizontalArrangement = Arrangement.SpaceBetween,
+                                            verticalAlignment = Alignment.CenterVertically
+                                        ) {
+                                            Text(
+                                                text = label,
+                                                fontSize = 13.sp,
+                                                fontWeight = if (isSelected) FontWeight.SemiBold else FontWeight.Medium,
+                                                color = if (isSelected) Color(0xFF256B57) else Color(0xFF334155),
+                                                maxLines = 1
+                                            )
+                                            if (isSelected) {
+                                                Icon(
+                                                    Icons.Outlined.Check,
+                                                    contentDescription = null,
+                                                    tint = Color(0xFF256B57),
+                                                    modifier = Modifier.size(16.dp)
+                                                )
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+
+                // 2. Section: JATUH TEMPO (Aging Category: Grid 2x2)
+                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                    Text(
+                        text = "JATUH TEMPO",
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = Color(0xFF64748B),
+                        letterSpacing = 0.8.sp,
+                    )
+
+                    val duePairs = listOf(
+                        listOf(ReceivableDueFilter.All to "Semua", ReceivableDueFilter.Overdue to "Lewat Jatuh Tempo"),
+                        listOf(ReceivableDueFilter.DueToday to "Hari Ini", ReceivableDueFilter.Upcoming to "Akan Datang")
+                    )
+
+                    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                        duePairs.forEach { rowPair ->
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.spacedBy(10.dp)
+                            ) {
+                                rowPair.forEach { (filter, label) ->
+                                    val isSelected = selectedDue == filter
+                                    Surface(
+                                        modifier = Modifier
+                                            .weight(1f)
+                                            .height(46.dp)
+                                            .clickable { selectedDue = filter },
+                                        shape = RoundedCornerShape(12.dp),
+                                        color = Color.White,
+                                        border = BorderStroke(1.dp, if (isSelected) Color(0xFF256B57) else Color(0xFFE2E8F0)),
+                                        shadowElevation = if (isSelected) 0.5.dp else 0.dp
+                                    ) {
+                                        Row(
+                                            modifier = Modifier
+                                                .fillMaxSize()
+                                                .padding(horizontal = 14.dp),
+                                            horizontalArrangement = Arrangement.SpaceBetween,
+                                            verticalAlignment = Alignment.CenterVertically
+                                        ) {
+                                            Text(
+                                                text = label,
+                                                fontSize = 13.sp,
+                                                fontWeight = if (isSelected) FontWeight.SemiBold else FontWeight.Medium,
+                                                color = if (isSelected) Color(0xFF256B57) else Color(0xFF334155),
+                                                maxLines = 1
+                                            )
+                                            if (isSelected) {
+                                                Icon(
+                                                    Icons.Outlined.Check,
+                                                    contentDescription = null,
+                                                    tint = Color(0xFF256B57),
+                                                    modifier = Modifier.size(16.dp)
+                                                )
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+
+                // 3. Section: URUTKAN BERDASARKAN (2 on row 1, 1 full-width on row 2)
+                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                    Text(
+                        text = "URUTKAN BERDASARKAN",
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = Color(0xFF64748B),
+                        letterSpacing = 0.8.sp,
+                    )
+
+                    // Row 1: Tempo Terdekat & Nominal Terbesar
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(10.dp)
+                    ) {
+                        // Tempo Terdekat
+                        val isDueDateSelected = selectedSortOrder == ReceivableSortOrder.NearestDueDate
+                        Surface(
+                            modifier = Modifier
+                                .weight(1f)
+                                .height(40.dp)
+                                .clickable { selectedSortOrder = ReceivableSortOrder.NearestDueDate },
+                            shape = RoundedCornerShape(12.dp),
+                            color = Color.White,
+                            border = BorderStroke(1.dp, if (isDueDateSelected) Color(0xFF256B57) else Color(0xFFE2E8F0)),
+                            shadowElevation = if (isDueDateSelected) 0.5.dp else 0.dp
+                        ) {
+                            Row(
+                                modifier = Modifier.fillMaxSize(),
+                                horizontalArrangement = Arrangement.Center,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Outlined.Schedule,
+                                    contentDescription = null,
+                                    tint = if (isDueDateSelected) Color(0xFF256B57) else Color(0xFF64748B),
+                                    modifier = Modifier.size(14.dp)
+                                )
+                                Spacer(Modifier.width(6.dp))
+                                Text(
+                                    text = "Tempo Terdekat",
+                                    fontSize = 12.sp,
+                                    fontWeight = if (isDueDateSelected) FontWeight.SemiBold else FontWeight.Medium,
+                                    color = if (isDueDateSelected) Color(0xFF256B57) else Color(0xFF475569)
+                                )
+                            }
+                        }
+
+                        // Nominal Terbesar
+                        val isAmountSelected = selectedSortOrder == ReceivableSortOrder.HighestAmount
+                        Surface(
+                            modifier = Modifier
+                                .weight(1f)
+                                .height(40.dp)
+                                .clickable { selectedSortOrder = ReceivableSortOrder.HighestAmount },
+                            shape = RoundedCornerShape(12.dp),
+                            color = Color.White,
+                            border = BorderStroke(1.dp, if (isAmountSelected) Color(0xFF256B57) else Color(0xFFE2E8F0)),
+                            shadowElevation = if (isAmountSelected) 0.5.dp else 0.dp
+                        ) {
+                            Row(
+                                modifier = Modifier.fillMaxSize(),
+                                horizontalArrangement = Arrangement.Center,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Icon(
+                                    imageVector = Icons.AutoMirrored.Outlined.TrendingUp,
+                                    contentDescription = null,
+                                    tint = if (isAmountSelected) Color(0xFF256B57) else Color(0xFF64748B),
+                                    modifier = Modifier.size(14.dp)
+                                )
+                                Spacer(Modifier.width(6.dp))
+                                Text(
+                                    text = "Nominal Terbesar",
+                                    fontSize = 12.sp,
+                                    fontWeight = if (isAmountSelected) FontWeight.SemiBold else FontWeight.Medium,
+                                    color = if (isAmountSelected) Color(0xFF256B57) else Color(0xFF475569)
+                                )
+                            }
+                        }
+                    }
+
+                    // Row 2 (col-span-2): Nama Pelanggan (A–Z)
+                    val isNameSelected = selectedSortOrder == ReceivableSortOrder.CustomerNameAsc
+                    Surface(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(40.dp)
+                            .clickable { selectedSortOrder = ReceivableSortOrder.CustomerNameAsc },
+                        shape = RoundedCornerShape(12.dp),
+                        color = Color.White,
+                        border = BorderStroke(1.dp, if (isNameSelected) Color(0xFF256B57) else Color(0xFFE2E8F0)),
+                        shadowElevation = if (isNameSelected) 0.5.dp else 0.dp
+                    ) {
+                        Row(
+                            modifier = Modifier.fillMaxSize(),
+                            horizontalArrangement = Arrangement.Center,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Icon(
+                                imageVector = Icons.Outlined.FilterList,
+                                contentDescription = null,
+                                tint = if (isNameSelected) Color(0xFF256B57) else Color(0xFF64748B),
+                                modifier = Modifier.size(14.dp)
+                            )
+                            Spacer(Modifier.width(6.dp))
+                            Text(
+                                text = "Nama Pelanggan (A–Z)",
+                                fontSize = 12.sp,
+                                fontWeight = if (isNameSelected) FontWeight.SemiBold else FontWeight.Medium,
+                                color = if (isNameSelected) Color(0xFF256B57) else Color(0xFF475569)
+                            )
+                        }
                     }
                 }
             }
+
+            HorizontalDivider(color = Color(0xFFF1F5F9), thickness = 1.dp)
+
+            // Footer Actions: Reset (Green Outlined) & Terapkan (Green Filled)
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 20.dp, vertical = 14.dp),
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                // Reset Button: border border-[#256B57] text-[#256B57] font-semibold
+                Surface(
+                    onClick = {
+                        selectedStatus = ReceivableStatusFilter.All
+                        selectedDue = ReceivableDueFilter.All
+                        selectedSortOrder = ReceivableSortOrder.NearestDueDate
+                    },
+                    modifier = Modifier
+                        .weight(1f)
+                        .height(48.dp),
+                    shape = RoundedCornerShape(12.dp),
+                    color = Color.White,
+                    border = BorderStroke(1.dp, Color(0xFF256B57))
+                ) {
+                    Box(
+                        modifier = Modifier.fillMaxSize(),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text(
+                            text = "Reset",
+                            fontSize = 14.sp,
+                            fontWeight = FontWeight.SemiBold,
+                            color = Color(0xFF256B57)
+                        )
+                    }
+                }
+
+                // Terapkan Button: bg-brand text-white font-semibold
+                Button(
+                    onClick = {
+                        onApplyStatusFilter(selectedStatus)
+                        onApplyDueFilter(selectedDue)
+                        onApplySortOrder(selectedSortOrder)
+                        onDismiss()
+                    },
+                    modifier = Modifier
+                        .weight(2f)
+                        .height(48.dp),
+                    shape = RoundedCornerShape(12.dp),
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = Color(0xFF256B57),
+                        contentColor = Color.White
+                    ),
+                    elevation = ButtonDefaults.buttonElevation(defaultElevation = 1.dp)
+                ) {
+                    Text(
+                        text = "Terapkan",
+                        fontSize = 14.sp,
+                        fontWeight = FontWeight.SemiBold
+                    )
+                }
+            }
+        }
+    }
+}
+
+@OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class)
+@Composable
+internal fun ReceivableSummaryBottomSheet(
+    uiState: ReceivableUiState,
+    onDismiss: () -> Unit
+) {
+    val totalRemaining = uiState.pageRemainingTotal
+    val totalDebtors = remember(uiState.filteredReceivables) {
+        uiState.filteredReceivables.map { it.customerId }.distinct().size
+    }
+    val unpaidInvoices = remember(uiState.filteredReceivables) {
+        uiState.filteredReceivables.count { it.status != ReceivableStatusFilter.Paid.apiValue }
+    }
+    val overdueInvoices = remember(uiState.filteredReceivables) {
+        val today = LocalDate.now()
+        uiState.filteredReceivables.count { r ->
+            val due = runCatching { LocalDate.parse(r.dueDate.take(10)) }.getOrNull()
+            due != null && due.isBefore(today) && r.status != ReceivableStatusFilter.Paid.apiValue
+        }
+    }
+
+    ModalBottomSheet(
+        onDismissRequest = onDismiss,
+        containerColor = Color.White,
+        dragHandle = {
+            Column(
+                modifier = Modifier.fillMaxWidth().padding(top = 12.dp, bottom = 4.dp),
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                Box(modifier = Modifier.width(40.dp).height(4.dp).background(Color(0xFFE2E8F0), CircleShape))
+            }
+        },
+        shape = RoundedCornerShape(topStart = 32.dp, topEnd = 32.dp)
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(bottom = 16.dp)
+        ) {
+            // Modal Header
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 24.dp, vertical = 8.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Column {
+                    Text(
+                        text = "Ringkasan Piutang",
+                        fontSize = 18.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = Color(0xFF0F172A),
+                        letterSpacing = (-0.3).sp
+                    )
+                    Spacer(Modifier.height(2.dp))
+                    Text(
+                        text = "Informasi ringkas total piutang dan debitur",
+                        fontSize = 12.sp,
+                        color = Color(0xFF64748B)
+                    )
+                }
+                Box(
+                    modifier = Modifier
+                        .size(32.dp)
+                        .clip(CircleShape)
+                        .background(Color(0xFFF1F5F9))
+                        .clickable { onDismiss() },
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(
+                        Icons.Outlined.Close,
+                        contentDescription = "Tutup ringkasan modal",
+                        tint = Color(0xFF94A3B8),
+                        modifier = Modifier.size(16.dp)
+                    )
+                }
+            }
+
+            HorizontalDivider(color = Color(0xFFF1F5F9), thickness = 1.dp)
+
+            // Content Metrics List
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 24.dp, vertical = 4.dp)
+            ) {
+                // Row 1: Total Sisa Piutang (Featured Highlight)
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(vertical = 16.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                        Text(
+                            text = "Total Sisa Piutang",
+                            fontSize = 14.sp,
+                            fontWeight = FontWeight.Medium,
+                            color = Color(0xFF334155)
+                        )
+                        Text(
+                            text = "Sesuai filter halaman aktif",
+                            fontSize = 12.sp,
+                            color = Color(0xFF94A3B8)
+                        )
+                    }
+                    Text(
+                        text = totalRemaining.currencyText(),
+                        fontSize = 24.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = Color(0xFF256B57),
+                        letterSpacing = (-0.5).sp
+                    )
+                }
+
+                HorizontalDivider(color = Color(0xFFF1F5F9), thickness = 1.dp)
+
+                // Row 2: Pelanggan Berpiutang
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(vertical = 16.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                        Text(
+                            text = "Pelanggan Berpiutang",
+                            fontSize = 14.sp,
+                            fontWeight = FontWeight.Medium,
+                            color = Color(0xFF475569)
+                        )
+                        Text(
+                            text = "Jumlah debitur aktif",
+                            fontSize = 12.sp,
+                            color = Color(0xFF94A3B8)
+                        )
+                    }
+                    Row(
+                        verticalAlignment = Alignment.Bottom,
+                        horizontalArrangement = Arrangement.spacedBy(3.dp)
+                    ) {
+                        Text(
+                            text = totalDebtors.toString(),
+                            fontSize = 16.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = Color(0xFF0F172A)
+                        )
+                        Text(
+                            text = "Orang",
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.Medium,
+                            color = Color(0xFF64748B),
+                            modifier = Modifier.padding(bottom = 1.dp)
+                        )
+                    }
+                }
+
+                HorizontalDivider(color = Color(0xFFF1F5F9), thickness = 1.dp)
+
+                // Row 3: Tagihan Belum Lunas
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(vertical = 16.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                        Text(
+                            text = "Tagihan Belum Lunas",
+                            fontSize = 14.sp,
+                            fontWeight = FontWeight.Medium,
+                            color = Color(0xFF475569)
+                        )
+                        Text(
+                            text = "Nota yang belum selesai",
+                            fontSize = 12.sp,
+                            color = Color(0xFF94A3B8)
+                        )
+                    }
+                    Row(
+                        verticalAlignment = Alignment.Bottom,
+                        horizontalArrangement = Arrangement.spacedBy(3.dp)
+                    ) {
+                        Text(
+                            text = unpaidInvoices.toString(),
+                            fontSize = 16.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = Color(0xFF0F172A)
+                        )
+                        Text(
+                            text = "Nota",
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.Medium,
+                            color = Color(0xFF64748B),
+                            modifier = Modifier.padding(bottom = 1.dp)
+                        )
+                    }
+                }
+
+                HorizontalDivider(color = Color(0xFFF1F5F9), thickness = 1.dp)
+
+                // Row 4: Lewat Jatuh Tempo
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(vertical = 16.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                        Text(
+                            text = "Lewat Jatuh Tempo",
+                            fontSize = 14.sp,
+                            fontWeight = FontWeight.Medium,
+                            color = Color(0xFF475569)
+                        )
+                        Text(
+                            text = "Perlu segera ditagih",
+                            fontSize = 12.sp,
+                            color = Color(0xFF94A3B8)
+                        )
+                    }
+                    Row(
+                        verticalAlignment = Alignment.Bottom,
+                        horizontalArrangement = Arrangement.spacedBy(3.dp)
+                    ) {
+                        Text(
+                            text = overdueInvoices.toString(),
+                            fontSize = 16.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = if (overdueInvoices > 0) Color(0xFFDC2626) else Color(0xFF0F172A)
+                        )
+                        Text(
+                            text = "Nota",
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.Medium,
+                            color = if (overdueInvoices > 0) Color(0xFFDC2626) else Color(0xFF64748B),
+                            modifier = Modifier.padding(bottom = 1.dp)
+                        )
+                    }
+                }
+            }
+
+            // Action Button Area
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 24.dp, vertical = 12.dp)
+            ) {
+                Button(
+                    onClick = onDismiss,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(48.dp),
+                    shape = RoundedCornerShape(12.dp),
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = Color(0xFF256B57),
+                        contentColor = Color.White
+                    ),
+                    elevation = ButtonDefaults.buttonElevation(defaultElevation = 0.dp)
+                ) {
+                    Text(
+                        text = "Selesai",
+                        fontSize = 16.sp,
+                        fontWeight = FontWeight.SemiBold
+                    )
+                }
+            }
+            Spacer(Modifier.height(8.dp))
+        }
+    }
+}
+
+
+@OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class)
+@Composable
+internal fun ReceivableActionBottomSheet(
+    canAdjust: Boolean,
+    onDismiss: () -> Unit,
+    onAddOpeningBalance: () -> Unit,
+    onAddAdjustment: () -> Unit,
+    onOpenSummary: () -> Unit = {}
+) {
+    ModalBottomSheet(
+        onDismissRequest = onDismiss,
+        containerColor = Color.White,
+        dragHandle = {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(top = 12.dp, bottom = 8.dp),
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                Box(
+                    modifier = Modifier
+                        .width(40.dp)
+                        .height(4.dp)
+                        .background(Color(0xFFE2E8F0), CircleShape)
+                )
+            }
+        },
+        shape = RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp)
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(bottom = 20.dp)
+        ) {
+            // Header
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(start = 20.dp, end = 20.dp, top = 4.dp, bottom = 12.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.Top
+            ) {
+                Column(modifier = Modifier.weight(1f).padding(end = 12.dp)) {
+                    Text(
+                        text = "Kelola Piutang",
+                        fontSize = 16.sp,
+                        fontWeight = FontWeight.SemiBold,
+                        color = Color(0xFF1E293B),
+                        letterSpacing = (-0.3).sp
+                    )
+                    Spacer(Modifier.height(2.dp))
+                    Text(
+                        text = "Pilih tindakan atau transaksi piutang pelanggan",
+                        fontSize = 12.sp,
+                        color = Color(0xFF64748B),
+                        lineHeight = 16.sp
+                    )
+                }
+                Box(
+                    modifier = Modifier
+                        .size(32.dp)
+                        .clip(CircleShape)
+                        .background(Color(0xFFF1F5F9))
+                        .clickable(onClick = onDismiss),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(
+                        Icons.Outlined.Close,
+                        contentDescription = "Tutup menu",
+                        tint = Color(0xFF64748B),
+                        modifier = Modifier.size(16.dp)
+                    )
+                }
+            }
+
+            HorizontalDivider(
+                modifier = Modifier.padding(horizontal = 20.dp),
+                color = Color(0xFFF1F5F9),
+                thickness = 1.dp
+            )
+
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 20.dp, vertical = 16.dp),
+                verticalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                // Action Item 1: Input Saldo Awal Piutang
+                ActionShortcutCard(
+                    title = "Input Saldo Awal Piutang",
+                    description = "Catat saldo utang lama pelanggan sebelum migrasi sistem toko",
+                    icon = Icons.Outlined.AddCircleOutline,
+                    iconBg = Color(0xFFF0F7F5),
+                    iconBorder = Color(0xFFE1EFEA).copy(alpha = 0.8f),
+                    iconTint = Color(0xFF256B57),
+                    badge = null,
+                    onClick = onAddOpeningBalance,
+                    testTag = "action-opening-balance"
+                )
+
+                // Action Item 2: Penyesuaian Piutang (Adjustment)
+                if (canAdjust) {
+                    ActionShortcutCard(
+                        title = "Penyesuaian Piutang (Adjustment)",
+                        description = "Koreksi selisih saldo, diskon khusus tempo, atau hapus buku piutang macet",
+                        icon = Icons.Outlined.Tune,
+                        iconBg = Color(0xFFF0F7F5),
+                        iconBorder = Color(0xFFE1EFEA).copy(alpha = 0.8f),
+                        iconTint = Color(0xFF256B57),
+                        badge = "Owner / Admin",
+                        onClick = onAddAdjustment,
+                        testTag = "action-adjustment"
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun ActionShortcutCard(
+    title: String,
+    description: String,
+    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    iconBg: Color,
+    iconBorder: Color = Color.Transparent,
+    iconTint: Color,
+    badge: String?,
+    onClick: () -> Unit,
+    testTag: String
+) {
+    Surface(
+        onClick = onClick,
+        shape = RoundedCornerShape(16.dp),
+        color = Color.White,
+        border = BorderStroke(1.dp, Color(0xFFE2E8F0).copy(alpha = 0.8f)),
+        shadowElevation = 0.dp,
+        modifier = Modifier
+            .fillMaxWidth()
+            .testTag(testTag)
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 14.dp, vertical = 14.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.SpaceBetween
+        ) {
+            Row(
+                modifier = Modifier
+                    .weight(1f)
+                    .padding(end = 8.dp),
+                verticalAlignment = Alignment.Top,
+                horizontalArrangement = Arrangement.spacedBy(14.dp)
+            ) {
+                Box(
+                    modifier = Modifier
+                        .size(40.dp)
+                        .clip(RoundedCornerShape(12.dp))
+                        .background(iconBg)
+                        .then(
+                            if (iconBorder != Color.Transparent) {
+                                Modifier.border(1.dp, iconBorder, RoundedCornerShape(12.dp))
+                            } else Modifier
+                        ),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(
+                        imageVector = icon,
+                        contentDescription = null,
+                        tint = iconTint,
+                        modifier = Modifier.size(20.dp)
+                    )
+                }
+
+                Column(
+                    modifier = Modifier.weight(1f),
+                    verticalArrangement = Arrangement.spacedBy(4.dp)
+                ) {
+                    Text(
+                        text = title,
+                        fontSize = 14.sp,
+                        fontWeight = FontWeight.SemiBold,
+                        color = Color(0xFF1E293B),
+                        lineHeight = 19.sp
+                    )
+
+                    if (badge != null) {
+                        Surface(
+                            shape = RoundedCornerShape(6.dp),
+                            color = Color(0xFFF1F5F9),
+                            border = BorderStroke(1.dp, Color(0xFFE2E8F0))
+                        ) {
+                            Row(
+                                modifier = Modifier.padding(horizontal = 7.dp, vertical = 2.5.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(4.dp)
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Outlined.Shield,
+                                    contentDescription = null,
+                                    tint = Color(0xFF64748B),
+                                    modifier = Modifier.size(11.dp)
+                                )
+                                Text(
+                                    text = badge,
+                                    fontSize = 10.5.sp,
+                                    fontWeight = FontWeight.SemiBold,
+                                    color = Color(0xFF334155),
+                                    letterSpacing = 0.2.sp
+                                )
+                            }
+                        }
+                    }
+
+                    Text(
+                        text = description,
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.Normal,
+                        color = Color(0xFF64748B),
+                        lineHeight = 16.sp,
+                        modifier = Modifier.padding(top = 2.dp)
+                    )
+                }
+            }
+
+            Icon(
+                imageVector = Icons.Default.ChevronRight,
+                contentDescription = null,
+                tint = Color(0xFF94A3B8),
+                modifier = Modifier.size(16.dp)
+            )
         }
     }
 }

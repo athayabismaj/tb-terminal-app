@@ -1,5 +1,7 @@
 package com.tbterminal.app.ui.payables
 
+import com.tbterminal.app.ui.components.TbPagination
+
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -55,8 +57,13 @@ import androidx.compose.runtime.LaunchedEffect
 internal fun SupplierDebtTableCard(
     modifier: Modifier,
     uiState: SupplierDebtUiState,
+    isSearchExpanded: Boolean = false,
+    onToggleSearch: () -> Unit = {},
+    onResetAllFilters: () -> Unit = {},
     onSearchChanged: (String) -> Unit,
     onStatusFilterChanged: (SupplierDebtStatusFilter) -> Unit,
+    onDueFilterChanged: (SupplierDebtDueFilter) -> Unit = {},
+    onOpenActionMenu: () -> Unit = {},
     @Suppress("UNUSED_PARAMETER") onRefresh: () -> Unit,
     onPayClick: (SupplierPayable) -> Unit,
     onPreviousPage: () -> Unit,
@@ -223,72 +230,25 @@ internal fun SupplierDebtTableCard(
                         }
                     }
 
-                    // Pagination (Mobile Style: 5 users per page)
+                    // Pagination (Mobile Style: 5 users per page using TbPagination)
                     val startUser = if (totalUsers == 0) 0 else ((safeUserPage - 1) * SUPPLIER_DEBT_USERS_PER_PAGE) + 1
                     val endUser = minOf(safeUserPage * SUPPLIER_DEBT_USERS_PER_PAGE, totalUsers)
-                    Row(
-                        modifier = Modifier.fillMaxWidth().padding(top = 8.dp, bottom = 8.dp),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Surface(
-                            color = Color.White,
-                            shape = RoundedCornerShape(50),
-                            border = BorderStroke(1.dp, Color(0xFFE2E8F0).copy(alpha = 0.9f))
-                        ) {
-                            val userRangeText = if (totalUsers == 0) "0 supplier" else "$startUser-$endUser dari $totalUsers supplier"
-                            Text(
-                                userRangeText,
-                                fontSize = 12.sp,
-                                fontWeight = FontWeight.SemiBold,
-                                color = Color(0xFF475569),
-                                modifier = Modifier.padding(horizontal = 14.dp, vertical = 6.dp)
-                            )
-                        }
-
-                        Surface(
-                            color = Color.White,
-                            shape = RoundedCornerShape(50),
-                            border = BorderStroke(1.dp, Color(0xFFE2E8F0).copy(alpha = 0.9f))
-                        ) {
-                            Row(
-                                modifier = Modifier.padding(horizontal = 6.dp, vertical = 4.dp),
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.spacedBy(12.dp)
-                            ) {
-                                IconButton(
-                                    onClick = { userPage = (safeUserPage - 1).coerceAtLeast(1) },
-                                    modifier = Modifier.size(28.dp).background(Color.Transparent, CircleShape),
-                                    enabled = safeUserPage > 1
-                                ) {
-                                    Icon(
-                                        Icons.Default.ChevronLeft,
-                                        contentDescription = "Sebelumnya",
-                                        tint = if (safeUserPage > 1) Color(0xFF334155) else Color(0xFF94A3B8).copy(alpha = 0.5f),
-                                        modifier = Modifier.size(16.dp)
-                                    )
-                                }
-                                Text(
-                                    "$safeUserPage / $totalUserPages",
-                                    fontSize = 12.sp,
-                                    fontWeight = FontWeight.Bold,
-                                    color = Color(0xFF1E293B)
-                                )
-                                IconButton(
-                                    onClick = { userPage = (safeUserPage + 1).coerceAtMost(totalUserPages) },
-                                    modifier = Modifier.size(28.dp).background(Color.Transparent, CircleShape),
-                                    enabled = safeUserPage < totalUserPages
-                                ) {
-                                    Icon(
-                                        Icons.Default.ChevronRight,
-                                        contentDescription = "Selanjutnya",
-                                        tint = if (safeUserPage < totalUserPages) Color(0xFF334155) else Color(0xFF94A3B8).copy(alpha = 0.5f),
-                                        modifier = Modifier.size(16.dp)
-                                    )
-                                }
-                            }
-                        }
+                    val userRangeText = if (totalUsers == 0) {
+                        "0 supplier"
+                    } else if (totalUsers <= SUPPLIER_DEBT_USERS_PER_PAGE) {
+                        "$totalUsers supplier"
+                    } else {
+                        "$startUser-$endUser dari $totalUsers supplier"
                     }
+                    TbPagination(
+                        currentPage = safeUserPage,
+                        totalPages = totalUserPages,
+                        onPreviousPage = { userPage = (safeUserPage - 1).coerceAtLeast(1) },
+                        onNextPage = { userPage = (safeUserPage + 1).coerceAtMost(totalUserPages) },
+                        supportingText = userRangeText,
+                        compact = true,
+                        testTag = "supplier-debt-mobile-pagination",
+                    )
                 }
             }
         }

@@ -138,86 +138,22 @@ private fun StockTableFooter(
 ) {
     val safePage = uiState.tablePage.coerceAtLeast(1)
     val safeTotalPages = uiState.totalTablePages.coerceAtLeast(1)
-
-    if (compact) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(top = 10.dp, bottom = 4.dp)
-                .testTag("stock-adjustment-pagination"),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Surface(
-                shape = CircleShape,
-                color = Color.White,
-                border = BorderStroke(1.dp, BorderSlate200),
-            ) {
-                Text(
-                    text = "${uiState.totalTableProducts} produk",
-                    modifier = Modifier.padding(horizontal = 14.dp, vertical = 6.dp),
-                    fontSize = 12.sp,
-                    fontWeight = FontWeight.SemiBold,
-                    color = Color(0xFF475569),
-                )
-            }
-
-            Surface(
-                shape = CircleShape,
-                color = Color.White,
-                border = BorderStroke(1.dp, BorderSlate200),
-            ) {
-                Row(
-                    modifier = Modifier.padding(horizontal = 6.dp, vertical = 3.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    val canPrev = safePage > 1 && !uiState.isLoading
-                    val canNext = safePage < safeTotalPages && !uiState.isLoading
-                    IconButton(
-                        onClick = onPreviousPage,
-                        enabled = canPrev,
-                        modifier = Modifier.size(28.dp),
-                    ) {
-                        Icon(
-                            Icons.Default.ChevronLeft,
-                            contentDescription = "Halaman sebelumnya",
-                            tint = if (canPrev) Color(0xFF475569) else Color(0xFFCBD5E1),
-                            modifier = Modifier.size(16.dp),
-                        )
-                    }
-                    Text(
-                        text = "$safePage / $safeTotalPages",
-                        modifier = Modifier.padding(horizontal = 8.dp),
-                        fontSize = 12.sp,
-                        fontWeight = FontWeight.Medium,
-                        color = Color(0xFF334155),
-                    )
-                    IconButton(
-                        onClick = onNextPage,
-                        enabled = canNext,
-                        modifier = Modifier.size(28.dp),
-                    ) {
-                        Icon(
-                            Icons.Default.ChevronRight,
-                            contentDescription = "Halaman berikutnya",
-                            tint = if (canNext) Color(0xFF475569) else Color(0xFFCBD5E1),
-                            modifier = Modifier.size(16.dp),
-                        )
-                    }
-                }
-            }
-        }
+    val first = if (uiState.totalTableProducts == 0) 0 else (safePage - 1) * STOCK_OPNAME_TABLE_PAGE_SIZE + 1
+    val last = minOf(safePage * STOCK_OPNAME_TABLE_PAGE_SIZE, uiState.totalTableProducts)
+    val text = if (compact) {
+        "${uiState.totalTableProducts} produk"
     } else {
-        val first = if (uiState.totalTableProducts == 0) 0 else (safePage - 1) * STOCK_OPNAME_TABLE_PAGE_SIZE + 1
-        val last = minOf(safePage * STOCK_OPNAME_TABLE_PAGE_SIZE, uiState.totalTableProducts)
-        TbPagination(
-            currentPage = safePage,
-            totalPages = safeTotalPages,
-            onPreviousPage = onPreviousPage,
-            onNextPage = onNextPage,
-            supportingText = "Menampilkan $first–$last dari ${uiState.totalTableProducts} produk",
-            isLoading = uiState.isLoading,
-            testTag = "stock-adjustment-pagination",
-        )
+        "Menampilkan $first–$last dari ${uiState.totalTableProducts} produk"
     }
+
+    TbPagination(
+        currentPage = safePage,
+        totalPages = safeTotalPages,
+        onPreviousPage = onPreviousPage,
+        onNextPage = onNextPage,
+        supportingText = text,
+        isLoading = uiState.isLoading,
+        compact = compact,
+        testTag = "stock-adjustment-pagination",
+    )
 }

@@ -1,5 +1,7 @@
 package com.tbterminal.app.ui.receivables
 
+import com.tbterminal.app.ui.components.TbPagination
+
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -466,35 +468,14 @@ private fun DetailReceivableCard(receivable: Receivable) {
 
 @Composable
 private fun DetailPaginationRow(displayCount: Int, totalCount: Int) {
-    Row(
-        modifier = Modifier.fillMaxWidth().padding(horizontal = 4.dp, vertical = 4.dp),
-        horizontalArrangement = Arrangement.SpaceBetween,
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        Surface(
-            color = Color.White,
-            shape = RoundedCornerShape(50),
-            border = BorderStroke(1.dp, BorderDarker),
-            modifier = Modifier.height(28.dp)
-        ) {
-            Box(modifier = Modifier.padding(horizontal = 14.dp), contentAlignment = Alignment.Center) {
-                Text("$totalCount data", fontSize = 12.sp, fontWeight = FontWeight.SemiBold, color = Slate600)
-            }
-        }
-        
-        Surface(
-            color = Color.White,
-            shape = RoundedCornerShape(50),
-            border = BorderStroke(1.dp, BorderDarker),
-            modifier = Modifier.height(32.dp)
-        ) {
-            Row(modifier = Modifier.padding(horizontal = 12.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                Icon(Icons.Default.ChevronLeft, contentDescription = null, tint = Slate400, modifier = Modifier.size(16.dp))
-                Text("1 / 1", fontSize = 12.sp, fontWeight = FontWeight.SemiBold, color = Slate800)
-                Icon(Icons.Default.ChevronRight, contentDescription = null, tint = Slate600, modifier = Modifier.size(16.dp))
-            }
-        }
-    }
+    TbPagination(
+        currentPage = 1,
+        totalPages = 1,
+        onPreviousPage = {},
+        onNextPage = {},
+        supportingText = "$totalCount data",
+        testTag = "receivable-detail-pagination",
+    )
 }
 
 @Composable

@@ -1,5 +1,7 @@
 package com.tbterminal.app.ui.suppliers
 
+import com.tbterminal.app.ui.components.TbPagination
+
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -257,79 +259,16 @@ private fun SupplierPagination(
     val start = if (totalCount == 0L) 0 else (uiState.page - 1L) * uiState.pageSize + 1
     val end = minOf(uiState.page.toLong() * uiState.pageSize, if (uiState.statusFilter == SupplierStatusFilter.ALL) uiState.totalSuppliers else totalCount)
     val totalDisplay = if (uiState.statusFilter == SupplierStatusFilter.ALL) uiState.totalSuppliers else totalCount
-    val safePage = uiState.page.coerceAtLeast(1)
-    val safeTotalPages = uiState.totalPages.coerceAtLeast(1)
+    val supportingText = "$start–$end dari $totalDisplay supplier"
 
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(top = 4.dp)
-            .testTag("supplier-pagination"),
-        horizontalArrangement = Arrangement.SpaceBetween,
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        // Range Pill
-        Surface(
-            shape = RoundedCornerShape(999.dp),
-            color = Color.White,
-            border = BorderStroke(1.dp, SupplierSlate200),
-        ) {
-            Text(
-                text = "$start-$end dari $totalDisplay supplier",
-                modifier = Modifier.padding(horizontal = 14.dp, vertical = 6.dp),
-                fontSize = 12.sp,
-                fontWeight = FontWeight.Medium,
-                color = SupplierSlate600,
-            )
-        }
-
-        // Navigation Pill
-        Surface(
-            shape = RoundedCornerShape(999.dp),
-            color = Color.White,
-            border = BorderStroke(1.dp, SupplierSlate200),
-        ) {
-            Row(
-                modifier = Modifier.padding(horizontal = 4.dp, vertical = 2.dp),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                val canPrev = safePage > 1 && !uiState.isLoading
-                val canNext = safePage < safeTotalPages && !uiState.isLoading
-
-                IconButton(
-                    onClick = onPreviousPage,
-                    enabled = canPrev,
-                    modifier = Modifier.size(28.dp),
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.ChevronLeft,
-                        contentDescription = "Halaman sebelumnya",
-                        modifier = Modifier.size(16.dp),
-                        tint = if (canPrev) SupplierSlate700 else SupplierSlate300,
-                    )
-                }
-
-                Text(
-                    text = "$safePage / $safeTotalPages",
-                    fontSize = 12.sp,
-                    fontWeight = FontWeight.SemiBold,
-                    color = SupplierSlate800,
-                    modifier = Modifier.padding(horizontal = 6.dp),
-                )
-
-                IconButton(
-                    onClick = onNextPage,
-                    enabled = canNext,
-                    modifier = Modifier.size(28.dp),
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.ChevronRight,
-                        contentDescription = "Halaman berikutnya",
-                        modifier = Modifier.size(16.dp),
-                        tint = if (canNext) SupplierSlate700 else SupplierSlate300,
-                    )
-                }
-            }
-        }
-    }
+    TbPagination(
+        currentPage = uiState.page,
+        totalPages = uiState.totalPages,
+        onPreviousPage = onPreviousPage,
+        onNextPage = onNextPage,
+        supportingText = supportingText,
+        isLoading = uiState.isLoading,
+        compact = compact,
+        testTag = "supplier-pagination",
+    )
 }

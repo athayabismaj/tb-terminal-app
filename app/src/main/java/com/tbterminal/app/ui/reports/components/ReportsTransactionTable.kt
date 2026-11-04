@@ -326,87 +326,23 @@ private fun ReportsTransactionPagination(
     onPreviousPage: () -> Unit,
     onNextPage: () -> Unit,
 ) {
-    if (compact) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(top = 10.dp, bottom = 4.dp)
-                .testTag("report-transactions-pagination"),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Surface(
-                shape = CircleShape,
-                color = Color.White,
-                border = BorderStroke(1.dp, ReportColors.OutlineSoft),
-            ) {
-                Text(
-                    text = if (totalItems == 0L) "0 data" else "$totalItems data",
-                    modifier = Modifier.padding(horizontal = 14.dp, vertical = 6.dp),
-                    fontSize = 12.sp,
-                    fontWeight = FontWeight.SemiBold,
-                    color = Color(0xFF475569),
-                )
-            }
-
-            Surface(
-                shape = CircleShape,
-                color = Color.White,
-                border = BorderStroke(1.dp, ReportColors.OutlineSoft),
-            ) {
-                Row(
-                    modifier = Modifier.padding(horizontal = 6.dp, vertical = 3.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    val canPrev = page > 1 && !isLoading
-                    val canNext = page < totalPages && !isLoading
-                    IconButton(
-                        onClick = onPreviousPage,
-                        enabled = canPrev,
-                        modifier = Modifier.size(28.dp),
-                    ) {
-                        Icon(
-                            Icons.Default.ChevronLeft,
-                            contentDescription = "Halaman sebelumnya",
-                            tint = if (canPrev) Color(0xFF475569) else Color(0xFFCBD5E1),
-                            modifier = Modifier.size(16.dp),
-                        )
-                    }
-                    Text(
-                        text = "$page / ${totalPages.coerceAtLeast(1)}",
-                        modifier = Modifier.padding(horizontal = 8.dp),
-                        fontSize = 12.sp,
-                        fontWeight = FontWeight.Medium,
-                        color = Color(0xFF334155),
-                    )
-                    IconButton(
-                        onClick = onNextPage,
-                        enabled = canNext,
-                        modifier = Modifier.size(28.dp),
-                    ) {
-                        Icon(
-                            Icons.Default.ChevronRight,
-                            contentDescription = "Halaman berikutnya",
-                            tint = if (canNext) Color(0xFF475569) else Color(0xFFCBD5E1),
-                            modifier = Modifier.size(16.dp),
-                        )
-                    }
-                }
-            }
-        }
+    val firstItem = if (totalItems == 0L) 0 else ((page - 1) * REPORTS_PAGE_SIZE) + 1
+    val lastItem = minOf(page * REPORTS_PAGE_SIZE, totalItems.toInt())
+    val text = if (compact) {
+        if (totalItems == 0L) "0 data" else "$totalItems data"
     } else {
-        val firstItem = if (totalItems == 0L) 0 else ((page - 1) * REPORTS_PAGE_SIZE) + 1
-        val lastItem = minOf(page * REPORTS_PAGE_SIZE, totalItems.toInt())
-        TbPagination(
-            currentPage = page,
-            totalPages = totalPages,
-            onPreviousPage = onPreviousPage,
-            onNextPage = onNextPage,
-            supportingText = if (totalItems == 0L) "0 data" else "Menampilkan $firstItem–$lastItem dari $totalItems data",
-            isLoading = isLoading,
-            testTag = "report-transactions-pagination",
-        )
+        if (totalItems == 0L) "0 data" else "Menampilkan $firstItem–$lastItem dari $totalItems data"
     }
+    TbPagination(
+        currentPage = page,
+        totalPages = totalPages,
+        onPreviousPage = onPreviousPage,
+        onNextPage = onNextPage,
+        supportingText = text,
+        isLoading = isLoading,
+        compact = compact,
+        testTag = "report-transactions-pagination",
+    )
 }
 
 @Composable

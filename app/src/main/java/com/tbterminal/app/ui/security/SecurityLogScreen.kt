@@ -1,5 +1,7 @@
 package com.tbterminal.app.ui.security
 
+import com.tbterminal.app.ui.components.TbPagination
+
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -672,81 +674,17 @@ private fun SecurityPagination(
 ) {
     val start = if (uiState.totalLogs == 0L) 0 else (uiState.page - 1L) * uiState.limit + 1
     val end = minOf(uiState.page.toLong() * uiState.limit, uiState.totalLogs)
-    val safePage = uiState.page.coerceAtLeast(1)
-    val safeTotalPages = uiState.totalPages.coerceAtLeast(1)
+    val supportingText = "$start–$end dari ${uiState.totalLogs} data"
 
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(top = 4.dp)
-            .testTag("security-log-pagination"),
-        horizontalArrangement = Arrangement.SpaceBetween,
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        // Range Pill
-        Surface(
-            shape = RoundedCornerShape(999.dp),
-            color = Color.White,
-            border = BorderStroke(1.dp, Slate200),
-        ) {
-            Text(
-                text = "$start–$end dari ${uiState.totalLogs} data",
-                modifier = Modifier.padding(horizontal = 14.dp, vertical = 6.dp),
-                fontSize = 12.sp,
-                fontWeight = FontWeight.Medium,
-                color = Slate600,
-            )
-        }
-
-        // Navigation Pill
-        Surface(
-            shape = RoundedCornerShape(999.dp),
-            color = Color.White,
-            border = BorderStroke(1.dp, Slate200),
-        ) {
-            Row(
-                modifier = Modifier.padding(horizontal = 4.dp, vertical = 2.dp),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                val canPrev = safePage > 1 && !uiState.isLoading
-                val canNext = safePage < safeTotalPages && !uiState.isLoading
-
-                IconButton(
-                    onClick = onPrevious,
-                    enabled = canPrev,
-                    modifier = Modifier.size(28.dp),
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.ChevronLeft,
-                        contentDescription = "Halaman sebelumnya",
-                        modifier = Modifier.size(16.dp),
-                        tint = if (canPrev) Slate700 else Slate300,
-                    )
-                }
-
-                Text(
-                    text = "$safePage / $safeTotalPages",
-                    fontSize = 12.sp,
-                    fontWeight = FontWeight.SemiBold,
-                    color = Slate800,
-                    modifier = Modifier.padding(horizontal = 6.dp),
-                )
-
-                IconButton(
-                    onClick = onNext,
-                    enabled = canNext,
-                    modifier = Modifier.size(28.dp),
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.ChevronRight,
-                        contentDescription = "Halaman berikutnya",
-                        modifier = Modifier.size(16.dp),
-                        tint = if (canNext) Slate700 else Slate300,
-                    )
-                }
-            }
-        }
-    }
+    TbPagination(
+        currentPage = uiState.page,
+        totalPages = uiState.totalPages,
+        onPreviousPage = onPrevious,
+        onNextPage = onNext,
+        supportingText = supportingText,
+        isLoading = uiState.isLoading,
+        testTag = "security-log-pagination",
+    )
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
