@@ -872,12 +872,19 @@ private fun CustomerTableCard(
             uiState.isLoading && uiState.customers.isEmpty() -> CustomerListLoading(compact = compact)
             uiState.errorMessage != null && uiState.customers.isEmpty() -> CustomerEmpty("Pelanggan gagal dimuat.")
             uiState.visibleCustomers.isEmpty() -> CustomerEmpty()
-            compact -> Column(
+            compact -> Surface(
                 modifier = Modifier.fillMaxWidth().testTag("customer-card-list"),
-                verticalArrangement = Arrangement.spacedBy(10.dp),
+                shape = RoundedCornerShape(16.dp),
+                color = Color.White,
+                border = BorderStroke(1.dp, Color(0xFFE2E8F0)),
             ) {
-                uiState.visibleCustomers.forEach { customer ->
-                    CustomerMobileRow(customer, onCustomerDetailClick, onEditCustomerClick, onDeactivateClick, canManage)
+                Column(modifier = Modifier.fillMaxWidth()) {
+                    uiState.visibleCustomers.forEachIndexed { index, customer ->
+                        CustomerMobileCard(customer, onCustomerDetailClick, onEditCustomerClick, onDeactivateClick, canManage)
+                        if (index < uiState.visibleCustomers.lastIndex) {
+                            HorizontalDivider(color = Color(0xFFF1F5F9), thickness = 1.dp)
+                        }
+                    }
                 }
             }
             else -> Surface(
@@ -1636,146 +1643,222 @@ private fun CustomerPagination(uiState: CustomerListUiState, compact: Boolean, o
 }
 
 @Composable
-private fun CustomerMobileRow(
+private fun CustomerMobileCard(
     customer: Customer,
     onDetail: (String) -> Unit,
     onEdit: (String) -> Unit,
     onDeactivate: (Customer) -> Unit,
     canManage: Boolean,
 ) {
-    Surface(
-        modifier = Modifier.fillMaxWidth().testTag("customer-card-${customer.id}"),
-        onClick = { onDetail(customer.id) },
-        color = CustomerSurface,
-        shape = RoundedCornerShape(16.dp),
-        border = BorderStroke(1.dp, com.tbterminal.app.ui.theme.TbOutline.copy(alpha = 0.7f)),
-        shadowElevation = 1.dp
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .testTag("customer-card-${customer.id}")
+            .clickable { onDetail(customer.id) }
+            .padding(16.dp),
+        verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
-        Column(
-            Modifier.fillMaxWidth().padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(14.dp),
+        // Item Header: Avatar, Name & Status Inline, More Menu
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.Top,
         ) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Box(
-                    modifier = Modifier.size(40.dp).clip(CircleShape).background(com.tbterminal.app.ui.theme.TbGreenLight),
-                    contentAlignment = Alignment.Center,
-                ) {
-                    Text(customer.name.initialText(), color = com.tbterminal.app.ui.theme.TbGreenDark, fontSize = 16.sp, fontWeight = FontWeight.Bold)
-                }
-                Spacer(Modifier.width(12.dp))
-                Text(
-                    customer.name,
-                    modifier = Modifier.weight(1f),
-                    color = CustomerText,
-                    fontSize = 14.sp,
-                    fontWeight = FontWeight.SemiBold,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                )
-                CustomerTypeBadge(
-                    isContractor = customer.isContractor,
-                    modifier = Modifier.testTag("customer-type-${customer.id}"),
-                )
-                if (canManage) {
-                    Spacer(Modifier.width(6.dp))
-                    CustomerActionsMenu(customer, onEdit, onDeactivate)
-                }
-            }
-
             Row(
-                modifier = Modifier.fillMaxWidth(),
+                modifier = Modifier.weight(1f).padding(end = 8.dp),
+                verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(12.dp),
-                verticalAlignment = Alignment.Top,
             ) {
-                CustomerInfoRow(
-                    icon = Icons.Outlined.Phone,
-                    label = "Nomor HP",
-                    value = customer.phone ?: "Belum diisi",
-                    modifier = Modifier.weight(1f),
-                    isEmpty = customer.phone.isNullOrBlank()
-                )
-                CustomerInfoRow(
-                    icon = Icons.Outlined.Place,
-                    label = "Alamat",
-                    value = customer.address ?: "Belum diisi",
-                    modifier = Modifier.weight(1f),
-                    maxLines = 2,
-                    isEmpty = customer.address.isNullOrBlank()
-                )
-            }
-
-            HorizontalDivider(color = CustomerLine.copy(alpha = 0.55f))
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(24.dp),
-            ) {
-                Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                    Text("Limit kredit", color = CustomerMuted, fontSize = 11.sp, fontWeight = FontWeight.Medium)
+                CustomerAvatar(customer.name)
+                Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
                     Text(
-                        customer.creditLimit.currencyText(),
-                        color = CustomerText,
+                        text = customer.name,
+                        color = Color(0xFF0F172A),
+                        fontSize = 15.sp,
                         fontWeight = FontWeight.Bold,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    ) {
+                        CustomerStatusInline(
+                            isActive = customer.isActive,
+                            modifier = Modifier.testTag("customer-status-${customer.id}"),
+                        )
+                        CustomerTypeBadge(
+                            isContractor = customer.isContractor,
+                            modifier = Modifier.testTag("customer-type-${customer.id}"),
+                        )
+                    }
+                }
+            }
+            if (canManage) {
+                CustomerActionsMenu(customer, onEdit, onDeactivate)
+            }
+        }
+
+        // Contact & Address Clean List
+        Column(
+            modifier = Modifier.fillMaxWidth().padding(top = 2.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            // Telepon Row
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                Icon(
+                    imageVector = Icons.Outlined.Phone,
+                    contentDescription = null,
+                    modifier = Modifier.size(16.dp),
+                    tint = Color(0xFF256B57),
+                )
+                Text(
+                    text = "Telepon:",
+                    fontSize = 12.sp,
+                    color = Color(0xFF64748B),
+                    fontWeight = FontWeight.Normal,
+                )
+                if (customer.phone.isNullOrBlank()) {
+                    Text(
+                        text = "Belum diisi",
                         fontSize = 12.sp,
+                        color = Color(0xFF94A3B8),
+                        fontStyle = androidx.compose.ui.text.font.FontStyle.Italic,
+                    )
+                } else {
+                    Text(
+                        text = customer.phone,
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.SemiBold,
+                        color = Color(0xFF0F172A),
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
                     )
                 }
-                Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                    Text("Termin pembayaran", color = CustomerMuted, fontSize = 11.sp, fontWeight = FontWeight.Medium)
+            }
+
+            // Alamat Row
+            Row(
+                verticalAlignment = Alignment.Top,
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                Icon(
+                    imageVector = Icons.Outlined.Place,
+                    contentDescription = null,
+                    modifier = Modifier.size(16.dp).padding(top = 1.dp),
+                    tint = Color(0xFF256B57),
+                )
+                Text(
+                    text = "Alamat:",
+                    fontSize = 12.sp,
+                    color = Color(0xFF64748B),
+                    fontWeight = FontWeight.Normal,
+                )
+                if (customer.address.isNullOrBlank()) {
                     Text(
-                        "${customer.paymentTermDays} hari",
-                        color = CustomerText,
-                        fontWeight = FontWeight.Bold,
+                        text = "Belum diisi",
                         fontSize = 12.sp,
+                        color = Color(0xFF94A3B8),
+                        fontStyle = androidx.compose.ui.text.font.FontStyle.Italic,
+                    )
+                } else {
+                    Text(
+                        text = customer.address,
+                        fontSize = 12.sp,
+                        color = Color(0xFF334155),
+                        maxLines = 2,
+                        overflow = TextOverflow.Ellipsis,
                     )
                 }
+            }
+        }
+
+        // Divider & Credit Info (Clean inline text without container)
+        HorizontalDivider(color = Color(0xFFF1F5F9), thickness = 1.dp)
+        Column(
+            modifier = Modifier.fillMaxWidth().padding(top = 2.dp),
+            verticalArrangement = Arrangement.spacedBy(6.dp),
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text(
+                    text = "Limit Kredit",
+                    fontSize = 12.sp,
+                    color = Color(0xFF64748B),
+                    fontWeight = FontWeight.Normal,
+                )
+                Text(
+                    text = customer.creditLimit.currencyText(),
+                    fontSize = 12.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    color = Color(0xFF0F172A),
+                )
+            }
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text(
+                    text = "Termin Pembayaran",
+                    fontSize = 12.sp,
+                    color = Color(0xFF64748B),
+                    fontWeight = FontWeight.Normal,
+                )
+                Text(
+                    text = "${customer.paymentTermDays} hari",
+                    fontSize = 12.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    color = Color(0xFF0F172A),
+                )
             }
         }
     }
 }
 
 @Composable
-private fun CustomerInfoRow(
-    icon: ImageVector,
-    label: String,
-    value: String,
-    modifier: Modifier = Modifier,
-    maxLines: Int = 1,
-    isEmpty: Boolean = false,
-) {
+private fun CustomerAvatar(name: String, modifier: Modifier = Modifier) {
+    Box(
+        modifier = modifier
+            .size(40.dp)
+            .clip(CircleShape)
+            .background(Color(0xFFEAF3EF)),
+        contentAlignment = Alignment.Center,
+    ) {
+        Text(
+            text = name.trim().firstOrNull()?.uppercase() ?: "P",
+            color = Color(0xFF256B57),
+            fontSize = 16.sp,
+            fontWeight = FontWeight.Bold,
+        )
+    }
+}
+
+@Composable
+private fun CustomerStatusInline(isActive: Boolean, modifier: Modifier = Modifier) {
     Row(
-        modifier = modifier.heightIn(min = 40.dp),
-        horizontalArrangement = Arrangement.spacedBy(10.dp),
-        verticalAlignment = Alignment.Top,
+        modifier = modifier,
+        horizontalArrangement = Arrangement.spacedBy(5.dp),
+        verticalAlignment = Alignment.CenterVertically,
     ) {
         Box(
             modifier = Modifier
-                .padding(top = 2.dp)
-                .size(28.dp)
-                .clip(RoundedCornerShape(8.dp))
-                .background(com.tbterminal.app.ui.theme.TbGreenLight.copy(alpha = 0.7f)),
-            contentAlignment = Alignment.Center,
-        ) {
-            Icon(
-                imageVector = icon,
-                contentDescription = null,
-                modifier = Modifier.size(14.dp),
-                tint = com.tbterminal.app.ui.theme.TbGreenDark,
-            )
-        }
-        Column(modifier = Modifier.weight(1f)) {
-            Text(label, color = CustomerMuted, fontSize = 11.sp, fontWeight = FontWeight.Medium)
-            Text(
-                value,
-                modifier = Modifier.padding(top = 4.dp),
-                color = if (isEmpty) CustomerMuted else CustomerText,
-                fontSize = 12.sp,
-                fontWeight = if (isEmpty) FontWeight.Normal else FontWeight.SemiBold,
-                fontStyle = if (isEmpty) androidx.compose.ui.text.font.FontStyle.Italic else androidx.compose.ui.text.font.FontStyle.Normal,
-                maxLines = maxLines,
-                overflow = TextOverflow.Ellipsis,
-            )
-        }
+                .size(6.dp)
+                .clip(CircleShape)
+                .background(if (isActive) Color(0xFF256B57) else Color(0xFF94A3B8)),
+        )
+        Text(
+            text = if (isActive) "Aktif" else "Nonaktif",
+            color = if (isActive) Color(0xFF256B57) else Color(0xFF64748B),
+            fontSize = 12.sp,
+            fontWeight = FontWeight.Medium,
+        )
     }
 }
 
