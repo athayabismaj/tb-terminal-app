@@ -1,5 +1,11 @@
 package com.tbterminal.app.ui.dashboard.cashier
 
+import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -18,6 +24,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -37,6 +44,7 @@ import androidx.compose.material.icons.outlined.Settings
 import androidx.compose.material.icons.outlined.Sync
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
@@ -211,6 +219,17 @@ private fun CashierCompactTopBar(
 ) {
     var expanded by rememberSaveable { mutableStateOf(false) }
 
+    val infiniteTransition = rememberInfiniteTransition(label = "TopBarPulseTransition")
+    val dotAlpha by infiniteTransition.animateFloat(
+        initialValue = 0.5f,
+        targetValue = 1f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(800, easing = LinearEasing),
+            repeatMode = RepeatMode.Reverse
+        ),
+        label = "TopBarDotAlpha"
+    )
+
     val displayName = remember(userName) {
         val trimmed = userName.trim()
         if (trimmed.isEmpty() || trimmed.equals("kasir", ignoreCase = true)) {
@@ -218,6 +237,10 @@ private fun CashierCompactTopBar(
         } else {
             trimmed
         }
+    }
+
+    val userInitial = remember(displayName) {
+        displayName.firstOrNull()?.uppercase() ?: "K"
     }
 
     Column(
@@ -229,222 +252,305 @@ private fun CashierCompactTopBar(
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(horizontal = 16.dp, vertical = 12.dp),
-            verticalAlignment = Alignment.CenterVertically
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.SpaceBetween
         ) {
-            // Badge TB dengan status dot hijau di pojok kanan bawah
-            Box(
-                modifier = Modifier
-                    .size(36.dp)
-                    .clip(RoundedCornerShape(10.dp))
-                    .background(Color(0xFFF4F9F5))
-                    .border(1.dp, Color(0xFF1B5E3C).copy(alpha = 0.15f), RoundedCornerShape(10.dp))
-                    .clickable(onClick = onTerminalInfoClick),
-                contentAlignment = Alignment.Center
+            // Sisi Kiri: Badge Logo TB + Title "Terminal Barokah Jaya" + Subtitle "Terminal Kasir"
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(10.dp)
             ) {
-                Text(
-                    text = "TB",
-                    color = Color(0xFF1B5E3C),
-                    fontSize = 13.sp,
-                    fontWeight = FontWeight.ExtraBold
-                )
+                // Button Badge TB
                 Box(
                     modifier = Modifier
-                        .align(Alignment.BottomEnd)
-                        .size(10.dp)
-                        .clip(CircleShape)
-                        .background(Color.White)
-                        .padding(1.5.dp)
-                ) {
-                    Box(
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .clip(CircleShape)
-                            .background(Color(0xFF10B981))
-                    )
-                }
-            }
-            Spacer(modifier = Modifier.width(10.dp))
-            Column(modifier = Modifier.weight(1f)) {
-                Text(
-                    text = "Terminal Barokah Jaya",
-                    color = Color(0xFF0F172A),
-                    fontSize = 15.sp,
-                    fontWeight = FontWeight.Bold,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                    letterSpacing = (-0.3).sp
-                )
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                        .size(36.dp)
+                        .clip(RoundedCornerShape(12.dp))
+                        .background(Color(0xFFF4F9F5))
+                        .border(1.dp, Color(0xFF1B5E3C).copy(alpha = 0.15f), RoundedCornerShape(12.dp))
+                        .clickable(onClick = onTerminalInfoClick),
+                    contentAlignment = Alignment.Center
                 ) {
                     Text(
-                        text = "Terminal Kasir",
-                        color = Color(0xFF64748B),
-                        fontSize = 11.sp,
-                        fontWeight = FontWeight.Medium
-                    )
-                    OfflineStatusMiniDot()
-                }
-            }
-
-            // Profile pill button
-            Surface(
-                onClick = { expanded = !expanded },
-                shape = RoundedCornerShape(999.dp),
-                color = Color(0xFFF8FAFC),
-                border = BorderStroke(1.dp, if (expanded) Color(0xFF1B5E3C) else Color(0xFFE2E8F0)),
-                shadowElevation = 0.5.dp
-            ) {
-                Row(
-                    modifier = Modifier.padding(start = 4.dp, top = 4.dp, end = 10.dp, bottom = 4.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(6.dp)
-                ) {
-                    Box(
-                        modifier = Modifier
-                            .size(24.dp)
-                            .clip(CircleShape)
-                            .background(Color(0xFFE8F3EC)),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Text(
-                            text = displayName.firstOrNull()?.uppercase() ?: "K",
-                            color = Color(0xFF1B5E3C),
-                            fontSize = 11.sp,
-                            fontWeight = FontWeight.Bold
-                        )
-                    }
-                    Text(
-                        text = displayName.take(12),
-                        color = Color(0xFF334155),
+                        text = "TB",
+                        color = Color(0xFF1B5E3C),
                         fontSize = 12.sp,
-                        fontWeight = FontWeight.SemiBold,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis
+                        fontWeight = FontWeight.Bold,
+                        letterSpacing = (-0.3).sp
                     )
-                    Icon(
-                        imageVector = if (expanded) Icons.Outlined.ExpandLess else Icons.Outlined.ExpandMore,
-                        contentDescription = "Menu Profil",
-                        tint = if (expanded) Color(0xFF1B5E3C) else Color(0xFF94A3B8),
-                        modifier = Modifier.size(14.dp)
-                    )
-                }
-            }
-        }
-
-        // Profile Dropdown Popover
-        if (expanded) {
-            Surface(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(start = 16.dp, end = 16.dp, bottom = 12.dp),
-                shape = RoundedCornerShape(16.dp),
-                color = Color.White,
-                border = BorderStroke(1.dp, Color(0xFFE2E8F0)),
-                shadowElevation = 4.dp
-            ) {
-                Column(
-                    modifier = Modifier.padding(10.dp),
-                    verticalArrangement = Arrangement.spacedBy(4.dp)
-                ) {
-                    Row(
+                    // Status dot hijau berkedip di pojok kanan bawah
+                    Box(
                         modifier = Modifier
-                            .fillMaxWidth()
-                            .clip(RoundedCornerShape(12.dp))
-                            .background(Color(0xFFF8FAFC))
-                            .border(1.dp, Color(0xFFF1F5F9), RoundedCornerShape(12.dp))
-                            .padding(10.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(10.dp)
+                            .align(Alignment.BottomEnd)
+                            .size(10.dp)
+                            .clip(CircleShape)
+                            .background(Color.White)
+                            .padding(1.5.dp)
                     ) {
                         Box(
                             modifier = Modifier
-                                .size(36.dp)
+                                .fillMaxSize()
+                                .clip(CircleShape)
+                                .background(Color(0xFF10B981).copy(alpha = dotAlpha))
+                        )
+                    }
+                }
+
+                // Title & Subtitle
+                Column(modifier = Modifier.widthIn(max = 210.dp)) {
+                    Text(
+                        text = "Terminal Barokah Jaya",
+                        color = Color(0xFF0F172A),
+                        fontSize = 14.sp,
+                        fontWeight = FontWeight.Bold,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        letterSpacing = (-0.2).sp
+                    )
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(6.dp),
+                        modifier = Modifier.padding(top = 2.dp)
+                    ) {
+                        Text(
+                            text = "Terminal Kasir",
+                            color = Color(0xFF64748B),
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.Medium
+                        )
+                        OfflineStatusMiniDot()
+                    }
+                }
+            }
+
+            // Sisi Kanan: User Profile Pill Button + Floating Dropdown Popover
+            Box {
+                Surface(
+                    onClick = { expanded = !expanded },
+                    shape = RoundedCornerShape(999.dp),
+                    color = Color(0xFFF8FAFC),
+                    border = BorderStroke(
+                        1.dp,
+                        if (expanded) Color(0xFF1B5E3C) else Color(0xFFE2E8F0).copy(alpha = 0.8f)
+                    ),
+                    shadowElevation = 0.5.dp
+                ) {
+                    Row(
+                        modifier = Modifier.padding(start = 4.dp, top = 4.dp, end = 10.dp, bottom = 4.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                    ) {
+                        // Avatar bulat kecil inisial
+                        Box(
+                            modifier = Modifier
+                                .size(24.dp)
                                 .clip(CircleShape)
                                 .background(Color(0xFFE8F3EC)),
                             contentAlignment = Alignment.Center
                         ) {
                             Text(
-                                text = displayName.firstOrNull()?.uppercase() ?: "K",
+                                text = userInitial,
                                 color = Color(0xFF1B5E3C),
-                                fontSize = 14.sp,
+                                fontSize = 11.sp,
                                 fontWeight = FontWeight.Bold
                             )
                         }
-                        Column(modifier = Modifier.weight(1f)) {
-                            Text(
-                                text = displayName,
-                                color = Color(0xFF0F172A),
-                                fontSize = 13.sp,
-                                fontWeight = FontWeight.Bold,
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis
-                            )
-                            Text(
-                                text = "KASIR · BAROKAH JAYA",
-                                color = Color(0xFF64748B),
-                                fontSize = 10.sp,
-                                fontWeight = FontWeight.SemiBold
-                            )
-                            Spacer(modifier = Modifier.height(4.dp))
+                        // Nama Kasir
+                        Text(
+                            text = displayName.take(12),
+                            color = Color(0xFF334155),
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.SemiBold,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                        // Chevron icon
+                        Icon(
+                            imageVector = if (expanded) Icons.Outlined.ExpandLess else Icons.Outlined.ExpandMore,
+                            contentDescription = "User profile menu",
+                            tint = if (expanded) Color(0xFF1B5E3C) else Color(0xFF94A3B8),
+                            modifier = Modifier.size(14.dp)
+                        )
+                    }
+                }
+
+                // Profile Dropdown Popover Card
+                DropdownMenu(
+                    expanded = expanded,
+                    onDismissRequest = { expanded = false },
+                    modifier = Modifier
+                        .width(260.dp)
+                        .background(Color.White, RoundedCornerShape(16.dp))
+                        .border(1.dp, Color(0xFFF1F5F9), RoundedCornerShape(16.dp))
+                        .padding(8.dp),
+                    shape = RoundedCornerShape(16.dp),
+                    containerColor = Color.White,
+                    shadowElevation = 12.dp
+                ) {
+                    // Header card di dalam dropdown
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clip(RoundedCornerShape(12.dp))
+                            .background(Color(0xFFF8FAFC))
+                            .border(1.dp, Color(0xFFF1F5F9), RoundedCornerShape(12.dp))
+                            .padding(12.dp)
+                    ) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(10.dp)
+                        ) {
                             Box(
                                 modifier = Modifier
-                                    .clip(RoundedCornerShape(999.dp))
-                                    .background(Color(0xFFECFDF5))
-                                    .border(1.dp, Color(0xFFA7F3D0).copy(alpha = 0.6f), RoundedCornerShape(999.dp))
-                                    .padding(horizontal = 8.dp, vertical = 2.dp)
+                                    .size(36.dp)
+                                    .clip(CircleShape)
+                                    .background(Color(0xFFE8F3EC)),
+                                contentAlignment = Alignment.Center
                             ) {
-                                Row(
-                                    verticalAlignment = Alignment.CenterVertically,
-                                    horizontalArrangement = Arrangement.spacedBy(4.dp)
+                                Text(
+                                    text = userInitial,
+                                    color = Color(0xFF1B5E3C),
+                                    fontSize = 14.sp,
+                                    fontWeight = FontWeight.Bold
+                                )
+                            }
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text(
+                                    text = if (displayName.equals("Budi", ignoreCase = true)) "Budi Santoso" else displayName,
+                                    color = Color(0xFF0F172A),
+                                    fontSize = 12.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis
+                                )
+                                Text(
+                                    text = "KASIR · BAROKAH JAYA",
+                                    color = Color(0xFF64748B),
+                                    fontSize = 10.sp,
+                                    fontWeight = FontWeight.Medium,
+                                    letterSpacing = 0.4.sp
+                                )
+                                Spacer(modifier = Modifier.height(4.dp))
+                                Box(
+                                    modifier = Modifier
+                                        .clip(RoundedCornerShape(999.dp))
+                                        .background(Color(0xFFECFDF5))
+                                        .border(1.dp, Color(0xFFA7F3D0).copy(alpha = 0.6f), RoundedCornerShape(999.dp))
+                                        .padding(horizontal = 8.dp, vertical = 2.dp)
                                 ) {
-                                    Box(
-                                        modifier = Modifier
-                                            .size(6.dp)
-                                            .clip(CircleShape)
-                                            .background(Color(0xFF10B981))
-                                    )
-                                    Text(
-                                        text = "Online",
-                                        fontSize = 10.sp,
-                                        fontWeight = FontWeight.SemiBold,
-                                        color = Color(0xFF047857)
-                                    )
+                                    Row(
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        horizontalArrangement = Arrangement.spacedBy(4.dp)
+                                    ) {
+                                        Box(
+                                            modifier = Modifier
+                                                .size(6.dp)
+                                                .clip(CircleShape)
+                                                .background(Color(0xFF10B981).copy(alpha = dotAlpha))
+                                        )
+                                        Text(
+                                            text = "Online",
+                                            fontSize = 11.sp,
+                                            fontWeight = FontWeight.Medium,
+                                            color = Color(0xFF047857)
+                                        )
+                                    }
                                 }
                             }
                         }
                     }
-                    HorizontalDivider(color = Color(0xFFF1F5F9), thickness = 1.dp)
-                    CashierSidebarProfileAction(
+
+                    Spacer(modifier = Modifier.height(4.dp))
+
+                    // Menu Item: Profil Saya
+                    CashierHeaderDropdownItem(
                         icon = Icons.Outlined.Person,
                         label = "Profil Saya",
-                        color = Color(0xFF1E293B)
-                    ) {
-                        expanded = false
-                        onProfileClick()
-                    }
-                    CashierSidebarProfileAction(
+                        textColor = Color(0xFF334155),
+                        iconColor = Color(0xFF475569),
+                        iconBgColor = Color(0xFFF1F5F9),
+                        onClick = {
+                            expanded = false
+                            onProfileClick()
+                        }
+                    )
+
+                    // Menu Item: Pengaturan
+                    CashierHeaderDropdownItem(
                         icon = Icons.Outlined.Settings,
                         label = "Pengaturan",
-                        color = Color(0xFF1E293B)
-                    ) {
-                        expanded = false
-                        onSettingsClick()
-                    }
-                    CashierSidebarProfileAction(
+                        textColor = Color(0xFF334155),
+                        iconColor = Color(0xFF475569),
+                        iconBgColor = Color(0xFFF1F5F9),
+                        onClick = {
+                            expanded = false
+                            onSettingsClick()
+                        }
+                    )
+
+                    HorizontalDivider(
+                        color = Color(0xFFF1F5F9),
+                        thickness = 1.dp,
+                        modifier = Modifier.padding(vertical = 4.dp)
+                    )
+
+                    // Menu Item: Keluar dari Akun
+                    CashierHeaderDropdownItem(
                         icon = Icons.AutoMirrored.Outlined.Logout,
                         label = "Keluar dari Akun",
-                        color = Color(0xFFDC2626),
-                        iconBackground = Color(0xFFFFF1F2)
-                    ) {
-                        expanded = false
-                        onLogout()
-                    }
+                        textColor = Color(0xFFE11D48),
+                        iconColor = Color(0xFFE11D48),
+                        iconBgColor = Color(0xFFFFF1F2),
+                        onClick = {
+                            expanded = false
+                            onLogout()
+                        }
+                    )
                 }
             }
         }
-        HorizontalDivider(color = Color(0xFFE2E8F0), thickness = 1.dp)
+        HorizontalDivider(color = Color(0xFFF1F5F9), thickness = 1.dp)
+    }
+}
+
+@Composable
+private fun CashierHeaderDropdownItem(
+    icon: ImageVector,
+    label: String,
+    textColor: Color,
+    iconColor: Color,
+    iconBgColor: Color,
+    onClick: () -> Unit
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(38.dp)
+            .clip(RoundedCornerShape(8.dp))
+            .clickable(onClick = onClick)
+            .padding(horizontal = 8.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(10.dp)
+    ) {
+        Box(
+            modifier = Modifier
+                .size(26.dp)
+                .clip(RoundedCornerShape(6.dp))
+                .background(iconBgColor),
+            contentAlignment = Alignment.Center
+        ) {
+            Icon(
+                imageVector = icon,
+                contentDescription = label,
+                tint = iconColor,
+                modifier = Modifier.size(14.dp)
+            )
+        }
+        Text(
+            text = label,
+            fontSize = 12.sp,
+            fontWeight = FontWeight.SemiBold,
+            color = textColor
+        )
     }
 }
 
@@ -643,16 +749,17 @@ private fun CashierSidebarBrand(
         Box(
             modifier = Modifier
                 .size(36.dp)
-                .clip(RoundedCornerShape(10.dp))
+                .clip(RoundedCornerShape(12.dp))
                 .background(Color(0xFFF4F9F5))
-                .border(1.dp, Color(0xFF1B5E3C).copy(alpha = 0.15f), RoundedCornerShape(10.dp)),
+                .border(1.dp, Color(0xFF1B5E3C).copy(alpha = 0.15f), RoundedCornerShape(12.dp)),
             contentAlignment = Alignment.Center
         ) {
             Text(
                 text = "TB",
                 color = Color(0xFF1B5E3C),
-                fontSize = 13.sp,
-                fontWeight = FontWeight.ExtraBold
+                fontSize = 12.sp,
+                fontWeight = FontWeight.Bold,
+                letterSpacing = (-0.3).sp
             )
             Box(
                 modifier = Modifier
@@ -739,6 +846,9 @@ private fun CashierSidebarProfileSection(
             trimmed
         }
     }
+    val userInitial = remember(displayName) {
+        displayName.firstOrNull()?.uppercase() ?: "K"
+    }
 
     Column(modifier = Modifier.fillMaxWidth()) {
         if (expanded) {
@@ -748,38 +858,51 @@ private fun CashierSidebarProfileSection(
                     .padding(start = 14.dp, end = 14.dp, bottom = 8.dp),
                 shape = RoundedCornerShape(16.dp),
                 color = Color.White,
-                border = BorderStroke(1.dp, Color(0xFFE2E8F0)),
-                shadowElevation = 3.dp
+                border = BorderStroke(1.dp, Color(0xFFF1F5F9)),
+                shadowElevation = 4.dp
             ) {
                 Column(
                     modifier = Modifier.padding(6.dp),
                     verticalArrangement = Arrangement.spacedBy(2.dp)
                 ) {
-                    CashierSidebarProfileAction(
-                        Icons.Outlined.Person,
-                        "Profil Saya",
-                        Color(0xFF1E293B)
-                    ) {
-                        expanded = false
-                        onProfileClick()
-                    }
-                    CashierSidebarProfileAction(
-                        Icons.Outlined.Settings,
-                        "Pengaturan",
-                        Color(0xFF1E293B)
-                    ) {
-                        expanded = false
-                        onSettingsClick()
-                    }
-                    CashierSidebarProfileAction(
+                    CashierHeaderDropdownItem(
+                        icon = Icons.Outlined.Person,
+                        label = "Profil Saya",
+                        textColor = Color(0xFF334155),
+                        iconColor = Color(0xFF475569),
+                        iconBgColor = Color(0xFFF1F5F9),
+                        onClick = {
+                            expanded = false
+                            onProfileClick()
+                        }
+                    )
+                    CashierHeaderDropdownItem(
+                        icon = Icons.Outlined.Settings,
+                        label = "Pengaturan",
+                        textColor = Color(0xFF334155),
+                        iconColor = Color(0xFF475569),
+                        iconBgColor = Color(0xFFF1F5F9),
+                        onClick = {
+                            expanded = false
+                            onSettingsClick()
+                        }
+                    )
+                    HorizontalDivider(
+                        color = Color(0xFFF1F5F9),
+                        thickness = 1.dp,
+                        modifier = Modifier.padding(vertical = 2.dp)
+                    )
+                    CashierHeaderDropdownItem(
                         icon = Icons.AutoMirrored.Outlined.Logout,
                         label = "Keluar dari Akun",
-                        color = Color(0xFFDC2626),
-                        iconBackground = Color(0xFFFFF1F2)
-                    ) {
-                        expanded = false
-                        onLogout()
-                    }
+                        textColor = Color(0xFFE11D48),
+                        iconColor = Color(0xFFE11D48),
+                        iconBgColor = Color(0xFFFFF1F2),
+                        onClick = {
+                            expanded = false
+                            onLogout()
+                        }
+                    )
                 }
             }
         }
@@ -792,13 +915,13 @@ private fun CashierSidebarProfileSection(
         ) {
             Box(
                 modifier = Modifier
-                    .size(40.dp)
+                    .size(36.dp)
                     .clip(CircleShape)
                     .background(Color(0xFFE8F3EC)),
                 contentAlignment = Alignment.Center
             ) {
                 Text(
-                    text = displayName.firstOrNull()?.uppercase() ?: "K",
+                    text = userInitial,
                     color = Color(0xFF1B5E3C),
                     fontSize = 14.sp,
                     fontWeight = FontWeight.Bold
@@ -815,10 +938,10 @@ private fun CashierSidebarProfileSection(
                     overflow = TextOverflow.Ellipsis
                 )
                 Text(
-                    text = "KASIR",
+                    text = "KASIR · BAROKAH JAYA",
                     color = Color(0xFF64748B),
                     fontSize = 10.sp,
-                    fontWeight = FontWeight.SemiBold,
+                    fontWeight = FontWeight.Medium,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis
                 )
@@ -830,37 +953,6 @@ private fun CashierSidebarProfileSection(
                 modifier = Modifier.size(18.dp)
             )
         }
-    }
-}
-
-@Composable
-private fun CashierSidebarProfileAction(
-    icon: ImageVector,
-    label: String,
-    color: Color,
-    iconBackground: Color = Color(0xFFEAF1F3),
-    onClick: () -> Unit
-) {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .height(42.dp)
-            .clip(RoundedCornerShape(10.dp))
-            .clickable(onClick = onClick)
-            .padding(horizontal = 8.dp),
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        Box(
-            modifier = Modifier
-                .size(28.dp)
-                .clip(RoundedCornerShape(8.dp))
-                .background(iconBackground),
-            contentAlignment = Alignment.Center
-        ) {
-            Icon(icon, contentDescription = label, tint = color, modifier = Modifier.size(16.dp))
-        }
-        Spacer(modifier = Modifier.width(12.dp))
-        Text(label, color = color, fontSize = 13.sp, fontWeight = FontWeight.Medium)
     }
 }
 
@@ -909,16 +1001,17 @@ fun CashierTerminalInfoModalSheet(
                     Box(
                         modifier = Modifier
                             .size(36.dp)
-                            .clip(RoundedCornerShape(10.dp))
+                            .clip(RoundedCornerShape(12.dp))
                             .background(Color(0xFFF4F9F5))
-                            .border(1.dp, Color(0xFF1B5E3C).copy(alpha = 0.15f), RoundedCornerShape(10.dp)),
+                            .border(1.dp, Color(0xFF1B5E3C).copy(alpha = 0.15f), RoundedCornerShape(12.dp)),
                         contentAlignment = Alignment.Center
                     ) {
                         Text(
                             text = "TB",
                             color = Color(0xFF1B5E3C),
-                            fontSize = 13.sp,
-                            fontWeight = FontWeight.ExtraBold
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.Bold,
+                            letterSpacing = (-0.3).sp
                         )
                     }
                     Column {
