@@ -105,6 +105,7 @@ private val Slate700 = Color(0xFF334155)
 private val Slate600 = Color(0xFF475569)
 private val Slate500 = Color(0xFF64748B)
 private val Slate400 = Color(0xFF94A3B8)
+private val Slate300 = Color(0xFFCBD5E1)
 private val Slate200 = Color(0xFFE2E8F0)
 private val Slate100 = Color(0xFFF1F5F9)
 private val Slate50 = Color(0xFFF8FAFC)
@@ -301,7 +302,7 @@ private fun PrimaryHeroMetricCard(
         ?: 0.0
 
     val grossProfit = financialTotals?.grossProfit?.toDouble()
-        ?: (netRevenue * 0.25) // Estimasi proporsional margin laba bila data spesifik belum terisi
+        ?: 0.0
 
     val activeReceivables = metrics?.totalActiveReceivables
         ?: 0.0
@@ -616,8 +617,12 @@ private fun DailySalesTrendCard(
         }
     }
 
+    val hasSalesData = remember(dailySalesTrend) {
+        dailySalesTrend.any { it.totalRevenue > 0 }
+    }
+
     val bars = remember(dailySalesTrend) {
-        if (dailySalesTrend.size >= 2) {
+        if (dailySalesTrend.isNotEmpty() && dailySalesTrend.any { it.totalRevenue > 0 }) {
             val displayItems = if (dailySalesTrend.size > 5) dailySalesTrend.takeLast(5) else dailySalesTrend
             val maxRevenue = displayItems.maxOfOrNull { it.totalRevenue }?.takeIf { it > 0 } ?: 1.0
             displayItems.map { summary ->
@@ -630,19 +635,25 @@ private fun DailySalesTrendCard(
                 )
             }
         } else {
-            // Default 5-slot hourly distribution matching HTML mockup: 08:00 (35%), 11:00 (75%), 14:00 (55%), 17:00 (90% Peak), 20:00 (40%)
-            listOf(
-                TrendBarSlot("08:00", 0.35f, false),
-                TrendBarSlot("11:00", 0.75f, false),
-                TrendBarSlot("14:00", 0.55f, false),
-                TrendBarSlot("17:00", 0.90f, true),
-                TrendBarSlot("20:00", 0.40f, false)
-            )
+            // Real last 5 calendar days with 0/baseline height
+            val today = LocalDate.now()
+            (4 downTo 0).map { offset ->
+                val date = today.minusDays(offset.toLong())
+                TrendBarSlot(
+                    label = date.format(DateTimeFormatter.ofPattern("dd/MM", Locale.forLanguageTag("id-ID"))),
+                    fraction = 0.08f,
+                    isPeak = false
+                )
+            }
         }
     }
 
-    val peakLabel = remember(bars) {
-        bars.firstOrNull { it.isPeak }?.label ?: "17:00"
+    val peakLabel = remember(bars, hasSalesData) {
+        if (hasSalesData) {
+            bars.firstOrNull { it.isPeak }?.label ?: "-"
+        } else {
+            "-"
+        }
     }
 
     Surface(
@@ -749,7 +760,7 @@ private fun DailySalesTrendCard(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Text(
-                    text = if (peakLabel.contains(":")) "Puncak penjualan pukul $peakLabel" else "Puncak penjualan: $peakLabel",
+                    text = if (hasSalesData) "Puncak penjualan: $peakLabel" else "Belum ada transaksi pada periode ini",
                     fontSize = 12.sp,
                     color = Slate400
                 )
@@ -796,29 +807,21 @@ private fun RecentTransactionsCard(
     onTransactionsClick: () -> Unit
 ) {
     val items = remember(recentTransactions) {
-        if (recentTransactions.isNotEmpty()) {
-            recentTransactions.take(3).map { trx ->
-                val receiptNo = if (trx.receiptId.isNotBlank()) {
-                    val code = trx.receiptId.takeLast(6).uppercase()
-                    "#TRX-$code"
-                } else {
-                    "#TRX-${trx.id.takeLast(4).uppercase()}"
-                }
-                val method = trx.paymentMethods.firstOrNull()?.uppercase() ?: "TUNAI"
-                val timeStr = formatIsoTime(trx.createdAt)
-                DisplayTransactionItem(
-                    title = "$receiptNo · 1 item",
-                    subtitle = "$timeStr WIB · $method",
-                    amount = trx.total.toDouble().toRupiah(),
-                    status = if (trx.status.equals("COMPLETED", ignoreCase = true) || trx.status.equals("PAID", ignoreCase = true) || trx.status.equals("LUNAS", ignoreCase = true)) "Lunas" else trx.status
-                )
+        recentTransactions.take(5).map { trx ->
+            val receiptNo = if (trx.receiptId.isNotBlank()) {
+                val code = trx.receiptId.takeLast(6).uppercase()
+                "#TRX-$code"
+            } else {
+                "#TRX-${trx.id.takeLast(4).uppercase()}"
             }
-        } else {
-            // Default 3 transactions from mockup
-            listOf(
-                DisplayTransactionItem("#TRX-8821 · 3 item", "16:42 WIB · Tunai", "Rp78.000", "Lunas"),
-                DisplayTransactionItem("#TRX-8820 · 1 item", "16:15 WIB · QRIS", "Rp45.000", "Lunas"),
-                DisplayTransactionItem("#TRX-8819 · 5 item", "15:50 WIB · Transfer", "Rp125.000", "Lunas")
+            val customer = if (!trx.customerName.isNullOrBlank()) trx.customerName else "Pelanggan Umum"
+            val method = trx.paymentMethods.firstOrNull()?.uppercase() ?: "TUNAI"
+            val timeStr = formatIsoTime(trx.createdAt)
+            DisplayTransactionItem(
+                title = "$receiptNo · $customer",
+                subtitle = "$timeStr WIB · $method",
+                amount = trx.total.toDouble().toRupiah(),
+                status = if (trx.status.equals("COMPLETED", ignoreCase = true) || trx.status.equals("PAID", ignoreCase = true) || trx.status.equals("LUNAS", ignoreCase = true)) "Lunas" else trx.status
             )
         }
     }
@@ -883,12 +886,44 @@ private fun RecentTransactionsCard(
                 }
             }
 
-            // Transaction rows
-            Column(
-                modifier = Modifier.fillMaxWidth(),
-                verticalArrangement = Arrangement.spacedBy(10.dp)
-            ) {
-                items.forEachIndexed { index, item ->
+            if (items.isEmpty()) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(vertical = 16.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Column(
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.spacedBy(6.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.AutoMirrored.Outlined.ReceiptLong,
+                            contentDescription = null,
+                            tint = Slate300,
+                            modifier = Modifier.size(32.dp)
+                        )
+                        Text(
+                            text = "Belum ada transaksi pada periode ini",
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.Medium,
+                            color = Slate500
+                        )
+                        Text(
+                            text = "Transaksi kasir yang selesai akan muncul otomatis di sini.",
+                            fontSize = 11.sp,
+                            color = Slate400,
+                            textAlign = TextAlign.Center
+                        )
+                    }
+                }
+            } else {
+                // Transaction rows
+                Column(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
+                    items.forEachIndexed { index, item ->
                     if (index > 0) {
                         HorizontalDivider(color = Slate100, thickness = 1.dp)
                     }
@@ -967,6 +1002,7 @@ private fun RecentTransactionsCard(
                         }
                     }
                 }
+            }
             }
         }
     }

@@ -62,6 +62,8 @@ import com.tbterminal.app.data.repository.CashReconciliationRepository
 import com.tbterminal.app.data.repository.InventoryRepository
 import com.tbterminal.app.data.repository.PurchasingRepository
 import com.tbterminal.app.data.repository.ReceivableRepository
+import com.tbterminal.app.data.repository.AnalyticsRepository
+import com.tbterminal.app.data.repository.SyncMonitoringRepository
 import com.tbterminal.app.data.repository.RepositoryResult
 import java.math.BigDecimal
 import com.tbterminal.app.ui.barcode.CameraBarcodeScannerDialog
@@ -97,6 +99,8 @@ fun BackofficeHubScreen(
     cashReconciliationRepository: CashReconciliationRepository? = null,
     receivableRepository: ReceivableRepository? = null,
     purchasingRepository: PurchasingRepository? = null,
+    analyticsRepository: AnalyticsRepository? = null,
+    syncMonitoringRepository: SyncMonitoringRepository? = null,
     onNavigate: ((AdminDestination) -> Unit)? = null,
     onLogout: () -> Unit,
     onUserManagementClick: () -> Unit = {},
@@ -135,9 +139,16 @@ fun BackofficeHubScreen(
                         cashReconciliationRepository = cashReconciliationRepository,
                         receivableRepository = receivableRepository,
                         purchasingRepository = purchasingRepository,
+                        analyticsRepository = analyticsRepository,
                         onNavigate = navigate,
                     )
-                    BackofficeSection.STOCK -> StockHub(layout, stockHubContent(role), inventoryRepository, navigate)
+                    BackofficeSection.STOCK -> StockHub(
+                        layout = layout,
+                        content = stockHubContent(role),
+                        inventoryRepository = inventoryRepository,
+                        syncMonitoringRepository = syncMonitoringRepository,
+                        onNavigate = navigate,
+                    )
                     BackofficeSection.MORE -> BackofficeMoreContent(
                         layout = layout,
                         role = role,
@@ -189,63 +200,105 @@ private fun FinanceHub(
     cashReconciliationRepository: CashReconciliationRepository? = null,
     receivableRepository: ReceivableRepository? = null,
     purchasingRepository: PurchasingRepository? = null,
+    analyticsRepository: AnalyticsRepository? = null,
     onNavigate: (AdminDestination) -> Unit,
 ) {
-    var totalCashBalance by remember { mutableStateOf(BigDecimal("14850000")) }
-    var todayCashInflow by remember { mutableStateOf(BigDecimal("1250000")) }
-    var totalReceivables by remember { mutableStateOf(BigDecimal("3400000")) }
-    var receivableNotesCount by remember { mutableIntStateOf(3) }
-    var totalPayables by remember { mutableStateOf(BigDecimal("2100000")) }
-    var payableNotesCount by remember { mutableIntStateOf(2) }
-    var hasActiveSession by remember { mutableStateOf(true) }
+    var totalCashBalance by remember { mutableStateOf(BigDecimal.ZERO) }
+    var todayCashInflow by remember { mutableStateOf(BigDecimal.ZERO) }
+    var totalReceivables by remember { mutableStateOf(BigDecimal.ZERO) }
+    var receivableNotesCount by remember { mutableIntStateOf(0) }
+    var totalPayables by remember { mutableStateOf(BigDecimal.ZERO) }
+    var payableNotesCount by remember { mutableIntStateOf(0) }
+    var hasActiveSession by remember { mutableStateOf(false) }
     var isCashHealthy by remember { mutableStateOf(true) }
-    var isLoading by remember { mutableStateOf(cashReconciliationRepository != null || receivableRepository != null || purchasingRepository != null) }
+    var isLoading by remember { mutableStateOf(true) }
 
-    LaunchedEffect(cashReconciliationRepository, receivableRepository, purchasingRepository) {
-        if (cashReconciliationRepository != null || receivableRepository != null || purchasingRepository != null) {
-            cashReconciliationRepository?.let { repo ->
-                when (val sessionRes = repo.getActiveSession()) {
+    LaunchedEffect(cashReconciliationRepository, receivableRepository, purchasingRepository, analyticsRepository) {
+        isLoading = true
+        var loadedBalance = BigDecimal.ZERO
+        var loadedInflow = BigDecimal.ZERO
+        var loadedReceivables = BigDecimal.ZERO
+        var loadedReceivablesCount = 0
+        var loadedPayables = BigDecimal.ZERO
+        var loadedPayablesCount = 0
+
+        // 1. Fetch Analytics for today's summary & receivables
+        if (analyticsRepository != null) {
+            runCatching {
+                val metrics = analyticsRepository.getDashboardMetrics()
+                loadedInflow = BigDecimal.valueOf(metrics.totalRevenueToday)
+                loadedReceivables = BigDecimal.valueOf(metrics.totalActiveReceivables)
+                loadedReceivablesCount = metrics.activeReceivableCount.toInt()
+            }
+        }
+
+        // 2. Fetch Cash Reconciliation for active session or last session cash
+        if (cashReconciliationRepository != null) {
+            runCatching {
+                when (val sessionRes = cashReconciliationRepository.getActiveSession()) {
                     is RepositoryResult.Success -> {
                         val activeSession = sessionRes.data
                         hasActiveSession = activeSession != null
                         if (activeSession != null) {
-                            totalCashBalance = activeSession.systemCash ?: activeSession.openingCash
-                            todayCashInflow = activeSession.systemCash?.subtract(activeSession.openingCash)?.max(BigDecimal.ZERO) ?: activeSession.openingCash
+                            loadedBalance = activeSession.systemCash ?: activeSession.openingCash
+                            val sessionInflow = activeSession.systemCash?.subtract(activeSession.openingCash)?.max(BigDecimal.ZERO)
+                            if (sessionInflow != null && sessionInflow > BigDecimal.ZERO) {
+                                loadedInflow = sessionInflow
+                            }
+                        } else {
+                            // If no active session, fetch latest closed session cash balance
+                            when (val lastSessions = cashReconciliationRepository.getSessions(page = 1, limit = 1)) {
+                                is RepositoryResult.Success -> {
+                                    val last = lastSessions.data.data.firstOrNull()
+                                    if (last != null) {
+                                        loadedBalance = last.closingCash ?: last.systemCash ?: last.openingCash
+                                    }
+                                }
+                                else -> Unit
+                            }
                         }
                     }
                     else -> Unit
                 }
             }
+        }
 
-            receivableRepository?.let { repo ->
-                when (val recRes = repo.getReceivables(page = 1, limit = 50, status = "unpaid")) {
+        // 3. Receivables detailed list
+        if (receivableRepository != null) {
+            runCatching {
+                when (val recRes = receivableRepository.getReceivables(page = 1, limit = 50, status = "unpaid")) {
                     is RepositoryResult.Success -> {
                         val page = recRes.data
-                        if (page.data.isNotEmpty()) {
-                            receivableNotesCount = page.total.toInt().coerceAtLeast(page.data.size)
-                            totalReceivables = page.data.fold(BigDecimal.ZERO) { acc, r -> acc.add(r.remainingAmount) }
-                        }
+                        loadedReceivablesCount = page.total.toInt().coerceAtLeast(page.data.size)
+                        loadedReceivables = page.data.fold(BigDecimal.ZERO) { acc, r -> acc.add(r.remainingAmount) }
                     }
                     else -> Unit
                 }
             }
+        }
 
-            purchasingRepository?.let { repo ->
-                when (val payRes = repo.getPayables(page = 1, limit = 50, status = "unpaid")) {
+        // 4. Payables detailed list
+        if (purchasingRepository != null) {
+            runCatching {
+                when (val payRes = purchasingRepository.getPayables(page = 1, limit = 50, status = "unpaid")) {
                     is RepositoryResult.Success -> {
                         val page = payRes.data
-                        if (page.data.isNotEmpty()) {
-                            payableNotesCount = page.total.toInt().coerceAtLeast(page.data.size)
-                            totalPayables = page.data.fold(BigDecimal.ZERO) { acc, p -> acc.add(p.remainingAmount) }
-                        }
+                        loadedPayablesCount = page.total.toInt().coerceAtLeast(page.data.size)
+                        loadedPayables = page.data.fold(BigDecimal.ZERO) { acc, p -> acc.add(p.remainingAmount) }
                     }
                     else -> Unit
                 }
             }
-
-            isCashHealthy = totalCashBalance >= totalPayables
-            isLoading = false
         }
+
+        totalCashBalance = loadedBalance
+        todayCashInflow = loadedInflow
+        totalReceivables = loadedReceivables
+        receivableNotesCount = loadedReceivablesCount
+        totalPayables = loadedPayables
+        payableNotesCount = loadedPayablesCount
+        isCashHealthy = loadedBalance >= loadedPayables
+        isLoading = false
     }
 
     Column(
@@ -765,6 +818,7 @@ private fun StockHub(
     layout: TbLayoutInfo,
     content: BackofficeHubContent,
     inventoryRepository: InventoryRepository? = null,
+    syncMonitoringRepository: SyncMonitoringRepository? = null,
     onNavigate: (AdminDestination) -> Unit,
 ) {
     var showBarcodeScanner by remember { mutableStateOf(false) }
@@ -783,18 +837,59 @@ private fun StockHub(
     var valuationSummary by remember { mutableStateOf<com.tbterminal.app.data.costing.InventoryValuationSummary?>(null) }
     var lowStockCount by remember { mutableIntStateOf(0) }
     var totalProductsCount by remember { mutableIntStateOf(0) }
+    var totalCategoriesCount by remember { mutableIntStateOf(0) }
+    var totalUnitsCount by remember { mutableIntStateOf(0) }
+    var syncStatusText by remember { mutableStateOf("Tersinkron") }
+    var isSyncHealthy by remember { mutableStateOf(true) }
     var isLoading by remember { mutableStateOf(inventoryRepository != null) }
 
     LaunchedEffect(inventoryRepository) {
         if (inventoryRepository != null) {
-            val result = inventoryRepository.getProductStocks(page = 1, limit = 100)
-            if (result is RepositoryResult.Success) {
-                val products = result.data.data
-                valuationSummary = com.tbterminal.app.data.costing.MovingAverageCalculator.calculateInventoryValuation(products)
-                lowStockCount = products.count { it.isActive && it.quantity <= it.minStock }
-                totalProductsCount = result.data.total.toInt().coerceAtLeast(products.size)
+            isLoading = true
+            runCatching {
+                val result = inventoryRepository.getProductStocks(page = 1, limit = 100)
+                if (result is RepositoryResult.Success) {
+                    val products = result.data.data
+                    valuationSummary = com.tbterminal.app.data.costing.MovingAverageCalculator.calculateInventoryValuation(products)
+                    lowStockCount = products.count { it.isActive && it.quantity <= it.minStock }
+                    totalProductsCount = result.data.total.toInt().coerceAtLeast(products.size)
+                }
+            }
+            runCatching {
+                when (val catRes = inventoryRepository.getCategories()) {
+                    is RepositoryResult.Success -> totalCategoriesCount = catRes.data.size
+                    else -> Unit
+                }
+            }
+            runCatching {
+                when (val unitRes = inventoryRepository.getUnits()) {
+                    is RepositoryResult.Success -> totalUnitsCount = unitRes.data.size
+                    else -> Unit
+                }
             }
             isLoading = false
+        }
+    }
+
+    LaunchedEffect(syncMonitoringRepository) {
+        syncMonitoringRepository?.let { repo ->
+            repo.observeSnapshot().collect { snapshot ->
+                when {
+                    snapshot.totalFailed > 0 -> {
+                        syncStatusText = "${snapshot.totalFailed} Gagal"
+                        isSyncHealthy = false
+                    }
+                    snapshot.totalPending > 0 || snapshot.totalSyncing > 0 -> {
+                        val pendingCount = snapshot.totalPending + snapshot.totalSyncing
+                        syncStatusText = "$pendingCount Menunggu"
+                        isSyncHealthy = false
+                    }
+                    else -> {
+                        syncStatusText = "Tersinkron"
+                        isSyncHealthy = true
+                    }
+                }
+            }
         }
     }
 
@@ -876,6 +971,8 @@ private fun StockHub(
             valuationSummary = valuationSummary,
             totalProductsCount = totalProductsCount,
             lowStockCount = lowStockCount,
+            syncStatusText = syncStatusText,
+            isSyncHealthy = isSyncHealthy,
             isLoading = isLoading,
             onLowStockClick = { onNavigate(AdminDestination.Products) }
         )
@@ -971,14 +1068,14 @@ private fun StockHub(
                     StockHubItem(
                         icon = Icons.Outlined.Category,
                         title = "Kategori Produk",
-                        subtitle = "Kelompok & rak etalase",
+                        subtitle = if (totalCategoriesCount > 0) "$totalCategoriesCount kategori terdaftar" else "Kelompok & rak etalase",
                         onClick = { onNavigate(AdminDestination.ProductCategories) },
                     )
                     HorizontalDivider(color = StockSlate100, thickness = 1.dp)
                     StockHubItem(
                         icon = Icons.Outlined.Straighten,
                         title = "Satuan Ukuran",
-                        subtitle = "Pcs, sak, batang, dus, meter",
+                        subtitle = if (totalUnitsCount > 0) "$totalUnitsCount satuan ukuran terdaftar" else "Pcs, sak, batang, dus, meter",
                         onClick = { onNavigate(AdminDestination.ProductUnits) },
                     )
                 }
@@ -993,6 +1090,8 @@ private fun StockValuationDashboardCard(
     valuationSummary: com.tbterminal.app.data.costing.InventoryValuationSummary?,
     totalProductsCount: Int,
     lowStockCount: Int,
+    syncStatusText: String,
+    isSyncHealthy: Boolean,
     isLoading: Boolean,
     onLowStockClick: () -> Unit,
 ) {
@@ -1205,13 +1304,15 @@ private fun StockValuationDashboardCard(
                             modifier = Modifier
                                 .size(6.dp)
                                 .clip(CircleShape)
-                                .background(StockBrand500)
+                                .background(if (isSyncHealthy) StockBrand500 else Color(0xFFD97706))
                         )
                         Text(
-                            text = "Tersinkron",
+                            text = syncStatusText,
                             fontSize = 14.sp,
                             fontWeight = FontWeight.SemiBold,
-                            color = StockSlate800
+                            color = StockSlate800,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
                         )
                     }
                 }
