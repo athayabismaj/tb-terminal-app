@@ -120,27 +120,31 @@ fun OfflineStatusMiniDot(
         !status.isInternetOnline -> "Offline"
         status.backendStatus == BackendStatus.UNREACHABLE -> "Server Terputus"
         isSyncing -> "Sinkronisasi (${status.pendingSyncCount})"
-        isNormal -> "Server Aktif"
-        else -> "Memeriksa"
+        isNormal -> ""
+        else -> ""
     }
 
-    Row(
-        modifier = modifier,
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(4.dp)
-    ) {
-        Box(
-            modifier = Modifier
-                .size(6.dp)
-                .clip(CircleShape)
-                .background(dotColor)
-        )
-        Text(
-            text = labelText,
-            fontSize = 9.sp,
-            fontWeight = FontWeight.Medium,
-            color = dotColor
-        )
+    if (!isNormal || labelText.isNotEmpty()) {
+        Row(
+            modifier = modifier,
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(4.dp)
+        ) {
+            Box(
+                modifier = Modifier
+                    .size(6.dp)
+                    .clip(CircleShape)
+                    .background(dotColor)
+            )
+            if (labelText.isNotEmpty()) {
+                Text(
+                    text = labelText,
+                    fontSize = 9.sp,
+                    fontWeight = FontWeight.Medium,
+                    color = dotColor
+                )
+            }
+        }
     }
 }
 
