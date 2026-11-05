@@ -2,6 +2,7 @@ package com.tbterminal.app.ui.dashboard.cashier
 
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -40,6 +41,7 @@ import androidx.compose.material3.NavigationBarItemDefaults
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -188,97 +190,178 @@ private fun CashierCompactTopBar(
 ) {
     var expanded by rememberSaveable { mutableStateOf(false) }
 
-    Column(modifier = Modifier.fillMaxWidth()) {
+    val displayName = remember(userName) {
+        val trimmed = userName.trim()
+        if (trimmed.isEmpty() || trimmed.equals("kasir", ignoreCase = true)) {
+            "Kasir"
+        } else {
+            trimmed
+        }
+    }
+
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .background(Color.White)
+    ) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 16.dp, vertical = 10.dp),
+                .padding(horizontal = 16.dp, vertical = 12.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
             Box(
                 modifier = Modifier
-                    .size(32.dp)
-                    .clip(RoundedCornerShape(9.dp))
-                    .background(Color(0xFFE6ECEF)),
+                    .size(36.dp)
+                    .clip(RoundedCornerShape(10.dp))
+                    .background(Color(0xFFEEF7F2))
+                    .border(1.dp, Color(0xFFD1FAE5), RoundedCornerShape(10.dp)),
                 contentAlignment = Alignment.Center
             ) {
                 Text(
                     text = "TB",
-                    color = CashierSidebarTextSecondary,
+                    color = Color(0xFF1B5E3C),
                     fontSize = 14.sp,
-                    fontWeight = FontWeight.Bold
+                    fontWeight = FontWeight.ExtraBold
                 )
             }
             Spacer(modifier = Modifier.width(10.dp))
-            Text(
-                text = "Terminal",
-                color = CashierSidebarTextPrimary,
-                fontSize = 19.sp,
-                fontWeight = FontWeight.SemiBold,
-                modifier = Modifier.weight(1f)
-            )
-            Row(
-                modifier = Modifier
-                    .clip(RoundedCornerShape(999.dp))
-                    .clickable { expanded = !expanded }
-                    .padding(start = 8.dp, top = 6.dp, end = 4.dp, bottom = 6.dp),
-                verticalAlignment = Alignment.CenterVertically
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = "Terminal Barokah Jaya",
+                    color = Color(0xFF0F172A),
+                    fontSize = 16.sp,
+                    fontWeight = FontWeight.Bold,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    letterSpacing = (-0.3).sp
+                )
+                Text(
+                    text = "TERMINAL KASIR",
+                    color = Color(0xFF64748B),
+                    fontSize = 10.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    letterSpacing = 0.5.sp
+                )
+            }
+
+            Surface(
+                onClick = { expanded = !expanded },
+                shape = RoundedCornerShape(999.dp),
+                color = Color.White,
+                border = BorderStroke(1.dp, if (expanded) Color(0xFF1B5E3C) else Color(0xFFE2E8F0)),
+                shadowElevation = 0.5.dp
             ) {
-                Box(
-                    modifier = Modifier
-                        .size(32.dp)
-                        .clip(CircleShape)
-                        .background(Color(0xFFE6ECEF)),
-                    contentAlignment = Alignment.Center
+                Row(
+                    modifier = Modifier.padding(start = 4.dp, top = 4.dp, end = 10.dp, bottom = 4.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
+                    Box(
+                        modifier = Modifier
+                            .size(28.dp)
+                            .clip(CircleShape)
+                            .background(Color(0xFFEEF7F2)),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text(
+                            text = displayName.firstOrNull()?.uppercase() ?: "K",
+                            color = Color(0xFF1B5E3C),
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
                     Text(
-                        text = userName.firstOrNull()?.uppercase() ?: "K",
-                        color = CashierSidebarTeal,
-                        fontSize = 13.sp,
-                        fontWeight = FontWeight.Bold
+                        text = displayName.take(12),
+                        color = Color(0xFF1E293B),
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.SemiBold,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                    Icon(
+                        imageVector = if (expanded) Icons.Outlined.ExpandLess else Icons.Outlined.ExpandMore,
+                        contentDescription = "Menu Profil",
+                        tint = if (expanded) Color(0xFF1B5E3C) else Color(0xFF94A3B8),
+                        modifier = Modifier.size(16.dp)
                     )
                 }
-                Icon(
-                    imageVector = if (expanded) Icons.Outlined.ExpandLess else Icons.Outlined.ExpandMore,
-                    contentDescription = null,
-                    tint = CashierSidebarTextSecondary,
-                    modifier = Modifier.size(18.dp)
-                )
             }
         }
         if (expanded) {
             Surface(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(start = 16.dp, end = 16.dp, bottom = 10.dp),
-                shape = RoundedCornerShape(14.dp),
+                    .padding(start = 16.dp, end = 16.dp, bottom = 12.dp),
+                shape = RoundedCornerShape(16.dp),
                 color = Color.White,
-                border = BorderStroke(1.dp, CashierSidebarLine.copy(alpha = 0.75f)),
-                shadowElevation = 1.dp
+                border = BorderStroke(1.dp, Color(0xFFE2E8F0)),
+                shadowElevation = 4.dp
             ) {
-                Column(modifier = Modifier.padding(6.dp)) {
-                    Text(
-                        text = "$userName - ${role.uppercase()}",
-                        color = CashierSidebarTextSecondary,
-                        fontSize = 11.sp,
-                        fontWeight = FontWeight.Medium,
-                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 8.dp),
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis
-                    )
-                    CashierSidebarProfileAction(Icons.Outlined.Person, "Profil", CashierSidebarTextPrimary) {
+                Column(
+                    modifier = Modifier.padding(10.dp),
+                    verticalArrangement = Arrangement.spacedBy(4.dp)
+                ) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 8.dp, vertical = 6.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(10.dp)
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .size(36.dp)
+                                .clip(CircleShape)
+                                .background(Color(0xFFEEF7F2)),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Text(
+                                text = displayName.firstOrNull()?.uppercase() ?: "K",
+                                color = Color(0xFF1B5E3C),
+                                fontSize = 14.sp,
+                                fontWeight = FontWeight.Bold
+                            )
+                        }
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                text = displayName,
+                                color = Color(0xFF0F172A),
+                                fontSize = 13.sp,
+                                fontWeight = FontWeight.Bold,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis
+                            )
+                            Text(
+                                text = "KASIR · TERMINAL BAROKAH JAYA",
+                                color = Color(0xFF64748B),
+                                fontSize = 10.sp,
+                                fontWeight = FontWeight.SemiBold
+                            )
+                        }
+                    }
+                    HorizontalDivider(color = Color(0xFFF1F5F9), thickness = 1.dp)
+                    CashierSidebarProfileAction(
+                        icon = Icons.Outlined.Person,
+                        label = "Profil Saya",
+                        color = Color(0xFF1E293B)
+                    ) {
                         expanded = false
                         onProfileClick()
                     }
-                    CashierSidebarProfileAction(Icons.Outlined.Settings, "Pengaturan", CashierSidebarTextPrimary) {
+                    CashierSidebarProfileAction(
+                        icon = Icons.Outlined.Settings,
+                        label = "Pengaturan",
+                        color = Color(0xFF1E293B)
+                    ) {
                         expanded = false
                         onSettingsClick()
                     }
                     CashierSidebarProfileAction(
                         icon = Icons.AutoMirrored.Outlined.Logout,
-                        label = "Keluar",
-                        color = CashierSidebarDanger,
-                        iconBackground = CashierSidebarDangerSoft
+                        label = "Keluar dari Akun",
+                        color = Color(0xFFDC2626),
+                        iconBackground = Color(0xFFFFF1F2)
                     ) {
                         expanded = false
                         onLogout()
@@ -286,10 +369,9 @@ private fun CashierCompactTopBar(
                 }
             }
         }
-        HorizontalDivider(color = CashierSidebarLine.copy(alpha = 0.65f))
+        HorizontalDivider(color = Color(0xFFE2E8F0), thickness = 1.dp)
     }
 }
-
 @Composable
 private fun CashierBottomNavigation(
     activeDestination: CashierDestination,
@@ -474,33 +556,44 @@ private fun CashierShellSidebar(
 @Composable
 private fun CashierSidebarBrand() {
     Row(
-        modifier = Modifier.padding(start = 27.dp, top = 28.dp, end = 20.dp),
+        modifier = Modifier.padding(start = 22.dp, top = 24.dp, end = 20.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
         Box(
             modifier = Modifier
-                .size(34.dp)
-                .clip(RoundedCornerShape(9.dp))
-                .background(Color(0xFFE6ECEF)),
+                .size(36.dp)
+                .clip(RoundedCornerShape(10.dp))
+                .background(Color(0xFFEEF7F2))
+                .border(1.dp, Color(0xFFD1FAE5), RoundedCornerShape(10.dp)),
             contentAlignment = Alignment.Center
         ) {
             Text(
                 text = "TB",
-                color = CashierSidebarTextSecondary,
-                fontSize = 16.sp,
-                fontWeight = FontWeight.Bold
+                color = Color(0xFF1B5E3C),
+                fontSize = 15.sp,
+                fontWeight = FontWeight.ExtraBold
             )
         }
         Spacer(modifier = Modifier.width(11.dp))
-        Text(
-            text = "Terminal",
-            color = CashierSidebarTextPrimary,
-            fontSize = 21.sp,
-            fontWeight = FontWeight.SemiBold
-        )
+        Column {
+            Text(
+                text = "Terminal Barokah Jaya",
+                color = Color(0xFF0F172A),
+                fontSize = 16.sp,
+                fontWeight = FontWeight.Bold,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+            )
+            Text(
+                text = "TERMINAL KASIR",
+                color = Color(0xFF64748B),
+                fontSize = 10.sp,
+                fontWeight = FontWeight.SemiBold,
+                letterSpacing = 0.5.sp
+            )
+        }
     }
 }
-
 @Composable
 private fun CashierShellSidebarItem(
     icon: ImageVector,
@@ -542,16 +635,25 @@ private fun CashierSidebarProfileSection(
     onLogout: () -> Unit
 ) {
     var expanded by rememberSaveable { mutableStateOf(false) }
+    val displayName = remember(userName) {
+        val trimmed = userName.trim()
+        if (trimmed.isEmpty() || trimmed.equals("kasir", ignoreCase = true)) {
+            "Kasir"
+        } else {
+            trimmed
+        }
+    }
+
     Column(modifier = Modifier.fillMaxWidth()) {
         if (expanded) {
             Surface(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(start = 18.dp, end = 18.dp, bottom = 8.dp),
-                shape = RoundedCornerShape(14.dp),
+                    .padding(start = 14.dp, end = 14.dp, bottom = 8.dp),
+                shape = RoundedCornerShape(16.dp),
                 color = Color.White,
-                border = BorderStroke(1.dp, CashierSidebarLine.copy(alpha = 0.75f)),
-                shadowElevation = 1.dp
+                border = BorderStroke(1.dp, Color(0xFFE2E8F0)),
+                shadowElevation = 3.dp
             ) {
                 Column(
                     modifier = Modifier.padding(6.dp),
@@ -559,8 +661,8 @@ private fun CashierSidebarProfileSection(
                 ) {
                     CashierSidebarProfileAction(
                         Icons.Outlined.Person,
-                        "Profil",
-                        CashierSidebarTextPrimary
+                        "Profil Saya",
+                        Color(0xFF1E293B)
                     ) {
                         expanded = false
                         onProfileClick()
@@ -568,16 +670,16 @@ private fun CashierSidebarProfileSection(
                     CashierSidebarProfileAction(
                         Icons.Outlined.Settings,
                         "Pengaturan",
-                        CashierSidebarTextPrimary
+                        Color(0xFF1E293B)
                     ) {
                         expanded = false
                         onSettingsClick()
                     }
                     CashierSidebarProfileAction(
                         icon = Icons.AutoMirrored.Outlined.Logout,
-                        label = "Keluar",
-                        color = CashierSidebarDanger,
-                        iconBackground = CashierSidebarDangerSoft
+                        label = "Keluar dari Akun",
+                        color = Color(0xFFDC2626),
+                        iconBackground = Color(0xFFFFF1F2)
                     ) {
                         expanded = false
                         onLogout()
@@ -589,37 +691,39 @@ private fun CashierSidebarProfileSection(
             modifier = Modifier
                 .fillMaxWidth()
                 .clickable { expanded = !expanded }
-                .padding(horizontal = 20.dp, vertical = 16.dp),
+                .padding(horizontal = 16.dp, vertical = 14.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
             Box(
                 modifier = Modifier
-                    .size(42.dp)
+                    .size(40.dp)
                     .clip(CircleShape)
-                    .background(Color(0xFFE6ECEF)),
+                    .background(Color(0xFFEEF7F2))
+                    .border(1.dp, Color(0xFFD1FAE5), CircleShape),
                 contentAlignment = Alignment.Center
             ) {
                 Text(
-                    text = userName.firstOrNull()?.uppercase() ?: "K",
-                    color = CashierSidebarTeal,
-                    fontSize = 15.sp,
+                    text = displayName.firstOrNull()?.uppercase() ?: "K",
+                    color = Color(0xFF1B5E3C),
+                    fontSize = 14.sp,
                     fontWeight = FontWeight.Bold
                 )
             }
             Spacer(modifier = Modifier.width(10.dp))
             Column(modifier = Modifier.weight(1f)) {
                 Text(
-                    text = userName,
-                    color = CashierSidebarTextPrimary,
-                    fontSize = 14.sp,
-                    fontWeight = FontWeight.Medium,
+                    text = displayName,
+                    color = Color(0xFF0F172A),
+                    fontSize = 13.sp,
+                    fontWeight = FontWeight.Bold,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis
                 )
                 Text(
-                    text = role.uppercase(),
-                    color = CashierSidebarTextSecondary,
+                    text = "KASIR",
+                    color = Color(0xFF64748B),
                     fontSize = 10.sp,
+                    fontWeight = FontWeight.SemiBold,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis
                 )
@@ -627,13 +731,12 @@ private fun CashierSidebarProfileSection(
             Icon(
                 imageVector = if (expanded) Icons.Outlined.ExpandLess else Icons.Outlined.ExpandMore,
                 contentDescription = null,
-                tint = CashierSidebarTextSecondary,
+                tint = if (expanded) Color(0xFF1B5E3C) else Color(0xFF94A3B8),
                 modifier = Modifier.size(18.dp)
             )
         }
     }
 }
-
 @Composable
 private fun CashierSidebarProfileAction(
     icon: ImageVector,
