@@ -132,8 +132,8 @@ private fun MoreMenuGroup(
 @Composable
 private fun MoreMenuRow(action: MoreMenuAction, onClick: () -> Unit) {
     val isLogout = action == MoreMenuAction.LOGOUT
-    val iconBg = if (isLogout) Color(0xFFFFEEF0) else Color(0xFFE1EFEA)
-    val iconTint = if (isLogout) Color(0xFFE11D48) else Color(0xFF1B4D3E)
+    val iconBg = if (isLogout) Color(0xFFFFEEF0) else Color(0xFFEEF7F2)
+    val iconTint = if (isLogout) Color(0xFFE11D48) else Color(0xFF1B5E3C)
     val textColor = if (isLogout) Color(0xFFE11D48) else Color(0xFF0F172A)
 
     Row(

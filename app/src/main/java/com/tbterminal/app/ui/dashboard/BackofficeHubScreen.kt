@@ -164,13 +164,13 @@ private val StockSlate300 = Color(0xFFCBD5E1)
 private val StockSlate200 = Color(0xFFE2E8F0)
 private val StockSlate100 = Color(0xFFF1F5F9)
 
-private val FinanceBrand50 = Color(0xFFECFDF5)
+private val FinanceBrand50 = Color(0xFFEEF7F2)
 private val FinanceBrand100 = Color(0xFFD1FAE5)
 private val FinanceBrand200 = Color(0xFFA7F3D0)
-private val FinanceBrand600 = Color(0xFF059669)
-private val FinanceBrand700 = Color(0xFF047857)
-private val FinanceBrand800 = Color(0xFF065F46)
-private val FinanceBrand900 = Color(0xFF064E3B)
+private val FinanceBrand600 = Color(0xFF1B5E3C)
+private val FinanceBrand700 = Color(0xFF15803D)
+private val FinanceBrand800 = Color(0xFF1B5E3C)
+private val FinanceBrand900 = Color(0xFF14532D)
 
 private fun formatShortCurrency(amount: BigDecimal): String {
     val value = amount.toDouble()
@@ -753,11 +753,11 @@ private fun FinanceHubItem(
     }
 }
 
-private val StockBrand50 = Color(0xFFF0FDF4)
+private val StockBrand50 = Color(0xFFEEF7F2)
 private val StockBrand100 = Color(0xFFDCFCE7)
 private val StockBrand500 = Color(0xFF16A34A)
-private val StockBrand600 = Color(0xFF15803D)
-private val StockBrand700 = Color(0xFF166534)
+private val StockBrand600 = Color(0xFF1B5E3C)
+private val StockBrand700 = Color(0xFF1B5E3C)
 private val StockBrand800 = Color(0xFF14532D)
 
 @Composable
@@ -1394,10 +1394,10 @@ private fun TransactionsHub(
                             horizontalArrangement = Arrangement.spacedBy(14.dp)
                         ) {
                             Box(
-                                modifier = Modifier.size(40.dp).background(Color(0xFFE1EFEA), RoundedCornerShape(12.dp)),
+                                modifier = Modifier.size(40.dp).background(Color(0xFFEEF7F2), RoundedCornerShape(12.dp)),
                                 contentAlignment = Alignment.Center
                             ) {
-                                Icon(Icons.AutoMirrored.Outlined.ReceiptLong, contentDescription = null, tint = Color(0xFF1B4D3E), modifier = Modifier.size(20.dp))
+                                Icon(Icons.AutoMirrored.Outlined.ReceiptLong, contentDescription = null, tint = Color(0xFF1B5E3C), modifier = Modifier.size(20.dp))
                             }
                             Column(modifier = Modifier.weight(1f)) {
                                 Text("Riwayat penjualan", color = Color(0xFF0F172A), fontSize = 14.sp, fontWeight = FontWeight.SemiBold)
@@ -1453,10 +1453,10 @@ private fun TransactionsHub(
                             horizontalArrangement = Arrangement.spacedBy(14.dp)
                         ) {
                             Box(
-                                modifier = Modifier.size(40.dp).background(Color(0xFFE1EFEA), RoundedCornerShape(12.dp)),
+                                modifier = Modifier.size(40.dp).background(Color(0xFFEEF7F2), RoundedCornerShape(12.dp)),
                                 contentAlignment = Alignment.Center
                             ) {
-                                Icon(Icons.Outlined.LocalShipping, contentDescription = null, tint = Color(0xFF1B4D3E), modifier = Modifier.size(20.dp))
+                                Icon(Icons.Outlined.LocalShipping, contentDescription = null, tint = Color(0xFF1B5E3C), modifier = Modifier.size(20.dp))
                             }
                             Column(modifier = Modifier.weight(1f)) {
                                 Text("Barang masuk / PO", color = Color(0xFF0F172A), fontSize = 14.sp, fontWeight = FontWeight.SemiBold)
@@ -1473,10 +1473,10 @@ private fun TransactionsHub(
                             horizontalArrangement = Arrangement.spacedBy(14.dp)
                         ) {
                             Box(
-                                modifier = Modifier.size(40.dp).background(Color(0xFFE1EFEA), RoundedCornerShape(12.dp)),
+                                modifier = Modifier.size(40.dp).background(Color(0xFFEEF7F2), RoundedCornerShape(12.dp)),
                                 contentAlignment = Alignment.Center
                             ) {
-                                Icon(Icons.AutoMirrored.Outlined.ListAlt, contentDescription = null, tint = Color(0xFF1B4D3E), modifier = Modifier.size(20.dp))
+                                Icon(Icons.AutoMirrored.Outlined.ListAlt, contentDescription = null, tint = Color(0xFF1B5E3C), modifier = Modifier.size(20.dp))
                             }
                             Column(modifier = Modifier.weight(1f)) {
                                 Text("Riwayat pembelian", color = Color(0xFF0F172A), fontSize = 14.sp, fontWeight = FontWeight.SemiBold)

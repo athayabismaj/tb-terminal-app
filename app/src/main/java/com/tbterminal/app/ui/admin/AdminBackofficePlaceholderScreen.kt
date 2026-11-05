@@ -264,8 +264,8 @@ private fun AdminDestination.icon(): ImageVector {
     }
 }
 
-private val AdminPlaceholderBackground = Color(0xFFF4FAFD)
+private val AdminPlaceholderBackground = Color(0xFFF8FAF9)
 private val AdminPlaceholderText = Color(0xFF0F172A)
 private val AdminPlaceholderMuted = Color(0xFF64748B)
-private val AdminPlaceholderLine = Color(0xFFE2E8F0)
-private val AdminPlaceholderPrimary = Color(0xFF059669)
+private val AdminPlaceholderLine = Color(0xFFF1F5F9)
+private val AdminPlaceholderPrimary = Color(0xFF1B5E3C)

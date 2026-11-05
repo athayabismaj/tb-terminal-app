@@ -480,7 +480,8 @@ internal fun TransactionHistoryContent(
                                 .testTag("sales-transaction-grouped-list"),
                             shape = RoundedCornerShape(16.dp),
                             color = Color.White,
-                            border = BorderStroke(1.dp, Color(0xFFE2E8F0)),
+                            border = BorderStroke(1.dp, Color(0xFFF1F5F9)),
+                            shadowElevation = 0.5.dp,
                         ) {
                             Column {
                                 state.transactions.forEachIndexed { index, transaction ->
@@ -1497,12 +1498,23 @@ private fun SalesHistorySectionHeader(
         if (isLoading) {
             SkeletonBox(Modifier.width(110.dp).height(20.dp), shape = RoundedCornerShape(4.dp))
         } else {
-            Text(
-                "Penjualan",
-                fontSize = 16.sp,
-                fontWeight = FontWeight.Bold,
-                color = Color(0xFF0F172A),
-            )
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                Box(
+                    modifier = Modifier
+                        .size(8.dp)
+                        .background(Color(0xFF1B5E3C), CircleShape)
+                )
+                Text(
+                    text = "Daftar Transaksi",
+                    fontSize = 13.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = Color(0xFF0F172A),
+                    letterSpacing = (-0.2).sp
+                )
+            }
         }
     }
 }
@@ -1513,179 +1525,158 @@ private fun SalesTransactionMobileItem(
     transaction: CashTransaction,
     onReceiptClick: (String) -> Unit,
 ) {
-    Column(
+    val statusClean = transaction.status.lowercase()
+    val isPaid = statusClean in listOf("lunas", "paid", "success", "completed")
+    val isPartial = statusClean in listOf("dp", "partial", "pending")
+    val isVoided = statusClean in listOf("voided", "void", "refunded", "cancelled")
+    val isUnpaid = statusClean in listOf("hutang", "unpaid")
+
+    val (badgeBg, badgeText, badgeBorder) = when {
+        isPaid -> Triple(Color(0xFFEEF7F2), Color(0xFF1B5E3C), Color(0xFFC7E0D6))
+        isPartial -> Triple(Color(0xFFFFFBEB), Color(0xFFD97706), Color(0xFFFDE68A))
+        isUnpaid -> Triple(Color(0xFFFEF2F2), Color(0xFFDC2626), Color(0xFFFECACA))
+        isVoided -> Triple(Color(0xFFF1F5F9), Color(0xFF64748B), Color(0xFFE2E8F0))
+        else -> Triple(Color(0xFFEEF7F2), Color(0xFF1B5E3C), Color(0xFFC7E0D6))
+    }
+
+    val customerName = transaction.customerName?.takeIf { it.isNotBlank() } ?: "Pelanggan umum"
+    val cashierName = transaction.cashierName?.takeIf { it.isNotBlank() }
+    val paymentLabel = transaction.paymentMethods.salesPaymentMethodsLabel(transaction.status)
+
+    Row(
         modifier = Modifier
             .fillMaxWidth()
             .clickable { onReceiptClick(transaction.id) }
             .testTag("sales-transaction-${transaction.id}")
-            .padding(16.dp),
+            .padding(horizontal = 16.dp, vertical = 14.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.SpaceBetween,
     ) {
-        // Header: Icon, Details & Chevron
         Row(
-            modifier = Modifier.fillMaxWidth(),
+            modifier = Modifier.weight(1f).padding(end = 12.dp),
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.SpaceBetween,
+            horizontalArrangement = Arrangement.spacedBy(14.dp)
         ) {
-            Row(
-                modifier = Modifier.weight(1f),
-                verticalAlignment = Alignment.CenterVertically,
+            // 42x42dp rounded-12dp icon container (matches Beranda, Keuangan & Stok)
+            Box(
+                modifier = Modifier
+                    .size(42.dp)
+                    .clip(RoundedCornerShape(12.dp))
+                    .background(Color(0xFFEEF7F2)),
+                contentAlignment = Alignment.Center,
             ) {
-                Surface(
-                    modifier = Modifier.size(40.dp),
-                    shape = RoundedCornerShape(12.dp),
-                    color = Color.White,
-                    border = BorderStroke(1.dp, Color(0xFFE2E8F0)),
-                ) {
-                    Box(contentAlignment = Alignment.Center) {
-                        Icon(
-                            Icons.Outlined.Description,
-                            contentDescription = null,
-                            tint = Color(0xFF1E293B),
-                            modifier = Modifier.size(20.dp),
-                        )
-                    }
-                }
-                Spacer(Modifier.width(12.dp))
-                Column(
-                    modifier = Modifier.weight(1f),
+                Icon(
+                    imageVector = Icons.AutoMirrored.Outlined.ReceiptLong,
+                    contentDescription = null,
+                    tint = Color(0xFF1B5E3C),
+                    modifier = Modifier.size(20.dp),
+                )
+            }
+
+            Column(
+                modifier = Modifier.weight(1f),
+                verticalArrangement = Arrangement.spacedBy(2.dp)
+            ) {
+                // Receipt Number
+                Text(
+                    text = transaction.receiptNumber(),
+                    fontSize = 14.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    color = Color(0xFF0F172A),
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+
+                // Customer & Cashier info
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(4.dp)
                 ) {
                     Text(
-                        text = transaction.receiptNumber(),
+                        text = customerName,
                         fontSize = 12.sp,
-                        fontWeight = FontWeight.SemiBold,
-                        color = Color(0xFF0F172A),
+                        fontWeight = FontWeight.Medium,
+                        color = Color(0xFF334155),
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.weight(1f, fill = false)
                     )
-                    Spacer(Modifier.height(2.dp))
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        verticalAlignment = Alignment.CenterVertically,
-                    ) {
+                    if (cashierName != null) {
                         Text(
-                            text = transaction.customerName?.takeIf { it.isNotBlank() } ?: "Pelanggan umum",
-                            fontSize = 11.sp,
-                            fontWeight = FontWeight.Medium,
-                            color = Color(0xFF334155),
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis,
-                            modifier = Modifier.weight(1f, fill = false),
+                            text = "·",
+                            fontSize = 12.sp,
+                            color = Color(0xFF94A3B8)
                         )
                         Text(
-                            text = " • ",
+                            text = cashierName,
                             fontSize = 11.sp,
-                            fontWeight = FontWeight.Normal,
-                            color = Color(0xFFCBD5E1),
-                        )
-                        val cashierName = transaction.cashierName?.takeIf { it.isNotBlank() } ?: "-"
-                        Text(
-                            text = "Kasir: $cashierName",
-                            fontSize = 11.sp,
-                            fontWeight = FontWeight.Normal,
                             color = Color(0xFF64748B),
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis,
-                            modifier = Modifier.weight(1f, fill = false),
-                        )
-                        Text(
-                            text = " • ",
-                            fontSize = 11.sp,
-                            fontWeight = FontWeight.Normal,
-                            color = Color(0xFFCBD5E1),
-                        )
-                        Text(
-                            text = transaction.paymentMethods.salesPaymentMethodsLabel(),
-                            fontSize = 11.sp,
-                            fontWeight = FontWeight.Medium,
-                            color = Color(0xFF475569),
-                            maxLines = 1,
+                            modifier = Modifier.weight(1f, fill = false)
                         )
                     }
                 }
+
+                // Date, Time & Payment Method
+                Text(
+                    text = "${transaction.createdAt.displayDate()} · ${transaction.createdAt.displayTime()} WIB · $paymentLabel",
+                    fontSize = 11.sp,
+                    color = Color(0xFF94A3B8),
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
             }
-            Spacer(Modifier.width(8.dp))
-            Icon(
-                Icons.AutoMirrored.Outlined.KeyboardArrowRight,
-                contentDescription = null,
-                tint = Color(0xFF94A3B8),
-                modifier = Modifier.size(16.dp),
-            )
         }
 
-        Spacer(Modifier.height(10.dp))
-        HorizontalDivider(color = Color(0xFFF1F5F9))
-        Spacer(Modifier.height(10.dp))
-
-        // Details Grid: Baris 1 Total & Dibayar
+        // Right side: Nominal, Status Capsule, Sisa & Chevron
         Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
         ) {
-            Column {
-                Text(
-                    text = "TOTAL",
-                    fontSize = 10.sp,
-                    fontWeight = FontWeight.Medium,
-                    letterSpacing = 0.5.sp,
-                    color = Color(0xFF94A3B8),
-                )
-                Spacer(Modifier.height(2.dp))
+            Column(
+                horizontalAlignment = Alignment.End,
+                verticalArrangement = Arrangement.spacedBy(3.dp)
+            ) {
                 Text(
                     text = transaction.total.moneyText(),
                     fontSize = 14.sp,
-                    fontWeight = FontWeight.SemiBold,
-                    color = Color(0xFF1E293B),
-                )
-            }
-            Column(horizontalAlignment = Alignment.End) {
-                Text(
-                    text = "DIBAYAR",
-                    fontSize = 10.sp,
-                    fontWeight = FontWeight.Medium,
-                    letterSpacing = 0.5.sp,
-                    color = Color(0xFF94A3B8),
-                    textAlign = TextAlign.End,
-                )
-                Spacer(Modifier.height(2.dp))
-                Text(
-                    text = transaction.paidAmount.moneyText(),
-                    fontSize = 14.sp,
                     fontWeight = FontWeight.Bold,
-                    color = Color(0xFF15803D),
+                    color = Color(0xFF0F172A),
                     textAlign = TextAlign.End,
                 )
-            }
-        }
 
-        Spacer(Modifier.height(6.dp))
-        HorizontalDivider(color = Color(0xFFF8FAFC))
-        Spacer(Modifier.height(6.dp))
+                Surface(
+                    shape = RoundedCornerShape(999.dp),
+                    color = badgeBg,
+                    border = BorderStroke(1.dp, badgeBorder.copy(alpha = 0.5f))
+                ) {
+                    Text(
+                        text = transaction.status.salesStatusDisplay(),
+                        fontSize = 10.5.sp,
+                        fontWeight = FontWeight.SemiBold,
+                        color = badgeText,
+                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp)
+                    )
+                }
 
-        // Details Grid: Baris 2 Tanggal & Status
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Text(
-                text = "${transaction.createdAt.displayDate()}, ${transaction.createdAt.displayTime()}",
-                fontSize = 12.sp,
-                fontWeight = FontWeight.Medium,
-                color = Color(0xFF64748B),
-            )
-            val statusColor = when (transaction.status.lowercase()) {
-                "lunas", "paid", "success", "completed" -> Color(0xFF15803D)
-                "dp", "partial", "pending" -> Color(0xFFD97706)
-                "voided", "void", "refunded", "cancelled" -> Color(0xFFE11D48)
-                "hutang", "unpaid" -> Color(0xFFEA580C)
-                else -> Color(0xFF15803D)
+                val remaining = transaction.remainingAmount ?: transaction.total.subtract(transaction.paidAmount).max(BigDecimal.ZERO)
+                if (remaining > BigDecimal.ZERO && !isPaid) {
+                    Text(
+                        text = "Sisa: ${remaining.moneyText()}",
+                        fontSize = 10.sp,
+                        fontWeight = FontWeight.Medium,
+                        color = Color(0xFFD97706),
+                        textAlign = TextAlign.End,
+                    )
+                }
             }
-            Text(
-                text = transaction.status.salesStatusDisplay(),
-                fontSize = 12.sp,
-                fontWeight = FontWeight.SemiBold,
-                color = statusColor,
+
+            Icon(
+                imageVector = Icons.AutoMirrored.Outlined.KeyboardArrowRight,
+                contentDescription = null,
+                tint = Color(0xFFCBD5E1),
+                modifier = Modifier.size(16.dp),
             )
         }
     }
@@ -1696,88 +1687,13 @@ private fun SalesTransactionCard(transaction: CashTransaction, onReceiptClick: (
     Surface(
         modifier = Modifier
             .fillMaxWidth()
-            .clickable { onReceiptClick(transaction.id) }
             .testTag("sales-transaction-${transaction.id}"),
-        color = TbSurface,
-        shape = RoundedCornerShape(18.dp),
-        border = BorderStroke(1.dp, TbOutline),
-        tonalElevation = 1.dp,
+        color = Color.White,
+        shape = RoundedCornerShape(16.dp),
+        border = BorderStroke(1.dp, Color(0xFFF1F5F9)),
+        shadowElevation = 0.5.dp,
     ) {
-        Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-            Row(verticalAlignment = Alignment.Top) {
-                Column(modifier = Modifier.weight(1f)) {
-                    Text(
-                        transaction.receiptNumber(),
-                        style = MaterialTheme.typography.titleSmall,
-                        fontWeight = FontWeight.SemiBold,
-                        color = TbText,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                    )
-                    Text(
-                        "${transaction.createdAt.displayDate()} · ${transaction.createdAt.displayTime()}",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = TbTextMuted,
-                    )
-                }
-                SalesStatusBadge(transaction.status)
-            }
-            HorizontalDivider(color = TbOutline.copy(alpha = 0.72f))
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Box(
-                    modifier = Modifier.size(36.dp).clip(CircleShape)
-                        .background(MaterialTheme.colorScheme.primaryContainer),
-                    contentAlignment = Alignment.Center,
-                ) {
-                    Icon(
-                        Icons.AutoMirrored.Outlined.ReceiptLong, null,
-                        tint = MaterialTheme.colorScheme.onPrimaryContainer,
-                        modifier = Modifier.size(19.dp),
-                    )
-                }
-                Spacer(Modifier.width(10.dp))
-                Column(modifier = Modifier.weight(1f)) {
-                    Text(
-                        transaction.customerName ?: "Pelanggan umum",
-                        style = MaterialTheme.typography.bodyMedium,
-                        fontWeight = FontWeight.Medium,
-                        color = TbText,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                    )
-                    Text(
-                        buildSalesMeta(transaction),
-                        style = MaterialTheme.typography.bodySmall,
-                        color = TbTextMuted,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                    )
-                }
-                Column(horizontalAlignment = Alignment.End) {
-                    Text("Total", style = MaterialTheme.typography.labelSmall, color = TbTextMuted)
-                    Text(
-                        transaction.total.moneyText(),
-                        style = MaterialTheme.typography.bodyLarge,
-                        fontWeight = FontWeight.SemiBold,
-                        color = TbText,
-                    )
-                }
-            }
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Text(
-                    "Dibayar ${transaction.paidAmount.moneyText()}",
-                    modifier = Modifier.weight(1f),
-                    style = MaterialTheme.typography.labelMedium,
-                    color = TbTextMuted,
-                )
-                Text("Lihat struk", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.primary)
-                Icon(
-                    Icons.AutoMirrored.Outlined.KeyboardArrowRight, null,
-                    tint = MaterialTheme.colorScheme.primary,
-                    modifier = Modifier.size(20.dp),
-                )
-            }
-        }
+        SalesTransactionMobileItem(transaction, onReceiptClick)
     }
 }
 

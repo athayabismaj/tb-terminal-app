@@ -219,9 +219,9 @@ fun BackofficeAdaptiveShell(
                                 selected = selected,
                                 onClick = { onSectionSelected(item.section) },
                                 colors = androidx.compose.material3.NavigationBarItemDefaults.colors(
-                                    selectedIconColor = Color(0xFF256B57),
-                                    selectedTextColor = Color(0xFF256B57),
-                                    indicatorColor = Color(0xFFE1EFEA),
+                                    selectedIconColor = Color(0xFF1B5E3C),
+                                    selectedTextColor = Color(0xFF1B5E3C),
+                                    indicatorColor = Color(0xFFEEF7F2),
                                     unselectedIconColor = Color(0xFF94A3B8),
                                     unselectedTextColor = Color(0xFF64748B)
                                 )

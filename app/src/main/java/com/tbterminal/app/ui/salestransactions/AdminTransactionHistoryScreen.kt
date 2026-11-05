@@ -118,7 +118,7 @@ fun AdminTransactionHistoryScreen(
                 Icon(
                     imageVector = Icons.Outlined.Search,
                     contentDescription = "Cari transaksi",
-                    tint = if (isSearchExpanded || uiState.query.isNotEmpty()) Color(0xFF256B57) else Color(0xFF475569),
+                    tint = if (isSearchExpanded || uiState.query.isNotEmpty()) Color(0xFF1B5E3C) else Color(0xFF64748B),
                     modifier = Modifier.size(20.dp)
                 )
             }
@@ -135,7 +135,7 @@ fun AdminTransactionHistoryScreen(
                     Icon(
                         imageVector = Icons.Outlined.Tune,
                         contentDescription = "Filter transaksi",
-                        tint = if (isFiltered) Color(0xFF256B57) else Color(0xFF475569),
+                        tint = if (isFiltered) Color(0xFF1B5E3C) else Color(0xFF64748B),
                         modifier = Modifier.size(20.dp)
                     )
                 }
@@ -159,7 +159,7 @@ fun AdminTransactionHistoryScreen(
                 Icon(
                     imageVector = Icons.Outlined.Description,
                     contentDescription = "Tampilkan rekap transaksi",
-                    tint = Color(0xFF475569),
+                    tint = Color(0xFF64748B),
                     modifier = Modifier.size(20.dp)
                 )
             }
