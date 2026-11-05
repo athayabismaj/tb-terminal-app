@@ -132,7 +132,14 @@ fun BackofficeHubScreen(
                 verticalArrangement = Arrangement.spacedBy(if (layout.isCompact) 20.dp else 24.dp),
             ) {
                 when (section) {
-                    BackofficeSection.TRANSACTIONS -> TransactionsHub(layout, role, navigate)
+                    BackofficeSection.TRANSACTIONS -> TransactionsHub(
+                        layout = layout,
+                        role = role,
+                        analyticsRepository = analyticsRepository,
+                        cashReconciliationRepository = cashReconciliationRepository,
+                        purchasingRepository = purchasingRepository,
+                        onNavigate = navigate,
+                    )
                     BackofficeSection.FINANCE -> FinanceHub(
                         layout = layout,
                         content = financeHubContent(role),
@@ -1384,10 +1391,80 @@ private fun StockHubItem(
 private fun TransactionsHub(
     layout: TbLayoutInfo,
     role: String,
+    analyticsRepository: AnalyticsRepository? = null,
+    cashReconciliationRepository: CashReconciliationRepository? = null,
+    purchasingRepository: PurchasingRepository? = null,
     onNavigate: (AdminDestination) -> Unit,
 ) {
     var mode by remember { mutableStateOf("penjualan") }
-    
+    var todayRevenue by remember { mutableStateOf(BigDecimal.ZERO) }
+    var todayTrxCount by remember { mutableIntStateOf(0) }
+    var hasActiveSession by remember { mutableStateOf(false) }
+
+    var monthlyPurchases by remember { mutableStateOf(BigDecimal.ZERO) }
+    var monthlyPurchasesCount by remember { mutableIntStateOf(0) }
+
+    LaunchedEffect(analyticsRepository, cashReconciliationRepository, purchasingRepository) {
+        if (analyticsRepository != null) {
+            runCatching {
+                val metrics = analyticsRepository.getDashboardMetrics()
+                todayRevenue = BigDecimal.valueOf(metrics.totalRevenueToday)
+            }
+        }
+        if (cashReconciliationRepository != null) {
+            runCatching {
+                when (val sessionRes = cashReconciliationRepository.getActiveSession()) {
+                    is RepositoryResult.Success -> {
+                        hasActiveSession = sessionRes.data != null
+                    }
+                    else -> Unit
+                }
+            }
+            runCatching {
+                val todayStr = java.time.LocalDate.now().toString()
+                when (val trxRes = cashReconciliationRepository.getTransactions(page = 1, limit = 50, sessionId = null, startDate = todayStr, endDate = todayStr)) {
+                    is RepositoryResult.Success -> {
+                        todayTrxCount = trxRes.data.total.toInt().coerceAtLeast(trxRes.data.data.size)
+                        if (todayRevenue == BigDecimal.ZERO && trxRes.data.data.isNotEmpty()) {
+                            todayRevenue = trxRes.data.data.fold(BigDecimal.ZERO) { acc, t -> acc.add(t.total) }
+                        }
+                    }
+                    else -> Unit
+                }
+            }
+        }
+
+        if (purchasingRepository != null) {
+            runCatching {
+                val now = java.time.LocalDate.now()
+                val startOfMonth = now.withDayOfMonth(1).toString()
+                when (val purchasesRes = purchasingRepository.getPurchases(page = 1, limit = 50, startDate = startOfMonth)) {
+                    is RepositoryResult.Success -> {
+                        monthlyPurchasesCount = purchasesRes.data.total.toInt().coerceAtLeast(purchasesRes.data.data.size)
+                        monthlyPurchases = purchasesRes.data.data.fold(BigDecimal.ZERO) { acc, p -> acc.add(p.total) }
+                    }
+                    else -> {
+                        when (val payRes = purchasingRepository.getPayables(page = 1, limit = 50)) {
+                            is RepositoryResult.Success -> {
+                                monthlyPurchasesCount = payRes.data.total.toInt().coerceAtLeast(payRes.data.data.size)
+                                monthlyPurchases = payRes.data.data.fold(BigDecimal.ZERO) { acc, p -> acc.add(p.amount) }
+                            }
+                            else -> Unit
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    val formattedSalesToday = java.text.NumberFormat.getCurrencyInstance(java.util.Locale.forLanguageTag("id-ID")).apply {
+        maximumFractionDigits = 0
+    }.format(todayRevenue).replace(" ", "")
+
+    val formattedPurchasesMonth = java.text.NumberFormat.getCurrencyInstance(java.util.Locale.forLanguageTag("id-ID")).apply {
+        maximumFractionDigits = 0
+    }.format(monthlyPurchases).replace(" ", "")
+
     Column(
         modifier = Modifier
             .fillMaxWidth()
@@ -1415,13 +1492,13 @@ private fun TransactionsHub(
                     Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.padding(vertical = 10.dp)) {
                         Text(
                             text = "Penjualan",
-                            color = if (mode == "penjualan") Color(0xFF256B57) else Color(0xFF64748B),
+                            color = if (mode == "penjualan") Color(0xFF1B5E3C) else Color(0xFF64748B),
                             fontWeight = FontWeight.SemiBold,
                             fontSize = 14.sp
                         )
                     }
                     if (mode == "penjualan") {
-                        Box(modifier = Modifier.align(Alignment.BottomCenter).width(50.dp).height(3.dp).background(Color(0xFF256B57), RoundedCornerShape(50)))
+                        Box(modifier = Modifier.align(Alignment.BottomCenter).width(50.dp).height(3.dp).background(Color(0xFF1B5E3C), RoundedCornerShape(50)))
                     }
                 }
                 // Tab Pembelian
@@ -1432,13 +1509,13 @@ private fun TransactionsHub(
                     Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.padding(vertical = 10.dp)) {
                         Text(
                             text = "Pembelian",
-                            color = if (mode == "pembelian") Color(0xFF256B57) else Color(0xFF64748B),
+                            color = if (mode == "pembelian") Color(0xFF1B5E3C) else Color(0xFF64748B),
                             fontWeight = FontWeight.SemiBold,
                             fontSize = 14.sp
                         )
                     }
                     if (mode == "pembelian") {
-                        Box(modifier = Modifier.align(Alignment.BottomCenter).width(50.dp).height(3.dp).background(Color(0xFF256B57), RoundedCornerShape(50)))
+                        Box(modifier = Modifier.align(Alignment.BottomCenter).width(50.dp).height(3.dp).background(Color(0xFF1B5E3C), RoundedCornerShape(50)))
                     }
                 }
             }
@@ -1446,34 +1523,90 @@ private fun TransactionsHub(
         
         // Content Section
         if (mode == "penjualan") {
-            // Penjualan Stats
-            Box(
-                modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(16.dp)).background(
-                    brush = androidx.compose.ui.graphics.Brush.linearGradient(
-                        colors = listOf(Color(0xFF256B57), Color(0xFF1E5545))
-                    )
-                ).padding(16.dp)
+            // Penjualan Stats (White Background, Green Border)
+            Surface(
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(16.dp),
+                color = Color.White,
+                border = BorderStroke(1.dp, Color(0xFF1B5E3C)),
+                shadowElevation = 0.5.dp
             ) {
-                Column {
-                    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
-                        Text("Ringkasan Hari Ini", color = Color.White.copy(alpha = 0.8f), fontSize = 12.sp, fontWeight = FontWeight.Medium)
-                        Row(
-                            modifier = Modifier.background(Color.White.copy(alpha = 0.2f), RoundedCornerShape(999.dp)).padding(horizontal = 8.dp, vertical = 2.dp),
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(4.dp)
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(16.dp),
+                    verticalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            text = "Ringkasan Hari Ini",
+                            color = Color(0xFF64748B),
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.Medium
+                        )
+                        Surface(
+                            shape = RoundedCornerShape(999.dp),
+                            color = Color(0xFFEEF7F2),
+                            border = BorderStroke(1.dp, Color(0xFFD1FAE5))
                         ) {
-                            Box(modifier = Modifier.size(6.dp).background(Color(0xFF6EE7B7), CircleShape))
-                            Text("Kasir Aktif", color = Color(0xFFD1FAE5), fontSize = 11.sp, fontWeight = FontWeight.SemiBold)
+                            Row(
+                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(4.dp)
+                            ) {
+                                Box(
+                                    modifier = Modifier
+                                        .size(6.dp)
+                                        .clip(CircleShape)
+                                        .background(Color(0xFF1B5E3C))
+                                )
+                                Text(
+                                    text = if (hasActiveSession) "Kasir Aktif" else "Hari Ini",
+                                    color = Color(0xFF1B5E3C),
+                                    fontSize = 11.sp,
+                                    fontWeight = FontWeight.SemiBold
+                                )
+                            }
                         }
                     }
-                    Spacer(modifier = Modifier.height(2.dp))
-                    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.Bottom) {
+
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.Bottom
+                    ) {
                         Column {
-                            Text("Rp 3.850.000", color = Color.White, fontSize = 22.sp, fontWeight = FontWeight.Bold, letterSpacing = (-0.5).sp)
-                            Text("18 Transaksi Berhasil", color = Color.White.copy(alpha = 0.8f), fontSize = 12.sp, modifier = Modifier.padding(top = 2.dp))
+                            Text(
+                                text = formattedSalesToday,
+                                color = Color(0xFF0F172A),
+                                fontSize = 24.sp,
+                                fontWeight = FontWeight.Bold,
+                                letterSpacing = (-0.5).sp
+                            )
+                            Text(
+                                text = if (todayTrxCount > 0) "$todayTrxCount Transaksi Berhasil" else "Belum ada transaksi hari ini",
+                                color = Color(0xFF64748B),
+                                fontSize = 12.sp,
+                                modifier = Modifier.padding(top = 2.dp)
+                            )
                         }
-                        Box(modifier = Modifier.background(Color.White.copy(alpha = 0.15f), RoundedCornerShape(8.dp)).padding(horizontal = 10.dp, vertical = 6.dp)) {
-                            Text("Shift #1 (Pagi)", color = Color(0xFFECFDF5), fontSize = 12.sp, fontWeight = FontWeight.Medium)
+
+                        Surface(
+                            shape = RoundedCornerShape(8.dp),
+                            color = Color(0xFFEEF7F2),
+                            border = BorderStroke(1.dp, Color(0xFFD1FAE5))
+                        ) {
+                            Text(
+                                text = if (hasActiveSession) "Shift Aktif" else "Total Penjualan",
+                                color = Color(0xFF1B5E3C),
+                                fontSize = 11.sp,
+                                fontWeight = FontWeight.Medium,
+                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+                            )
                         }
                     }
                 }
@@ -1510,29 +1643,90 @@ private fun TransactionsHub(
                 }
             }
         } else {
-            // Pembelian Stats
-            Box(
-                modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(16.dp)).background(
-                    brush = androidx.compose.ui.graphics.Brush.linearGradient(
-                        colors = listOf(Color(0xFF1E293B), Color(0xFF0F172A))
-                    )
-                ).padding(16.dp)
+            // Pembelian Stats (White Background, Green Border)
+            Surface(
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(16.dp),
+                color = Color.White,
+                border = BorderStroke(1.dp, Color(0xFF1B5E3C)),
+                shadowElevation = 0.5.dp
             ) {
-                Column {
-                    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
-                        Text("Total Pembelian Bulan Ini", color = Color(0xFFCBD5E1), fontSize = 12.sp, fontWeight = FontWeight.Medium)
-                        Box(modifier = Modifier.background(Color(0xFF334155).copy(alpha = 0.6f), RoundedCornerShape(999.dp)).padding(horizontal = 8.dp, vertical = 2.dp)) {
-                            Text("Bulan Berjalan", color = Color(0xFFE2E8F0), fontSize = 11.sp, fontWeight = FontWeight.Medium)
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(16.dp),
+                    verticalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            text = "Total Pembelian Bulan Ini",
+                            color = Color(0xFF64748B),
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.Medium
+                        )
+                        Surface(
+                            shape = RoundedCornerShape(999.dp),
+                            color = Color(0xFFEEF7F2),
+                            border = BorderStroke(1.dp, Color(0xFFD1FAE5))
+                        ) {
+                            Row(
+                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(4.dp)
+                            ) {
+                                Box(
+                                    modifier = Modifier
+                                        .size(6.dp)
+                                        .clip(CircleShape)
+                                        .background(Color(0xFF1B5E3C))
+                                )
+                                Text(
+                                    text = "Bulan Berjalan",
+                                    color = Color(0xFF1B5E3C),
+                                    fontSize = 11.sp,
+                                    fontWeight = FontWeight.SemiBold
+                                )
+                            }
                         }
                     }
-                    Spacer(modifier = Modifier.height(2.dp))
-                    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.Bottom) {
+
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.Bottom
+                    ) {
                         Column {
-                            Text("Rp 14.280.000", color = Color.White, fontSize = 22.sp, fontWeight = FontWeight.Bold, letterSpacing = (-0.5).sp)
-                            Text("6 Faktur dari Supplier", color = Color(0xFF94A3B8), fontSize = 12.sp, modifier = Modifier.padding(top = 2.dp))
+                            Text(
+                                text = formattedPurchasesMonth,
+                                color = Color(0xFF0F172A),
+                                fontSize = 24.sp,
+                                fontWeight = FontWeight.Bold,
+                                letterSpacing = (-0.5).sp
+                            )
+                            Text(
+                                text = if (monthlyPurchasesCount > 0) "$monthlyPurchasesCount Faktur dari Supplier" else "Belum ada pembelian bulan ini",
+                                color = Color(0xFF64748B),
+                                fontSize = 12.sp,
+                                modifier = Modifier.padding(top = 2.dp)
+                            )
                         }
-                        Box(modifier = Modifier.border(1.dp, Color(0xFF475569).copy(alpha = 0.5f), RoundedCornerShape(8.dp)).background(Color(0xFF334155).copy(alpha = 0.5f), RoundedCornerShape(8.dp)).padding(horizontal = 10.dp, vertical = 6.dp)) {
-                            Text("1 Pending PO", color = Color(0xFF34D399), fontSize = 12.sp, fontWeight = FontWeight.Medium)
+
+                        Surface(
+                            shape = RoundedCornerShape(8.dp),
+                            color = Color(0xFFEEF7F2),
+                            border = BorderStroke(1.dp, Color(0xFFD1FAE5))
+                        ) {
+                            Text(
+                                text = "Pengadaan",
+                                color = Color(0xFF1B5E3C),
+                                fontSize = 11.sp,
+                                fontWeight = FontWeight.Medium,
+                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+                            )
                         }
                     }
                 }
