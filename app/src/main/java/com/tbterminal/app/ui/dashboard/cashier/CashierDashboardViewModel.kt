@@ -3,6 +3,8 @@ package com.tbterminal.app.ui.dashboard.cashier
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
+import com.tbterminal.app.data.local.cashexpense.LocalCashExpenseService
+import com.tbterminal.app.data.local.database.CashSessionLocalDataSource
 import com.tbterminal.app.data.model.CashSession
 import com.tbterminal.app.data.model.CashTransaction
 import com.tbterminal.app.data.repository.CashReconciliationRepository
@@ -20,12 +22,16 @@ data class CashierDashboardUiState(
     val activeSession: CashSession? = null,
     val recentTransactions: List<CashTransaction> = emptyList(),
     val todayTransactionsCount: Int = 0,
+    val todaySalesRevenue: BigDecimal = BigDecimal.ZERO,
+    val openingCash: BigDecimal = BigDecimal.ZERO,
     val systemCash: BigDecimal = BigDecimal.ZERO,
     val errorMessage: String? = null
 )
 
 class CashierDashboardViewModel(
-    private val repository: CashReconciliationRepository
+    private val repository: CashReconciliationRepository,
+    private val cashSessionLocalDataSource: CashSessionLocalDataSource? = null,
+    private val localCashExpenseService: LocalCashExpenseService? = null
 ) : ViewModel() {
     private val _uiState = MutableStateFlow(CashierDashboardUiState())
     val uiState: StateFlow<CashierDashboardUiState> = _uiState.asStateFlow()
@@ -44,50 +50,98 @@ class CashierDashboardViewModel(
                     if (session != null) {
                         loadSessionTransactions(session)
                     } else {
-                        _uiState.update { 
-                            it.copy(
-                                isLoading = false, 
-                                activeSession = null,
-                                systemCash = BigDecimal.ZERO,
-                                todayTransactionsCount = 0,
-                                recentTransactions = emptyList()
-                            ) 
-                        }
+                        checkFallbackLocalSession()
                     }
                 }
                 is RepositoryResult.Error -> {
-                    _uiState.update { it.copy(isLoading = false, errorMessage = sessionResult.message) }
+                    if (!checkFallbackLocalSession()) {
+                        _uiState.update { it.copy(isLoading = false, errorMessage = sessionResult.message) }
+                    }
                 }
                 is RepositoryResult.Exception -> {
-                    _uiState.update { it.copy(isLoading = false, errorMessage = "Koneksi bermasalah. Gagal memuat dashboard.") }
+                    if (!checkFallbackLocalSession()) {
+                        _uiState.update { it.copy(isLoading = false, errorMessage = "Koneksi bermasalah. Gagal memuat dashboard.") }
+                    }
                 }
             }
         }
     }
 
-    private suspend fun loadSessionTransactions(session: CashSession) {
-        val txResult = repository.getTransactions(page = 1, limit = 1000, sessionId = session.id)
-        
-        if (txResult is RepositoryResult.Success) {
-            val transactionsList = txResult.data.data
-            
-            val validTransactions = transactionsList.filter { it.type != "EXPENSE" && it.status != "BATAL" }
-            
+    private suspend fun checkFallbackLocalSession(): Boolean {
+        val localSession = cashSessionLocalDataSource?.getLatestOpenSession()
+        return if (localSession != null) {
+            val session = CashSession(
+                id = localSession.serverId ?: localSession.clientGeneratedId,
+                userId = localSession.cashierUserId,
+                userName = null,
+                openedAt = java.time.Instant.ofEpochMilli(localSession.openedAt).toString(),
+                closedAt = localSession.closedAt?.let { java.time.Instant.ofEpochMilli(it).toString() },
+                openingCash = BigDecimal.valueOf(localSession.startingCash),
+                closingCash = localSession.actualCash?.let { BigDecimal.valueOf(it) },
+                systemCash = localSession.expectedCash?.let { BigDecimal.valueOf(it) } ?: BigDecimal.valueOf(localSession.startingCash),
+                difference = localSession.difference?.let { BigDecimal.valueOf(it) },
+                totalExpenses = BigDecimal.ZERO,
+                totalCashIn = BigDecimal.ZERO,
+                notes = localSession.openingNote,
+                status = localSession.status
+            )
             _uiState.update {
                 it.copy(
                     isLoading = false,
                     activeSession = session,
+                    openingCash = session.openingCash,
+                    systemCash = session.systemCash ?: session.openingCash,
+                    errorMessage = null
+                )
+            }
+            true
+        } else {
+            _uiState.update {
+                it.copy(
+                    isLoading = false,
+                    activeSession = null,
+                    systemCash = BigDecimal.ZERO,
+                    openingCash = BigDecimal.ZERO,
+                    todayTransactionsCount = 0,
+                    todaySalesRevenue = BigDecimal.ZERO,
+                    recentTransactions = emptyList()
+                )
+            }
+            false
+        }
+    }
+
+    private suspend fun loadSessionTransactions(session: CashSession) {
+        val txResult = repository.getTransactions(page = 1, limit = 1000, sessionId = session.id)
+
+        if (txResult is RepositoryResult.Success) {
+            val transactionsList = txResult.data.data
+
+            val validTransactions = transactionsList.filter { 
+                it.type != "EXPENSE" && 
+                !it.status.equals("BATAL", ignoreCase = true) && 
+                !it.status.equals("VOIDED", ignoreCase = true) 
+            }
+
+            val totalRevenue = validTransactions.fold(BigDecimal.ZERO) { acc, t -> acc.add(t.total) }
+
+            _uiState.update {
+                it.copy(
+                    isLoading = false,
+                    activeSession = session,
+                    openingCash = session.openingCash,
                     systemCash = session.systemCash ?: session.openingCash,
                     todayTransactionsCount = validTransactions.size,
-                    recentTransactions = validTransactions.take(3)
+                    todaySalesRevenue = totalRevenue,
+                    recentTransactions = validTransactions.take(5)
                 )
             }
         } else {
-            // Just update session if tx load fails
             _uiState.update {
                 it.copy(
                     isLoading = false,
                     activeSession = session,
+                    openingCash = session.openingCash,
                     systemCash = session.systemCash ?: session.openingCash
                 )
             }
@@ -99,9 +153,17 @@ class CashierDashboardViewModel(
     }
 
     companion object {
-        fun factory(repository: CashReconciliationRepository): ViewModelProvider.Factory {
+        fun factory(
+            repository: CashReconciliationRepository,
+            cashSessionLocalDataSource: CashSessionLocalDataSource? = null,
+            localCashExpenseService: LocalCashExpenseService? = null
+        ): ViewModelProvider.Factory {
             return viewModelFactory {
-                CashierDashboardViewModel(repository)
+                CashierDashboardViewModel(
+                    repository = repository,
+                    cashSessionLocalDataSource = cashSessionLocalDataSource,
+                    localCashExpenseService = localCashExpenseService
+                )
             }
         }
     }

@@ -330,6 +330,8 @@ internal fun NavGraphBuilder.dashboardGraph(navController: NavHostController, se
                             name = sessionUser.name,
                             role = sessionUser.role,
                             cashReconciliationRepository = appContainer.cashReconciliationRepository,
+                            cashSessionLocalDataSource = appContainer.cashSessionLocalDataSource,
+                            localCashExpenseService = appContainer.localCashExpenseService,
                             onDashboardClick = {},
                             onPosClick = {
                                 navController.navigate(AppRoute.CashierPos.route) {
