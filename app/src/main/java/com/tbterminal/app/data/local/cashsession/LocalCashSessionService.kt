@@ -90,8 +90,9 @@ class LocalCashSessionService(
 
                 val now = System.currentTimeMillis()
                 val cashSales = database.paymentDao().sumCashPaymentsByCashSession(localId)
-                val cashExpenses = database.cashExpenseDao().sumExpensesByCashSession(localId)
-                val expectedCash = session.startingCash + cashSales - cashExpenses
+                val cashIn = database.cashExpenseDao().sumCashInByCashSession(localId)
+                val cashOut = database.cashExpenseDao().sumCashOutByCashSession(localId)
+                val expectedCash = session.startingCash + cashSales + cashIn - cashOut
                 val actualCash = closingCash.toSafeDouble()
                 database.cashSessionDao().closeSession(
                     localId = localId,

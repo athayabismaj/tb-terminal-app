@@ -33,6 +33,8 @@ internal fun CashReconciliationScreen(
     onHideExpenseDialog: () -> Unit,
     onExpenseAmountChanged: (String) -> Unit,
     onExpenseDescriptionChanged: (String) -> Unit,
+    onPettyCashTypeChanged: (com.tbterminal.app.data.local.cashexpense.CashMovementType) -> Unit = {},
+    onPettyCashCategoryChanged: (String) -> Unit = {},
     onAddExpense: () -> Unit
 ) {
     Box(
@@ -78,12 +80,19 @@ internal fun CashReconciliationScreen(
         )
     }
 
-    if (uiState.isExpenseDialogOpen) {
-        CashExpenseDialog(
-            uiState = uiState,
-            onDismiss = onHideExpenseDialog,
+    if (uiState.isPettyCashDialogOpen || uiState.isExpenseDialogOpen) {
+        com.tbterminal.app.ui.cash.components.PettyCashDialog(
+            selectedType = uiState.pettyCashType,
+            amountInput = uiState.pettyCashAmountInput.ifBlank { uiState.expenseAmountInput },
+            categoryInput = uiState.pettyCashCategoryInput,
+            descriptionInput = uiState.pettyCashDescriptionInput.ifBlank { uiState.expenseDescriptionInput },
+            isSubmitting = uiState.isSubmitting,
+            errorMessage = uiState.errorMessage,
+            onTypeChanged = onPettyCashTypeChanged,
             onAmountChanged = onExpenseAmountChanged,
+            onCategoryChanged = onPettyCashCategoryChanged,
             onDescriptionChanged = onExpenseDescriptionChanged,
+            onDismiss = onHideExpenseDialog,
             onConfirm = onAddExpense
         )
     }
@@ -106,6 +115,8 @@ internal fun CashReconciliationContent(
     onHideExpenseDialog: () -> Unit,
     onExpenseAmountChanged: (String) -> Unit,
     onExpenseDescriptionChanged: (String) -> Unit,
+    onPettyCashTypeChanged: (com.tbterminal.app.data.local.cashexpense.CashMovementType) -> Unit = {},
+    onPettyCashCategoryChanged: (String) -> Unit = {},
     onAddExpense: () -> Unit
 ) {
     CashReconciliationScreen(

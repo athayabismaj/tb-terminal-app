@@ -19,7 +19,9 @@ data class DevicePreferences(
     val autoCutPaper: Boolean = true,
     val openCashDrawer: Boolean = false,
     val cashTolerance: String = "0",
-    val autoLockMinutes: Int = 15
+    val autoLockMinutes: Int = 15,
+    val scannerSoundFeedback: Boolean = true,
+    val scannerVibrateFeedback: Boolean = true
 )
 
 class LocalAppSettingsDataSource(
@@ -73,7 +75,11 @@ class LocalAppSettingsDataSource(
             cashTolerance = appSettingDao.getValue(AppSettingKeys.CASH_TOLERANCE)
                 ?.takeIf(String::isNotBlank) ?: "0",
             autoLockMinutes = appSettingDao.getValue(AppSettingKeys.AUTO_LOCK_MINUTES)
-                ?.toIntOrNull()?.takeIf { it in 1..120 } ?: 15
+                ?.toIntOrNull()?.takeIf { it in 1..120 } ?: 15,
+            scannerSoundFeedback = appSettingDao.getValue(AppSettingKeys.SCANNER_SOUND_FEEDBACK)
+                ?.toBooleanStrictOrNull() ?: true,
+            scannerVibrateFeedback = appSettingDao.getValue(AppSettingKeys.SCANNER_VIBRATE_FEEDBACK)
+                ?.toBooleanStrictOrNull() ?: true
         )
     }
 
@@ -89,7 +95,9 @@ class LocalAppSettingsDataSource(
                 AppSettingEntity(AppSettingKeys.PRINTER_AUTO_CUT, preferences.autoCutPaper.toString(), now),
                 AppSettingEntity(AppSettingKeys.PRINTER_OPEN_DRAWER, preferences.openCashDrawer.toString(), now),
                 AppSettingEntity(AppSettingKeys.CASH_TOLERANCE, preferences.cashTolerance, now),
-                AppSettingEntity(AppSettingKeys.AUTO_LOCK_MINUTES, preferences.autoLockMinutes.toString(), now)
+                AppSettingEntity(AppSettingKeys.AUTO_LOCK_MINUTES, preferences.autoLockMinutes.toString(), now),
+                AppSettingEntity(AppSettingKeys.SCANNER_SOUND_FEEDBACK, preferences.scannerSoundFeedback.toString(), now),
+                AppSettingEntity(AppSettingKeys.SCANNER_VIBRATE_FEEDBACK, preferences.scannerVibrateFeedback.toString(), now)
             )
         )
     }

@@ -11,26 +11,40 @@ import com.tbterminal.app.data.local.model.SyncOperation
 import com.tbterminal.app.data.local.model.SyncStatus
 import java.math.BigDecimal
 
+enum class CashMovementType {
+    CASH_IN,
+    CASH_OUT
+}
+
 class LocalCashExpenseService(
     private val database: TbTerminalDatabase,
     private val deviceId: String? = null
 ) {
-    suspend fun addLocalExpense(
+    suspend fun addLocalCashMovement(
         cashSessionLocalId: Long,
+        type: CashMovementType,
         amount: BigDecimal,
         description: String,
         category: String = DEFAULT_CATEGORY
     ): LocalCashExpenseResult {
         val normalizedDescription = description.trim()
-        val normalizedCategory = category.trim().ifBlank { DEFAULT_CATEGORY }
+        val baseCategory = category.trim().ifBlank { DEFAULT_CATEGORY }
+        val normalizedCategory = if (type == CashMovementType.CASH_IN) {
+            if (baseCategory.startsWith("CASH_IN", ignoreCase = true)) baseCategory else "CASH_IN: $baseCategory"
+        } else {
+            if (baseCategory.startsWith("CASH_OUT", ignoreCase = true)) baseCategory else "CASH_OUT: $baseCategory"
+        }
+        val prefix = if (type == CashMovementType.CASH_IN) "CASH_IN" else "EXPENSE"
+        val actionLabel = if (type == CashMovementType.CASH_IN) "kas masuk" else "pengeluaran"
+
         if (cashSessionLocalId <= 0L) {
             return LocalCashExpenseResult.Failed("Sesi kas lokal belum valid.")
         }
         if (amount <= BigDecimal.ZERO) {
-            return LocalCashExpenseResult.Failed("Nominal pengeluaran harus lebih besar dari nol.")
+            return LocalCashExpenseResult.Failed("Nominal $actionLabel harus lebih besar dari nol.")
         }
         if (normalizedDescription.isBlank()) {
-            return LocalCashExpenseResult.Failed("Keterangan pengeluaran wajib diisi.")
+            return LocalCashExpenseResult.Failed("Keterangan $actionLabel wajib diisi.")
         }
 
         return runCatching {
@@ -38,13 +52,13 @@ class LocalCashExpenseService(
                 val session = database.cashSessionDao().getByLocalId(cashSessionLocalId)
                     ?: return@withTransaction LocalCashExpenseResult.Failed("Sesi kas lokal tidak ditemukan.")
                 if (!session.status.equals(CASH_SESSION_OPEN, ignoreCase = true)) {
-                    return@withTransaction LocalCashExpenseResult.Failed("Pengeluaran hanya bisa dicatat pada sesi kas lokal terbuka.")
+                    return@withTransaction LocalCashExpenseResult.Failed("Mutasi kas hanya bisa dicatat pada sesi kas lokal terbuka.")
                 }
 
                 val now = System.currentTimeMillis()
                 val expense = LocalCashExpenseEntity(
                     serverId = null,
-                    clientGeneratedId = LocalIdGenerator.clientGeneratedId("EXPENSE"),
+                    clientGeneratedId = LocalIdGenerator.clientGeneratedId(prefix),
                     deviceId = deviceId,
                     cashSessionLocalId = cashSessionLocalId,
                     cashSessionServerId = session.serverId,
@@ -60,7 +74,7 @@ class LocalCashExpenseService(
                 )
                 val localId = database.cashExpenseDao().upsert(expense)
                 val savedExpense = database.cashExpenseDao().getByLocalId(localId)
-                    ?: error("Pengeluaran kas lokal gagal dibaca ulang.")
+                    ?: error("Mutasi kas lokal gagal dibaca ulang.")
                 database.syncQueueDao().enqueue(
                     SyncQueueEntity(
                         entityType = SyncEntityType.CASH_EXPENSE,
@@ -75,9 +89,22 @@ class LocalCashExpenseService(
                 LocalCashExpenseResult.Success(savedExpense)
             }
         }.getOrElse { error ->
-            LocalCashExpenseResult.Failed(error.message ?: "Pengeluaran kas lokal gagal dicatat.")
+            LocalCashExpenseResult.Failed(error.message ?: "Mutasi kas lokal gagal dicatat.")
         }
     }
+
+    suspend fun addLocalExpense(
+        cashSessionLocalId: Long,
+        amount: BigDecimal,
+        description: String,
+        category: String = DEFAULT_CATEGORY
+    ): LocalCashExpenseResult = addLocalCashMovement(
+        cashSessionLocalId = cashSessionLocalId,
+        type = CashMovementType.CASH_OUT,
+        amount = amount,
+        description = description,
+        category = category
+    )
 
     suspend fun getLocalExpenses(cashSessionLocalId: Long): List<LocalCashExpenseEntity> {
         return database.cashExpenseDao().getByCashSession(cashSessionLocalId)

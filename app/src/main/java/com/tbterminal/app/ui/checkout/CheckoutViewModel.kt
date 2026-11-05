@@ -59,6 +59,7 @@ class CheckoutViewModel(
     private val customerRepository: CustomerRepository,
     private val cashReconciliationRepository: CashReconciliationRepository,
     private val cashSessionLocalDataSource: CashSessionLocalDataSource? = null,
+    private val localCashExpenseService: com.tbterminal.app.data.local.cashexpense.LocalCashExpenseService? = null,
     private val localCheckoutLookupService: LocalCheckoutLookupService? = null,
     private val localCheckoutService: LocalCheckoutService? = null,
     private val offlineStatusRepository: OfflineStatusRepository? = null,
@@ -767,6 +768,98 @@ class CheckoutViewModel(
 
     fun dismissHeldCartsSheet() {
         _uiState.update { it.copy(isHeldCartsSheetOpen = false) }
+    }
+
+    fun openPettyCashDialog(type: com.tbterminal.app.data.local.cashexpense.CashMovementType = com.tbterminal.app.data.local.cashexpense.CashMovementType.CASH_OUT) {
+        _uiState.update {
+            it.copy(
+                isPettyCashDialogOpen = true,
+                pettyCashType = type,
+                pettyCashAmountInput = "",
+                pettyCashCategoryInput = if (type == com.tbterminal.app.data.local.cashexpense.CashMovementType.CASH_IN) "Tambah Modal Kembalian" else "Bensin Armada",
+                pettyCashDescriptionInput = "",
+                pettyCashError = null
+            )
+        }
+    }
+
+    fun dismissPettyCashDialog() {
+        _uiState.update { it.copy(isPettyCashDialogOpen = false, pettyCashError = null) }
+    }
+
+    fun onPettyCashTypeChanged(type: com.tbterminal.app.data.local.cashexpense.CashMovementType) {
+        _uiState.update {
+            it.copy(
+                pettyCashType = type,
+                pettyCashCategoryInput = if (type == com.tbterminal.app.data.local.cashexpense.CashMovementType.CASH_IN) "Tambah Modal Kembalian" else "Bensin Armada"
+            )
+        }
+    }
+
+    fun onPettyCashAmountChanged(amount: String) {
+        _uiState.update { it.copy(pettyCashAmountInput = amount.filter(Char::isDigit), pettyCashError = null) }
+    }
+
+    fun onPettyCashCategoryChanged(category: String) {
+        _uiState.update { it.copy(pettyCashCategoryInput = category, pettyCashError = null) }
+    }
+
+    fun onPettyCashDescriptionChanged(description: String) {
+        _uiState.update { it.copy(pettyCashDescriptionInput = description, pettyCashError = null) }
+    }
+
+    fun submitPettyCash() {
+        val state = _uiState.value
+        val amount = state.pettyCashAmountInput.toBigDecimalOrNull()
+            ?: return _uiState.update { it.copy(pettyCashError = "Nominal wajib diisi angka valid.") }
+        if (amount <= BigDecimal.ZERO) return _uiState.update { it.copy(pettyCashError = "Nominal harus lebih dari nol.") }
+        val type = state.pettyCashType
+        val cat = state.pettyCashCategoryInput.trim()
+        val desc = state.pettyCashDescriptionInput.trim().ifBlank { cat }
+        val actionLabel = if (type == com.tbterminal.app.data.local.cashexpense.CashMovementType.CASH_IN) "Kas masuk" else "Pengeluaran"
+
+        viewModelScope.launch {
+            _uiState.update { it.copy(isPettyCashSubmitting = true, pettyCashError = null) }
+            val localSession = state.activeCashSession?.localId
+            if (localSession != null && localCashExpenseService != null) {
+                when (val res = localCashExpenseService.addLocalCashMovement(localSession, type, amount, desc, cat)) {
+                    is com.tbterminal.app.data.local.cashexpense.LocalCashExpenseResult.Success -> {
+                        _uiState.update {
+                            it.copy(
+                                isPettyCashDialogOpen = false,
+                                isPettyCashSubmitting = false,
+                                quickFeedbackMessage = "$actionLabel Rp $amount berhasil dicatat."
+                            )
+                        }
+                    }
+                    is com.tbterminal.app.data.local.cashexpense.LocalCashExpenseResult.Failed -> {
+                        _uiState.update { it.copy(isPettyCashSubmitting = false, pettyCashError = res.message) }
+                    }
+                }
+            } else {
+                when (val res = if (type == com.tbterminal.app.data.local.cashexpense.CashMovementType.CASH_IN) {
+                    cashReconciliationRepository.addExpense(amount, "KAS MASUK: $desc ($cat)")
+                } else {
+                    cashReconciliationRepository.addExpense(amount, "$desc ($cat)")
+                }) {
+                    is RepositoryResult.Success -> {
+                        _uiState.update {
+                            it.copy(
+                                isPettyCashDialogOpen = false,
+                                isPettyCashSubmitting = false,
+                                quickFeedbackMessage = "$actionLabel Rp $amount berhasil dicatat."
+                            )
+                        }
+                    }
+                    is RepositoryResult.Error -> {
+                        _uiState.update { it.copy(isPettyCashSubmitting = false, pettyCashError = res.message) }
+                    }
+                    is RepositoryResult.Exception -> {
+                        _uiState.update { it.copy(isPettyCashSubmitting = false, pettyCashError = res.throwable.message ?: "Gagal mencatat mutasi kas.") }
+                    }
+                }
+            }
+        }
     }
 
     fun resumeHeldCart(heldCartId: String) {
@@ -1594,6 +1687,7 @@ class CheckoutViewModel(
             customerRepository: CustomerRepository,
             cashReconciliationRepository: CashReconciliationRepository,
             cashSessionLocalDataSource: CashSessionLocalDataSource? = null,
+            localCashExpenseService: com.tbterminal.app.data.local.cashexpense.LocalCashExpenseService? = null,
             localCheckoutLookupService: LocalCheckoutLookupService? = null,
             localCheckoutService: LocalCheckoutService? = null,
             offlineStatusRepository: OfflineStatusRepository? = null,
@@ -1606,6 +1700,7 @@ class CheckoutViewModel(
                     customerRepository = customerRepository,
                     cashReconciliationRepository = cashReconciliationRepository,
                     cashSessionLocalDataSource = cashSessionLocalDataSource,
+                    localCashExpenseService = localCashExpenseService,
                     localCheckoutLookupService = localCheckoutLookupService,
                     localCheckoutService = localCheckoutService,
                     offlineStatusRepository = offlineStatusRepository,

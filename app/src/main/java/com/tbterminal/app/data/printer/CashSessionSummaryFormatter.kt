@@ -74,11 +74,14 @@ object CashSessionSummaryFormatter {
         builder.twoColumn("Modal Kas Awal", formatMoney(session.openingCash))
 
         val systemCash = session.systemCash ?: session.openingCash
-        val cashSales = systemCash.subtract(session.openingCash).coerceAtLeast(BigDecimal.ZERO)
+        val cashSales = systemCash.subtract(session.openingCash).add(session.totalExpenses).subtract(session.totalCashIn).coerceAtLeast(BigDecimal.ZERO)
         builder.twoColumn("Penjualan Tunai", formatMoney(cashSales))
 
+        if (session.totalCashIn > BigDecimal.ZERO) {
+            builder.twoColumn("Kas Masuk (In)", "+ " + formatMoney(session.totalCashIn))
+        }
         if (session.totalExpenses > BigDecimal.ZERO) {
-            builder.twoColumn("Pengeluaran Kas", "- " + formatMoney(session.totalExpenses))
+            builder.twoColumn("Kas Keluar (Out)", "- " + formatMoney(session.totalExpenses))
         }
 
         builder.lineSeparator('-')
@@ -139,7 +142,7 @@ object CashSessionSummaryFormatter {
     ): String {
         val cashier = session.userName ?: session.userId
         val systemCash = session.systemCash ?: session.openingCash
-        val cashSales = systemCash.subtract(session.openingCash).coerceAtLeast(BigDecimal.ZERO)
+        val cashSales = systemCash.subtract(session.openingCash).add(session.totalExpenses).subtract(session.totalCashIn).coerceAtLeast(BigDecimal.ZERO)
         val closingCash = session.closingCash ?: systemCash
         val difference = session.difference ?: BigDecimal.ZERO
         val diffStatus = when {
@@ -158,8 +161,11 @@ object CashSessionSummaryFormatter {
         sb.appendLine("*RINGKASAN ARUS KAS:*")
         sb.appendLine("• Modal Awal        : ${formatMoney(session.openingCash)}")
         sb.appendLine("• Penjualan Tunai   : ${formatMoney(cashSales)}")
+        if (session.totalCashIn > BigDecimal.ZERO) {
+            sb.appendLine("• Kas Masuk (In)    : +${formatMoney(session.totalCashIn)}")
+        }
         if (session.totalExpenses > BigDecimal.ZERO) {
-            sb.appendLine("• Pengeluaran Kas   : -${formatMoney(session.totalExpenses)}")
+            sb.appendLine("• Kas Keluar (Out)  : -${formatMoney(session.totalExpenses)}")
         }
         sb.appendLine("• Kas Seharusnya    : ${formatMoney(systemCash)}")
         sb.appendLine("• Kas Fisik Nyata   : *${formatMoney(closingCash)}*")

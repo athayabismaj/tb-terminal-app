@@ -88,6 +88,7 @@ fun CashierPosScreen(
     onClearScanNotification: () -> Unit = {},
     onOpenHoldCartDialog: () -> Unit = {},
     onOpenHeldCarts: () -> Unit = {},
+    onOpenPettyCashDialog: () -> Unit = {},
     onLockScreen: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
@@ -214,6 +215,20 @@ fun CashierPosScreen(
                             Spacer(Modifier.width(4.dp))
                             Text("Parkir", fontWeight = FontWeight.Bold, fontSize = 13.sp)
                         }
+                    }
+                    IconButton(
+                        onClick = onOpenPettyCashDialog,
+                        modifier = Modifier
+                            .size(38.dp)
+                            .clip(CircleShape)
+                            .background(Color(0xFFE6F4EA))
+                    ) {
+                        Icon(
+                            Icons.Outlined.Payments,
+                            contentDescription = "Kas Kecil (Petty Cash)",
+                            tint = Color(0xFF1B5E3C),
+                            modifier = Modifier.size(20.dp)
+                        )
                     }
                     IconButton(
                         onClick = { showMaterialEstimator = true },

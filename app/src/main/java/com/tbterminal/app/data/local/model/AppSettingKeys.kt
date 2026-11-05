@@ -12,4 +12,6 @@ object AppSettingKeys {
     const val PRINTER_OPEN_DRAWER = "device_printer_open_drawer"
     const val CASH_TOLERANCE = "device_cash_tolerance"
     const val AUTO_LOCK_MINUTES = "device_auto_lock_minutes"
+    const val SCANNER_SOUND_FEEDBACK = "device_scanner_sound_feedback"
+    const val SCANNER_VIBRATE_FEEDBACK = "device_scanner_vibrate_feedback"
 }

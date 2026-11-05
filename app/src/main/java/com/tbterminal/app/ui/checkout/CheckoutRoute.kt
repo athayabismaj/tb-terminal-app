@@ -165,6 +165,7 @@ fun CashierPosRoute(
                 onClearScanNotification = viewModel::clearScanNotification,
                 onOpenHoldCartDialog = viewModel::openHoldCartDialog,
                 onOpenHeldCarts = viewModel::openHeldCartsSheet,
+                onOpenPettyCashDialog = { viewModel.openPettyCashDialog() },
                 onLockScreen = viewModel::lockScreen,
                 modifier = Modifier
                     .fillMaxSize()
@@ -204,6 +205,22 @@ fun CashierPosRoute(
             storeName = "TB TERMINAL",
             onConfirmPayment = viewModel::confirmQrisPayment,
             onDismissRequest = viewModel::dismissQrisDialog
+        )
+    }
+    if (uiState.isPettyCashDialogOpen) {
+        com.tbterminal.app.ui.cash.components.PettyCashDialog(
+            selectedType = uiState.pettyCashType,
+            amountInput = uiState.pettyCashAmountInput,
+            categoryInput = uiState.pettyCashCategoryInput,
+            descriptionInput = uiState.pettyCashDescriptionInput,
+            isSubmitting = uiState.isPettyCashSubmitting,
+            errorMessage = uiState.pettyCashError,
+            onTypeChanged = viewModel::onPettyCashTypeChanged,
+            onAmountChanged = viewModel::onPettyCashAmountChanged,
+            onCategoryChanged = viewModel::onPettyCashCategoryChanged,
+            onDescriptionChanged = viewModel::onPettyCashDescriptionChanged,
+            onDismiss = viewModel::dismissPettyCashDialog,
+            onConfirm = viewModel::submitPettyCash
         )
     }
     approvalAttemptId?.let { attemptId ->
@@ -356,7 +373,8 @@ fun CashierCartRoute(
         onSettingsClick = onSettingsClick,
         onLogout = onLogout,
         onScanBarcode = { barcode -> viewModel.onScanBarcode(barcode, context) },
-        onOpenQrisDialog = viewModel::openQrisDialog
+        onOpenQrisDialog = viewModel::openQrisDialog,
+        onOpenPettyCashDialog = { viewModel.openPettyCashDialog() }
     )
 }
     if (uiState.isHoldCartDialogOpen) {
@@ -390,6 +408,22 @@ fun CashierCartRoute(
             storeName = "TB TERMINAL",
             onConfirmPayment = viewModel::confirmQrisPayment,
             onDismissRequest = viewModel::dismissQrisDialog
+        )
+    }
+    if (uiState.isPettyCashDialogOpen) {
+        com.tbterminal.app.ui.cash.components.PettyCashDialog(
+            selectedType = uiState.pettyCashType,
+            amountInput = uiState.pettyCashAmountInput,
+            categoryInput = uiState.pettyCashCategoryInput,
+            descriptionInput = uiState.pettyCashDescriptionInput,
+            isSubmitting = uiState.isPettyCashSubmitting,
+            errorMessage = uiState.pettyCashError,
+            onTypeChanged = viewModel::onPettyCashTypeChanged,
+            onAmountChanged = viewModel::onPettyCashAmountChanged,
+            onCategoryChanged = viewModel::onPettyCashCategoryChanged,
+            onDescriptionChanged = viewModel::onPettyCashDescriptionChanged,
+            onDismiss = viewModel::dismissPettyCashDialog,
+            onConfirm = viewModel::submitPettyCash
         )
     }
     approvalAttemptId?.let { attemptId ->

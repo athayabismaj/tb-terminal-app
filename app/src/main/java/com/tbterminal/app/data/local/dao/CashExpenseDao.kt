@@ -74,6 +74,12 @@ interface CashExpenseDao {
     @Query("SELECT COALESCE(SUM(amount), 0.0) FROM local_cash_expenses WHERE cashSessionLocalId = :cashSessionLocalId AND deletedAt IS NULL")
     suspend fun sumExpensesByCashSession(cashSessionLocalId: Long): Double
 
+    @Query("SELECT COALESCE(SUM(amount), 0.0) FROM local_cash_expenses WHERE cashSessionLocalId = :cashSessionLocalId AND deletedAt IS NULL AND (category LIKE 'CASH_IN%' OR category LIKE 'KAS_MASUK%')")
+    suspend fun sumCashInByCashSession(cashSessionLocalId: Long): Double
+
+    @Query("SELECT COALESCE(SUM(amount), 0.0) FROM local_cash_expenses WHERE cashSessionLocalId = :cashSessionLocalId AND deletedAt IS NULL AND (category NOT LIKE 'CASH_IN%' AND category NOT LIKE 'KAS_MASUK%')")
+    suspend fun sumCashOutByCashSession(cashSessionLocalId: Long): Double
+
     @Query(
         """
         UPDATE local_cash_expenses

@@ -403,7 +403,7 @@ private fun CashierActionPanel(
         Column(modifier = Modifier.padding(18.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
             Text("Aksi kerja", color = DashboardTextPrimary, fontSize = 17.sp, fontWeight = FontWeight.Bold)
             CashierQuickAction(Icons.Outlined.PointOfSale, "Mulai transaksi", "Buka POS dan buat penjualan baru.", DashboardBrandGreenDark, onPosClick)
-            CashierQuickAction(Icons.Outlined.Payments, "Sesi kas", "Buka, periksa, atau tutup sesi kas.", DashboardInfoBlue, onCashSessionClick)
+            CashierQuickAction(Icons.Outlined.Payments, "Sesi kas & Kas Kecil", "Buka/tutup shift, catat kas masuk & operasional.", DashboardInfoBlue, onCashSessionClick)
             CashierQuickAction(Icons.Outlined.AccountBalanceWallet, "Piutang & pembayaran", "Cari piutang dan catat pembayaran pelanggan.", DashboardWarningOrange, onReceivablesClick)
         }
     }

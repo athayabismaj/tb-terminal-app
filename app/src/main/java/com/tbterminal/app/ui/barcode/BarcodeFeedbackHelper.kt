@@ -14,6 +14,12 @@ import android.os.VibratorManager
  */
 object BarcodeFeedbackHelper {
 
+    @Volatile
+    var isSoundEnabled: Boolean = true
+
+    @Volatile
+    var isVibrateEnabled: Boolean = true
+
     private var toneGenerator: ToneGenerator? = null
 
     init {
@@ -28,6 +34,7 @@ object BarcodeFeedbackHelper {
      * Memutar nada beep sukses (frekuensi tinggi singkat seperti mesin kasir supermarket).
      */
     fun playSuccessBeep() {
+        if (!isSoundEnabled) return
         try {
             toneGenerator?.startTone(ToneGenerator.TONE_PROP_BEEP, 120)
         } catch (_: Throwable) {
@@ -38,6 +45,7 @@ object BarcodeFeedbackHelper {
      * Memutar nada error (dua nada rendah sebagai peringatan barang tidak ditemukan).
      */
     fun playErrorBeep() {
+        if (!isSoundEnabled) return
         try {
             toneGenerator?.startTone(ToneGenerator.TONE_PROP_NACK, 250)
         } catch (_: Throwable) {
@@ -48,6 +56,7 @@ object BarcodeFeedbackHelper {
      * Memberikan getaran haptic singkat saat barcode terbaca.
      */
     fun vibrate(context: Context, durationMs: Long = 80) {
+        if (!isVibrateEnabled) return
         try {
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
                 val vibratorManager = context.getSystemService(Context.VIBRATOR_MANAGER_SERVICE) as? VibratorManager

@@ -281,80 +281,157 @@ class CashReconciliationViewModel(
     }
 
     fun showExpenseDialog() {
-        _uiState.update { it.copy(isExpenseDialogOpen = true, expenseAmountInput = "", expenseDescriptionInput = "") }
+        showPettyCashDialog(com.tbterminal.app.data.local.cashexpense.CashMovementType.CASH_OUT)
     }
 
     fun hideExpenseDialog() {
-        _uiState.update { it.copy(isExpenseDialogOpen = false) }
+        hidePettyCashDialog()
     }
 
     fun onExpenseAmountChanged(value: String) {
-        _uiState.update { it.copy(expenseAmountInput = value.moneyInput(), errorMessage = null) }
+        onPettyCashAmountChanged(value)
     }
 
     fun onExpenseDescriptionChanged(value: String) {
-        _uiState.update { it.copy(expenseDescriptionInput = value, errorMessage = null) }
+        onPettyCashDescriptionChanged(value)
     }
 
     fun addExpense() {
-        val amount = _uiState.value.expenseAmountInput.toBigDecimalOrNull()
-            ?: return setActionError("Nominal pengeluaran wajib diisi dengan angka valid.")
-        if (amount <= BigDecimal.ZERO) return setActionError("Nominal pengeluaran harus lebih besar dari nol.")
-        val desc = _uiState.value.expenseDescriptionInput.trim()
-        if (desc.isEmpty()) return setActionError("Keterangan pengeluaran wajib diisi.")
+        addPettyCash()
+    }
+
+    fun showPettyCashDialog(type: com.tbterminal.app.data.local.cashexpense.CashMovementType = com.tbterminal.app.data.local.cashexpense.CashMovementType.CASH_OUT) {
+        _uiState.update {
+            it.copy(
+                isPettyCashDialogOpen = true,
+                isExpenseDialogOpen = true,
+                pettyCashType = type,
+                pettyCashAmountInput = "",
+                pettyCashCategoryInput = if (type == com.tbterminal.app.data.local.cashexpense.CashMovementType.CASH_IN) "Tambah Modal Kembalian" else "Bensin Armada",
+                pettyCashDescriptionInput = "",
+                errorMessage = null
+            )
+        }
+    }
+
+    fun hidePettyCashDialog() {
+        _uiState.update {
+            it.copy(isPettyCashDialogOpen = false, isExpenseDialogOpen = false)
+        }
+    }
+
+    fun onPettyCashTypeChanged(type: com.tbterminal.app.data.local.cashexpense.CashMovementType) {
+        _uiState.update {
+            it.copy(
+                pettyCashType = type,
+                pettyCashCategoryInput = if (type == com.tbterminal.app.data.local.cashexpense.CashMovementType.CASH_IN) "Tambah Modal Kembalian" else "Bensin Armada"
+            )
+        }
+    }
+
+    fun onPettyCashAmountChanged(value: String) {
+        _uiState.update {
+            it.copy(
+                pettyCashAmountInput = value.moneyInput(),
+                expenseAmountInput = value.moneyInput(),
+                errorMessage = null
+            )
+        }
+    }
+
+    fun onPettyCashCategoryChanged(category: String) {
+        _uiState.update { it.copy(pettyCashCategoryInput = category, errorMessage = null) }
+    }
+
+    fun onPettyCashDescriptionChanged(description: String) {
+        _uiState.update {
+            it.copy(
+                pettyCashDescriptionInput = description,
+                expenseDescriptionInput = description,
+                errorMessage = null
+            )
+        }
+    }
+
+    fun addPettyCash() {
+        val state = _uiState.value
+        val rawInput = state.pettyCashAmountInput.ifBlank { state.expenseAmountInput }
+        val amount = rawInput.toBigDecimalOrNull()
+            ?: return setActionError("Nominal wajib diisi dengan angka valid.")
+        if (amount <= BigDecimal.ZERO) return setActionError("Nominal harus lebih besar dari nol.")
+        val type = state.pettyCashType
+        val cat = state.pettyCashCategoryInput.trim()
+        val rawDesc = state.pettyCashDescriptionInput.ifBlank { state.expenseDescriptionInput }
+        val desc = rawDesc.trim().ifBlank { cat }
+        val actionLabel = if (type == com.tbterminal.app.data.local.cashexpense.CashMovementType.CASH_IN) "Kas masuk" else "Pengeluaran"
 
         viewModelScope.launch {
             _uiState.update { it.copy(isSubmitting = true, errorMessage = null, message = null) }
 
             if (_uiState.value.isUsingLocalActiveSession || shouldUseLocalCashSession()) {
-                addLocalExpense(amount, desc)
+                addLocalCashMovement(type, amount, cat, desc)
                 return@launch
             }
 
-            when (val result = repository.addExpense(amount, desc)) {
+            when (val result = if (type == com.tbterminal.app.data.local.cashexpense.CashMovementType.CASH_IN) {
+                repository.addExpense(amount, "KAS MASUK: $desc ($cat)")
+            } else {
+                repository.addExpense(amount, "$desc ($cat)")
+            }) {
                 is RepositoryResult.Success -> {
                     _uiState.update {
                         it.copy(
+                            isPettyCashDialogOpen = false,
                             isExpenseDialogOpen = false,
                             isSubmitting = false,
-                            message = "Pengeluaran berhasil dicatat."
+                            message = "$actionLabel berhasil dicatat."
                         )
                     }
-                    loadCash(page = 1) // Refresh session data
+                    loadCash(page = 1)
                 }
-
                 is RepositoryResult.Error -> setActionError(result.message)
-                is RepositoryResult.Exception -> addLocalExpense(amount, desc)
+                is RepositoryResult.Exception -> addLocalCashMovement(type, amount, cat, desc)
             }
         }
     }
 
-    private suspend fun addLocalExpense(amount: BigDecimal, description: String) {
-        val service = localCashExpenseService ?: return setActionError("Service pengeluaran kas lokal belum tersedia.")
+    private suspend fun addLocalCashMovement(
+        type: com.tbterminal.app.data.local.cashexpense.CashMovementType,
+        amount: BigDecimal,
+        category: String,
+        description: String
+    ) {
+        val service = localCashExpenseService ?: return setActionError("Service mutasi kas lokal belum tersedia.")
         val localSessionId = _uiState.value.localCashSessionId
             ?: _uiState.value.activeSession?.id?.removePrefix("LOCAL-")?.toLongOrNull()
-            ?: return setActionError("Sesi kas lokal belum valid. Pengeluaran belum bisa dicatat offline.")
+            ?: return setActionError("Sesi kas lokal belum valid.")
 
+        val actionLabel = if (type == com.tbterminal.app.data.local.cashexpense.CashMovementType.CASH_IN) "Kas masuk" else "Pengeluaran"
         when (
-            val result = service.addLocalExpense(
+            val result = service.addLocalCashMovement(
                 cashSessionLocalId = localSessionId,
+                type = type,
                 amount = amount,
+                category = category,
                 description = description
             )
         ) {
-            is LocalCashExpenseResult.Success -> {
+            is com.tbterminal.app.data.local.cashexpense.LocalCashExpenseResult.Success -> {
                 _uiState.update {
                     it.copy(
+                        isPettyCashDialogOpen = false,
                         isExpenseDialogOpen = false,
+                        pettyCashAmountInput = "",
+                        pettyCashDescriptionInput = "",
                         expenseAmountInput = "",
                         expenseDescriptionInput = "",
                         isSubmitting = false,
-                        message = "Pengeluaran kas lokal berhasil dicatat. Belum tersinkron ke server."
+                        message = "$actionLabel kas lokal berhasil dicatat."
                     )
                 }
                 loadCash(page = 1)
             }
-            is LocalCashExpenseResult.Failed -> setActionError(result.message)
+            is com.tbterminal.app.data.local.cashexpense.LocalCashExpenseResult.Failed -> setActionError(result.message)
         }
     }
 
@@ -434,11 +511,15 @@ class CashReconciliationViewModel(
                 ?: if (allowAnyCashier) dataSource.getLatestOpenSession(null) else null
         }.getOrNull() ?: return false
         val localExpenses = localCashExpenseService?.getLocalExpenses(localSession.localId).orEmpty()
+        val totalExpenses = localExpenses.totalExpenses()
+        val totalCashIn = localExpenses.totalCashIn()
 
         _uiState.update {
             it.copy(
-                activeSession = localSession.toCashSession(totalExpenses = localExpenses.totalAmount()),
+                activeSession = localSession.toCashSession(totalExpenses = totalExpenses, totalCashIn = totalCashIn),
                 transactions = localExpenses.map { expense -> expense.toCashTransaction(localSession) },
+                totalCashIn = totalCashIn,
+                totalCashOut = totalExpenses,
                 page = page,
                 total = localExpenses.size.toLong(),
                 totalPages = 1,
@@ -530,7 +611,10 @@ class CashReconciliationViewModel(
     }
 }
 
-private fun LocalCashSessionEntity.toCashSession(totalExpenses: BigDecimal = BigDecimal.ZERO): CashSession {
+private fun LocalCashSessionEntity.toCashSession(
+    totalExpenses: BigDecimal = BigDecimal.ZERO,
+    totalCashIn: BigDecimal = BigDecimal.ZERO
+): CashSession {
     val baseSystemCash = expectedCash?.let(BigDecimal::valueOf) ?: BigDecimal.valueOf(startingCash)
     return CashSession(
         id = serverId ?: "LOCAL-$localId",
@@ -540,26 +624,34 @@ private fun LocalCashSessionEntity.toCashSession(totalExpenses: BigDecimal = Big
         closedAt = closedAt?.toOffsetDateTimeString(),
         openingCash = BigDecimal.valueOf(startingCash),
         closingCash = actualCash?.let(BigDecimal::valueOf),
-        systemCash = baseSystemCash.subtract(totalExpenses),
+        systemCash = baseSystemCash.subtract(totalExpenses).add(totalCashIn),
         difference = difference?.let(BigDecimal::valueOf),
         totalExpenses = totalExpenses,
+        totalCashIn = totalCashIn,
         notes = openingNote,
         status = status
     )
 }
 
-private fun List<LocalCashExpenseEntity>.totalAmount(): BigDecimal {
-    return fold(BigDecimal.ZERO) { acc, expense -> acc.add(BigDecimal.valueOf(expense.amount)) }
+private fun List<LocalCashExpenseEntity>.totalExpenses(): BigDecimal {
+    return filter { !it.category.orEmpty().startsWith("CASH_IN", ignoreCase = true) && !it.category.orEmpty().startsWith("KAS_MASUK", ignoreCase = true) }
+        .fold(BigDecimal.ZERO) { acc, expense -> acc.add(BigDecimal.valueOf(expense.amount)) }
+}
+
+private fun List<LocalCashExpenseEntity>.totalCashIn(): BigDecimal {
+    return filter { it.category.orEmpty().startsWith("CASH_IN", ignoreCase = true) || it.category.orEmpty().startsWith("KAS_MASUK", ignoreCase = true) }
+        .fold(BigDecimal.ZERO) { acc, expense -> acc.add(BigDecimal.valueOf(expense.amount)) }
 }
 
 private fun LocalCashExpenseEntity.toCashTransaction(session: LocalCashSessionEntity): CashTransaction {
+    val isCashIn = category.orEmpty().startsWith("CASH_IN", ignoreCase = true) || category.orEmpty().startsWith("KAS_MASUK", ignoreCase = true)
     return CashTransaction(
-        id = serverId ?: "LOCAL-EXPENSE-$localId",
-        receiptId = description ?: "Pengeluaran kas",
+        id = serverId ?: (if (isCashIn) "LOCAL-CASHIN-$localId" else "LOCAL-EXPENSE-$localId"),
+        receiptId = description ?: (if (isCashIn) "Kas Masuk" else "Pengeluaran kas"),
         sessionId = session.serverId ?: "LOCAL-${session.localId}",
         customerId = null,
         customerName = null,
-        type = "EXPENSE",
+        type = if (isCashIn) "CASH_IN" else "EXPENSE",
         status = syncStatus.name,
         total = BigDecimal.valueOf(amount),
         paidAmount = BigDecimal.valueOf(amount),

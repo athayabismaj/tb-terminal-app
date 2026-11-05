@@ -273,18 +273,21 @@ private fun ActiveSessionCard(modifier: Modifier, uiState: CashReconciliationUiS
             CashInfoRow("Sesi Dibuka", session?.openedAt.displayDateTime())
             CashInfoRow("Modal Awal", session?.openingCash.money())
             CashInfoRow("Kas Sistem", uiState.systemCash.money())
+            if ((session?.totalCashIn ?: uiState.totalCashIn) > java.math.BigDecimal.ZERO) {
+                CashInfoRow("Kas Masuk (In)", (session?.totalCashIn ?: uiState.totalCashIn).money())
+            }
             CashInfoRow("Pengeluaran Kasir", session?.totalExpenses.money())
             
             Spacer(modifier = Modifier.weight(1f))
             Button(
                 onClick = onShowExpenseDialog,
-                colors = ButtonDefaults.buttonColors(containerColor = CashDanger),
+                colors = ButtonDefaults.buttonColors(containerColor = CashPrimary),
                 shape = RoundedCornerShape(12.dp),
                 modifier = Modifier.fillMaxWidth().height(52.dp)
             ) {
                 Icon(Icons.Outlined.Payments, contentDescription = null)
                 Spacer(modifier = Modifier.width(8.dp))
-                Text("Catat Pengeluaran", fontWeight = FontWeight.Bold)
+                Text("Kelola Kas Kecil (Petty Cash)", fontWeight = FontWeight.Bold)
             }
         }
     }

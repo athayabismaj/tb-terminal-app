@@ -13,6 +13,7 @@ data class CashSession(
     val systemCash: BigDecimal?,
     val difference: BigDecimal?,
     val totalExpenses: BigDecimal,
+    val totalCashIn: BigDecimal = BigDecimal.ZERO,
     val notes: String?,
     val status: String
 )

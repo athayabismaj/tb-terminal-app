@@ -56,6 +56,13 @@ data class CheckoutUiState(
     val isQrisDialogOpen: Boolean = false,
     val isCameraScannerOpen: Boolean = false,
     val quickFeedbackMessage: String? = null,
+    val isPettyCashDialogOpen: Boolean = false,
+    val pettyCashType: com.tbterminal.app.data.local.cashexpense.CashMovementType = com.tbterminal.app.data.local.cashexpense.CashMovementType.CASH_OUT,
+    val pettyCashAmountInput: String = "",
+    val pettyCashCategoryInput: String = "Bensin Armada",
+    val pettyCashDescriptionInput: String = "",
+    val isPettyCashSubmitting: Boolean = false,
+    val pettyCashError: String? = null,
 )
 
 data class HeldCart(

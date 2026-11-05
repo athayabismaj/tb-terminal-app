@@ -93,13 +93,20 @@ fun CashierCashSessionRoute(
         )
     }
 
-    if (uiState.isExpenseDialogOpen) {
-        CashExpenseDialog(
-            uiState = uiState,
-            onDismiss = viewModel::hideExpenseDialog,
-            onAmountChanged = viewModel::onExpenseAmountChanged,
-            onDescriptionChanged = viewModel::onExpenseDescriptionChanged,
-            onConfirm = viewModel::addExpense
+    if (uiState.isPettyCashDialogOpen || uiState.isExpenseDialogOpen) {
+        com.tbterminal.app.ui.cash.components.PettyCashDialog(
+            selectedType = uiState.pettyCashType,
+            amountInput = uiState.pettyCashAmountInput.ifBlank { uiState.expenseAmountInput },
+            categoryInput = uiState.pettyCashCategoryInput,
+            descriptionInput = uiState.pettyCashDescriptionInput.ifBlank { uiState.expenseDescriptionInput },
+            isSubmitting = uiState.isSubmitting,
+            errorMessage = uiState.errorMessage,
+            onTypeChanged = viewModel::onPettyCashTypeChanged,
+            onAmountChanged = viewModel::onPettyCashAmountChanged,
+            onCategoryChanged = viewModel::onPettyCashCategoryChanged,
+            onDescriptionChanged = viewModel::onPettyCashDescriptionChanged,
+            onDismiss = viewModel::hidePettyCashDialog,
+            onConfirm = viewModel::addPettyCash
         )
     }
 }

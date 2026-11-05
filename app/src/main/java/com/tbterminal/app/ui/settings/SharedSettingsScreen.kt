@@ -169,6 +169,8 @@ fun SharedSettingsScreen(
     onPrinterDeviceSelected: (PrinterDeviceItem) -> Unit = {},
     onAutoCutPaperChanged: (Boolean) -> Unit = {},
     onOpenCashDrawerChanged: (Boolean) -> Unit = {},
+    onScannerSoundFeedbackChanged: (Boolean) -> Unit = {},
+    onScannerVibrateFeedbackChanged: (Boolean) -> Unit = {},
     onScanPrinters: () -> Unit = {},
     onTestPrint: () -> Unit = {},
     onTestCashDrawer: () -> Unit = {},
@@ -245,6 +247,8 @@ fun SharedSettingsScreen(
                                 onPrinterDeviceSelected = onPrinterDeviceSelected,
                                 onAutoCutPaperChanged = onAutoCutPaperChanged,
                                 onOpenCashDrawerChanged = onOpenCashDrawerChanged,
+                                onScannerSoundFeedbackChanged = onScannerSoundFeedbackChanged,
+                                onScannerVibrateFeedbackChanged = onScannerVibrateFeedbackChanged,
                                 onScanPrinters = onScanPrinters,
                                 onTestPrint = onTestPrint,
                                 onTestCashDrawer = onTestCashDrawer,
@@ -1245,6 +1249,8 @@ private fun DeviceAndReceiptPanel(
     onPrinterDeviceSelected: (PrinterDeviceItem) -> Unit,
     onAutoCutPaperChanged: (Boolean) -> Unit,
     onOpenCashDrawerChanged: (Boolean) -> Unit,
+    onScannerSoundFeedbackChanged: (Boolean) -> Unit = {},
+    onScannerVibrateFeedbackChanged: (Boolean) -> Unit = {},
     onScanPrinters: () -> Unit,
     onTestPrint: () -> Unit,
     onTestCashDrawer: () -> Unit,
@@ -1299,6 +1305,8 @@ private fun DeviceAndReceiptPanel(
                     onPrinterDeviceSelected = onPrinterDeviceSelected,
                     onAutoCutPaperChanged = onAutoCutPaperChanged,
                     onOpenCashDrawerChanged = onOpenCashDrawerChanged,
+                    onScannerSoundFeedbackChanged = onScannerSoundFeedbackChanged,
+                    onScannerVibrateFeedbackChanged = onScannerVibrateFeedbackChanged,
                     onScanPrinters = onScanPrinters,
                     onTestPrint = onTestPrint,
                     onTestCashDrawer = onTestCashDrawer,
@@ -1420,6 +1428,8 @@ private fun DevicePanel(
     onPrinterDeviceSelected: (PrinterDeviceItem) -> Unit,
     onAutoCutPaperChanged: (Boolean) -> Unit,
     onOpenCashDrawerChanged: (Boolean) -> Unit,
+    onScannerSoundFeedbackChanged: (Boolean) -> Unit = {},
+    onScannerVibrateFeedbackChanged: (Boolean) -> Unit = {},
     onScanPrinters: () -> Unit,
     onTestPrint: () -> Unit,
     onTestCashDrawer: () -> Unit,
@@ -1484,9 +1494,13 @@ private fun DevicePanel(
             autoCutPaper = uiState.autoCutPaper,
             openCashDrawer = uiState.openCashDrawer,
             autoPrintReceipt = uiState.autoPrintReceipt,
+            scannerSoundFeedback = uiState.scannerSoundFeedback,
+            scannerVibrateFeedback = uiState.scannerVibrateFeedback,
             onAutoCutPaperChanged = onAutoCutPaperChanged,
             onOpenCashDrawerChanged = onOpenCashDrawerChanged,
             onAutoPrintReceiptChanged = onAutoPrintReceiptChanged,
+            onScannerSoundFeedbackChanged = onScannerSoundFeedbackChanged,
+            onScannerVibrateFeedbackChanged = onScannerVibrateFeedbackChanged,
         )
 
         HardwareTestCard(
@@ -2097,9 +2111,13 @@ private fun HardwareOptionsCard(
     autoCutPaper: Boolean,
     openCashDrawer: Boolean,
     autoPrintReceipt: Boolean,
+    scannerSoundFeedback: Boolean = true,
+    scannerVibrateFeedback: Boolean = true,
     onAutoCutPaperChanged: (Boolean) -> Unit,
     onOpenCashDrawerChanged: (Boolean) -> Unit,
     onAutoPrintReceiptChanged: (Boolean) -> Unit,
+    onScannerSoundFeedbackChanged: (Boolean) -> Unit = {},
+    onScannerVibrateFeedbackChanged: (Boolean) -> Unit = {},
 ) {
     Card(
         modifier = Modifier.fillMaxWidth(),
@@ -2142,6 +2160,20 @@ private fun HardwareOptionsCard(
                     subtitle = "Kirim instruksi cetak seketika transaksi kasir berhasil diselesaikan.",
                     checked = autoPrintReceipt,
                     onCheckedChange = onAutoPrintReceiptChanged,
+                )
+                HorizontalDivider(color = Slate100, thickness = 1.dp, modifier = Modifier.padding(vertical = 12.dp))
+                HardwareSwitchItem(
+                    title = "Suara bip pemindai barcode",
+                    subtitle = "Bunyikan nada konfirmasi instan saat barcode produk berhasil dipindai kasir.",
+                    checked = scannerSoundFeedback,
+                    onCheckedChange = onScannerSoundFeedbackChanged,
+                )
+                HorizontalDivider(color = Slate100, thickness = 1.dp, modifier = Modifier.padding(vertical = 12.dp))
+                HardwareSwitchItem(
+                    title = "Getar pemindai barcode (Haptic)",
+                    subtitle = "Berikan getaran halus perangkat saat kamera atau scanner membaca barcode.",
+                    checked = scannerVibrateFeedback,
+                    onCheckedChange = onScannerVibrateFeedbackChanged,
                 )
             }
         }

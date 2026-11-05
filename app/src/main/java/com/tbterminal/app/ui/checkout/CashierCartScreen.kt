@@ -100,7 +100,8 @@ fun CashierCartScreen(
     onSettingsClick: () -> Unit = {},
     onLogout: () -> Unit = {},
     onScanBarcode: (String) -> Unit = {},
-    onOpenQrisDialog: () -> Unit = {}
+    onOpenQrisDialog: () -> Unit = {},
+    onOpenPettyCashDialog: () -> Unit = {}
 ) {
     var discountItemId by remember { mutableStateOf<String?>(null) }
     var showTransactionDiscount by remember { mutableStateOf(false) }
@@ -159,6 +160,7 @@ fun CashierCartScreen(
                     onDeliveryCourierChanged = onDeliveryCourierChanged,
                     onOpenCameraScanner = { showCameraScanner = true },
                     onOpenQrisDialog = onOpenQrisDialog,
+                    onOpenPettyCashDialog = onOpenPettyCashDialog,
                     modifier = Modifier
                         .fillMaxSize()
                         .padding(contentPadding)
@@ -237,6 +239,7 @@ private fun CartContent(
     onDeliveryCourierChanged: (String) -> Unit = {},
     onOpenCameraScanner: () -> Unit = {},
     onOpenQrisDialog: () -> Unit = {},
+    onOpenPettyCashDialog: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     val totalItems = state.cartItems.sumOf { it.quantity }
@@ -336,6 +339,20 @@ private fun CartContent(
                                 Text("Parkir (${state.heldCarts.size})", color = Color(0xFFB45309), fontSize = 12.sp, fontWeight = FontWeight.Bold)
                             }
                         }
+                    }
+                    FilledTonalButton(
+                        onClick = onOpenPettyCashDialog,
+                        shape = RoundedCornerShape(10.dp),
+                        colors = ButtonDefaults.filledTonalButtonColors(
+                            containerColor = Color(0xFFE6F4EA),
+                            contentColor = Color(0xFF1B5E3C)
+                        ),
+                        contentPadding = PaddingValues(horizontal = 10.dp, vertical = 6.dp),
+                        modifier = Modifier.padding(end = 4.dp)
+                    ) {
+                        Icon(Icons.Outlined.Payments, contentDescription = null, modifier = Modifier.size(16.dp))
+                        Spacer(Modifier.width(4.dp))
+                        Text("Kas Kecil", fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
                     }
                     FilledTonalButton(
                         onClick = onOpenCameraScanner,

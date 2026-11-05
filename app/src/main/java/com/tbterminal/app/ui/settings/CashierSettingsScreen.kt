@@ -77,6 +77,8 @@ fun CashierSettingsScreen(
             onPrinterDeviceSelected = viewModel::onPrinterDeviceSelected,
             onAutoCutPaperChanged = viewModel::onAutoCutPaperChanged,
             onOpenCashDrawerChanged = viewModel::onOpenCashDrawerChanged,
+            onScannerSoundFeedbackChanged = viewModel::onScannerSoundFeedbackChanged,
+            onScannerVibrateFeedbackChanged = viewModel::onScannerVibrateFeedbackChanged,
             onScanPrinters = { viewModel.scanPrinters(context) },
             onTestPrint = { viewModel.testPrint(context) },
             onTestCashDrawer = { viewModel.testCashDrawer(context) },

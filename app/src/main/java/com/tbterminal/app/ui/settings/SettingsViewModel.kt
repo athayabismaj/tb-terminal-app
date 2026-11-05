@@ -42,6 +42,8 @@ data class SettingsUiState(
     val printerBluetoothName: String = "",
     val autoCutPaper: Boolean = true,
     val openCashDrawer: Boolean = false,
+    val scannerSoundFeedback: Boolean = true,
+    val scannerVibrateFeedback: Boolean = true,
     val availablePrinters: List<PrinterDeviceItem> = emptyList(),
     val isScanningPrinters: Boolean = false,
     val isPrintingTest: Boolean = false
@@ -158,6 +160,8 @@ class SettingsViewModel(
             printerBluetoothName = state.printerBluetoothName,
             autoCutPaper = state.autoCutPaper,
             openCashDrawer = state.openCashDrawer,
+            scannerSoundFeedback = state.scannerSoundFeedback,
+            scannerVibrateFeedback = state.scannerVibrateFeedback,
         )
         if (validated.error != null) {
             _uiState.update { it.copy(error = validated.error, message = null) }
@@ -171,6 +175,8 @@ class SettingsViewModel(
                     preferences.copy(autoPrintReceipt = state.autoPrintReceipt)
                 )
             }.onSuccess {
+                com.tbterminal.app.ui.barcode.BarcodeFeedbackHelper.isSoundEnabled = preferences.scannerSoundFeedback
+                com.tbterminal.app.ui.barcode.BarcodeFeedbackHelper.isVibrateEnabled = preferences.scannerVibrateFeedback
                 _uiState.update {
                     it.copy(
                         isSaving = false,
@@ -192,6 +198,8 @@ class SettingsViewModel(
             _uiState.update { it.copy(error = null) }
             runCatching { localAppSettingsDataSource.getDevicePreferences() }
                 .onSuccess { preferences ->
+                    com.tbterminal.app.ui.barcode.BarcodeFeedbackHelper.isSoundEnabled = preferences.scannerSoundFeedback
+                    com.tbterminal.app.ui.barcode.BarcodeFeedbackHelper.isVibrateEnabled = preferences.scannerVibrateFeedback
                     val connType = when (preferences.printerConnectionType) {
                         "USB" -> PrinterConnectionType.USB
                         "SYSTEM" -> PrinterConnectionType.SYSTEM
@@ -213,7 +221,9 @@ class SettingsViewModel(
                             openCashDrawer = preferences.openCashDrawer,
                             cashTolerance = preferences.cashTolerance,
                             autoLockMinutes = preferences.autoLockMinutes.toString(),
-                            autoPrintReceipt = preferences.autoPrintReceipt
+                            autoPrintReceipt = preferences.autoPrintReceipt,
+                            scannerSoundFeedback = preferences.scannerSoundFeedback,
+                            scannerVibrateFeedback = preferences.scannerVibrateFeedback
                         )
                     }
                 }
@@ -238,6 +248,8 @@ class SettingsViewModel(
     }
     fun onAutoLockMinutesChanged(value: String) = _uiState.update { it.copy(autoLockMinutes = value.filter(Char::isDigit), error = null) }
     fun onAutoPrintReceiptChanged(value: Boolean) = _uiState.update { it.copy(autoPrintReceipt = value, error = null) }
+    fun onScannerSoundFeedbackChanged(value: Boolean) = _uiState.update { it.copy(scannerSoundFeedback = value, error = null) }
+    fun onScannerVibrateFeedbackChanged(value: Boolean) = _uiState.update { it.copy(scannerVibrateFeedback = value, error = null) }
 
     fun onPrinterConnectionTypeChanged(type: PrinterConnectionType) {
         _uiState.update {
@@ -392,6 +404,8 @@ internal fun validateDevicePreferences(
     printerBluetoothName: String = "",
     autoCutPaper: Boolean = true,
     openCashDrawer: Boolean = false,
+    scannerSoundFeedback: Boolean = true,
+    scannerVibrateFeedback: Boolean = true,
 ): DevicePreferencesValidation {
     if (paperSize !in setOf("58mm", "80mm")) {
         return DevicePreferencesValidation(error = "Ukuran kertas harus 58mm atau 80mm.")
@@ -414,7 +428,9 @@ internal fun validateDevicePreferences(
             autoCutPaper = autoCutPaper,
             openCashDrawer = openCashDrawer,
             cashTolerance = tolerance.stripTrailingZeros().toPlainString(),
-            autoLockMinutes = lockMinutes
+            autoLockMinutes = lockMinutes,
+            scannerSoundFeedback = scannerSoundFeedback,
+            scannerVibrateFeedback = scannerVibrateFeedback
         )
     )
 }
