@@ -3,6 +3,7 @@ package com.tbterminal.app.ui.dashboard.cashier
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.CubicBezierEasing
 import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.MutableTransitionState
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.animateFloatAsState
@@ -76,6 +77,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.TransformOrigin
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalDensity
@@ -231,6 +233,9 @@ private fun CashierCompactTopBar(
     onLogout: () -> Unit
 ) {
     var expanded by rememberSaveable { mutableStateOf(false) }
+    var lastDismissTime by remember { mutableStateOf(0L) }
+    val menuTransitionState = remember { MutableTransitionState(false) }
+    menuTransitionState.targetState = expanded
 
     val infiniteTransition = rememberInfiniteTransition(label = "TopBarPulseTransition")
     val dotAlpha by infiniteTransition.animateFloat(
@@ -250,6 +255,23 @@ private fun CashierCompactTopBar(
             easing = CubicBezierEasing(0.16f, 1f, 0.3f, 1f)
         ),
         label = "ChevronRotation"
+    )
+
+    val cardScale by animateFloatAsState(
+        targetValue = if (expanded) 1f else 0.95f,
+        animationSpec = tween(
+            durationMillis = 200,
+            easing = CubicBezierEasing(0.16f, 1f, 0.3f, 1f)
+        ),
+        label = "UserCardScale"
+    )
+    val cardAlpha by animateFloatAsState(
+        targetValue = if (expanded) 1f else 0f,
+        animationSpec = tween(
+            durationMillis = 180,
+            easing = LinearEasing
+        ),
+        label = "UserCardAlpha"
     )
 
     val displayName = remember(userName) {
@@ -350,7 +372,12 @@ private fun CashierCompactTopBar(
             // Sisi Kanan: User Profile Pill Button + Floating Animated Dropdown Popover
             Box {
                 Surface(
-                    onClick = { expanded = !expanded },
+                    onClick = {
+                        val now = System.currentTimeMillis()
+                        if (now - lastDismissTime > 250L) {
+                            expanded = !expanded
+                        }
+                    },
                     shape = RoundedCornerShape(999.dp),
                     color = Color(0xFFF8FAFC),
                     border = BorderStroke(
@@ -400,33 +427,57 @@ private fun CashierCompactTopBar(
                     }
                 }
 
-                // Profile Dropdown Popover Card dengan Animasi Enter/Exit Transition
-                if (expanded) {
+                // Profile Dropdown Popover Card dengan Animasi Enter/Exit Transition Sesuai Mockup HTML
+                if (menuTransitionState.currentState || menuTransitionState.targetState) {
                     Popup(
                         alignment = Alignment.TopEnd,
                         offset = IntOffset(x = 0, y = popupYOffset),
-                        onDismissRequest = { expanded = false },
+                        onDismissRequest = {
+                            lastDismissTime = System.currentTimeMillis()
+                            expanded = false
+                        },
                         properties = PopupProperties(focusable = true)
                     ) {
-                        var isVisible by remember { mutableStateOf(false) }
-                        LaunchedEffect(Unit) {
-                            isVisible = true
-                        }
-
                         androidx.compose.animation.AnimatedVisibility(
-                            visible = isVisible,
+                            visibleState = menuTransitionState,
                             enter = fadeIn(
-                                animationSpec = tween(200, easing = CubicBezierEasing(0.16f, 1f, 0.3f, 1f))
+                                animationSpec = tween(
+                                    durationMillis = 200,
+                                    easing = CubicBezierEasing(0.16f, 1f, 0.3f, 1f)
+                                )
                             ) + slideInVertically(
-                                initialOffsetY = { -it / 6 },
-                                animationSpec = tween(200, easing = CubicBezierEasing(0.16f, 1f, 0.3f, 1f))
+                                initialOffsetY = { with(density) { (-8).dp.roundToPx() } },
+                                animationSpec = tween(
+                                    durationMillis = 200,
+                                    easing = CubicBezierEasing(0.16f, 1f, 0.3f, 1f)
+                                )
                             ) + scaleIn(
-                                initialScale = 0.96f,
-                                animationSpec = tween(200, easing = CubicBezierEasing(0.16f, 1f, 0.3f, 1f))
+                                initialScale = 0.98f,
+                                transformOrigin = TransformOrigin(1f, 0f),
+                                animationSpec = tween(
+                                    durationMillis = 200,
+                                    easing = CubicBezierEasing(0.16f, 1f, 0.3f, 1f)
+                                )
                             ),
-                            exit = fadeOut(animationSpec = tween(150)) +
-                                slideOutVertically(targetOffsetY = { -it / 6 }) +
-                                scaleOut(targetScale = 0.96f)
+                            exit = fadeOut(
+                                animationSpec = tween(
+                                    durationMillis = 200,
+                                    easing = CubicBezierEasing(0.16f, 1f, 0.3f, 1f)
+                                )
+                            ) + slideOutVertically(
+                                targetOffsetY = { with(density) { (-8).dp.roundToPx() } },
+                                animationSpec = tween(
+                                    durationMillis = 200,
+                                    easing = CubicBezierEasing(0.16f, 1f, 0.3f, 1f)
+                                )
+                            ) + scaleOut(
+                                targetScale = 0.98f,
+                                transformOrigin = TransformOrigin(1f, 0f),
+                                animationSpec = tween(
+                                    durationMillis = 200,
+                                    easing = CubicBezierEasing(0.16f, 1f, 0.3f, 1f)
+                                )
+                            )
                         ) {
                             Surface(
                                 modifier = Modifier
@@ -451,6 +502,11 @@ private fun CashierCompactTopBar(
                                     Box(
                                         modifier = Modifier
                                             .fillMaxWidth()
+                                            .graphicsLayer {
+                                                scaleX = cardScale
+                                                scaleY = cardScale
+                                                alpha = cardAlpha
+                                            }
                                             .clip(RoundedCornerShape(12.dp))
                                             .background(Color(0xFFF8FAFC))
                                             .border(1.dp, Color(0xFFF1F5F9), RoundedCornerShape(12.dp))
