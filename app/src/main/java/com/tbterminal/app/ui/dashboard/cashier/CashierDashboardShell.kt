@@ -56,6 +56,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.tbterminal.app.ui.offline.OfflineStatusIndicatorHost
+import com.tbterminal.app.ui.offline.OfflineStatusMiniDot
 import com.tbterminal.app.ui.dashboard.admin.AdminDestination
 import com.tbterminal.app.ui.dashboard.admin.LocalAdminDestinationNavigator
 import com.tbterminal.app.ui.theme.TbBackground
@@ -236,13 +237,19 @@ private fun CashierCompactTopBar(
                     overflow = TextOverflow.Ellipsis,
                     letterSpacing = (-0.3).sp
                 )
-                Text(
-                    text = "TERMINAL KASIR",
-                    color = Color(0xFF64748B),
-                    fontSize = 10.sp,
-                    fontWeight = FontWeight.SemiBold,
-                    letterSpacing = 0.5.sp
-                )
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    Text(
+                        text = "TERMINAL KASIR",
+                        color = Color(0xFF64748B),
+                        fontSize = 10.sp,
+                        fontWeight = FontWeight.SemiBold,
+                        letterSpacing = 0.5.sp
+                    )
+                    OfflineStatusMiniDot()
+                }
             }
 
             Surface(

@@ -1,8 +1,14 @@
 package com.tbterminal.app.ui.offline
 
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.expandVertically
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -38,18 +44,104 @@ import com.tbterminal.app.data.sync.DataSourceStatus
 import com.tbterminal.app.data.sync.OfflineConnectionStatus
 import com.tbterminal.app.data.sync.OfflineStatus
 
+/**
+ * Host banner indikator koneksi dan sinkronisasi.
+ *
+ * Standar POS & Industrial UX (Notification by Exception):
+ * Saat kondisi NORMAL (server tersambung, internet aktif, tidak ada pending/gagal sync),
+ * banner besar ini OTOMATIS TERSEMBUNYI agar tidak memakan ruang layar kasir.
+ * Banner HANYA MUNCUL ketika:
+ * 1. Offline (tidak ada internet)
+ * 2. Server tidak tersambung (unreachable)
+ * 3. Sedang sinkronisasi data (syncing)
+ * 4. Sinkronisasi gagal atau ada antrean pending
+ * 5. Mode data lokal (LOCAL_ONLY)
+ */
 @Composable
 fun OfflineStatusIndicatorHost(
+    modifier: Modifier = Modifier,
+    alwaysShow: Boolean = false
+) {
+    val app = LocalContext.current.applicationContext as? TbTerminalApplication ?: return
+    val statusFlow = remember(app) { app.appContainer.offlineStatusRepository.status }
+    val status by statusFlow.collectAsState(initial = OfflineStatus())
+
+    val isNormalConnected = status.isInternetOnline &&
+        status.backendStatus == BackendStatus.CONNECTED &&
+        status.dataSourceStatus != DataSourceStatus.LOCAL_ONLY &&
+        status.connectionStatus == OfflineConnectionStatus.ONLINE &&
+        status.pendingSyncCount == 0 &&
+        status.failedSyncCount == 0
+
+    val shouldShow = alwaysShow || !isNormalConnected
+
+    AnimatedVisibility(
+        visible = shouldShow,
+        enter = expandVertically() + fadeIn(),
+        exit = shrinkVertically() + fadeOut()
+    ) {
+        OfflineStatusIndicator(
+            status = status,
+            modifier = modifier
+        )
+    }
+}
+
+/**
+ * Micro indicator status koneksi (titik mini + label) yang hemat ruang,
+ * cocok disematkan di top bar atau header kasir tanpa memakan tempat.
+ */
+@Composable
+fun OfflineStatusMiniDot(
     modifier: Modifier = Modifier
 ) {
     val app = LocalContext.current.applicationContext as? TbTerminalApplication ?: return
     val statusFlow = remember(app) { app.appContainer.offlineStatusRepository.status }
     val status by statusFlow.collectAsState(initial = OfflineStatus())
 
-    OfflineStatusIndicator(
-        status = status,
-        modifier = modifier
-    )
+    val isNormal = status.isInternetOnline &&
+        status.backendStatus == BackendStatus.CONNECTED &&
+        status.dataSourceStatus != DataSourceStatus.LOCAL_ONLY &&
+        status.connectionStatus == OfflineConnectionStatus.ONLINE &&
+        status.pendingSyncCount == 0 &&
+        status.failedSyncCount == 0
+
+    val isWarning = !status.isInternetOnline || status.backendStatus == BackendStatus.UNREACHABLE
+    val isSyncing = status.connectionStatus == OfflineConnectionStatus.SYNCING || status.pendingSyncCount > 0
+
+    val dotColor = when {
+        isWarning -> Color(0xFFD97706) // Amber
+        isSyncing -> Color(0xFF2563EB) // Blue
+        isNormal -> Color(0xFF1B5E3C) // Brand Green
+        else -> Color(0xFF64748B) // Slate
+    }
+
+    val labelText = when {
+        !status.isInternetOnline -> "Offline"
+        status.backendStatus == BackendStatus.UNREACHABLE -> "Server Terputus"
+        isSyncing -> "Sinkronisasi (${status.pendingSyncCount})"
+        isNormal -> "Server Aktif"
+        else -> "Memeriksa"
+    }
+
+    Row(
+        modifier = modifier,
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(4.dp)
+    ) {
+        Box(
+            modifier = Modifier
+                .size(6.dp)
+                .clip(CircleShape)
+                .background(dotColor)
+        )
+        Text(
+            text = labelText,
+            fontSize = 9.sp,
+            fontWeight = FontWeight.Medium,
+            color = dotColor
+        )
+    }
 }
 
 @Composable
@@ -71,7 +163,7 @@ private fun OfflineStatusIndicator(
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(10.dp)
         ) {
-            androidx.compose.foundation.layout.Box(
+            Box(
                 modifier = Modifier
                     .size(30.dp)
                     .clip(CircleShape)
