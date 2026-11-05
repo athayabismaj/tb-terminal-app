@@ -798,7 +798,8 @@ private data class DisplayTransactionItem(
     val title: String,
     val subtitle: String,
     val amount: String,
-    val status: String = "Lunas"
+    val status: String = "Lunas",
+    val isPaid: Boolean = true
 )
 
 @Composable
@@ -817,11 +818,25 @@ private fun RecentTransactionsCard(
             val customer = if (!trx.customerName.isNullOrBlank()) trx.customerName else "Pelanggan Umum"
             val method = trx.paymentMethods.firstOrNull()?.uppercase() ?: "TUNAI"
             val timeStr = formatIsoTime(trx.createdAt)
+            val hasRemaining = trx.remainingAmount != null && trx.remainingAmount > java.math.BigDecimal.ZERO
+            val isLunas = !hasRemaining && (
+                trx.status.equals("COMPLETED", ignoreCase = true) ||
+                trx.status.equals("PAID", ignoreCase = true) ||
+                trx.status.equals("LUNAS", ignoreCase = true)
+            )
+            val statusText = if (isLunas) {
+                "Lunas"
+            } else if (hasRemaining || trx.status.equals("PARTIAL", ignoreCase = true) || trx.status.equals("UNPAID", ignoreCase = true) || trx.status.equals("HUTANG", ignoreCase = true)) {
+                "Belum Lunas"
+            } else {
+                trx.status
+            }
             DisplayTransactionItem(
                 title = "$receiptNo · $customer",
                 subtitle = "$timeStr WIB · $method",
                 amount = trx.total.toDouble().toRupiah(),
-                status = if (trx.status.equals("COMPLETED", ignoreCase = true) || trx.status.equals("PAID", ignoreCase = true) || trx.status.equals("LUNAS", ignoreCase = true)) "Lunas" else trx.status
+                status = statusText,
+                isPaid = isLunas
             )
         }
     }
@@ -987,18 +1002,12 @@ private fun RecentTransactionsCard(
                                 color = Slate900
                             )
 
-                            Surface(
-                                shape = RoundedCornerShape(999.dp),
-                                color = BrandGreenLight
-                            ) {
-                                Text(
-                                    text = item.status,
-                                    fontSize = 10.sp,
-                                    fontWeight = FontWeight.SemiBold,
-                                    color = BrandGreen,
-                                    modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
-                                )
-                            }
+                            Text(
+                                text = item.status,
+                                fontSize = 11.sp,
+                                fontWeight = FontWeight.SemiBold,
+                                color = if (item.isPaid) BrandGreen else Color(0xFFDC2626)
+                            )
                         }
                     }
                 }

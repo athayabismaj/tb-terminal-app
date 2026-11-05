@@ -728,7 +728,7 @@ private fun RecentTransactionsLiveCard(
                             text = trx.status,
                             fontSize = 10.sp,
                             fontWeight = FontWeight.SemiBold,
-                            color = if (trx.status.equals("Lunas", ignoreCase = true)) BrandGreen else AmberText
+                            color = if (trx.status.equals("Lunas", ignoreCase = true)) BrandGreen else Color(0xFFDC2626)
                         )
                     }
                 }
