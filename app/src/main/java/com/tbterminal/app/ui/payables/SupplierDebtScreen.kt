@@ -446,360 +446,397 @@ internal fun SupplierDebtFilterBottomSheet(
         Column(
             modifier = Modifier.fillMaxWidth()
         ) {
-            // Modal Header
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 20.dp, vertical = 12.dp),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.Top,
-            ) {
-                Column {
-                    Text(
-                        text = "Filter Hutang",
-                        fontSize = 18.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = Color(0xFF0F172A),
-                        letterSpacing = (-0.3).sp,
-                    )
-                    Spacer(Modifier.height(2.dp))
-                    Text(
-                        text = "Atur status pelunasan dan filter hutang supplier",
-                        fontSize = 12.sp,
-                        color = Color(0xFF64748B),
-                    )
-                }
-                Box(
-                    modifier = Modifier
-                        .size(32.dp)
-                        .clip(CircleShape)
-                        .background(Color(0xFFF1F5F9))
-                        .clickable(onClick = onDismiss),
-                    contentAlignment = Alignment.Center,
-                ) {
-                    Icon(
-                        Icons.Outlined.Close,
-                        contentDescription = "Tutup Filter",
-                        tint = Color(0xFF94A3B8),
-                        modifier = Modifier.size(18.dp),
-                    )
-                }
-            }
+            SupplierDebtFilterHeader(onDismiss = onDismiss)
 
             HorizontalDivider(color = Color(0xFFF1F5F9), thickness = 1.dp)
 
-            // Scrollable Content Body
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(horizontal = 20.dp, vertical = 16.dp),
                 verticalArrangement = Arrangement.spacedBy(18.dp),
             ) {
-                // 1. Section: STATUS PELUNASAN (Grid 2x2 with white bg & green border on active)
-                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                    Text(
-                        text = "STATUS PELUNASAN",
-                        fontSize = 11.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = Color(0xFF64748B),
-                        letterSpacing = 0.8.sp,
-                    )
+                SupplierDebtStatusFilterSection(
+                    selectedStatus = selectedStatus,
+                    onSelect = { selectedStatus = it }
+                )
 
-                    val statusPairs = listOf(
-                        listOf(SupplierDebtStatusFilter.All to "Semua", SupplierDebtStatusFilter.Unpaid to "Belum Lunas"),
-                        listOf(SupplierDebtStatusFilter.Partial to "Sebagian", SupplierDebtStatusFilter.Paid to "Lunas")
-                    )
+                SupplierDebtDueFilterSection(
+                    selectedDue = selectedDue,
+                    onSelect = { selectedDue = it }
+                )
 
-                    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                        statusPairs.forEach { rowPair ->
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.spacedBy(10.dp)
-                            ) {
-                                rowPair.forEach { (status, label) ->
-                                    val isSelected = selectedStatus == status
-                                    Surface(
-                                        modifier = Modifier
-                                            .weight(1f)
-                                            .height(46.dp)
-                                            .clickable { selectedStatus = status },
-                                        shape = RoundedCornerShape(12.dp),
-                                        color = Color.White,
-                                        border = BorderStroke(1.dp, if (isSelected) Color(0xFF256B57) else Color(0xFFE2E8F0)),
-                                        shadowElevation = if (isSelected) 0.5.dp else 0.dp
-                                    ) {
-                                        Row(
-                                            modifier = Modifier
-                                                .fillMaxSize()
-                                                .padding(horizontal = 14.dp),
-                                            horizontalArrangement = Arrangement.SpaceBetween,
-                                            verticalAlignment = Alignment.CenterVertically
-                                        ) {
-                                            Text(
-                                                text = label,
-                                                fontSize = 13.sp,
-                                                fontWeight = if (isSelected) FontWeight.SemiBold else FontWeight.Medium,
-                                                color = if (isSelected) Color(0xFF256B57) else Color(0xFF334155),
-                                                maxLines = 1
-                                            )
-                                            if (isSelected) {
-                                                Icon(
-                                                    Icons.Outlined.Check,
-                                                    contentDescription = null,
-                                                    tint = Color(0xFF256B57),
-                                                    modifier = Modifier.size(16.dp)
-                                                )
-                                            }
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
-
-                // 2. Section: JATUH TEMPO (Aging Category: Grid 2x2)
-                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                    Text(
-                        text = "JATUH TEMPO",
-                        fontSize = 11.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = Color(0xFF64748B),
-                        letterSpacing = 0.8.sp,
-                    )
-
-                    val duePairs = listOf(
-                        listOf(SupplierDebtDueFilter.All to "Semua", SupplierDebtDueFilter.Overdue to "Lewat Jatuh Tempo"),
-                        listOf(SupplierDebtDueFilter.DueToday to "Hari Ini", SupplierDebtDueFilter.Upcoming to "Akan Datang")
-                    )
-
-                    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                        duePairs.forEach { rowPair ->
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.spacedBy(10.dp)
-                            ) {
-                                rowPair.forEach { (filter, label) ->
-                                    val isSelected = selectedDue == filter
-                                    Surface(
-                                        modifier = Modifier
-                                            .weight(1f)
-                                            .height(46.dp)
-                                            .clickable { selectedDue = filter },
-                                        shape = RoundedCornerShape(12.dp),
-                                        color = Color.White,
-                                        border = BorderStroke(1.dp, if (isSelected) Color(0xFF256B57) else Color(0xFFE2E8F0)),
-                                        shadowElevation = if (isSelected) 0.5.dp else 0.dp
-                                    ) {
-                                        Row(
-                                            modifier = Modifier
-                                                .fillMaxSize()
-                                                .padding(horizontal = 14.dp),
-                                            horizontalArrangement = Arrangement.SpaceBetween,
-                                            verticalAlignment = Alignment.CenterVertically
-                                        ) {
-                                            Text(
-                                                text = label,
-                                                fontSize = 13.sp,
-                                                fontWeight = if (isSelected) FontWeight.SemiBold else FontWeight.Medium,
-                                                color = if (isSelected) Color(0xFF256B57) else Color(0xFF334155),
-                                                maxLines = 1
-                                            )
-                                            if (isSelected) {
-                                                Icon(
-                                                    Icons.Outlined.Check,
-                                                    contentDescription = null,
-                                                    tint = Color(0xFF256B57),
-                                                    modifier = Modifier.size(16.dp)
-                                                )
-                                            }
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
-
-                // 3. Section: URUTKAN BERDASARKAN (2 on row 1, 1 full-width on row 2)
-                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                    Text(
-                        text = "URUTKAN BERDASARKAN",
-                        fontSize = 11.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = Color(0xFF64748B),
-                        letterSpacing = 0.8.sp,
-                    )
-
-                    // Row 1: Tempo Terdekat & Nominal Terbesar
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(10.dp)
-                    ) {
-                        // Tempo Terdekat
-                        val isDueDateSelected = selectedSortOrder == SupplierDebtSortOrder.NearestDueDate
-                        Surface(
-                            modifier = Modifier
-                                .weight(1f)
-                                .height(40.dp)
-                                .clickable { selectedSortOrder = SupplierDebtSortOrder.NearestDueDate },
-                            shape = RoundedCornerShape(12.dp),
-                            color = Color.White,
-                            border = BorderStroke(1.dp, if (isDueDateSelected) Color(0xFF256B57) else Color(0xFFE2E8F0)),
-                            shadowElevation = if (isDueDateSelected) 0.5.dp else 0.dp
-                        ) {
-                            Row(
-                                modifier = Modifier.fillMaxSize(),
-                                horizontalArrangement = Arrangement.Center,
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                Icon(
-                                    imageVector = Icons.Outlined.Schedule,
-                                    contentDescription = null,
-                                    tint = if (isDueDateSelected) Color(0xFF256B57) else Color(0xFF64748B),
-                                    modifier = Modifier.size(14.dp)
-                                )
-                                Spacer(Modifier.width(6.dp))
-                                Text(
-                                    text = "Tempo Terdekat",
-                                    fontSize = 12.sp,
-                                    fontWeight = if (isDueDateSelected) FontWeight.SemiBold else FontWeight.Medium,
-                                    color = if (isDueDateSelected) Color(0xFF256B57) else Color(0xFF475569)
-                                )
-                            }
-                        }
-
-                        // Nominal Terbesar
-                        val isAmountSelected = selectedSortOrder == SupplierDebtSortOrder.HighestAmount
-                        Surface(
-                            modifier = Modifier
-                                .weight(1f)
-                                .height(40.dp)
-                                .clickable { selectedSortOrder = SupplierDebtSortOrder.HighestAmount },
-                            shape = RoundedCornerShape(12.dp),
-                            color = Color.White,
-                            border = BorderStroke(1.dp, if (isAmountSelected) Color(0xFF256B57) else Color(0xFFE2E8F0)),
-                            shadowElevation = if (isAmountSelected) 0.5.dp else 0.dp
-                        ) {
-                            Row(
-                                modifier = Modifier.fillMaxSize(),
-                                horizontalArrangement = Arrangement.Center,
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                Icon(
-                                    imageVector = Icons.AutoMirrored.Outlined.TrendingUp,
-                                    contentDescription = null,
-                                    tint = if (isAmountSelected) Color(0xFF256B57) else Color(0xFF64748B),
-                                    modifier = Modifier.size(14.dp)
-                                )
-                                Spacer(Modifier.width(6.dp))
-                                Text(
-                                    text = "Nominal Terbesar",
-                                    fontSize = 12.sp,
-                                    fontWeight = if (isAmountSelected) FontWeight.SemiBold else FontWeight.Medium,
-                                    color = if (isAmountSelected) Color(0xFF256B57) else Color(0xFF475569)
-                                )
-                            }
-                        }
-                    }
-
-                    // Row 2 (col-span-2): Nama Supplier (A–Z)
-                    val isNameSelected = selectedSortOrder == SupplierDebtSortOrder.SupplierNameAsc
-                    Surface(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(40.dp)
-                            .clickable { selectedSortOrder = SupplierDebtSortOrder.SupplierNameAsc },
-                        shape = RoundedCornerShape(12.dp),
-                        color = Color.White,
-                        border = BorderStroke(1.dp, if (isNameSelected) Color(0xFF256B57) else Color(0xFFE2E8F0)),
-                        shadowElevation = if (isNameSelected) 0.5.dp else 0.dp
-                    ) {
-                        Row(
-                            modifier = Modifier.fillMaxSize(),
-                            horizontalArrangement = Arrangement.Center,
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Icon(
-                                imageVector = Icons.Outlined.FilterList,
-                                contentDescription = null,
-                                tint = if (isNameSelected) Color(0xFF256B57) else Color(0xFF64748B),
-                                modifier = Modifier.size(14.dp)
-                            )
-                            Spacer(Modifier.width(6.dp))
-                            Text(
-                                text = "Nama Supplier (A–Z)",
-                                fontSize = 12.sp,
-                                fontWeight = if (isNameSelected) FontWeight.SemiBold else FontWeight.Medium,
-                                color = if (isNameSelected) Color(0xFF256B57) else Color(0xFF475569)
-                            )
-                        }
-                    }
-                }
+                SupplierDebtSortOrderSection(
+                    selectedSortOrder = selectedSortOrder,
+                    onSelect = { selectedSortOrder = it }
+                )
             }
 
             HorizontalDivider(color = Color(0xFFF1F5F9), thickness = 1.dp)
 
-            // Footer Actions: Reset (Green Outlined) & Terapkan (Green Filled)
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 20.dp, vertical = 14.dp),
-                horizontalArrangement = Arrangement.spacedBy(12.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                // Reset Button: border border-[#256B57] text-[#256B57] font-semibold
-                Surface(
-                    onClick = {
-                        selectedStatus = SupplierDebtStatusFilter.All
-                        selectedDue = SupplierDebtDueFilter.All
-                        selectedSortOrder = SupplierDebtSortOrder.NearestDueDate
-                    },
-                    modifier = Modifier
-                        .weight(1f)
-                        .height(48.dp),
-                    shape = RoundedCornerShape(12.dp),
-                    color = Color.White,
-                    border = BorderStroke(1.dp, Color(0xFF256B57))
+            SupplierDebtFilterFooterActions(
+                onReset = {
+                    selectedStatus = SupplierDebtStatusFilter.All
+                    selectedDue = SupplierDebtDueFilter.All
+                    selectedSortOrder = SupplierDebtSortOrder.NearestDueDate
+                },
+                onApply = {
+                    onApplyStatusFilter(selectedStatus)
+                    onApplyDueFilter(selectedDue)
+                    onApplySortOrder(selectedSortOrder)
+                    onDismiss()
+                }
+            )
+        }
+    }
+}
+
+@Composable
+private fun SupplierDebtFilterHeader(onDismiss: () -> Unit) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 20.dp, vertical = 12.dp),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.Top,
+    ) {
+        Column {
+            Text(
+                text = "Filter Hutang",
+                fontSize = 18.sp,
+                fontWeight = FontWeight.Bold,
+                color = Color(0xFF0F172A),
+                letterSpacing = (-0.3).sp,
+            )
+            Spacer(Modifier.height(2.dp))
+            Text(
+                text = "Atur status pelunasan dan filter hutang supplier",
+                fontSize = 12.sp,
+                color = Color(0xFF64748B),
+            )
+        }
+        Box(
+            modifier = Modifier
+                .size(32.dp)
+                .clip(CircleShape)
+                .background(Color(0xFFF1F5F9))
+                .clickable(onClick = onDismiss),
+            contentAlignment = Alignment.Center,
+        ) {
+            Icon(
+                Icons.Outlined.Close,
+                contentDescription = "Tutup Filter",
+                tint = Color(0xFF94A3B8),
+                modifier = Modifier.size(18.dp),
+            )
+        }
+    }
+}
+
+@Composable
+private fun SupplierDebtStatusFilterSection(
+    selectedStatus: SupplierDebtStatusFilter,
+    onSelect: (SupplierDebtStatusFilter) -> Unit
+) {
+    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+        Text(
+            text = "STATUS PELUNASAN",
+            fontSize = 11.sp,
+            fontWeight = FontWeight.Bold,
+            color = Color(0xFF64748B),
+            letterSpacing = 0.8.sp,
+        )
+
+        val statusPairs = listOf(
+            listOf(SupplierDebtStatusFilter.All to "Semua", SupplierDebtStatusFilter.Unpaid to "Belum Lunas"),
+            listOf(SupplierDebtStatusFilter.Partial to "Sebagian", SupplierDebtStatusFilter.Paid to "Lunas")
+        )
+
+        Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+            statusPairs.forEach { rowPair ->
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(10.dp)
                 ) {
-                    Box(
-                        modifier = Modifier.fillMaxSize(),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Text(
-                            text = "Reset",
-                            fontSize = 14.sp,
-                            fontWeight = FontWeight.SemiBold,
-                            color = Color(0xFF256B57)
-                        )
+                    rowPair.forEach { (status, label) ->
+                        val isSelected = selectedStatus == status
+                        Surface(
+                            modifier = Modifier
+                                .weight(1f)
+                                .height(46.dp)
+                                .clickable { onSelect(status) },
+                            shape = RoundedCornerShape(12.dp),
+                            color = Color.White,
+                            border = BorderStroke(1.dp, if (isSelected) Color(0xFF256B57) else Color(0xFFE2E8F0)),
+                            shadowElevation = if (isSelected) 0.5.dp else 0.dp
+                        ) {
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxSize()
+                                    .padding(horizontal = 14.dp),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Text(
+                                    text = label,
+                                    fontSize = 13.sp,
+                                    fontWeight = if (isSelected) FontWeight.SemiBold else FontWeight.Medium,
+                                    color = if (isSelected) Color(0xFF256B57) else Color(0xFF334155),
+                                    maxLines = 1
+                                )
+                                if (isSelected) {
+                                    Icon(
+                                        Icons.Outlined.Check,
+                                        contentDescription = null,
+                                        tint = Color(0xFF256B57),
+                                        modifier = Modifier.size(16.dp)
+                                    )
+                                }
+                            }
+                        }
                     }
                 }
+            }
+        }
+    }
+}
 
-                // Terapkan Button: bg-brand text-white font-semibold
-                Button(
-                    onClick = {
-                        onApplyStatusFilter(selectedStatus)
-                        onApplyDueFilter(selectedDue)
-                        onApplySortOrder(selectedSortOrder)
-                        onDismiss()
-                    },
-                    modifier = Modifier
-                        .weight(2f)
-                        .height(48.dp),
-                    shape = RoundedCornerShape(12.dp),
-                    colors = ButtonDefaults.buttonColors(
-                        containerColor = Color(0xFF256B57),
-                        contentColor = Color.White
-                    ),
-                    elevation = ButtonDefaults.buttonElevation(defaultElevation = 1.dp)
+@Composable
+private fun SupplierDebtDueFilterSection(
+    selectedDue: SupplierDebtDueFilter,
+    onSelect: (SupplierDebtDueFilter) -> Unit
+) {
+    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+        Text(
+            text = "JATUH TEMPO",
+            fontSize = 11.sp,
+            fontWeight = FontWeight.Bold,
+            color = Color(0xFF64748B),
+            letterSpacing = 0.8.sp,
+        )
+
+        val duePairs = listOf(
+            listOf(SupplierDebtDueFilter.All to "Semua", SupplierDebtDueFilter.Overdue to "Lewat Jatuh Tempo"),
+            listOf(SupplierDebtDueFilter.DueToday to "Hari Ini", SupplierDebtDueFilter.Upcoming to "Akan Datang")
+        )
+
+        Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+            duePairs.forEach { rowPair ->
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(10.dp)
                 ) {
+                    rowPair.forEach { (filter, label) ->
+                        val isSelected = selectedDue == filter
+                        Surface(
+                            modifier = Modifier
+                                .weight(1f)
+                                .height(46.dp)
+                                .clickable { onSelect(filter) },
+                            shape = RoundedCornerShape(12.dp),
+                            color = Color.White,
+                            border = BorderStroke(1.dp, if (isSelected) Color(0xFF256B57) else Color(0xFFE2E8F0)),
+                            shadowElevation = if (isSelected) 0.5.dp else 0.dp
+                        ) {
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxSize()
+                                    .padding(horizontal = 14.dp),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Text(
+                                    text = label,
+                                    fontSize = 13.sp,
+                                    fontWeight = if (isSelected) FontWeight.SemiBold else FontWeight.Medium,
+                                    color = if (isSelected) Color(0xFF256B57) else Color(0xFF334155),
+                                    maxLines = 1
+                                )
+                                if (isSelected) {
+                                    Icon(
+                                        Icons.Outlined.Check,
+                                        contentDescription = null,
+                                        tint = Color(0xFF256B57),
+                                        modifier = Modifier.size(16.dp)
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun SupplierDebtSortOrderSection(
+    selectedSortOrder: SupplierDebtSortOrder,
+    onSelect: (SupplierDebtSortOrder) -> Unit
+) {
+    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+        Text(
+            text = "URUTKAN BERDASARKAN",
+            fontSize = 11.sp,
+            fontWeight = FontWeight.Bold,
+            color = Color(0xFF64748B),
+            letterSpacing = 0.8.sp,
+        )
+
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(10.dp)
+        ) {
+            val isDueDateSelected = selectedSortOrder == SupplierDebtSortOrder.NearestDueDate
+            Surface(
+                modifier = Modifier
+                    .weight(1f)
+                    .height(40.dp)
+                    .clickable { onSelect(SupplierDebtSortOrder.NearestDueDate) },
+                shape = RoundedCornerShape(12.dp),
+                color = Color.White,
+                border = BorderStroke(1.dp, if (isDueDateSelected) Color(0xFF256B57) else Color(0xFFE2E8F0)),
+                shadowElevation = if (isDueDateSelected) 0.5.dp else 0.dp
+            ) {
+                Row(
+                    modifier = Modifier.fillMaxSize(),
+                    horizontalArrangement = Arrangement.Center,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Icon(
+                        imageVector = Icons.Outlined.Schedule,
+                        contentDescription = null,
+                        tint = if (isDueDateSelected) Color(0xFF256B57) else Color(0xFF64748B),
+                        modifier = Modifier.size(14.dp)
+                    )
+                    Spacer(Modifier.width(6.dp))
                     Text(
-                        text = "Terapkan",
-                        fontSize = 14.sp,
-                        fontWeight = FontWeight.SemiBold
+                        text = "Tempo Terdekat",
+                        fontSize = 12.sp,
+                        fontWeight = if (isDueDateSelected) FontWeight.SemiBold else FontWeight.Medium,
+                        color = if (isDueDateSelected) Color(0xFF256B57) else Color(0xFF475569)
                     )
                 }
             }
+
+            val isAmountSelected = selectedSortOrder == SupplierDebtSortOrder.HighestAmount
+            Surface(
+                modifier = Modifier
+                    .weight(1f)
+                    .height(40.dp)
+                    .clickable { onSelect(SupplierDebtSortOrder.HighestAmount) },
+                shape = RoundedCornerShape(12.dp),
+                color = Color.White,
+                border = BorderStroke(1.dp, if (isAmountSelected) Color(0xFF256B57) else Color(0xFFE2E8F0)),
+                shadowElevation = if (isAmountSelected) 0.5.dp else 0.dp
+            ) {
+                Row(
+                    modifier = Modifier.fillMaxSize(),
+                    horizontalArrangement = Arrangement.Center,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Icon(
+                        imageVector = Icons.AutoMirrored.Outlined.TrendingUp,
+                        contentDescription = null,
+                        tint = if (isAmountSelected) Color(0xFF256B57) else Color(0xFF64748B),
+                        modifier = Modifier.size(14.dp)
+                    )
+                    Spacer(Modifier.width(6.dp))
+                    Text(
+                        text = "Nominal Terbesar",
+                        fontSize = 12.sp,
+                        fontWeight = if (isAmountSelected) FontWeight.SemiBold else FontWeight.Medium,
+                        color = if (isAmountSelected) Color(0xFF256B57) else Color(0xFF475569)
+                    )
+                }
+            }
+        }
+
+        val isNameSelected = selectedSortOrder == SupplierDebtSortOrder.SupplierNameAsc
+        Surface(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(40.dp)
+                .clickable { onSelect(SupplierDebtSortOrder.SupplierNameAsc) },
+            shape = RoundedCornerShape(12.dp),
+            color = Color.White,
+            border = BorderStroke(1.dp, if (isNameSelected) Color(0xFF256B57) else Color(0xFFE2E8F0)),
+            shadowElevation = if (isNameSelected) 0.5.dp else 0.dp
+        ) {
+            Row(
+                modifier = Modifier.fillMaxSize(),
+                horizontalArrangement = Arrangement.Center,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Icon(
+                    imageVector = Icons.Outlined.FilterList,
+                    contentDescription = null,
+                    tint = if (isNameSelected) Color(0xFF256B57) else Color(0xFF64748B),
+                    modifier = Modifier.size(14.dp)
+                )
+                Spacer(Modifier.width(6.dp))
+                Text(
+                    text = "Nama Supplier (A–Z)",
+                    fontSize = 12.sp,
+                    fontWeight = if (isNameSelected) FontWeight.SemiBold else FontWeight.Medium,
+                    color = if (isNameSelected) Color(0xFF256B57) else Color(0xFF475569)
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun SupplierDebtFilterFooterActions(
+    onReset: () -> Unit,
+    onApply: () -> Unit
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 20.dp, vertical = 14.dp),
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Surface(
+            onClick = onReset,
+            modifier = Modifier
+                .weight(1f)
+                .height(48.dp),
+            shape = RoundedCornerShape(12.dp),
+            color = Color.White,
+            border = BorderStroke(1.dp, Color(0xFF256B57))
+        ) {
+            Box(
+                modifier = Modifier.fillMaxSize(),
+                contentAlignment = Alignment.Center
+            ) {
+                Text(
+                    text = "Reset",
+                    fontSize = 14.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    color = Color(0xFF256B57)
+                )
+            }
+        }
+
+        Button(
+            onClick = onApply,
+            modifier = Modifier
+                .weight(2f)
+                .height(48.dp),
+            shape = RoundedCornerShape(12.dp),
+            colors = ButtonDefaults.buttonColors(
+                containerColor = Color(0xFF256B57),
+                contentColor = Color.White
+            ),
+            elevation = ButtonDefaults.buttonElevation(defaultElevation = 1.dp)
+        ) {
+            Text(
+                text = "Terapkan",
+                fontSize = 14.sp,
+                fontWeight = FontWeight.SemiBold
+            )
         }
     }
 }
@@ -816,9 +853,9 @@ internal fun SupplierDebtSummaryBottomSheet(
     }
     val unpaidInvoices = uiState.unpaidCount
     val overdueInvoices = remember(uiState.filteredPayables) {
-        val today = LocalDate.now()
+        val today = java.time.LocalDate.now()
         uiState.filteredPayables.count { p ->
-            val due = runCatching { LocalDate.parse(p.dueDate.take(10)) }.getOrNull()
+            val due = runCatching { java.time.LocalDate.parse(p.dueDate.take(10)) }.getOrNull()
             due != null && due.isBefore(today) && !p.status.equals(SupplierDebtStatusFilter.Paid.apiValue, ignoreCase = true)
         }
     }
@@ -848,210 +885,50 @@ internal fun SupplierDebtSummaryBottomSheet(
                 .fillMaxWidth()
                 .padding(horizontal = 20.dp, vertical = 4.dp)
         ) {
-            // Modal Header
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(bottom = 12.dp, top = 2.dp),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.Top
-            ) {
-                Column {
-                    Text(
-                        text = "Ringkasan Hutang",
-                        fontSize = 18.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = Color(0xFF0F172A),
-                        letterSpacing = (-0.3).sp
-                    )
-                    Spacer(Modifier.height(2.dp))
-                    Text(
-                        text = "Informasi ringkas total kewajiban dan supplier",
-                        fontSize = 12.sp,
-                        color = Color(0xFF64748B)
-                    )
-                }
-                Box(
-                    modifier = Modifier
-                        .size(32.dp)
-                        .clip(CircleShape)
-                        .background(Color(0xFFF1F5F9))
-                        .clickable { onDismiss() },
-                    contentAlignment = Alignment.Center
-                ) {
-                    Icon(
-                        Icons.Outlined.Close,
-                        contentDescription = "Tutup Ringkasan",
-                        tint = Color(0xFF94A3B8),
-                        modifier = Modifier.size(18.dp)
-                    )
-                }
-            }
+            SupplierDebtSummaryHeader(onDismiss = onDismiss)
 
             HorizontalDivider(color = Color(0xFFF1F5F9), thickness = 1.dp)
 
-            // Metric List Rows (divide-y divide-slate-100)
             Column(
                 modifier = Modifier.fillMaxWidth()
             ) {
-                // Row 1: Total Sisa Hutang
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(vertical = 14.dp),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Column(modifier = Modifier.padding(end = 8.dp), verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                        Text(
-                            text = "Total Sisa Hutang",
-                            fontSize = 13.sp,
-                            fontWeight = FontWeight.SemiBold,
-                            color = Color(0xFF0F172A)
-                        )
-                        Text(
-                            text = "Sesuai filter halaman aktif",
-                            fontSize = 12.sp,
-                            color = Color(0xFF94A3B8)
-                        )
-                    }
-                    Text(
-                        text = totalRemaining.currencyText(),
-                        fontSize = 18.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = Color(0xFF256B57),
-                        letterSpacing = (-0.3).sp
-                    )
-                }
+                SupplierDebtSummaryMetricRow(
+                    title = "Total Sisa Hutang",
+                    subtitle = "Sesuai filter halaman aktif",
+                    value = totalRemaining.currencyText(),
+                    valueColor = Color(0xFF256B57)
+                )
 
                 HorizontalDivider(color = Color(0xFFF1F5F9), thickness = 1.dp)
 
-                // Row 2: Supplier Berhutang
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(vertical = 14.dp),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Column(modifier = Modifier.padding(end = 8.dp), verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                        Text(
-                            text = "Supplier Berhutang",
-                            fontSize = 13.sp,
-                            fontWeight = FontWeight.SemiBold,
-                            color = Color(0xFF0F172A)
-                        )
-                        Text(
-                            text = "Jumlah supplier dengan tagihan",
-                            fontSize = 12.sp,
-                            color = Color(0xFF94A3B8)
-                        )
-                    }
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(4.dp)
-                    ) {
-                        Text(
-                            text = totalSuppliers.toString(),
-                            fontSize = 16.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = Color(0xFF0F172A)
-                        )
-                        Text(
-                            text = "Supplier",
-                            fontSize = 12.sp,
-                            fontWeight = FontWeight.Medium,
-                            color = Color(0xFF64748B)
-                        )
-                    }
-                }
+                SupplierDebtSummaryMetricRow(
+                    title = "Supplier Berhutang",
+                    subtitle = "Jumlah supplier dengan tagihan",
+                    value = totalSuppliers.toString(),
+                    unit = "Supplier"
+                )
 
                 HorizontalDivider(color = Color(0xFFF1F5F9), thickness = 1.dp)
 
-                // Row 3: Tagihan Belum Lunas
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(vertical = 14.dp),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Column(modifier = Modifier.padding(end = 8.dp), verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                        Text(
-                            text = "Tagihan Belum Lunas",
-                            fontSize = 13.sp,
-                            fontWeight = FontWeight.SemiBold,
-                            color = Color(0xFF0F172A)
-                        )
-                        Text(
-                            text = "Nota hutang belum selesai",
-                            fontSize = 12.sp,
-                            color = Color(0xFF94A3B8)
-                        )
-                    }
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(4.dp)
-                    ) {
-                        Text(
-                            text = unpaidInvoices.toString(),
-                            fontSize = 16.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = Color(0xFF0F172A)
-                        )
-                        Text(
-                            text = "Nota",
-                            fontSize = 12.sp,
-                            fontWeight = FontWeight.Medium,
-                            color = Color(0xFF64748B)
-                        )
-                    }
-                }
+                SupplierDebtSummaryMetricRow(
+                    title = "Tagihan Belum Lunas",
+                    subtitle = "Nota hutang belum selesai",
+                    value = unpaidInvoices.toString(),
+                    unit = "Nota"
+                )
 
                 HorizontalDivider(color = Color(0xFFF1F5F9), thickness = 1.dp)
 
-                // Row 4: Lewat Jatuh Tempo (Status Urgensi)
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(vertical = 14.dp),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Column(modifier = Modifier.padding(end = 8.dp), verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                        Text(
-                            text = "Lewat Jatuh Tempo",
-                            fontSize = 13.sp,
-                            fontWeight = FontWeight.SemiBold,
-                            color = Color(0xFF0F172A)
-                        )
-                        Text(
-                            text = "Perlu segera dilunasi",
-                            fontSize = 12.sp,
-                            color = Color(0xFF94A3B8)
-                        )
-                    }
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(4.dp)
-                    ) {
-                        Text(
-                            text = overdueInvoices.toString(),
-                            fontSize = 16.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = if (overdueInvoices > 0) Color(0xFFE11D48) else Color(0xFF0F172A)
-                        )
-                        Text(
-                            text = "Nota",
-                            fontSize = 12.sp,
-                            fontWeight = FontWeight.SemiBold,
-                            color = if (overdueInvoices > 0) Color(0xFFF43F5E) else Color(0xFF64748B)
-                        )
-                    }
-                }
+                SupplierDebtSummaryMetricRow(
+                    title = "Lewat Jatuh Tempo",
+                    subtitle = "Perlu segera dilunasi",
+                    value = overdueInvoices.toString(),
+                    unit = "Nota",
+                    valueColor = if (overdueInvoices > 0) Color(0xFFE11D48) else Color(0xFF0F172A),
+                    unitColor = if (overdueInvoices > 0) Color(0xFFF43F5E) else Color(0xFF64748B)
+                )
             }
 
-            // Bottom Actions (Solid Brand Green "Tutup" Button)
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -1076,6 +953,107 @@ internal fun SupplierDebtSummaryBottomSheet(
                     )
                 }
             }
+        }
+    }
+}
+
+@Composable
+private fun SupplierDebtSummaryHeader(onDismiss: () -> Unit) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(bottom = 12.dp, top = 2.dp),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.Top
+    ) {
+        Column {
+            Text(
+                text = "Ringkasan Hutang",
+                fontSize = 18.sp,
+                fontWeight = FontWeight.Bold,
+                color = Color(0xFF0F172A),
+                letterSpacing = (-0.3).sp
+            )
+            Spacer(Modifier.height(2.dp))
+            Text(
+                text = "Informasi ringkas total kewajiban dan supplier",
+                fontSize = 12.sp,
+                color = Color(0xFF64748B)
+            )
+        }
+        Box(
+            modifier = Modifier
+                .size(32.dp)
+                .clip(CircleShape)
+                .background(Color(0xFFF1F5F9))
+                .clickable { onDismiss() },
+            contentAlignment = Alignment.Center
+        ) {
+            Icon(
+                Icons.Outlined.Close,
+                contentDescription = "Tutup Ringkasan",
+                tint = Color(0xFF94A3B8),
+                modifier = Modifier.size(18.dp)
+            )
+        }
+    }
+}
+
+@Composable
+private fun SupplierDebtSummaryMetricRow(
+    title: String,
+    subtitle: String,
+    value: String,
+    unit: String? = null,
+    valueColor: Color = Color(0xFF0F172A),
+    unitColor: Color = Color(0xFF64748B)
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(vertical = 14.dp),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Column(modifier = Modifier.padding(end = 8.dp), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+            Text(
+                text = title,
+                fontSize = 13.sp,
+                fontWeight = FontWeight.SemiBold,
+                color = Color(0xFF0F172A)
+            )
+            Text(
+                text = subtitle,
+                fontSize = 12.sp,
+                color = Color(0xFF94A3B8)
+            )
+        }
+        if (unit != null) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(4.dp)
+            ) {
+                Text(
+                    text = value,
+                    fontSize = 16.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = valueColor
+                )
+                Text(
+                    text = unit,
+                    fontSize = 12.sp,
+                    fontWeight = FontWeight.Medium,
+                    color = unitColor
+                )
+            }
+        } else {
+            Text(
+                text = value,
+                fontSize = 18.sp,
+                fontWeight = FontWeight.Bold,
+                color = valueColor,
+                letterSpacing = (-0.3).sp
+            )
         }
     }
 }
