@@ -74,9 +74,9 @@ fun CashierCashSessionScreen(
                     .fillMaxSize()
                     .widthIn(max = if (isDesktop) 720.dp else 512.dp)
                     .verticalScroll(rememberScrollState())
-                    .padding(horizontal = 16.dp, vertical = 16.dp)
+                    .padding(horizontal = 14.dp, vertical = 14.dp)
                     .padding(bottom = 32.dp),
-                verticalArrangement = Arrangement.spacedBy(16.dp)
+                verticalArrangement = Arrangement.spacedBy(14.dp)
             ) {
                 // Sesi lokal offline badge jika ada
                 LocalCashSessionBadges(uiState = uiState)

@@ -322,14 +322,13 @@ private fun CashierCompactTopBar(
                             .size(36.dp)
                             .align(Alignment.TopStart)
                             .clip(RoundedCornerShape(10.dp))
-                            .background(Color(0xFFF4F9F5))
-                            .border(1.dp, Color(0xFF1B5E3C).copy(alpha = 0.15f), RoundedCornerShape(10.dp))
+                            .background(Color(0xFF10533C))
                             .clickable(onClick = onTerminalInfoClick),
                         contentAlignment = Alignment.Center
                     ) {
                         Text(
                             text = "TB",
-                            color = Color(0xFF1B5E3C),
+                            color = Color.White,
                             fontSize = 12.sp,
                             fontWeight = FontWeight.Bold,
                             letterSpacing = (-0.3).sp
