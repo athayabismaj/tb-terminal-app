@@ -22,14 +22,12 @@ import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.outlined.KeyboardArrowLeft
-import androidx.compose.material.icons.automirrored.outlined.KeyboardArrowRight
 import androidx.compose.material.icons.outlined.Add
+import androidx.compose.material.icons.outlined.Delete
 import androidx.compose.material.icons.outlined.Remove
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Icon
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -39,25 +37,42 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.tbterminal.app.ui.checkout.CartItem
-import com.tbterminal.app.ui.checkout.Error
-import com.tbterminal.app.ui.checkout.ErrorContainer
-import com.tbterminal.app.ui.checkout.OnSecondaryContainer
-import com.tbterminal.app.ui.checkout.OnSurface
-import com.tbterminal.app.ui.checkout.OnSurfaceVariant
-import com.tbterminal.app.ui.checkout.Outline
-import com.tbterminal.app.ui.checkout.OutlineVariant
-import com.tbterminal.app.ui.checkout.Primary
 import com.tbterminal.app.ui.checkout.Product
-import com.tbterminal.app.ui.checkout.SecondaryContainer
-import com.tbterminal.app.ui.checkout.SurfaceContainerLow
 import java.math.BigDecimal
 import java.text.NumberFormat
 import java.util.Locale
+
+// ═════════════════════════════════════════════════════════════════════════════
+// INDUSTRIAL POS DESIGN TOKENS (TB Terminal Design System)
+// Harmonized with Forest Green, Slate 900/800/500, Emerald, and Amber
+// ═════════════════════════════════════════════════════════════════════════════
+private val BrandForest = Color(0xFF10533C)
+private val BrandForestDark = Color(0xFF0B3828)
+private val BrandGreenLight = Color(0xFFF0FDF4)
+private val BrandGreenBorder = Color(0xFFBBF7D0)
+
+private val Slate900 = Color(0xFF0F172A)
+private val Slate800 = Color(0xFF1E293B)
+private val Slate700 = Color(0xFF334155)
+private val Slate500 = Color(0xFF64748B)
+private val Slate400 = Color(0xFF94A3B8)
+private val Slate200 = Color(0xFFE2E8F0)
+private val Slate100 = Color(0xFFF1F5F9)
+private val Slate50 = Color(0xFFF8FAFC)
+
+private val Emerald700 = Color(0xFF15803D)
+private val Emerald50 = Color(0xFFECFDF5)
+
+private val Amber700 = Color(0xFFB45309)
+private val AmberBg = Color(0xFFFEF3C7)
+
+private val DangerRed = Color(0xFFDC2626)
+private val DangerBg = Color(0xFFFEF2F2)
+private val DangerBorder = Color(0xFFFECACA)
 
 @Composable
 internal fun ProductCardGrid(
@@ -72,11 +87,14 @@ internal fun ProductCardGrid(
         return
     }
 
+    // 155.dp adapts into exactly 2 columns on 360-420dp mobile phones,
+    // and 3-4 columns on wider tablets/desktops
     LazyVerticalGrid(
-        columns = GridCells.Adaptive(minSize = 220.dp),
+        columns = GridCells.Adaptive(minSize = 155.dp),
         modifier = modifier,
-        horizontalArrangement = Arrangement.spacedBy(14.dp),
-        verticalArrangement = Arrangement.spacedBy(14.dp)
+        horizontalArrangement = Arrangement.spacedBy(10.dp),
+        verticalArrangement = Arrangement.spacedBy(10.dp),
+        contentPadding = PaddingValues(bottom = 80.dp) // Spacing for bottom cart dock
     ) {
         items(products, key = { product -> product.productId }) { product ->
             val cartItem = cartItems.firstOrNull { item -> item.productId == product.productId }
@@ -148,25 +166,37 @@ private fun ProductGridEmptyState(modifier: Modifier) {
     Surface(
         modifier = modifier,
         color = Color.White,
-        shape = RoundedCornerShape(12.dp),
-        border = BorderStroke(1.dp, OutlineVariant.copy(alpha = 0.45f))
+        shape = RoundedCornerShape(16.dp),
+        border = BorderStroke(1.dp, Slate200)
     ) {
         Box(
-            modifier = Modifier.fillMaxSize(),
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(24.dp),
             contentAlignment = Alignment.Center
         ) {
-            Text(
-                text = "Tidak ada produk pada kategori ini.",
-                color = Outline,
-                fontSize = 14.sp,
-                fontWeight = FontWeight.SemiBold
-            )
+            Column(
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.spacedBy(6.dp)
+            ) {
+                Text(
+                    text = "Tidak Ada Produk",
+                    color = Slate900,
+                    fontSize = 15.sp,
+                    fontWeight = FontWeight.Bold
+                )
+                Text(
+                    text = "Tidak ada produk pada kategori atau pencarian ini.",
+                    color = Slate500,
+                    fontSize = 12.sp
+                )
+            }
         }
     }
 }
 
 @Composable
-private fun ProductMinimalCard(
+internal fun ProductMinimalCard(
     product: Product,
     cartQty: Int,
     onAddClick: () -> Unit,
@@ -175,103 +205,128 @@ private fun ProductMinimalCard(
 ) {
     val isOutOfStock = product.stockQty <= BigDecimal.ZERO
     val onCardClick = if (cartQty > 0) onIncreaseQty else onAddClick
+    val isInCart = cartQty > 0
 
     Surface(
         modifier = Modifier
             .fillMaxWidth()
-            .height(180.dp)
             .clickable(enabled = !isOutOfStock, onClick = onCardClick),
         color = Color.White,
-        shape = RoundedCornerShape(12.dp),
-        border = BorderStroke(1.dp, OutlineVariant.copy(alpha = 0.42f)),
-        shadowElevation = 1.dp
+        shape = RoundedCornerShape(14.dp),
+        border = BorderStroke(
+            1.dp,
+            if (isInCart) BrandForest else Slate200
+        ),
+        shadowElevation = if (isInCart) 2.dp else 0.5.dp
     ) {
         Column(
             modifier = Modifier
-                .fillMaxSize()
-                .padding(16.dp)
+                .fillMaxWidth()
+                .padding(12.dp)
         ) {
+            // Row 1: Category & Stock Pill
             Row(
-                verticalAlignment = Alignment.Top,
-                horizontalArrangement = Arrangement.spacedBy(10.dp)
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
             ) {
-                Column(modifier = Modifier.weight(1f)) {
-                    Text(
-                        text = product.name,
-                        color = OnSurface,
-                        fontWeight = FontWeight.Bold,
-                        fontSize = 15.sp,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis
-                    )
-                    Spacer(modifier = Modifier.height(6.dp))
-                    Text(
-                        text = product.categoryName.ifBlank { product.unitName.ifBlank { "Tanpa kategori" } },
-                        color = OnSurfaceVariant,
-                        fontSize = 12.sp,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis
-                    )
-                    Spacer(modifier = Modifier.height(2.dp))
-                    Text(
-                        text = "SKU: ${product.sku.ifBlank { "-" }}",
-                        color = Outline,
-                        fontSize = 11.sp,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis
-                    )
-                    if (product.secondaryUnitFactor != null && product.secondaryUnitFactor > BigDecimal.ONE) {
-                        Spacer(modifier = Modifier.height(2.dp))
-                        Text(
-                            text = "1 ${product.secondaryUnitName?.ifBlank { "Satuan 2" } ?: "Satuan 2"} = ${product.secondaryUnitFactor.stripTrailingZeros().toPlainString()} ${product.unitName}",
-                            color = Primary,
-                            fontSize = 11.sp,
-                            fontWeight = FontWeight.SemiBold,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis
-                        )
-                    }
-                }
+                Text(
+                    text = product.categoryName.ifBlank { "Umum" },
+                    color = Slate500,
+                    fontSize = 10.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.weight(1f)
+                )
+
+                Spacer(modifier = Modifier.width(6.dp))
+
                 StockPill(
                     stockQty = product.stockQty,
                     isOutOfStock = isOutOfStock
                 )
             }
 
-            Spacer(modifier = Modifier.weight(1f))
+            Spacer(modifier = Modifier.height(6.dp))
 
-            Column {
-                Row(
-                    verticalAlignment = Alignment.Bottom,
-                    horizontalArrangement = Arrangement.spacedBy(4.dp)
+            // Row 2: Product Name
+            Text(
+                text = product.name,
+                color = Slate900,
+                fontWeight = FontWeight.Bold,
+                fontSize = 13.sp,
+                lineHeight = 17.sp,
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.height(34.dp)
+            )
+
+            Spacer(modifier = Modifier.height(2.dp))
+
+            // Row 3: SKU / Secondary Unit
+            if (product.secondaryUnitFactor != null && product.secondaryUnitFactor > BigDecimal.ONE) {
+                Surface(
+                    color = BrandGreenLight,
+                    shape = RoundedCornerShape(4.dp),
+                    border = BorderStroke(1.dp, BrandGreenBorder)
                 ) {
                     Text(
-                        text = product.unitPrice.moneyText(),
-                        color = Primary,
-                        fontSize = 18.sp,
-                        fontWeight = FontWeight.ExtraBold,
+                        text = "1 ${product.secondaryUnitName ?: "Satuan 2"} = ${product.secondaryUnitFactor.stripTrailingZeros().toPlainString()} ${product.unitName}",
+                        color = BrandForest,
+                        fontSize = 9.sp,
+                        fontWeight = FontWeight.Bold,
                         maxLines = 1,
-                        overflow = TextOverflow.Ellipsis
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.padding(horizontal = 4.dp, vertical = 1.dp)
                     )
-                    if (product.unitName.isNotBlank()) {
-                        Text(
-                            text = "/ ${product.unitName}",
-                            color = OnSurfaceVariant,
-                            fontSize = 12.sp,
-                            modifier = Modifier.padding(bottom = 2.dp),
-                            maxLines = 1
-                        )
-                    }
                 }
-                Spacer(modifier = Modifier.height(8.dp))
-                ProductCardAction(
-                    cartQty = cartQty,
-                    isOutOfStock = isOutOfStock,
-                    onAddClick = onAddClick,
-                    onDecreaseQty = onDecreaseQty,
-                    onIncreaseQty = onIncreaseQty
+            } else {
+                Text(
+                    text = "SKU: ${product.sku.ifBlank { "-" }}",
+                    color = Slate400,
+                    fontSize = 10.sp,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
                 )
             }
+
+            Spacer(modifier = Modifier.height(10.dp))
+
+            // Row 4: Price & Unit
+            Row(
+                verticalAlignment = Alignment.Bottom,
+                horizontalArrangement = Arrangement.spacedBy(3.dp)
+            ) {
+                Text(
+                    text = product.unitPrice.moneyText(),
+                    color = BrandForest,
+                    fontSize = 15.sp,
+                    fontWeight = FontWeight.ExtraBold,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+                if (product.unitName.isNotBlank()) {
+                    Text(
+                        text = "/ ${product.unitName}",
+                        color = Slate500,
+                        fontSize = 10.sp,
+                        modifier = Modifier.padding(bottom = 2.dp),
+                        maxLines = 1
+                    )
+                }
+            }
+
+            Spacer(modifier = Modifier.height(8.dp))
+
+            // Row 5: Action Button / Qty Stepper
+            ProductCardAction(
+                cartQty = cartQty,
+                isOutOfStock = isOutOfStock,
+                onAddClick = onAddClick,
+                onDecreaseQty = onDecreaseQty,
+                onIncreaseQty = onIncreaseQty
+            )
         }
     }
 }
@@ -284,35 +339,34 @@ private fun StockPill(
 ) {
     val isLowStock = !isOutOfStock && stockQty <= BigDecimal(5)
     val backgroundColor = when {
-        isOutOfStock -> ErrorContainer
-        isLowStock -> SecondaryContainer.copy(alpha = 0.18f)
-        else -> Primary.copy(alpha = 0.1f)
+        isOutOfStock -> DangerBg
+        isLowStock -> AmberBg
+        else -> Emerald50
     }
     val textColor = when {
-        isOutOfStock -> Error
-        isLowStock -> OnSecondaryContainer
-        else -> Primary
+        isOutOfStock -> DangerRed
+        isLowStock -> Amber700
+        else -> Emerald700
     }
     val text = when {
         isOutOfStock -> "Habis"
         isLowStock -> "Tipis: ${stockQty.qtyText()}"
-        else -> stockQty.qtyText()
+        else -> "Stok ${stockQty.qtyText()}"
     }
 
-    Box(modifier = modifier) {
-        Surface(
-            color = backgroundColor,
-            shape = RoundedCornerShape(20.dp)
-        ) {
-            Text(
-                text = text,
-                color = textColor,
-                fontSize = 11.sp,
-                fontWeight = FontWeight.Bold,
-                maxLines = 1,
-                modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
-            )
-        }
+    Surface(
+        color = backgroundColor,
+        shape = RoundedCornerShape(20.dp),
+        modifier = modifier
+    ) {
+        Text(
+            text = text,
+            color = textColor,
+            fontSize = 9.sp,
+            fontWeight = FontWeight.Bold,
+            maxLines = 1,
+            modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+        )
     }
 }
 
@@ -324,64 +378,88 @@ private fun ProductCardAction(
     onDecreaseQty: () -> Unit,
     onIncreaseQty: () -> Unit
 ) {
-    Box(modifier = Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
+    Box(modifier = Modifier.fillMaxWidth()) {
         when {
-            isOutOfStock -> Surface(
-                color = SurfaceContainerLow,
-                shape = RoundedCornerShape(10.dp),
-                border = BorderStroke(1.dp, OutlineVariant.copy(alpha = 0.5f)),
-                modifier = Modifier.fillMaxWidth().height(40.dp)
-            ) {
-                Box(
-                    modifier = Modifier.fillMaxSize(),
-                    contentAlignment = Alignment.Center
+            isOutOfStock -> {
+                Surface(
+                    color = Slate100,
+                    shape = RoundedCornerShape(8.dp),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(34.dp)
                 ) {
-                    Text("Habis", color = Outline, fontWeight = FontWeight.Bold, fontSize = 13.sp)
+                    Box(
+                        modifier = Modifier.fillMaxSize(),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text(
+                            text = "Stok Habis",
+                            color = Slate400,
+                            fontWeight = FontWeight.SemiBold,
+                            fontSize = 11.sp
+                        )
+                    }
                 }
             }
 
-            cartQty > 0 -> Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(40.dp)
-                    .background(SurfaceContainerLow, RoundedCornerShape(10.dp))
-                    .border(1.dp, OutlineVariant.copy(alpha = 0.35f), RoundedCornerShape(10.dp))
-                    .padding(horizontal = 4.dp),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                QuantityActionButton(
-                    icon = Icons.Outlined.Remove,
-                    contentDescription = "Kurangi",
-                    onClick = onDecreaseQty
-                )
-                Text(
-                    text = cartQty.toString(),
-                    fontWeight = FontWeight.Bold,
-                    fontSize = 14.sp,
-                    color = OnSurface,
-                    textAlign = TextAlign.Center,
-                    modifier = Modifier.weight(1f)
-                )
-                QuantityActionButton(
-                    icon = Icons.Outlined.Add,
-                    contentDescription = "Tambah",
-                    onClick = onIncreaseQty,
-                    containerColor = Primary.copy(alpha = 0.1f),
-                    borderColor = Color.Transparent
-                )
+            cartQty > 0 -> {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(34.dp)
+                        .background(BrandGreenLight, RoundedCornerShape(8.dp))
+                        .border(1.dp, BrandGreenBorder, RoundedCornerShape(8.dp))
+                        .padding(2.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    QuantityActionButton(
+                        icon = if (cartQty == 1) Icons.Outlined.Delete else Icons.Outlined.Remove,
+                        contentDescription = "Kurangi",
+                        onClick = onDecreaseQty,
+                        tint = if (cartQty == 1) DangerRed else BrandForest
+                    )
+                    Text(
+                        text = cartQty.toString(),
+                        fontWeight = FontWeight.ExtraBold,
+                        fontSize = 13.sp,
+                        color = BrandForest
+                    )
+                    QuantityActionButton(
+                        icon = Icons.Outlined.Add,
+                        contentDescription = "Tambah",
+                        onClick = onIncreaseQty,
+                        containerColor = BrandForest,
+                        tint = Color.White
+                    )
+                }
             }
 
-            else -> Button(
-                onClick = onAddClick,
-                modifier = Modifier.fillMaxWidth().height(40.dp),
-                shape = RoundedCornerShape(10.dp),
-                colors = ButtonDefaults.buttonColors(containerColor = Primary),
-                contentPadding = PaddingValues(horizontal = 10.dp)
-            ) {
-                Icon(Icons.Outlined.Add, contentDescription = null, modifier = Modifier.size(17.dp))
-                Spacer(modifier = Modifier.width(6.dp))
-                Text("Keranjang", fontWeight = FontWeight.Bold, fontSize = 13.sp)
+            else -> {
+                Button(
+                    onClick = onAddClick,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(34.dp),
+                    shape = RoundedCornerShape(8.dp),
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = BrandForest,
+                        contentColor = Color.White
+                    ),
+                    contentPadding = PaddingValues(horizontal = 8.dp)
+                ) {
+                    Icon(
+                        imageVector = Icons.Outlined.Add,
+                        contentDescription = null,
+                        modifier = Modifier.size(15.dp)
+                    )
+                    Spacer(modifier = Modifier.width(4.dp))
+                    Text(
+                        text = "Tambah",
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 11.sp
+                    )
+                }
             }
         }
     }
@@ -392,23 +470,23 @@ private fun QuantityActionButton(
     icon: ImageVector,
     contentDescription: String,
     onClick: () -> Unit,
-    containerColor: Color = Color.Transparent,
-    borderColor: Color = OutlineVariant.copy(alpha = 0.35f)
+    containerColor: Color = Color.White,
+    tint: Color = BrandForest
 ) {
     Box(
         modifier = Modifier
-            .size(32.dp)
-            .clip(RoundedCornerShape(8.dp))
+            .size(28.dp)
+            .clip(RoundedCornerShape(6.dp))
             .background(containerColor)
-            .border(1.dp, borderColor, RoundedCornerShape(8.dp))
+            .border(0.5.dp, Slate200, RoundedCornerShape(6.dp))
             .clickable(onClick = onClick),
         contentAlignment = Alignment.Center
     ) {
         Icon(
-            icon,
+            imageVector = icon,
             contentDescription = contentDescription,
-            tint = Primary,
-            modifier = Modifier.size(17.dp)
+            tint = tint,
+            modifier = Modifier.size(15.dp)
         )
     }
 }

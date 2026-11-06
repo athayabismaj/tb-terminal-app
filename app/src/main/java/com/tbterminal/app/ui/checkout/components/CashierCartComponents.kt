@@ -53,17 +53,17 @@ import java.math.BigDecimal
 import java.text.NumberFormat
 import java.util.Locale
 
-private val CartSurface = Color(0xFFFFFFFF)
-private val CartSurfaceContainerLow = Color(0xFFEFF4FF)
-private val CartOnSurface = Color(0xFF121C2A)
-private val CartOnSurfaceVariant = Color(0xFF3D4A42)
-private val CartOutlineVariant = Color(0xFFBCCAC0)
-private val CartOutline = Color(0xFF6D7A72)
-private val CartPrimary = Color(0xFF006948)
-private val CartPrimaryContainer = Color(0xFF00855D)
+private val CartSurface = Color.White
+private val CartSurfaceContainerLow = Color(0xFFF0FDF4)
+private val CartOnSurface = Color(0xFF0F172A)
+private val CartOnSurfaceVariant = Color(0xFF64748B)
+private val CartOutlineVariant = Color(0xFFE2E8F0)
+private val CartOutline = Color(0xFF94A3B8)
+private val CartPrimary = Color(0xFF10533C)
+private val CartPrimaryContainer = Color(0xFF10533C)
 private val CartOnPrimary = Color(0xFFFFFFFF)
-private val CartTertiary = Color(0xFF9B3E3B)
-private val CartError = Color(0xFFBA1A1A)
+private val CartTertiary = Color(0xFFB45309)
+private val CartError = Color(0xFFDC2626)
 
 @Composable
 fun CartItemCard(

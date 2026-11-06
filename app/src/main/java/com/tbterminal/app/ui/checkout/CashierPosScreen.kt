@@ -4,63 +4,104 @@ import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.offset
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.ArrowForward
 import androidx.compose.material.icons.filled.CheckCircle
-import androidx.compose.material.icons.outlined.*
-import androidx.compose.material3.*
-import androidx.compose.runtime.*
-import com.tbterminal.app.ui.barcode.CameraBarcodeScannerDialog
-import com.tbterminal.app.ui.barcode.hardwareBarcodeScanner
-import kotlinx.coroutines.delay
+import androidx.compose.material.icons.outlined.BookmarkAdd
+import androidx.compose.material.icons.outlined.Calculate
+import androidx.compose.material.icons.outlined.Clear
+import androidx.compose.material.icons.outlined.Lock
+import androidx.compose.material.icons.outlined.PauseCircleOutline
+import androidx.compose.material.icons.outlined.Payments
+import androidx.compose.material.icons.outlined.QrCodeScanner
+import androidx.compose.material.icons.outlined.Search
+import androidx.compose.material.icons.outlined.ShoppingCart
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.OutlinedTextFieldDefaults
+import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Surface
+import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.input.KeyboardType
-import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.tbterminal.app.data.model.Customer
-import com.tbterminal.app.ui.common.UiText
+import com.tbterminal.app.ui.barcode.CameraBarcodeScannerDialog
+import com.tbterminal.app.ui.barcode.hardwareBarcodeScanner
+import com.tbterminal.app.ui.checkout.components.MaterialEstimatorDialog
 import com.tbterminal.app.ui.checkout.components.ProductCardGrid
 import com.tbterminal.app.ui.checkout.components.ProductErrorState
 import com.tbterminal.app.ui.checkout.components.ProductPaginationBar
-import com.tbterminal.app.ui.checkout.components.MaterialEstimatorDialog
+import com.tbterminal.app.ui.common.toRupiahText
+import kotlinx.coroutines.delay
 import java.math.BigDecimal
-import java.text.NumberFormat
-import java.util.Locale
 
-// ==========================================
-// TEMA & WARNA
-// ==========================================
+// ═════════════════════════════════════════════════════════════════════════════
+// INDUSTRIAL POS DESIGN TOKENS (TB Terminal Design System)
+// ═════════════════════════════════════════════════════════════════════════════
 val SurfaceBright = Color.White
-val SurfaceContainerLow = Color(0xFFEFF4FF)
-val OnSurface = Color(0xFF121C2A)
-val OnSurfaceVariant = Color(0xFF3D4A42)
-val OutlineVariant = Color(0xFFD8E2E7)
-val Outline = Color(0xFF6D7A72)
+val Primary = Color(0xFF10533C)
+val PrimaryContainer = Color(0xFF0B3828)
+val OnPrimary = Color.White
 
-val Primary = Color(0xFF006948)
-val PrimaryContainer = Color(0xFF00855D)
-val OnPrimary = Color(0xFFFFFFFF)
+private val BrandForest = Color(0xFF10533C)
+private val BrandForestDark = Color(0xFF0B3828)
+private val BrandGreenLight = Color(0xFFF0FDF4)
+private val BrandGreenBorder = Color(0xFFBBF7D0)
 
-val SecondaryContainer = Color(0xFFFEA619)
-val OnSecondaryContainer = Color(0xFF684000)
+private val Slate900 = Color(0xFF0F172A)
+private val Slate800 = Color(0xFF1E293B)
+private val Slate700 = Color(0xFF334155)
+private val Slate500 = Color(0xFF64748B)
+private val Slate400 = Color(0xFF94A3B8)
+private val Slate200 = Color(0xFFE2E8F0)
+private val Slate100 = Color(0xFFF1F5F9)
+private val Slate50 = Color(0xFFF8FAFC)
 
-val Error = Color(0xFFBA1A1A)
-val ErrorContainer = Color(0xFFFFDAD6)
-val OnError = Color(0xFFFFFFFF)
-val WarningOrange = Color(0xFFFEA619)
+private val Emerald700 = Color(0xFF15803D)
+private val Emerald50 = Color(0xFFECFDF5)
+
+private val Amber700 = Color(0xFFB45309)
+private val AmberBg = Color(0xFFFEF3C7)
+private val AmberBorder = Color(0xFFF59E0B)
+
+private val DangerRed = Color(0xFFDC2626)
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -94,303 +135,207 @@ fun CashierPosScreen(
 ) {
     var showCameraScanner by remember { mutableStateOf(false) }
     var showMaterialEstimator by remember { mutableStateOf(false) }
-    val allCategory = "Semua kategori"
-    val categories = listOf(allCategory) + state.products.map { it.categoryName }.filter { it.isNotBlank() }.distinct()
+
+    val allCategory = "Semua Kategori"
+    val categories = remember(state.products) {
+        listOf(allCategory) + state.products.map { it.categoryName }.filter { it.isNotBlank() }.distinct()
+    }
     var selectedCategory by remember { mutableStateOf(allCategory) }
     LaunchedEffect(categories) {
         if (selectedCategory !in categories) {
             selectedCategory = allCategory
         }
     }
-    
-    val filteredProducts = if (selectedCategory == allCategory) state.products else state.products.filter { it.categoryName == selectedCategory }
-    
+
+    val filteredProducts = remember(selectedCategory, state.products) {
+        if (selectedCategory == allCategory) state.products
+        else state.products.filter { it.categoryName == selectedCategory }
+    }
+
     val cartItemCount = state.cartItems.sumOf { it.quantity }
+    val cartSubtotal = state.cartItems.fold(BigDecimal.ZERO) { acc, item ->
+        acc.add(item.unitPrice.multiply(item.quantity.toBigDecimal()))
+    }
 
     Scaffold(
         modifier = modifier
             .fillMaxSize()
             .hardwareBarcodeScanner { barcode -> onScanBarcode(barcode) },
-        containerColor = SurfaceBright,
-        contentWindowInsets = WindowInsets(0.dp),
-        floatingActionButton = {
-            // Floating Action Button Keranjang Belanja
-            Box(
-                contentAlignment = Alignment.TopEnd,
-                modifier = Modifier.offset(y = (-60).dp)
-            ) {
-                FloatingActionButton(
-                    onClick = onNavigateToCart,
-                    containerColor = Primary,
-                    contentColor = OnPrimary,
-                    shape = CircleShape,
-                    modifier = Modifier.size(64.dp)
-                ) {
-                    Icon(Icons.Outlined.ShoppingCart, contentDescription = "Keranjang", modifier = Modifier.size(32.dp))
-                }
-                
-                // Badge Notifikasi
-                if (cartItemCount > 0) {
-                    Box(
-                        modifier = Modifier
-                            .offset(x = (-4).dp, y = 4.dp)
-                            .size(24.dp)
-                            .clip(CircleShape)
-                            .background(Error)
-                            .border(2.dp, Color.White, CircleShape),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Text(
-                            text = cartItemCount.toString(),
-                            color = OnError,
-                            fontSize = 12.sp,
-                            fontWeight = FontWeight.Bold
-                        )
-                    }
-                }
-            }
-        }
+        containerColor = Slate50,
+        contentWindowInsets = WindowInsets(0.dp)
     ) { paddingValues ->
-        BoxWithConstraints(modifier = Modifier.padding(paddingValues).fillMaxSize()) {
-            val compact = maxWidth < 600.dp
-            Column(
-                modifier = Modifier.fillMaxSize().padding(if (compact) 16.dp else 24.dp)
-            ) {
-            // ── Page Header ──
-            Row(
-                modifier = Modifier.fillMaxWidth().padding(bottom = if (compact) 16.dp else 24.dp),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Text(
-                        text = "Kasir POS",
-                        color = OnSurface,
-                        fontSize = if (compact) 24.sp else 28.sp,
-                        fontWeight = FontWeight.ExtraBold
+        Box(
+            modifier = Modifier
+                .padding(paddingValues)
+                .fillMaxSize()
+        ) {
+            BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
+                val compact = maxWidth < 600.dp
+
+                Column(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(horizontal = if (compact) 14.dp else 24.dp)
+                        .padding(top = 12.dp)
+                ) {
+                    // ── 1. OPERATIONAL REGISTER HEADER ──
+                    PosOperationalHeader(
+                        heldCartsCount = state.heldCarts.size,
+                        cartItemCount = cartItemCount,
+                        onOpenHeldCarts = onOpenHeldCarts,
+                        onOpenHoldCartDialog = onOpenHoldCartDialog,
+                        onOpenPettyCashDialog = onOpenPettyCashDialog,
+                        onOpenMaterialEstimator = { showMaterialEstimator = true },
+                        onLockScreen = onLockScreen
                     )
-                    if (state.heldCarts.isNotEmpty()) {
-                        Spacer(Modifier.width(12.dp))
+
+                    Spacer(modifier = Modifier.height(10.dp))
+
+                    // ── 2. SEARCH & SCANNER INPUT BAR ──
+                    PosSearchBar(
+                        query = state.searchQuery,
+                        onQueryChanged = onSearchChanged,
+                        onOpenCameraScanner = { showCameraScanner = true }
+                    )
+
+                    Spacer(modifier = Modifier.height(10.dp))
+
+                    // ── 3. CATEGORY PILL CAROUSEL (ONE-TAP SPEED) ──
+                    PosCategoryCarousel(
+                        categories = categories,
+                        selectedCategory = selectedCategory,
+                        onCategorySelected = { selectedCategory = it }
+                    )
+
+                    // ── 4. BARCODE SCAN NOTIFICATION TOAST PILL ──
+                    state.scanNotification?.let { notification ->
+                        LaunchedEffect(notification) {
+                            delay(2500)
+                            onClearScanNotification()
+                        }
+                        Spacer(modifier = Modifier.height(8.dp))
                         Surface(
-                            onClick = onOpenHeldCarts,
-                            shape = RoundedCornerShape(20.dp),
-                            color = Color(0xFFFEF3C7),
-                            border = BorderStroke(1.dp, Color(0xFFF59E0B))
+                            modifier = Modifier.fillMaxWidth(),
+                            shape = RoundedCornerShape(12.dp),
+                            color = BrandGreenLight,
+                            border = BorderStroke(1.dp, BrandGreenBorder)
                         ) {
                             Row(
-                                modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp),
+                                modifier = Modifier.padding(horizontal = 14.dp, vertical = 8.dp),
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
                                 Icon(
-                                    Icons.Outlined.PauseCircleOutline,
+                                    imageVector = Icons.Filled.CheckCircle,
                                     contentDescription = null,
-                                    tint = Color(0xFFB45309),
-                                    modifier = Modifier.size(16.dp)
+                                    tint = BrandForest,
+                                    modifier = Modifier.size(18.dp)
                                 )
-                                Spacer(Modifier.width(6.dp))
+                                Spacer(modifier = Modifier.width(8.dp))
                                 Text(
-                                    text = "Parkir (${state.heldCarts.size})",
-                                    color = Color(0xFFB45309),
+                                    text = notification,
+                                    fontSize = 12.sp,
                                     fontWeight = FontWeight.Bold,
-                                    fontSize = 12.sp
+                                    color = BrandForestDark
                                 )
                             }
                         }
                     }
-                }
 
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    if (cartItemCount > 0) {
-                        OutlinedButton(
-                            onClick = onOpenHoldCartDialog,
-                            shape = RoundedCornerShape(12.dp),
-                            border = BorderStroke(1.dp, Color(0xFFD97706)),
-                            colors = ButtonDefaults.outlinedButtonColors(contentColor = Color(0xFFD97706)),
-                            contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp)
-                        ) {
-                            Icon(Icons.Outlined.BookmarkAdd, null, modifier = Modifier.size(16.dp))
-                            Spacer(Modifier.width(4.dp))
-                            Text("Parkir", fontWeight = FontWeight.Bold, fontSize = 13.sp)
+                    Spacer(modifier = Modifier.height(10.dp))
+
+                    // ── 5. PRODUCT CATALOG GRID ──
+                    Box(
+                        modifier = Modifier
+                            .weight(1f)
+                            .fillMaxWidth()
+                    ) {
+                        when {
+                            state.isProductLoading -> {
+                                Box(
+                                    modifier = Modifier.fillMaxSize(),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    CircularProgressIndicator(
+                                        color = BrandForest,
+                                        strokeWidth = 3.dp,
+                                        modifier = Modifier.size(36.dp)
+                                    )
+                                }
+                            }
+
+                            state.productError != null -> {
+                                ProductErrorState(
+                                    message = state.productError.toMessage(),
+                                    onRetry = onRefreshProducts,
+                                    modifier = Modifier.align(Alignment.Center)
+                                )
+                            }
+
+                            state.products.isEmpty() -> {
+                                Box(
+                                    modifier = Modifier.fillMaxSize(),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Column(
+                                        horizontalAlignment = Alignment.CenterHorizontally,
+                                        verticalArrangement = Arrangement.spacedBy(6.dp)
+                                    ) {
+                                        Text(
+                                            text = "Katalog Produk Kosong",
+                                            fontWeight = FontWeight.Bold,
+                                            fontSize = 15.sp,
+                                            color = Slate900
+                                        )
+                                        Text(
+                                            text = "Belum ada produk yang terdaftar di toko.",
+                                            fontSize = 12.sp,
+                                            color = Slate500
+                                        )
+                                    }
+                                }
+                            }
+
+                            else -> {
+                                ProductCardGrid(
+                                    products = filteredProducts,
+                                    cartItems = state.cartItems,
+                                    onProductClick = onProductClick,
+                                    onUpdateQty = onUpdateQty,
+                                    modifier = Modifier.fillMaxSize()
+                                )
+                            }
                         }
                     }
-                    IconButton(
-                        onClick = onOpenPettyCashDialog,
-                        modifier = Modifier
-                            .size(38.dp)
-                            .clip(CircleShape)
-                            .background(Color(0xFFE6F4EA))
-                    ) {
-                        Icon(
-                            Icons.Outlined.Payments,
-                            contentDescription = "Kas Kecil (Petty Cash)",
-                            tint = Color(0xFF1B5E3C),
-                            modifier = Modifier.size(20.dp)
-                        )
-                    }
-                    IconButton(
-                        onClick = { showMaterialEstimator = true },
-                        modifier = Modifier
-                            .size(38.dp)
-                            .clip(CircleShape)
-                            .background(Color(0xFFE2E8F0))
-                    ) {
-                        Icon(
-                            Icons.Outlined.Calculate,
-                            contentDescription = "Kalkulator Bahan Bangunan",
-                            tint = Color(0xFF256B57),
-                            modifier = Modifier.size(20.dp)
-                        )
-                    }
-                    IconButton(
-                        onClick = onLockScreen,
-                        modifier = Modifier
-                            .size(38.dp)
-                            .clip(CircleShape)
-                            .background(Color(0xFFF1F5F9))
-                    ) {
-                        Icon(
-                            Icons.Outlined.Lock,
-                            contentDescription = "Kunci Layar",
-                            tint = Color(0xFF475569),
-                            modifier = Modifier.size(18.dp)
-                        )
-                    }
-                }
-            }
 
-            // 1. Search & Filter
-            val searchField: @Composable (Modifier) -> Unit = { fieldModifier ->
-                OutlinedTextField(
-                    value = state.searchQuery,
-                    onValueChange = onSearchChanged,
-                    placeholder = { Text("Cari produk, SKU, atau scan barcode...", color = Outline) },
-                    leadingIcon = { Icon(Icons.Outlined.Search, contentDescription = null, tint = Outline) },
-                    trailingIcon = {
-                        IconButton(onClick = { showCameraScanner = true }) {
-                            Icon(
-                                imageVector = Icons.Outlined.QrCodeScanner,
-                                contentDescription = "Scan Barcode Kamera",
-                                tint = Primary
-                            )
-                        }
-                    },
-                    modifier = fieldModifier.height(56.dp),
-                    shape = RoundedCornerShape(12.dp),
-                    colors = OutlinedTextFieldDefaults.colors(
-                        unfocusedContainerColor = Color.White,
-                        focusedContainerColor = Color.White,
-                        unfocusedBorderColor = OutlineVariant,
-                        focusedBorderColor = Primary
-                    ),
-                    singleLine = true
-                )
-            }
-            if (compact) {
-                Column(
-                    modifier = Modifier.fillMaxWidth().padding(bottom = 14.dp),
-                    verticalArrangement = Arrangement.spacedBy(10.dp)
-                ) {
-                    searchField(Modifier.fillMaxWidth())
-                    CashierCategoryDropdown(
-                        categories = categories,
-                        selectedCategory = selectedCategory,
-                        onCategorySelected = { selectedCategory = it },
-                        modifier = Modifier.fillMaxWidth()
-                    )
-                }
-            } else {
-                Row(
-                    modifier = Modifier.fillMaxWidth().padding(bottom = 16.dp),
-                    horizontalArrangement = Arrangement.spacedBy(16.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    searchField(Modifier.weight(1f))
-                    CashierCategoryDropdown(
-                        categories = categories,
-                        selectedCategory = selectedCategory,
-                        onCategorySelected = { selectedCategory = it },
-                        modifier = Modifier.width(220.dp)
+                    // ── 6. PAGINATION BAR ──
+                    ProductPaginationBar(
+                        page = state.productPage,
+                        totalPages = state.productTotalPages,
+                        totalItems = state.productTotal,
+                        limit = state.productLimit,
+                        isLoading = state.isProductLoading,
+                        onPrevious = { onProductPageChanged(state.productPage - 1) },
+                        onNext = { onProductPageChanged(state.productPage + 1) },
+                        modifier = Modifier.padding(vertical = 4.dp)
                     )
                 }
             }
 
-            state.scanNotification?.let { notification ->
-                LaunchedEffect(notification) {
-                    delay(2500)
-                    onClearScanNotification()
-                }
-                Surface(
+            // ── 7. STICKY INDUSTRIAL BOTTOM CART DOCK (POS DOCK BAR) ──
+            if (cartItemCount > 0) {
+                PosBottomCartDock(
+                    cartItemCount = cartItemCount,
+                    cartSubtotal = cartSubtotal,
+                    onNavigateToCart = onNavigateToCart,
                     modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(bottom = 12.dp),
-                    shape = RoundedCornerShape(12.dp),
-                    color = Color(0xFFE8F5E9),
-                    border = BorderStroke(1.dp, Color(0xFFA5D6A7))
-                ) {
-                    Row(
-                        modifier = Modifier.padding(horizontal = 14.dp, vertical = 10.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Icon(
-                            Icons.Filled.CheckCircle,
-                            contentDescription = null,
-                            tint = Color(0xFF2E7D32),
-                            modifier = Modifier.size(20.dp)
-                        )
-                        Spacer(Modifier.width(8.dp))
-                        Text(
-                            notification,
-                            fontSize = 13.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = Color(0xFF1B5E20)
-                        )
-                    }
-                }
-            }
-
-            // 2. Kartu Produk
-            Box(modifier = Modifier.weight(1f).fillMaxWidth()) {
-                when {
-                    state.isProductLoading -> CircularProgressIndicator(modifier = Modifier.align(Alignment.Center))
-                    state.productError != null -> ProductErrorState(
-                        message = state.productError.message(),
-                        onRetry = onRefreshProducts,
-                        modifier = Modifier.align(Alignment.Center)
-                    )
-                    state.products.isEmpty() -> Text(
-                        text = "No products found.",
-                        color = Outline,
-                        fontSize = 16.sp,
-                        modifier = Modifier.align(Alignment.Center)
-                    )
-                    else -> {
-                        ProductCardGrid(
-                            products = filteredProducts,
-                            cartItems = state.cartItems,
-                            onProductClick = onProductClick,
-                            onUpdateQty = onUpdateQty,
-                            modifier = Modifier.fillMaxSize()
-                        )
-                    }
-                }
-            }
-            ProductPaginationBar(
-                page = state.productPage,
-                totalPages = state.productTotalPages,
-                totalItems = state.productTotal,
-                limit = state.productLimit,
-                isLoading = state.isProductLoading,
-                onPrevious = { onProductPageChanged(state.productPage - 1) },
-                onNext = { onProductPageChanged(state.productPage + 1) },
-                modifier = Modifier.padding(top = 12.dp)
-            )
+                        .align(Alignment.BottomCenter)
+                        .padding(horizontal = 14.dp, vertical = 10.dp)
+                )
             }
         }
     }
 
+    // Modal Scanner Kamera Barcode
     if (showCameraScanner) {
         CameraBarcodeScannerDialog(
             onDismissRequest = { showCameraScanner = false },
@@ -401,6 +346,7 @@ fun CashierPosScreen(
         )
     }
 
+    // Modal Kalkulator Bahan Bangunan
     if (showMaterialEstimator) {
         MaterialEstimatorDialog(
             onDismiss = { showMaterialEstimator = false },
@@ -409,867 +355,389 @@ fun CashierPosScreen(
     }
 }
 
+// ═════════════════════════════════════════════════════════════════════════════
+// SUB-KOMPONEN 1: OPERATIONAL POS REGISTER HEADER
+// ═════════════════════════════════════════════════════════════════════════════
 @Composable
-private fun CashierCategoryDropdown(
-    categories: List<String>,
-    selectedCategory: String,
-    onCategorySelected: (String) -> Unit,
-    modifier: Modifier = Modifier
+private fun PosOperationalHeader(
+    heldCartsCount: Int,
+    cartItemCount: Int,
+    onOpenHeldCarts: () -> Unit,
+    onOpenHoldCartDialog: () -> Unit,
+    onOpenPettyCashDialog: () -> Unit,
+    onOpenMaterialEstimator: () -> Unit,
+    onLockScreen: () -> Unit
 ) {
-    var expanded by remember { mutableStateOf(false) }
-
-    Box {
-        Surface(
-            onClick = { expanded = true },
-            shape = RoundedCornerShape(12.dp),
-            color = Color.White,
-            border = BorderStroke(1.dp, OutlineVariant),
-            modifier = modifier.height(56.dp)
-        ) {
-            Row(
-                modifier = Modifier.padding(horizontal = 16.dp),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Text(
-                    text = selectedCategory,
-                    color = OnSurface,
-                    fontSize = 14.sp,
-                    fontWeight = FontWeight.SemiBold,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                    modifier = Modifier.weight(1f)
-                )
-                Spacer(modifier = Modifier.width(8.dp))
-                Icon(
-                    Icons.Outlined.ExpandMore,
-                    contentDescription = "Pilih kategori",
-                    tint = Outline,
-                    modifier = Modifier.size(20.dp)
-                )
-            }
-        }
-
-        DropdownMenu(
-            expanded = expanded,
-            onDismissRequest = { expanded = false },
-            modifier = Modifier
-                .width(220.dp)
-                .background(Color.White)
-        ) {
-            categories.forEach { category ->
-                DropdownMenuItem(
-                    text = {
-                        Text(
-                            text = category,
-                            color = if (category == selectedCategory) Primary else OnSurface,
-                            fontWeight = if (category == selectedCategory) FontWeight.Bold else FontWeight.Medium,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis
-                        )
-                    },
-                    onClick = {
-                        expanded = false
-                        onCategorySelected(category)
-                    }
-                )
-            }
-        }
-    }
-}
-
-@Composable
-fun ProductGlassCard(
-    product: Product,
-    cartQty: Int,
-    onAddClick: () -> Unit,
-    onDecreaseQty: () -> Unit,
-    onIncreaseQty: () -> Unit
-) {
-    val isOutOfStock = product.stockQty <= BigDecimal.ZERO
-    
-    Card(
-        colors = CardDefaults.cardColors(containerColor = Color.White.copy(alpha = 0.7f)),
-        shape = RoundedCornerShape(12.dp),
-        border = BorderStroke(1.dp, OutlineVariant.copy(alpha = 0.5f)),
-        modifier = Modifier.clickable(enabled = !isOutOfStock, onClick = {
-            if (cartQty == 0) onAddClick()
-        })
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically
     ) {
-        Column(modifier = Modifier.padding(10.dp)) {
-            // Gambar & Badge
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(84.dp)
-                    .background(SurfaceContainerLow, RoundedCornerShape(8.dp)),
-                contentAlignment = Alignment.Center
+        // Left: Register Identity Title
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            Text(
+                text = "Kasir POS",
+                color = Slate900,
+                fontSize = 20.sp,
+                fontWeight = FontWeight.ExtraBold
+            )
+
+            Surface(
+                shape = RoundedCornerShape(6.dp),
+                color = BrandGreenLight,
+                border = BorderStroke(1.dp, BrandGreenBorder)
             ) {
                 Text(
-                    text = product.name.firstOrNull()?.uppercase() ?: "P",
-                    color = Primary,
-                    fontWeight = FontWeight.ExtraBold,
-                    fontSize = 26.sp
+                    text = "POS-01",
+                    color = BrandForest,
+                    fontSize = 11.sp,
+                    fontWeight = FontWeight.Bold,
+                    modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
                 )
-                
-                // Konfigurasi Badge Peringatan Stok
-                val badgeColor = if (isOutOfStock) Error else if (product.stockQty <= BigDecimal(5)) SecondaryContainer else Primary
-                val badgeBg = if (isOutOfStock) ErrorContainer else if (product.stockQty <= BigDecimal(5)) SecondaryContainer.copy(alpha=0.2f) else Primary.copy(alpha=0.1f)
-                val badgeText = if (isOutOfStock) "Out of Stock" else if (product.stockQty <= BigDecimal(5)) "Low Stock: ${product.stockQty.qtyText()}" else "In Stock: ${product.stockQty.qtyText()}"
-                
-                Surface(
-                    color = badgeBg, 
-                    shape = RoundedCornerShape(4.dp), 
-                    modifier = Modifier.padding(6.dp).align(Alignment.TopStart)
-                ) {
-                    Text(
-                        text = badgeText, 
-                        color = badgeColor, 
-                        fontSize = 9.sp, 
-                        fontWeight = FontWeight.Bold, 
-                        modifier = Modifier.padding(horizontal = 5.dp, vertical = 2.dp)
-                    )
-                }
             }
-            
-            Spacer(modifier = Modifier.height(8.dp))
-            
-            // Teks Informasi
-            Text(product.name, fontSize = 13.sp, fontWeight = FontWeight.Bold, color = OnSurface, maxLines = 1, overflow = TextOverflow.Ellipsis)
-            Text("SKU: ${product.sku.ifBlank { "-" }}", fontSize = 11.sp, color = OnSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis)
-            
-            Spacer(modifier = Modifier.height(10.dp))
-            
-            // Area Bawah: Harga & Tombol Kuantitas
-            Column {
-                Text(product.unitPrice.moneyText(), fontSize = 15.sp, fontWeight = FontWeight.ExtraBold, color = Primary)
-                Spacer(modifier = Modifier.height(8.dp))
-                
-                if (cartQty > 0) {
+        }
+
+        // Right: Operational Shortcuts
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(6.dp)
+        ) {
+            // Badge Parkir Nota (Held Carts) jika ada yang ditahan
+            if (heldCartsCount > 0) {
+                Surface(
+                    onClick = onOpenHeldCarts,
+                    shape = RoundedCornerShape(10.dp),
+                    color = AmberBg,
+                    border = BorderStroke(1.dp, AmberBorder)
+                ) {
                     Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .background(SurfaceContainerLow, RoundedCornerShape(8.dp))
-                            .border(1.dp, OutlineVariant.copy(alpha=0.3f), RoundedCornerShape(8.dp))
-                            .padding(2.dp),
-                        horizontalArrangement = Arrangement.SpaceBetween,
+                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 5.dp),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        IconButton(onClick = onDecreaseQty, modifier = Modifier.size(30.dp)) { 
-                            Icon(Icons.Outlined.Remove, contentDescription = null, tint = Primary, modifier = Modifier.size(16.dp)) 
-                        }
-                        Text(cartQty.toString(), fontWeight = FontWeight.Bold, fontSize = 13.sp, color = OnSurface)
-                        IconButton(onClick = onIncreaseQty, modifier = Modifier.size(30.dp).background(Primary.copy(alpha = 0.1f), RoundedCornerShape(6.dp))) { 
-                            Icon(Icons.Outlined.Add, contentDescription = null, tint = Primary, modifier = Modifier.size(16.dp)) 
-                        }
-                    }
-                } else {
-                    Surface(
-                        modifier = Modifier.fillMaxWidth().clickable(enabled = !isOutOfStock, onClick = onAddClick),
-                        color = if (isOutOfStock) SurfaceContainerLow else Primary,
-                        shape = RoundedCornerShape(8.dp),
-                        border = BorderStroke(1.dp, OutlineVariant.copy(alpha=0.3f))
-                    ) {
-                        Box(
-                            modifier = Modifier.fillMaxWidth().height(36.dp),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Text(
-                                text = if (isOutOfStock) "Habis" else "+ Keranjang",
-                                color = if (isOutOfStock) Outline else OnPrimary,
-                                fontWeight = FontWeight.Bold,
-                                fontSize = 13.sp
-                            )
-                        }
+                        Icon(
+                            imageVector = Icons.Outlined.PauseCircleOutline,
+                            contentDescription = null,
+                            tint = Amber700,
+                            modifier = Modifier.size(15.dp)
+                        )
+                        Spacer(Modifier.width(4.dp))
+                        Text(
+                            text = "Parkir ($heldCartsCount)",
+                            color = Amber700,
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 11.sp
+                        )
                     }
                 }
+            }
+
+            // Tombol Parkir Nota Baru saat kasir melayani transaksi yang perlu ditunda
+            if (cartItemCount > 0) {
+                OutlinedButton(
+                    onClick = onOpenHoldCartDialog,
+                    shape = RoundedCornerShape(10.dp),
+                    border = BorderStroke(1.dp, Amber700),
+                    colors = ButtonDefaults.outlinedButtonColors(contentColor = Amber700),
+                    contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp),
+                    modifier = Modifier.height(34.dp)
+                ) {
+                    Icon(
+                        imageVector = Icons.Outlined.BookmarkAdd,
+                        contentDescription = null,
+                        modifier = Modifier.size(14.dp)
+                    )
+                    Spacer(Modifier.width(4.dp))
+                    Text(
+                        text = "Parkir",
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 11.sp
+                    )
+                }
+            }
+
+            // Shortcut 1: Kas Kecil
+            IconButton(
+                onClick = onOpenPettyCashDialog,
+                modifier = Modifier
+                    .size(34.dp)
+                    .clip(CircleShape)
+                    .background(BrandGreenLight)
+            ) {
+                Icon(
+                    imageVector = Icons.Outlined.Payments,
+                    contentDescription = "Kas Kecil",
+                    tint = BrandForest,
+                    modifier = Modifier.size(18.dp)
+                )
+            }
+
+            // Shortcut 2: Kalkulator Material
+            IconButton(
+                onClick = onOpenMaterialEstimator,
+                modifier = Modifier
+                    .size(34.dp)
+                    .clip(CircleShape)
+                    .background(Color.White)
+                    .border(1.dp, Slate200, CircleShape)
+            ) {
+                Icon(
+                    imageVector = Icons.Outlined.Calculate,
+                    contentDescription = "Kalkulator Bahan Bangunan",
+                    tint = Slate700,
+                    modifier = Modifier.size(18.dp)
+                )
+            }
+
+            // Shortcut 3: Kunci Kasir
+            IconButton(
+                onClick = onLockScreen,
+                modifier = Modifier
+                    .size(34.dp)
+                    .clip(CircleShape)
+                    .background(Color.White)
+                    .border(1.dp, Slate200, CircleShape)
+            ) {
+                Icon(
+                    imageVector = Icons.Outlined.Lock,
+                    contentDescription = "Kunci Layar Kasir",
+                    tint = Slate500,
+                    modifier = Modifier.size(16.dp)
+                )
             }
         }
     }
 }
 
+// ═════════════════════════════════════════════════════════════════════════════
+// SUB-KOMPONEN 2: SEARCH & BARCODE SCANNER BAR
+// ═════════════════════════════════════════════════════════════════════════════
 @Composable
-fun CartSection(
-    cartItems: List<CartItem>,
-    customers: List<Customer>,
-    customerSearchQuery: String,
-    selectedCustomer: Customer?,
-    isCustomerLoading: Boolean,
-    customerError: UiText?,
-    subtotal: BigDecimal,
-    totalDiscount: BigDecimal,
-    finalTotal: BigDecimal,
-    selectedPaymentMethod: PaymentMethod,
-    amountPaidInput: String,
-    hasActiveCashSession: Boolean,
-    isCashSessionLoading: Boolean,
-    isOpeningCashSession: Boolean,
-    startingCashInput: String,
-    cashSessionError: UiText?,
-    isLoading: Boolean,
-    onCustomerSearchChanged: (String) -> Unit,
-    onSelectCustomer: (Customer) -> Unit,
-    onClearCustomer: () -> Unit,
-    onUseCustomerName: () -> Unit,
-    onRefreshCustomers: () -> Unit,
-    onUpdateQty: (String, Int) -> Unit,
-    onSelectPayment: (PaymentMethod) -> Unit,
-    onAmountPaidChanged: (String) -> Unit,
-    onStartingCashChanged: (String) -> Unit,
-    onOpenCashSession: () -> Unit,
-    onRefreshCashSession: () -> Unit,
-    onCheckout: () -> Unit,
+private fun PosSearchBar(
+    query: String,
+    onQueryChanged: (String) -> Unit,
+    onOpenCameraScanner: () -> Unit
+) {
+    OutlinedTextField(
+        value = query,
+        onValueChange = onQueryChanged,
+        placeholder = {
+            Text(
+                text = "Cari nama barang, SKU, atau scan barcode...",
+                color = Slate400,
+                fontSize = 13.sp
+            )
+        },
+        leadingIcon = {
+            Icon(
+                imageVector = Icons.Outlined.Search,
+                contentDescription = null,
+                tint = Slate500,
+                modifier = Modifier.size(20.dp)
+            )
+        },
+        trailingIcon = {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(2.dp),
+                modifier = Modifier.padding(end = 6.dp)
+            ) {
+                if (query.isNotBlank()) {
+                    IconButton(
+                        onClick = { onQueryChanged("") },
+                        modifier = Modifier.size(30.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Outlined.Clear,
+                            contentDescription = "Hapus Pencarian",
+                            tint = Slate400,
+                            modifier = Modifier.size(18.dp)
+                        )
+                    }
+                }
+                IconButton(
+                    onClick = onOpenCameraScanner,
+                    modifier = Modifier
+                        .size(36.dp)
+                        .clip(RoundedCornerShape(8.dp))
+                        .background(BrandGreenLight)
+                ) {
+                    Icon(
+                        imageVector = Icons.Outlined.QrCodeScanner,
+                        contentDescription = "Scan Barcode Kamera",
+                        tint = BrandForest,
+                        modifier = Modifier.size(20.dp)
+                    )
+                }
+            }
+        },
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(52.dp),
+        shape = RoundedCornerShape(12.dp),
+        colors = OutlinedTextFieldDefaults.colors(
+            unfocusedContainerColor = Color.White,
+            focusedContainerColor = Color.White,
+            unfocusedBorderColor = Slate200,
+            focusedBorderColor = BrandForest
+        ),
+        singleLine = true
+    )
+}
+
+// ═════════════════════════════════════════════════════════════════════════════
+// SUB-KOMPONEN 3: HORIZONTAL CATEGORY PILL CAROUSEL
+// Fast, tactile category filtering like modern industrial POS systems
+// ═════════════════════════════════════════════════════════════════════════════
+@Composable
+private fun PosCategoryCarousel(
+    categories: List<String>,
+    selectedCategory: String,
+    onCategorySelected: (String) -> Unit
+) {
+    LazyRow(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        contentPadding = PaddingValues(horizontal = 1.dp)
+    ) {
+        items(categories) { category ->
+            val isSelected = category == selectedCategory
+
+            Surface(
+                onClick = { onCategorySelected(category) },
+                shape = RoundedCornerShape(20.dp),
+                color = if (isSelected) BrandForest else Color.White,
+                border = BorderStroke(
+                    1.dp,
+                    if (isSelected) BrandForest else Slate200
+                ),
+                shadowElevation = if (isSelected) 1.dp else 0.dp
+            ) {
+                Text(
+                    text = category,
+                    color = if (isSelected) Color.White else Slate700,
+                    fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
+                    fontSize = 12.sp,
+                    modifier = Modifier.padding(horizontal = 14.dp, vertical = 7.dp)
+                )
+            }
+        }
+    }
+}
+
+// ═════════════════════════════════════════════════════════════════════════════
+// SUB-KOMPONEN 4: STICKY INDUSTRIAL BOTTOM CART DOCK
+// Anchored at bottom with live price, item count, and direct review CTA
+// ═════════════════════════════════════════════════════════════════════════════
+@Composable
+private fun PosBottomCartDock(
+    cartItemCount: Int,
+    cartSubtotal: BigDecimal,
+    onNavigateToCart: () -> Unit,
     modifier: Modifier = Modifier
 ) {
-    Column(
-        modifier = modifier.background(Color.White)
-    ) {
-        // Header
-        Row(
-            modifier = Modifier.fillMaxWidth().padding(24.dp),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Icon(Icons.Outlined.ShoppingCart, contentDescription = null, tint = Primary)
-                Spacer(modifier = Modifier.width(8.dp))
-                Text("Current Order", fontSize = 20.sp, fontWeight = FontWeight.Bold, color = OnSurface)
-            }
-            Surface(color = SurfaceContainerLow, shape = RoundedCornerShape(16.dp)) {
-                Text(
-                    text = "${cartItems.sumOf { it.quantity }} Items", 
-                    fontSize = 12.sp, 
-                    fontWeight = FontWeight.Bold, 
-                    color = OnSurfaceVariant, 
-                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 4.dp)
-                )
-            }
-        }
-
-        HorizontalDivider(color = OutlineVariant.copy(alpha = 0.3f))
-
-        LazyColumn(
-            modifier = Modifier.weight(1f).padding(horizontal = 16.dp),
-            contentPadding = PaddingValues(vertical = 16.dp),
-            verticalArrangement = Arrangement.spacedBy(16.dp)
-        ) {
-            item {
-                CustomerPicker(
-                    customers = customers,
-                    query = customerSearchQuery,
-                    selectedCustomer = selectedCustomer,
-                    isLoading = isCustomerLoading,
-                    error = customerError,
-                    onQueryChanged = onCustomerSearchChanged,
-                    onSelectCustomer = onSelectCustomer,
-                    onClearCustomer = onClearCustomer,
-                    onUseCustomerName = onUseCustomerName,
-                    onRefreshCustomers = onRefreshCustomers
-                )
-            }
-
-            if (cartItems.isEmpty()) {
-                item {
-                    EmptyCartState(modifier = Modifier.fillMaxWidth().height(180.dp))
-                }
-            }
-
-            items(cartItems, key = { it.cartItemId }) { item ->
-                CartItemCard(item, onUpdateQty = onUpdateQty)
-            }
-
-            item {
-                HorizontalDivider(color = OutlineVariant.copy(alpha = 0.3f), modifier = Modifier.padding(vertical = 8.dp))
-            }
-
-            item {
-                CashSessionGate(
-                    hasActiveCashSession = hasActiveCashSession,
-                    isCashSessionLoading = isCashSessionLoading,
-                    isOpeningCashSession = isOpeningCashSession,
-                    startingCashInput = startingCashInput,
-                    error = cashSessionError,
-                    onStartingCashChanged = onStartingCashChanged,
-                    onOpenCashSession = onOpenCashSession,
-                    onRefresh = onRefreshCashSession
-                )
-            }
-
-            item {
-                PaymentMethodPicker(
-                    selectedPaymentMethod = selectedPaymentMethod,
-                    onSelectPayment = onSelectPayment
-                )
-            }
-
-            if (selectedPaymentMethod == PaymentMethod.TUNAI || selectedPaymentMethod.requiresReceivable()) {
-                item {
-                    ReceivablePaymentInput(
-                        paymentMethod = selectedPaymentMethod,
-                        amountPaidInput = amountPaidInput,
-                        finalTotal = finalTotal,
-                        onAmountPaidChanged = onAmountPaidChanged
-                    )
-                }
-            }
-        }
-
-        // Footer
-        Surface(
-            modifier = Modifier.fillMaxWidth(),
-            shadowElevation = 16.dp,
-            color = Color.White
-        ) {
-            Column(modifier = Modifier.padding(24.dp)) {
-                CalculationRow("Subtotal", subtotal.moneyText())
-                if (totalDiscount > BigDecimal.ZERO) {
-                    CalculationRow("Discount", "- ${totalDiscount.moneyText()}", color = WarningOrange)
-                }
-                
-                HorizontalDivider(modifier = Modifier.padding(vertical = 16.dp), color = OutlineVariant.copy(alpha = 0.5f))
-
-                Row(modifier = Modifier.fillMaxWidth().padding(bottom = 24.dp), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.Bottom) {
-                    Text("Total", fontSize = 18.sp, fontWeight = FontWeight.Bold, color = OnSurface)
-                    Text(finalTotal.moneyText(), fontSize = 32.sp, fontWeight = FontWeight.ExtraBold, color = Primary, letterSpacing = (-1).sp)
-                }
-
-                Button(
-                    onClick = onCheckout,
-                    enabled = cartItems.isNotEmpty() && hasActiveCashSession && !isLoading && selectedPaymentMethod.canSubmit(amountPaidInput, finalTotal),
-                    modifier = Modifier.fillMaxWidth().height(56.dp),
-                    shape = RoundedCornerShape(12.dp),
-                    colors = ButtonDefaults.buttonColors(containerColor = Primary)
-                ) {
-                    if (isLoading) {
-                        CircularProgressIndicator(modifier = Modifier.size(24.dp), color = Color.White, strokeWidth = 2.dp)
-                    } else {
-                        Text(
-                            text = checkoutButtonText(hasActiveCashSession, selectedPaymentMethod, amountPaidInput, finalTotal),
-                            fontSize = 18.sp, 
-                            fontWeight = FontWeight.Bold
-                        )
-                        Spacer(modifier = Modifier.width(8.dp))
-                        Icon(Icons.AutoMirrored.Outlined.ArrowForward, contentDescription = null)
-                    }
-                }
-            }
-        }
-    }
-}
-
-@Composable
-fun CartItemCard(item: CartItem, onUpdateQty: (String, Int) -> Unit) {
-    Card(
-        colors = CardDefaults.cardColors(containerColor = Color.White),
-        shape = RoundedCornerShape(12.dp),
-        border = BorderStroke(1.dp, OutlineVariant.copy(alpha = 0.5f))
-    ) {
-        Column(modifier = Modifier.padding(12.dp)) {
-            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.Top) {
-                Column(modifier = Modifier.weight(1f)) {
-                    Text(item.productName, fontSize = 14.sp, fontWeight = FontWeight.Bold, color = OnSurface)
-                    Text(item.unitPrice.moneyText(), fontSize = 12.sp, color = OnSurfaceVariant)
-                }
-                IconButton(onClick = { onUpdateQty(item.cartItemId, 0) }, modifier = Modifier.size(24.dp)) {
-                    Icon(Icons.Outlined.Delete, contentDescription = "Remove", tint = Error, modifier = Modifier.size(16.dp))
-                }
-            }
-            
-            Spacer(modifier = Modifier.height(12.dp))
-            
-            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
-                // Quantity Control
-                Row(
-                    modifier = Modifier.background(SurfaceContainerLow, RoundedCornerShape(8.dp)).border(1.dp, OutlineVariant.copy(alpha=0.3f), RoundedCornerShape(8.dp)).padding(2.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    IconButton(onClick = { if(item.quantity > 1) onUpdateQty(item.cartItemId, item.quantity - 1) }, modifier = Modifier.size(28.dp)) { Icon(Icons.Outlined.Remove, contentDescription = null, tint = Primary, modifier = Modifier.size(16.dp)) }
-                    Text(
-                        text = item.quantity.toString(),
-                        fontWeight = FontWeight.Bold, 
-                        fontSize = 14.sp, 
-                        textAlign = TextAlign.Center, 
-                        color = OnSurface,
-                        modifier = Modifier.widthIn(min = 24.dp)
-                    )
-                    IconButton(onClick = { onUpdateQty(item.cartItemId, item.quantity + 1) }, modifier = Modifier.size(28.dp)) { Icon(Icons.Outlined.Add, contentDescription = null, tint = Primary, modifier = Modifier.size(16.dp)) }
-                }
-                
-                // Unit & Price
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Text((item.unitPrice * item.quantity.toBigDecimal()).moneyText(), fontSize = 14.sp, fontWeight = FontWeight.ExtraBold, color = OnSurface, modifier = Modifier.widthIn(min = 80.dp), textAlign = TextAlign.End)
-                }
-            }
-        }
-    }
-}
-
-@Composable
-fun CalculationRow(label: String, value: String, color: Color = OnSurfaceVariant) {
-    Row(
-        modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp),
-        horizontalArrangement = Arrangement.SpaceBetween
-    ) {
-        Text(label, fontSize = 14.sp, color = color)
-        Text(value, fontSize = 14.sp, color = color, fontWeight = FontWeight.Bold)
-    }
-}
-
-@OptIn(ExperimentalMaterial3Api::class)
-@Composable
-private fun CustomerPicker(
-    customers: List<Customer>,
-    query: String,
-    selectedCustomer: Customer?,
-    isLoading: Boolean,
-    error: UiText?,
-    onQueryChanged: (String) -> Unit,
-    onSelectCustomer: (Customer) -> Unit,
-    onClearCustomer: () -> Unit,
-    onUseCustomerName: () -> Unit,
-    onRefreshCustomers: () -> Unit
-) {
-    val trimmedQuery = query.trim()
-    val exactMatch = customers.any { customer ->
-        customer.name.equals(trimmedQuery, ignoreCase = true)
-    }
-
     Surface(
-        color = SurfaceContainerLow,
-        shape = RoundedCornerShape(14.dp)
-    ) {
-        Column(
-            modifier = Modifier.padding(14.dp),
-            verticalArrangement = Arrangement.spacedBy(10.dp)
-        ) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Text("Nama Pelanggan", color = OnSurface, fontWeight = FontWeight.Bold)
-                if (isLoading) {
-                    CircularProgressIndicator(modifier = Modifier.size(18.dp), strokeWidth = 2.dp)
-                }
-            }
-
-            if (selectedCustomer == null) {
-                val isCustomerError = error != null
-                OutlinedTextField(
-                    value = query,
-                    onValueChange = onQueryChanged,
-                    placeholder = { Text("Ketik nama pelanggan...", color = Outline) },
-                    leadingIcon = { Icon(Icons.Outlined.Person, contentDescription = null, tint = if (isCustomerError) Error else Outline) },
-                    isError = isCustomerError,
-                    supportingText = error?.let {
-                        { Text(it.message(), color = Error, fontSize = 12.sp) }
-                    },
-                    modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(14.dp),
-                    singleLine = true,
-                    colors = OutlinedTextFieldDefaults.colors(
-                        unfocusedContainerColor = if (isCustomerError) Error.copy(alpha = 0.05f) else Color.White,
-                        focusedContainerColor = if (isCustomerError) Error.copy(alpha = 0.05f) else Color.White,
-                        unfocusedBorderColor = if (isCustomerError) Error else OutlineVariant,
-                        focusedBorderColor = if (isCustomerError) Error else Primary,
-                        errorBorderColor = Error,
-                        errorContainerColor = Error.copy(alpha = 0.05f)
-                    )
-                )
-
-                if (trimmedQuery.isNotBlank() && !exactMatch) {
-                    Text(
-                        text = "Hanya dipakai di nota transaksi.",
-                        color = Outline,
-                        fontSize = 12.sp
-                    )
-                }
-
-                customers
-                    .filter(Customer::isActive)
-                    .take(3)
-                    .forEach { customer ->
-                        CustomerSuggestionRow(
-                            customer = customer,
-                            onClick = { onSelectCustomer(customer) }
-                        )
-                    }
-
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    OutlinedButton(
-                        onClick = onUseCustomerName,
-                        enabled = trimmedQuery.isNotBlank() && !isLoading && !exactMatch,
-                        modifier = Modifier.weight(1f),
-                        shape = RoundedCornerShape(12.dp)
-                    ) {
-                        Text("Pakai nama ini", fontWeight = FontWeight.Bold, color = Primary)
-                    }
-                    TextButton(
-                        onClick = onRefreshCustomers,
-                        modifier = Modifier
-                            .heightIn(min = 48.dp)
-                            .clip(RoundedCornerShape(12.dp))
-                            .background(Color.White)
-                    ) {
-                        Text("Muat ulang", color = Primary, fontWeight = FontWeight.SemiBold)
-                    }
-                }
-            } else {
-                SelectedCustomerCard(
-                    customer = selectedCustomer,
-                    onClear = onClearCustomer
-                )
-            }
-        }
-    }
-}
-
-@Composable
-private fun CustomerSuggestionRow(
-    customer: Customer,
-    onClick: () -> Unit
-) {
-    Row(
-        modifier = Modifier
+        modifier = modifier
             .fillMaxWidth()
-            .clip(RoundedCornerShape(12.dp))
-            .background(Color.White)
-            .clickable(onClick = onClick)
-            .padding(12.dp),
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        Box(
-            modifier = Modifier.size(32.dp).clip(CircleShape).background(PrimaryContainer.copy(alpha = 0.2f)),
-            contentAlignment = Alignment.Center
-        ) {
-            Icon(Icons.Outlined.Person, contentDescription = null, tint = Primary, modifier = Modifier.size(16.dp))
-        }
-        Spacer(modifier = Modifier.width(10.dp))
-        Column(modifier = Modifier.weight(1f)) {
-            Text(customer.name, color = OnSurface, fontWeight = FontWeight.Bold, maxLines = 1)
-            Text(
-                text = customer.phone?.takeIf(String::isNotBlank) ?: "Tersimpan",
-                color = OnSurfaceVariant,
-                fontSize = 12.sp,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis
-            )
-        }
-    }
-}
-
-@Composable
-private fun SelectedCustomerCard(
-    customer: Customer,
-    onClear: () -> Unit
-) {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clip(RoundedCornerShape(12.dp))
-            .background(Color.White)
-            .padding(12.dp),
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        Box(
-            modifier = Modifier.size(32.dp).clip(CircleShape).background(PrimaryContainer.copy(alpha = 0.2f)),
-            contentAlignment = Alignment.Center
-        ) {
-            Icon(Icons.Outlined.Person, contentDescription = null, tint = Primary, modifier = Modifier.size(16.dp))
-        }
-        Spacer(modifier = Modifier.width(10.dp))
-        Column(modifier = Modifier.weight(1f)) {
-            Text(customer.name, color = OnSurface, fontWeight = FontWeight.Bold, maxLines = 1)
-            Text(
-                text = customer.phone?.takeIf(String::isNotBlank) ?: "Dipakai untuk nota",
-                color = Primary,
-                fontSize = 12.sp,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis
-            )
-        }
-        IconButton(onClick = onClear) {
-            Icon(Icons.Outlined.Close, contentDescription = "Hapus", tint = OnSurfaceVariant)
-        }
-    }
-}
-
-@Composable
-private fun CashSessionGate(
-    hasActiveCashSession: Boolean,
-    isCashSessionLoading: Boolean,
-    isOpeningCashSession: Boolean,
-    startingCashInput: String,
-    error: UiText?,
-    onStartingCashChanged: (String) -> Unit,
-    onOpenCashSession: () -> Unit,
-    onRefresh: () -> Unit
-) {
-    Surface(
-        color = if (hasActiveCashSession) Primary.copy(alpha = 0.1f) else SurfaceBright,
+            .clickable(onClick = onNavigateToCart),
         shape = RoundedCornerShape(16.dp),
-        border = BorderStroke(1.dp, if (hasActiveCashSession) Primary.copy(alpha = 0.2f) else OutlineVariant.copy(alpha = 0.5f))
+        color = BrandForestDark,
+        border = BorderStroke(1.dp, BrandForest),
+        shadowElevation = 8.dp
     ) {
-        Column(
-            modifier = Modifier.padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp)
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 16.dp, vertical = 12.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.SpaceBetween
         ) {
+            // Left: Cart icon + badge + subtotal
             Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(12.dp)
             ) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
+                Box(contentAlignment = Alignment.TopEnd) {
                     Box(
-                        modifier = Modifier.size(36.dp).clip(RoundedCornerShape(10.dp)).background(Primary.copy(alpha = 0.16f)),
+                        modifier = Modifier
+                            .size(42.dp)
+                            .clip(RoundedCornerShape(12.dp))
+                            .background(BrandForest),
                         contentAlignment = Alignment.Center
                     ) {
-                        Icon(Icons.Outlined.Wallet, contentDescription = null, tint = Primary)
-                    }
-                    Spacer(modifier = Modifier.width(10.dp))
-                    Column {
-                        Text(
-                            text = if (hasActiveCashSession) "Sesi kasir aktif" else "Sesi kasir ditutup",
-                            color = OnSurface,
-                            fontWeight = FontWeight.Bold,
-                            fontSize = 14.sp
+                        Icon(
+                            imageVector = Icons.Outlined.ShoppingCart,
+                            contentDescription = "Keranjang",
+                            tint = Color.White,
+                            modifier = Modifier.size(22.dp)
                         )
                     }
-                }
 
-                TextButton(
-                    onClick = onRefresh,
-                    enabled = !isCashSessionLoading,
-                    modifier = Modifier.heightIn(min = 48.dp).clip(RoundedCornerShape(10.dp)).background(Color.White)
-                ) {
-                    if (isCashSessionLoading) {
-                        CircularProgressIndicator(modifier = Modifier.size(16.dp), strokeWidth = 2.dp)
-                    } else {
-                        Text("Cek status", color = Primary, fontWeight = FontWeight.SemiBold)
-                    }
-                }
-            }
-
-            if (!hasActiveCashSession) {
-                val isCashError = error != null
-                Row(
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                    verticalAlignment = Alignment.Top
-                ) {
-                    OutlinedTextField(
-                        value = startingCashInput,
-                        onValueChange = onStartingCashChanged,
-                        placeholder = { Text("Modal awal", color = Outline, fontSize = 12.sp) },
-                        isError = isCashError,
-                        supportingText = error?.let {
-                            { Text(it.message(), color = Error, fontSize = 11.sp) }
-                        },
-                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                        modifier = Modifier.weight(1f),
-                        singleLine = true,
-                        shape = RoundedCornerShape(10.dp),
-                        colors = OutlinedTextFieldDefaults.colors(
-                            unfocusedContainerColor = if (isCashError) Error.copy(alpha = 0.05f) else Color.White,
-                            focusedContainerColor = if (isCashError) Error.copy(alpha = 0.05f) else Color.White,
-                            unfocusedBorderColor = if (isCashError) Error else OutlineVariant,
-                            focusedBorderColor = if (isCashError) Error else Primary,
-                            errorBorderColor = Error,
-                            errorContainerColor = Error.copy(alpha = 0.05f)
-                        )
-                    )
-                    Button(
-                        onClick = onOpenCashSession,
-                        enabled = startingCashInput.isNotBlank() && !isOpeningCashSession && !isCashSessionLoading,
-                        modifier = Modifier.height(52.dp),
-                        shape = RoundedCornerShape(10.dp),
-                        colors = ButtonDefaults.buttonColors(containerColor = Primary)
+                    Box(
+                        modifier = Modifier
+                            .offset(x = 4.dp, y = (-4).dp)
+                            .size(18.dp)
+                            .clip(CircleShape)
+                            .background(DangerRed)
+                            .border(1.5.dp, BrandForestDark, CircleShape),
+                        contentAlignment = Alignment.Center
                     ) {
-                        if (isOpeningCashSession) {
-                            CircularProgressIndicator(modifier = Modifier.size(16.dp), strokeWidth = 2.dp, color = Color.White)
-                        } else {
-                            Text("Buka Sesi", fontWeight = FontWeight.Bold, fontSize = 12.sp)
-                        }
+                        Text(
+                            text = cartItemCount.toString(),
+                            color = Color.White,
+                            fontSize = 10.sp,
+                            fontWeight = FontWeight.ExtraBold
+                        )
                     }
                 }
-            }
-        }
-    }
-}
 
-@Composable
-private fun PaymentMethodPicker(
-    selectedPaymentMethod: PaymentMethod,
-    onSelectPayment: (PaymentMethod) -> Unit
-) {
-    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-        Text("Payment Method", color = OnSurface, fontSize = 14.sp, fontWeight = FontWeight.Bold)
-        LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            items(PaymentMethod.entries.toList()) { method ->
-                PaymentMethodCard(
-                    method = method,
-                    isSelected = selectedPaymentMethod == method,
-                    onClick = { onSelectPayment(method) }
-                )
-            }
-        }
-    }
-}
-
-@Composable
-private fun PaymentMethodCard(
-    method: PaymentMethod,
-    isSelected: Boolean,
-    onClick: () -> Unit,
-    modifier: Modifier = Modifier
-) {
-    val tint = if (isSelected) Primary else OnSurfaceVariant
-    val icon = when (method) {
-        PaymentMethod.TUNAI -> Icons.Outlined.Payments
-        PaymentMethod.TRANSFER -> Icons.Outlined.Wallet
-        PaymentMethod.QRIS -> Icons.Outlined.QrCodeScanner
-        PaymentMethod.HUTANG -> Icons.Outlined.History
-        PaymentMethod.DP -> Icons.Outlined.PointOfSale
-    }
-
-    Surface(
-        modifier = modifier.height(64.dp).width(100.dp),
-        color = if (isSelected) Primary.copy(alpha = 0.1f) else Color.White,
-        shape = RoundedCornerShape(12.dp),
-        border = BorderStroke(1.dp, if (isSelected) Primary else OutlineVariant.copy(alpha = 0.5f)),
-        onClick = onClick
-    ) {
-        Column(
-            modifier = Modifier.padding(10.dp),
-            verticalArrangement = Arrangement.SpaceBetween
-        ) {
-            Icon(icon, contentDescription = null, tint = tint, modifier = Modifier.size(18.dp))
-            Text(
-                text = method.displayName(),
-                color = tint,
-                fontSize = 12.sp,
-                fontWeight = FontWeight.Bold,
-                maxLines = 1
-            )
-        }
-    }
-}
-
-@Composable
-private fun ReceivablePaymentInput(
-    paymentMethod: PaymentMethod,
-    amountPaidInput: String,
-    finalTotal: BigDecimal,
-    onAmountPaidChanged: (String) -> Unit
-) {
-    Surface(
-        color = SurfaceBright,
-        shape = RoundedCornerShape(12.dp)
-    ) {
-        Column(
-            modifier = Modifier.padding(12.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp)
-        ) {
-            Text(
-                text = when (paymentMethod) {
-                    PaymentMethod.TUNAI -> "Uang Diterima"
-                    PaymentMethod.HUTANG -> "Hutang Pelanggan"
-                    else -> "Nominal DP"
-                },
-                color = OnSurface,
-                fontWeight = FontWeight.Bold,
-                fontSize = 14.sp
-            )
-
-            if (paymentMethod == PaymentMethod.DP || paymentMethod == PaymentMethod.TUNAI) {
-                OutlinedTextField(
-                    value = amountPaidInput,
-                    onValueChange = onAmountPaidChanged,
-                    placeholder = { Text(if (paymentMethod == PaymentMethod.TUNAI) "Masukkan uang diterima" else "Masukkan DP", color = Outline) },
-                    leadingIcon = { Text("Rp", color = Outline, fontWeight = FontWeight.Bold) },
-                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                    modifier = Modifier.fillMaxWidth().height(52.dp),
-                    singleLine = true,
-                    shape = RoundedCornerShape(10.dp),
-                    colors = OutlinedTextFieldDefaults.colors(
-                        unfocusedContainerColor = Color.White,
-                        focusedContainerColor = Color.White,
-                        unfocusedBorderColor = OutlineVariant,
-                        focusedBorderColor = Primary
-                    )
-                )
-                if (paymentMethod == PaymentMethod.TUNAI) {
+                Column(verticalArrangement = Arrangement.spacedBy(1.dp)) {
                     Text(
-                        "Kembalian: ${checkoutChange(amountPaidInput, finalTotal).moneyText()}",
-                        color = Primary,
-                        fontWeight = FontWeight.Bold
+                        text = "$cartItemCount Barang Dipilih",
+                        color = Color.White.copy(alpha = 0.8f),
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.Medium
+                    )
+                    Text(
+                        text = cartSubtotal.toRupiahText(),
+                        color = Color.White,
+                        fontSize = 18.sp,
+                        fontWeight = FontWeight.ExtraBold
                     )
                 }
             }
+
+            // Right: Review CTA Button
+            Button(
+                onClick = onNavigateToCart,
+                shape = RoundedCornerShape(10.dp),
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = BrandGreenLight,
+                    contentColor = BrandForest
+                ),
+                contentPadding = PaddingValues(horizontal = 14.dp, vertical = 8.dp),
+                modifier = Modifier.height(38.dp)
+            ) {
+                Text(
+                    text = "Review & Bayar",
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 12.sp
+                )
+                Spacer(modifier = Modifier.width(6.dp))
+                Icon(
+                    imageVector = Icons.AutoMirrored.Outlined.ArrowForward,
+                    contentDescription = null,
+                    modifier = Modifier.size(14.dp)
+                )
+            }
         }
     }
 }
 
-@Composable
-private fun EmptyCartState(modifier: Modifier = Modifier) {
-    Box(modifier = modifier, contentAlignment = Alignment.Center) {
-        Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            Icon(Icons.Outlined.ShoppingCart, contentDescription = null, tint = Outline, modifier = Modifier.size(48.dp))
-            Text("Keranjang Kosong", color = Outline, fontWeight = FontWeight.SemiBold)
-            Text("Silakan tambah produk", color = Outline, fontSize = 12.sp)
-        }
-    }
-}
-
-private fun checkoutButtonText(
-    hasActiveCashSession: Boolean,
-    paymentMethod: PaymentMethod,
-    amountPaidInput: String,
-    finalTotal: BigDecimal
-): String {
-    if (!hasActiveCashSession) return "Buka Sesi Kasir"
-    if (!paymentMethod.canSubmit(amountPaidInput, finalTotal)) return "Data Belum Lengkap"
-    return "Proses Bayar"
-}
-
-private fun BigDecimal.moneyText(): String {
-    val formatter = NumberFormat.getCurrencyInstance(Locale.forLanguageTag("id-ID"))
-    formatter.maximumFractionDigits = 0
-    return formatter.format(this)
-}
-
-private fun BigDecimal.qtyText(): String {
-    return stripTrailingZeros().toPlainString()
-}
-
-private fun PaymentMethod.requiresReceivable(): Boolean {
-    return this == PaymentMethod.HUTANG || this == PaymentMethod.DP
-}
-
-private fun PaymentMethod.paidAmount(amountPaidInput: String, finalTotal: BigDecimal): BigDecimal {
+private fun com.tbterminal.app.ui.common.UiText.toMessage(): String {
     return when (this) {
-        PaymentMethod.HUTANG -> BigDecimal.ZERO
-        PaymentMethod.DP -> amountPaidInput.toBigDecimalOrNull() ?: BigDecimal.ZERO
-        PaymentMethod.TUNAI -> amountPaidInput.toBigDecimalOrNull() ?: BigDecimal.ZERO
-        else -> finalTotal
-    }
-}
-
-private fun PaymentMethod.outstandingAmount(amountPaidInput: String, finalTotal: BigDecimal): BigDecimal {
-    return finalTotal.subtract(paidAmount(amountPaidInput, finalTotal)).coerceAtLeast(BigDecimal.ZERO)
-}
-
-private fun PaymentMethod.canSubmit(amountPaidInput: String, finalTotal: BigDecimal): Boolean {
-    val paid = paidAmount(amountPaidInput, finalTotal)
-    return when (this) {
-        PaymentMethod.HUTANG -> finalTotal > BigDecimal.ZERO
-        PaymentMethod.DP -> paid > BigDecimal.ZERO && paid < finalTotal
-        PaymentMethod.TUNAI -> paid >= finalTotal
-        else -> finalTotal > BigDecimal.ZERO
-    }
-}
-
-private fun UiText.message(): String {
-    return when (this) {
-        is UiText.DynamicString -> value
+        is com.tbterminal.app.ui.common.UiText.DynamicString -> value
     }
 }

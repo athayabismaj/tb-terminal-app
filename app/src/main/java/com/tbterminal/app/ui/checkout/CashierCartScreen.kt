@@ -7,13 +7,14 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.ArrowBack
 import androidx.compose.material.icons.automirrored.outlined.ArrowForward
 import androidx.compose.material.icons.automirrored.outlined.ReceiptLong
-import androidx.compose.material.icons.filled.*
 import androidx.compose.material.icons.outlined.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -43,27 +44,24 @@ import java.math.BigDecimal
 import java.text.NumberFormat
 import java.util.Locale
 
-// ==========================================
-// TEMA & WARNA KERANJANG
-// ==========================================
-private val CartBackground = Color.White
-private val CartSurface = Color(0xFFFFFFFF)
-private val CartSurfaceContainerLow = Color(0xFFEFF4FF)
-private val CartOnSurface = Color(0xFF121C2A)
-private val CartOnSurfaceVariant = Color(0xFF3D4A42)
-private val CartOutlineVariant = Color(0xFFBCCAC0)
-private val CartOutline = Color(0xFF6D7A72)
+// ═════════════════════════════════════════════════════════════════════════════
+// INDUSTRIAL POS DESIGN TOKENS (TB Terminal Design System)
+// ═════════════════════════════════════════════════════════════════════════════
+private val CartBackground = Color(0xFFF8FAFC)
+private val CartSurface = Color.White
+private val CartSurfaceContainerLow = Color(0xFFF0FDF4)
+private val CartOnSurface = Color(0xFF0F172A)
+private val CartOnSurfaceVariant = Color(0xFF64748B)
+private val CartOutlineVariant = Color(0xFFE2E8F0)
+private val CartOutline = Color(0xFF94A3B8)
 
-private val CartPrimary = Color(0xFF006948)
+private val CartPrimary = Color(0xFF10533C)
 private val CartOnPrimary = Color(0xFFFFFFFF)
-private val CartSecondary = Color(0xFF855300)
-private val CartSecondaryContainer = Color(0xFFFEA619)
+private val CartSecondary = Color(0xFFB45309)
+private val CartSecondaryContainer = Color(0xFFFEF3C7)
 
-private val CartError = Color(0xFFBA1A1A)
+private val CartError = Color(0xFFDC2626)
 
-// ==========================================
-// SCREEN UTAMA
-// ==========================================
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun CashierCartScreen(
@@ -226,10 +224,9 @@ fun CashierCartScreen(
     }
 }
 
-// ==========================================
-// KONTEN KERANJANG (2-Panel Layout)
-// ==========================================
-@OptIn(ExperimentalMaterial3Api::class)
+// ═════════════════════════════════════════════════════════════════════════════
+// RESPONSIVE CART CONTENT (ADAPTIVE MOBILE / TABLET SPLIT)
+// ═════════════════════════════════════════════════════════════════════════════
 @Composable
 private fun CartContent(
     state: CheckoutUiState,
@@ -248,16 +245,16 @@ private fun CartContent(
     onToggleUnit: (String, Boolean) -> Unit,
     onCheckout: () -> Unit,
     onBackToPos: () -> Unit,
-    onOpenHoldCartDialog: () -> Unit = {},
-    onOpenHeldCarts: () -> Unit = {},
-    onToggleDelivery: (Boolean) -> Unit = {},
-    onDeliveryFeeChanged: (String) -> Unit = {},
-    onDeliveryAddressChanged: (String) -> Unit = {},
-    onDeliveryCourierChanged: (String) -> Unit = {},
-    onOpenCameraScanner: () -> Unit = {},
-    onOpenQrisDialog: () -> Unit = {},
-    onOpenPettyCashDialog: () -> Unit = {},
-    onOpenQuickAddCustomer: () -> Unit = {},
+    onOpenHoldCartDialog: () -> Unit,
+    onOpenHeldCarts: () -> Unit,
+    onToggleDelivery: (Boolean) -> Unit,
+    onDeliveryFeeChanged: (String) -> Unit,
+    onDeliveryAddressChanged: (String) -> Unit,
+    onDeliveryCourierChanged: (String) -> Unit,
+    onOpenCameraScanner: () -> Unit,
+    onOpenQrisDialog: () -> Unit,
+    onOpenPettyCashDialog: () -> Unit,
+    onOpenQuickAddCustomer: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     val totalItems = state.cartItems.sumOf { it.quantity }
@@ -267,510 +264,653 @@ private fun CartContent(
         total = state.finalTotal
     ).error == null
     val creditCustomerIsValid = state.selectedPaymentMethod !in setOf(PaymentMethod.HUTANG, PaymentMethod.DP) ||
-        state.selectedCustomer != null
+            state.selectedCustomer != null
 
-    Row(modifier = modifier.fillMaxSize()) {
-        // BAGIAN KIRI: Daftar Item (2/3 Lebar)
-        Column(
-            modifier = Modifier
-                .weight(2f)
-                .fillMaxHeight()
-                .padding(24.dp)
-        ) {
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(bottom = 16.dp),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Row(
-                    modifier = Modifier.weight(1f),
-                    verticalAlignment = Alignment.CenterVertically
+    BoxWithConstraints(modifier = modifier.fillMaxSize()) {
+        val isTablet = maxWidth >= 768.dp
+
+        if (isTablet) {
+            // ── TAMPILAN TABLET: 2-KOLOM SPLIT REGISTER ──
+            Row(modifier = Modifier.fillMaxSize()) {
+                // Sisi Kiri: Daftar Item Keranjang
+                Column(
+                    modifier = Modifier
+                        .weight(1.3f)
+                        .fillMaxHeight()
+                        .padding(20.dp)
                 ) {
-                    IconButton(
-                        onClick = onBackToPos,
-                        modifier = Modifier
-                            .size(42.dp)
-                            .clip(RoundedCornerShape(12.dp))
-                            .background(CartSurface)
-                    ) {
-                        Icon(
-                            Icons.AutoMirrored.Outlined.ArrowBack,
-                            contentDescription = "Kembali",
-                            tint = CartOnSurface
-                        )
-                    }
-                    Spacer(modifier = Modifier.width(12.dp))
-                    Icon(
-                        Icons.Outlined.ShoppingCart,
-                        contentDescription = null,
-                        tint = CartPrimary,
-                        modifier = Modifier.size(26.dp)
+                    CartTopBar(
+                        totalItems = totalItems,
+                        heldCartsCount = state.heldCarts.size,
+                        onBackToPos = onBackToPos,
+                        onOpenHeldCarts = onOpenHeldCarts,
+                        onOpenPettyCashDialog = onOpenPettyCashDialog,
+                        onOpenCameraScanner = onOpenCameraScanner
                     )
-                    Spacer(modifier = Modifier.width(10.dp))
-                    Column {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Text(
-                                "Keranjang Belanja",
-                                fontSize = 20.sp,
-                                fontWeight = FontWeight.Bold,
-                                color = CartOnSurface
+
+                    Spacer(modifier = Modifier.height(14.dp))
+
+                    LazyColumn(
+                        verticalArrangement = Arrangement.spacedBy(10.dp),
+                        modifier = Modifier.weight(1f)
+                    ) {
+                        items(state.cartItems, key = { it.cartItemId }) { item ->
+                            val product = state.products.firstOrNull { it.productId == item.productId }
+                            CartItemCard(
+                                item = item,
+                                sku = item.sku.ifBlank { product?.sku ?: "" },
+                                unitName = item.unitName.ifBlank { product?.unitName ?: "" },
+                                onIncrease = { onIncrease(item.cartItemId) },
+                                onDecrease = { onDecrease(item.cartItemId) },
+                                onRemove = { onRemove(item.cartItemId) },
+                                onDiscountClick = { onEditItemDiscount(item.cartItemId) },
+                                onToggleUnit = { toSecondary -> onToggleUnit(item.cartItemId, toSecondary) },
                             )
-                            Spacer(modifier = Modifier.width(10.dp))
-                            Surface(
-                                shape = RoundedCornerShape(18.dp),
-                                color = CartPrimary.copy(alpha = 0.1f)
-                            ) {
-                                Text(
-                                    text = "$totalItems item",
-                                    color = CartPrimary,
-                                    fontSize = 13.sp,
-                                    fontWeight = FontWeight.Bold,
-                                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp)
-                                )
-                            }
                         }
-                        Text(
-                            "Daftar Barang",
-                            fontSize = 12.sp,
-                            fontWeight = FontWeight.SemiBold,
-                            color = CartOnSurfaceVariant
+                    }
+                }
+
+                // Sisi Kanan: Ringkasan Pesanan & Pembayaran
+                Surface(
+                    modifier = Modifier
+                        .weight(1f)
+                        .fillMaxHeight(),
+                    color = Color.White,
+                    border = BorderStroke(1.dp, CartOutlineVariant)
+                ) {
+                    Column(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .verticalScroll(rememberScrollState())
+                            .padding(20.dp),
+                        verticalArrangement = Arrangement.spacedBy(14.dp)
+                    ) {
+                        CartSummaryPanel(
+                            state = state,
+                            paymentIsValid = paymentIsValid,
+                            creditCustomerIsValid = creditCustomerIsValid,
+                            onCustomerSearchChanged = onCustomerSearchChanged,
+                            onSelectCustomer = onSelectCustomer,
+                            onClearCustomer = onClearCustomer,
+                            onUseCustomerName = onUseCustomerName,
+                            onOpenQuickAddCustomer = onOpenQuickAddCustomer,
+                            onToggleDelivery = onToggleDelivery,
+                            onDeliveryFeeChanged = onDeliveryFeeChanged,
+                            onDeliveryAddressChanged = onDeliveryAddressChanged,
+                            onDeliveryCourierChanged = onDeliveryCourierChanged,
+                            onSelectPayment = onSelectPayment,
+                            onAmountPaidChanged = onAmountPaidChanged,
+                            onOpenQrisDialog = onOpenQrisDialog,
+                            onEditTransactionDiscount = onEditTransactionDiscount,
+                            onClearCart = onClearCart,
+                            onOpenHoldCartDialog = onOpenHoldCartDialog,
+                            onCheckout = onCheckout
                         )
                     }
                 }
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    if (state.heldCarts.isNotEmpty()) {
-                        Surface(
-                            onClick = onOpenHeldCarts,
-                            shape = RoundedCornerShape(12.dp),
-                            color = Color(0xFFFEF3C7),
-                            border = BorderStroke(1.dp, Color(0xFFF59E0B)),
-                            modifier = Modifier.padding(end = 8.dp)
-                        ) {
-                            Row(
-                                modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                Icon(Icons.Outlined.PauseCircleOutline, contentDescription = null, tint = Color(0xFFB45309), modifier = Modifier.size(16.dp))
-                                Spacer(Modifier.width(4.dp))
-                                Text("Parkir (${state.heldCarts.size})", color = Color(0xFFB45309), fontSize = 12.sp, fontWeight = FontWeight.Bold)
-                            }
-                        }
-                    }
-                    FilledTonalButton(
-                        onClick = onOpenPettyCashDialog,
-                        shape = RoundedCornerShape(10.dp),
-                        colors = ButtonDefaults.filledTonalButtonColors(
-                            containerColor = Color(0xFFE6F4EA),
-                            contentColor = Color(0xFF1B5E3C)
-                        ),
-                        contentPadding = PaddingValues(horizontal = 10.dp, vertical = 6.dp),
-                        modifier = Modifier.padding(end = 4.dp)
-                    ) {
-                        Icon(Icons.Outlined.Payments, contentDescription = null, modifier = Modifier.size(16.dp))
-                        Spacer(Modifier.width(4.dp))
-                        Text("Kas Kecil", fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
-                    }
-                    FilledTonalButton(
-                        onClick = onOpenCameraScanner,
-                        shape = RoundedCornerShape(10.dp),
-                        colors = ButtonDefaults.filledTonalButtonColors(
-                            containerColor = CartPrimary.copy(alpha = 0.12f),
-                            contentColor = CartPrimary
-                        ),
-                        contentPadding = PaddingValues(horizontal = 10.dp, vertical = 6.dp),
-                        modifier = Modifier.padding(end = 4.dp)
-                    ) {
-                        Icon(
-                            Icons.Outlined.QrCodeScanner,
-                            contentDescription = "Scan Barcode",
-                            modifier = Modifier.size(16.dp)
+            }
+        } else {
+            // ── TAMPILAN SMARTPHONE: SINGLE SCROLLABLE (RESPONSIF PENUH) ──
+            Column(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .verticalScroll(rememberScrollState())
+                    .padding(14.dp)
+                    .padding(bottom = 32.dp),
+                verticalArrangement = Arrangement.spacedBy(14.dp)
+            ) {
+                CartTopBar(
+                    totalItems = totalItems,
+                    heldCartsCount = state.heldCarts.size,
+                    onBackToPos = onBackToPos,
+                    onOpenHeldCarts = onOpenHeldCarts,
+                    onOpenPettyCashDialog = onOpenPettyCashDialog,
+                    onOpenCameraScanner = onOpenCameraScanner
+                )
+
+                // Daftar Item di Smartphone
+                Text(
+                    text = "Daftar Barang Belanja ($totalItems)",
+                    fontSize = 14.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = CartOnSurface
+                )
+
+                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                    state.cartItems.forEach { item ->
+                        val product = state.products.firstOrNull { it.productId == item.productId }
+                        CartItemCard(
+                            item = item,
+                            sku = item.sku.ifBlank { product?.sku ?: "" },
+                            unitName = item.unitName.ifBlank { product?.unitName ?: "" },
+                            onIncrease = { onIncrease(item.cartItemId) },
+                            onDecrease = { onDecrease(item.cartItemId) },
+                            onRemove = { onRemove(item.cartItemId) },
+                            onDiscountClick = { onEditItemDiscount(item.cartItemId) },
+                            onToggleUnit = { toSecondary -> onToggleUnit(item.cartItemId, toSecondary) },
                         )
-                        Spacer(Modifier.width(4.dp))
-                        Text("Scan", fontWeight = FontWeight.Bold, fontSize = 12.sp)
                     }
-                    TextButton(onClick = onBackToPos) {
-                        Icon(
-                            Icons.Outlined.Add,
-                            contentDescription = null,
-                            tint = CartPrimary,
-                            modifier = Modifier.size(18.dp)
-                        )
-                        Spacer(modifier = Modifier.width(4.dp))
+                }
+
+                HorizontalDivider(color = CartOutlineVariant)
+
+                // Panel Checkout & Ringkasan
+                CartSummaryPanel(
+                    state = state,
+                    paymentIsValid = paymentIsValid,
+                    creditCustomerIsValid = creditCustomerIsValid,
+                    onCustomerSearchChanged = onCustomerSearchChanged,
+                    onSelectCustomer = onSelectCustomer,
+                    onClearCustomer = onClearCustomer,
+                    onUseCustomerName = onUseCustomerName,
+                    onOpenQuickAddCustomer = onOpenQuickAddCustomer,
+                    onToggleDelivery = onToggleDelivery,
+                    onDeliveryFeeChanged = onDeliveryFeeChanged,
+                    onDeliveryAddressChanged = onDeliveryAddressChanged,
+                    onDeliveryCourierChanged = onDeliveryCourierChanged,
+                    onSelectPayment = onSelectPayment,
+                    onAmountPaidChanged = onAmountPaidChanged,
+                    onOpenQrisDialog = onOpenQrisDialog,
+                    onEditTransactionDiscount = onEditTransactionDiscount,
+                    onClearCart = onClearCart,
+                    onOpenHoldCartDialog = onOpenHoldCartDialog,
+                    onCheckout = onCheckout
+                )
+            }
+        }
+    }
+}
+
+// ═════════════════════════════════════════════════════════════════════════════
+// SUB-KOMPONEN: TOP BAR KERANJANG
+// ═════════════════════════════════════════════════════════════════════════════
+@Composable
+private fun CartTopBar(
+    totalItems: Int,
+    heldCartsCount: Int,
+    onBackToPos: () -> Unit,
+    onOpenHeldCarts: () -> Unit,
+    onOpenPettyCashDialog: () -> Unit,
+    onOpenCameraScanner: () -> Unit
+) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            IconButton(
+                onClick = onBackToPos,
+                modifier = Modifier
+                    .size(38.dp)
+                    .clip(RoundedCornerShape(10.dp))
+                    .background(Color.White)
+                    .border(1.dp, CartOutlineVariant, RoundedCornerShape(10.dp))
+            ) {
+                Icon(
+                    imageVector = Icons.AutoMirrored.Outlined.ArrowBack,
+                    contentDescription = "Kembali ke POS",
+                    tint = CartOnSurface,
+                    modifier = Modifier.size(20.dp)
+                )
+            }
+
+            Spacer(modifier = Modifier.width(10.dp))
+
+            Column {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                ) {
+                    Text(
+                        text = "Keranjang POS",
+                        fontSize = 18.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = CartOnSurface
+                    )
+
+                    Surface(
+                        shape = RoundedCornerShape(12.dp),
+                        color = CartSurfaceContainerLow,
+                        border = BorderStroke(1.dp, Color(0xFFBBF7D0))
+                    ) {
                         Text(
-                            "Tambah Barang",
+                            text = "$totalItems Item",
                             color = CartPrimary,
-                            fontWeight = FontWeight.SemiBold
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.Bold,
+                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp)
+                        )
+                    }
+                }
+            }
+        }
+
+        // Action shortcuts
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(6.dp)
+        ) {
+            if (heldCartsCount > 0) {
+                Surface(
+                    onClick = onOpenHeldCarts,
+                    shape = RoundedCornerShape(10.dp),
+                    color = CartSecondaryContainer,
+                    border = BorderStroke(1.dp, Color(0xFFF59E0B))
+                ) {
+                    Row(
+                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 5.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Icon(
+                            imageVector = Icons.Outlined.PauseCircleOutline,
+                            contentDescription = null,
+                            tint = CartSecondary,
+                            modifier = Modifier.size(14.dp)
+                        )
+                        Spacer(Modifier.width(4.dp))
+                        Text(
+                            text = "Parkir ($heldCartsCount)",
+                            color = CartSecondary,
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.Bold
                         )
                     }
                 }
             }
 
-            LazyColumn(
-                verticalArrangement = Arrangement.spacedBy(12.dp),
-                modifier = Modifier.weight(1f)
+            IconButton(
+                onClick = onOpenPettyCashDialog,
+                modifier = Modifier
+                    .size(34.dp)
+                    .clip(CircleShape)
+                    .background(CartSurfaceContainerLow)
             ) {
-                items(state.cartItems, key = { it.cartItemId }) { item ->
-                    val product = state.products.firstOrNull { it.productId == item.productId }
-                    CartItemCard(
-                        item = item,
-                        sku = item.sku.ifBlank { product?.sku ?: "" },
-                        unitName = item.unitName.ifBlank { product?.unitName ?: "" },
-                        onIncrease = { onIncrease(item.cartItemId) },
-                        onDecrease = { onDecrease(item.cartItemId) },
-                        onRemove = { onRemove(item.cartItemId) },
-                        onDiscountClick = { onEditItemDiscount(item.cartItemId) },
-                        onToggleUnit = { toSecondary -> onToggleUnit(item.cartItemId, toSecondary) },
+                Icon(
+                    imageVector = Icons.Outlined.Payments,
+                    contentDescription = "Kas Kecil",
+                    tint = CartPrimary,
+                    modifier = Modifier.size(18.dp)
+                )
+            }
+
+            IconButton(
+                onClick = onOpenCameraScanner,
+                modifier = Modifier
+                    .size(34.dp)
+                    .clip(CircleShape)
+                    .background(Color.White)
+                    .border(1.dp, CartOutlineVariant, CircleShape)
+            ) {
+                Icon(
+                    imageVector = Icons.Outlined.QrCodeScanner,
+                    contentDescription = "Scan Barcode",
+                    tint = CartPrimary,
+                    modifier = Modifier.size(18.dp)
+                )
+            }
+
+            TextButton(
+                onClick = onBackToPos,
+                contentPadding = PaddingValues(horizontal = 8.dp)
+            ) {
+                Icon(
+                    imageVector = Icons.Outlined.Add,
+                    contentDescription = null,
+                    tint = CartPrimary,
+                    modifier = Modifier.size(16.dp)
+                )
+                Spacer(modifier = Modifier.width(3.dp))
+                Text(
+                    text = "Tambah",
+                    color = CartPrimary,
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 12.sp
+                )
+            }
+        }
+    }
+}
+
+// ═════════════════════════════════════════════════════════════════════════════
+// SUB-KOMPONEN: SUMMARY & CHECKOUT PANEL
+// ═════════════════════════════════════════════════════════════════════════════
+@Composable
+private fun CartSummaryPanel(
+    state: CheckoutUiState,
+    paymentIsValid: Boolean,
+    creditCustomerIsValid: Boolean,
+    onCustomerSearchChanged: (String) -> Unit,
+    onSelectCustomer: (Customer) -> Unit,
+    onClearCustomer: () -> Unit,
+    onUseCustomerName: () -> Unit,
+    onOpenQuickAddCustomer: () -> Unit,
+    onToggleDelivery: (Boolean) -> Unit,
+    onDeliveryFeeChanged: (String) -> Unit,
+    onDeliveryAddressChanged: (String) -> Unit,
+    onDeliveryCourierChanged: (String) -> Unit,
+    onSelectPayment: (PaymentMethod) -> Unit,
+    onAmountPaidChanged: (String) -> Unit,
+    onOpenQrisDialog: () -> Unit,
+    onEditTransactionDiscount: () -> Unit,
+    onClearCart: () -> Unit,
+    onOpenHoldCartDialog: () -> Unit,
+    onCheckout: () -> Unit
+) {
+    Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
+        // 1. Pemilih Pelanggan
+        CartCustomerSelector(
+            customerSearchQuery = state.customerSearchQuery,
+            selectedCustomer = state.selectedCustomer,
+            customers = state.customers,
+            isLoading = state.isCustomerLoading,
+            onSearchChanged = onCustomerSearchChanged,
+            onSelectCustomer = onSelectCustomer,
+            onClearCustomer = onClearCustomer,
+            onUseCustomerName = onUseCustomerName,
+            error = state.customerError,
+            onOpenQuickAddCustomer = onOpenQuickAddCustomer
+        )
+
+        if (state.selectedCustomer != null) {
+            CustomerCreditInspectorCard(
+                customer = state.selectedCustomer,
+                currentBillTotal = state.finalTotal
+            )
+        }
+
+        // 2. Pengiriman Toko
+        DeliverySectionCard(
+            isDeliveryEnabled = state.isDeliveryEnabled,
+            deliveryFeeInput = state.deliveryFeeInput,
+            deliveryAddress = state.deliveryAddress,
+            deliveryCourier = state.deliveryCourier,
+            onToggleDelivery = onToggleDelivery,
+            onDeliveryFeeChanged = onDeliveryFeeChanged,
+            onDeliveryAddressChanged = onDeliveryAddressChanged,
+            onDeliveryCourierChanged = onDeliveryCourierChanged,
+        )
+
+        // 3. Metode Pembayaran
+        PaymentMethodSelector(
+            selectedMethod = state.selectedPaymentMethod,
+            onSelectPayment = onSelectPayment
+        )
+
+        // 4. Input Uang Tunai / DP
+        if (state.selectedPaymentMethod == PaymentMethod.DP || state.selectedPaymentMethod == PaymentMethod.TUNAI) {
+            Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                OutlinedTextField(
+                    value = state.amountPaidInput,
+                    onValueChange = onAmountPaidChanged,
+                    label = {
+                        Text(if (state.selectedPaymentMethod == PaymentMethod.TUNAI) "Uang Tunai Diterima" else "Nominal DP Proyek")
+                    },
+                    placeholder = { Text("0") },
+                    leadingIcon = {
+                        Text(
+                            "Rp",
+                            fontWeight = FontWeight.Bold,
+                            color = CartPrimary,
+                            modifier = Modifier.padding(start = 12.dp)
+                        )
+                    },
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(12.dp),
+                    colors = OutlinedTextFieldDefaults.colors(
+                        unfocusedContainerColor = Color.White,
+                        focusedContainerColor = Color.White,
+                        unfocusedBorderColor = CartOutlineVariant,
+                        focusedBorderColor = CartPrimary
+                    ),
+                    singleLine = true
+                )
+
+                if (state.selectedPaymentMethod == PaymentMethod.TUNAI) {
+                    Text(
+                        text = "Kembalian: ${checkoutChange(state.amountPaidInput, state.finalTotal)}",
+                        color = CartPrimary,
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.Bold,
+                        modifier = Modifier.padding(start = 4.dp)
                     )
                 }
             }
         }
 
-        // BAGIAN KANAN: Ringkasan Pesanan (1/3 Lebar)
+        // 5. QRIS Shortcut Banner
+        if (state.selectedPaymentMethod == PaymentMethod.QRIS) {
+            Surface(
+                onClick = onOpenQrisDialog,
+                shape = RoundedCornerShape(12.dp),
+                color = Color(0xFFF0FDF4),
+                border = BorderStroke(1.dp, Color(0xFF86EFAC)),
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Row(
+                    modifier = Modifier.padding(12.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Surface(
+                        color = Color(0xFF10B981),
+                        shape = CircleShape,
+                        modifier = Modifier.size(36.dp)
+                    ) {
+                        Box(contentAlignment = Alignment.Center) {
+                            Icon(
+                                imageVector = Icons.Outlined.QrCode2,
+                                contentDescription = null,
+                                tint = Color.White,
+                                modifier = Modifier.size(20.dp)
+                            )
+                        }
+                    }
+                    Spacer(Modifier.width(10.dp))
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            text = "Tampilkan Kode QRIS",
+                            fontSize = 13.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = Color(0xFF065F46)
+                        )
+                        Text(
+                            text = "Tampilkan QR di layar tablet untuk discan pembeli",
+                            fontSize = 11.sp,
+                            color = Color(0xFF047857)
+                        )
+                    }
+                    Icon(
+                        imageVector = Icons.AutoMirrored.Outlined.ArrowForward,
+                        contentDescription = null,
+                        tint = Color(0xFF059669),
+                        modifier = Modifier.size(18.dp)
+                    )
+                }
+            }
+        }
+
+        // 6. Ringkasan Kalkulasi Nota
         Surface(
-            modifier = Modifier
-                .weight(1f)
-                .fillMaxHeight(),
-            color = CartSurfaceContainerLow,
-            border = BorderStroke(1.dp, CartPrimary.copy(alpha = 0.08f))
+            modifier = Modifier.fillMaxWidth(),
+            shape = RoundedCornerShape(14.dp),
+            color = Color.White,
+            border = BorderStroke(1.dp, CartOutlineVariant)
         ) {
             Column(
-                modifier = Modifier
-                    .padding(24.dp)
-                    .fillMaxHeight()
+                modifier = Modifier.padding(14.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp)
             ) {
                 Text(
-                    "Ringkasan Pesanan",
-                    fontSize = 22.sp,
+                    text = "RINCIAN PERHITUNGAN",
+                    fontSize = 11.sp,
                     fontWeight = FontWeight.Bold,
-                    color = CartOnSurface,
-                    modifier = Modifier.padding(bottom = 20.dp)
+                    color = CartOutline,
+                    letterSpacing = 0.8.sp
                 )
 
-                // Kalkulasi
-                CartCalculationRow(
-                    "Subtotal",
-                    formatRupiah(state.subtotal)
-                )
+                CartCalculationRow("Subtotal Produk", formatRupiah(state.subtotal))
+
                 if (state.itemDiscountTotal > BigDecimal.ZERO) {
                     CartCalculationRow(
-                        "Diskon item",
+                        "Diskon Item",
                         "-${formatRupiah(state.itemDiscountTotal)}",
                         isDiscount = true
                     )
                 }
+
                 if (state.transactionDiscountAmount > BigDecimal.ZERO) {
                     CartCalculationRow(
-                        "Diskon transaksi",
+                        "Diskon Transaksi",
                         "-${formatRupiah(state.transactionDiscountAmount)}",
                         isDiscount = true
                     )
                 }
+
                 if (state.isDeliveryEnabled && state.deliveryFee > BigDecimal.ZERO) {
                     CartCalculationRow(
-                        "Ongkos kirim",
+                        "Ongkos Kirim Armada",
                         "+${formatRupiah(state.deliveryFee)}"
                     )
                 }
+
                 TextButton(
                     onClick = onEditTransactionDiscount,
-                    modifier = Modifier.align(Alignment.End),
+                    contentPadding = PaddingValues(0.dp)
                 ) {
                     Text(
-                        if (state.transactionDiscount == null) "+ Diskon transaksi" else "Ubah diskon transaksi",
+                        text = if (state.transactionDiscount == null) "+ Tambah Diskon Nota" else "Ubah Diskon Nota",
                         color = CartPrimary,
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.Bold
                     )
                 }
 
-                if (state.isPreviewLoading) {
-                    LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
-                    Text(
-                        "Memeriksa harga dan diskon ke server...",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = CartOnSurfaceVariant,
-                    )
-                } else if (state.checkoutPreview?.approvalRequired == true) {
-                    Text(
-                        "Diskon memerlukan persetujuan owner atau admin.",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = CartSecondary,
-                        fontWeight = FontWeight.SemiBold,
-                    )
-                }
-                if (state.hasAmbiguousCheckout) {
-                    Text(
-                        "Status transaksi belum pasti. Tekan tombol di bawah untuk memeriksa ulang dengan request yang sama.",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = CartError,
-                        fontWeight = FontWeight.SemiBold,
-                    )
-                }
+                HorizontalDivider(color = CartOutlineVariant)
 
-                HorizontalDivider(
-                    modifier = Modifier.padding(vertical = 16.dp),
-                    color = CartOutlineVariant
-                )
-
-                // Total
-                Text(
-                    "Total Bayar",
-                    fontSize = 13.sp,
-                    color = CartOnSurfaceVariant,
-                    fontWeight = FontWeight.Bold,
-                    letterSpacing = 1.sp
-                )
-                Text(
-                    formatRupiah(state.finalTotal),
-                    fontSize = 32.sp,
-                    fontWeight = FontWeight.ExtraBold,
-                    color = CartPrimary,
-                    modifier = Modifier.padding(bottom = 24.dp)
-                )
-
-                // Pemilih Pelanggan
-                CartCustomerSelector(
-                    customerSearchQuery = state.customerSearchQuery,
-                    selectedCustomer = state.selectedCustomer,
-                    customers = state.customers,
-                    isLoading = state.isCustomerLoading,
-                    onSearchChanged = onCustomerSearchChanged,
-                    onSelectCustomer = onSelectCustomer,
-                    onClearCustomer = onClearCustomer,
-                    onUseCustomerName = onUseCustomerName,
-                    error = state.customerError,
-                    onOpenQuickAddCustomer = onOpenQuickAddCustomer
-                )
-
-                if (state.selectedCustomer != null) {
-                    Spacer(modifier = Modifier.height(8.dp))
-                    CustomerCreditInspectorCard(
-                        customer = state.selectedCustomer,
-                        currentBillTotal = state.finalTotal
-                    )
-                }
-
-                Spacer(modifier = Modifier.height(10.dp))
-
-                // Pengiriman / Ekspedisi Toko
-                DeliverySectionCard(
-                    isDeliveryEnabled = state.isDeliveryEnabled,
-                    deliveryFeeInput = state.deliveryFeeInput,
-                    deliveryAddress = state.deliveryAddress,
-                    deliveryCourier = state.deliveryCourier,
-                    onToggleDelivery = onToggleDelivery,
-                    onDeliveryFeeChanged = onDeliveryFeeChanged,
-                    onDeliveryAddressChanged = onDeliveryAddressChanged,
-                    onDeliveryCourierChanged = onDeliveryCourierChanged,
-                )
-
-                Spacer(modifier = Modifier.height(12.dp))
-
-                // Metode Pembayaran
-                PaymentMethodSelector(
-                    selectedMethod = state.selectedPaymentMethod,
-                    onSelectPayment = onSelectPayment
-                )
-
-                // Input uang diterima/DP
-                if (state.selectedPaymentMethod == PaymentMethod.DP || state.selectedPaymentMethod == PaymentMethod.TUNAI) {
-                    Spacer(modifier = Modifier.height(12.dp))
-                    OutlinedTextField(
-                        value = state.amountPaidInput,
-                        onValueChange = onAmountPaidChanged,
-                        placeholder = {
-                            Text(
-                                if (state.selectedPaymentMethod == PaymentMethod.TUNAI) "Uang diterima" else "Nominal DP",
-                                color = CartOutline
-                            )
-                        },
-                        leadingIcon = {
-                            Text(
-                                "Rp",
-                                color = CartPrimary,
-                                fontWeight = FontWeight.Bold,
-                                fontSize = 14.sp,
-                                modifier = Modifier.padding(start = 12.dp)
-                            )
-                        },
-                        modifier = Modifier.fillMaxWidth(),
-                        shape = RoundedCornerShape(12.dp),
-                        colors = OutlinedTextFieldDefaults.colors(
-                            unfocusedContainerColor = CartSurface,
-                            focusedContainerColor = CartSurface,
-                            unfocusedBorderColor = CartOutlineVariant,
-                            focusedBorderColor = CartPrimary
-                        ),
-                        singleLine = true
-                    )
-                    if (state.selectedPaymentMethod == PaymentMethod.TUNAI) {
-                        Text(
-                            "Kembalian: ${checkoutChange(state.amountPaidInput, state.finalTotal)}",
-                            color = CartPrimary,
-                            fontWeight = FontWeight.Bold
-                        )
-                    }
-                }
-
-                if (state.selectedPaymentMethod == PaymentMethod.QRIS) {
-                    Spacer(modifier = Modifier.height(12.dp))
-                    Surface(
-                        onClick = onOpenQrisDialog,
-                        shape = RoundedCornerShape(12.dp),
-                        color = Color(0xFFF0FDF4),
-                        border = BorderStroke(1.dp, Color(0xFF86EFAC)),
-                        modifier = Modifier.fillMaxWidth()
-                    ) {
-                        Row(
-                            modifier = Modifier.padding(12.dp),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Surface(
-                                color = Color(0xFF10B981),
-                                shape = CircleShape,
-                                modifier = Modifier.size(36.dp)
-                            ) {
-                                Box(contentAlignment = Alignment.Center) {
-                                    Icon(
-                                        imageVector = Icons.Outlined.QrCode2,
-                                        contentDescription = null,
-                                        tint = Color.White,
-                                        modifier = Modifier.size(20.dp)
-                                    )
-                                }
-                            }
-                            Spacer(Modifier.width(10.dp))
-                            Column(modifier = Modifier.weight(1f)) {
-                                Text(
-                                    "Tampilkan Kode QRIS",
-                                    fontSize = 13.sp,
-                                    fontWeight = FontWeight.Bold,
-                                    color = Color(0xFF065F46)
-                                )
-                                Text(
-                                    "Tampilkan QR di layar tablet untuk discan pembeli",
-                                    fontSize = 11.sp,
-                                    color = Color(0xFF047857)
-                                )
-                            }
-                            Icon(
-                                imageVector = Icons.AutoMirrored.Outlined.ArrowForward,
-                                contentDescription = null,
-                                tint = Color(0xFF059669),
-                                modifier = Modifier.size(18.dp)
-                            )
-                        }
-                    }
-                }
-
-                Spacer(modifier = Modifier.weight(1f))
-
-                // Tombol Aksi
                 Row(
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                    modifier = Modifier.fillMaxWidth()
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.Bottom
                 ) {
-                    OutlinedButton(
-                        onClick = onClearCart,
-                        modifier = Modifier
-                            .height(56.dp)
-                            .weight(0.75f),
-                        shape = RoundedCornerShape(12.dp),
-                        border = BorderStroke(1.5.dp, CartError),
-                        colors = ButtonDefaults.outlinedButtonColors(
-                            contentColor = CartError
-                        )
-                    ) {
-                        Icon(
-                            Icons.Outlined.DeleteSweep,
-                            contentDescription = null,
-                            modifier = Modifier.size(18.dp)
-                        )
-                        Spacer(modifier = Modifier.width(4.dp))
-                        Text(
-                            "Batal",
-                            fontWeight = FontWeight.Bold,
-                            fontSize = 14.sp
-                        )
-                    }
+                    Text(
+                        text = "Total Bayar",
+                        fontSize = 14.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = CartOnSurface
+                    )
+                    Text(
+                        text = formatRupiah(state.finalTotal),
+                        fontSize = 24.sp,
+                        fontWeight = FontWeight.ExtraBold,
+                        color = CartPrimary
+                    )
+                }
+            }
+        }
 
-                    OutlinedButton(
-                        onClick = onOpenHoldCartDialog,
-                        modifier = Modifier
-                            .height(56.dp)
-                            .weight(0.85f),
-                        shape = RoundedCornerShape(12.dp),
-                        border = BorderStroke(1.5.dp, Color(0xFFD97706)),
-                        colors = ButtonDefaults.outlinedButtonColors(
-                            contentColor = Color(0xFFD97706)
-                        )
-                    ) {
-                        Icon(
-                            Icons.Outlined.BookmarkAdd,
-                            contentDescription = null,
-                            modifier = Modifier.size(18.dp)
-                        )
-                        Spacer(modifier = Modifier.width(4.dp))
-                        Text(
-                            "Parkir",
-                            fontWeight = FontWeight.Bold,
-                            fontSize = 14.sp
-                        )
-                    }
+        // Status Peringatan Diskon / Ambiguous
+        if (state.isPreviewLoading) {
+            LinearProgressIndicator(
+                modifier = Modifier.fillMaxWidth(),
+                color = CartPrimary
+            )
+        } else if (state.checkoutPreview?.approvalRequired == true) {
+            Text(
+                text = "Diskon melebihi limit dan memerlukan persetujuan Owner/Admin.",
+                style = MaterialTheme.typography.bodySmall,
+                color = CartSecondary,
+                fontWeight = FontWeight.SemiBold
+            )
+        }
 
-                    Button(
-                        onClick = {
-                            if (state.selectedPaymentMethod == PaymentMethod.QRIS) {
-                                onOpenQrisDialog()
-                            } else {
-                                onCheckout()
-                            }
+        // 7. Tombol Aksi Bawah
+        Row(
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            OutlinedButton(
+                onClick = onClearCart,
+                modifier = Modifier
+                    .height(48.dp)
+                    .weight(0.7f),
+                shape = RoundedCornerShape(12.dp),
+                border = BorderStroke(1.dp, CartError),
+                colors = ButtonDefaults.outlinedButtonColors(contentColor = CartError)
+            ) {
+                Icon(
+                    imageVector = Icons.Outlined.DeleteSweep,
+                    contentDescription = null,
+                    modifier = Modifier.size(16.dp)
+                )
+                Spacer(modifier = Modifier.width(4.dp))
+                Text("Batal", fontWeight = FontWeight.Bold, fontSize = 12.sp)
+            }
+
+            OutlinedButton(
+                onClick = onOpenHoldCartDialog,
+                modifier = Modifier
+                    .height(48.dp)
+                    .weight(0.8f),
+                shape = RoundedCornerShape(12.dp),
+                border = BorderStroke(1.dp, CartSecondary),
+                colors = ButtonDefaults.outlinedButtonColors(contentColor = CartSecondary)
+            ) {
+                Icon(
+                    imageVector = Icons.Outlined.BookmarkAdd,
+                    contentDescription = null,
+                    modifier = Modifier.size(16.dp)
+                )
+                Spacer(modifier = Modifier.width(4.dp))
+                Text("Parkir", fontWeight = FontWeight.Bold, fontSize = 12.sp)
+            }
+
+            Button(
+                onClick = {
+                    if (state.selectedPaymentMethod == PaymentMethod.QRIS) {
+                        onOpenQrisDialog()
+                    } else {
+                        onCheckout()
+                    }
+                },
+                enabled = !state.isLoading && !state.isPreviewLoading && state.cartItems.isNotEmpty() && paymentIsValid && creditCustomerIsValid,
+                modifier = Modifier
+                    .height(48.dp)
+                    .weight(1.5f),
+                shape = RoundedCornerShape(12.dp),
+                colors = ButtonDefaults.buttonColors(containerColor = CartPrimary)
+            ) {
+                if (state.isLoading || state.isPreviewLoading) {
+                    CircularProgressIndicator(
+                        modifier = Modifier.size(18.dp),
+                        color = CartOnPrimary,
+                        strokeWidth = 2.dp
+                    )
+                } else {
+                    Icon(
+                        imageVector = if (state.selectedPaymentMethod == PaymentMethod.QRIS) Icons.Outlined.QrCode2 else Icons.AutoMirrored.Outlined.ReceiptLong,
+                        contentDescription = null,
+                        modifier = Modifier.size(18.dp)
+                    )
+                    Spacer(modifier = Modifier.width(6.dp))
+                    Text(
+                        text = when {
+                            state.hasAmbiguousCheckout -> "Periksa"
+                            state.checkoutPreview?.approvalRequired == true -> "Persetujuan"
+                            state.selectedPaymentMethod == PaymentMethod.QRIS -> "QRIS"
+                            else -> "Proses Bayar"
                         },
-                        enabled = !state.isLoading && !state.isPreviewLoading && state.cartItems.isNotEmpty() && paymentIsValid && creditCustomerIsValid,
-                        modifier = Modifier
-                            .height(56.dp)
-                            .weight(1.4f),
-                        shape = RoundedCornerShape(12.dp),
-                        colors = ButtonDefaults.buttonColors(
-                            containerColor = CartPrimary
-                        )
-                    ) {
-                        if (state.isLoading || state.isPreviewLoading) {
-                            CircularProgressIndicator(
-                                modifier = Modifier.size(20.dp),
-                                color = CartOnPrimary,
-                                strokeWidth = 2.dp
-                            )
-                        } else {
-                            Icon(
-                                if (state.selectedPaymentMethod == PaymentMethod.QRIS) Icons.Outlined.QrCode2 else Icons.AutoMirrored.Outlined.ReceiptLong,
-                                contentDescription = null,
-                                modifier = Modifier.size(20.dp)
-                            )
-                            Spacer(modifier = Modifier.width(6.dp))
-                            Text(
-                                when {
-                                    state.hasAmbiguousCheckout -> "Periksa"
-                                    state.checkoutPreview?.approvalRequired == true -> "Persetujuan"
-                                    state.selectedPaymentMethod == PaymentMethod.QRIS -> "QRIS"
-                                    else -> "Bayar"
-                                },
-                                fontWeight = FontWeight.Bold,
-                                fontSize = 16.sp
-                            )
-                        }
-                    }
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 14.sp
+                    )
                 }
             }
         }
     }
 }
 
-
-// ==========================================
-// PEMILIH PELANGGAN
-// ==========================================
-@OptIn(ExperimentalMaterial3Api::class)
+// ═════════════════════════════════════════════════════════════════════════════
+// SUB-KOMPONEN: PEMILIH PELANGGAN
+// ═════════════════════════════════════════════════════════════════════════════
 @Composable
 private fun CartCustomerSelector(
     customerSearchQuery: String,
@@ -793,12 +933,12 @@ private fun CartCustomerSelector(
 
     Surface(
         modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(16.dp),
-        color = CartSurface,
+        shape = RoundedCornerShape(14.dp),
+        color = Color.White,
         border = BorderStroke(
             1.dp,
-            if (selectedCustomer != null || hasQuickName) CartPrimary.copy(alpha = 0.3f)
-            else CartOutlineVariant.copy(alpha = 0.5f)
+            if (selectedCustomer != null || hasQuickName) CartPrimary
+            else CartOutlineVariant
         )
     ) {
         Column {
@@ -810,45 +950,43 @@ private fun CartCustomerSelector(
                             isExpanded = !isExpanded
                         }
                     }
-                    .padding(14.dp),
+                    .padding(12.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Box(
                     modifier = Modifier
-                        .size(42.dp)
+                        .size(38.dp)
                         .background(
-                            if (selectedCustomer != null || hasQuickName) CartPrimary.copy(alpha = 0.1f)
-                            else CartSecondaryContainer.copy(alpha = 0.2f),
+                            if (selectedCustomer != null || hasQuickName) CartSurfaceContainerLow
+                            else CartSecondaryContainer,
                             CircleShape
                         ),
                     contentAlignment = Alignment.Center
                 ) {
                     Icon(
-                        if (selectedCustomer != null) Icons.Outlined.Person else Icons.Outlined.EditNote,
+                        imageVector = if (selectedCustomer != null) Icons.Outlined.Person else Icons.Outlined.EditNote,
                         contentDescription = null,
                         tint = if (selectedCustomer != null || hasQuickName) CartPrimary else CartSecondary,
-                        modifier = Modifier.size(22.dp)
+                        modifier = Modifier.size(20.dp)
                     )
                 }
-                Spacer(modifier = Modifier.width(12.dp))
+                Spacer(modifier = Modifier.width(10.dp))
                 Column(modifier = Modifier.weight(1f)) {
                     Text(
-                        selectedCustomer?.name ?: typedName.ifBlank { "Pilih Pelanggan" },
-                        fontSize = 15.sp,
+                        text = selectedCustomer?.name ?: typedName.ifBlank { "Pilih Pelanggan" },
+                        fontSize = 14.sp,
                         fontWeight = FontWeight.Bold,
                         color = CartOnSurface,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis
                     )
                     Text(
-                        when {
-                            selectedCustomer != null -> "Pelanggan terdaftar"
-                            hasQuickName -> "Dipakai di nota, tidak disimpan"
+                        text = when {
+                            selectedCustomer != null -> "Pelanggan Terdaftar"
+                            hasQuickName -> "Dipakai di nota kasir"
                             else -> "Opsional untuk transaksi tunai"
-                        }, /*
-                        else "Opsional • Loyalty",
-                        */
-                        fontSize = 12.sp,
+                        },
+                        fontSize = 11.sp,
                         color = CartOnSurfaceVariant
                     )
                 }
@@ -858,18 +996,18 @@ private fun CartCustomerSelector(
                             onClearCustomer()
                             isExpanded = false
                         },
-                        modifier = Modifier.size(32.dp)
+                        modifier = Modifier.size(28.dp)
                     ) {
                         Icon(
-                            Icons.Outlined.Close,
+                            imageVector = Icons.Outlined.Close,
                             contentDescription = "Hapus pelanggan",
                             tint = CartOnSurfaceVariant,
-                            modifier = Modifier.size(18.dp)
+                            modifier = Modifier.size(16.dp)
                         )
                     }
                 } else {
                     Icon(
-                        if (isExpanded) Icons.Outlined.ExpandLess else Icons.Outlined.ExpandMore,
+                        imageVector = if (isExpanded) Icons.Outlined.ExpandLess else Icons.Outlined.ExpandMore,
                         contentDescription = null,
                         tint = CartOnSurfaceVariant
                     )
@@ -878,48 +1016,43 @@ private fun CartCustomerSelector(
 
             // Dropdown Pencarian Pelanggan
             if (isExpanded && selectedCustomer == null) {
-                HorizontalDivider(color = CartOutlineVariant.copy(alpha = 0.3f))
+                HorizontalDivider(color = CartOutlineVariant)
                 Column(
-                    modifier = Modifier.padding(14.dp),
-                    verticalArrangement = Arrangement.spacedBy(10.dp)
+                    modifier = Modifier.padding(12.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
                     OutlinedTextField(
                         value = customerSearchQuery,
                         onValueChange = onSearchChanged,
                         placeholder = {
-                            Text(
-                                "Cari nama pelanggan...",
-                                color = CartOutline,
-                                fontSize = 13.sp
-                            )
+                            Text("Cari nama pelanggan...", color = CartOutline, fontSize = 12.sp)
                         },
                         leadingIcon = {
                             Icon(
-                                Icons.Outlined.Search,
+                                imageVector = Icons.Outlined.Search,
                                 contentDescription = null,
                                 tint = CartOutline,
-                                modifier = Modifier.size(18.dp)
+                                modifier = Modifier.size(16.dp)
                             )
                         },
                         modifier = Modifier
                             .fillMaxWidth()
-                            .height(56.dp),
-                        shape = RoundedCornerShape(12.dp),
+                            .height(48.dp),
+                        shape = RoundedCornerShape(10.dp),
                         colors = OutlinedTextFieldDefaults.colors(
-                            unfocusedContainerColor = CartSurfaceContainerLow,
-                            focusedContainerColor = CartSurfaceContainerLow,
-                            unfocusedBorderColor = Color.Transparent,
+                            unfocusedContainerColor = Color(0xFFF8FAFC),
+                            focusedContainerColor = Color.White,
+                            unfocusedBorderColor = CartOutlineVariant,
                             focusedBorderColor = CartPrimary
                         ),
-                        singleLine = true,
-                        textStyle = androidx.compose.ui.text.TextStyle(fontSize = 13.sp)
+                        singleLine = true
                     )
 
                     error?.let {
                         Text(
                             text = it.toMessage(),
                             color = CartError,
-                            fontSize = 12.sp,
+                            fontSize = 11.sp,
                             fontWeight = FontWeight.SemiBold
                         )
                     }
@@ -930,25 +1063,18 @@ private fun CartCustomerSelector(
                                 onUseCustomerName()
                                 isExpanded = false
                             },
-                            modifier = Modifier.fillMaxWidth().height(44.dp),
-                            shape = RoundedCornerShape(12.dp),
+                            modifier = Modifier.fillMaxWidth().height(38.dp),
+                            shape = RoundedCornerShape(10.dp),
                             colors = ButtonDefaults.buttonColors(containerColor = CartPrimary)
                         ) {
-                            Icon(Icons.AutoMirrored.Outlined.ReceiptLong, contentDescription = null, modifier = Modifier.size(18.dp))
-                            Spacer(modifier = Modifier.width(8.dp))
                             Text(
-                                "Pakai \"$typedName\" di nota",
+                                text = "Pakai \"$typedName\" di nota",
                                 fontWeight = FontWeight.Bold,
+                                fontSize = 12.sp,
                                 maxLines = 1,
                                 overflow = TextOverflow.Ellipsis
                             )
                         }
-                        Text(
-                            "Nama ini hanya masuk catatan nota dan tidak dibuat sebagai pelanggan baru.",
-                            color = CartOnSurfaceVariant,
-                            fontSize = 12.sp,
-                            lineHeight = 16.sp
-                        )
                     }
 
                     OutlinedButton(
@@ -956,17 +1082,17 @@ private fun CartCustomerSelector(
                             onOpenQuickAddCustomer()
                             isExpanded = false
                         },
-                        modifier = Modifier.fillMaxWidth().height(42.dp),
-                        shape = RoundedCornerShape(12.dp),
+                        modifier = Modifier.fillMaxWidth().height(38.dp),
+                        shape = RoundedCornerShape(10.dp),
                         border = BorderStroke(1.dp, CartPrimary),
                         colors = ButtonDefaults.outlinedButtonColors(contentColor = CartPrimary)
                     ) {
-                        Icon(Icons.Outlined.PersonAdd, contentDescription = null, modifier = Modifier.size(17.dp), tint = CartPrimary)
-                        Spacer(modifier = Modifier.width(8.dp))
+                        Icon(Icons.Outlined.PersonAdd, contentDescription = null, modifier = Modifier.size(16.dp))
+                        Spacer(modifier = Modifier.width(6.dp))
                         Text(
-                            if (typedName.isNotBlank() && !exactMatch) "Daftarkan \"$typedName\" Sebagai Pelanggan Baru" else "+ Tambah Pelanggan Baru",
+                            text = if (typedName.isNotBlank() && !exactMatch) "Daftarkan \"$typedName\"" else "+ Tambah Pelanggan Baru",
                             fontWeight = FontWeight.Bold,
-                            fontSize = 12.sp,
+                            fontSize = 11.sp,
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis
                         )
@@ -976,76 +1102,57 @@ private fun CartCustomerSelector(
                         Box(
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .height(40.dp),
+                                .height(36.dp),
                             contentAlignment = Alignment.Center
                         ) {
                             CircularProgressIndicator(
-                                modifier = Modifier.size(20.dp),
+                                modifier = Modifier.size(18.dp),
                                 strokeWidth = 2.dp,
                                 color = CartPrimary
                             )
                         }
                     } else {
-                        customers.take(4).forEach { customer ->
+                        customers.take(3).forEach { customer ->
                             Surface(
                                 onClick = {
                                     onSelectCustomer(customer)
                                     isExpanded = false
                                 },
                                 shape = RoundedCornerShape(8.dp),
-                                color = CartSurfaceContainerLow.copy(alpha = 0.45f)
+                                color = Color(0xFFF8FAFC)
                             ) {
                                 Row(
                                     modifier = Modifier
                                         .fillMaxWidth()
-                                        .padding(10.dp),
+                                        .padding(8.dp),
                                     verticalAlignment = Alignment.CenterVertically
                                 ) {
                                     Box(
                                         modifier = Modifier
-                                            .size(32.dp)
-                                            .background(
-                                                CartPrimary.copy(alpha = 0.08f),
-                                                CircleShape
-                                            ),
+                                            .size(28.dp)
+                                            .background(CartSurfaceContainerLow, CircleShape),
                                         contentAlignment = Alignment.Center
                                     ) {
                                         Text(
-                                            customer.name.take(1).uppercase(),
-                                            fontSize = 13.sp,
+                                            text = customer.name.take(1).uppercase(),
+                                            fontSize = 12.sp,
                                             fontWeight = FontWeight.Bold,
                                             color = CartPrimary
                                         )
                                     }
-                                    Spacer(modifier = Modifier.width(10.dp))
+                                    Spacer(modifier = Modifier.width(8.dp))
                                     Column(modifier = Modifier.weight(1f)) {
                                         Text(
-                                            customer.name,
-                                            fontSize = 14.sp,
-                                            fontWeight = FontWeight.Medium,
+                                            text = customer.name,
+                                            fontSize = 13.sp,
+                                            fontWeight = FontWeight.SemiBold,
                                             color = CartOnSurface,
                                             maxLines = 1,
                                             overflow = TextOverflow.Ellipsis
                                         )
-                                        if (!customer.phone.isNullOrBlank()) {
-                                            Text(
-                                                customer.phone!!,
-                                                fontSize = 12.sp,
-                                                color = CartOnSurfaceVariant
-                                            )
-                                        }
                                     }
                                 }
                             }
-                        }
-
-                        if (customers.isEmpty() && customerSearchQuery.isNotBlank()) {
-                            Text(
-                                "Tidak ada pelanggan terdaftar yang cocok.",
-                                fontSize = 13.sp,
-                                color = CartOnSurfaceVariant,
-                                modifier = Modifier.padding(vertical = 4.dp)
-                            )
                         }
                     }
                 }
@@ -1054,11 +1161,8 @@ private fun CartCustomerSelector(
     }
 }
 
-// ==========================================
-// FORMAT HELPER
-// ==========================================
 private fun formatRupiah(amount: BigDecimal): String {
-    val formatter = NumberFormat.getNumberInstance(Locale("id", "ID"))
+    val formatter = NumberFormat.getNumberInstance(Locale.forLanguageTag("id-ID"))
     return "Rp ${formatter.format(amount)}"
 }
 
