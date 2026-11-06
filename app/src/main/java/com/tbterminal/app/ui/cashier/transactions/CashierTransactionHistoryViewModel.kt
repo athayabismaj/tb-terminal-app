@@ -86,24 +86,23 @@ class CashierTransactionHistoryViewModel(
                         ?.toLocalDateOrNull()
                         ?.format(DateTimeFormatter.ISO_LOCAL_DATE)
                     _uiState.update { state ->
-                        val shouldFollowActiveSessionDate = sessionDate != null
+                        val isPresetToday = state.selectedPreset == "Hari ini"
+                        val resolvedDate = if (isPresetToday && sessionDate != null) sessionDate else state.selectedDate
                         state.copy(
                             activeSession = session,
                             page = page,
-                            selectedDate = if (shouldFollowActiveSessionDate) sessionDate else state.selectedDate,
-                            startDate = if (shouldFollowActiveSessionDate) sessionDate else state.startDate,
-                            endDate = if (shouldFollowActiveSessionDate) sessionDate else state.endDate,
+                            selectedDate = resolvedDate,
+                            startDate = if (isPresetToday && sessionDate != null) sessionDate else state.startDate,
+                            endDate = if (isPresetToday && sessionDate != null) sessionDate else state.endDate,
                             total = 0,
                             totalPages = 1,
                             transactions = emptyList()
                         )
                     }
 
-                    if (session == null) {
-                        loadSessionTransactions(null)
-                    } else {
-                        loadSessionTransactions(session.id)
-                    }
+                    val state = _uiState.value
+                    val isOnlyTodaySession = state.selectedPreset == "Hari ini" && session != null
+                    loadSessionTransactions(if (isOnlyTodaySession) session.id else null)
                 }
 
                 is RepositoryResult.Error -> setListError(sessionResult.message)
@@ -281,6 +280,16 @@ class CashierTransactionHistoryViewModel(
             }
         }
 
+        // Calculate summary metrics for filtered set
+        val totalSales = filtered.fold(java.math.BigDecimal.ZERO) { acc, tx -> acc + tx.total }
+        val totalPaid = filtered.fold(java.math.BigDecimal.ZERO) { acc, tx -> acc + tx.paidAmount }
+        val totalRemaining = filtered.fold(java.math.BigDecimal.ZERO) { acc, tx ->
+            val rem = tx.remainingAmount ?: (tx.total.subtract(tx.paidAmount)).max(java.math.BigDecimal.ZERO)
+            acc + rem
+        }
+        val paidCount = filtered.count { tx -> tx.status.lowercase() in listOf("lunas", "paid", "success", "completed") }
+        val debtCount = filtered.count { tx -> tx.status.lowercase() in listOf("hutang", "unpaid", "dp", "partial") }
+
         // Paginate
         val total = filtered.size.toLong()
         val totalPages = ((total + CASHIER_TRANSACTION_PAGE_SIZE - 1) / CASHIER_TRANSACTION_PAGE_SIZE).toInt().coerceAtLeast(1)
@@ -294,9 +303,31 @@ class CashierTransactionHistoryViewModel(
                 total = total,
                 totalPages = totalPages,
                 page = page,
-                isLoading = false
+                isLoading = false,
+                summaryTotalSales = totalSales,
+                summaryTotalPaid = totalPaid,
+                summaryTotalRemaining = totalRemaining,
+                summaryTransactionCount = filtered.size,
+                summaryPaidCount = paidCount,
+                summaryDebtCount = debtCount
             )
         }
+    }
+
+    fun resetFilters() {
+        val today = LocalDate.now(WIB_ZONE).format(DateTimeFormatter.ISO_LOCAL_DATE)
+        _uiState.update {
+            it.copy(
+                query = "",
+                statusFilter = "Semua",
+                selectedPreset = "Hari ini",
+                selectedDate = today,
+                startDate = today,
+                endDate = today,
+                page = 1
+            )
+        }
+        loadTransactions(page = 1)
     }
 
     fun loadReceipt(transactionId: String, preserveMessage: Boolean = false) {

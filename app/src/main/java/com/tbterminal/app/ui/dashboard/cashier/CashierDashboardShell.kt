@@ -193,8 +193,15 @@ fun CashierDashboardShell(
                     CashierCompactTopBar(
                         userName = userName,
                         role = role,
-                        title = if (activeDestination == CashierDestination.CashSession) "Kas Harian & Shift" else "Terminal Barokah Jaya",
-                        subtitle = if (activeDestination == CashierDestination.CashSession) "Terminal Barokah Jaya" else "Terminal Kasir",
+                        title = when (activeDestination) {
+                            CashierDestination.CashSession -> "Kas Harian & Shift"
+                            CashierDestination.TransactionHistory -> "Riwayat Transaksi"
+                            else -> "Terminal Barokah Jaya"
+                        },
+                        subtitle = when (activeDestination) {
+                            CashierDestination.CashSession, CashierDestination.TransactionHistory -> "Terminal Barokah Jaya"
+                            else -> "Terminal Kasir"
+                        },
                         onTerminalInfoClick = { showTerminalModal = true },
                         onProfileClick = onProfileClick,
                         onSettingsClick = onSettingsClick,

@@ -1,11 +1,8 @@
 package com.tbterminal.app.ui.cashier.transactions
 
-import androidx.compose.material.icons.automirrored.outlined.KeyboardArrowRight
-import androidx.compose.material.icons.automirrored.outlined.ReceiptLong
-
 import androidx.compose.foundation.BorderStroke
-import com.tbterminal.app.ui.components.TbPagination
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -13,27 +10,35 @@ import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.ChevronLeft
-import androidx.compose.material.icons.filled.ChevronRight
-import androidx.compose.material.icons.outlined.ExpandMore
+import androidx.compose.material.icons.automirrored.outlined.KeyboardArrowRight
+import androidx.compose.material.icons.automirrored.outlined.ReceiptLong
+import androidx.compose.material.icons.automirrored.outlined.TrendingUp
+import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.outlined.CalendarMonth
+import androidx.compose.material.icons.outlined.Payments
+import androidx.compose.material.icons.outlined.Refresh
 import androidx.compose.material.icons.outlined.Search
+import androidx.compose.material.icons.outlined.Sync
 import androidx.compose.material.icons.outlined.Visibility
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.DropdownMenu
-import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
@@ -41,6 +46,7 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.VerticalDivider
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -52,31 +58,32 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.zIndex
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.tbterminal.app.data.local.dao.TransactionDao
 import com.tbterminal.app.data.model.CashTransaction
 import com.tbterminal.app.data.repository.CashReconciliationRepository
 import com.tbterminal.app.data.sync.OfflineCheckoutSyncService
-import com.tbterminal.app.ui.dashboard.DashboardBrandGreenDark
-import com.tbterminal.app.ui.dashboard.DashboardSurface
-import com.tbterminal.app.ui.dashboard.DashboardTextPrimary
-import com.tbterminal.app.ui.dashboard.DashboardTextSecondary
-import com.tbterminal.app.ui.dashboard.DashboardWarningOrange
 import com.tbterminal.app.ui.components.HistoryDateFilter
 import com.tbterminal.app.ui.components.HistoryDatePickerDialog
 import com.tbterminal.app.ui.components.RefreshableContent
+import com.tbterminal.app.ui.components.TbPagination
 import com.tbterminal.app.ui.components.TopFloatingCapsule
-import androidx.compose.ui.zIndex
+import com.tbterminal.app.ui.dashboard.DashboardBrandGreenDark
+import com.tbterminal.app.ui.dashboard.DashboardTextSecondary
+import com.tbterminal.app.ui.dashboard.DashboardWarningOrange
 import com.tbterminal.app.ui.dashboard.cashier.CashierDashboardShell
 import com.tbterminal.app.ui.dashboard.cashier.CashierDestination
 import com.tbterminal.app.ui.offline.LocalPendingTransactionsCard
 import java.math.BigDecimal
+import java.math.RoundingMode
 import java.text.NumberFormat
 import java.time.Instant
 import java.time.LocalDate
@@ -87,8 +94,34 @@ import java.time.ZonedDateTime
 import java.time.format.DateTimeFormatter
 import java.util.Locale
 
-private val CashierLine = Color(0xFFE2E8F0)
-private val CashierSurfaceSoft = Color(0xFFF1F5F9)
+private val Forest900 = Color(0xFF10533C)
+private val Forest800 = Color(0xFF166534)
+private val Forest50 = Color(0xFFF0FDF4)
+private val SurfaceCanvas = Color(0xFFF8FAF9)
+private val SurfaceCard = Color.White
+private val CardBorder = Color(0xFFE2E8F0).copy(alpha = 0.8f)
+
+private val Slate900 = Color(0xFF0F172A)
+private val Slate800 = Color(0xFF1E293B)
+private val Slate700 = Color(0xFF334155)
+private val Slate600 = Color(0xFF475569)
+private val Slate500 = Color(0xFF64748B)
+private val Slate400 = Color(0xFF94A3B8)
+private val Slate200 = Color(0xFFE2E8F0)
+private val Slate100 = Color(0xFFF1F5F9)
+private val Slate50 = Color(0xFFF8FAFC)
+
+private val Emerald700 = Color(0xFF047857)
+private val Emerald50 = Color(0xFFECFDF5)
+private val EmeraldBorder = Color(0xFFA7F3D0)
+
+private val Amber700 = Color(0xFFB45309)
+private val Amber50 = Color(0xFFFFFBEB)
+private val AmberBorder = Color(0xFFFDE68A)
+
+private val Rose700 = Color(0xFFB91C1C)
+private val Rose50 = Color(0xFFFEF2F2)
+private val RoseBorder = Color(0xFFFECACA)
 
 @Composable
 fun CashierTransactionHistoryScreen(
@@ -170,105 +203,72 @@ private fun CashierTransactionHistoryContent(
 ) {
     var showCalendarPicker by remember { mutableStateOf(false) }
 
-    BoxWithConstraints(modifier.fillMaxSize().background(Color.White)) {
-        val compact = maxWidth < 700.dp
-        Column(modifier = Modifier.fillMaxSize().padding(horizontal = if (compact) 16.dp else 32.dp, vertical = if (compact) 14.dp else 24.dp).verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(if (compact) 14.dp else 22.dp)) {
-        // ── Header ──
-        CashierHistoryHeader(
-            selectedDate = state.selectedDate,
-            startDate = state.startDate,
-            endDate = state.endDate,
-            selectedPreset = state.selectedPreset,
-            onPreviousDate = viewModel::previousDate,
-            onNextDate = viewModel::nextDate,
-            onCalendarClick = { showCalendarPicker = true },
-            onDatePresetSelected = viewModel::setDatePreset,
-            compact = compact
-        )
+    BoxWithConstraints(
+        modifier = modifier
+            .fillMaxSize()
+            .background(SurfaceCanvas)
+    ) {
+        val compact = maxWidth < 720.dp
 
-        // ── Period Info ──
-        // ── Search + Date Navigator ──
-        val searchField: @Composable (Modifier) -> Unit = { fieldModifier ->
-            Surface(
-                shape = RoundedCornerShape(16.dp),
-                color = Color.White,
-                border = BorderStroke(1.dp, CashierLine),
-                modifier = fieldModifier.height(52.dp)
-            ) {
-                Row(
-                    modifier = Modifier.fillMaxSize().padding(horizontal = 16.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Icon(Icons.Outlined.Search, contentDescription = null, tint = DashboardTextSecondary, modifier = Modifier.size(20.dp))
-                    Spacer(modifier = Modifier.width(12.dp))
-                    Box(modifier = Modifier.weight(1f), contentAlignment = Alignment.CenterStart) {
-                        if (state.query.isEmpty()) {
-                            Text("Cari struk atau pembeli", color = DashboardTextSecondary.copy(alpha = 0.5f), fontSize = 14.sp)
-                        }
-                        BasicTextField(
-                            value = state.query,
-                            onValueChange = viewModel::updateSearchQuery,
-                            singleLine = true,
-                            textStyle = TextStyle(fontSize = 14.sp, color = DashboardTextPrimary),
-                            modifier = Modifier.fillMaxWidth()
-                        )
-                    }
-                }
-            }
-        }
-        if (compact) Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-            searchField(Modifier.fillMaxWidth())
-            CashierStatusDropdown(state.statusFilter, viewModel::updateStatusFilter, Modifier.fillMaxWidth())
-        } else Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(16.dp)) {
-            searchField(Modifier.weight(1f))
-            CashierStatusDropdown(state.statusFilter, viewModel::updateStatusFilter, Modifier.width(220.dp))
-        }
-
-        // ── Status Chips ──
-
-        // ── Table Card ──
-        LocalPendingTransactionsCard(
-            transactions = state.localPendingTransactions,
-            message = state.localSyncMessage,
-            bulkProgressMessage = state.bulkSyncProgressMessage,
-            isBulkSyncing = state.isBulkSyncing,
-            onSyncClick = viewModel::syncLocalTransaction,
-            onSyncAllClick = viewModel::syncAllLocalTransactions
-        )
-
-        Card(
-            modifier = Modifier.fillMaxWidth(),
-            colors = CardDefaults.cardColors(containerColor = Color.White),
-            shape = RoundedCornerShape(16.dp),
-            border = BorderStroke(1.dp, Color(0xFFF1F5F9))
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .widthIn(max = if (compact) 600.dp else 1024.dp)
+                .align(Alignment.TopCenter)
+                .verticalScroll(rememberScrollState())
+                .padding(horizontal = 14.dp, vertical = 14.dp)
+                .padding(bottom = 24.dp),
+            verticalArrangement = Arrangement.spacedBy(14.dp)
         ) {
-            Column {
-                if (!compact) CashierHistoryTableHeader()
-                HorizontalDivider(color = Color(0xFFF1F5F9))
+            // ── Section 1: Period & Date Navigator ──
+            CashierHistoryHeader(
+                selectedDate = state.selectedDate,
+                startDate = state.startDate,
+                endDate = state.endDate,
+                selectedPreset = state.selectedPreset,
+                onPreviousDate = viewModel::previousDate,
+                onNextDate = viewModel::nextDate,
+                onCalendarClick = { showCalendarPicker = true },
+                onDatePresetSelected = viewModel::setDatePreset,
+                compact = compact
+            )
 
-                when {
-                    state.isLoading -> CashierHistorySkeletonRows()
-                    state.errorMessage != null -> CashierHistoryMessage(state.errorMessage)
-                    !state.hasActiveSession -> CashierHistoryMessage("Belum ada sesi kasir aktif.")
-                    state.transactions.isEmpty() -> CashierHistoryMessage("Belum ada transaksi pada sesi ini.")
-                    else -> {
-                        state.transactions.forEachIndexed { index, transaction ->
-                            if (compact) CashierHistoryMobileRow(transaction, onReceiptClick) else CashierHistoryRow(transaction = transaction, onReceiptClick = onReceiptClick)
-                            if (index < state.transactions.lastIndex) {
-                                HorizontalDivider(color = Color(0xFFF1F5F9))
-                            }
-                        }
-                    }
-                }
+            // ── Section 2: Summary KPI Card (Standard Industri POS) ──
+            CashierTransactionSummaryCard(state = state)
 
-                HorizontalDivider(color = Color(0xFFF1F5F9))
-                CashierHistoryPagination(state, compact, onPreviousPage, onNextPage)
+            // ── Section 3: Search Bar & Status Filter Chips ──
+            CashierSearchBarAndFilter(
+                query = state.query,
+                onQueryChange = viewModel::updateSearchQuery,
+                selectedStatus = state.statusFilter,
+                onStatusChange = viewModel::updateStatusFilter,
+                compact = compact
+            )
+
+            // ── Section 4: Offline Pending Sync (if any) ──
+            if (state.localPendingTransactions.isNotEmpty()) {
+                LocalPendingTransactionsCard(
+                    transactions = state.localPendingTransactions,
+                    message = state.localSyncMessage,
+                    bulkProgressMessage = state.bulkSyncProgressMessage,
+                    isBulkSyncing = state.isBulkSyncing,
+                    onSyncClick = viewModel::syncLocalTransaction,
+                    onSyncAllClick = viewModel::syncAllLocalTransactions
+                )
             }
+
+            // ── Section 5: Transactions List Card ──
+            CashierTransactionsCard(
+                state = state,
+                compact = compact,
+                onPreviousPage = onPreviousPage,
+                onNextPage = onNextPage,
+                onReceiptClick = onReceiptClick,
+                onResetFilters = viewModel::resetFilters
+            )
         }
     }
-    }
 
-    // ── Calendar Picker Dialog ──
     if (showCalendarPicker) {
         HistoryDatePickerDialog(
             currentDate = state.endDate ?: state.selectedDate ?: LocalDate.now().format(DateTimeFormatter.ISO_LOCAL_DATE),
@@ -282,13 +282,7 @@ private fun CashierTransactionHistoryContent(
 }
 
 // ═══════════════════════════════════════════════
-// DATE NAVIGATOR BAR
-// ═══════════════════════════════════════════════
-// ═══════════════════════════════════════════════
-// CALENDAR PICKER DIALOG (single date)
-// ═══════════════════════════════════════════════
-// ═══════════════════════════════════════════════
-// HEADER
+// SECTION 1: DATE NAVIGATOR & PRESET PILLS
 // ═══════════════════════════════════════════════
 @Composable
 private fun CashierHistoryHeader(
@@ -302,15 +296,34 @@ private fun CashierHistoryHeader(
     onDatePresetSelected: (String) -> Unit,
     compact: Boolean
 ) {
-    if (compact) Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-        HistoryDateFilter(selectedDate = endDate ?: selectedDate, onPreviousDate = onPreviousDate, onNextDate = onNextDate, onCalendarClick = onCalendarClick, onClearDate = { onDatePresetSelected("Hari ini") }, displayTextOverride = formatHistoryDateRange(startDate, endDate, selectedDate), showClearButton = false, modifier = Modifier.fillMaxWidth())
-        CashierDatePresetChips(selectedPreset, onDatePresetSelected, Modifier.fillMaxWidth())
-    } else Row(
-        modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.SpaceBetween,
-        verticalAlignment = Alignment.Top
-    ) {
+    val dateRangeText = remember(startDate, endDate, selectedDate) {
+        formatHistoryDateRange(startDate, endDate, selectedDate)
+    }
+
+    if (compact) {
+        Column(
+            modifier = Modifier.fillMaxWidth(),
+            verticalArrangement = Arrangement.spacedBy(10.dp)
+        ) {
+            HistoryDateFilter(
+                selectedDate = endDate ?: selectedDate,
+                onPreviousDate = onPreviousDate,
+                onNextDate = onNextDate,
+                onCalendarClick = onCalendarClick,
+                onClearDate = { onDatePresetSelected("Hari ini") },
+                displayTextOverride = dateRangeText,
+                showClearButton = false,
+                modifier = Modifier.fillMaxWidth()
+            )
+            CashierDatePresetChips(
+                selectedPreset = selectedPreset,
+                onPresetSelected = onDatePresetSelected,
+                modifier = Modifier.fillMaxWidth()
+            )
+        }
+    } else {
         Row(
+            modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.spacedBy(12.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
@@ -320,13 +333,14 @@ private fun CashierHistoryHeader(
                 onNextDate = onNextDate,
                 onCalendarClick = onCalendarClick,
                 onClearDate = { onDatePresetSelected("Hari ini") },
-                displayTextOverride = formatHistoryDateRange(startDate, endDate, selectedDate),
+                displayTextOverride = dateRangeText,
                 showClearButton = false,
-                modifier = Modifier.width(320.dp)
+                modifier = Modifier.weight(1f)
             )
             CashierDatePresetChips(
                 selectedPreset = selectedPreset,
-                onPresetSelected = onDatePresetSelected
+                onPresetSelected = onDatePresetSelected,
+                modifier = Modifier.widthIn(min = 240.dp)
             )
         }
     }
@@ -340,124 +354,714 @@ private fun CashierDatePresetChips(
 ) {
     Surface(
         shape = RoundedCornerShape(12.dp),
-        color = Color.White,
-        border = BorderStroke(1.dp, CashierLine),
-        modifier = modifier.height(48.dp)
+        color = SurfaceCard,
+        border = BorderStroke(1.dp, CardBorder),
+        modifier = modifier.height(46.dp)
     ) {
         Row(
-            modifier = Modifier.padding(horizontal = 6.dp, vertical = 6.dp),
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(4.dp),
             horizontalArrangement = Arrangement.spacedBy(4.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
             listOf("Hari ini", "7 hari", "30 hari").forEach { preset ->
-                CashierDatePresetChip(
-                    text = preset,
-                    selected = selectedPreset == preset,
-                    onClick = { onPresetSelected(preset) }
-                )
-            }
-        }
-    }
-}
-
-@Composable
-private fun CashierDatePresetChip(
-    text: String,
-    selected: Boolean,
-    onClick: () -> Unit
-) {
-    val background = if (selected) Color(0xFF86F8C9) else Color.Transparent
-    val textColor = if (selected) Color(0xFF00513A) else DashboardTextSecondary
-
-    Box(
-        modifier = Modifier
-            .height(36.dp)
-            .clip(RoundedCornerShape(10.dp))
-            .background(background)
-            .clickable(onClick = onClick)
-            .padding(horizontal = 14.dp),
-        contentAlignment = Alignment.Center
-    ) {
-        Text(
-            text = text,
-            color = textColor,
-            fontSize = 12.sp,
-            fontWeight = FontWeight.Bold
-        )
-    }
-}
-
-@Composable
-private fun CashierStatusDropdown(
-    selectedStatus: String,
-    onStatusChanged: (String) -> Unit,
-    modifier: Modifier = Modifier
-) {
-    var expanded by remember { mutableStateOf(false) }
-
-    Box {
-        OutlinedButton(
-            onClick = { expanded = true },
-            modifier = modifier.height(48.dp),
-            shape = RoundedCornerShape(12.dp),
-            border = BorderStroke(1.dp, CashierLine),
-            colors = ButtonDefaults.outlinedButtonColors(
-                containerColor = Color.White,
-                contentColor = DashboardTextPrimary
-            )
-        ) {
-            Text(
-                text = selectedStatus,
-                modifier = Modifier.weight(1f),
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-                fontSize = 13.sp,
-                fontWeight = FontWeight.Medium
-            )
-            Icon(
-                imageVector = Icons.Outlined.ExpandMore,
-                contentDescription = "Pilih status pembayaran",
-                tint = DashboardTextSecondary,
-                modifier = Modifier.size(18.dp)
-            )
-        }
-
-        DropdownMenu(
-            expanded = expanded,
-            onDismissRequest = { expanded = false },
-            modifier = Modifier.width(220.dp).background(Color.White)
-        ) {
-            listOf("Semua", "Lunas", "DP", "Hutang").forEach { status ->
-                DropdownMenuItem(
-                    text = { Text(status, color = DashboardTextPrimary) },
-                    onClick = {
-                        onStatusChanged(status)
-                        expanded = false
-                    }
-                )
+                val isSelected = selectedPreset == preset
+                Box(
+                    modifier = Modifier
+                        .weight(1f)
+                        .fillMaxHeight()
+                        .clip(RoundedCornerShape(8.dp))
+                        .background(if (isSelected) Forest900 else Color.Transparent)
+                        .clickable { onPresetSelected(preset) },
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(
+                        text = preset,
+                        color = if (isSelected) Color.White else Slate600,
+                        fontSize = 12.sp,
+                        fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium
+                    )
+                }
             }
         }
     }
 }
 
 // ═══════════════════════════════════════════════
-// TABLE HEADER, ROW, SKELETON, PAGINATION
+// SECTION 2: SUMMARY KPI CARD (Standard Industri POS)
+// ═══════════════════════════════════════════════
+@Composable
+private fun CashierTransactionSummaryCard(
+    state: CashierTransactionHistoryUiState
+) {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(14.dp),
+        colors = CardDefaults.cardColors(containerColor = SurfaceCard),
+        border = BorderStroke(1.dp, CardBorder)
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(14.dp)
+        ) {
+            // Header Row: Judul & Status Badge
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .size(28.dp)
+                            .clip(RoundedCornerShape(8.dp))
+                            .background(Forest50),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(
+                            imageVector = Icons.AutoMirrored.Outlined.TrendingUp,
+                            contentDescription = null,
+                            tint = Forest900,
+                            modifier = Modifier.size(16.dp)
+                        )
+                    }
+                    Text(
+                        text = "Ringkasan Transaksi",
+                        fontSize = 13.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = Slate900
+                    )
+                }
+
+                // Status Badge
+                Surface(
+                    shape = RoundedCornerShape(999.dp),
+                    color = if (state.hasActiveSession) Emerald50 else Slate100,
+                    border = BorderStroke(1.dp, if (state.hasActiveSession) EmeraldBorder else Slate200)
+                ) {
+                    Row(
+                        modifier = Modifier.padding(horizontal = 9.dp, vertical = 3.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(5.dp)
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .size(6.dp)
+                                .clip(CircleShape)
+                                .background(if (state.hasActiveSession) Emerald700 else Slate400)
+                        )
+                        Text(
+                            text = if (state.hasActiveSession) "Sesi Aktif" else (state.selectedPreset ?: "Selesai"),
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = if (state.hasActiveSession) Emerald700 else Slate600
+                        )
+                    }
+                }
+            }
+
+            // Hero Metric: Total Penjualan Omset
+            Column(verticalArrangement = Arrangement.spacedBy(3.dp)) {
+                Text(
+                    text = "TOTAL OMSET PENJUALAN",
+                    fontSize = 10.5.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = Slate400,
+                    letterSpacing = 0.5.sp
+                )
+                Text(
+                    text = state.summaryTotalSales.cleanMoney(),
+                    fontSize = 24.sp,
+                    fontWeight = FontWeight.ExtraBold,
+                    color = Slate900,
+                    letterSpacing = (-0.5).sp
+                )
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(5.dp)
+                ) {
+                    Icon(
+                        imageVector = Icons.Outlined.Sync,
+                        contentDescription = null,
+                        tint = Slate400,
+                        modifier = Modifier.size(12.dp)
+                    )
+                    Text(
+                        text = "Akumulasi dari ${state.summaryTransactionCount} transaksi tercatat",
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.Medium,
+                        color = Slate500
+                    )
+                }
+            }
+
+            // 4-Grid Divided Clean Metric Box
+            val averageTicket = remember(state.summaryTotalSales, state.summaryTransactionCount) {
+                if (state.summaryTransactionCount > 0) {
+                    state.summaryTotalSales.divide(BigDecimal(state.summaryTransactionCount), 0, RoundingMode.HALF_UP)
+                } else {
+                    BigDecimal.ZERO
+                }
+            }
+
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(12.dp))
+                    .background(Slate50)
+                    .border(1.dp, Slate200, RoundedCornerShape(12.dp))
+            ) {
+                Column(modifier = Modifier.fillMaxWidth()) {
+                    // Row 1: Lunas & Sisa Hutang
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(vertical = 10.dp)
+                    ) {
+                        MetricGridCell(
+                            modifier = Modifier.weight(1f),
+                            label = "Lunas",
+                            value = state.summaryTotalPaid.cleanMoney(),
+                            subtext = "${state.summaryPaidCount} Trx",
+                            indicatorColor = Emerald700
+                        )
+                        VerticalDivider(
+                            modifier = Modifier.height(44.dp),
+                            color = Slate200
+                        )
+                        MetricGridCell(
+                            modifier = Modifier.weight(1f),
+                            label = "Sisa Hutang",
+                            value = state.summaryTotalRemaining.cleanMoney(),
+                            subtext = "${state.summaryDebtCount} Trx",
+                            indicatorColor = if (state.summaryTotalRemaining > BigDecimal.ZERO) Amber700 else Slate400
+                        )
+                    }
+
+                    HorizontalDivider(color = Slate200)
+
+                    // Row 2: Total Trx & Rata-rata Struk
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(vertical = 10.dp)
+                    ) {
+                        MetricGridCell(
+                            modifier = Modifier.weight(1f),
+                            label = "Total Transaksi",
+                            value = "${state.summaryTransactionCount} Trx",
+                            subtext = if (state.summaryTransactionCount > 0) "100% Tercatat" else "-",
+                            indicatorColor = Forest900
+                        )
+                        VerticalDivider(
+                            modifier = Modifier.height(44.dp),
+                            color = Slate200
+                        )
+                        MetricGridCell(
+                            modifier = Modifier.weight(1f),
+                            label = "Rata-rata Struk",
+                            value = averageTicket.cleanMoney(),
+                            subtext = "Per transaksi",
+                            indicatorColor = Slate600
+                        )
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun MetricGridCell(
+    modifier: Modifier = Modifier,
+    label: String,
+    value: String,
+    subtext: String,
+    indicatorColor: Color
+) {
+    Column(
+        modifier = modifier.padding(horizontal = 14.dp),
+        verticalArrangement = Arrangement.spacedBy(2.dp)
+    ) {
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(5.dp)
+        ) {
+            Box(
+                modifier = Modifier
+                    .size(6.dp)
+                    .clip(CircleShape)
+                    .background(indicatorColor)
+            )
+            Text(
+                text = label,
+                fontSize = 11.sp,
+                fontWeight = FontWeight.Medium,
+                color = Slate500,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+            )
+        }
+        Text(
+            text = value,
+            fontSize = 13.5.sp,
+            fontWeight = FontWeight.Bold,
+            color = Slate900,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis
+        )
+        Text(
+            text = subtext,
+            fontSize = 10.5.sp,
+            fontWeight = FontWeight.Medium,
+            color = Slate400,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis
+        )
+    }
+}
+
+// ═══════════════════════════════════════════════
+// SECTION 3: SEARCH BAR & STATUS FILTER PILLS
+// ═══════════════════════════════════════════════
+@Composable
+private fun CashierSearchBarAndFilter(
+    query: String,
+    onQueryChange: (String) -> Unit,
+    selectedStatus: String,
+    onStatusChange: (String) -> Unit,
+    compact: Boolean
+) {
+    Column(
+        modifier = Modifier.fillMaxWidth(),
+        verticalArrangement = Arrangement.spacedBy(10.dp)
+    ) {
+        // Search Input Bar
+        Surface(
+            shape = RoundedCornerShape(12.dp),
+            color = SurfaceCard,
+            border = BorderStroke(1.dp, CardBorder),
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(44.dp)
+        ) {
+            Row(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(horizontal = 12.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Icon(
+                    imageVector = Icons.Outlined.Search,
+                    contentDescription = null,
+                    tint = Slate400,
+                    modifier = Modifier.size(18.dp)
+                )
+                Spacer(modifier = Modifier.width(10.dp))
+                Box(
+                    modifier = Modifier.weight(1f),
+                    contentAlignment = Alignment.CenterStart
+                ) {
+                    if (query.isEmpty()) {
+                        Text(
+                            text = "Cari no. struk atau pelanggan...",
+                            color = Slate400,
+                            fontSize = 13.sp
+                        )
+                    }
+                    BasicTextField(
+                        value = query,
+                        onValueChange = onQueryChange,
+                        singleLine = true,
+                        textStyle = TextStyle(
+                            fontSize = 13.sp,
+                            color = Slate900,
+                            fontWeight = FontWeight.Medium
+                        ),
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                }
+                if (query.isNotEmpty()) {
+                    IconButton(
+                        onClick = { onQueryChange("") },
+                        modifier = Modifier.size(24.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Close,
+                            contentDescription = "Hapus pencarian",
+                            tint = Slate400,
+                            modifier = Modifier.size(16.dp)
+                        )
+                    }
+                }
+            }
+        }
+
+        // Status Segmented Filter Pills
+        val statusList = listOf("Semua", "Lunas", "DP", "Hutang")
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            statusList.forEach { status ->
+                val isSelected = selectedStatus.equals(status, ignoreCase = true)
+                Surface(
+                    shape = RoundedCornerShape(999.dp),
+                    color = if (isSelected) Forest900 else SurfaceCard,
+                    border = BorderStroke(1.dp, if (isSelected) Forest900 else CardBorder),
+                    modifier = Modifier
+                        .weight(1f)
+                        .height(36.dp)
+                        .clickable { onStatusChange(status) }
+                ) {
+                    Box(
+                        modifier = Modifier.fillMaxSize(),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text(
+                            text = status,
+                            color = if (isSelected) Color.White else Slate600,
+                            fontSize = 12.sp,
+                            fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium
+                        )
+                    }
+                }
+            }
+        }
+    }
+}
+
+// ═══════════════════════════════════════════════
+// SECTION 5: TRANSACTIONS LIST CARD
+// ═══════════════════════════════════════════════
+@Composable
+private fun CashierTransactionsCard(
+    state: CashierTransactionHistoryUiState,
+    compact: Boolean,
+    onPreviousPage: () -> Unit,
+    onNextPage: () -> Unit,
+    onReceiptClick: (String) -> Unit,
+    onResetFilters: () -> Unit
+) {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(14.dp),
+        colors = CardDefaults.cardColors(containerColor = SurfaceCard),
+        border = BorderStroke(1.dp, CardBorder)
+    ) {
+        Column(modifier = Modifier.fillMaxWidth()) {
+            // Header Bar
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp, vertical = 12.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = "Daftar Transaksi",
+                    fontSize = 13.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = Slate900
+                )
+
+                Surface(
+                    shape = RoundedCornerShape(999.dp),
+                    color = Forest50,
+                    border = BorderStroke(1.dp, Forest900.copy(alpha = 0.2f))
+                ) {
+                    Text(
+                        text = "${state.total} Transaksi",
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = Forest900,
+                        modifier = Modifier.padding(horizontal = 9.dp, vertical = 3.dp)
+                    )
+                }
+            }
+
+            HorizontalDivider(color = Slate100)
+
+            when {
+                state.isLoading -> {
+                    CashierHistorySkeletonRows()
+                }
+
+                state.errorMessage != null -> {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(24.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Column(
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                            verticalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            Text(
+                                text = state.errorMessage,
+                                fontSize = 13.sp,
+                                fontWeight = FontWeight.SemiBold,
+                                color = Rose700,
+                                textAlign = TextAlign.Center
+                            )
+                            Button(
+                                onClick = onResetFilters,
+                                colors = ButtonDefaults.buttonColors(containerColor = Forest900),
+                                shape = RoundedCornerShape(8.dp)
+                            ) {
+                                Icon(Icons.Outlined.Refresh, contentDescription = null, modifier = Modifier.size(16.dp))
+                                Spacer(modifier = Modifier.width(6.dp))
+                                Text("Muat Ulang Data", fontSize = 12.sp)
+                            }
+                        }
+                    }
+                }
+
+                state.transactions.isEmpty() -> {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(32.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Column(
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                            verticalArrangement = Arrangement.spacedBy(10.dp)
+                        ) {
+                            Box(
+                                modifier = Modifier
+                                    .size(48.dp)
+                                    .clip(CircleShape)
+                                    .background(Slate100),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Icon(
+                                    imageVector = Icons.AutoMirrored.Outlined.ReceiptLong,
+                                    contentDescription = null,
+                                    tint = Slate400,
+                                    modifier = Modifier.size(24.dp)
+                                )
+                            }
+                            Text(
+                                text = "Tidak Ada Transaksi",
+                                fontSize = 14.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = Slate900
+                            )
+                            Text(
+                                text = "Belum ada transaksi yang sesuai pada filter atau tanggal ini.",
+                                fontSize = 12.sp,
+                                color = Slate500,
+                                textAlign = TextAlign.Center
+                            )
+                            if (state.query.isNotEmpty() || state.statusFilter != "Semua") {
+                                OutlinedButton(
+                                    onClick = onResetFilters,
+                                    shape = RoundedCornerShape(8.dp),
+                                    border = BorderStroke(1.dp, CardBorder)
+                                ) {
+                                    Text("Atur Ulang Filter", fontSize = 12.sp, color = Forest900, fontWeight = FontWeight.SemiBold)
+                                }
+                            }
+                        }
+                    }
+                }
+
+                else -> {
+                    if (!compact) {
+                        CashierHistoryTableHeader()
+                        HorizontalDivider(color = Slate100)
+                    }
+
+                    state.transactions.forEachIndexed { index, transaction ->
+                        if (compact) {
+                            CashierHistoryMobileRow(
+                                transaction = transaction,
+                                onReceiptClick = onReceiptClick
+                            )
+                        } else {
+                            CashierHistoryRow(
+                                transaction = transaction,
+                                onReceiptClick = onReceiptClick
+                            )
+                        }
+                        if (index < state.transactions.lastIndex) {
+                            HorizontalDivider(color = Slate100)
+                        }
+                    }
+                }
+            }
+
+            HorizontalDivider(color = Slate100)
+
+            // Pagination Controls
+            CashierHistoryPagination(
+                state = state,
+                compact = compact,
+                onPreviousPage = onPreviousPage,
+                onNextPage = onNextPage
+            )
+        }
+    }
+}
+
+// ═══════════════════════════════════════════════
+// COMPACT / MOBILE ROW (Standar Industri Modern)
+// ═══════════════════════════════════════════════
+@Composable
+private fun CashierHistoryMobileRow(
+    transaction: CashTransaction,
+    onReceiptClick: (String) -> Unit
+) {
+    val statusClean = transaction.status.lowercase()
+    val isPaid = statusClean in listOf("lunas", "paid", "success", "completed")
+    val isPartial = statusClean in listOf("dp", "partial")
+    val isUnpaid = statusClean in listOf("hutang", "unpaid")
+
+    val (badgeBg, badgeText, badgeBorder) = when {
+        isPaid -> Triple(Emerald50, Emerald700, EmeraldBorder)
+        isPartial -> Triple(Amber50, Amber700, AmberBorder)
+        isUnpaid -> Triple(Rose50, Rose700, RoseBorder)
+        else -> Triple(Slate100, Slate600, Slate200)
+    }
+
+    val customerName = transaction.customerName?.takeIf { it.isNotBlank() } ?: "Pelanggan Umum"
+    val paymentLabel = transaction.paymentMethods.firstOrNull()?.uppercase() ?: "TUNAI"
+    val remaining = transaction.remainingAmount ?: transaction.total.subtract(transaction.paidAmount).max(BigDecimal.ZERO)
+
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable { onReceiptClick(transaction.id) }
+            .padding(horizontal = 14.dp, vertical = 12.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.SpaceBetween
+    ) {
+        Column(
+            modifier = Modifier.weight(1f).padding(end = 10.dp),
+            verticalArrangement = Arrangement.spacedBy(3.dp)
+        ) {
+            // Baris 1: Monospace ID Struk & Status Badge
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(6.dp)
+            ) {
+                Text(
+                    text = transaction.receiptId,
+                    fontFamily = FontFamily.Monospace,
+                    fontSize = 12.5.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = Slate900,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+
+                Surface(
+                    shape = RoundedCornerShape(999.dp),
+                    color = badgeBg,
+                    border = BorderStroke(1.dp, badgeBorder)
+                ) {
+                    Text(
+                        text = if (isPaid) "LUNAS" else transaction.status.uppercase(),
+                        fontSize = 10.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = badgeText,
+                        modifier = Modifier.padding(horizontal = 6.dp, vertical = 1.5.dp)
+                    )
+                }
+            }
+
+            // Baris 2: Pelanggan · Waktu Lengkap · Metode
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(4.dp)
+            ) {
+                Text(
+                    text = customerName,
+                    fontSize = 11.5.sp,
+                    fontWeight = FontWeight.Medium,
+                    color = Slate700,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+                Text(text = "·", fontSize = 11.sp, color = Slate400)
+                Text(
+                    text = transaction.createdAt.formatTransactionFullDate(),
+                    fontSize = 11.sp,
+                    color = Slate400,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+                Text(text = "·", fontSize = 11.sp, color = Slate400)
+                Text(
+                    text = paymentLabel,
+                    fontSize = 10.5.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    color = Slate600
+                )
+            }
+        }
+
+        // Sisi Kanan: Total Nominal & Sisa Hutang jika ada
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            Column(
+                horizontalAlignment = Alignment.End,
+                verticalArrangement = Arrangement.spacedBy(2.dp)
+            ) {
+                Text(
+                    text = transaction.total.cleanMoney(),
+                    fontSize = 13.5.sp,
+                    fontWeight = FontWeight.ExtraBold,
+                    color = Slate900
+                )
+                if (remaining > BigDecimal.ZERO && !isPaid) {
+                    Text(
+                        text = "Sisa: ${remaining.cleanMoney()}",
+                        fontSize = 10.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = Amber700
+                    )
+                }
+            }
+
+            Icon(
+                imageVector = Icons.AutoMirrored.Outlined.KeyboardArrowRight,
+                contentDescription = null,
+                tint = Slate400,
+                modifier = Modifier.size(16.dp)
+            )
+        }
+    }
+}
+
+// ═══════════════════════════════════════════════
+// DESKTOP / TABLET TABLE VIEW
 // ═══════════════════════════════════════════════
 @Composable
 private fun CashierHistoryTableHeader() {
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .background(CashierSurfaceSoft)
-            .padding(horizontal = 24.dp, vertical = 14.dp),
+            .background(Slate50)
+            .padding(horizontal = 20.dp, vertical = 11.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        CashierHeaderText("WAKTU", Modifier.weight(1.2f))
-        CashierHeaderText("NO STRUK", Modifier.weight(1.6f))
-        CashierHeaderText("PEMBELI", Modifier.weight(1.2f))
+        CashierHeaderText("WAKTU", Modifier.weight(1.3f))
+        CashierHeaderText("NO STRUK", Modifier.weight(1.5f))
+        CashierHeaderText("PELANGGAN", Modifier.weight(1.3f))
         CashierHeaderText("STATUS", Modifier.weight(1f))
-        CashierHeaderText("TOTAL", Modifier.weight(1.35f), Alignment.End)
-        CashierHeaderText("DIBAYAR", Modifier.weight(1.35f), Alignment.End)
+        CashierHeaderText("METODE", Modifier.weight(0.9f))
+        CashierHeaderText("TOTAL", Modifier.weight(1.3f), Alignment.End)
         CashierHeaderText("AKSI", Modifier.weight(0.6f), Alignment.End)
     }
 }
@@ -467,221 +1071,109 @@ private fun CashierHistoryRow(
     transaction: CashTransaction,
     onReceiptClick: (String) -> Unit
 ) {
+    val statusClean = transaction.status.lowercase()
+    val isPaid = statusClean in listOf("lunas", "paid", "success", "completed")
+    val isPartial = statusClean in listOf("dp", "partial")
+    val isUnpaid = statusClean in listOf("hutang", "unpaid")
+
+    val (badgeBg, badgeText, badgeBorder) = when {
+        isPaid -> Triple(Emerald50, Emerald700, EmeraldBorder)
+        isPartial -> Triple(Amber50, Amber700, AmberBorder)
+        isUnpaid -> Triple(Rose50, Rose700, RoseBorder)
+        else -> Triple(Slate100, Slate600, Slate200)
+    }
+
     Row(
         modifier = Modifier
             .fillMaxWidth()
             .clickable { onReceiptClick(transaction.id) }
-            .padding(horizontal = 24.dp, vertical = 18.dp),
+            .padding(horizontal = 20.dp, vertical = 14.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        Column(modifier = Modifier.weight(1.2f)) {
-            Text(transaction.createdAt.displayTime(), color = DashboardTextPrimary, fontWeight = FontWeight.Bold)
-            Text(transaction.createdAt.displayDate(), color = DashboardTextSecondary, fontSize = 11.sp)
-        }
-        Column(modifier = Modifier.weight(1.6f)) {
+        Column(modifier = Modifier.weight(1.3f)) {
             Text(
-                text = transaction.receiptNumber(),
-                color = DashboardTextPrimary,
-                fontWeight = FontWeight.ExtraBold,
+                text = transaction.createdAt.formatTransactionTime(),
+                color = Slate900,
+                fontWeight = FontWeight.Bold,
+                fontSize = 12.5.sp
+            )
+            Text(
+                text = transaction.createdAt.formatTransactionDateShort(),
+                color = Slate400,
+                fontSize = 11.sp
+            )
+        }
+        Column(modifier = Modifier.weight(1.5f)) {
+            Text(
+                text = transaction.receiptId,
+                color = Slate900,
+                fontFamily = FontFamily.Monospace,
+                fontWeight = FontWeight.Bold,
+                fontSize = 12.sp,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis
             )
         }
-        Column(modifier = Modifier.weight(1.2f)) {
+        Column(modifier = Modifier.weight(1.3f)) {
             Text(
-                text = transaction.customerName ?: "-",
-                color = DashboardTextPrimary,
+                text = transaction.customerName?.ifBlank { "Pelanggan Umum" } ?: "Pelanggan Umum",
+                color = Slate800,
                 fontWeight = FontWeight.Medium,
+                fontSize = 12.sp,
                 maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-                fontSize = 13.sp
+                overflow = TextOverflow.Ellipsis
             )
         }
         Box(modifier = Modifier.weight(1f)) {
-            Box(
-                modifier = Modifier
-                    .clip(RoundedCornerShape(16.dp))
-                    .background(transaction.status.statusColor().copy(alpha = 0.12f))
-                    .padding(horizontal = 10.dp, vertical = 5.dp)
-            ) {
-                Text(transaction.status.uppercase(), color = transaction.status.statusColor(), fontSize = 11.sp, fontWeight = FontWeight.Bold)
-            }
-        }
-        Text(
-            transaction.total.moneyText(),
-            color = DashboardTextPrimary,
-            fontWeight = FontWeight.Bold,
-            modifier = Modifier.weight(1.35f),
-            textAlign = TextAlign.End,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis
-        )
-        Text(
-            transaction.paidAmount.moneyText(),
-            color = DashboardTextSecondary,
-            fontWeight = FontWeight.SemiBold,
-            modifier = Modifier.weight(1.35f),
-            textAlign = TextAlign.End,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis
-        )
-        Box(modifier = Modifier.weight(0.6f), contentAlignment = Alignment.CenterEnd) {
-            Icon(Icons.Outlined.Visibility, contentDescription = "Detail struk", tint = DashboardTextSecondary)
-        }
-    }
-}
-
-@Composable
-private fun CashierHistoryMobileRow(
-    transaction: CashTransaction,
-    onReceiptClick: (String) -> Unit
-) {
-    val statusClean = transaction.status.lowercase()
-    val isPaid = statusClean in listOf("lunas", "paid", "success", "completed")
-    val isPartial = statusClean in listOf("dp", "partial", "pending")
-    val isVoided = statusClean in listOf("voided", "void", "refunded", "cancelled")
-    val isUnpaid = statusClean in listOf("hutang", "unpaid")
-
-    val (badgeBg, badgeText, badgeBorder) = when {
-        isPaid -> Triple(Color(0xFFEEF7F2), Color(0xFF1B5E3C), Color(0xFFC7E0D6))
-        isPartial -> Triple(Color(0xFFFFFBEB), Color(0xFFD97706), Color(0xFFFDE68A))
-        isUnpaid -> Triple(Color(0xFFFEF2F2), Color(0xFFDC2626), Color(0xFFFECACA))
-        isVoided -> Triple(Color(0xFFF1F5F9), Color(0xFF64748B), Color(0xFFE2E8F0))
-        else -> Triple(Color(0xFFEEF7F2), Color(0xFF1B5E3C), Color(0xFFC7E0D6))
-    }
-
-    val customerName = transaction.customerName?.takeIf { it.isNotBlank() } ?: "Pelanggan umum"
-    val cashierName = transaction.cashierName?.takeIf { it.isNotBlank() }
-    val paymentLabel = transaction.paymentMethods.firstOrNull()?.uppercase() ?: "TUNAI"
-
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clickable { onReceiptClick(transaction.id) }
-            .padding(horizontal = 16.dp, vertical = 14.dp),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.SpaceBetween,
-    ) {
-        Row(
-            modifier = Modifier.weight(1f).padding(end = 12.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(14.dp)
-        ) {
-            Box(
-                modifier = Modifier
-                    .size(42.dp)
-                    .clip(RoundedCornerShape(12.dp))
-                    .background(Color(0xFFEEF7F2)),
-                contentAlignment = Alignment.Center,
-            ) {
-                Icon(
-                    imageVector = Icons.AutoMirrored.Outlined.ReceiptLong,
-                    contentDescription = null,
-                    tint = Color(0xFF1B5E3C),
-                    modifier = Modifier.size(20.dp),
-                )
-            }
-
-            Column(
-                modifier = Modifier.weight(1f),
-                verticalArrangement = Arrangement.spacedBy(2.dp)
+            Surface(
+                shape = RoundedCornerShape(999.dp),
+                color = badgeBg,
+                border = BorderStroke(1.dp, badgeBorder)
             ) {
                 Text(
-                    text = transaction.receiptNumber(),
-                    fontSize = 14.sp,
-                    fontWeight = FontWeight.SemiBold,
-                    color = Color(0xFF0F172A),
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                )
-
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(4.dp)
-                ) {
-                    Text(
-                        text = customerName,
-                        fontSize = 12.sp,
-                        fontWeight = FontWeight.Medium,
-                        color = Color(0xFF334155),
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                        modifier = Modifier.weight(1f, fill = false)
-                    )
-                    if (cashierName != null) {
-                        Text(
-                            text = "·",
-                            fontSize = 12.sp,
-                            color = Color(0xFF94A3B8)
-                        )
-                        Text(
-                            text = cashierName,
-                            fontSize = 11.sp,
-                            color = Color(0xFF64748B),
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis,
-                            modifier = Modifier.weight(1f, fill = false)
-                        )
-                    }
-                }
-
-                Text(
-                    text = "${transaction.createdAt.displayDate()} · ${transaction.createdAt.displayTime()} WIB · $paymentLabel",
-                    fontSize = 11.sp,
-                    color = Color(0xFF94A3B8),
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
-                )
-            }
-        }
-
-        Row(
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(8.dp)
-        ) {
-            Column(
-                horizontalAlignment = Alignment.End,
-                verticalArrangement = Arrangement.spacedBy(3.dp)
-            ) {
-                Text(
-                    text = transaction.total.moneyText(),
-                    fontSize = 14.sp,
+                    text = if (isPaid) "LUNAS" else transaction.status.uppercase(),
+                    color = badgeText,
+                    fontSize = 10.sp,
                     fontWeight = FontWeight.Bold,
-                    color = Color(0xFF0F172A),
-                    textAlign = TextAlign.End,
+                    modifier = Modifier.padding(horizontal = 7.dp, vertical = 2.dp)
                 )
-
-                Surface(
-                    shape = RoundedCornerShape(999.dp),
-                    color = badgeBg,
-                    border = BorderStroke(1.dp, badgeBorder.copy(alpha = 0.5f))
-                ) {
-                    Text(
-                        text = if (isPaid) "Lunas" else transaction.status,
-                        fontSize = 10.5.sp,
-                        fontWeight = FontWeight.SemiBold,
-                        color = badgeText,
-                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp)
-                    )
-                }
-
-                val remaining = transaction.remainingAmount ?: transaction.total.subtract(transaction.paidAmount).max(BigDecimal.ZERO)
-                if (remaining > BigDecimal.ZERO && !isPaid) {
-                    Text(
-                        text = "Sisa: ${remaining.moneyText()}",
-                        fontSize = 10.sp,
-                        fontWeight = FontWeight.Medium,
-                        color = Color(0xFFD97706),
-                        textAlign = TextAlign.End,
-                    )
-                }
             }
-
+        }
+        Column(modifier = Modifier.weight(0.9f)) {
+            Text(
+                text = transaction.paymentMethods.firstOrNull()?.uppercase() ?: "TUNAI",
+                color = Slate600,
+                fontSize = 11.sp,
+                fontWeight = FontWeight.SemiBold
+            )
+        }
+        Column(
+            modifier = Modifier.weight(1.3f),
+            horizontalAlignment = Alignment.End
+        ) {
+            Text(
+                text = transaction.total.cleanMoney(),
+                color = Slate900,
+                fontWeight = FontWeight.ExtraBold,
+                fontSize = 13.sp,
+                textAlign = TextAlign.End
+            )
+            val remaining = transaction.remainingAmount ?: transaction.total.subtract(transaction.paidAmount).max(BigDecimal.ZERO)
+            if (remaining > BigDecimal.ZERO && !isPaid) {
+                Text(
+                    text = "Sisa: ${remaining.cleanMoney()}",
+                    fontSize = 10.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = Amber700
+                )
+            }
+        }
+        Box(modifier = Modifier.weight(0.6f), contentAlignment = Alignment.CenterEnd) {
             Icon(
-                imageVector = Icons.AutoMirrored.Outlined.KeyboardArrowRight,
-                contentDescription = null,
-                tint = Color(0xFFCBD5E1),
-                modifier = Modifier.size(16.dp),
+                imageVector = Icons.Outlined.Visibility,
+                contentDescription = "Detail struk",
+                tint = Slate400,
+                modifier = Modifier.size(18.dp)
             )
         }
     }
@@ -694,7 +1186,13 @@ private fun CashierHeaderText(
     align: Alignment.Horizontal = Alignment.Start
 ) {
     Column(modifier = modifier, horizontalAlignment = align) {
-        Text(text, color = DashboardTextSecondary, fontSize = 11.sp, fontWeight = FontWeight.ExtraBold)
+        Text(
+            text = text,
+            color = Slate400,
+            fontSize = 10.5.sp,
+            fontWeight = FontWeight.ExtraBold,
+            letterSpacing = 0.5.sp
+        )
     }
 }
 
@@ -705,42 +1203,32 @@ private fun CashierHistorySkeletonRows() {
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(horizontal = 24.dp, vertical = 18.dp),
+                    .padding(horizontal = 20.dp, vertical = 14.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Column(modifier = Modifier.weight(1.2f)) {
-                    Box(modifier = Modifier.size(40.dp, 16.dp).clip(RoundedCornerShape(4.dp)).background(CashierLine))
+                Column(modifier = Modifier.weight(1.3f)) {
+                    Box(modifier = Modifier.size(40.dp, 14.dp).clip(RoundedCornerShape(4.dp)).background(Slate200))
                     Spacer(modifier = Modifier.height(4.dp))
-                    Box(modifier = Modifier.size(60.dp, 12.dp).clip(RoundedCornerShape(4.dp)).background(CashierLine))
+                    Box(modifier = Modifier.size(60.dp, 10.dp).clip(RoundedCornerShape(4.dp)).background(Slate200))
                 }
-                Column(modifier = Modifier.weight(1.6f)) {
-                    Box(modifier = Modifier.size(100.dp, 16.dp).clip(RoundedCornerShape(4.dp)).background(CashierLine))
+                Column(modifier = Modifier.weight(1.5f)) {
+                    Box(modifier = Modifier.size(110.dp, 14.dp).clip(RoundedCornerShape(4.dp)).background(Slate200))
                 }
-                Column(modifier = Modifier.weight(1.2f)) {
-                    Box(modifier = Modifier.size(80.dp, 14.dp).clip(RoundedCornerShape(4.dp)).background(CashierLine))
+                Column(modifier = Modifier.weight(1.3f)) {
+                    Box(modifier = Modifier.size(80.dp, 12.dp).clip(RoundedCornerShape(4.dp)).background(Slate200))
                 }
                 Box(modifier = Modifier.weight(1f)) {
-                    Box(modifier = Modifier.size(60.dp, 24.dp).clip(RoundedCornerShape(12.dp)).background(CashierLine))
+                    Box(modifier = Modifier.size(54.dp, 20.dp).clip(RoundedCornerShape(10.dp)).background(Slate200))
                 }
-                Box(modifier = Modifier.weight(1.35f), contentAlignment = Alignment.CenterEnd) {
-                    Box(modifier = Modifier.size(80.dp, 16.dp).clip(RoundedCornerShape(4.dp)).background(CashierLine))
-                }
-                Box(modifier = Modifier.weight(1.35f), contentAlignment = Alignment.CenterEnd) {
-                    Box(modifier = Modifier.size(80.dp, 16.dp).clip(RoundedCornerShape(4.dp)).background(CashierLine))
+                Box(modifier = Modifier.weight(1.3f), contentAlignment = Alignment.CenterEnd) {
+                    Box(modifier = Modifier.size(80.dp, 14.dp).clip(RoundedCornerShape(4.dp)).background(Slate200))
                 }
                 Box(modifier = Modifier.weight(0.6f), contentAlignment = Alignment.CenterEnd) {
-                    Box(modifier = Modifier.size(24.dp).clip(RoundedCornerShape(4.dp)).background(CashierLine))
+                    Box(modifier = Modifier.size(20.dp).clip(RoundedCornerShape(4.dp)).background(Slate200))
                 }
             }
-            HorizontalDivider(color = Color(0xFFF1F5F9))
+            HorizontalDivider(color = Slate100)
         }
-    }
-}
-
-@Composable
-private fun CashierHistoryMessage(message: String) {
-    Box(modifier = Modifier.fillMaxWidth().height(200.dp), contentAlignment = Alignment.Center) {
-        Text(message, color = DashboardTextSecondary, fontSize = 15.sp, fontWeight = FontWeight.SemiBold)
     }
 }
 
@@ -768,8 +1256,13 @@ private fun CashierHistoryPagination(
 // ═══════════════════════════════════════════════
 internal fun CashTransaction.receiptNumber(): String = receiptId
 
-internal fun BigDecimal.moneyText(): String =
-    NumberFormat.getCurrencyInstance(Locale.forLanguageTag("id-ID")).format(this)
+internal fun BigDecimal?.cleanMoney(): String {
+    if (this == null) return "Rp 0"
+    val format = NumberFormat.getNumberInstance(Locale.forLanguageTag("id-ID"))
+    return "Rp ${format.format(this.setScale(0, RoundingMode.HALF_UP))}"
+}
+
+internal fun BigDecimal.moneyText(): String = cleanMoney()
 
 private val WIB_ZONE = ZoneId.of("Asia/Jakarta")
 
@@ -781,29 +1274,40 @@ private fun parseToWib(raw: String): ZonedDateTime? {
         ?: runCatching { LocalDate.parse(trimmed.take(10)).atStartOfDay(WIB_ZONE) }.getOrNull()
 }
 
-internal fun String.displayDateTime(): String = runCatching {
-    parseToWib(this)?.format(DateTimeFormatter.ofPattern("dd MMM yyyy HH:mm", Locale.forLanguageTag("id-ID"))) ?: this
-}.getOrDefault(this)
-
-internal fun String.displayDate(): String = runCatching {
-    parseToWib(this)?.format(DateTimeFormatter.ofPattern("dd MMM yyyy", Locale.forLanguageTag("id-ID"))) ?: "-"
-}.getOrDefault("-")
-
-internal fun String.displayTime(): String = runCatching {
-    parseToWib(this)?.format(DateTimeFormatter.ofPattern("HH:mm", Locale.forLanguageTag("id-ID"))) ?: "-"
-}.getOrDefault("-")
-
-internal fun String.statusColor(): Color = when (lowercase()) {
-    "lunas", "paid", "success", "completed" -> DashboardBrandGreenDark
-    "dp", "partial" -> DashboardWarningOrange
-    "hutang", "unpaid" -> Color(0xFFEF4444)
-    else -> DashboardTextSecondary
+internal fun String?.formatTransactionFullDate(): String {
+    if (this.isNullOrBlank()) return "-"
+    return runCatching {
+        val parsed = parseToWib(this) ?: return this
+        DateTimeFormatter.ofPattern("d MMM yyyy, HH:mm 'WIB'", Locale.forLanguageTag("id-ID")).format(parsed)
+    }.getOrDefault(this)
 }
 
-/** Format "yyyy-MM-dd" -> "dd/MM/yyyy" for display */
-private fun String.formatDisplayDate(): String = runCatching {
-    LocalDate.parse(this).format(DateTimeFormatter.ofPattern("dd/MM/yyyy"))
-}.getOrDefault(this)
+internal fun String?.formatTransactionTime(): String {
+    if (this.isNullOrBlank()) return "-"
+    return runCatching {
+        val parsed = parseToWib(this) ?: return this
+        DateTimeFormatter.ofPattern("HH:mm", Locale.forLanguageTag("id-ID")).format(parsed)
+    }.getOrDefault("-")
+}
+
+internal fun String?.formatTransactionDateShort(): String {
+    if (this.isNullOrBlank()) return "-"
+    return runCatching {
+        val parsed = parseToWib(this) ?: return this
+        DateTimeFormatter.ofPattern("d MMM yyyy", Locale.forLanguageTag("id-ID")).format(parsed)
+    }.getOrDefault("-")
+}
+
+internal fun String.displayDateTime(): String = formatTransactionFullDate()
+internal fun String.displayDate(): String = formatTransactionDateShort()
+internal fun String.displayTime(): String = formatTransactionTime()
+
+internal fun String.statusColor(): Color = when (lowercase()) {
+    "lunas", "paid", "success", "completed" -> Emerald700
+    "dp", "partial" -> Amber700
+    "hutang", "unpaid" -> Rose700
+    else -> Slate500
+}
 
 private fun formatHistoryDateRange(startDate: String?, endDate: String?, fallbackDate: String?): String {
     val start = startDate ?: fallbackDate
@@ -816,12 +1320,12 @@ private fun formatHistoryDateRange(startDate: String?, endDate: String?, fallbac
 }
 
 private fun LocalDate.formatDisplayDateLong(): String =
-    format(DateTimeFormatter.ofPattern("dd MMM yyyy", Locale.forLanguageTag("id-ID")))
+    format(DateTimeFormatter.ofPattern("d MMM yyyy", Locale.forLanguageTag("id-ID")))
 
 private fun String.formatDisplayDateShort(): String = runCatching {
-    LocalDate.parse(this).format(DateTimeFormatter.ofPattern("dd MMM", Locale.forLanguageTag("id-ID")))
+    LocalDate.parse(this).format(DateTimeFormatter.ofPattern("d MMM", Locale.forLanguageTag("id-ID")))
 }.getOrDefault(this)
 
 private fun String.formatDisplayDateLong(): String = runCatching {
-    LocalDate.parse(this).format(DateTimeFormatter.ofPattern("dd MMM yyyy", Locale.forLanguageTag("id-ID")))
+    LocalDate.parse(this).format(DateTimeFormatter.ofPattern("d MMM yyyy", Locale.forLanguageTag("id-ID")))
 }.getOrDefault(this)
