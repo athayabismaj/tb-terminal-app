@@ -106,7 +106,8 @@ fun CashierPosRoute(
         onStockCheckClick = onStockCheckClick,
         onProfileClick = onProfileClick,
         onSettingsClick = onSettingsClick,
-        onLogout = onLogout
+        onLogout = onLogout,
+        onLockScreen = viewModel::lockScreen
     ) { contentModifier ->
         Box(modifier = contentModifier.fillMaxSize()) {
             TopFloatingCapsule(
@@ -374,7 +375,11 @@ fun CashierCartRoute(
         onLogout = onLogout,
         onScanBarcode = { barcode -> viewModel.onScanBarcode(barcode, context) },
         onOpenQrisDialog = viewModel::openQrisDialog,
-        onOpenPettyCashDialog = { viewModel.openPettyCashDialog() }
+        onOpenPettyCashDialog = { viewModel.openPettyCashDialog() },
+        onOpenQuickAddCustomer = viewModel::openQuickAddCustomer,
+        onDismissQuickAddCustomer = viewModel::dismissQuickAddCustomer,
+        onQuickCreateCustomer = viewModel::quickCreateCustomer,
+        onLockScreen = viewModel::lockScreen
     )
 }
     if (uiState.isHoldCartDialogOpen) {

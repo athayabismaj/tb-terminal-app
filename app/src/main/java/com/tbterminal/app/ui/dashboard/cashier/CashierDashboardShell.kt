@@ -46,6 +46,7 @@ import androidx.compose.material.icons.outlined.AccountBalanceWallet
 import androidx.compose.material.icons.outlined.ExpandMore
 import androidx.compose.material.icons.outlined.History
 import androidx.compose.material.icons.outlined.Home
+import androidx.compose.material.icons.outlined.Lock
 import androidx.compose.material.icons.outlined.Payments
 import androidx.compose.material.icons.outlined.Person
 import androidx.compose.material.icons.outlined.PointOfSale
@@ -134,6 +135,7 @@ fun CashierDashboardShell(
     onProfileClick: () -> Unit = {},
     onSettingsClick: () -> Unit = {},
     onLogout: () -> Unit,
+    onLockScreen: (() -> Unit)? = null,
     showHeader: Boolean = true,
     content: @Composable (Modifier) -> Unit
 ) {
@@ -152,6 +154,19 @@ fun CashierDashboardShell(
     }
 
     var showTerminalModal by rememberSaveable { mutableStateOf(false) }
+    var internalIsLocked by rememberSaveable { mutableStateOf(false) }
+    var internalPinInput by rememberSaveable { mutableStateOf("") }
+    var internalPinError by rememberSaveable { mutableStateOf<String?>(null) }
+
+    val handleLock: () -> Unit = {
+        if (onLockScreen != null) {
+            onLockScreen()
+        } else {
+            internalIsLocked = true
+            internalPinInput = ""
+            internalPinError = null
+        }
+    }
 
     BoxWithConstraints(
         modifier = Modifier
@@ -176,6 +191,7 @@ fun CashierDashboardShell(
                     onProfileClick = onProfileClick,
                     onSettingsClick = onSettingsClick,
                     onLogout = onLogout,
+                    onLockClick = handleLock,
                     onTerminalInfoClick = { showTerminalModal = true },
                     modifier = Modifier.width(266.dp)
                 )
@@ -205,7 +221,8 @@ fun CashierDashboardShell(
                         onTerminalInfoClick = { showTerminalModal = true },
                         onProfileClick = onProfileClick,
                         onSettingsClick = onSettingsClick,
-                        onLogout = onLogout
+                        onLogout = onLogout,
+                        onLockClick = handleLock
                     )
                 }
                 content(Modifier.weight(1f).then(if (showHeader) Modifier else Modifier.statusBarsPadding()))
@@ -229,6 +246,27 @@ fun CashierDashboardShell(
                 onDismiss = { showTerminalModal = false }
             )
         }
+
+        if (internalIsLocked) {
+            com.tbterminal.app.ui.checkout.components.QuickPinLockOverlay(
+                cashierName = userName,
+                pinInput = internalPinInput,
+                errorMessage = internalPinError,
+                onPinChange = { pin ->
+                    internalPinInput = pin.filter(Char::isDigit).take(6)
+                    internalPinError = null
+                },
+                onUnlock = {
+                    if (internalPinInput.length < 4) {
+                        internalPinError = "PIN minimal 4 angka."
+                    } else {
+                        internalIsLocked = false
+                        internalPinInput = ""
+                        internalPinError = null
+                    }
+                }
+            )
+        }
     }
 }
 
@@ -241,7 +279,8 @@ private fun CashierCompactTopBar(
     onTerminalInfoClick: () -> Unit,
     onProfileClick: () -> Unit,
     onSettingsClick: () -> Unit,
-    onLogout: () -> Unit
+    onLogout: () -> Unit,
+    onLockClick: () -> Unit = {}
 ) {
     var expanded by rememberSaveable { mutableStateOf(false) }
     var lastDismissTime by remember { mutableStateOf(0L) }
@@ -379,8 +418,30 @@ private fun CashierCompactTopBar(
                 }
             }
 
-            // Sisi Kanan: User Profile Pill Button + Floating Animated Dropdown Popover
-            Box {
+            // Sisi Kanan: Quick Lock Button + User Profile Pill Button + Floating Animated Dropdown Popover
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                Surface(
+                    onClick = onLockClick,
+                    shape = RoundedCornerShape(999.dp),
+                    color = Color(0xFFF8FAFC),
+                    border = BorderStroke(1.dp, Color(0xFFE2E8F0).copy(alpha = 0.8f)),
+                    shadowElevation = 0.5.dp,
+                    modifier = Modifier.size(32.dp)
+                ) {
+                    Box(contentAlignment = Alignment.Center) {
+                        Icon(
+                            Icons.Outlined.Lock,
+                            contentDescription = "Kunci Layar Kasir",
+                            tint = Color(0xFF475569),
+                            modifier = Modifier.size(16.dp)
+                        )
+                    }
+                }
+
+                Box {
                 Surface(
                     onClick = {
                         val now = System.currentTimeMillis()
@@ -620,6 +681,19 @@ private fun CashierCompactTopBar(
                                         modifier = Modifier.padding(vertical = 4.dp)
                                     )
 
+                                    // Menu Item: Kunci Layar (PIN)
+                                    CashierHeaderDropdownItem(
+                                        icon = Icons.Outlined.Lock,
+                                        label = "Kunci Layar (PIN)",
+                                        textColor = Color(0xFFD97706),
+                                        iconColor = Color(0xFFD97706),
+                                        iconBgColor = Color(0xFFFEF3C7),
+                                        onClick = {
+                                            expanded = false
+                                            onLockClick()
+                                        }
+                                    )
+
                                     // Menu Item: Keluar
                                     CashierHeaderDropdownItem(
                                         icon = Icons.AutoMirrored.Outlined.Logout,
@@ -636,6 +710,7 @@ private fun CashierCompactTopBar(
                             }
                         }
                     }
+                }
                 }
             }
         }
@@ -788,6 +863,7 @@ private fun CashierShellSidebar(
     onProfileClick: () -> Unit = {},
     onSettingsClick: () -> Unit,
     onLogout: () -> Unit,
+    onLockClick: () -> Unit = {},
     onTerminalInfoClick: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
@@ -862,7 +938,8 @@ private fun CashierShellSidebar(
             role = role,
             onProfileClick = onProfileClick,
             onSettingsClick = onSettingsClick,
-            onLogout = onLogout
+            onLogout = onLogout,
+            onLockClick = onLockClick
         )
     }
 }
@@ -970,7 +1047,8 @@ private fun CashierSidebarProfileSection(
     role: String,
     onProfileClick: () -> Unit,
     onSettingsClick: () -> Unit,
-    onLogout: () -> Unit
+    onLogout: () -> Unit,
+    onLockClick: () -> Unit = {}
 ) {
     var expanded by rememberSaveable { mutableStateOf(false) }
     val displayName = remember(userName) {
@@ -1026,6 +1104,17 @@ private fun CashierSidebarProfileSection(
                         color = Color(0xFFF1F5F9),
                         thickness = 1.dp,
                         modifier = Modifier.padding(vertical = 2.dp)
+                    )
+                    CashierHeaderDropdownItem(
+                        icon = Icons.Outlined.Lock,
+                        label = "Kunci Layar (PIN)",
+                        textColor = Color(0xFFD97706),
+                        iconColor = Color(0xFFD97706),
+                        iconBgColor = Color(0xFFFEF3C7),
+                        onClick = {
+                            expanded = false
+                            onLockClick()
+                        }
                     )
                     CashierHeaderDropdownItem(
                         icon = Icons.AutoMirrored.Outlined.Logout,

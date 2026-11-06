@@ -4,6 +4,7 @@ import androidx.compose.runtime.Composable
 import com.tbterminal.app.data.local.cashexpense.LocalCashExpenseService
 import com.tbterminal.app.data.local.cashsession.LocalCashSessionService
 import com.tbterminal.app.data.local.database.CashSessionLocalDataSource
+import com.tbterminal.app.data.printer.ThermalPrinterManager
 import com.tbterminal.app.data.repository.CashReconciliationRepository
 import com.tbterminal.app.data.sync.OfflineStatusRepository
 
@@ -16,6 +17,7 @@ fun CashierCloseShiftScreen(
     localCashSessionService: LocalCashSessionService? = null,
     localCashExpenseService: LocalCashExpenseService? = null,
     offlineStatusRepository: OfflineStatusRepository? = null,
+    thermalPrinterManager: ThermalPrinterManager? = null,
     cashierUserId: String? = null,
     cashierNameFallback: String? = null,
     onDashboardClick: () -> Unit,
@@ -34,6 +36,7 @@ fun CashierCloseShiftScreen(
         localCashSessionService = localCashSessionService,
         localCashExpenseService = localCashExpenseService,
         offlineStatusRepository = offlineStatusRepository,
+        thermalPrinterManager = thermalPrinterManager,
         cashierUserId = cashierUserId,
         cashierNameFallback = cashierNameFallback,
         onDashboardClick = onDashboardClick,

@@ -36,6 +36,7 @@ import com.tbterminal.app.ui.checkout.components.CartItemCard
 import com.tbterminal.app.ui.checkout.components.DeliverySectionCard
 import com.tbterminal.app.ui.checkout.components.CustomerCreditInspectorCard
 import com.tbterminal.app.ui.checkout.components.PaymentMethodSelector
+import com.tbterminal.app.ui.checkout.components.QuickAddCustomerSheet
 import com.tbterminal.app.ui.dashboard.cashier.CashierDashboardShell
 import com.tbterminal.app.ui.dashboard.cashier.CashierDestination
 import java.math.BigDecimal
@@ -101,7 +102,11 @@ fun CashierCartScreen(
     onLogout: () -> Unit = {},
     onScanBarcode: (String) -> Unit = {},
     onOpenQrisDialog: () -> Unit = {},
-    onOpenPettyCashDialog: () -> Unit = {}
+    onOpenPettyCashDialog: () -> Unit = {},
+    onOpenQuickAddCustomer: () -> Unit = {},
+    onDismissQuickAddCustomer: () -> Unit = {},
+    onQuickCreateCustomer: (String, String, String, Boolean) -> Unit = { _, _, _, _ -> },
+    onLockScreen: (() -> Unit)? = null
 ) {
     var discountItemId by remember { mutableStateOf<String?>(null) }
     var showTransactionDiscount by remember { mutableStateOf(false) }
@@ -119,6 +124,7 @@ fun CashierCartScreen(
         onProfileClick = onProfileClick,
         onSettingsClick = onSettingsClick,
         onLogout = onLogout,
+        onLockScreen = onLockScreen,
         showHeader = false
     ) { contentModifier ->
         Scaffold(
@@ -161,12 +167,23 @@ fun CashierCartScreen(
                     onOpenCameraScanner = { showCameraScanner = true },
                     onOpenQrisDialog = onOpenQrisDialog,
                     onOpenPettyCashDialog = onOpenPettyCashDialog,
+                    onOpenQuickAddCustomer = onOpenQuickAddCustomer,
                     modifier = Modifier
                         .fillMaxSize()
                         .padding(contentPadding)
                 )
             }
         }
+    }
+
+    if (state.isQuickAddCustomerOpen) {
+        QuickAddCustomerSheet(
+            initialName = state.customerSearchQuery,
+            isSubmitting = state.isQuickCustomerSubmitting,
+            errorMessage = state.customerError?.toMessage(),
+            onDismiss = onDismissQuickAddCustomer,
+            onSubmit = onQuickCreateCustomer
+        )
     }
 
     if (showCameraScanner) {
@@ -240,6 +257,7 @@ private fun CartContent(
     onOpenCameraScanner: () -> Unit = {},
     onOpenQrisDialog: () -> Unit = {},
     onOpenPettyCashDialog: () -> Unit = {},
+    onOpenQuickAddCustomer: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     val totalItems = state.cartItems.sumOf { it.quantity }
@@ -520,7 +538,8 @@ private fun CartContent(
                     onSelectCustomer = onSelectCustomer,
                     onClearCustomer = onClearCustomer,
                     onUseCustomerName = onUseCustomerName,
-                    error = state.customerError
+                    error = state.customerError,
+                    onOpenQuickAddCustomer = onOpenQuickAddCustomer
                 )
 
                 if (state.selectedCustomer != null) {
@@ -762,7 +781,8 @@ private fun CartCustomerSelector(
     onSelectCustomer: (Customer) -> Unit,
     onClearCustomer: () -> Unit,
     onUseCustomerName: () -> Unit,
-    error: UiText?
+    error: UiText?,
+    onOpenQuickAddCustomer: () -> Unit = {}
 ) {
     var isExpanded by remember { mutableStateOf(false) }
     val typedName = customerSearchQuery.trim()
@@ -928,6 +948,27 @@ private fun CartCustomerSelector(
                             color = CartOnSurfaceVariant,
                             fontSize = 12.sp,
                             lineHeight = 16.sp
+                        )
+                    }
+
+                    OutlinedButton(
+                        onClick = {
+                            onOpenQuickAddCustomer()
+                            isExpanded = false
+                        },
+                        modifier = Modifier.fillMaxWidth().height(42.dp),
+                        shape = RoundedCornerShape(12.dp),
+                        border = BorderStroke(1.dp, CartPrimary),
+                        colors = ButtonDefaults.outlinedButtonColors(contentColor = CartPrimary)
+                    ) {
+                        Icon(Icons.Outlined.PersonAdd, contentDescription = null, modifier = Modifier.size(17.dp), tint = CartPrimary)
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text(
+                            if (typedName.isNotBlank() && !exactMatch) "Daftarkan \"$typedName\" Sebagai Pelanggan Baru" else "+ Tambah Pelanggan Baru",
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 12.sp,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
                         )
                     }
 

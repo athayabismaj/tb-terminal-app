@@ -408,6 +408,73 @@ class CheckoutViewModel(
         }
     }
 
+    fun openQuickAddCustomer() {
+        _uiState.update { it.copy(isQuickAddCustomerOpen = true) }
+    }
+
+    fun dismissQuickAddCustomer() {
+        _uiState.update { it.copy(isQuickAddCustomerOpen = false, isQuickCustomerSubmitting = false) }
+    }
+
+    fun quickCreateCustomer(
+        name: String,
+        phone: String,
+        address: String,
+        isContractor: Boolean
+    ) {
+        val cleanName = name.trim()
+        if (cleanName.isBlank()) {
+            _uiState.update { it.copy(customerError = UiText.DynamicString("Nama pelanggan wajib diisi.")) }
+            return
+        }
+
+        viewModelScope.launch {
+            _uiState.update { it.copy(isQuickCustomerSubmitting = true) }
+            val command = com.tbterminal.app.data.model.CustomerCommand(
+                name = cleanName,
+                phone = phone.trim().takeIf(String::isNotBlank),
+                address = address.trim().takeIf(String::isNotBlank),
+                isContractor = isContractor,
+                creditLimit = BigDecimal.ZERO,
+                paymentTermDays = 0
+            )
+
+            when (val result = customerRepository.createCustomer(command)) {
+                is RepositoryResult.Success -> {
+                    val created = result.data
+                    val updatedCustomers = listOf(created) + _uiState.value.customers.filter { it.id != created.id }
+                    _uiState.update {
+                        it.copy(
+                            customers = updatedCustomers,
+                            selectedCustomer = created,
+                            customerSearchQuery = created.name,
+                            isQuickAddCustomerOpen = false,
+                            isQuickCustomerSubmitting = false,
+                            customerError = null,
+                            quickFeedbackMessage = "Pelanggan \"${created.name}\" berhasil didaftarkan!"
+                        )
+                    }
+                }
+                is RepositoryResult.Error -> {
+                    _uiState.update {
+                        it.copy(
+                            isQuickCustomerSubmitting = false,
+                            customerError = UiText.DynamicString(result.message)
+                        )
+                    }
+                }
+                is RepositoryResult.Exception -> {
+                    _uiState.update {
+                        it.copy(
+                            isQuickCustomerSubmitting = false,
+                            customerError = UiText.DynamicString(result.throwable.message ?: "Gagal mendaftarkan pelanggan.")
+                        )
+                    }
+                }
+            }
+        }
+    }
+
     fun replaceCart(items: List<CartItem>) {
         if (!allowCheckoutIntentMutation()) return
         _uiState.update { state ->
@@ -417,6 +484,7 @@ class CheckoutViewModel(
 
     fun addProduct(product: Product, isSecondary: Boolean = false) {
         if (product.stockQty <= BigDecimal.ZERO) {
+            com.tbterminal.app.ui.barcode.BarcodeFeedbackHelper.playErrorBeep()
             setError(UiText.DynamicString("Stok ${product.name} kosong."))
             return
         }
@@ -431,6 +499,7 @@ class CheckoutViewModel(
         val neededBaseQty = currentConsumedBaseQty.add(factor)
         if (neededBaseQty > product.stockQty) {
             val sisa = product.stockQty.subtract(currentConsumedBaseQty).coerceAtLeast(BigDecimal.ZERO)
+            com.tbterminal.app.ui.barcode.BarcodeFeedbackHelper.playErrorBeep()
             setError(
                 UiText.DynamicString(
                     "Stok ${product.name} tidak cukup (tersedia ${sisa.stripTrailingZeros().toPlainString()} ${product.unitName})."
@@ -496,6 +565,11 @@ class CheckoutViewModel(
         }
 
         if (matchedProduct != null) {
+            if (matchedProduct.stockQty <= BigDecimal.ZERO) {
+                com.tbterminal.app.ui.barcode.BarcodeFeedbackHelper.playErrorBeep()
+                setError(UiText.DynamicString("Stok ${matchedProduct.name} kosong."))
+                return
+            }
             addProduct(matchedProduct)
             com.tbterminal.app.ui.barcode.BarcodeFeedbackHelper.playSuccessBeep()
             context?.let { ctx ->
@@ -514,6 +588,11 @@ class CheckoutViewModel(
                     } ?: result.data.data.firstOrNull { it.isActive }
 
                     if (found != null) {
+                        if (found.quantity <= BigDecimal.ZERO) {
+                            com.tbterminal.app.ui.barcode.BarcodeFeedbackHelper.playErrorBeep()
+                            setError(UiText.DynamicString("Stok ${found.productName} kosong."))
+                            return@launch
+                        }
                         val uiProduct = Product(
                             productId = found.productId,
                             name = found.productName,

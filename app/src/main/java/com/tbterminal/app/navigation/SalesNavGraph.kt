@@ -85,6 +85,7 @@ internal fun NavGraphBuilder.salesGraph(navController: NavHostController, sessio
                     localCashSessionService = appContainer.localCashSessionService,
                     localCashExpenseService = appContainer.localCashExpenseService,
                     offlineStatusRepository = appContainer.offlineStatusRepository,
+                    thermalPrinterManager = appContainer.thermalPrinterManager,
                     cashierUserId = sessionUser.userId ?: sessionUser.name,
                     cashierNameFallback = sessionUser.name,
                     onDashboardClick = {

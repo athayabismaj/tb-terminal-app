@@ -53,6 +53,8 @@ data class CheckoutUiState(
     val isScreenLocked: Boolean = false,
     val lockPinInput: String = "",
     val lockPinError: String? = null,
+    val isQuickAddCustomerOpen: Boolean = false,
+    val isQuickCustomerSubmitting: Boolean = false,
     val isQrisDialogOpen: Boolean = false,
     val isCameraScannerOpen: Boolean = false,
     val quickFeedbackMessage: String? = null,

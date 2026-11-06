@@ -92,8 +92,7 @@ fun CameraBarcodeScannerDialog(
                 CameraPreviewContent(
                     onDismissRequest = onDismissRequest,
                     onBarcodeScanned = { barcode ->
-                        BarcodeFeedbackHelper.playSuccessBeep()
-                        BarcodeFeedbackHelper.vibrate(context)
+                        BarcodeFeedbackHelper.vibrate(context, 40)
                         onBarcodeScanned(barcode)
                     }
                 )
@@ -102,8 +101,7 @@ fun CameraBarcodeScannerDialog(
                     onRequestPermission = { permissionLauncher.launch(Manifest.permission.CAMERA) },
                     onDismiss = onDismissRequest,
                     onManualBarcodeSubmit = { barcode ->
-                        BarcodeFeedbackHelper.playSuccessBeep()
-                        BarcodeFeedbackHelper.vibrate(context)
+                        BarcodeFeedbackHelper.vibrate(context, 40)
                         onBarcodeScanned(barcode)
                     }
                 )

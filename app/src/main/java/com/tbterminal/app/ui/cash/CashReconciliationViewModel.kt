@@ -201,6 +201,7 @@ class CashReconciliationViewModel(
                     _uiState.update {
                         it.copy(
                             activeSession = result.data,
+                            lastClosedSession = result.data,
                             closingCashInput = "",
                             closingNotesInput = "",
                             isSubmitting = false,
@@ -262,9 +263,11 @@ class CashReconciliationViewModel(
             )
         ) {
             is LocalCashSessionResult.Success -> {
+                val sessionModel = result.session.toCashSession()
                 _uiState.update {
                     it.copy(
-                        activeSession = result.session.toCashSession(),
+                        activeSession = sessionModel,
+                        lastClosedSession = sessionModel,
                         closingCashInput = "",
                         closingNotesInput = "",
                         isSubmitting = false,
