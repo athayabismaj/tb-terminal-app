@@ -28,8 +28,6 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.KeyboardArrowRight
 import androidx.compose.material.icons.automirrored.outlined.ReceiptLong
-import androidx.compose.material.icons.automirrored.outlined.TrendingUp
-import androidx.compose.material.icons.outlined.AccountBalanceWallet
 import androidx.compose.material.icons.outlined.Calculate
 import androidx.compose.material.icons.outlined.CheckCircle
 import androidx.compose.material.icons.outlined.History
@@ -39,17 +37,11 @@ import androidx.compose.material.icons.outlined.PauseCircleOutline
 import androidx.compose.material.icons.outlined.Payments
 import androidx.compose.material.icons.outlined.PointOfSale
 import androidx.compose.material.icons.outlined.QrCode2
-import androidx.compose.material.icons.outlined.Refresh
-import androidx.compose.material.icons.outlined.Schedule
-import androidx.compose.material.icons.outlined.Storefront
 import androidx.compose.material.icons.outlined.Visibility
 import androidx.compose.material.icons.outlined.VisibilityOff
-import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -84,45 +76,35 @@ import com.tbterminal.app.ui.components.TopFloatingCapsule
 
 // ═════════════════════════════════════════════════════════════════════════════
 // INDUSTRIAL POS DESIGN TOKENS
-// Harmonized with Terminal Barokah Jaya Design System & Global POS Standards
-// (Moka POS, Toast POS, Square POS, Clover)
+// Aligned with Terminal Barokah Jaya Cashier Dashboard Specifications
 // ═════════════════════════════════════════════════════════════════════════════
-private val SurfaceBg = Color(0xFFF8FAFC)
-private val Slate900 = Color(0xFF0F172A)
+private val SurfaceBg = Color(0xFFF8FAF9)
+private val PrimaryDark = Color(0xFF004528)
+private val PrimaryBrand = Color(0xFF1B5E3C)
+private val CardBorder = Color(0xFFE7ECE9)
+private val StatusChipBg = Color(0xFFE8F6ED)
+private val StatusChipBorder = Color(0xFFD1ECD9)
+
+private val Slate900 = Color(0xFF111827)
 private val Slate800 = Color(0xFF1E293B)
 private val Slate700 = Color(0xFF334155)
 private val Slate600 = Color(0xFF475569)
 private val Slate500 = Color(0xFF64748B)
 private val Slate400 = Color(0xFF94A3B8)
-private val Slate300 = Color(0xFFCBD5E1)
 private val Slate200 = Color(0xFFE2E8F0)
 private val Slate100 = Color(0xFFF1F5F9)
 private val Slate50 = Color(0xFFF8FAFC)
 
-private val BrandForest = Color(0xFF10533C)
-private val BrandForestDark = Color(0xFF0B3828)
-private val BrandGreenLight = Color(0xFFF0FDF4)
-private val BrandGreenBorder = Color(0xFFBBF7D0)
+private val Emerald50 = Color(0xFFEDF7F1)
 private val Emerald500 = Color(0xFF10B981)
-private val Emerald700 = Color(0xFF047857)
-
-private val CardBorder = Color(0xFFE2E8F0)
+private val Emerald600 = Color(0xFF059669)
+private val Forest700 = Color(0xFF17583D)
 
 private val AmberBg = Color(0xFFFFFBEB)
 private val AmberBorder = Color(0xFFFDE68A)
 private val AmberText = Color(0xFFD97706)
 
-private val IndigoBg = Color(0xFFEEF2FF)
-private val IndigoBorder = Color(0xFFC7D2FE)
-private val IndigoText = Color(0xFF4338CA)
-
-private val TealBg = Color(0xFFF0FDFA)
-private val TealBorder = Color(0xFF99F6E4)
-private val TealText = Color(0xFF0D9488)
-
 private val DangerRed = Color(0xFFDC2626)
-private val DangerBg = Color(0xFFFEF2F2)
-private val DangerBorder = Color(0xFFFECACA)
 
 @Composable
 fun CashierDashboardScreen(
@@ -229,25 +211,24 @@ private fun CashierDashboardContent(
                 .padding(bottom = 36.dp),
             verticalArrangement = Arrangement.spacedBy(14.dp)
         ) {
-            // ── 1. OPERATIONAL CONTEXT HEADER ──
+            // ── 1. SAPAAN KASIR & STATUS SHIFT (OVERVIEW) ──
             CashierOperationalHeader(
                 displayName = displayName,
-                uiState = uiState,
-                onRefresh = onRefresh
+                uiState = uiState
             )
 
             if (uiState.isLoading && uiState.activeSession == null && uiState.recentTransactions.isEmpty()) {
                 SkeletonCard()
                 SkeletonCard()
             } else {
-                // ── 2. PRIMARY POS CTA HERO CARD (STANDAR INDUSTRI KASIR) ──
+                // ── 2. BANNER AKSI UTAMA POS REGISTER ──
                 CashierHeroCtaCard(
                     isShiftActive = uiState.activeSession != null,
                     onPosClick = onPosClick,
                     onOpenSessionClick = onCashSessionClick
                 )
 
-                // ── 3. SHIFT METRICS & CASH DRAWER CARD ──
+                // ── 3. CARD RINGKASAN SHIFT KASIR ──
                 CashierShiftMetricsCard(
                     uiState = uiState,
                     isPrivacyHidden = isPrivacyHidden,
@@ -255,13 +236,13 @@ private fun CashierDashboardContent(
                     onCashSessionClick = onCashSessionClick
                 )
 
-                // ── 4. SHIFT TENDER BREAKDOWN CARD (METODE PEMBAYARAN) ──
+                // ── 4. RINCIAN METODE PEMBAYARAN SHIFT ──
                 CashierTenderBreakdownCard(
                     uiState = uiState,
                     isPrivacyHidden = isPrivacyHidden
                 )
 
-                // ── 5. OPERATIONAL LAUNCHPAD (AKSI CEPAT 6 GRID) ──
+                // ── 5. SEKSI AKSI CEPAT OPERASIONAL (6 MENU) ──
                 CashierQuickActionsGrid(
                     onPosClick = onPosClick,
                     onCashSessionClick = onCashSessionClick,
@@ -271,17 +252,16 @@ private fun CashierDashboardContent(
                     onMaterialEstimatorClick = { showMaterialEstimator = true }
                 )
 
-                // ── 6. LIVE RECENT TRANSACTIONS FEED ──
+                // ── 6. TRANSAKSI SHIFT TERKINI FEED ──
                 CashierRecentTransactionsCard(
                     recentTransactions = uiState.recentTransactions,
-                    onViewAllClick = onTransactionHistoryClick,
-                    onStartFirstTransactionClick = onPosClick
+                    onViewAllClick = onTransactionHistoryClick
                 )
             }
         }
     }
 
-    // Material Estimator Dialog Modal for Building Materials
+    // Modal Kalkulator Estimasi Bahan Bangunan
     if (showMaterialEstimator) {
         MaterialEstimatorDialog(
             onDismiss = { showMaterialEstimator = false },
@@ -294,164 +274,226 @@ private fun CashierDashboardContent(
 }
 
 // ═════════════════════════════════════════════════════════════════════════════
-// 1. OPERATIONAL CONTEXT HEADER
+// 1. SAPAAN KASIR & STATUS SHIFT
 // ═════════════════════════════════════════════════════════════════════════════
 @Composable
 private fun CashierOperationalHeader(
     displayName: String,
-    uiState: CashierDashboardUiState,
-    onRefresh: () -> Unit
+    uiState: CashierDashboardUiState
 ) {
     val isShiftActive = uiState.activeSession != null
 
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(top = 2.dp),
-        horizontalArrangement = Arrangement.SpaceBetween,
-        verticalAlignment = Alignment.CenterVertically
+    Surface(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(16.dp),
+        color = Color.White,
+        border = BorderStroke(1.dp, CardBorder),
+        shadowElevation = 0.5.dp
     ) {
         Column(
-            modifier = Modifier.weight(1f),
-            verticalArrangement = Arrangement.spacedBy(2.dp)
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp)
         ) {
+            // Row 1: Halo, [Name] + Live Pulsing Shift Duration Badge
             Row(
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(6.dp)
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
             ) {
                 Text(
                     text = "Halo, $displayName",
-                    fontSize = 20.sp,
+                    fontSize = 16.sp,
                     fontWeight = FontWeight.Bold,
                     color = Slate900,
-                    letterSpacing = (-0.4).sp
+                    letterSpacing = (-0.3).sp
                 )
 
-                Surface(
-                    shape = RoundedCornerShape(6.dp),
-                    color = Slate100,
-                    border = BorderStroke(1.dp, Slate200)
-                ) {
-                    Text(
-                        text = "POS-01",
-                        fontSize = 10.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = Slate600,
-                        modifier = Modifier.padding(horizontal = 5.dp, vertical = 1.dp)
+                if (isShiftActive) {
+                    val infiniteTransition = rememberInfiniteTransition(label = "pulseShift")
+                    val pulseAlpha by infiniteTransition.animateFloat(
+                        initialValue = 0.35f,
+                        targetValue = 1f,
+                        animationSpec = infiniteRepeatable(
+                            animation = tween(900),
+                            repeatMode = RepeatMode.Reverse
+                        ),
+                        label = "pulseAlpha"
                     )
+
+                    Surface(
+                        shape = RoundedCornerShape(999.dp),
+                        color = Emerald50,
+                        border = BorderStroke(1.dp, StatusChipBorder)
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(6.dp)
+                        ) {
+                            Box(
+                                modifier = Modifier
+                                    .size(6.dp)
+                                    .background(Emerald500.copy(alpha = pulseAlpha), CircleShape)
+                            )
+                            Text(
+                                text = uiState.shiftDurationFormatted ?: "Shift Aktif",
+                                fontSize = 12.sp,
+                                fontWeight = FontWeight.SemiBold,
+                                color = Forest700
+                            )
+                        }
+                    }
+                } else {
+                    Surface(
+                        shape = RoundedCornerShape(999.dp),
+                        color = AmberBg,
+                        border = BorderStroke(1.dp, AmberBorder)
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(6.dp)
+                        ) {
+                            Box(
+                                modifier = Modifier
+                                    .size(6.dp)
+                                    .background(AmberText, CircleShape)
+                            )
+                            Text(
+                                text = "Shift Ditutup",
+                                fontSize = 12.sp,
+                                fontWeight = FontWeight.SemiBold,
+                                color = AmberText
+                            )
+                        }
+                    }
                 }
             }
 
+            HorizontalDivider(color = Slate100, thickness = 1.dp)
+
+            // Row 2: Status siap melayani + Waktu Buka
             Row(
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(4.dp)
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
             ) {
-                Icon(
-                    imageVector = Icons.Outlined.Storefront,
-                    contentDescription = null,
-                    tint = Slate400,
-                    modifier = Modifier.size(13.dp)
-                )
-                Text(
-                    text = "Terminal Barokah Jaya",
-                    fontSize = 11.sp,
-                    fontWeight = FontWeight.Medium,
-                    color = Slate500
-                )
-                if (isShiftActive && uiState.shiftOpenedTimeFormatted != null) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .size(6.dp)
+                            .background(if (isShiftActive) Emerald500 else Slate400, CircleShape)
+                    )
                     Text(
-                        text = "• Buka ${uiState.shiftOpenedTimeFormatted}",
-                        fontSize = 11.sp,
+                        text = if (isShiftActive) "Kasir siap melayani transaksi" else "Shift kasir belum dibuka",
+                        fontSize = 12.sp,
                         fontWeight = FontWeight.Medium,
-                        color = Slate500
+                        color = Slate600
                     )
                 }
+
+                Text(
+                    text = if (isShiftActive && uiState.shiftOpenedTimeFormatted != null) {
+                        "Buka ${uiState.shiftOpenedTimeFormatted} WIB"
+                    } else if (isShiftActive) {
+                        "Shift Berjalan"
+                    } else {
+                        "Belum Aktif"
+                    },
+                    fontSize = 11.sp,
+                    fontFamily = FontFamily.Monospace,
+                    fontWeight = FontWeight.Normal,
+                    color = Slate400
+                )
             }
         }
+    }
+}
 
-        // Live Shift Status Pill + Refresh Button
+// ═════════════════════════════════════════════════════════════════════════════
+// 2. BANNER AKSI UTAMA POS REGISTER
+// ═════════════════════════════════════════════════════════════════════════════
+@Composable
+private fun CashierHeroCtaCard(
+    isShiftActive: Boolean,
+    onPosClick: () -> Unit,
+    onOpenSessionClick: () -> Unit
+) {
+    Surface(
+        onClick = if (isShiftActive) onPosClick else onOpenSessionClick,
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(16.dp),
+        color = Color.White,
+        border = BorderStroke(1.dp, Slate200),
+        shadowElevation = 0.5.dp
+    ) {
         Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(16.dp),
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(6.dp)
+            horizontalArrangement = Arrangement.SpaceBetween
         ) {
-            if (isShiftActive) {
-                val infiniteTransition = rememberInfiniteTransition(label = "pulse")
-                val alpha by infiniteTransition.animateFloat(
-                    initialValue = 0.35f,
-                    targetValue = 1f,
-                    animationSpec = infiniteRepeatable(
-                        animation = tween(900),
-                        repeatMode = RepeatMode.Reverse
-                    ),
-                    label = "alpha"
-                )
-
-                Surface(
-                    shape = RoundedCornerShape(999.dp),
-                    color = BrandGreenLight,
-                    border = BorderStroke(1.dp, BrandGreenBorder)
+            Row(
+                modifier = Modifier.weight(1f),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(14.dp)
+            ) {
+                Box(
+                    modifier = Modifier
+                        .size(44.dp)
+                        .clip(RoundedCornerShape(12.dp))
+                        .background(if (isShiftActive) Slate100 else AmberBg)
+                        .border(1.dp, if (isShiftActive) Slate200 else AmberBorder, RoundedCornerShape(12.dp)),
+                    contentAlignment = Alignment.Center
                 ) {
-                    Row(
-                        modifier = Modifier.padding(horizontal = 9.dp, vertical = 4.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(5.dp)
-                    ) {
-                        Box(
-                            modifier = Modifier
-                                .size(6.dp)
-                                .clip(CircleShape)
-                                .background(Emerald500.copy(alpha = alpha))
-                        )
-                        Text(
-                            text = if (uiState.shiftDurationFormatted != null) {
-                                "Shift ${uiState.shiftDurationFormatted}"
-                            } else {
-                                "Shift Aktif"
-                            },
-                            fontSize = 11.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = BrandForest
-                        )
-                    }
+                    Icon(
+                        imageVector = if (isShiftActive) Icons.Outlined.PointOfSale else Icons.Outlined.LockOpen,
+                        contentDescription = null,
+                        tint = if (isShiftActive) PrimaryDark else AmberText,
+                        modifier = Modifier.size(24.dp)
+                    )
                 }
-            } else {
-                Surface(
-                    shape = RoundedCornerShape(999.dp),
-                    color = AmberBg,
-                    border = BorderStroke(1.dp, AmberBorder)
-                ) {
-                    Row(
-                        modifier = Modifier.padding(horizontal = 9.dp, vertical = 4.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(5.dp)
-                    ) {
-                        Box(
-                            modifier = Modifier
-                                .size(6.dp)
-                                .clip(CircleShape)
-                                .background(AmberText)
-                        )
-                        Text(
-                            text = "Shift Ditutup",
-                            fontSize = 11.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = AmberText
-                        )
-                    }
+
+                Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                    Text(
+                        text = if (isShiftActive) "BUKA TRANSAKSI KASIR (POS)" else "BUKA SHIFT KASIR DAHULU",
+                        fontSize = 13.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = Slate900,
+                        letterSpacing = 0.3.sp
+                    )
+                    Text(
+                        text = if (isShiftActive) {
+                            "Input item, scan barcode & terima pembayaran"
+                        } else {
+                            "Masukkan modal awal untuk mulai melayani transaksi"
+                        },
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.Normal,
+                        color = Slate500,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
                 }
             }
 
-            IconButton(
-                onClick = onRefresh,
+            Box(
                 modifier = Modifier
                     .size(32.dp)
                     .clip(CircleShape)
-                    .background(Color.White)
-                    .border(1.dp, Slate200, CircleShape)
+                    .background(Slate100)
+                    .border(1.dp, Slate200, CircleShape),
+                contentAlignment = Alignment.Center
             ) {
                 Icon(
-                    imageVector = Icons.Outlined.Refresh,
-                    contentDescription = "Muat Ulang",
+                    imageVector = Icons.AutoMirrored.Outlined.KeyboardArrowRight,
+                    contentDescription = "Buka POS",
                     tint = Slate600,
                     modifier = Modifier.size(16.dp)
                 )
@@ -461,165 +503,7 @@ private fun CashierOperationalHeader(
 }
 
 // ═════════════════════════════════════════════════════════════════════════════
-// 2. PRIMARY POS CTA HERO CARD
-// Primary industry focus: Quick one-tap entry to point of sale screen
-// ═════════════════════════════════════════════════════════════════════════════
-@Composable
-private fun CashierHeroCtaCard(
-    isShiftActive: Boolean,
-    onPosClick: () -> Unit,
-    onOpenSessionClick: () -> Unit
-) {
-    if (isShiftActive) {
-        Surface(
-            modifier = Modifier
-                .fillMaxWidth()
-                .clickable(onClick = onPosClick),
-            shape = RoundedCornerShape(16.dp),
-            color = BrandForest,
-            border = BorderStroke(1.dp, BrandForestDark),
-            shadowElevation = 2.dp
-        ) {
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 18.dp, vertical = 14.dp),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.SpaceBetween
-            ) {
-                Row(
-                    modifier = Modifier.weight(1f),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(14.dp)
-                ) {
-                    Box(
-                        modifier = Modifier
-                            .size(46.dp)
-                            .clip(RoundedCornerShape(12.dp))
-                            .background(Color.White.copy(alpha = 0.15f))
-                            .border(1.dp, Color.White.copy(alpha = 0.25f), RoundedCornerShape(12.dp)),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Icon(
-                            imageVector = Icons.Outlined.PointOfSale,
-                            contentDescription = null,
-                            tint = Color.White,
-                            modifier = Modifier.size(24.dp)
-                        )
-                    }
-
-                    Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                        Text(
-                            text = "BUKA MESIN KASIR (POS)",
-                            fontSize = 14.sp,
-                            fontWeight = FontWeight.ExtraBold,
-                            color = Color.White,
-                            letterSpacing = 0.3.sp
-                        )
-                        Text(
-                            text = "Input item, scan barcode & terima pembayaran",
-                            fontSize = 11.sp,
-                            fontWeight = FontWeight.Medium,
-                            color = Color.White.copy(alpha = 0.85f),
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis
-                        )
-                    }
-                }
-
-                Box(
-                    modifier = Modifier
-                        .size(32.dp)
-                        .clip(CircleShape)
-                        .background(Color.White.copy(alpha = 0.2f)),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Icon(
-                        imageVector = Icons.AutoMirrored.Outlined.KeyboardArrowRight,
-                        contentDescription = "Buka POS",
-                        tint = Color.White,
-                        modifier = Modifier.size(18.dp)
-                    )
-                }
-            }
-        }
-    } else {
-        Surface(
-            modifier = Modifier
-                .fillMaxWidth()
-                .clickable(onClick = onOpenSessionClick),
-            shape = RoundedCornerShape(16.dp),
-            color = AmberBg,
-            border = BorderStroke(1.dp, AmberBorder),
-            shadowElevation = 1.dp
-        ) {
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 16.dp, vertical = 14.dp),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.SpaceBetween
-            ) {
-                Row(
-                    modifier = Modifier.weight(1f),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(12.dp)
-                ) {
-                    Box(
-                        modifier = Modifier
-                            .size(44.dp)
-                            .clip(RoundedCornerShape(12.dp))
-                            .background(Color.White)
-                            .border(1.dp, AmberBorder, RoundedCornerShape(12.dp)),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Icon(
-                            imageVector = Icons.Outlined.LockOpen,
-                            contentDescription = null,
-                            tint = AmberText,
-                            modifier = Modifier.size(22.dp)
-                        )
-                    }
-
-                    Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                        Text(
-                            text = "Shift Belum Dibuka",
-                            fontSize = 13.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = Slate900
-                        )
-                        Text(
-                            text = "Buka sesi & masukkan modal awal untuk mulai melayani",
-                            fontSize = 11.sp,
-                            color = Slate600,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis
-                        )
-                    }
-                }
-
-                Button(
-                    onClick = onOpenSessionClick,
-                    shape = RoundedCornerShape(10.dp),
-                    colors = ButtonDefaults.buttonColors(
-                        containerColor = BrandForest,
-                        contentColor = Color.White
-                    ),
-                    modifier = Modifier.height(36.dp)
-                ) {
-                    Text(
-                        text = "Buka Shift",
-                        fontSize = 11.sp,
-                        fontWeight = FontWeight.Bold
-                    )
-                }
-            }
-        }
-    }
-}
-
-// ═════════════════════════════════════════════════════════════════════════════
-// 3. SHIFT METRICS & CASH DRAWER CARD
+// 3. CARD RINGKASAN SHIFT KASIR
 // ═════════════════════════════════════════════════════════════════════════════
 @Composable
 private fun CashierShiftMetricsCard(
@@ -643,7 +527,7 @@ private fun CashierShiftMetricsCard(
                 .padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(14.dp)
         ) {
-            // Header Row: Label Ringkasan + Privacy Eye Button + Status Pill
+            // Header: RINGKASAN SHIFT KASIR + Toggle Eye + Badge Shift Aktif
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
@@ -657,38 +541,45 @@ private fun CashierShiftMetricsCard(
                         text = "RINGKASAN SHIFT KASIR",
                         fontSize = 11.sp,
                         fontWeight = FontWeight.Bold,
-                        color = Slate400,
+                        color = Slate500,
                         letterSpacing = 0.8.sp
                     )
 
                     IconButton(
                         onClick = onTogglePrivacy,
-                        modifier = Modifier.size(26.dp)
+                        modifier = Modifier.size(24.dp)
                     ) {
                         Icon(
                             imageVector = if (isPrivacyHidden) Icons.Outlined.VisibilityOff else Icons.Outlined.Visibility,
                             contentDescription = if (isPrivacyHidden) "Tampilkan Nominal" else "Sembunyikan Nominal",
                             tint = Slate400,
-                            modifier = Modifier.size(15.dp)
+                            modifier = Modifier.size(14.dp)
                         )
                     }
                 }
 
-                Text(
-                    text = if (isShiftActive) "Sesi Berjalan" else "Sesi Ditutup",
-                    fontSize = 11.sp,
-                    fontWeight = FontWeight.SemiBold,
-                    color = if (isShiftActive) Emerald700 else Slate400
-                )
+                Surface(
+                    shape = RoundedCornerShape(999.dp),
+                    color = if (isShiftActive) StatusChipBg else AmberBg,
+                    border = BorderStroke(1.dp, if (isShiftActive) StatusChipBorder else AmberBorder)
+                ) {
+                    Text(
+                        text = if (isShiftActive) "Shift Aktif" else "Shift Ditutup",
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.SemiBold,
+                        color = if (isShiftActive) Forest700 else AmberText,
+                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 2.dp)
+                    )
+                }
             }
 
-            // Main Metric: Penjualan Shift Saya
+            // Main Shift Revenue Highlight
             Column(
                 modifier = Modifier.fillMaxWidth(),
-                verticalArrangement = Arrangement.spacedBy(3.dp)
+                verticalArrangement = Arrangement.spacedBy(4.dp)
             ) {
                 Text(
-                    text = "Total Penjualan Shift Saya",
+                    text = "Penjualan Shift Saya",
                     fontSize = 12.sp,
                     fontWeight = FontWeight.Medium,
                     color = Slate500
@@ -696,7 +587,7 @@ private fun CashierShiftMetricsCard(
 
                 Text(
                     text = if (isPrivacyHidden) "••••••••" else uiState.todaySalesRevenue.toRupiahText(),
-                    fontSize = 28.sp,
+                    fontSize = 30.sp,
                     fontWeight = FontWeight.ExtraBold,
                     color = Slate900,
                     letterSpacing = (-0.5).sp,
@@ -712,146 +603,199 @@ private fun CashierShiftMetricsCard(
                     Icon(
                         imageVector = Icons.Outlined.CheckCircle,
                         contentDescription = null,
-                        tint = Emerald700,
-                        modifier = Modifier.size(14.dp)
+                        tint = Emerald600,
+                        modifier = Modifier.size(15.dp)
                     )
                     Text(
                         text = if (isShiftActive) {
-                            "${uiState.todayTransactionsCount} transaksi · Rata-rata ${if (isPrivacyHidden) "••••" else uiState.averageTicket.toRupiahText()}"
+                            "${uiState.todayTransactionsCount} transaksi berhasil pada shift ini"
                         } else {
                             "Belum ada transaksi shift yang tercatat"
                         },
                         fontSize = 12.sp,
                         fontWeight = FontWeight.Medium,
-                        color = Emerald700
+                        color = Slate600
                     )
                 }
             }
 
             HorizontalDivider(color = Slate100, thickness = 1.dp)
 
-            // Sub Metrics 3-Grid: Estimasi Kas di Laci, Modal Awal Shift, & Kas Kecil Net
+            // Metrics Breakdown:
+            // Row 1: Estimasi Fisik Laci
             Row(
                 modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
             ) {
-                // Item 1: Kas di Laci (Physical Drawer Cash)
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .size(36.dp)
+                            .clip(RoundedCornerShape(8.dp))
+                            .background(Emerald50),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(
+                            imageVector = Icons.Outlined.Payments,
+                            contentDescription = null,
+                            tint = PrimaryDark,
+                            modifier = Modifier.size(18.dp)
+                        )
+                    }
+
+                    Column(verticalArrangement = Arrangement.spacedBy(1.dp)) {
+                        Text(
+                            text = "Estimasi Fisik Laci",
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = Slate800
+                        )
+                        Text(
+                            text = "Modal Awal + Tunai Shift",
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.Medium,
+                            color = Slate500
+                        )
+                    }
+                }
+
+                Text(
+                    text = if (isPrivacyHidden) "••••••••" else uiState.systemCash.toRupiahText(),
+                    fontSize = 16.sp,
+                    fontWeight = FontWeight.ExtraBold,
+                    color = Slate900,
+                    letterSpacing = (-0.3).sp
+                )
+            }
+
+            HorizontalDivider(color = Slate100, thickness = 1.dp)
+
+            // Row 2: Modal Awal & Kas Kecil Net (2 Kolom divided by vertical line)
+            val netPettyCash = uiState.totalCashIn - uiState.totalExpenses
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                // Column 1: Modal Awal
                 Column(
                     modifier = Modifier
                         .weight(1f)
-                        .clip(RoundedCornerShape(10.dp))
-                        .background(Slate50)
-                        .padding(horizontal = 8.dp, vertical = 8.dp),
+                        .padding(end = 12.dp),
                     verticalArrangement = Arrangement.spacedBy(2.dp)
                 ) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            text = "Modal Awal",
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.Medium,
+                            color = Slate500
+                        )
+                        Text(
+                            text = "Awal",
+                            fontSize = 10.sp,
+                            fontWeight = FontWeight.Medium,
+                            color = Slate400
+                        )
+                    }
                     Text(
-                        text = "Kas Fisik Laci",
-                        fontSize = 10.sp,
-                        fontWeight = FontWeight.Medium,
-                        color = Slate500
-                    )
-                    Text(
-                        text = if (isPrivacyHidden) "••••••" else uiState.systemCash.toRupiahText(),
-                        fontSize = 13.sp,
+                        text = if (isPrivacyHidden) "••••••" else uiState.openingCash.toRupiahText(),
+                        fontSize = 14.sp,
                         fontWeight = FontWeight.Bold,
                         color = Slate900,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis
                     )
                     Text(
-                        text = "Modal + Tunai",
-                        fontSize = 9.sp,
+                        text = "Kas laci masuk",
+                        fontSize = 10.sp,
                         color = Slate400
                     )
                 }
 
-                // Item 2: Modal Awal (Starting Float)
-                Column(
+                // Vertical Divider
+                Box(
                     modifier = Modifier
-                        .weight(1f)
-                        .clip(RoundedCornerShape(10.dp))
-                        .background(Slate50)
-                        .padding(horizontal = 8.dp, vertical = 8.dp),
-                    verticalArrangement = Arrangement.spacedBy(2.dp)
-                ) {
-                    Text(
-                        text = "Modal Awal",
-                        fontSize = 10.sp,
-                        fontWeight = FontWeight.Medium,
-                        color = Slate500
-                    )
-                    Text(
-                        text = if (isPrivacyHidden) "••••••" else uiState.openingCash.toRupiahText(),
-                        fontSize = 13.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = Slate800,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis
-                    )
-                    Text(
-                        text = "Uang awal laci",
-                        fontSize = 9.sp,
-                        color = Slate400
-                    )
-                }
+                        .width(1.dp)
+                        .height(44.dp)
+                        .background(Slate100)
+                )
 
-                // Item 3: Kas Kecil Net (Petty Cash Flow)
-                val netPettyCash = uiState.totalCashIn - uiState.totalExpenses
+                // Column 2: Kas Kecil Net
                 Column(
                     modifier = Modifier
                         .weight(1f)
-                        .clip(RoundedCornerShape(10.dp))
-                        .background(Slate50)
-                        .padding(horizontal = 8.dp, vertical = 8.dp),
+                        .padding(start = 12.dp),
                     verticalArrangement = Arrangement.spacedBy(2.dp)
                 ) {
-                    Text(
-                        text = "Kas Kecil Net",
-                        fontSize = 10.sp,
-                        fontWeight = FontWeight.Medium,
-                        color = Slate500
-                    )
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            text = "Kas Kecil Net",
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.Medium,
+                            color = Slate500
+                        )
+                        Text(
+                            text = "Mutasi",
+                            fontSize = 10.sp,
+                            fontWeight = FontWeight.Medium,
+                            color = Slate400
+                        )
+                    }
                     Text(
                         text = if (isPrivacyHidden) "••••••" else netPettyCash.toRupiahText(),
-                        fontSize = 13.sp,
+                        fontSize = 14.sp,
                         fontWeight = FontWeight.Bold,
-                        color = if (netPettyCash >= java.math.BigDecimal.ZERO) Slate800 else DangerRed,
+                        color = if (netPettyCash >= java.math.BigDecimal.ZERO) Slate900 else DangerRed,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis
                     )
                     Text(
-                        text = "Masuk - Keluar",
-                        fontSize = 9.sp,
+                        text = "Masuk - keluar",
+                        fontSize = 10.sp,
                         color = Slate400
                     )
                 }
             }
 
             // Action Button: Kelola Kas & Tutup Shift
-            if (isShiftActive) {
-                OutlinedButton(
-                    onClick = onCashSessionClick,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(42.dp),
-                    shape = RoundedCornerShape(12.dp),
-                    border = BorderStroke(1.dp, CardBorder),
-                    colors = ButtonDefaults.outlinedButtonColors(
-                        containerColor = Slate50,
-                        contentColor = Slate800
-                    )
+            Surface(
+                onClick = onCashSessionClick,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(42.dp),
+                shape = RoundedCornerShape(12.dp),
+                color = Color.White,
+                border = BorderStroke(1.dp, CardBorder)
+            ) {
+                Row(
+                    modifier = Modifier.fillMaxSize(),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.Center
                 ) {
                     Icon(
                         imageVector = Icons.Outlined.Payments,
                         contentDescription = null,
                         modifier = Modifier.size(16.dp),
-                        tint = BrandForest
+                        tint = PrimaryBrand
                     )
                     Spacer(modifier = Modifier.width(8.dp))
                     Text(
                         text = "Kelola Kas & Tutup Shift (Z-Report)",
                         fontSize = 12.sp,
-                        fontWeight = FontWeight.Bold
+                        fontWeight = FontWeight.Bold,
+                        color = Slate800
                     )
                 }
             }
@@ -860,168 +804,215 @@ private fun CashierShiftMetricsCard(
 }
 
 // ═════════════════════════════════════════════════════════════════════════════
-// 4. SHIFT TENDER BREAKDOWN CARD (METODE PEMBAYARAN)
-// Industry standard: Cashiers must know tender split (Cash vs Digital vs Credit)
+// 4. RINCIAN METODE PEMBAYARAN SHIFT
 // ═════════════════════════════════════════════════════════════════════════════
 @Composable
 private fun CashierTenderBreakdownCard(
     uiState: CashierDashboardUiState,
     isPrivacyHidden: Boolean
 ) {
-    Surface(
+    Column(
         modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(16.dp),
-        color = Color.White,
-        border = BorderStroke(1.dp, CardBorder),
-        shadowElevation = 0.5.dp
+        verticalArrangement = Arrangement.spacedBy(10.dp)
     ) {
-        Column(
+        // Section Header
+        Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp)
+                .padding(horizontal = 2.dp),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
         ) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
+            Text(
+                text = "RINCIAN METODE PEMBAYARAN",
+                fontSize = 11.sp,
+                fontWeight = FontWeight.Bold,
+                color = Slate500,
+                letterSpacing = 0.8.sp
+            )
+
+            Surface(
+                shape = RoundedCornerShape(999.dp),
+                color = Slate100,
+                border = BorderStroke(1.dp, Slate200)
             ) {
                 Text(
-                    text = "RINCIAN METODE PEMBAYARAN SHIFT",
-                    fontSize = 11.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = Slate400,
-                    letterSpacing = 0.8.sp
-                )
-
-                Text(
-                    text = "Tersinkron POS",
+                    text = "Shift Ini",
                     fontSize = 10.sp,
-                    fontWeight = FontWeight.Medium,
-                    color = Slate400
-                )
-            }
-
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                // 1. Tunai di Laci (Cash)
-                TenderItem(
-                    label = "Tunai (Laci)",
-                    amount = if (isPrivacyHidden) "••••••" else uiState.cashRevenue.toRupiahText(),
-                    badge = "Fisik Laci",
-                    icon = Icons.Outlined.AccountBalanceWallet,
-                    iconTint = BrandForest,
-                    badgeBg = BrandGreenLight,
-                    badgeBorder = BrandGreenBorder,
-                    badgeText = BrandForest,
-                    modifier = Modifier.weight(1f)
-                )
-
-                // 2. QRIS & Transfer Bank
-                TenderItem(
-                    label = "QRIS / Transfer",
-                    amount = if (isPrivacyHidden) "••••••" else uiState.qrisRevenue.toRupiahText(),
-                    badge = "Bank / EDC",
-                    icon = Icons.Outlined.QrCode2,
-                    iconTint = IndigoText,
-                    badgeBg = IndigoBg,
-                    badgeBorder = IndigoBorder,
-                    badgeText = IndigoText,
-                    modifier = Modifier.weight(1f)
-                )
-
-                // 3. Nota Tempo / Piutang Pelanggan
-                TenderItem(
-                    label = "Nota Tempo",
-                    amount = if (isPrivacyHidden) "••••••" else uiState.receivableRevenue.toRupiahText(),
-                    badge = "Tempo Proyek",
-                    icon = Icons.AutoMirrored.Outlined.ReceiptLong,
-                    iconTint = AmberText,
-                    badgeBg = AmberBg,
-                    badgeBorder = AmberBorder,
-                    badgeText = AmberText,
-                    modifier = Modifier.weight(1f)
+                    fontWeight = FontWeight.SemiBold,
+                    color = Slate500,
+                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp)
                 )
             }
         }
-    }
-}
 
-@Composable
-private fun TenderItem(
-    label: String,
-    amount: String,
-    badge: String,
-    icon: ImageVector,
-    iconTint: Color,
-    badgeBg: Color,
-    badgeBorder: Color,
-    badgeText: Color,
-    modifier: Modifier = Modifier
-) {
-    Surface(
-        modifier = modifier,
-        shape = RoundedCornerShape(12.dp),
-        color = Slate50,
-        border = BorderStroke(1.dp, Slate200)
-    ) {
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 10.dp, vertical = 10.dp),
-            verticalArrangement = Arrangement.spacedBy(6.dp)
+        // Unified 3-Column Card
+        Surface(
+            modifier = Modifier.fillMaxWidth(),
+            shape = RoundedCornerShape(16.dp),
+            color = Color.White,
+            border = BorderStroke(1.dp, CardBorder),
+            shadowElevation = 0.5.dp
         ) {
             Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(14.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Icon(
-                    imageVector = icon,
-                    contentDescription = label,
-                    tint = iconTint,
-                    modifier = Modifier.size(16.dp)
-                )
-
-                Surface(
-                    shape = RoundedCornerShape(4.dp),
-                    color = badgeBg,
-                    border = BorderStroke(1.dp, badgeBorder)
+                // Column 1: Tunai Laci
+                Column(
+                    modifier = Modifier
+                        .weight(1f)
+                        .padding(end = 8.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .size(24.dp)
+                                .clip(RoundedCornerShape(6.dp))
+                                .background(Emerald50),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Icon(
+                                imageVector = Icons.Outlined.Payments,
+                                contentDescription = null,
+                                tint = PrimaryDark,
+                                modifier = Modifier.size(14.dp)
+                            )
+                        }
+                        Text(
+                            text = "Tunai Laci",
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.SemiBold,
+                            color = Slate700
+                        )
+                    }
+
                     Text(
-                        text = badge,
-                        fontSize = 9.sp,
+                        text = if (isPrivacyHidden) "••••••" else uiState.cashRevenue.toRupiahText(),
+                        fontSize = 12.sp,
                         fontWeight = FontWeight.Bold,
-                        color = badgeText,
-                        modifier = Modifier.padding(horizontal = 4.dp, vertical = 1.dp)
+                        color = PrimaryDark,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
                     )
                 }
-            }
 
-            Column(verticalArrangement = Arrangement.spacedBy(1.dp)) {
-                Text(
-                    text = label,
-                    fontSize = 10.sp,
-                    fontWeight = FontWeight.Medium,
-                    color = Slate500
+                // Divider 1
+                Box(
+                    modifier = Modifier
+                        .width(1.dp)
+                        .height(38.dp)
+                        .background(Slate100)
                 )
-                Text(
-                    text = amount,
-                    fontSize = 12.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = Slate900,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
+
+                // Column 2: QRIS / EDC
+                val hasQris = uiState.qrisRevenue > java.math.BigDecimal.ZERO
+                Column(
+                    modifier = Modifier
+                        .weight(1f)
+                        .padding(horizontal = 8.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .size(24.dp)
+                                .clip(RoundedCornerShape(6.dp))
+                                .background(Slate50),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Icon(
+                                imageVector = Icons.Outlined.QrCode2,
+                                contentDescription = null,
+                                tint = Slate600,
+                                modifier = Modifier.size(14.dp)
+                            )
+                        }
+                        Text(
+                            text = "QRIS / EDC",
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.SemiBold,
+                            color = Slate600
+                        )
+                    }
+
+                    Text(
+                        text = if (isPrivacyHidden) "••••••" else uiState.qrisRevenue.toRupiahText(),
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = if (hasQris) Slate800 else Slate400,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                }
+
+                // Divider 2
+                Box(
+                    modifier = Modifier
+                        .width(1.dp)
+                        .height(38.dp)
+                        .background(Slate100)
                 )
+
+                // Column 3: Kredit / Bon
+                val hasReceivable = uiState.receivableRevenue > java.math.BigDecimal.ZERO
+                Column(
+                    modifier = Modifier
+                        .weight(1f)
+                        .padding(start = 8.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .size(24.dp)
+                                .clip(RoundedCornerShape(6.dp))
+                                .background(Slate50),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Icon(
+                                imageVector = Icons.AutoMirrored.Outlined.ReceiptLong,
+                                contentDescription = null,
+                                tint = Slate600,
+                                modifier = Modifier.size(14.dp)
+                            )
+                        }
+                        Text(
+                            text = "Kredit / Bon",
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.SemiBold,
+                            color = Slate600
+                        )
+                    }
+
+                    Text(
+                        text = if (isPrivacyHidden) "••••••" else uiState.receivableRevenue.toRupiahText(),
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = if (hasReceivable) Slate800 else Slate400,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                }
             }
         }
     }
 }
 
 // ═════════════════════════════════════════════════════════════════════════════
-// 5. OPERATIONAL LAUNCHPAD (AKSI CEPAT 6 GRID)
+// 5. SEKSI AKSI CEPAT OPERASIONAL (6 MENU)
 // ═════════════════════════════════════════════════════════════════════════════
 @Composable
 private fun CashierQuickActionsGrid(
@@ -1036,82 +1027,107 @@ private fun CashierQuickActionsGrid(
         modifier = Modifier.fillMaxWidth(),
         verticalArrangement = Arrangement.spacedBy(10.dp)
     ) {
-        Text(
-            text = "AKSI CEPAT OPERASIONAL",
-            fontSize = 11.sp,
-            fontWeight = FontWeight.Bold,
-            color = Slate400,
-            letterSpacing = 0.8.sp,
-            modifier = Modifier.padding(horizontal = 2.dp)
-        )
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 2.dp),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text(
+                text = "AKSI CEPAT",
+                fontSize = 11.sp,
+                fontWeight = FontWeight.Bold,
+                color = Slate500,
+                letterSpacing = 0.8.sp
+            )
+            Text(
+                text = "6 Menu",
+                fontSize = 10.sp,
+                fontWeight = FontWeight.SemiBold,
+                color = Slate400
+            )
+        }
 
-        // Row 1: Mulai POS, Kas Kecil, Keranjang Ditahan (Hold/Parkir)
+        // Row 1: Mulai POS (Primary emerald highlight), Kas Kecil, Parkir Nota
         Row(
             modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(8.dp)
+            horizontalArrangement = Arrangement.spacedBy(10.dp)
         ) {
-            CashierLaunchpadItem(
+            CashierActionItem(
                 title = "Mulai POS",
                 subtitle = "Jual Barang",
                 icon = Icons.Outlined.PointOfSale,
-                iconTint = BrandForest,
-                bgIcon = BrandGreenLight,
+                iconTint = PrimaryDark,
+                iconBg = Emerald50,
+                borderColor = StatusChipBorder,
+                titleColor = Slate900,
                 onClick = onPosClick,
                 modifier = Modifier.weight(1f)
             )
 
-            CashierLaunchpadItem(
+            CashierActionItem(
                 title = "Kas Kecil",
                 subtitle = "Masuk/Keluar",
                 icon = Icons.Outlined.Payments,
-                iconTint = Emerald700,
-                bgIcon = BrandGreenLight,
+                iconTint = Slate700,
+                iconBg = Slate50,
+                borderColor = CardBorder,
+                titleColor = Slate800,
                 onClick = onCashSessionClick,
                 modifier = Modifier.weight(1f)
             )
 
-            CashierLaunchpadItem(
-                title = "Hold Cart",
-                subtitle = "Parkir Nota",
+            CashierActionItem(
+                title = "Parkir Nota",
+                subtitle = "Hold Cart",
                 icon = Icons.Outlined.PauseCircleOutline,
-                iconTint = IndigoText,
-                bgIcon = IndigoBg,
+                iconTint = Slate700,
+                iconBg = Slate50,
+                borderColor = CardBorder,
+                titleColor = Slate800,
                 onClick = onHeldCartsClick,
                 modifier = Modifier.weight(1f)
             )
         }
 
-        // Row 2: Riwayat Shift, Cek Stok, Kalkulator Material Bangunan
+        // Row 2: Riwayat, Cek Stok, Kalkulator Bangunan
         Row(
             modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(8.dp)
+            horizontalArrangement = Arrangement.spacedBy(10.dp)
         ) {
-            CashierLaunchpadItem(
+            CashierActionItem(
                 title = "Riwayat",
                 subtitle = "Struk Shift",
                 icon = Icons.Outlined.History,
                 iconTint = Slate700,
-                bgIcon = Slate100,
+                iconBg = Slate50,
+                borderColor = CardBorder,
+                titleColor = Slate800,
                 onClick = onTransactionHistoryClick,
                 modifier = Modifier.weight(1f)
             )
 
-            CashierLaunchpadItem(
+            CashierActionItem(
                 title = "Cek Stok",
                 subtitle = "Harga & Sisa",
                 icon = Icons.Outlined.Inventory2,
-                iconTint = AmberText,
-                bgIcon = AmberBg,
+                iconTint = Slate700,
+                iconBg = Slate50,
+                borderColor = CardBorder,
+                titleColor = Slate800,
                 onClick = onStockCheckClick,
                 modifier = Modifier.weight(1f)
             )
 
-            CashierLaunchpadItem(
+            CashierActionItem(
                 title = "Kalkulator",
-                subtitle = "Bahan Material",
+                subtitle = "Bangunan",
                 icon = Icons.Outlined.Calculate,
-                iconTint = TealText,
-                bgIcon = TealBg,
+                iconTint = Slate700,
+                iconBg = Slate50,
+                borderColor = CardBorder,
+                titleColor = Slate800,
                 onClick = onMaterialEstimatorClick,
                 modifier = Modifier.weight(1f)
             )
@@ -1120,73 +1136,73 @@ private fun CashierQuickActionsGrid(
 }
 
 @Composable
-private fun CashierLaunchpadItem(
+private fun CashierActionItem(
     title: String,
     subtitle: String,
     icon: ImageVector,
     iconTint: Color,
-    bgIcon: Color,
+    iconBg: Color,
+    borderColor: Color,
+    titleColor: Color,
     onClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     Surface(
         onClick = onClick,
-        modifier = modifier,
-        shape = RoundedCornerShape(12.dp),
+        modifier = modifier.height(94.dp),
+        shape = RoundedCornerShape(16.dp),
         color = Color.White,
-        border = BorderStroke(1.dp, CardBorder),
+        border = BorderStroke(1.dp, borderColor),
         shadowElevation = 0.5.dp
     ) {
         Column(
             modifier = Modifier
-                .fillMaxWidth()
-                .padding(vertical = 10.dp, horizontal = 6.dp),
+                .fillMaxSize()
+                .padding(vertical = 10.dp, horizontal = 4.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.spacedBy(5.dp)
+            verticalArrangement = Arrangement.Center
         ) {
             Box(
                 modifier = Modifier
-                    .size(38.dp)
-                    .clip(RoundedCornerShape(10.dp))
-                    .background(bgIcon),
+                    .size(40.dp)
+                    .clip(RoundedCornerShape(12.dp))
+                    .background(iconBg),
                 contentAlignment = Alignment.Center
             ) {
                 Icon(
                     imageVector = icon,
                     contentDescription = title,
                     tint = iconTint,
-                    modifier = Modifier.size(19.dp)
+                    modifier = Modifier.size(20.dp)
                 )
             }
 
-            Column(
-                horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.spacedBy(1.dp)
-            ) {
-                Text(
-                    text = title,
-                    fontSize = 11.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = Slate800,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                    textAlign = TextAlign.Center
-                )
-                Text(
-                    text = subtitle,
-                    fontSize = 9.sp,
-                    color = Slate400,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                    textAlign = TextAlign.Center
-                )
-            }
+            Spacer(modifier = Modifier.height(6.dp))
+
+            Text(
+                text = title,
+                fontSize = 12.sp,
+                fontWeight = FontWeight.Bold,
+                color = titleColor,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                textAlign = TextAlign.Center
+            )
+            Text(
+                text = subtitle,
+                fontSize = 10.sp,
+                fontWeight = FontWeight.Medium,
+                color = Slate400,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                textAlign = TextAlign.Center
+            )
         }
     }
 }
 
 // ═════════════════════════════════════════════════════════════════════════════
-// 6. RECENT TRANSACTIONS FEED
+// 6. TRANSAKSI SHIFT TERKINI
 // ═════════════════════════════════════════════════════════════════════════════
 private data class DisplayTransactionItem(
     val title: String,
@@ -1200,8 +1216,7 @@ private data class DisplayTransactionItem(
 @Composable
 private fun CashierRecentTransactionsCard(
     recentTransactions: List<CashTransaction>,
-    onViewAllClick: () -> Unit,
-    onStartFirstTransactionClick: () -> Unit
+    onViewAllClick: () -> Unit
 ) {
     val items = remember(recentTransactions) {
         recentTransactions.take(5).map { trx ->
@@ -1209,7 +1224,7 @@ private fun CashierRecentTransactionsCard(
                 val code = trx.receiptId.takeLast(6).uppercase()
                 "#TRX-$code"
             } else {
-                "#TRX-${trx.id.takeLast(4).uppercase()}"
+                "#TRX-${trx.id.takeLast(6).uppercase()}"
             }
             val customer = if (!trx.customerName.isNullOrBlank()) trx.customerName else "Pelanggan Umum"
             val method = trx.paymentMethods.firstOrNull()?.uppercase() ?: "TUNAI"
@@ -1232,7 +1247,7 @@ private fun CashierRecentTransactionsCard(
             DisplayTransactionItem(
                 title = receiptNo,
                 subtitle = customer,
-                timeMethod = "$timeStr WIB · $method",
+                timeMethod = "$timeStr WIB • $method",
                 amount = trx.total.toRupiahText(),
                 status = statusText,
                 isPaid = isLunas
@@ -1253,7 +1268,7 @@ private fun CashierRecentTransactionsCard(
                 .padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
-            // Header: Dot + Transaksi Shift Terkini + Lihat Semua Link
+            // Header: Green dot + Transaksi Shift Terkini + Lihat Semua Link
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
@@ -1272,7 +1287,8 @@ private fun CashierRecentTransactionsCard(
                         text = "Transaksi Shift Terkini",
                         fontSize = 12.sp,
                         fontWeight = FontWeight.Bold,
-                        color = Slate900
+                        color = Slate800,
+                        letterSpacing = (-0.2).sp
                     )
                 }
 
@@ -1288,22 +1304,24 @@ private fun CashierRecentTransactionsCard(
                         text = "Lihat Semua",
                         fontSize = 12.sp,
                         fontWeight = FontWeight.SemiBold,
-                        color = BrandForest
+                        color = Slate600
                     )
                     Icon(
                         imageVector = Icons.AutoMirrored.Outlined.KeyboardArrowRight,
                         contentDescription = null,
-                        tint = BrandForest,
+                        tint = Slate400,
                         modifier = Modifier.size(14.dp)
                     )
                 }
             }
 
+            HorizontalDivider(color = Slate100, thickness = 1.dp)
+
             if (items.isEmpty()) {
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(vertical = 20.dp),
+                        .padding(vertical = 16.dp),
                     contentAlignment = Alignment.Center
                 ) {
                     Column(
@@ -1312,7 +1330,7 @@ private fun CashierRecentTransactionsCard(
                     ) {
                         Box(
                             modifier = Modifier
-                                .size(44.dp)
+                                .size(40.dp)
                                 .clip(CircleShape)
                                 .background(Slate100),
                             contentAlignment = Alignment.Center
@@ -1321,7 +1339,7 @@ private fun CashierRecentTransactionsCard(
                                 imageVector = Icons.AutoMirrored.Outlined.ReceiptLong,
                                 contentDescription = null,
                                 tint = Slate400,
-                                modifier = Modifier.size(24.dp)
+                                modifier = Modifier.size(20.dp)
                             )
                         }
                         Text(
@@ -1336,82 +1354,52 @@ private fun CashierRecentTransactionsCard(
                             color = Slate400,
                             textAlign = TextAlign.Center
                         )
-                        OutlinedButton(
-                            onClick = onStartFirstTransactionClick,
-                            shape = RoundedCornerShape(8.dp),
-                            border = BorderStroke(1.dp, CardBorder),
-                            colors = ButtonDefaults.outlinedButtonColors(contentColor = BrandForest),
-                            modifier = Modifier.padding(top = 4.dp)
-                        ) {
-                            Icon(
-                                imageVector = Icons.Outlined.PointOfSale,
-                                contentDescription = null,
-                                modifier = Modifier.size(14.dp)
-                            )
-                            Spacer(modifier = Modifier.width(6.dp))
-                            Text(
-                                text = "Mulai Transaksi Pertama",
-                                fontSize = 11.sp,
-                                fontWeight = FontWeight.Bold
-                            )
-                        }
                     }
                 }
             } else {
                 Column(
                     modifier = Modifier.fillMaxWidth(),
-                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                    verticalArrangement = Arrangement.spacedBy(10.dp)
                 ) {
                     items.forEachIndexed { index, item ->
-                        if (index > 0) {
-                            HorizontalDivider(color = Slate100, thickness = 1.dp)
-                        }
-
                         Row(
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .clip(RoundedCornerShape(10.dp))
-                                .clickable(onClick = onViewAllClick)
-                                .padding(vertical = 4.dp, horizontal = 2.dp),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.CenterVertically
+                                .padding(vertical = 2.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.SpaceBetween
                         ) {
                             Row(
-                                modifier = Modifier
-                                    .weight(1f)
-                                    .padding(end = 12.dp),
+                                modifier = Modifier.weight(1f),
                                 verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.spacedBy(10.dp)
+                                horizontalArrangement = Arrangement.spacedBy(12.dp)
                             ) {
                                 Box(
                                     modifier = Modifier
-                                        .size(36.dp)
-                                        .clip(RoundedCornerShape(10.dp))
-                                        .background(BrandGreenLight)
-                                        .border(1.dp, BrandGreenBorder, RoundedCornerShape(10.dp)),
+                                        .size(40.dp)
+                                        .clip(RoundedCornerShape(12.dp))
+                                        .background(Slate100),
                                     contentAlignment = Alignment.Center
                                 ) {
                                     Icon(
                                         imageVector = Icons.AutoMirrored.Outlined.ReceiptLong,
                                         contentDescription = null,
-                                        tint = BrandForest,
-                                        modifier = Modifier.size(18.dp)
+                                        tint = PrimaryBrand,
+                                        modifier = Modifier.size(20.dp)
                                     )
                                 }
 
-                                Column(verticalArrangement = Arrangement.spacedBy(1.dp)) {
+                                Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
                                     Text(
                                         text = item.title,
                                         fontSize = 12.sp,
                                         fontWeight = FontWeight.Bold,
                                         fontFamily = FontFamily.Monospace,
-                                        color = Slate900,
-                                        maxLines = 1,
-                                        overflow = TextOverflow.Ellipsis
+                                        color = Slate900
                                     )
                                     Text(
                                         text = item.subtitle,
-                                        fontSize = 11.sp,
+                                        fontSize = 12.sp,
                                         fontWeight = FontWeight.Medium,
                                         color = Slate600,
                                         maxLines = 1,
@@ -1420,37 +1408,33 @@ private fun CashierRecentTransactionsCard(
                                     Text(
                                         text = item.timeMethod,
                                         fontSize = 10.sp,
-                                        color = Slate400,
-                                        maxLines = 1
+                                        fontWeight = FontWeight.Medium,
+                                        color = Slate400
                                     )
                                 }
                             }
 
                             Column(
                                 horizontalAlignment = Alignment.End,
-                                verticalArrangement = Arrangement.spacedBy(3.dp)
+                                verticalArrangement = Arrangement.spacedBy(2.dp)
                             ) {
                                 Text(
                                     text = item.amount,
                                     fontSize = 12.sp,
-                                    fontWeight = FontWeight.Bold,
+                                    fontWeight = FontWeight.ExtraBold,
                                     color = Slate900
                                 )
-
-                                Surface(
-                                    shape = RoundedCornerShape(4.dp),
-                                    color = if (item.isPaid) BrandGreenLight else AmberBg,
-                                    border = BorderStroke(1.dp, if (item.isPaid) BrandGreenBorder else AmberBorder)
-                                ) {
-                                    Text(
-                                        text = item.status,
-                                        fontSize = 10.sp,
-                                        fontWeight = FontWeight.Bold,
-                                        color = if (item.isPaid) Emerald700 else AmberText,
-                                        modifier = Modifier.padding(horizontal = 5.dp, vertical = 1.dp)
-                                    )
-                                }
+                                Text(
+                                    text = item.status,
+                                    fontSize = 11.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = if (item.isPaid) Emerald600 else AmberText
+                                )
                             }
+                        }
+
+                        if (index < items.lastIndex) {
+                            HorizontalDivider(color = Slate50, thickness = 1.dp)
                         }
                     }
                 }
