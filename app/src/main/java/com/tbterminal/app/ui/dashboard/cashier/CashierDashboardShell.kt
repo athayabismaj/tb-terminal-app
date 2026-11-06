@@ -193,6 +193,8 @@ fun CashierDashboardShell(
                     CashierCompactTopBar(
                         userName = userName,
                         role = role,
+                        title = if (activeDestination == CashierDestination.CashSession) "Kas Harian & Shift" else "Terminal Barokah Jaya",
+                        subtitle = if (activeDestination == CashierDestination.CashSession) "Terminal Barokah Jaya" else "Terminal Kasir",
                         onTerminalInfoClick = { showTerminalModal = true },
                         onProfileClick = onProfileClick,
                         onSettingsClick = onSettingsClick,
@@ -227,6 +229,8 @@ fun CashierDashboardShell(
 private fun CashierCompactTopBar(
     userName: String,
     role: String,
+    title: String = "Terminal Barokah Jaya",
+    subtitle: String = "Terminal Kasir",
     onTerminalInfoClick: () -> Unit,
     onProfileClick: () -> Unit,
     onSettingsClick: () -> Unit,
@@ -348,10 +352,10 @@ private fun CashierCompactTopBar(
                     }
                 }
 
-                // Title & Subtitle (bersih tanpa teks server aktif)
+                // Title & Subtitle (dinamis sesuai layar kasir)
                 Column(modifier = Modifier.widthIn(max = 210.dp)) {
                     Text(
-                        text = "Terminal Barokah Jaya",
+                        text = title,
                         color = Color(0xFF0F172A),
                         fontSize = 14.sp,
                         fontWeight = FontWeight.Bold,
@@ -360,7 +364,7 @@ private fun CashierCompactTopBar(
                         letterSpacing = (-0.2).sp
                     )
                     Text(
-                        text = "Terminal Kasir",
+                        text = subtitle,
                         color = Color(0xFF64748B),
                         fontSize = 11.sp,
                         fontWeight = FontWeight.Medium,
