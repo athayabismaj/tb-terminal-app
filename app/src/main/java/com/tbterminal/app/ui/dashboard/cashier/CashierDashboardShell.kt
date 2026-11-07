@@ -401,31 +401,13 @@ private fun CashierCompactTopBar(
                 }
             }
 
-            // Sisi Kanan: Optional TopBar Actions (Search, Filter, Rekap) + Quick Lock Button + User Profile Pill Button + Floating Animated Dropdown Popover
+            // Sisi Kanan: Optional TopBar Actions (Search, Filter, Rekap) + User Profile Pill Button + Floating Animated Dropdown Popover
             Row(
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
                 if (topBarActions != null) {
                     topBarActions()
-                }
-
-                Surface(
-                    onClick = onLockClick,
-                    shape = RoundedCornerShape(12.dp),
-                    color = Color(0xFFF8FAFC),
-                    border = BorderStroke(1.dp, Color(0xFFE2E8F0)),
-                    shadowElevation = 0.5.dp,
-                    modifier = Modifier.size(32.dp)
-                ) {
-                    Box(contentAlignment = Alignment.Center) {
-                        Icon(
-                            Icons.Outlined.Lock,
-                            contentDescription = "Kunci/Buka Laci",
-                            tint = Color(0xFF475569),
-                            modifier = Modifier.size(16.dp)
-                        )
-                    }
                 }
 
                 Box {
@@ -445,9 +427,9 @@ private fun CashierCompactTopBar(
                     shadowElevation = 0.5.dp
                 ) {
                     Row(
-                        modifier = Modifier.padding(start = 4.dp, top = 4.dp, end = 8.dp, bottom = 4.dp),
+                        modifier = Modifier.padding(start = 4.dp, top = 4.dp, end = 6.dp, bottom = 4.dp),
                         verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                        horizontalArrangement = Arrangement.spacedBy(4.dp)
                     ) {
                         // Avatar kotak rounded inisial
                         Box(
@@ -464,22 +446,13 @@ private fun CashierCompactTopBar(
                                 fontWeight = FontWeight.Bold
                             )
                         }
-                        // Nama Kasir
-                        Text(
-                            text = displayName.take(12),
-                            color = Color(0xFF334155),
-                            fontSize = 12.sp,
-                            fontWeight = FontWeight.SemiBold,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis
-                        )
                         // Chevron icon dengan animasi rotasi 180 derajat
                         Icon(
                             imageVector = Icons.Outlined.ExpandMore,
                             contentDescription = "User profile menu",
                             tint = if (expanded) Color(0xFF1B5E3C) else Color(0xFF94A3B8),
                             modifier = Modifier
-                                .size(14.dp)
+                                .size(16.dp)
                                 .graphicsLayer { rotationZ = chevronRotation }
                         )
                     }
