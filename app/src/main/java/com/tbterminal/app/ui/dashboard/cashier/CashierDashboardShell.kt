@@ -32,6 +32,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
@@ -357,24 +358,24 @@ private fun CashierCompactTopBar(
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.SpaceBetween
         ) {
-            // Sisi Kiri: Badge Logo TB + Title "Terminal Barokah Jaya" + Subtitle "Terminal Kasir"
+            // Sisi Kiri: Badge Logo TB + Title "Transaksi Kasir (POS)" + Subtitle "Terminal Barokah Jaya"
             Row(
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(10.dp)
             ) {
-                // Button Badge TB (Logo Hijau Pekat sesuai standar brand)
+                // Button Badge TB (Logo Hijau Pekat BrandForest)
                 Box(
                     modifier = Modifier
-                        .size(40.dp)
+                        .size(36.dp)
                         .clip(RoundedCornerShape(12.dp))
-                        .background(Color(0xFF004528))
+                        .background(Color(0xFF10533C))
                         .clickable(onClick = onTerminalInfoClick),
                     contentAlignment = Alignment.Center
                 ) {
                     Text(
                         text = "TB",
                         color = Color.White,
-                        fontSize = 13.sp,
+                        fontSize = 13.5.sp,
                         fontWeight = FontWeight.Bold,
                         letterSpacing = 0.5.sp
                     )
@@ -394,9 +395,9 @@ private fun CashierCompactTopBar(
                     Text(
                         text = subtitle,
                         color = Color(0xFF64748B),
-                        fontSize = 12.sp,
+                        fontSize = 11.sp,
                         fontWeight = FontWeight.Medium,
-                        modifier = Modifier.padding(top = 2.dp)
+                        modifier = Modifier.padding(top = 1.dp)
                     )
                 }
             }
@@ -418,31 +419,31 @@ private fun CashierCompactTopBar(
                             expanded = !expanded
                         }
                     },
-                    shape = RoundedCornerShape(12.dp),
-                    color = Color(0xFFF8FAFC),
+                    shape = RoundedCornerShape(100.dp),
+                    color = Color.White,
                     border = BorderStroke(
                         1.dp,
-                        if (expanded) Color(0xFF1B5E3C) else Color(0xFFE2E8F0)
+                        if (expanded) Color(0xFF10533C) else Color(0xFFE2E8F0)
                     ),
                     shadowElevation = 0.5.dp
                 ) {
                     Row(
-                        modifier = Modifier.padding(start = 4.dp, top = 4.dp, end = 6.dp, bottom = 4.dp),
+                        modifier = Modifier.padding(start = 3.dp, top = 2.dp, end = 6.dp, bottom = 2.dp),
                         verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.spacedBy(4.dp)
                     ) {
-                        // Avatar kotak rounded inisial
+                        // Avatar bulat inisial pengguna sesuai mockup HTML
                         Box(
                             modifier = Modifier
-                                .size(24.dp)
-                                .clip(RoundedCornerShape(8.dp))
-                                .background(Color(0xFFD7ECE0)),
+                                .size(20.dp)
+                                .clip(CircleShape)
+                                .background(Color(0xFFE7EFEA)),
                             contentAlignment = Alignment.Center
                         ) {
                             Text(
                                 text = userInitial,
-                                color = Color(0xFF004528),
-                                fontSize = 12.sp,
+                                color = Color(0xFF10533C),
+                                fontSize = 11.sp,
                                 fontWeight = FontWeight.Bold
                             )
                         }
@@ -450,9 +451,9 @@ private fun CashierCompactTopBar(
                         Icon(
                             imageVector = Icons.Outlined.ExpandMore,
                             contentDescription = "User profile menu",
-                            tint = if (expanded) Color(0xFF1B5E3C) else Color(0xFF94A3B8),
+                            tint = if (expanded) Color(0xFF10533C) else Color(0xFF94A3B8),
                             modifier = Modifier
-                                .size(16.dp)
+                                .size(14.dp)
                                 .graphicsLayer { rotationZ = chevronRotation }
                         )
                     }
@@ -764,11 +765,17 @@ private fun CashierBottomNavigation(
 
     Surface(
         color = Color.White,
-        border = BorderStroke(1.dp, Color(0xFFE7ECE9))
+        border = BorderStroke(1.dp, Color(0xFFF1F5F9)),
+        shadowElevation = 2.dp,
+        modifier = Modifier.fillMaxWidth()
     ) {
-        NavigationBar(
-            containerColor = Color.White,
-            tonalElevation = 0.dp
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .navigationBarsPadding()
+                .padding(horizontal = 6.dp, vertical = 6.dp),
+            horizontalArrangement = Arrangement.SpaceAround,
+            verticalAlignment = Alignment.CenterVertically
         ) {
             items.forEach { item ->
                 val selected = activeDestination == item.destination ||
@@ -776,33 +783,58 @@ private fun CashierBottomNavigation(
                         CashierDestination.Customers,
                         CashierDestination.ReceivablePayments,
                     ))
-                NavigationBarItem(
-                    selected = selected,
-                    onClick = item.onClick,
-                    icon = {
-                        Icon(
-                            imageVector = item.icon,
-                            contentDescription = item.label,
-                            modifier = Modifier.size(20.dp)
-                        )
-                    },
-                    label = {
+
+                Column(
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(12.dp))
+                        .clickable(onClick = item.onClick)
+                        .padding(horizontal = 8.dp, vertical = 2.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.spacedBy(2.dp)
+                ) {
+                    if (selected) {
+                        Box(
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(100.dp))
+                                .background(Color(0xFFE7EFEA))
+                                .padding(horizontal = 14.dp, vertical = 2.5.dp),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Icon(
+                                imageVector = item.icon,
+                                contentDescription = item.label,
+                                tint = Color(0xFF10533C),
+                                modifier = Modifier.size(20.dp)
+                            )
+                        }
                         Text(
                             text = item.label,
-                            fontSize = 11.sp,
-                            fontWeight = if (selected) FontWeight.Bold else FontWeight.Medium,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis
+                            fontSize = 10.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = Color(0xFF10533C),
+                            maxLines = 1
                         )
-                    },
-                    colors = NavigationBarItemDefaults.colors(
-                        selectedIconColor = Color(0xFF1B5E3C),
-                        selectedTextColor = Color(0xFF1B5E3C),
-                        indicatorColor = Color(0xFFD7ECE0).copy(alpha = 0.9f),
-                        unselectedIconColor = Color(0xFF64748B),
-                        unselectedTextColor = Color(0xFF64748B)
-                    )
-                )
+                    } else {
+                        Box(
+                            modifier = Modifier.padding(horizontal = 14.dp, vertical = 2.5.dp),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Icon(
+                                imageVector = item.icon,
+                                contentDescription = item.label,
+                                tint = Color(0xFF94A3B8),
+                                modifier = Modifier.size(20.dp)
+                            )
+                        }
+                        Text(
+                            text = item.label,
+                            fontSize = 10.sp,
+                            fontWeight = FontWeight.SemiBold,
+                            color = Color(0xFF94A3B8),
+                            maxLines = 1
+                        )
+                    }
+                }
             }
         }
     }

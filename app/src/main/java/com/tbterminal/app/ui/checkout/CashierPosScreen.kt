@@ -417,15 +417,18 @@ private fun PosOperationalStatusRow(
     onOpenHoldCartDialog: () -> Unit
 ) {
     Row(
-        modifier = Modifier.fillMaxWidth(),
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(vertical = 2.dp),
         horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.CenterVertically
     ) {
-        // Tag Identitas Mesin Kasir POS-01 (Pill rounded-full dengan green pulse dot)
+        // Tag Identitas Mesin Kasir POS-01 (White pill dengan pulse dot hijau sesuai HTML mockup)
         Surface(
             shape = RoundedCornerShape(100.dp),
-            color = Color(0xFFECFDF5),
-            border = BorderStroke(1.dp, Color(0xFFA7F3D0).copy(alpha = 0.6f))
+            color = Color.White,
+            border = BorderStroke(1.dp, Slate200),
+            shadowElevation = 0.5.dp
         ) {
             Row(
                 modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp),
@@ -440,8 +443,8 @@ private fun PosOperationalStatusRow(
                 )
                 Text(
                     text = "POS-01",
-                    color = Color(0xFF065F46),
-                    fontSize = 12.sp,
+                    color = Slate800,
+                    fontSize = 11.5.sp,
                     fontWeight = FontWeight.SemiBold
                 )
             }
@@ -450,44 +453,52 @@ private fun PosOperationalStatusRow(
         // Action Parkir & Tunda Transaksi
         Row(
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(8.dp)
+            horizontalArrangement = Arrangement.spacedBy(6.dp)
         ) {
             // Badge Parkir Nota jika ada yang ditahan
             if (heldCartsCount > 0) {
                 Surface(
                     onClick = onOpenHeldCarts,
                     shape = RoundedCornerShape(100.dp),
-                    color = Color(0xFFFFFBEB),
-                    border = BorderStroke(1.dp, Color(0xFFFDE68A).copy(alpha = 0.7f))
+                    color = Color.White,
+                    border = BorderStroke(1.dp, Slate200),
+                    shadowElevation = 0.5.dp
                 ) {
                     Row(
-                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp),
+                        modifier = Modifier.padding(start = 10.dp, end = 8.dp, top = 4.dp, bottom = 4.dp),
                         verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.spacedBy(4.dp)
                     ) {
                         Icon(
                             imageVector = Icons.Outlined.PauseCircleOutline,
-                            contentDescription = null,
-                            tint = Color(0xFFD97706),
+                            contentDescription = "Buka transaksi diparkir",
+                            tint = Slate500,
                             modifier = Modifier.size(14.dp)
                         )
                         Text(
-                            text = "Parkir ($heldCartsCount)",
-                            color = Color(0xFF92400E),
-                            fontWeight = FontWeight.SemiBold,
-                            fontSize = 12.sp
+                            text = "Parkir",
+                            color = Slate700,
+                            fontWeight = FontWeight.Medium,
+                            fontSize = 11.sp
+                        )
+                        Text(
+                            text = "($heldCartsCount)",
+                            color = Color(0xFFD97706),
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 11.5.sp
                         )
                     }
                 }
             }
 
-            // Tombol Tunda / Parkir Transaksi saat kasir melayani transaksi yang perlu ditunda
+            // Tombol Tunda saat ada barang di keranjang
             if (cartItemCount > 0) {
                 Surface(
                     onClick = onOpenHoldCartDialog,
                     shape = RoundedCornerShape(100.dp),
                     color = Color.White,
-                    border = BorderStroke(1.dp, Slate200)
+                    border = BorderStroke(1.dp, Slate200),
+                    shadowElevation = 0.5.dp
                 ) {
                     Row(
                         modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp),
@@ -496,15 +507,15 @@ private fun PosOperationalStatusRow(
                     ) {
                         Icon(
                             imageVector = Icons.Outlined.BookmarkAdd,
-                            contentDescription = null,
+                            contentDescription = "Tunda transaksi saat ini",
                             tint = Slate500,
                             modifier = Modifier.size(14.dp)
                         )
                         Text(
-                            text = "Tunda Transaksi",
+                            text = "Tunda",
                             color = Slate700,
-                            fontWeight = FontWeight.SemiBold,
-                            fontSize = 12.sp
+                            fontWeight = FontWeight.Medium,
+                            fontSize = 11.sp
                         )
                     }
                 }

@@ -378,7 +378,7 @@ private fun FloatingStockBadge(
     val stockBorder = when {
         isOutOfStock -> DangerBorder
         isLowStock -> Amber200
-        else -> Emerald200.copy(alpha = 0.8f)
+        else -> Slate200.copy(alpha = 0.8f)
     }
     val stockDotColor = when {
         isOutOfStock -> DangerRed
@@ -388,7 +388,7 @@ private fun FloatingStockBadge(
     val stockTextColor = when {
         isOutOfStock -> DangerRed
         isLowStock -> Amber800
-        else -> Emerald800
+        else -> Slate700
     }
     val stockText = when {
         isOutOfStock -> "Habis"
@@ -406,7 +406,7 @@ private fun FloatingStockBadge(
         Row(
             modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.5.dp),
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(4.dp)
+            horizontalArrangement = Arrangement.spacedBy(5.dp)
         ) {
             Box(
                 modifier = Modifier
@@ -416,8 +416,8 @@ private fun FloatingStockBadge(
             )
             Text(
                 text = stockText,
-                fontSize = 10.sp,
-                fontWeight = FontWeight.SemiBold,
+                fontSize = 11.sp,
+                fontWeight = FontWeight.Medium,
                 color = stockTextColor
             )
         }

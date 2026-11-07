@@ -126,13 +126,12 @@ fun CashierPosRoute(
         role = role,
         activeDestination = CashierDestination.Pos,
         topBarActions = {
-            // Button 1: Search [ 🔍 ]
+            // Button 1: Search [ 🔍 ] (Rounded-full 32x32 dp matching HTML mockup)
             Surface(
                 onClick = { isSearchExpanded = !isSearchExpanded },
-                shape = RoundedCornerShape(12.dp),
-                color = if (isSearchActive) Color(0xFFE8F6ED) else Color(0xFFF8FAFC),
-                border = BorderStroke(1.dp, if (isSearchActive) Color(0xFF1B5E3C) else Color(0xFFE2E8F0)),
-                shadowElevation = 0.5.dp,
+                shape = CircleShape,
+                color = if (isSearchActive) Color(0xFFE7EFEA) else Color.Transparent,
+                border = if (isSearchActive) BorderStroke(1.dp, Color(0xFF10533C).copy(alpha = 0.4f)) else null,
                 modifier = Modifier
                     .size(32.dp)
                     .testTag("pos-toggle-search")
@@ -141,23 +140,22 @@ fun CashierPosRoute(
                     Icon(
                         imageVector = Icons.Outlined.Search,
                         contentDescription = "Cari produk kasir",
-                        tint = if (isSearchActive) Color(0xFF004528) else Color(0xFF475569),
+                        tint = if (isSearchActive) Color(0xFF10533C) else Color(0xFF475569),
                         modifier = Modifier.size(16.dp)
                     )
                 }
             }
 
-            // Button 2: Filter [ ⚙️ ]
+            // Button 2: Filter [ ⚙️ ] (Rounded-full 32x32 dp matching HTML mockup)
             Box(
                 modifier = Modifier.size(32.dp),
                 contentAlignment = Alignment.Center
             ) {
                 Surface(
                     onClick = { showFilterDialog = true },
-                    shape = RoundedCornerShape(12.dp),
-                    color = if (isFiltered) Color(0xFFE8F6ED) else Color(0xFFF8FAFC),
-                    border = BorderStroke(1.dp, if (isFiltered) Color(0xFF1B5E3C) else Color(0xFFE2E8F0)),
-                    shadowElevation = 0.5.dp,
+                    shape = CircleShape,
+                    color = if (isFiltered) Color(0xFFE7EFEA) else Color.Transparent,
+                    border = if (isFiltered) BorderStroke(1.dp, Color(0xFF10533C).copy(alpha = 0.4f)) else null,
                     modifier = Modifier
                         .fillMaxSize()
                         .testTag("pos-open-filter")
@@ -166,7 +164,7 @@ fun CashierPosRoute(
                         Icon(
                             imageVector = Icons.Outlined.Tune,
                             contentDescription = "Filter produk kasir",
-                            tint = if (isFiltered) Color(0xFF004528) else Color(0xFF475569),
+                            tint = if (isFiltered) Color(0xFF10533C) else Color(0xFF475569),
                             modifier = Modifier.size(16.dp)
                         )
                     }
@@ -183,13 +181,12 @@ fun CashierPosRoute(
                 }
             }
 
-            // Button 3: Kalkulator Bahan Bangunan [ 🧮 ]
+            // Button 3: Kalkulator Bahan Bangunan [ 🧮 ] (Rounded-full 32x32 dp matching HTML mockup)
             Surface(
                 onClick = { showMaterialEstimator = true },
-                shape = RoundedCornerShape(12.dp),
-                color = if (showMaterialEstimator) Color(0xFFE8F6ED) else Color(0xFFF8FAFC),
-                border = BorderStroke(1.dp, if (showMaterialEstimator) Color(0xFF1B5E3C) else Color(0xFFE2E8F0)),
-                shadowElevation = 0.5.dp,
+                shape = CircleShape,
+                color = if (showMaterialEstimator) Color(0xFFE7EFEA) else Color.Transparent,
+                border = if (showMaterialEstimator) BorderStroke(1.dp, Color(0xFF10533C).copy(alpha = 0.4f)) else null,
                 modifier = Modifier
                     .size(32.dp)
                     .testTag("pos-open-calculator")
@@ -198,7 +195,7 @@ fun CashierPosRoute(
                     Icon(
                         imageVector = Icons.Outlined.Calculate,
                         contentDescription = "Hitung estimasi bahan bangunan",
-                        tint = if (showMaterialEstimator) Color(0xFF004528) else Color(0xFF475569),
+                        tint = if (showMaterialEstimator) Color(0xFF10533C) else Color(0xFF475569),
                         modifier = Modifier.size(16.dp)
                     )
                 }
