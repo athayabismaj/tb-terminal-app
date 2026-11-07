@@ -28,16 +28,21 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.ArrowForward
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.outlined.BookmarkAdd
 import androidx.compose.material.icons.outlined.Calculate
+import androidx.compose.material.icons.outlined.Check
 import androidx.compose.material.icons.outlined.Clear
+import androidx.compose.material.icons.outlined.Close
 import androidx.compose.material.icons.outlined.PauseCircleOutline
 import androidx.compose.material.icons.outlined.QrCodeScanner
+import androidx.compose.material.icons.outlined.Refresh
 import androidx.compose.material.icons.outlined.Search
 import androidx.compose.material.icons.outlined.ShoppingCart
 import androidx.compose.material.icons.outlined.Tune
@@ -48,6 +53,7 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
@@ -592,8 +598,9 @@ private fun PosSearchBar(
 }
 
 // ═════════════════════════════════════════════════════════════════════════════
-// SUB-KOMPONEN 2B: POS FILTER DIALOG (KATEGORI & STATUS STOK)
+// SUB-KOMPONEN 2B: POS FILTER BOTTOM SHEET (DESAIN FILTER PENJUALAN)
 // ═════════════════════════════════════════════════════════════════════════════
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun PosFilterDialog(
     categories: List<String>,
@@ -606,222 +613,266 @@ private fun PosFilterDialog(
     var tempCategory by remember(selectedCategory) { mutableStateOf(selectedCategory) }
     var tempOnlyInStock by remember(onlyInStock) { mutableStateOf(onlyInStock) }
 
-    Dialog(onDismissRequest = onDismiss) {
-        Surface(
+    ModalBottomSheet(
+        onDismissRequest = onDismiss,
+        containerColor = Color.White,
+        shape = RoundedCornerShape(topStart = 32.dp, topEnd = 32.dp),
+        dragHandle = {
+            Box(
+                modifier = Modifier
+                    .padding(top = 12.dp, bottom = 4.dp)
+                    .width(40.dp)
+                    .height(5.dp)
+                    .background(Color(0xFFCBD5E1), CircleShape)
+            )
+        },
+    ) {
+        Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 4.dp),
-            shape = RoundedCornerShape(20.dp),
-            color = Color.White,
-            shadowElevation = 8.dp
+                .testTag("pos-filter-sheet")
         ) {
-            Column(
+            // Modal Header: Judul di kiri, tombol TERAPKAN & TUTUP di kanan atas
+            Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(20.dp),
-                verticalArrangement = Arrangement.spacedBy(16.dp)
+                    .padding(start = 24.dp, end = 20.dp, top = 4.dp, bottom = 12.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
             ) {
-                // Header Dialog
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(10.dp)
-                    ) {
-                        Surface(
-                            modifier = Modifier.size(36.dp),
-                            shape = RoundedCornerShape(10.dp),
-                            color = Color(0xFFE8F6ED),
-                            border = BorderStroke(1.dp, Color(0xFF1B5E3C))
-                        ) {
-                            Box(contentAlignment = Alignment.Center) {
-                                Icon(
-                                    imageVector = Icons.Outlined.Tune,
-                                    contentDescription = null,
-                                    tint = Color(0xFF004528),
-                                    modifier = Modifier.size(18.dp)
-                                )
-                            }
-                        }
-                        Column {
-                            Text(
-                                text = "Filter Katalog Produk",
-                                fontSize = 15.sp,
-                                fontWeight = FontWeight.Bold,
-                                color = Color(0xFF0F172A)
-                            )
-                            Text(
-                                text = "Saring produk berdasarkan kategori & ketersediaan",
-                                fontSize = 11.sp,
-                                color = Color(0xFF64748B)
-                            )
-                        }
-                    }
+                Column(modifier = Modifier.weight(1f).padding(end = 12.dp)) {
+                    Text(
+                        text = "Filter Katalog Produk",
+                        fontSize = 20.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = Color(0xFF0F172A),
+                        letterSpacing = (-0.3).sp,
+                    )
+                    Spacer(Modifier.height(2.dp))
+                    Text(
+                        text = "Atur kategori dan ketersediaan stok produk",
+                        fontSize = 13.sp,
+                        color = Color(0xFF64748B),
+                        lineHeight = 17.sp,
+                    )
+                }
 
-                    IconButton(
-                        onClick = onDismiss,
-                        modifier = Modifier.size(32.dp)
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    // Tombol Terapkan di bagian atas
+                    Button(
+                        onClick = {
+                            onApplyFilter(tempCategory, tempOnlyInStock)
+                        },
+                        shape = RoundedCornerShape(12.dp),
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = Color(0xFF004528),
+                            contentColor = Color.White
+                        ),
+                        contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp),
+                        modifier = Modifier
+                            .height(38.dp)
+                            .testTag("pos-filter-apply")
                     ) {
                         Icon(
-                            imageVector = Icons.Outlined.Clear,
-                            contentDescription = "Tutup",
-                            tint = Color(0xFF94A3B8),
-                            modifier = Modifier.size(18.dp)
+                            imageVector = Icons.Outlined.Check,
+                            contentDescription = null,
+                            modifier = Modifier.size(16.dp)
+                        )
+                        Spacer(Modifier.width(6.dp))
+                        Text(
+                            text = "Terapkan",
+                            fontSize = 13.sp,
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
+
+                    // Tombol Tutup (X)
+                    Box(
+                        modifier = Modifier
+                            .size(36.dp)
+                            .clip(CircleShape)
+                            .background(Color(0xFFF1F5F9))
+                            .clickable(onClick = onDismiss),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        Icon(
+                            imageVector = Icons.Outlined.Close,
+                            contentDescription = "Tutup Filter",
+                            tint = Color(0xFF64748B),
+                            modifier = Modifier.size(18.dp),
                         )
                     }
                 }
+            }
 
-                HorizontalDivider(color = Color(0xFFF1F5F9))
+            HorizontalDivider(color = Color(0xFFF1F5F9), thickness = 1.dp)
 
+            // Scrollable Filter Content
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .weight(1f, fill = false)
+                    .verticalScroll(rememberScrollState())
+                    .padding(horizontal = 24.dp, vertical = 18.dp),
+                verticalArrangement = Arrangement.spacedBy(22.dp)
+            ) {
                 // Section 1: Ketersediaan Stok
-                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                     Text(
-                        text = "Ketersediaan Stok",
+                        text = "KETERSEDIAAN STOK",
                         fontSize = 12.sp,
                         fontWeight = FontWeight.Bold,
-                        color = Color(0xFF334155)
+                        color = Color(0xFF64748B),
+                        letterSpacing = 0.8.sp,
                     )
                     Row(
                         modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        horizontalArrangement = Arrangement.spacedBy(10.dp)
                     ) {
-                        // Option A: Semua Produk
-                        Surface(
+                        PosFilterOptionCard(
+                            label = "Semua Produk",
+                            isSelected = !tempOnlyInStock,
                             onClick = { tempOnlyInStock = false },
-                            shape = RoundedCornerShape(10.dp),
-                            color = if (!tempOnlyInStock) Color(0xFFE8F6ED) else Color(0xFFF8FAFC),
-                            border = BorderStroke(1.dp, if (!tempOnlyInStock) Color(0xFF1B5E3C) else Color(0xFFE2E8F0)),
                             modifier = Modifier.weight(1f)
-                        ) {
-                            Box(
-                                modifier = Modifier.padding(vertical = 10.dp),
-                                contentAlignment = Alignment.Center
-                            ) {
-                                Text(
-                                    text = "Semua Produk",
-                                    fontSize = 12.sp,
-                                    fontWeight = if (!tempOnlyInStock) FontWeight.Bold else FontWeight.Medium,
-                                    color = if (!tempOnlyInStock) Color(0xFF004528) else Color(0xFF475569)
-                                )
-                            }
-                        }
-
-                        // Option B: Hanya Stok Tersedia
-                        Surface(
+                        )
+                        PosFilterOptionCard(
+                            label = "Stok Tersedia (>0)",
+                            isSelected = tempOnlyInStock,
                             onClick = { tempOnlyInStock = true },
-                            shape = RoundedCornerShape(10.dp),
-                            color = if (tempOnlyInStock) Color(0xFFE8F6ED) else Color(0xFFF8FAFC),
-                            border = BorderStroke(1.dp, if (tempOnlyInStock) Color(0xFF1B5E3C) else Color(0xFFE2E8F0)),
                             modifier = Modifier.weight(1f)
-                        ) {
-                            Box(
-                                modifier = Modifier.padding(vertical = 10.dp),
-                                contentAlignment = Alignment.Center
-                            ) {
-                                Text(
-                                    text = "Stok Tersedia (>0)",
-                                    fontSize = 12.sp,
-                                    fontWeight = if (tempOnlyInStock) FontWeight.Bold else FontWeight.Medium,
-                                    color = if (tempOnlyInStock) Color(0xFF004528) else Color(0xFF475569)
-                                )
-                            }
-                        }
+                        )
                     }
                 }
 
                 // Section 2: Kategori Produk
-                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                     Text(
-                        text = "Kategori Produk",
+                        text = "KATEGORI PRODUK",
                         fontSize = 12.sp,
                         fontWeight = FontWeight.Bold,
-                        color = Color(0xFF334155)
+                        color = Color(0xFF64748B),
+                        letterSpacing = 0.8.sp,
                     )
-                    Box(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .heightIn(max = 200.dp)
-                    ) {
-                        LazyColumn(
-                            verticalArrangement = Arrangement.spacedBy(6.dp)
+                    val categoryPairs = categories.chunked(2)
+                    categoryPairs.forEach { rowCategories ->
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(10.dp)
                         ) {
-                            items(categories) { category ->
-                                val isSelected = category == tempCategory
-                                Surface(
+                            rowCategories.forEach { category ->
+                                PosFilterOptionCard(
+                                    label = category,
+                                    isSelected = category == tempCategory,
                                     onClick = { tempCategory = category },
-                                    shape = RoundedCornerShape(8.dp),
-                                    color = if (isSelected) Color(0xFFF0FDF4) else Color(0xFFF8FAFC),
-                                    border = BorderStroke(1.dp, if (isSelected) Color(0xFF1B5E3C) else Color(0xFFE2E8F0)),
-                                    modifier = Modifier.fillMaxWidth()
-                                ) {
-                                    Row(
-                                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 9.dp),
-                                        horizontalArrangement = Arrangement.SpaceBetween,
-                                        verticalAlignment = Alignment.CenterVertically
-                                    ) {
-                                        Text(
-                                            text = category,
-                                            fontSize = 12.sp,
-                                            fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
-                                            color = if (isSelected) Color(0xFF004528) else Color(0xFF334155)
-                                        )
-                                        if (isSelected) {
-                                            Icon(
-                                                imageVector = Icons.Filled.CheckCircle,
-                                                contentDescription = null,
-                                                tint = Color(0xFF1B5E3C),
-                                                modifier = Modifier.size(16.dp)
-                                            )
-                                        }
-                                    }
-                                }
+                                    modifier = Modifier.weight(1f)
+                                )
+                            }
+                            if (rowCategories.size == 1) {
+                                Spacer(modifier = Modifier.weight(1f))
                             }
                         }
                     }
                 }
+            }
 
-                HorizontalDivider(color = Color(0xFFF1F5F9))
+            HorizontalDivider(color = Color(0xFFF1F5F9), thickness = 1.dp)
 
-                // Footer Buttons: Reset & Terapkan
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(10.dp)
+            // Sticky Footer: Tombol Reset di bagian bawah
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 20.dp, vertical = 14.dp)
+            ) {
+                Surface(
+                    onClick = {
+                        tempCategory = "Semua Kategori"
+                        tempOnlyInStock = false
+                        onResetFilter()
+                    },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(48.dp)
+                        .testTag("pos-filter-reset"),
+                    shape = RoundedCornerShape(12.dp),
+                    color = Color.White,
+                    border = BorderStroke(1.5.dp, Color(0xFF004528))
                 ) {
-                    OutlinedButton(
-                        onClick = onResetFilter,
-                        shape = RoundedCornerShape(12.dp),
-                        border = BorderStroke(1.dp, Color(0xFFE2E8F0)),
-                        modifier = Modifier
-                            .weight(1f)
-                            .height(42.dp)
+                    Box(
+                        modifier = Modifier.fillMaxSize(),
+                        contentAlignment = Alignment.Center
                     ) {
-                        Text(
-                            text = "Reset",
-                            color = Color(0xFF64748B),
-                            fontWeight = FontWeight.SemiBold,
-                            fontSize = 13.sp
-                        )
-                    }
-
-                    Button(
-                        onClick = { onApplyFilter(tempCategory, tempOnlyInStock) },
-                        shape = RoundedCornerShape(12.dp),
-                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF004528)),
-                        modifier = Modifier
-                            .weight(1f)
-                            .height(42.dp)
-                    ) {
-                        Text(
-                            text = "Terapkan",
-                            color = Color.White,
-                            fontWeight = FontWeight.Bold,
-                            fontSize = 13.sp
-                        )
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Outlined.Refresh,
+                                contentDescription = null,
+                                tint = Color(0xFF004528),
+                                modifier = Modifier.size(18.dp)
+                            )
+                            Text(
+                                text = "Reset Semua Filter",
+                                fontSize = 15.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = Color(0xFF004528)
+                            )
+                        }
                     }
                 }
+            }
+        }
+    }
+}
+
+@Composable
+private fun PosFilterOptionCard(
+    label: String,
+    isSelected: Boolean,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+    testTag: String? = null,
+) {
+    Surface(
+        onClick = onClick,
+        modifier = modifier
+            .height(46.dp)
+            .then(if (testTag != null) Modifier.testTag(testTag) else Modifier),
+        shape = RoundedCornerShape(12.dp),
+        color = Color.White,
+        border = BorderStroke(
+            if (isSelected) 1.5.dp else 1.dp,
+            if (isSelected) Color(0xFF004528) else Color(0xFFE2E8F0)
+        ),
+        shadowElevation = if (isSelected) 0.5.dp else 0.dp
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(horizontal = 14.dp),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text(
+                text = label,
+                fontSize = 13.5.sp,
+                fontWeight = if (isSelected) FontWeight.SemiBold else FontWeight.Medium,
+                color = if (isSelected) Color(0xFF004528) else Color(0xFF334155),
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.weight(1f, fill = false)
+            )
+            if (isSelected) {
+                Spacer(Modifier.width(6.dp))
+                Icon(
+                    imageVector = Icons.Outlined.Check,
+                    contentDescription = null,
+                    tint = Color(0xFF004528),
+                    modifier = Modifier.size(16.dp)
+                )
             }
         }
     }
