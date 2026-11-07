@@ -204,6 +204,42 @@ class CashierTransactionHistoryViewModel(
         applyClientFilters()
     }
 
+    fun updatePaymentMethodFilter(method: String) {
+        _uiState.update { it.copy(paymentMethodFilter = method, page = 1) }
+        applyClientFilters()
+    }
+
+    fun updateSortOrder(order: com.tbterminal.app.ui.salestransactions.SalesSortOrder) {
+        _uiState.update { it.copy(sortOrder = order, page = 1) }
+        applyClientFilters()
+    }
+
+    fun applyFilters(
+        status: String,
+        paymentMethod: String,
+        startDate: String?,
+        endDate: String?,
+        preset: String?,
+        sortOrder: com.tbterminal.app.ui.salestransactions.SalesSortOrder
+    ) {
+        val todayStr = LocalDate.now(WIB_ZONE).toString()
+        val finalStart = startDate ?: todayStr
+        val finalEnd = endDate ?: todayStr
+        _uiState.update {
+            it.copy(
+                statusFilter = status,
+                paymentMethodFilter = paymentMethod,
+                startDate = finalStart,
+                endDate = finalEnd,
+                selectedDate = finalEnd,
+                selectedPreset = preset,
+                sortOrder = sortOrder,
+                page = 1
+            )
+        }
+        applyClientFilters()
+    }
+
     fun setDate(date: String?) {
         val resolvedDate = date ?: LocalDate.now(WIB_ZONE).format(DateTimeFormatter.ISO_LOCAL_DATE)
         _uiState.update {
@@ -221,11 +257,25 @@ class CashierTransactionHistoryViewModel(
     fun setDatePreset(preset: String) {
         val today = LocalDate.now(WIB_ZONE)
         val startDate = when (preset) {
-            "7 hari" -> today.minusDays(6)
-            "30 hari" -> today.minusDays(29)
+            "Minggu ini", "Minggu", "7 hari" -> today.minusDays(6)
+            "Bulan ini", "Bulan", "30 hari" -> today.minusDays(29)
+            "Semua" -> LocalDate.of(2020, 1, 1)
             else -> today
         }
         setDateRange(startDate, today, preset)
+    }
+
+    fun setDateRange(startDateStr: String, endDateStr: String, preset: String?) {
+        _uiState.update {
+            it.copy(
+                startDate = startDateStr,
+                endDate = endDateStr,
+                selectedDate = endDateStr,
+                selectedPreset = preset,
+                page = 1
+            )
+        }
+        applyClientFilters()
     }
 
     fun previousDate() {
@@ -271,6 +321,20 @@ class CashierTransactionHistoryViewModel(
             }
         }
 
+        // Filter by payment method
+        if (state.paymentMethodFilter != "Semua") {
+            val targetMethod = state.paymentMethodFilter.lowercase()
+            filtered = filtered.filter { tx ->
+                tx.paymentMethods.any { method ->
+                    method.lowercase().contains(targetMethod) ||
+                    (targetMethod == "tunai" && method.lowercase() in listOf("tunai", "cash")) ||
+                    (targetMethod == "qris" && method.lowercase() in listOf("qris", "qr")) ||
+                    (targetMethod == "transfer" && method.lowercase() in listOf("transfer", "bank", "bca", "mandiri", "bri")) ||
+                    (targetMethod == "bon" && method.lowercase() in listOf("hutang", "bon", "tempo", "credit"))
+                }
+            }
+        }
+
         val startDate = (state.startDate ?: state.selectedDate)?.let(LocalDate::parse)
         val endDate = (state.endDate ?: state.selectedDate)?.let(LocalDate::parse)
         if (startDate != null || endDate != null) {
@@ -278,6 +342,13 @@ class CashierTransactionHistoryViewModel(
                 val txDate = tx.createdAt.toLocalDateOrNull()
                 txDate != null && (startDate == null || !txDate.isBefore(startDate)) && (endDate == null || !txDate.isAfter(endDate))
             }
+        }
+
+        // Sorting
+        filtered = when (state.sortOrder) {
+            com.tbterminal.app.ui.salestransactions.SalesSortOrder.Newest -> filtered.sortedByDescending { it.createdAt }
+            com.tbterminal.app.ui.salestransactions.SalesSortOrder.HighestAmount -> filtered.sortedByDescending { it.total }
+            com.tbterminal.app.ui.salestransactions.SalesSortOrder.ReceiptAsc -> filtered.sortedBy { it.receiptId }
         }
 
         // Calculate summary metrics for filtered set
@@ -320,6 +391,8 @@ class CashierTransactionHistoryViewModel(
             it.copy(
                 query = "",
                 statusFilter = "Semua",
+                paymentMethodFilter = "Semua",
+                sortOrder = com.tbterminal.app.ui.salestransactions.SalesSortOrder.Newest,
                 selectedPreset = "Hari ini",
                 selectedDate = today,
                 startDate = today,

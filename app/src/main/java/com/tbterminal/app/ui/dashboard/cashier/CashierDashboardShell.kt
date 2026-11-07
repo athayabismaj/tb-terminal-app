@@ -137,6 +137,7 @@ fun CashierDashboardShell(
     onLogout: () -> Unit,
     onLockScreen: (() -> Unit)? = null,
     showHeader: Boolean = true,
+    topBarActions: (@Composable () -> Unit)? = null,
     content: @Composable (Modifier) -> Unit
 ) {
     val adminNavigator = LocalAdminDestinationNavigator.current
@@ -219,6 +220,7 @@ fun CashierDashboardShell(
                             CashierDestination.CashSession, CashierDestination.TransactionHistory -> "Terminal Barokah Jaya"
                             else -> "Terminal Barokah Jaya"
                         },
+                        topBarActions = topBarActions,
                         onTerminalInfoClick = { showTerminalModal = true },
                         onProfileClick = onProfileClick,
                         onSettingsClick = onSettingsClick,
@@ -277,6 +279,7 @@ private fun CashierCompactTopBar(
     role: String,
     title: String = "Terminal Barokah Jaya",
     subtitle: String = "Terminal Kasir",
+    topBarActions: (@Composable () -> Unit)? = null,
     onTerminalInfoClick: () -> Unit,
     onProfileClick: () -> Unit,
     onSettingsClick: () -> Unit,
@@ -398,11 +401,15 @@ private fun CashierCompactTopBar(
                 }
             }
 
-            // Sisi Kanan: Quick Lock Button + User Profile Pill Button + Floating Animated Dropdown Popover
+            // Sisi Kanan: Optional TopBar Actions (Search, Filter, Rekap) + Quick Lock Button + User Profile Pill Button + Floating Animated Dropdown Popover
             Row(
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
+                if (topBarActions != null) {
+                    topBarActions()
+                }
+
                 Surface(
                     onClick = onLockClick,
                     shape = RoundedCornerShape(12.dp),

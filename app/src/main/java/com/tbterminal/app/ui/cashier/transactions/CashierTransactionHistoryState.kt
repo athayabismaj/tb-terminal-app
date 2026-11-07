@@ -27,6 +27,8 @@ data class CashierTransactionHistoryUiState(
     val bulkSyncProgressMessage: String? = null,
     val query: String = "",
     val statusFilter: String = "Semua",
+    val paymentMethodFilter: String = "Semua",
+    val sortOrder: com.tbterminal.app.ui.salestransactions.SalesSortOrder = com.tbterminal.app.ui.salestransactions.SalesSortOrder.Newest,
     val selectedDate: String? = LocalDate.now(java.time.ZoneId.of("Asia/Jakarta")).toString(),
     val startDate: String? = LocalDate.now(java.time.ZoneId.of("Asia/Jakarta")).toString(),
     val endDate: String? = LocalDate.now(java.time.ZoneId.of("Asia/Jakarta")).toString(),
