@@ -9,6 +9,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
@@ -22,11 +23,13 @@ import androidx.compose.material.icons.outlined.AccountBalance
 import androidx.compose.material.icons.outlined.AccountBalanceWallet
 import androidx.compose.material.icons.outlined.Add
 import androidx.compose.material.icons.outlined.Delete
+import androidx.compose.material.icons.outlined.LocalOffer
 import androidx.compose.material.icons.outlined.Payments
 import androidx.compose.material.icons.outlined.QrCode2
 import androidx.compose.material.icons.outlined.Receipt
 import androidx.compose.material.icons.outlined.Remove
 import androidx.compose.material.icons.outlined.ShoppingCart
+import androidx.compose.material.icons.outlined.SyncAlt
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
@@ -78,218 +81,252 @@ fun CartItemCard(
 ) {
     val subtotal = item.unitPrice.multiply(item.quantity.toBigDecimal())
 
-    Card(
+    Surface(
         modifier = Modifier.fillMaxWidth(),
-        colors = CardDefaults.cardColors(containerColor = CartSurface),
         shape = RoundedCornerShape(16.dp),
-        border = BorderStroke(1.dp, CartOutlineVariant.copy(alpha = 0.4f)),
-        elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
+        color = Color.White,
+        border = BorderStroke(1.dp, Color(0xFFE2E8F0)),
+        shadowElevation = 0.5.dp
     ) {
-        Row(
-            modifier = Modifier.padding(16.dp),
-            verticalAlignment = Alignment.CenterVertically
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(14.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
-            Box(
-                modifier = Modifier
-                    .size(72.dp)
-                    .background(CartSurfaceContainerLow, RoundedCornerShape(12.dp)),
-                contentAlignment = Alignment.Center
-            ) {
-                Text(
-                    item.productName.take(2).uppercase(),
-                    fontSize = 22.sp,
-                    fontWeight = FontWeight.Black,
-                    color = CartPrimaryContainer
-                )
-            }
-
-            Spacer(modifier = Modifier.width(20.dp))
-
-            Column(modifier = Modifier.weight(1f)) {
-                Text(
-                    item.productName,
-                    fontSize = 16.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = CartOnSurface,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
-                )
-                Row {
-                    if (unitName.isNotBlank()) {
-                        Text(
-                            unitName,
-                            fontSize = 13.sp,
-                            color = CartOnSurfaceVariant
-                        )
-                    }
-                    if (sku.isNotBlank()) {
-                        if (unitName.isNotBlank()) {
-                            Text(
-                                " • ",
-                                fontSize = 13.sp,
-                                color = CartOnSurfaceVariant
-                            )
-                        }
-                        Text(
-                            "SKU: $sku",
-                            fontSize = 13.sp,
-                            color = CartOnSurfaceVariant
-                        )
-                    }
-                }
-                if (item.hasSecondaryUnit && onToggleUnit != null) {
-                    Spacer(modifier = Modifier.height(6.dp))
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(6.dp)
-                    ) {
-                        Surface(
-                            shape = RoundedCornerShape(8.dp),
-                            color = if (!item.isSecondaryUnit) CartPrimary else CartSurfaceContainerLow,
-                            border = BorderStroke(
-                                1.dp,
-                                if (!item.isSecondaryUnit) CartPrimary else CartOutlineVariant.copy(alpha = 0.5f)
-                            ),
-                            modifier = Modifier.clickable { onToggleUnit(false) }
-                        ) {
-                            Text(
-                                text = item.baseUnitName.ifBlank { "Utama" },
-                                fontSize = 11.sp,
-                                fontWeight = if (!item.isSecondaryUnit) FontWeight.Bold else FontWeight.Medium,
-                                color = if (!item.isSecondaryUnit) CartOnPrimary else CartOnSurfaceVariant,
-                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp)
-                            )
-                        }
-
-                        val secLabel = buildString {
-                            append(item.secondaryUnitName?.ifBlank { "Satuan 2" } ?: "Satuan 2")
-                            item.secondaryUnitFactor?.let {
-                                append(" (x${it.stripTrailingZeros().toPlainString()})")
-                            }
-                        }
-                        Surface(
-                            shape = RoundedCornerShape(8.dp),
-                            color = if (item.isSecondaryUnit) CartPrimary else CartSurfaceContainerLow,
-                            border = BorderStroke(
-                                1.dp,
-                                if (item.isSecondaryUnit) CartPrimary else CartOutlineVariant.copy(alpha = 0.5f)
-                            ),
-                            modifier = Modifier.clickable { onToggleUnit(true) }
-                        ) {
-                            Text(
-                                text = secLabel,
-                                fontSize = 11.sp,
-                                fontWeight = if (item.isSecondaryUnit) FontWeight.Bold else FontWeight.Medium,
-                                color = if (item.isSecondaryUnit) CartOnPrimary else CartOnSurfaceVariant,
-                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp)
-                            )
-                        }
-
-                        if (item.isSecondaryUnit && item.secondaryUnitFactor != null) {
-                            Text(
-                                text = "= ${item.equivalentBaseQuantityBigDecimal.stripTrailingZeros().toPlainString()} ${item.baseUnitName}",
-                                fontSize = 10.sp,
-                                color = CartOutline,
-                                maxLines = 1
-                            )
-                        }
-                    }
-                }
-                TextButton(
-                    onClick = onDiscountClick,
-                    contentPadding = androidx.compose.foundation.layout.PaddingValues(0.dp),
-                    modifier = Modifier.height(32.dp),
-                ) {
-                    val request = item.discountRequest
-                    Text(
-                        text = if (request == null) {
-                            "+ Diskon item"
-                        } else {
-                            when (request.type) {
-                                DiscountType.PERCENTAGE -> "Diskon ${request.value.stripTrailingZeros().toPlainString()}%"
-                                DiscountType.FIXED_AMOUNT -> "Diskon ${formatRupiah(request.value)}"
-                            }
-                        },
-                        color = CartPrimary,
-                        fontSize = 12.sp,
-                        fontWeight = FontWeight.SemiBold,
-                    )
-                }
-            }
-
+            // ── BARIS 1: Info Produk & Subtotal Harga ──
             Row(
-                modifier = Modifier.padding(horizontal = 16.dp),
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.Top
+            ) {
+                // Sisi Kiri: Avatar Inisial & Info Produk
+                Row(
+                    modifier = Modifier.weight(1f).padding(end = 10.dp),
+                    verticalAlignment = Alignment.Top,
+                    horizontalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
+                    // Badge Kotak Inisial Produk (Harmonis Hijau TB)
+                    Surface(
+                        modifier = Modifier.size(42.dp),
+                        shape = RoundedCornerShape(10.dp),
+                        color = Color(0xFFF0FDF4),
+                        border = BorderStroke(1.dp, Color(0xFFBBF7D0))
+                    ) {
+                        Box(contentAlignment = Alignment.Center) {
+                            Text(
+                                text = item.productName.take(2).uppercase(),
+                                fontSize = 14.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = Color(0xFF004528)
+                            )
+                        }
+                    }
+
+                    Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                        Text(
+                            text = item.productName,
+                            fontSize = 14.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = Color(0xFF0F172A),
+                            maxLines = 2,
+                            overflow = TextOverflow.Ellipsis,
+                            lineHeight = 18.sp
+                        )
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(4.dp)
+                        ) {
+                            Text(
+                                text = "@ ${formatRupiah(item.unitPrice)}",
+                                fontSize = 11.5.sp,
+                                fontWeight = FontWeight.Medium,
+                                color = Color(0xFF64748B)
+                            )
+                            if (unitName.isNotBlank()) {
+                                Text(
+                                    text = "/ $unitName",
+                                    fontSize = 11.5.sp,
+                                    color = Color(0xFF94A3B8)
+                                )
+                            }
+                            if (sku.isNotBlank()) {
+                                Text(
+                                    text = "• SKU: $sku",
+                                    fontSize = 11.sp,
+                                    color = Color(0xFF94A3B8)
+                                )
+                            }
+                        }
+                    }
+                }
+
+                // Sisi Kanan: Subtotal Nominal Produk
+                Column(horizontalAlignment = Alignment.End) {
+                    Text(
+                        text = formatRupiah(subtotal),
+                        fontSize = 15.sp,
+                        fontWeight = FontWeight.ExtraBold,
+                        color = Color(0xFF004528)
+                    )
+                    if (item.discountRequest != null) {
+                        Text(
+                            text = "Ada diskon",
+                            fontSize = 10.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = Color(0xFFB45309)
+                        )
+                    }
+                }
+            }
+
+            // ── BARIS 2: Satuan & Diskon (Kiri) + Stepper Qty (Kanan) ──
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                if (item.quantity <= 1) {
-                    IconButton(
-                        onClick = onRemove,
-                        modifier = Modifier
-                            .size(36.dp)
-                            .border(1.dp, CartError.copy(alpha = 0.5f), RoundedCornerShape(8.dp))
-                    ) {
-                        Icon(
-                            Icons.Outlined.Delete,
-                            contentDescription = "Hapus",
-                            tint = CartError,
-                            modifier = Modifier.size(18.dp)
-                        )
-                    }
-                } else {
-                    IconButton(
-                        onClick = onDecrease,
-                        modifier = Modifier
-                            .size(36.dp)
-                            .border(1.dp, CartOutlineVariant, RoundedCornerShape(8.dp))
-                    ) {
-                        Icon(
-                            Icons.Outlined.Remove,
-                            contentDescription = "Kurang",
-                            tint = CartOnSurface,
-                            modifier = Modifier.size(18.dp)
-                        )
-                    }
-                }
-
-                Text(
-                    text = item.quantity.toString(),
-                    fontSize = 18.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = CartOnSurface,
-                    textAlign = TextAlign.Center,
-                    modifier = Modifier.width(44.dp)
-                )
-
-                IconButton(
-                    onClick = onIncrease,
-                    modifier = Modifier
-                        .size(36.dp)
-                        .background(CartPrimaryContainer, RoundedCornerShape(8.dp))
+                // Sisi Kiri: Opsi Satuan Alternatif & Diskon Item
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                    modifier = Modifier.weight(1f, fill = false)
                 ) {
-                    Icon(
-                        Icons.Outlined.Add,
-                        contentDescription = "Tambah",
-                        tint = CartOnPrimary,
-                        modifier = Modifier.size(18.dp)
-                    )
-                }
-            }
+                    // Tombol Ganti Satuan jika ada secondary unit
+                    if (item.hasSecondaryUnit && onToggleUnit != null) {
+                        Surface(
+                            onClick = { onToggleUnit(!item.isSecondaryUnit) },
+                            shape = RoundedCornerShape(8.dp),
+                            color = if (item.isSecondaryUnit) Color(0xFF004528) else Color(0xFFF1F5F9),
+                            border = BorderStroke(1.dp, if (item.isSecondaryUnit) Color(0xFF004528) else Color(0xFFE2E8F0))
+                        ) {
+                            Row(
+                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(4.dp)
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Outlined.SyncAlt,
+                                    contentDescription = null,
+                                    tint = if (item.isSecondaryUnit) Color.White else Color(0xFF475569),
+                                    modifier = Modifier.size(13.dp)
+                                )
+                                Text(
+                                    text = if (item.isSecondaryUnit) (item.secondaryUnitName ?: "Satuan 2") else (item.baseUnitName.ifBlank { "Utama" }),
+                                    fontSize = 11.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = if (item.isSecondaryUnit) Color.White else Color(0xFF334155)
+                                )
+                            }
+                        }
+                    }
 
-            Column(
-                horizontalAlignment = Alignment.End,
-                modifier = Modifier.width(130.dp)
-            ) {
-                Text(
-                    "@ ${formatRupiah(item.unitPrice)}",
-                    fontSize = 11.sp,
-                    color = CartOnSurfaceVariant
-                )
-                Text(
-                    formatRupiah(subtotal),
-                    fontSize = 18.sp,
-                    fontWeight = FontWeight.ExtraBold,
-                    color = CartOnSurface
-                )
+                    // Tombol Diskon Item
+                    val request = item.discountRequest
+                    Surface(
+                        onClick = onDiscountClick,
+                        shape = RoundedCornerShape(8.dp),
+                        color = if (request != null) Color(0xFFFEF3C7) else Color(0xFFF8FAFC),
+                        border = BorderStroke(1.dp, if (request != null) Color(0xFFF59E0B) else Color(0xFFE2E8F0))
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(4.dp)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Outlined.LocalOffer,
+                                contentDescription = null,
+                                tint = if (request != null) Color(0xFFB45309) else Color(0xFF64748B),
+                                modifier = Modifier.size(12.dp)
+                            )
+                            Text(
+                                text = if (request == null) "+ Diskon" else when (request.type) {
+                                    DiscountType.PERCENTAGE -> "-${request.value.stripTrailingZeros().toPlainString()}%"
+                                    DiscountType.FIXED_AMOUNT -> "-${formatRupiah(request.value)}"
+                                },
+                                fontSize = 11.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = if (request != null) Color(0xFFB45309) else Color(0xFF475569)
+                            )
+                        }
+                    }
+                }
+
+                // Sisi Kanan: Stepper Quantity [ - ] [ qty ] [ + ]
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(4.dp)
+                ) {
+                    if (item.quantity <= 1) {
+                        // Tombol Hapus (Merah)
+                        Surface(
+                            onClick = onRemove,
+                            shape = RoundedCornerShape(8.dp),
+                            color = Color(0xFFFEF2F2),
+                            border = BorderStroke(1.dp, Color(0xFFFCA5A5)),
+                            modifier = Modifier.size(32.dp)
+                        ) {
+                            Box(contentAlignment = Alignment.Center) {
+                                Icon(
+                                    imageVector = Icons.Outlined.Delete,
+                                    contentDescription = "Hapus item",
+                                    tint = Color(0xFFDC2626),
+                                    modifier = Modifier.size(16.dp)
+                                )
+                            }
+                        }
+                    } else {
+                        // Tombol Kurang (Slate)
+                        Surface(
+                            onClick = onDecrease,
+                            shape = RoundedCornerShape(8.dp),
+                            color = Color(0xFFF8FAFC),
+                            border = BorderStroke(1.dp, Color(0xFFCBD5E1)),
+                            modifier = Modifier.size(32.dp)
+                        ) {
+                            Box(contentAlignment = Alignment.Center) {
+                                Icon(
+                                    imageVector = Icons.Outlined.Remove,
+                                    contentDescription = "Kurang jumlah",
+                                    tint = Color(0xFF334155),
+                                    modifier = Modifier.size(16.dp)
+                                )
+                            }
+                        }
+                    }
+
+                    // Teks Jumlah
+                    Box(
+                        modifier = Modifier.width(36.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text(
+                            text = item.quantity.toString(),
+                            fontSize = 15.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = Color(0xFF0F172A),
+                            textAlign = TextAlign.Center
+                        )
+                    }
+
+                    // Tombol Tambah (Hijau TB)
+                    Surface(
+                        onClick = onIncrease,
+                        shape = RoundedCornerShape(8.dp),
+                        color = Color(0xFF004528),
+                        modifier = Modifier.size(32.dp)
+                    ) {
+                        Box(contentAlignment = Alignment.Center) {
+                            Icon(
+                                imageVector = Icons.Outlined.Add,
+                                contentDescription = "Tambah jumlah",
+                                tint = Color.White,
+                                modifier = Modifier.size(16.dp)
+                            )
+                        }
+                    }
+                }
             }
         }
     }
@@ -304,20 +341,20 @@ fun CartCalculationRow(
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(vertical = 6.dp),
+            .padding(vertical = 4.dp),
         horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.CenterVertically
     ) {
         Text(
             label,
-            fontSize = 15.sp,
-            color = CartOnSurfaceVariant
+            fontSize = 13.5.sp,
+            color = Color(0xFF64748B)
         )
         Text(
             value,
-            fontSize = 15.sp,
+            fontSize = 13.5.sp,
             fontWeight = FontWeight.SemiBold,
-            color = if (isDiscount) CartTertiary else CartOnSurface
+            color = if (isDiscount) Color(0xFFB45309) else Color(0xFF0F172A)
         )
     }
 }
@@ -327,55 +364,129 @@ fun PaymentMethodSelector(
     selectedMethod: PaymentMethod,
     onSelectPayment: (PaymentMethod) -> Unit
 ) {
-    Column {
-        Text(
-            "Metode Pembayaran",
-            fontSize = 13.sp,
-            fontWeight = FontWeight.Bold,
-            color = CartOnSurfaceVariant,
-            letterSpacing = 0.5.sp,
-            modifier = Modifier.padding(bottom = 8.dp)
-        )
+    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text(
+                text = "METODE PEMBAYARAN",
+                fontSize = 11.sp,
+                fontWeight = FontWeight.Bold,
+                color = Color(0xFF64748B),
+                letterSpacing = 0.8.sp
+            )
+            Surface(
+                shape = RoundedCornerShape(6.dp),
+                color = Color(0xFFF0FDF4),
+                border = BorderStroke(1.dp, Color(0xFFBBF7D0))
+            ) {
+                Text(
+                    text = selectedMethod.displayName(),
+                    fontSize = 10.5.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = Color(0xFF004528),
+                    modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                )
+            }
+        }
 
+        // Baris 1: Pembayaran Langsung (Tunai, QRIS, Transfer)
         Row(
             horizontalArrangement = Arrangement.spacedBy(6.dp),
             modifier = Modifier.fillMaxWidth()
         ) {
-            PaymentMethod.entries.forEach { method ->
+            listOf(PaymentMethod.TUNAI, PaymentMethod.QRIS, PaymentMethod.TRANSFER).forEach { method ->
                 val isSelected = method == selectedMethod
                 Surface(
                     onClick = { onSelectPayment(method) },
                     shape = RoundedCornerShape(10.dp),
-                    color = if (isSelected) CartPrimary else CartSurface,
+                    color = if (isSelected) Color(0xFF004528) else Color(0xFFF8FAFC),
                     border = BorderStroke(
                         1.dp,
-                        if (isSelected) Color.Transparent else CartOutlineVariant
+                        if (isSelected) Color(0xFF004528) else Color(0xFFE2E8F0)
                     ),
-                    modifier = Modifier.weight(1f)
+                    shadowElevation = if (isSelected) 1.dp else 0.dp,
+                    modifier = Modifier
+                        .weight(1f)
+                        .height(44.dp)
                 ) {
-                    Column(
-                        horizontalAlignment = Alignment.CenterHorizontally,
-                        modifier = Modifier.padding(vertical = 10.dp, horizontal = 4.dp)
+                    Row(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .padding(horizontal = 6.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.Center
                     ) {
                         Icon(
-                            when (method) {
+                            imageVector = when (method) {
                                 PaymentMethod.TUNAI -> Icons.Outlined.Payments
-                                PaymentMethod.TRANSFER -> Icons.Outlined.AccountBalance
                                 PaymentMethod.QRIS -> Icons.Outlined.QrCode2
-                                PaymentMethod.HUTANG -> Icons.Outlined.Receipt
-                                PaymentMethod.DP -> Icons.Outlined.AccountBalanceWallet
+                                PaymentMethod.TRANSFER -> Icons.Outlined.AccountBalance
+                                else -> Icons.Outlined.Payments
                             },
                             contentDescription = method.displayName(),
-                            tint = if (isSelected) CartOnPrimary else CartOnSurfaceVariant,
-                            modifier = Modifier.size(20.dp)
+                            tint = if (isSelected) Color.White else Color(0xFF475569),
+                            modifier = Modifier.size(17.dp)
                         )
-                        Spacer(modifier = Modifier.height(4.dp))
+                        Spacer(modifier = Modifier.width(5.dp))
                         Text(
-                            method.displayName(),
-                            fontSize = 11.sp,
+                            text = method.displayName(),
+                            fontSize = 12.sp,
                             fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
-                            color = if (isSelected) CartOnPrimary else CartOnSurfaceVariant,
-                            textAlign = TextAlign.Center,
+                            color = if (isSelected) Color.White else Color(0xFF334155),
+                            maxLines = 1
+                        )
+                    }
+                }
+            }
+        }
+
+        // Baris 2: Piutang & Bertahap (Hutang / Tempo & DP Proyek)
+        Row(
+            horizontalArrangement = Arrangement.spacedBy(6.dp),
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            listOf(PaymentMethod.HUTANG, PaymentMethod.DP).forEach { method ->
+                val isSelected = method == selectedMethod
+                val label = if (method == PaymentMethod.HUTANG) "Hutang / Tempo" else "DP Proyek"
+                Surface(
+                    onClick = { onSelectPayment(method) },
+                    shape = RoundedCornerShape(10.dp),
+                    color = if (isSelected) Color(0xFF004528) else Color(0xFFF8FAFC),
+                    border = BorderStroke(
+                        1.dp,
+                        if (isSelected) Color(0xFF004528) else Color(0xFFE2E8F0)
+                    ),
+                    shadowElevation = if (isSelected) 1.dp else 0.dp,
+                    modifier = Modifier
+                        .weight(1f)
+                        .height(42.dp)
+                ) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .padding(horizontal = 8.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.Center
+                    ) {
+                        Icon(
+                            imageVector = when (method) {
+                                PaymentMethod.HUTANG -> Icons.Outlined.Receipt
+                                PaymentMethod.DP -> Icons.Outlined.AccountBalanceWallet
+                                else -> Icons.Outlined.Receipt
+                            },
+                            contentDescription = label,
+                            tint = if (isSelected) Color.White else Color(0xFF475569),
+                            modifier = Modifier.size(16.dp)
+                        )
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text(
+                            text = label,
+                            fontSize = 12.sp,
+                            fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
+                            color = if (isSelected) Color.White else Color(0xFF334155),
                             maxLines = 1
                         )
                     }
@@ -460,6 +571,6 @@ fun CartEmptyState(
 }
 
 private fun formatRupiah(amount: BigDecimal): String {
-    val formatter = NumberFormat.getNumberInstance(Locale("id", "ID"))
+    val formatter = NumberFormat.getNumberInstance(Locale.forLanguageTag("id-ID"))
     return "Rp ${formatter.format(amount)}"
 }
