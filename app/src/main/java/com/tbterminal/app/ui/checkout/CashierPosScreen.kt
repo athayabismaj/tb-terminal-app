@@ -186,7 +186,7 @@ fun CashierPosScreen(
         modifier = modifier
             .fillMaxSize()
             .hardwareBarcodeScanner { barcode -> onScanBarcode(barcode) },
-        containerColor = Slate50,
+        containerColor = Color(0xFFF8FAF9),
         contentWindowInsets = WindowInsets(0.dp)
     ) { paddingValues ->
         Box(
@@ -203,16 +203,14 @@ fun CashierPosScreen(
                         .padding(horizontal = if (compact) 14.dp else 24.dp)
                         .padding(top = 8.dp)
                 ) {
-                    // ── 1. OPERATIONAL NOTA STATUS ROW (Hanya tampil jika ada nota diparkir / keranjang terisi) ──
-                    if (state.heldCarts.isNotEmpty() || cartItemCount > 0) {
-                        PosOperationalStatusRow(
-                            heldCartsCount = state.heldCarts.size,
-                            cartItemCount = cartItemCount,
-                            onOpenHeldCarts = onOpenHeldCarts,
-                            onOpenHoldCartDialog = onOpenHoldCartDialog
-                        )
-                        Spacer(modifier = Modifier.height(8.dp))
-                    }
+                    // ── 1. OPERATIONAL NOTA STATUS ROW (Hadir di bagian atas katalog produk seperti HTML mockup) ──
+                    PosOperationalStatusRow(
+                        heldCartsCount = state.heldCarts.size,
+                        cartItemCount = cartItemCount,
+                        onOpenHeldCarts = onOpenHeldCarts,
+                        onOpenHoldCartDialog = onOpenHoldCartDialog
+                    )
+                    Spacer(modifier = Modifier.height(8.dp))
 
                     // ── 2. EXPANDABLE SEARCH & SCANNER INPUT BAR (Hanya nampak ketika icon cari di-trigger atau teks query terisi) ──
                     AnimatedVisibility(
@@ -423,60 +421,61 @@ private fun PosOperationalStatusRow(
         horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.CenterVertically
     ) {
-        // Tag Identitas Mesin Kasir POS
+        // Tag Identitas Mesin Kasir POS-01 (Pill rounded-full dengan green pulse dot)
         Surface(
-            shape = RoundedCornerShape(8.dp),
-            color = BrandGreenLight,
-            border = BorderStroke(1.dp, BrandGreenBorder)
+            shape = RoundedCornerShape(100.dp),
+            color = Color(0xFFECFDF5),
+            border = BorderStroke(1.dp, Color(0xFFA7F3D0).copy(alpha = 0.6f))
         ) {
             Row(
-                modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+                modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp),
                 verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(4.dp)
+                horizontalArrangement = Arrangement.spacedBy(6.dp)
             ) {
                 Box(
                     modifier = Modifier
                         .size(6.dp)
-                        .background(BrandForest, CircleShape)
+                        .clip(CircleShape)
+                        .background(Color(0xFF059669))
                 )
                 Text(
                     text = "POS-01",
-                    color = BrandForest,
-                    fontSize = 11.sp,
-                    fontWeight = FontWeight.Bold
+                    color = Color(0xFF065F46),
+                    fontSize = 12.sp,
+                    fontWeight = FontWeight.SemiBold
                 )
             }
         }
 
-        // Action Parkir Nota
+        // Action Parkir & Tunda Transaksi
         Row(
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(6.dp)
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
         ) {
             // Badge Parkir Nota jika ada yang ditahan
             if (heldCartsCount > 0) {
                 Surface(
                     onClick = onOpenHeldCarts,
-                    shape = RoundedCornerShape(10.dp),
-                    color = AmberBg,
-                    border = BorderStroke(1.dp, AmberBorder)
+                    shape = RoundedCornerShape(100.dp),
+                    color = Color(0xFFFFFBEB),
+                    border = BorderStroke(1.dp, Color(0xFFFDE68A).copy(alpha = 0.7f))
                 ) {
                     Row(
-                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
-                        verticalAlignment = Alignment.CenterVertically
+                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(4.dp)
                     ) {
                         Icon(
                             imageVector = Icons.Outlined.PauseCircleOutline,
                             contentDescription = null,
-                            tint = Amber700,
+                            tint = Color(0xFFD97706),
                             modifier = Modifier.size(14.dp)
                         )
-                        Spacer(Modifier.width(4.dp))
                         Text(
                             text = "Parkir ($heldCartsCount)",
-                            color = Amber700,
-                            fontWeight = FontWeight.Bold,
-                            fontSize = 11.sp
+                            color = Color(0xFF92400E),
+                            fontWeight = FontWeight.SemiBold,
+                            fontSize = 12.sp
                         )
                     }
                 }
@@ -484,25 +483,30 @@ private fun PosOperationalStatusRow(
 
             // Tombol Tunda / Parkir Transaksi saat kasir melayani transaksi yang perlu ditunda
             if (cartItemCount > 0) {
-                OutlinedButton(
+                Surface(
                     onClick = onOpenHoldCartDialog,
-                    shape = RoundedCornerShape(10.dp),
-                    border = BorderStroke(1.dp, Amber700),
-                    colors = ButtonDefaults.outlinedButtonColors(contentColor = Amber700),
-                    contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp),
-                    modifier = Modifier.height(30.dp)
+                    shape = RoundedCornerShape(100.dp),
+                    color = Color.White,
+                    border = BorderStroke(1.dp, Slate200)
                 ) {
-                    Icon(
-                        imageVector = Icons.Outlined.BookmarkAdd,
-                        contentDescription = null,
-                        modifier = Modifier.size(13.dp)
-                    )
-                    Spacer(Modifier.width(4.dp))
-                    Text(
-                        text = "Tunda Transaksi",
-                        fontWeight = FontWeight.Bold,
-                        fontSize = 11.sp
-                    )
+                    Row(
+                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(4.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Outlined.BookmarkAdd,
+                            contentDescription = null,
+                            tint = Slate500,
+                            modifier = Modifier.size(14.dp)
+                        )
+                        Text(
+                            text = "Tunda Transaksi",
+                            color = Slate700,
+                            fontWeight = FontWeight.SemiBold,
+                            fontSize = 12.sp
+                        )
+                    }
                 }
             }
         }
@@ -919,7 +923,7 @@ private fun PosCategoryCarousel(
 }
 
 // ═════════════════════════════════════════════════════════════════════════════
-// SUB-KOMPONEN 4: STICKY INDUSTRIAL BOTTOM CART DOCK
+// SUB-KOMPONEN 4: FLOATING BOTTOM CART DOCK (MATCHING HTML MOCKUP)
 // Anchored at bottom with live price, item count, and direct review CTA
 // ═════════════════════════════════════════════════════════════════════════════
 @Composable
@@ -933,15 +937,15 @@ private fun PosBottomCartDock(
         modifier = modifier
             .fillMaxWidth()
             .clickable(onClick = onNavigateToCart),
-        shape = RoundedCornerShape(16.dp),
-        color = BrandForestDark,
-        border = BorderStroke(1.dp, BrandForest),
+        shape = RoundedCornerShape(18.dp),
+        color = BrandForest,
+        border = BorderStroke(1.dp, Color(0xFF065F46)),
         shadowElevation = 8.dp
     ) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 16.dp, vertical = 12.dp),
+                .padding(horizontal = 14.dp, vertical = 10.dp),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.SpaceBetween
         ) {
@@ -950,34 +954,38 @@ private fun PosBottomCartDock(
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(12.dp)
             ) {
-                Box(contentAlignment = Alignment.TopEnd) {
+                Box(
+                    modifier = Modifier.size(40.dp)
+                ) {
                     Box(
                         modifier = Modifier
-                            .size(42.dp)
+                            .fillMaxSize()
                             .clip(RoundedCornerShape(12.dp))
-                            .background(BrandForest),
+                            .background(BrandForestDark),
                         contentAlignment = Alignment.Center
                     ) {
                         Icon(
                             imageVector = Icons.Outlined.ShoppingCart,
                             contentDescription = "Keranjang",
                             tint = Color.White,
-                            modifier = Modifier.size(22.dp)
+                            modifier = Modifier.size(20.dp)
                         )
                     }
 
+                    // White circular badge with BrandForest text
                     Box(
                         modifier = Modifier
+                            .align(Alignment.TopEnd)
                             .offset(x = 4.dp, y = (-4).dp)
                             .size(18.dp)
                             .clip(CircleShape)
-                            .background(DangerRed)
-                            .border(1.5.dp, BrandForestDark, CircleShape),
+                            .background(Color.White)
+                            .border(1.dp, BrandForestDark, CircleShape),
                         contentAlignment = Alignment.Center
                     ) {
                         Text(
                             text = cartItemCount.toString(),
-                            color = Color.White,
+                            color = BrandForest,
                             fontSize = 10.sp,
                             fontWeight = FontWeight.ExtraBold
                         )
@@ -987,41 +995,47 @@ private fun PosBottomCartDock(
                 Column(verticalArrangement = Arrangement.spacedBy(1.dp)) {
                     Text(
                         text = "$cartItemCount Barang Dipilih",
-                        color = Color.White.copy(alpha = 0.8f),
+                        color = Color(0xFFA7F3D0),
                         fontSize = 11.sp,
-                        fontWeight = FontWeight.Medium
+                        fontWeight = FontWeight.Medium,
+                        lineHeight = 14.sp
                     )
                     Text(
                         text = cartSubtotal.toRupiahText(),
                         color = Color.White,
-                        fontSize = 18.sp,
-                        fontWeight = FontWeight.ExtraBold
+                        fontSize = 16.sp,
+                        fontWeight = FontWeight.ExtraBold,
+                        letterSpacing = (-0.3).sp,
+                        lineHeight = 20.sp
                     )
                 }
             }
 
-            // Right: Review CTA Button
-            Button(
+            // Right: Checkout Action Button (Solid White Pill with BrandForest Text)
+            Surface(
                 onClick = onNavigateToCart,
-                shape = RoundedCornerShape(10.dp),
-                colors = ButtonDefaults.buttonColors(
-                    containerColor = BrandGreenLight,
-                    contentColor = BrandForest
-                ),
-                contentPadding = PaddingValues(horizontal = 14.dp, vertical = 8.dp),
-                modifier = Modifier.height(38.dp)
+                shape = RoundedCornerShape(12.dp),
+                color = Color.White,
+                shadowElevation = 1.dp
             ) {
-                Text(
-                    text = "Review & Bayar",
-                    fontWeight = FontWeight.Bold,
-                    fontSize = 12.sp
-                )
-                Spacer(modifier = Modifier.width(6.dp))
-                Icon(
-                    imageVector = Icons.AutoMirrored.Outlined.ArrowForward,
-                    contentDescription = null,
-                    modifier = Modifier.size(14.dp)
-                )
+                Row(
+                    modifier = Modifier.padding(horizontal = 14.dp, vertical = 8.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                ) {
+                    Text(
+                        text = "Review & Bayar",
+                        color = BrandForest,
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 12.sp
+                    )
+                    Icon(
+                        imageVector = Icons.AutoMirrored.Outlined.ArrowForward,
+                        contentDescription = null,
+                        tint = BrandForest,
+                        modifier = Modifier.size(14.dp)
+                    )
+                }
             }
         }
     }
