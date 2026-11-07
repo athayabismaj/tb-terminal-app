@@ -83,7 +83,7 @@ fun CartItemCard(
 
     Surface(
         modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(16.dp),
+        shape = RoundedCornerShape(14.dp),
         color = Color.White,
         border = BorderStroke(1.dp, Color(0xFFE2E8F0)),
         shadowElevation = 0.5.dp
@@ -92,7 +92,7 @@ fun CartItemCard(
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(14.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp)
+            verticalArrangement = Arrangement.spacedBy(10.dp)
         ) {
             // ── BARIS 1: Info Produk & Subtotal Harga ──
             Row(
@@ -100,63 +100,45 @@ fun CartItemCard(
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.Top
             ) {
-                // Sisi Kiri: Avatar Inisial & Info Produk
-                Row(
-                    modifier = Modifier.weight(1f).padding(end = 10.dp),
-                    verticalAlignment = Alignment.Top,
-                    horizontalArrangement = Arrangement.spacedBy(10.dp)
+                // Info Produk (Nama, Harga Satuan, SKU)
+                Column(
+                    modifier = Modifier
+                        .weight(1f)
+                        .padding(end = 12.dp),
+                    verticalArrangement = Arrangement.spacedBy(3.dp)
                 ) {
-                    // Badge Kotak Inisial Produk (Harmonis Hijau TB)
-                    Surface(
-                        modifier = Modifier.size(42.dp),
-                        shape = RoundedCornerShape(10.dp),
-                        color = Color(0xFFF0FDF4),
-                        border = BorderStroke(1.dp, Color(0xFFBBF7D0))
+                    Text(
+                        text = item.productName,
+                        fontSize = 14.5.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = Color(0xFF0F172A),
+                        maxLines = 2,
+                        overflow = TextOverflow.Ellipsis,
+                        lineHeight = 19.sp
+                    )
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(4.dp)
                     ) {
-                        Box(contentAlignment = Alignment.Center) {
+                        Text(
+                            text = "@ ${formatRupiah(item.unitPrice)}",
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.Medium,
+                            color = Color(0xFF64748B)
+                        )
+                        if (unitName.isNotBlank()) {
                             Text(
-                                text = item.productName.take(2).uppercase(),
-                                fontSize = 14.sp,
-                                fontWeight = FontWeight.Bold,
-                                color = Color(0xFF004528)
+                                text = "/ $unitName",
+                                fontSize = 12.sp,
+                                color = Color(0xFF94A3B8)
                             )
                         }
-                    }
-
-                    Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                        Text(
-                            text = item.productName,
-                            fontSize = 14.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = Color(0xFF0F172A),
-                            maxLines = 2,
-                            overflow = TextOverflow.Ellipsis,
-                            lineHeight = 18.sp
-                        )
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(4.dp)
-                        ) {
+                        if (sku.isNotBlank()) {
                             Text(
-                                text = "@ ${formatRupiah(item.unitPrice)}",
-                                fontSize = 11.5.sp,
-                                fontWeight = FontWeight.Medium,
-                                color = Color(0xFF64748B)
+                                text = "• SKU: $sku",
+                                fontSize = 11.sp,
+                                color = Color(0xFF94A3B8)
                             )
-                            if (unitName.isNotBlank()) {
-                                Text(
-                                    text = "/ $unitName",
-                                    fontSize = 11.5.sp,
-                                    color = Color(0xFF94A3B8)
-                                )
-                            }
-                            if (sku.isNotBlank()) {
-                                Text(
-                                    text = "• SKU: $sku",
-                                    fontSize = 11.sp,
-                                    color = Color(0xFF94A3B8)
-                                )
-                            }
                         }
                     }
                 }
@@ -165,15 +147,15 @@ fun CartItemCard(
                 Column(horizontalAlignment = Alignment.End) {
                     Text(
                         text = formatRupiah(subtotal),
-                        fontSize = 15.sp,
+                        fontSize = 15.5.sp,
                         fontWeight = FontWeight.ExtraBold,
                         color = Color(0xFF004528)
                     )
                     if (item.discountRequest != null) {
                         Text(
-                            text = "Ada diskon",
-                            fontSize = 10.sp,
-                            fontWeight = FontWeight.Bold,
+                            text = "Diskon diterapkan",
+                            fontSize = 10.5.sp,
+                            fontWeight = FontWeight.SemiBold,
                             color = Color(0xFFB45309)
                         )
                     }
@@ -197,8 +179,8 @@ fun CartItemCard(
                         Surface(
                             onClick = { onToggleUnit(!item.isSecondaryUnit) },
                             shape = RoundedCornerShape(8.dp),
-                            color = if (item.isSecondaryUnit) Color(0xFF004528) else Color(0xFFF1F5F9),
-                            border = BorderStroke(1.dp, if (item.isSecondaryUnit) Color(0xFF004528) else Color(0xFFE2E8F0))
+                            color = if (item.isSecondaryUnit) Color(0xFFF0FDF4) else Color(0xFFF8FAFC),
+                            border = BorderStroke(1.dp, if (item.isSecondaryUnit) Color(0xFF86EFAC) else Color(0xFFE2E8F0))
                         ) {
                             Row(
                                 modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
@@ -208,14 +190,14 @@ fun CartItemCard(
                                 Icon(
                                     imageVector = Icons.Outlined.SyncAlt,
                                     contentDescription = null,
-                                    tint = if (item.isSecondaryUnit) Color.White else Color(0xFF475569),
+                                    tint = if (item.isSecondaryUnit) Color(0xFF004528) else Color(0xFF64748B),
                                     modifier = Modifier.size(13.dp)
                                 )
                                 Text(
                                     text = if (item.isSecondaryUnit) (item.secondaryUnitName ?: "Satuan 2") else (item.baseUnitName.ifBlank { "Utama" }),
                                     fontSize = 11.sp,
                                     fontWeight = FontWeight.Bold,
-                                    color = if (item.isSecondaryUnit) Color.White else Color(0xFF334155)
+                                    color = if (item.isSecondaryUnit) Color(0xFF004528) else Color(0xFF475569)
                                 )
                             }
                         }
@@ -227,7 +209,7 @@ fun CartItemCard(
                         onClick = onDiscountClick,
                         shape = RoundedCornerShape(8.dp),
                         color = if (request != null) Color(0xFFFEF3C7) else Color(0xFFF8FAFC),
-                        border = BorderStroke(1.dp, if (request != null) Color(0xFFF59E0B) else Color(0xFFE2E8F0))
+                        border = BorderStroke(1.dp, if (request != null) Color(0xFFFCD34D) else Color(0xFFE2E8F0))
                     ) {
                         Row(
                             modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
@@ -253,77 +235,63 @@ fun CartItemCard(
                     }
                 }
 
-                // Sisi Kanan: Stepper Quantity [ - ] [ qty ] [ + ]
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(4.dp)
+                // Sisi Kanan: Stepper Quantity [ - ] [ qty ] [ + ] Ergonomis
+                Surface(
+                    shape = RoundedCornerShape(10.dp),
+                    color = Color(0xFFF8FAFC),
+                    border = BorderStroke(1.dp, Color(0xFFE2E8F0))
                 ) {
-                    if (item.quantity <= 1) {
-                        // Tombol Hapus (Merah)
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier.padding(2.dp)
+                    ) {
+                        // Tombol Kurang / Hapus
                         Surface(
-                            onClick = onRemove,
+                            onClick = if (item.quantity <= 1) onRemove else onDecrease,
                             shape = RoundedCornerShape(8.dp),
-                            color = Color(0xFFFEF2F2),
-                            border = BorderStroke(1.dp, Color(0xFFFCA5A5)),
-                            modifier = Modifier.size(32.dp)
+                            color = if (item.quantity <= 1) Color(0xFFFEF2F2) else Color.White,
+                            border = BorderStroke(1.dp, if (item.quantity <= 1) Color(0xFFFECACA) else Color(0xFFE2E8F0)),
+                            modifier = Modifier.size(30.dp)
                         ) {
                             Box(contentAlignment = Alignment.Center) {
                                 Icon(
-                                    imageVector = Icons.Outlined.Delete,
-                                    contentDescription = "Hapus item",
-                                    tint = Color(0xFFDC2626),
-                                    modifier = Modifier.size(16.dp)
+                                    imageVector = if (item.quantity <= 1) Icons.Outlined.Delete else Icons.Outlined.Remove,
+                                    contentDescription = if (item.quantity <= 1) "Hapus item" else "Kurang jumlah",
+                                    tint = if (item.quantity <= 1) Color(0xFFDC2626) else Color(0xFF334155),
+                                    modifier = Modifier.size(15.dp)
                                 )
                             }
                         }
-                    } else {
-                        // Tombol Kurang (Slate)
-                        Surface(
-                            onClick = onDecrease,
-                            shape = RoundedCornerShape(8.dp),
-                            color = Color(0xFFF8FAFC),
-                            border = BorderStroke(1.dp, Color(0xFFCBD5E1)),
-                            modifier = Modifier.size(32.dp)
+
+                        // Angka Kuantitas
+                        Box(
+                            modifier = Modifier.width(36.dp),
+                            contentAlignment = Alignment.Center
                         ) {
-                            Box(contentAlignment = Alignment.Center) {
-                                Icon(
-                                    imageVector = Icons.Outlined.Remove,
-                                    contentDescription = "Kurang jumlah",
-                                    tint = Color(0xFF334155),
-                                    modifier = Modifier.size(16.dp)
-                                )
-                            }
-                        }
-                    }
-
-                    // Teks Jumlah
-                    Box(
-                        modifier = Modifier.width(36.dp),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Text(
-                            text = item.quantity.toString(),
-                            fontSize = 15.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = Color(0xFF0F172A),
-                            textAlign = TextAlign.Center
-                        )
-                    }
-
-                    // Tombol Tambah (Hijau TB)
-                    Surface(
-                        onClick = onIncrease,
-                        shape = RoundedCornerShape(8.dp),
-                        color = Color(0xFF004528),
-                        modifier = Modifier.size(32.dp)
-                    ) {
-                        Box(contentAlignment = Alignment.Center) {
-                            Icon(
-                                imageVector = Icons.Outlined.Add,
-                                contentDescription = "Tambah jumlah",
-                                tint = Color.White,
-                                modifier = Modifier.size(16.dp)
+                            Text(
+                                text = item.quantity.toString(),
+                                fontSize = 14.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = Color(0xFF0F172A),
+                                textAlign = TextAlign.Center
                             )
+                        }
+
+                        // Tombol Tambah
+                        Surface(
+                            onClick = onIncrease,
+                            shape = RoundedCornerShape(8.dp),
+                            color = Color(0xFF004528),
+                            modifier = Modifier.size(30.dp)
+                        ) {
+                            Box(contentAlignment = Alignment.Center) {
+                                Icon(
+                                    imageVector = Icons.Outlined.Add,
+                                    contentDescription = "Tambah jumlah",
+                                    tint = Color.White,
+                                    modifier = Modifier.size(15.dp)
+                                )
+                            }
                         }
                     }
                 }

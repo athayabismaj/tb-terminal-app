@@ -110,6 +110,7 @@ fun CashierCartScreen(
     var discountItemId by remember { mutableStateOf<String?>(null) }
     var showTransactionDiscount by remember { mutableStateOf(false) }
     var showCameraScanner by remember { mutableStateOf(false) }
+    var showClearCartDialog by remember { mutableStateOf(false) }
 
     CashierDashboardShell(
         userName = name,
@@ -151,7 +152,7 @@ fun CashierCartScreen(
                     onUseCustomerName = onUseCustomerName,
                     onSelectPayment = onSelectPayment,
                     onAmountPaidChanged = onAmountPaidChanged,
-                    onClearCart = onClearCart,
+                    onClearCart = { showClearCartDialog = true },
                     onEditItemDiscount = { discountItemId = it },
                     onEditTransactionDiscount = { showTransactionDiscount = true },
                     onToggleUnit = onToggleUnit,
@@ -223,6 +224,54 @@ fun CashierCartScreen(
             },
         )
     }
+
+    if (showClearCartDialog) {
+        val totalItems = state.cartItems.sumOf { it.quantity }
+        AlertDialog(
+            onDismissRequest = { showClearCartDialog = false },
+            title = {
+                Text(
+                    text = "Kosongkan Keranjang?",
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 17.sp,
+                    color = CartOnSurface
+                )
+            },
+            text = {
+                Text(
+                    text = "Semua $totalItems barang belanjaan dalam keranjang ini akan dihapus.",
+                    fontSize = 13.5.sp,
+                    color = CartOnSurfaceVariant
+                )
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        showClearCartDialog = false
+                        onClearCart()
+                    },
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = CartError,
+                        contentColor = Color.White
+                    ),
+                    shape = RoundedCornerShape(10.dp)
+                ) {
+                    Text("Ya, Kosongkan", fontWeight = FontWeight.Bold)
+                }
+            },
+            dismissButton = {
+                OutlinedButton(
+                    onClick = { showClearCartDialog = false },
+                    shape = RoundedCornerShape(10.dp),
+                    border = BorderStroke(1.dp, CartOutlineVariant)
+                ) {
+                    Text("Batal", color = CartOnSurface, fontWeight = FontWeight.SemiBold)
+                }
+            },
+            containerColor = Color.White,
+            shape = RoundedCornerShape(16.dp)
+        )
+    }
 }
 
 // ═════════════════════════════════════════════════════════════════════════════
@@ -285,7 +334,8 @@ private fun CartContent(
                         heldCartsCount = state.heldCarts.size,
                         onBackToPos = onBackToPos,
                         onOpenHeldCarts = onOpenHeldCarts,
-                        onOpenCameraScanner = onOpenCameraScanner
+                        onOpenCameraScanner = onOpenCameraScanner,
+                        onClearCart = onClearCart
                     )
 
                     Spacer(modifier = Modifier.height(14.dp))
@@ -361,7 +411,8 @@ private fun CartContent(
                     heldCartsCount = state.heldCarts.size,
                     onBackToPos = onBackToPos,
                     onOpenHeldCarts = onOpenHeldCarts,
-                    onOpenCameraScanner = onOpenCameraScanner
+                    onOpenCameraScanner = onOpenCameraScanner,
+                    onClearCart = onClearCart
                 )
 
                 Spacer(modifier = Modifier.height(10.dp))
@@ -461,57 +512,39 @@ private fun CartContent(
                         HorizontalDivider(color = CartOutlineVariant)
 
                         Row(
-                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                            horizontalArrangement = Arrangement.spacedBy(10.dp),
+                            verticalAlignment = Alignment.CenterVertically,
                             modifier = Modifier.fillMaxWidth()
                         ) {
-                            OutlinedButton(
-                                onClick = onClearCart,
-                                modifier = Modifier
-                                    .height(46.dp)
-                                    .weight(0.7f),
-                                shape = RoundedCornerShape(12.dp),
-                                border = BorderStroke(1.dp, Color(0xFFFCA5A5)),
-                                colors = ButtonDefaults.outlinedButtonColors(
-                                    containerColor = Color(0xFFFEF2F2),
-                                    contentColor = Color(0xFFDC2626)
-                                )
-                            ) {
-                                Icon(
-                                    imageVector = Icons.Outlined.DeleteSweep,
-                                    contentDescription = null,
-                                    modifier = Modifier.size(16.dp)
-                                )
-                                Spacer(modifier = Modifier.width(3.dp))
-                                Text("Batal", fontWeight = FontWeight.Bold, fontSize = 12.sp)
-                            }
-
+                            // Secondary Action: Parkir Pesanan
                             OutlinedButton(
                                 onClick = onOpenHoldCartDialog,
-                                modifier = Modifier
-                                    .height(46.dp)
-                                    .weight(0.8f),
+                                modifier = Modifier.height(48.dp),
                                 shape = RoundedCornerShape(12.dp),
-                                border = BorderStroke(1.dp, Color(0xFFF59E0B)),
+                                border = BorderStroke(1.dp, CartOutlineVariant),
                                 colors = ButtonDefaults.outlinedButtonColors(
-                                    containerColor = Color(0xFFFEF3C7),
-                                    contentColor = Color(0xFFB45309)
-                                )
+                                    containerColor = Color.White,
+                                    contentColor = CartOnSurface
+                                ),
+                                contentPadding = PaddingValues(horizontal = 14.dp)
                             ) {
                                 Icon(
                                     imageVector = Icons.Outlined.BookmarkAdd,
                                     contentDescription = null,
-                                    modifier = Modifier.size(16.dp)
+                                    tint = CartSecondary,
+                                    modifier = Modifier.size(17.dp)
                                 )
-                                Spacer(modifier = Modifier.width(3.dp))
-                                Text("Parkir", fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                                Spacer(modifier = Modifier.width(6.dp))
+                                Text("Parkir", fontWeight = FontWeight.SemiBold, fontSize = 13.sp)
                             }
 
+                            // Dominant Primary Action: Lanjut ke Pembayaran
                             Button(
                                 onClick = onNavigateToPayment,
                                 enabled = state.cartItems.isNotEmpty(),
                                 modifier = Modifier
-                                    .height(46.dp)
-                                    .weight(1.5f),
+                                    .height(48.dp)
+                                    .weight(1f),
                                 shape = RoundedCornerShape(12.dp),
                                 colors = ButtonDefaults.buttonColors(
                                     containerColor = Color(0xFF004528),
@@ -520,15 +553,15 @@ private fun CartContent(
                                 )
                             ) {
                                 Text(
-                                    text = "Lanjut Bayar",
+                                    text = "Lanjut Pembayaran",
                                     fontWeight = FontWeight.Bold,
-                                    fontSize = 13.sp
+                                    fontSize = 14.sp
                                 )
-                                Spacer(modifier = Modifier.width(4.dp))
+                                Spacer(modifier = Modifier.width(6.dp))
                                 Icon(
                                     imageVector = Icons.AutoMirrored.Outlined.ArrowForward,
                                     contentDescription = null,
-                                    modifier = Modifier.size(16.dp)
+                                    modifier = Modifier.size(17.dp)
                                 )
                             }
                         }
@@ -548,7 +581,8 @@ private fun CartTopBar(
     heldCartsCount: Int,
     onBackToPos: () -> Unit,
     onOpenHeldCarts: () -> Unit,
-    onOpenCameraScanner: () -> Unit
+    onOpenCameraScanner: () -> Unit,
+    onClearCart: () -> Unit
 ) {
     Row(
         modifier = Modifier.fillMaxWidth(),
@@ -653,30 +687,21 @@ private fun CartTopBar(
                 )
             }
 
-            Surface(
-                onClick = onBackToPos,
-                shape = RoundedCornerShape(10.dp),
-                color = Color(0xFFF0FDF4),
-                border = BorderStroke(1.dp, Color(0xFFBBF7D0))
+            // Tombol Kosongkan Keranjang (Aman dengan Dialog Konfirmasi)
+            IconButton(
+                onClick = onClearCart,
+                modifier = Modifier
+                    .size(36.dp)
+                    .clip(RoundedCornerShape(10.dp))
+                    .background(Color.White)
+                    .border(1.dp, CartOutlineVariant, RoundedCornerShape(10.dp))
             ) {
-                Row(
-                    modifier = Modifier.padding(horizontal = 10.dp, vertical = 7.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(4.dp)
-                ) {
-                    Icon(
-                        imageVector = Icons.Outlined.Add,
-                        contentDescription = null,
-                        tint = CartPrimary,
-                        modifier = Modifier.size(15.dp)
-                    )
-                    Text(
-                        text = "Tambah",
-                        color = CartPrimary,
-                        fontWeight = FontWeight.Bold,
-                        fontSize = 12.sp
-                    )
-                }
+                Icon(
+                    imageVector = Icons.Outlined.DeleteOutline,
+                    contentDescription = "Kosongkan Keranjang",
+                    tint = Color(0xFF64748B),
+                    modifier = Modifier.size(19.dp)
+                )
             }
         }
     }
@@ -1105,51 +1130,31 @@ private fun CartSummaryPanel(
             )
         }
 
-        // 7. Tombol Aksi Bawah
+        // 7. Tombol Aksi Bawah (Tablet)
         Row(
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            horizontalArrangement = Arrangement.spacedBy(10.dp),
+            verticalAlignment = Alignment.CenterVertically,
             modifier = Modifier.fillMaxWidth()
         ) {
             OutlinedButton(
-                onClick = onClearCart,
-                modifier = Modifier
-                    .height(48.dp)
-                    .weight(0.7f),
-                shape = RoundedCornerShape(12.dp),
-                border = BorderStroke(1.dp, Color(0xFFFCA5A5)),
-                colors = ButtonDefaults.outlinedButtonColors(
-                    containerColor = Color(0xFFFEF2F2),
-                    contentColor = Color(0xFFDC2626)
-                )
-            ) {
-                Icon(
-                    imageVector = Icons.Outlined.DeleteSweep,
-                    contentDescription = null,
-                    modifier = Modifier.size(17.dp)
-                )
-                Spacer(modifier = Modifier.width(4.dp))
-                Text("Batal", fontWeight = FontWeight.Bold, fontSize = 12.sp)
-            }
-
-            OutlinedButton(
                 onClick = onOpenHoldCartDialog,
-                modifier = Modifier
-                    .height(48.dp)
-                    .weight(0.8f),
+                modifier = Modifier.height(48.dp),
                 shape = RoundedCornerShape(12.dp),
-                border = BorderStroke(1.dp, Color(0xFFF59E0B)),
+                border = BorderStroke(1.dp, CartOutlineVariant),
                 colors = ButtonDefaults.outlinedButtonColors(
-                    containerColor = Color(0xFFFEF3C7),
-                    contentColor = Color(0xFFB45309)
-                )
+                    containerColor = Color.White,
+                    contentColor = CartOnSurface
+                ),
+                contentPadding = PaddingValues(horizontal = 16.dp)
             ) {
                 Icon(
                     imageVector = Icons.Outlined.BookmarkAdd,
                     contentDescription = null,
+                    tint = CartSecondary,
                     modifier = Modifier.size(17.dp)
                 )
-                Spacer(modifier = Modifier.width(4.dp))
-                Text("Parkir", fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                Spacer(modifier = Modifier.width(6.dp))
+                Text("Parkir", fontWeight = FontWeight.SemiBold, fontSize = 13.sp)
             }
 
             Button(
@@ -1163,7 +1168,7 @@ private fun CartSummaryPanel(
                 enabled = !state.isLoading && !state.isPreviewLoading && state.cartItems.isNotEmpty() && paymentIsValid && creditCustomerIsValid,
                 modifier = Modifier
                     .height(48.dp)
-                    .weight(1.5f),
+                    .weight(1f),
                 shape = RoundedCornerShape(12.dp),
                 colors = ButtonDefaults.buttonColors(
                     containerColor = Color(0xFF004528),
@@ -1192,7 +1197,7 @@ private fun CartSummaryPanel(
                             else -> "Proses Bayar"
                         },
                         fontWeight = FontWeight.Bold,
-                        fontSize = 13.5.sp
+                        fontSize = 14.sp
                     )
                 }
             }
