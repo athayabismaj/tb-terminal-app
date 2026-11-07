@@ -528,9 +528,9 @@ private fun ProductCardAction(
                     contentAlignment = Alignment.Center
                 ) {
                     Icon(
-                        imageVector = if (cartQty == 1) Icons.Outlined.Delete else Icons.Outlined.Remove,
+                        imageVector = Icons.Outlined.Remove,
                         contentDescription = "Kurangi kuantitas",
-                        tint = if (cartQty == 1) DangerRed else Slate700,
+                        tint = Slate700,
                         modifier = Modifier.size(14.dp)
                     )
                 }
