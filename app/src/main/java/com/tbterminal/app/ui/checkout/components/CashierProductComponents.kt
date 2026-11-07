@@ -18,8 +18,10 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.grid.GridCells
+import androidx.compose.foundation.lazy.grid.GridItemSpan
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
+import androidx.compose.foundation.lazy.grid.rememberLazyGridState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -33,10 +35,15 @@ import androidx.compose.material.icons.outlined.Landscape
 import androidx.compose.material.icons.outlined.Layers
 import androidx.compose.material.icons.outlined.Remove
 import androidx.compose.material.icons.outlined.Straighten
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.derivedStateOf
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -91,21 +98,41 @@ internal fun ProductCardGrid(
     cartItems: List<CartItem>,
     onProductClick: (Product) -> Unit,
     onUpdateQty: (String, Int) -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    isLoadingMore: Boolean = false,
+    canLoadMore: Boolean = false,
+    onLoadMore: () -> Unit = {}
 ) {
     if (products.isEmpty()) {
         ProductGridEmptyState(modifier)
         return
     }
 
+    val gridState = rememberLazyGridState()
+
+    val shouldLoadMore by remember {
+        derivedStateOf {
+            val totalItemsCount = gridState.layoutInfo.totalItemsCount
+            val lastVisibleItemIndex = gridState.layoutInfo.visibleItemsInfo.lastOrNull()?.index ?: 0
+            totalItemsCount > 0 && lastVisibleItemIndex >= totalItemsCount - 4
+        }
+    }
+
+    LaunchedEffect(shouldLoadMore, canLoadMore, isLoadingMore) {
+        if (shouldLoadMore && canLoadMore && !isLoadingMore) {
+            onLoadMore()
+        }
+    }
+
     // 155.dp adapts into exactly 2 columns on 360-420dp mobile phones (grid-cols-2),
     // and responsive 3-4 columns on tablet / wider screens
     LazyVerticalGrid(
         columns = GridCells.Adaptive(minSize = 155.dp),
+        state = gridState,
         modifier = modifier,
         horizontalArrangement = Arrangement.spacedBy(10.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp),
-        contentPadding = PaddingValues(bottom = 88.dp) // Spacing for floating bottom cart dock
+        contentPadding = PaddingValues(bottom = 96.dp) // Spacing for floating bottom cart dock
     ) {
         items(products, key = { product -> product.productId }) { product ->
             val cartItem = cartItems.firstOrNull { item -> item.productId == product.productId }
@@ -126,6 +153,23 @@ internal fun ProductCardGrid(
                     }
                 }
             )
+        }
+
+        if (isLoadingMore) {
+            item(span = { GridItemSpan(maxLineSpan) }) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(vertical = 16.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    CircularProgressIndicator(
+                        color = BrandForest,
+                        strokeWidth = 2.5.dp,
+                        modifier = Modifier.size(24.dp)
+                    )
+                }
+            }
         }
     }
 }

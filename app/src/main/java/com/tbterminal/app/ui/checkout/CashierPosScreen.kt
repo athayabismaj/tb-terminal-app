@@ -82,7 +82,6 @@ import com.tbterminal.app.ui.barcode.hardwareBarcodeScanner
 import com.tbterminal.app.ui.checkout.components.MaterialEstimatorDialog
 import com.tbterminal.app.ui.checkout.components.ProductCardGrid
 import com.tbterminal.app.ui.checkout.components.ProductErrorState
-import com.tbterminal.app.ui.checkout.components.ProductPaginationBar
 import com.tbterminal.app.ui.common.toRupiahText
 import kotlinx.coroutines.delay
 import java.math.BigDecimal
@@ -124,7 +123,8 @@ fun CashierPosScreen(
     state: CheckoutUiState,
     onSearchChanged: (String) -> Unit,
     onRefreshProducts: () -> Unit,
-    onProductPageChanged: (Int) -> Unit,
+    onProductPageChanged: (Int) -> Unit = {},
+    onLoadMoreProducts: () -> Unit = {},
     onProductClick: (Product) -> Unit,
     onCustomerSearchChanged: (String) -> Unit,
     onSelectCustomer: (Customer) -> Unit,
@@ -231,14 +231,75 @@ fun CashierPosScreen(
                         }
                     }
 
-                    // ── 3. CATEGORY PILL CAROUSEL (ONE-TAP SPEED) ──
-                    PosCategoryCarousel(
-                        categories = categories,
-                        selectedCategory = selectedCategory,
-                        onCategorySelected = onCategorySelected
-                    )
+                    // Active Filter Badges (hanya muncul bila ada filter aktif dari modal filter)
+                    if (selectedCategory != allCategory || onlyInStock) {
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(bottom = 6.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(6.dp)
+                        ) {
+                            if (selectedCategory != allCategory) {
+                                Surface(
+                                    shape = RoundedCornerShape(100.dp),
+                                    color = BrandGreenLight,
+                                    border = BorderStroke(1.dp, BrandGreenBorder)
+                                ) {
+                                    Row(
+                                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp),
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        horizontalArrangement = Arrangement.spacedBy(4.dp)
+                                    ) {
+                                        Text(
+                                            text = selectedCategory,
+                                            fontSize = 11.sp,
+                                            fontWeight = FontWeight.SemiBold,
+                                            color = BrandForest
+                                        )
+                                        Icon(
+                                            imageVector = Icons.Outlined.Close,
+                                            contentDescription = "Hapus filter kategori",
+                                            tint = BrandForest,
+                                            modifier = Modifier
+                                                .size(12.dp)
+                                                .clickable { onCategorySelected(allCategory) }
+                                        )
+                                    }
+                                }
+                            }
+                            if (onlyInStock) {
+                                Surface(
+                                    shape = RoundedCornerShape(100.dp),
+                                    color = AmberBg,
+                                    border = BorderStroke(1.dp, AmberBorder.copy(alpha = 0.5f))
+                                ) {
+                                    Row(
+                                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp),
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        horizontalArrangement = Arrangement.spacedBy(4.dp)
+                                    ) {
+                                        Text(
+                                            text = "Stok Tersedia",
+                                            fontSize = 11.sp,
+                                            fontWeight = FontWeight.SemiBold,
+                                            color = Amber700
+                                        )
+                                        Icon(
+                                            imageVector = Icons.Outlined.Close,
+                                            contentDescription = "Hapus filter stok",
+                                            tint = Amber700,
+                                            modifier = Modifier
+                                                .size(12.dp)
+                                                .clickable { onToggleOnlyInStock(false) }
+                                        )
+                                    }
+                                }
+                            }
+                        }
+                    }
 
-                    // ── 4. BARCODE SCAN NOTIFICATION TOAST PILL ──
+                    // ── 3. BARCODE SCAN NOTIFICATION TOAST PILL ──
                     state.scanNotification?.let { notification ->
                         LaunchedEffect(notification) {
                             delay(2500)
@@ -274,7 +335,7 @@ fun CashierPosScreen(
 
                     Spacer(modifier = Modifier.height(10.dp))
 
-                    // ── 5. PRODUCT CATALOG GRID ──
+                    // ── 4. PRODUCT CATALOG GRID WITH LAZY LOAD ──
                     Box(
                         modifier = Modifier
                             .weight(1f)
@@ -332,23 +393,14 @@ fun CashierPosScreen(
                                     cartItems = state.cartItems,
                                     onProductClick = onProductClick,
                                     onUpdateQty = onUpdateQty,
+                                    isLoadingMore = state.isLoadingMoreProducts,
+                                    canLoadMore = state.productPage < state.productTotalPages,
+                                    onLoadMore = onLoadMoreProducts,
                                     modifier = Modifier.fillMaxSize()
                                 )
                             }
                         }
                     }
-
-                    // ── 6. PAGINATION BAR ──
-                    ProductPaginationBar(
-                        page = state.productPage,
-                        totalPages = state.productTotalPages,
-                        totalItems = state.productTotal,
-                        limit = state.productLimit,
-                        isLoading = state.isProductLoading,
-                        onPrevious = { onProductPageChanged(state.productPage - 1) },
-                        onNext = { onProductPageChanged(state.productPage + 1) },
-                        modifier = Modifier.padding(vertical = 4.dp)
-                    )
                 }
             }
 
@@ -893,45 +945,6 @@ private fun PosFilterOptionCard(
     }
 }
 
-// ═════════════════════════════════════════════════════════════════════════════
-// SUB-KOMPONEN 3: HORIZONTAL CATEGORY PILL CAROUSEL
-// Fast, tactile category filtering like modern industrial POS systems
-// ═════════════════════════════════════════════════════════════════════════════
-@Composable
-private fun PosCategoryCarousel(
-    categories: List<String>,
-    selectedCategory: String,
-    onCategorySelected: (String) -> Unit
-) {
-    LazyRow(
-        modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
-        contentPadding = PaddingValues(horizontal = 1.dp)
-    ) {
-        items(categories) { category ->
-            val isSelected = category == selectedCategory
-
-            Surface(
-                onClick = { onCategorySelected(category) },
-                shape = RoundedCornerShape(20.dp),
-                color = if (isSelected) BrandForest else Color.White,
-                border = BorderStroke(
-                    1.dp,
-                    if (isSelected) BrandForest else Slate200
-                ),
-                shadowElevation = if (isSelected) 1.dp else 0.dp
-            ) {
-                Text(
-                    text = category,
-                    color = if (isSelected) Color.White else Slate700,
-                    fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
-                    fontSize = 12.sp,
-                    modifier = Modifier.padding(horizontal = 14.dp, vertical = 7.dp)
-                )
-            }
-        }
-    }
-}
 
 // ═════════════════════════════════════════════════════════════════════════════
 // SUB-KOMPONEN 4: FLOATING BOTTOM CART DOCK (MATCHING HTML MOCKUP)

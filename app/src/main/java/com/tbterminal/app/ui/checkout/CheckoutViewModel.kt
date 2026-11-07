@@ -214,6 +214,70 @@ class CheckoutViewModel(
         }
     }
 
+    fun refreshProducts() {
+        _uiState.update { it.copy(productPage = 1) }
+        loadProducts()
+    }
+
+    fun loadMoreProducts() {
+        val state = _uiState.value
+        if (state.isProductLoading || state.isLoadingMoreProducts) return
+        if (state.productPage >= state.productTotalPages) return
+
+        viewModelScope.launch {
+            val nextPage = state.productPage + 1
+            val search = state.searchQuery.trim().takeIf(String::isNotBlank)
+            _uiState.update { it.copy(isLoadingMoreProducts = true) }
+
+            when (
+                val result = inventoryRepository.getProductStocks(
+                    page = nextPage,
+                    limit = PRODUCT_PAGE_LIMIT,
+                    search = search
+                )
+            ) {
+                is RepositoryResult.Success -> {
+                    val productPage = result.data
+                    val newItems = productPage.data
+                        .filter { it.isActive }
+                        .map { product ->
+                            Product(
+                                productId = product.productId,
+                                name = product.productName,
+                                unitPrice = product.priceRetail,
+                                sku = product.sku,
+                                barcode = product.sku,
+                                unitName = product.unitName,
+                                categoryName = product.categoryName,
+                                stockQty = product.quantity,
+                                secondaryUnitId = product.secondaryUnitId,
+                                secondaryUnitName = product.secondaryUnitName,
+                                secondaryUnitFactor = product.secondaryUnitFactor
+                            )
+                        }
+                    _uiState.update { current ->
+                        val existingIds = current.products.map { it.productId }.toSet()
+                        val combined = current.products + newItems.filter { it.productId !in existingIds }
+                        current.copy(
+                            products = combined,
+                            productPage = productPage.page.coerceAtLeast(1),
+                            productLimit = productPage.limit,
+                            productTotal = productPage.total,
+                            productTotalPages = productPage.totalPages.coerceAtLeast(1),
+                            isLoadingMoreProducts = false
+                        )
+                    }
+                }
+                is RepositoryResult.Error -> {
+                    _uiState.update { it.copy(isLoadingMoreProducts = false) }
+                }
+                is RepositoryResult.Exception -> {
+                    _uiState.update { it.copy(isLoadingMoreProducts = false) }
+                }
+            }
+        }
+    }
+
     fun loadProducts() {
         viewModelScope.launch {
             val page = _uiState.value.productPage.coerceAtLeast(1)

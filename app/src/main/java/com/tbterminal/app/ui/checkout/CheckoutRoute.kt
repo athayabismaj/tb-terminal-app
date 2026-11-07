@@ -230,8 +230,9 @@ fun CashierPosRoute(
             CashierPosScreen(
                 state = uiState,
                 onSearchChanged = viewModel::onSearchChanged,
-                onRefreshProducts = viewModel::loadProducts,
+                onRefreshProducts = viewModel::refreshProducts,
                 onProductPageChanged = viewModel::onProductPageChanged,
+                onLoadMoreProducts = viewModel::loadMoreProducts,
                 onProductClick = viewModel::addProduct,
                 onCustomerSearchChanged = viewModel::onCustomerSearchChanged,
                 onSelectCustomer = viewModel::selectCustomer,

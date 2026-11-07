@@ -36,6 +36,7 @@ data class CheckoutUiState(
     val startingCashInput: String = "",
     val cashSessionError: UiText? = null,
     val isProductLoading: Boolean = false,
+    val isLoadingMoreProducts: Boolean = false,
     val isCustomerLoading: Boolean = false,
     val isLoading: Boolean = false,
     val productError: UiText? = null,
