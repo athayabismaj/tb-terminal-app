@@ -103,6 +103,10 @@ sealed interface AppRoute {
         override val route = "cashier/cart"
     }
 
+    data object CashierPayment : AppRoute {
+        override val route = "cashier/payment"
+    }
+
     data object CashierStockCheck : AppRoute {
         override val route = "cashier/stock-check"
     }

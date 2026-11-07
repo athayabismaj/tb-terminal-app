@@ -84,6 +84,7 @@ fun CashierCartScreen(
     onToggleUnit: (String, Boolean) -> Unit = { _, _ -> },
     onCheckout: () -> Unit,
     onBackToPos: () -> Unit,
+    onNavigateToPayment: () -> Unit = onCheckout,
     onOpenHoldCartDialog: () -> Unit = {},
     onOpenHeldCarts: () -> Unit = {},
     onToggleDelivery: (Boolean) -> Unit = {},
@@ -156,6 +157,7 @@ fun CashierCartScreen(
                     onToggleUnit = onToggleUnit,
                     onCheckout = onCheckout,
                     onBackToPos = onBackToPos,
+                    onNavigateToPayment = onNavigateToPayment,
                     onOpenHoldCartDialog = onOpenHoldCartDialog,
                     onOpenHeldCarts = onOpenHeldCarts,
                     onToggleDelivery = onToggleDelivery,
@@ -244,6 +246,7 @@ private fun CartContent(
     onToggleUnit: (String, Boolean) -> Unit,
     onCheckout: () -> Unit,
     onBackToPos: () -> Unit,
+    onNavigateToPayment: () -> Unit = onCheckout,
     onOpenHoldCartDialog: () -> Unit,
     onOpenHeldCarts: () -> Unit,
     onToggleDelivery: (Boolean) -> Unit,
@@ -347,14 +350,11 @@ private fun CartContent(
                 }
             }
         } else {
-            // ── TAMPILAN SMARTPHONE: SINGLE SCROLLABLE (RESPONSIF PENUH) ──
+            // ── TAMPILAN SMARTPHONE: REVIEW KERANJANG (STEP 1) ──
             Column(
                 modifier = Modifier
                     .fillMaxSize()
-                    .verticalScroll(rememberScrollState())
                     .padding(14.dp)
-                    .padding(bottom = 32.dp),
-                verticalArrangement = Arrangement.spacedBy(14.dp)
             ) {
                 CartTopBar(
                     totalItems = totalItems,
@@ -364,16 +364,34 @@ private fun CartContent(
                     onOpenCameraScanner = onOpenCameraScanner
                 )
 
-                // Daftar Item di Smartphone
-                Text(
-                    text = "Daftar Barang Belanja ($totalItems)",
-                    fontSize = 14.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = CartOnSurface
-                )
+                Spacer(modifier = Modifier.height(10.dp))
 
-                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                    state.cartItems.forEach { item ->
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = "Daftar Barang Belanja ($totalItems)",
+                        fontSize = 13.5.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = CartOnSurface
+                    )
+                    Text(
+                        text = "Subtotal: ${formatRupiah(state.subtotal)}",
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.SemiBold,
+                        color = CartPrimary
+                    )
+                }
+
+                Spacer(modifier = Modifier.height(8.dp))
+
+                LazyColumn(
+                    verticalArrangement = Arrangement.spacedBy(10.dp),
+                    modifier = Modifier.weight(1f)
+                ) {
+                    items(state.cartItems, key = { it.cartItemId }) { item ->
                         val product = state.products.firstOrNull { it.productId == item.productId }
                         CartItemCard(
                             item = item,
@@ -388,30 +406,134 @@ private fun CartContent(
                     }
                 }
 
-                HorizontalDivider(color = CartOutlineVariant)
+                Spacer(modifier = Modifier.height(10.dp))
 
-                // Panel Checkout & Ringkasan
-                CartSummaryPanel(
-                    state = state,
-                    paymentIsValid = paymentIsValid,
-                    creditCustomerIsValid = creditCustomerIsValid,
-                    onCustomerSearchChanged = onCustomerSearchChanged,
-                    onSelectCustomer = onSelectCustomer,
-                    onClearCustomer = onClearCustomer,
-                    onUseCustomerName = onUseCustomerName,
-                    onOpenQuickAddCustomer = onOpenQuickAddCustomer,
-                    onToggleDelivery = onToggleDelivery,
-                    onDeliveryFeeChanged = onDeliveryFeeChanged,
-                    onDeliveryAddressChanged = onDeliveryAddressChanged,
-                    onDeliveryCourierChanged = onDeliveryCourierChanged,
-                    onSelectPayment = onSelectPayment,
-                    onAmountPaidChanged = onAmountPaidChanged,
-                    onOpenQrisDialog = onOpenQrisDialog,
-                    onEditTransactionDiscount = onEditTransactionDiscount,
-                    onClearCart = onClearCart,
-                    onOpenHoldCartDialog = onOpenHoldCartDialog,
-                    onCheckout = onCheckout
-                )
+                // ── STICKY BOTTOM BAR (MOBILE STEP 1) ──
+                Surface(
+                    shape = RoundedCornerShape(16.dp),
+                    color = Color.White,
+                    border = BorderStroke(1.dp, CartOutlineVariant),
+                    shadowElevation = 4.dp,
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(14.dp),
+                        verticalArrangement = Arrangement.spacedBy(10.dp)
+                    ) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Column {
+                                Text(
+                                    text = "Total Belanja",
+                                    fontSize = 11.5.sp,
+                                    color = CartOnSurfaceVariant
+                                )
+                                Text(
+                                    text = "$totalItems Barang",
+                                    fontSize = 12.sp,
+                                    fontWeight = FontWeight.SemiBold,
+                                    color = CartOnSurface
+                                )
+                            }
+                            Column(horizontalAlignment = Alignment.End) {
+                                Text(
+                                    text = formatRupiah(state.finalTotal),
+                                    fontSize = 20.sp,
+                                    fontWeight = FontWeight.ExtraBold,
+                                    color = CartPrimary
+                                )
+                                if (state.itemDiscountTotal > BigDecimal.ZERO) {
+                                    Text(
+                                        text = "Hemat ${formatRupiah(state.itemDiscountTotal)}",
+                                        fontSize = 10.5.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        color = CartSecondary
+                                    )
+                                }
+                            }
+                        }
+
+                        HorizontalDivider(color = CartOutlineVariant)
+
+                        Row(
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            OutlinedButton(
+                                onClick = onClearCart,
+                                modifier = Modifier
+                                    .height(46.dp)
+                                    .weight(0.7f),
+                                shape = RoundedCornerShape(12.dp),
+                                border = BorderStroke(1.dp, Color(0xFFFCA5A5)),
+                                colors = ButtonDefaults.outlinedButtonColors(
+                                    containerColor = Color(0xFFFEF2F2),
+                                    contentColor = Color(0xFFDC2626)
+                                )
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Outlined.DeleteSweep,
+                                    contentDescription = null,
+                                    modifier = Modifier.size(16.dp)
+                                )
+                                Spacer(modifier = Modifier.width(3.dp))
+                                Text("Batal", fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                            }
+
+                            OutlinedButton(
+                                onClick = onOpenHoldCartDialog,
+                                modifier = Modifier
+                                    .height(46.dp)
+                                    .weight(0.8f),
+                                shape = RoundedCornerShape(12.dp),
+                                border = BorderStroke(1.dp, Color(0xFFF59E0B)),
+                                colors = ButtonDefaults.outlinedButtonColors(
+                                    containerColor = Color(0xFFFEF3C7),
+                                    contentColor = Color(0xFFB45309)
+                                )
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Outlined.BookmarkAdd,
+                                    contentDescription = null,
+                                    modifier = Modifier.size(16.dp)
+                                )
+                                Spacer(modifier = Modifier.width(3.dp))
+                                Text("Parkir", fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                            }
+
+                            Button(
+                                onClick = onNavigateToPayment,
+                                enabled = state.cartItems.isNotEmpty(),
+                                modifier = Modifier
+                                    .height(46.dp)
+                                    .weight(1.5f),
+                                shape = RoundedCornerShape(12.dp),
+                                colors = ButtonDefaults.buttonColors(
+                                    containerColor = Color(0xFF004528),
+                                    disabledContainerColor = Color(0xFFE2E8F0),
+                                    disabledContentColor = Color(0xFF94A3B8)
+                                )
+                            ) {
+                                Text(
+                                    text = "Lanjut Bayar",
+                                    fontWeight = FontWeight.Bold,
+                                    fontSize = 13.sp
+                                )
+                                Spacer(modifier = Modifier.width(4.dp))
+                                Icon(
+                                    imageVector = Icons.AutoMirrored.Outlined.ArrowForward,
+                                    contentDescription = null,
+                                    modifier = Modifier.size(16.dp)
+                                )
+                            }
+                        }
+                    }
+                }
             }
         }
     }
@@ -1082,7 +1204,7 @@ private fun CartSummaryPanel(
 // SUB-KOMPONEN: PEMILIH PELANGGAN
 // ═════════════════════════════════════════════════════════════════════════════
 @Composable
-private fun CartCustomerSelector(
+internal fun CartCustomerSelector(
     customerSearchQuery: String,
     selectedCustomer: Customer?,
     customers: List<Customer>,
@@ -1331,12 +1453,12 @@ private fun CartCustomerSelector(
     }
 }
 
-private fun formatRupiah(amount: BigDecimal): String {
+internal fun formatRupiah(amount: BigDecimal): String {
     val formatter = NumberFormat.getNumberInstance(Locale.forLanguageTag("id-ID"))
     return "Rp ${formatter.format(amount)}"
 }
 
-private fun getCashQuickPresets(total: BigDecimal): List<BigDecimal> {
+internal fun getCashQuickPresets(total: BigDecimal): List<BigDecimal> {
     if (total <= BigDecimal.ZERO) {
         return listOf(BigDecimal(50_000), BigDecimal(100_000))
     }

@@ -127,7 +127,7 @@ internal object AppRouteAccessPolicy {
                 AppRoute.BackofficeMore.route,
             ) -> AppCapability.BACKOFFICE
 
-            value == AppRoute.CashierPos.route || value == AppRoute.CashierCart.route -> AppCapability.POS
+            value == AppRoute.CashierPos.route || value == AppRoute.CashierCart.route || value == AppRoute.CashierPayment.route -> AppCapability.POS
             value == AppRoute.CashierCashSession.route -> AppCapability.CASHIER_SHIFT
             value == AppRoute.CashierStockCheck.route -> AppCapability.STOCK
             value == AppRoute.CashierTransactionHistory.route ||

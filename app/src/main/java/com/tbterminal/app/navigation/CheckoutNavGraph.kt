@@ -25,6 +25,7 @@ import com.tbterminal.app.ui.cashier.stock.CashierStockCheckScreen
 import com.tbterminal.app.ui.cashier.transactions.CashierReceiptDetailScreen
 import com.tbterminal.app.ui.cashier.transactions.CashierTransactionHistoryScreen
 import com.tbterminal.app.ui.checkout.CashierCartRoute
+import com.tbterminal.app.ui.checkout.CashierPaymentRoute
 import com.tbterminal.app.ui.checkout.CashierPosRoute
 import com.tbterminal.app.ui.checkout.CheckoutViewModel
 import com.tbterminal.app.ui.customers.AdminCustomerDetailScreen
@@ -173,6 +174,11 @@ internal fun NavGraphBuilder.checkoutGraph(navController: NavHostController, ses
                     onBackToPos = {
                         navController.popBackStack()
                     },
+                    onNavigateToPayment = {
+                        navController.navigate(AppRoute.CashierPayment.route) {
+                            launchSingleTop = true
+                        }
+                    },
                     onDashboardClick = {
                         navController.navigate(AppRoute.Dashboard.route) {
                             launchSingleTop = true
@@ -180,6 +186,87 @@ internal fun NavGraphBuilder.checkoutGraph(navController: NavHostController, ses
                     },
                     onPosClick = {
                         navController.popBackStack()
+                    },
+                    onCashSessionClick = {
+                        navController.navigate(AppRoute.CashierCashSession.route) {
+                            launchSingleTop = true
+                        }
+                    },
+                    onTransactionHistoryClick = {
+                        navController.navigate(AppRoute.CashierTransactionHistory.route) {
+                            launchSingleTop = true
+                        }
+                    },
+                    onStockCheckClick = {
+                        navController.navigate(AppRoute.CashierStockCheck.route) {
+                            launchSingleTop = true
+                        }
+                    },
+                    onProfileClick = {
+                        navController.navigate(AppRoute.CashierProfile.route) {
+                            launchSingleTop = true
+                        }
+                    },
+                    onSettingsClick = {
+                        navController.navigate(AppRoute.CashierSettings.route) {
+                            launchSingleTop = true
+                        }
+                    },
+                    onLogout = logout,
+                    onNavigateToReceipt = { receiptId ->
+                        navController.navigate(AppRoute.CashierReceiptDetail.createRoute(receiptId)) {
+                            popUpTo(AppRoute.CashierPos.route) {
+                                inclusive = false
+                            }
+                            launchSingleTop = true
+                        }
+                    }
+                )
+            }
+        }
+
+        composable(AppRoute.CashierPayment.route) {
+            val sessionUser = sessionManager.readSessionUser()
+
+            if (sessionUser == null) {
+                LaunchedEffect(Unit) {
+                    sessionManager.logout()
+                    navController.navigate(AppRoute.Login.route) {
+                        popUpTo(0)
+                        launchSingleTop = true
+                    }
+                }
+            } else {
+                val logout: () -> Unit = {
+                    sessionManager.logout()
+                    navController.navigate(AppRoute.Login.route) {
+                        popUpTo(0)
+                        launchSingleTop = true
+                    }
+                }
+
+                CashierPaymentRoute(
+                    name = sessionUser.name,
+                    role = sessionUser.role,
+                    checkoutRepository = appContainer.checkoutRepository,
+                    inventoryRepository = appContainer.inventoryRepository,
+                    customerRepository = appContainer.customerRepository,
+                    cashReconciliationRepository = appContainer.cashReconciliationRepository,
+                    managerApprovalRepository = appContainer.managerApprovalRepository,
+                    viewModel = cashierCheckoutViewModel(
+                        navController = navController,
+                        appContainer = appContainer
+                    ),
+                    onBackToCart = {
+                        navController.popBackStack()
+                    },
+                    onDashboardClick = {
+                        navController.navigate(AppRoute.Dashboard.route) {
+                            launchSingleTop = true
+                        }
+                    },
+                    onPosClick = {
+                        navController.popBackStack(AppRoute.CashierPos.route, inclusive = false)
                     },
                     onCashSessionClick = {
                         navController.navigate(AppRoute.CashierCashSession.route) {

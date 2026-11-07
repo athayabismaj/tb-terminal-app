@@ -369,6 +369,7 @@ fun CashierCartRoute(
     cashReconciliationRepository: CashReconciliationRepository,
     managerApprovalRepository: ManagerApprovalRepository,
     onBackToPos: () -> Unit,
+    onNavigateToPayment: () -> Unit = {},
     onDashboardClick: () -> Unit = {},
     onPosClick: () -> Unit = {},
     onCashSessionClick: () -> Unit = {},
@@ -477,6 +478,7 @@ fun CashierCartRoute(
             }
         },
         onBackToPos = onBackToPos,
+        onNavigateToPayment = onNavigateToPayment,
         onOpenHoldCartDialog = viewModel::openHoldCartDialog,
         onOpenHeldCarts = viewModel::openHeldCartsSheet,
         onToggleDelivery = viewModel::toggleDelivery,
@@ -547,6 +549,166 @@ fun CashierCartRoute(
             onDescriptionChanged = viewModel::onPettyCashDescriptionChanged,
             onDismiss = viewModel::dismissPettyCashDialog,
             onConfirm = viewModel::submitPettyCash
+        )
+    }
+    approvalAttemptId?.let { attemptId ->
+        ManagerApprovalDialog(
+            context = ManagerApprovalContext(
+                action = ManagerApprovalAction.DISCOUNT_OVERRIDE,
+                resourceId = attemptId,
+            ),
+            repository = managerApprovalRepository,
+            onDismiss = { approvalAttemptId = null },
+            onApproved = { grant ->
+                approvalAttemptId = null
+                viewModel.continueCheckoutWithApproval(grant.approvalId, grant.resourceId)
+            },
+        )
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun CashierPaymentRoute(
+    name: String,
+    role: String,
+    checkoutRepository: CheckoutRepository,
+    inventoryRepository: InventoryRepository,
+    customerRepository: CustomerRepository,
+    cashReconciliationRepository: CashReconciliationRepository,
+    managerApprovalRepository: ManagerApprovalRepository,
+    onBackToCart: () -> Unit,
+    onDashboardClick: () -> Unit = {},
+    onPosClick: () -> Unit = {},
+    onCashSessionClick: () -> Unit = {},
+    onTransactionHistoryClick: () -> Unit = {},
+    onStockCheckClick: () -> Unit = {},
+    onProfileClick: () -> Unit = {},
+    onSettingsClick: () -> Unit = {},
+    onLogout: () -> Unit = {},
+    onNavigateToReceipt: (String) -> Unit = {},
+    viewModel: CheckoutViewModel = viewModel(
+        factory = CheckoutViewModel.factory(
+            checkoutRepository = checkoutRepository,
+            inventoryRepository = inventoryRepository,
+            customerRepository = customerRepository,
+            cashReconciliationRepository = cashReconciliationRepository
+        )
+    )
+) {
+    val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+    val snackbarHostState = remember { SnackbarHostState() }
+    var approvalAttemptId by remember { mutableStateOf<String?>(null) }
+    var feedbackMessage by remember { mutableStateOf<String?>(null) }
+
+    LaunchedEffect(uiState.checkoutPreview?.checkoutAttemptId, uiState.checkoutPreview?.approvalRequired) {
+        val preview = uiState.checkoutPreview
+        if (preview?.approvalRequired == true) approvalAttemptId = preview.checkoutAttemptId
+    }
+
+    LaunchedEffect(viewModel.errorEvent, snackbarHostState) {
+        viewModel.errorEvent
+            .filterNotNull()
+            .collect { error ->
+                feedbackMessage = error.message()
+                snackbarHostState.showSnackbar(error.message())
+                viewModel.clearErrorEvent()
+            }
+    }
+
+    LaunchedEffect(viewModel.checkoutEvents, onNavigateToReceipt) {
+        viewModel.checkoutEvents.collect { event ->
+            when (event) {
+                is CheckoutEvent.NavigateToReceipt -> onNavigateToReceipt(event.transactionId)
+            }
+        }
+    }
+
+    Box(modifier = Modifier.fillMaxSize()) {
+        TopFloatingCapsule(
+            message = feedbackMessage ?: uiState.quickFeedbackMessage,
+            isError = feedbackMessage != null,
+            onDismiss = {
+                feedbackMessage = null
+                viewModel.clearQuickFeedback()
+            }
+        )
+
+        CashierPaymentScreen(
+            name = name,
+            role = role,
+            state = uiState,
+            snackbarHostState = snackbarHostState,
+            onCustomerSearchChanged = viewModel::onCustomerSearchChanged,
+            onSelectCustomer = viewModel::selectCustomer,
+            onClearCustomer = viewModel::clearSelectedCustomer,
+            onUseCustomerName = viewModel::useQuickCustomerName,
+            onSelectPayment = viewModel::selectPaymentMethod,
+            onAmountPaidChanged = viewModel::onAmountPaidChanged,
+            onTransactionDiscountChanged = viewModel::setTransactionDiscount,
+            onCheckout = {
+                val preview = uiState.checkoutPreview
+                if (uiState.hasAmbiguousCheckout) {
+                    viewModel.prepareCheckout(uiState.selectedPaymentMethod, uiState.finalTotal)
+                } else if (preview?.approvalRequired == true) {
+                    val approvalId = uiState.approvedManagerApprovalId
+                    if (approvalId != null) {
+                        viewModel.continueCheckoutWithApproval(approvalId, preview.checkoutAttemptId)
+                    } else {
+                        approvalAttemptId = preview.checkoutAttemptId
+                    }
+                } else {
+                    viewModel.prepareCheckout(
+                        paymentMethod = uiState.selectedPaymentMethod,
+                        amountPaid = uiState.finalTotal,
+                    )
+                }
+            },
+            onBackToCart = onBackToCart,
+            onOpenHoldCartDialog = viewModel::openHoldCartDialog,
+            onToggleDelivery = viewModel::toggleDelivery,
+            onDeliveryFeeChanged = viewModel::updateDeliveryFee,
+            onDeliveryAddressChanged = viewModel::updateDeliveryAddress,
+            onDeliveryCourierChanged = viewModel::updateDeliveryCourier,
+            onDashboardClick = onDashboardClick,
+            onPosClick = onPosClick,
+            onCashSessionClick = onCashSessionClick,
+            onTransactionHistoryClick = onTransactionHistoryClick,
+            onStockCheckClick = onStockCheckClick,
+            onProfileClick = onProfileClick,
+            onSettingsClick = onSettingsClick,
+            onLogout = onLogout,
+            onOpenQrisDialog = viewModel::openQrisDialog,
+            onOpenQuickAddCustomer = viewModel::openQuickAddCustomer,
+            onDismissQuickAddCustomer = viewModel::dismissQuickAddCustomer,
+            onQuickCreateCustomer = viewModel::quickCreateCustomer,
+            onLockScreen = viewModel::lockScreen
+        )
+    }
+
+    if (uiState.isHoldCartDialogOpen) {
+        HoldCartDialog(
+            itemCount = uiState.cartItems.sumOf { it.quantity },
+            defaultNote = uiState.selectedCustomer?.name?.let { "Pesanan $it" } ?: "",
+            onDismiss = viewModel::dismissHoldCartDialog,
+            onConfirm = viewModel::holdCurrentCart
+        )
+    }
+    if (uiState.isScreenLocked) {
+        QuickPinLockOverlay(
+            cashierName = name,
+            pinInput = uiState.lockPinInput,
+            errorMessage = uiState.lockPinError,
+            onPinChange = viewModel::updateLockPinInput,
+            onUnlock = { viewModel.unlockScreen() }
+        )
+    }
+    if (uiState.isQrisDialogOpen) {
+        QrisPaymentDialog(
+            amount = uiState.finalTotal,
+            storeName = "TB TERMINAL",
+            onConfirmPayment = viewModel::confirmQrisPayment,
+            onDismissRequest = viewModel::dismissQrisDialog
         )
     }
     approvalAttemptId?.let { attemptId ->

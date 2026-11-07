@@ -14,6 +14,8 @@ class AppRouteAccessPolicyTest {
         assertFalse(AppRouteAccessPolicy.isAllowed(AppRoute.EditProduct.createRoute("product-1"), "kasir"))
         assertFalse(AppRouteAccessPolicy.isAllowed(AppRoute.StockOpnameForm.createRoute("product-1"), "kasir"))
         assertTrue(AppRouteAccessPolicy.isAllowed(AppRoute.CashierPos.route, "kasir"))
+        assertTrue(AppRouteAccessPolicy.isAllowed(AppRoute.CashierCart.route, "kasir"))
+        assertTrue(AppRouteAccessPolicy.isAllowed(AppRoute.CashierPayment.route, "kasir"))
         assertTrue(AppRouteAccessPolicy.isAllowed(AppRoute.Customers.route, "kasir"))
         assertTrue(AppRouteAccessPolicy.isAllowed(AppRoute.Receivables.route, "kasir"))
         assertTrue(AppRouteAccessPolicy.isAllowed(AppRoute.ReceivablePayments.route, "kasir"))
