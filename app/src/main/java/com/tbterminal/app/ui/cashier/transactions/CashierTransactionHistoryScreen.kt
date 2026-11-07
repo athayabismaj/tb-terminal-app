@@ -1,5 +1,6 @@
 package com.tbterminal.app.ui.cashier.transactions
 
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Box
@@ -7,12 +8,14 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Description
 import androidx.compose.material.icons.outlined.Search
 import androidx.compose.material.icons.outlined.Tune
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.Surface
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -115,64 +118,84 @@ fun CashierTransactionHistoryScreen(
         role = role,
         activeDestination = CashierDestination.TransactionHistory,
         topBarActions = {
+            val isSearchActive = isSearchExpanded || uiState.query.isNotEmpty()
+
             // Button 1: Search [ 🔍 ]
-            IconButton(
+            Surface(
                 onClick = { isSearchExpanded = !isSearchExpanded },
+                shape = RoundedCornerShape(12.dp),
+                color = if (isSearchActive) Color(0xFFE8F6ED) else Color(0xFFF8FAFC),
+                border = BorderStroke(1.dp, if (isSearchActive) Color(0xFF1B5E3C) else Color(0xFFE2E8F0)),
+                shadowElevation = 0.5.dp,
                 modifier = Modifier
-                    .size(36.dp)
+                    .size(32.dp)
                     .testTag("cashier-history-toggle-search")
             ) {
-                Icon(
-                    imageVector = Icons.Outlined.Search,
-                    contentDescription = "Cari transaksi",
-                    tint = if (isSearchExpanded || uiState.query.isNotEmpty()) Color(0xFF1B5E3C) else Color(0xFF64748B),
-                    modifier = Modifier.size(20.dp)
-                )
+                Box(contentAlignment = Alignment.Center) {
+                    Icon(
+                        imageVector = Icons.Outlined.Search,
+                        contentDescription = "Cari transaksi",
+                        tint = if (isSearchActive) Color(0xFF004528) else Color(0xFF475569),
+                        modifier = Modifier.size(16.dp)
+                    )
+                }
             }
 
             // Button 2: Filter [ ⚙️ ]
             Box(
-                modifier = Modifier.size(36.dp),
+                modifier = Modifier.size(32.dp),
                 contentAlignment = Alignment.Center
             ) {
-                IconButton(
+                Surface(
                     onClick = { showFilterPopup = true },
+                    shape = RoundedCornerShape(12.dp),
+                    color = if (isFiltered) Color(0xFFE8F6ED) else Color(0xFFF8FAFC),
+                    border = BorderStroke(1.dp, if (isFiltered) Color(0xFF1B5E3C) else Color(0xFFE2E8F0)),
+                    shadowElevation = 0.5.dp,
                     modifier = Modifier
-                        .size(36.dp)
+                        .fillMaxSize()
                         .testTag("cashier-history-open-filters")
                 ) {
-                    Icon(
-                        imageVector = Icons.Outlined.Tune,
-                        contentDescription = "Filter transaksi",
-                        tint = if (isFiltered) Color(0xFF1B5E3C) else Color(0xFF64748B),
-                        modifier = Modifier.size(20.dp)
-                    )
+                    Box(contentAlignment = Alignment.Center) {
+                        Icon(
+                            imageVector = Icons.Outlined.Tune,
+                            contentDescription = "Filter transaksi",
+                            tint = if (isFiltered) Color(0xFF004528) else Color(0xFF475569),
+                            modifier = Modifier.size(16.dp)
+                        )
+                    }
                 }
                 if (isFiltered) {
                     Box(
                         modifier = Modifier
                             .align(Alignment.TopEnd)
-                            .padding(top = 4.dp, end = 4.dp)
-                            .size(8.dp)
+                            .padding(top = 2.dp, end = 2.dp)
+                            .size(7.dp)
                             .background(Color(0xFFE5A93C), CircleShape)
-                            .border(1.5.dp, Color.White, CircleShape)
+                            .border(1.dp, Color.White, CircleShape)
                     )
                 }
             }
 
             // Button 3: Rekap / Ringkasan Shift Kasir [ 📑 ]
-            IconButton(
+            Surface(
                 onClick = { showSummaryPopup = true },
+                shape = RoundedCornerShape(12.dp),
+                color = if (showSummaryPopup) Color(0xFFE8F6ED) else Color(0xFFF8FAFC),
+                border = BorderStroke(1.dp, if (showSummaryPopup) Color(0xFF1B5E3C) else Color(0xFFE2E8F0)),
+                shadowElevation = 0.5.dp,
                 modifier = Modifier
-                    .size(36.dp)
+                    .size(32.dp)
                     .testTag("cashier-history-summary")
             ) {
-                Icon(
-                    imageVector = Icons.Outlined.Description,
-                    contentDescription = "Tampilkan rekap transaksi",
-                    tint = Color(0xFF64748B),
-                    modifier = Modifier.size(20.dp)
-                )
+                Box(contentAlignment = Alignment.Center) {
+                    Icon(
+                        imageVector = Icons.Outlined.Description,
+                        contentDescription = "Tampilkan rekap transaksi",
+                        tint = if (showSummaryPopup) Color(0xFF004528) else Color(0xFF475569),
+                        modifier = Modifier.size(16.dp)
+                    )
+                }
             }
         },
         onDashboardClick = onDashboardClick,

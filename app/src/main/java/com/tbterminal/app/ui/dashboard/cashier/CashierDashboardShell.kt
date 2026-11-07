@@ -404,7 +404,7 @@ private fun CashierCompactTopBar(
             // Sisi Kanan: Optional TopBar Actions (Search, Filter, Rekap) + User Profile Pill Button + Floating Animated Dropdown Popover
             Row(
                 verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                horizontalArrangement = Arrangement.spacedBy(6.dp)
             ) {
                 if (topBarActions != null) {
                     topBarActions()
