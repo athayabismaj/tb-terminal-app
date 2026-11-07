@@ -1,21 +1,39 @@
 package com.tbterminal.app.ui.checkout
 
+import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.Calculate
+import androidx.compose.material.icons.outlined.Search
+import androidx.compose.material.icons.outlined.Tune
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.Icon
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
+import androidx.compose.material3.Surface
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
@@ -71,6 +89,14 @@ fun CashierPosRoute(
     val context = androidx.compose.ui.platform.LocalContext.current
     var approvalAttemptId by remember { mutableStateOf<String?>(null) }
     var feedbackMessage by remember { mutableStateOf<String?>(null) }
+    var isSearchExpanded by rememberSaveable { mutableStateOf(false) }
+    var showFilterDialog by rememberSaveable { mutableStateOf(false) }
+    var showMaterialEstimator by rememberSaveable { mutableStateOf(false) }
+    var selectedCategory by rememberSaveable { mutableStateOf("Semua Kategori") }
+    var onlyInStock by rememberSaveable { mutableStateOf(false) }
+
+    val isSearchActive = isSearchExpanded || uiState.searchQuery.isNotEmpty()
+    val isFiltered = (selectedCategory != "Semua Kategori") || onlyInStock
 
     LaunchedEffect(uiState.checkoutPreview?.checkoutAttemptId, uiState.checkoutPreview?.approvalRequired) {
         val preview = uiState.checkoutPreview
@@ -99,6 +125,85 @@ fun CashierPosRoute(
         userName = name,
         role = role,
         activeDestination = CashierDestination.Pos,
+        topBarActions = {
+            // Button 1: Search [ 🔍 ]
+            Surface(
+                onClick = { isSearchExpanded = !isSearchExpanded },
+                shape = RoundedCornerShape(12.dp),
+                color = if (isSearchActive) Color(0xFFE8F6ED) else Color(0xFFF8FAFC),
+                border = BorderStroke(1.dp, if (isSearchActive) Color(0xFF1B5E3C) else Color(0xFFE2E8F0)),
+                shadowElevation = 0.5.dp,
+                modifier = Modifier
+                    .size(32.dp)
+                    .testTag("pos-toggle-search")
+            ) {
+                Box(contentAlignment = Alignment.Center) {
+                    Icon(
+                        imageVector = Icons.Outlined.Search,
+                        contentDescription = "Cari produk kasir",
+                        tint = if (isSearchActive) Color(0xFF004528) else Color(0xFF475569),
+                        modifier = Modifier.size(16.dp)
+                    )
+                }
+            }
+
+            // Button 2: Filter [ ⚙️ ]
+            Box(
+                modifier = Modifier.size(32.dp),
+                contentAlignment = Alignment.Center
+            ) {
+                Surface(
+                    onClick = { showFilterDialog = true },
+                    shape = RoundedCornerShape(12.dp),
+                    color = if (isFiltered) Color(0xFFE8F6ED) else Color(0xFFF8FAFC),
+                    border = BorderStroke(1.dp, if (isFiltered) Color(0xFF1B5E3C) else Color(0xFFE2E8F0)),
+                    shadowElevation = 0.5.dp,
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .testTag("pos-open-filter")
+                ) {
+                    Box(contentAlignment = Alignment.Center) {
+                        Icon(
+                            imageVector = Icons.Outlined.Tune,
+                            contentDescription = "Filter produk kasir",
+                            tint = if (isFiltered) Color(0xFF004528) else Color(0xFF475569),
+                            modifier = Modifier.size(16.dp)
+                        )
+                    }
+                }
+                if (isFiltered) {
+                    Box(
+                        modifier = Modifier
+                            .align(Alignment.TopEnd)
+                            .padding(top = 2.dp, end = 2.dp)
+                            .size(7.dp)
+                            .background(Color(0xFFE5A93C), CircleShape)
+                            .border(1.dp, Color.White, CircleShape)
+                    )
+                }
+            }
+
+            // Button 3: Kalkulator Bahan Bangunan [ 🧮 ]
+            Surface(
+                onClick = { showMaterialEstimator = true },
+                shape = RoundedCornerShape(12.dp),
+                color = if (showMaterialEstimator) Color(0xFFE8F6ED) else Color(0xFFF8FAFC),
+                border = BorderStroke(1.dp, if (showMaterialEstimator) Color(0xFF1B5E3C) else Color(0xFFE2E8F0)),
+                shadowElevation = 0.5.dp,
+                modifier = Modifier
+                    .size(32.dp)
+                    .testTag("pos-open-calculator")
+            ) {
+                Box(contentAlignment = Alignment.Center) {
+                    Icon(
+                        imageVector = Icons.Outlined.Calculate,
+                        contentDescription = "Hitung estimasi bahan bangunan",
+                        tint = if (showMaterialEstimator) Color(0xFF004528) else Color(0xFF475569),
+                        modifier = Modifier.size(16.dp)
+                    )
+                }
+            }
+        },
         onDashboardClick = onDashboardClick,
         onPosClick = onPosClick,
         onCashSessionClick = onCashSessionClick,
@@ -166,8 +271,21 @@ fun CashierPosRoute(
                 onClearScanNotification = viewModel::clearScanNotification,
                 onOpenHoldCartDialog = viewModel::openHoldCartDialog,
                 onOpenHeldCarts = viewModel::openHeldCartsSheet,
-                onOpenPettyCashDialog = { viewModel.openPettyCashDialog() },
-                onLockScreen = viewModel::lockScreen,
+                isSearchExpanded = isSearchExpanded,
+                onToggleSearch = { isSearchExpanded = !isSearchExpanded },
+                selectedCategory = selectedCategory,
+                onCategorySelected = { selectedCategory = it },
+                onlyInStock = onlyInStock,
+                onToggleOnlyInStock = { onlyInStock = it },
+                showFilterDialog = showFilterDialog,
+                onDismissFilterDialog = { showFilterDialog = false },
+                showMaterialEstimator = showMaterialEstimator,
+                onDismissMaterialEstimator = { showMaterialEstimator = false },
+                onApplyMaterialSearch = { query ->
+                    isSearchExpanded = true
+                    viewModel.onSearchChanged(query)
+                    showMaterialEstimator = false
+                },
                 modifier = Modifier
                     .fillMaxSize()
                     .padding(contentPadding)

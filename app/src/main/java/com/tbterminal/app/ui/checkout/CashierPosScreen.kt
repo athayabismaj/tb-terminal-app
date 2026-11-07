@@ -1,5 +1,10 @@
 package com.tbterminal.app.ui.checkout
 
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.expandVertically
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -15,10 +20,12 @@ import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
@@ -29,16 +36,16 @@ import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.outlined.BookmarkAdd
 import androidx.compose.material.icons.outlined.Calculate
 import androidx.compose.material.icons.outlined.Clear
-import androidx.compose.material.icons.outlined.Lock
 import androidx.compose.material.icons.outlined.PauseCircleOutline
-import androidx.compose.material.icons.outlined.Payments
 import androidx.compose.material.icons.outlined.QrCodeScanner
 import androidx.compose.material.icons.outlined.Search
 import androidx.compose.material.icons.outlined.ShoppingCart
+import androidx.compose.material.icons.outlined.Tune
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.OutlinedButton
@@ -57,10 +64,12 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.window.Dialog
 import com.tbterminal.app.data.model.Customer
 import com.tbterminal.app.ui.barcode.CameraBarcodeScannerDialog
 import com.tbterminal.app.ui.barcode.hardwareBarcodeScanner
@@ -131,25 +140,35 @@ fun CashierPosScreen(
     onOpenHeldCarts: () -> Unit = {},
     onOpenPettyCashDialog: () -> Unit = {},
     onLockScreen: () -> Unit = {},
+    isSearchExpanded: Boolean = false,
+    onToggleSearch: () -> Unit = {},
+    selectedCategory: String = "Semua Kategori",
+    onCategorySelected: (String) -> Unit = {},
+    onlyInStock: Boolean = false,
+    onToggleOnlyInStock: (Boolean) -> Unit = {},
+    showFilterDialog: Boolean = false,
+    onDismissFilterDialog: () -> Unit = {},
+    showMaterialEstimator: Boolean = false,
+    onDismissMaterialEstimator: () -> Unit = {},
+    onApplyMaterialSearch: (String) -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     var showCameraScanner by remember { mutableStateOf(false) }
-    var showMaterialEstimator by remember { mutableStateOf(false) }
 
     val allCategory = "Semua Kategori"
     val categories = remember(state.products) {
         listOf(allCategory) + state.products.map { it.categoryName }.filter { it.isNotBlank() }.distinct()
     }
-    var selectedCategory by remember { mutableStateOf(allCategory) }
-    LaunchedEffect(categories) {
-        if (selectedCategory !in categories) {
-            selectedCategory = allCategory
+    LaunchedEffect(categories, selectedCategory) {
+        if (selectedCategory !in categories && selectedCategory != allCategory) {
+            onCategorySelected(allCategory)
         }
     }
 
-    val filteredProducts = remember(selectedCategory, state.products) {
-        if (selectedCategory == allCategory) state.products
-        else state.products.filter { it.categoryName == selectedCategory }
+    val filteredProducts = remember(selectedCategory, onlyInStock, state.products) {
+        state.products
+            .filter { selectedCategory == allCategory || it.categoryName == selectedCategory }
+            .filter { !onlyInStock || it.stockQty > BigDecimal.ZERO }
     }
 
     val cartItemCount = state.cartItems.sumOf { it.quantity }
@@ -176,35 +195,43 @@ fun CashierPosScreen(
                     modifier = Modifier
                         .fillMaxSize()
                         .padding(horizontal = if (compact) 14.dp else 24.dp)
-                        .padding(top = 12.dp)
+                        .padding(top = 8.dp)
                 ) {
-                    // ── 1. OPERATIONAL REGISTER HEADER ──
-                    PosOperationalHeader(
-                        heldCartsCount = state.heldCarts.size,
-                        cartItemCount = cartItemCount,
-                        onOpenHeldCarts = onOpenHeldCarts,
-                        onOpenHoldCartDialog = onOpenHoldCartDialog,
-                        onOpenPettyCashDialog = onOpenPettyCashDialog,
-                        onOpenMaterialEstimator = { showMaterialEstimator = true },
-                        onLockScreen = onLockScreen
-                    )
+                    // ── 1. OPERATIONAL NOTA STATUS ROW (Hanya tampil jika ada nota diparkir / keranjang terisi) ──
+                    if (state.heldCarts.isNotEmpty() || cartItemCount > 0) {
+                        PosOperationalStatusRow(
+                            heldCartsCount = state.heldCarts.size,
+                            cartItemCount = cartItemCount,
+                            onOpenHeldCarts = onOpenHeldCarts,
+                            onOpenHoldCartDialog = onOpenHoldCartDialog
+                        )
+                        Spacer(modifier = Modifier.height(8.dp))
+                    }
 
-                    Spacer(modifier = Modifier.height(10.dp))
-
-                    // ── 2. SEARCH & SCANNER INPUT BAR ──
-                    PosSearchBar(
-                        query = state.searchQuery,
-                        onQueryChanged = onSearchChanged,
-                        onOpenCameraScanner = { showCameraScanner = true }
-                    )
-
-                    Spacer(modifier = Modifier.height(10.dp))
+                    // ── 2. EXPANDABLE SEARCH & SCANNER INPUT BAR (Hanya nampak ketika icon cari di-trigger atau teks query terisi) ──
+                    AnimatedVisibility(
+                        visible = isSearchExpanded || state.searchQuery.isNotEmpty(),
+                        enter = expandVertically() + fadeIn(),
+                        exit = shrinkVertically() + fadeOut()
+                    ) {
+                        Column(modifier = Modifier.padding(bottom = 8.dp)) {
+                            PosSearchBar(
+                                query = state.searchQuery,
+                                onQueryChanged = onSearchChanged,
+                                onOpenCameraScanner = { showCameraScanner = true },
+                                onCloseSearch = {
+                                    onSearchChanged("")
+                                    onToggleSearch()
+                                }
+                            )
+                        }
+                    }
 
                     // ── 3. CATEGORY PILL CAROUSEL (ONE-TAP SPEED) ──
                     PosCategoryCarousel(
                         categories = categories,
                         selectedCategory = selectedCategory,
-                        onCategorySelected = { selectedCategory = it }
+                        onCategorySelected = onCategorySelected
                     )
 
                     // ── 4. BARCODE SCAN NOTIFICATION TOAST PILL ──
@@ -349,63 +376,78 @@ fun CashierPosScreen(
     // Modal Kalkulator Bahan Bangunan
     if (showMaterialEstimator) {
         MaterialEstimatorDialog(
-            onDismiss = { showMaterialEstimator = false },
-            onApplySearchQuery = { query -> onSearchChanged(query) }
+            onDismiss = onDismissMaterialEstimator,
+            onApplySearchQuery = onApplyMaterialSearch
+        )
+    }
+
+    // Modal Filter Produk & Kategori POS
+    if (showFilterDialog) {
+        PosFilterDialog(
+            categories = categories,
+            selectedCategory = selectedCategory,
+            onlyInStock = onlyInStock,
+            onApplyFilter = { cat, stockOnly ->
+                onCategorySelected(cat)
+                onToggleOnlyInStock(stockOnly)
+                onDismissFilterDialog()
+            },
+            onResetFilter = {
+                onCategorySelected(allCategory)
+                onToggleOnlyInStock(false)
+                onDismissFilterDialog()
+            },
+            onDismiss = onDismissFilterDialog
         )
     }
 }
 
 // ═════════════════════════════════════════════════════════════════════════════
-// SUB-KOMPONEN 1: OPERATIONAL POS REGISTER HEADER
+// SUB-KOMPONEN 1: OPERATIONAL NOTA STATUS ROW (PARKIR NOTA)
 // ═════════════════════════════════════════════════════════════════════════════
 @Composable
-private fun PosOperationalHeader(
+private fun PosOperationalStatusRow(
     heldCartsCount: Int,
     cartItemCount: Int,
     onOpenHeldCarts: () -> Unit,
-    onOpenHoldCartDialog: () -> Unit,
-    onOpenPettyCashDialog: () -> Unit,
-    onOpenMaterialEstimator: () -> Unit,
-    onLockScreen: () -> Unit
+    onOpenHoldCartDialog: () -> Unit
 ) {
     Row(
         modifier = Modifier.fillMaxWidth(),
         horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.CenterVertically
     ) {
-        // Left: Register Identity Title
-        Row(
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(8.dp)
+        // Tag Identitas Mesin Kasir POS
+        Surface(
+            shape = RoundedCornerShape(8.dp),
+            color = BrandGreenLight,
+            border = BorderStroke(1.dp, BrandGreenBorder)
         ) {
-            Text(
-                text = "Kasir POS",
-                color = Slate900,
-                fontSize = 20.sp,
-                fontWeight = FontWeight.ExtraBold
-            )
-
-            Surface(
-                shape = RoundedCornerShape(6.dp),
-                color = BrandGreenLight,
-                border = BorderStroke(1.dp, BrandGreenBorder)
+            Row(
+                modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(4.dp)
             ) {
+                Box(
+                    modifier = Modifier
+                        .size(6.dp)
+                        .background(BrandForest, CircleShape)
+                )
                 Text(
                     text = "POS-01",
                     color = BrandForest,
                     fontSize = 11.sp,
-                    fontWeight = FontWeight.Bold,
-                    modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                    fontWeight = FontWeight.Bold
                 )
             }
         }
 
-        // Right: Operational Shortcuts
+        // Action Parkir Nota
         Row(
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(6.dp)
         ) {
-            // Badge Parkir Nota (Held Carts) jika ada yang ditahan
+            // Badge Parkir Nota jika ada yang ditahan
             if (heldCartsCount > 0) {
                 Surface(
                     onClick = onOpenHeldCarts,
@@ -414,14 +456,14 @@ private fun PosOperationalHeader(
                     border = BorderStroke(1.dp, AmberBorder)
                 ) {
                     Row(
-                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 5.dp),
+                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         Icon(
                             imageVector = Icons.Outlined.PauseCircleOutline,
                             contentDescription = null,
                             tint = Amber700,
-                            modifier = Modifier.size(15.dp)
+                            modifier = Modifier.size(14.dp)
                         )
                         Spacer(Modifier.width(4.dp))
                         Text(
@@ -434,7 +476,7 @@ private fun PosOperationalHeader(
                 }
             }
 
-            // Tombol Parkir Nota Baru saat kasir melayani transaksi yang perlu ditunda
+            // Tombol Tunda / Parkir Transaksi saat kasir melayani transaksi yang perlu ditunda
             if (cartItemCount > 0) {
                 OutlinedButton(
                     onClick = onOpenHoldCartDialog,
@@ -442,83 +484,34 @@ private fun PosOperationalHeader(
                     border = BorderStroke(1.dp, Amber700),
                     colors = ButtonDefaults.outlinedButtonColors(contentColor = Amber700),
                     contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp),
-                    modifier = Modifier.height(34.dp)
+                    modifier = Modifier.height(30.dp)
                 ) {
                     Icon(
                         imageVector = Icons.Outlined.BookmarkAdd,
                         contentDescription = null,
-                        modifier = Modifier.size(14.dp)
+                        modifier = Modifier.size(13.dp)
                     )
                     Spacer(Modifier.width(4.dp))
                     Text(
-                        text = "Parkir",
+                        text = "Tunda Transaksi",
                         fontWeight = FontWeight.Bold,
                         fontSize = 11.sp
                     )
                 }
-            }
-
-            // Shortcut 1: Kas Kecil
-            IconButton(
-                onClick = onOpenPettyCashDialog,
-                modifier = Modifier
-                    .size(34.dp)
-                    .clip(CircleShape)
-                    .background(BrandGreenLight)
-            ) {
-                Icon(
-                    imageVector = Icons.Outlined.Payments,
-                    contentDescription = "Kas Kecil",
-                    tint = BrandForest,
-                    modifier = Modifier.size(18.dp)
-                )
-            }
-
-            // Shortcut 2: Kalkulator Material
-            IconButton(
-                onClick = onOpenMaterialEstimator,
-                modifier = Modifier
-                    .size(34.dp)
-                    .clip(CircleShape)
-                    .background(Color.White)
-                    .border(1.dp, Slate200, CircleShape)
-            ) {
-                Icon(
-                    imageVector = Icons.Outlined.Calculate,
-                    contentDescription = "Kalkulator Bahan Bangunan",
-                    tint = Slate700,
-                    modifier = Modifier.size(18.dp)
-                )
-            }
-
-            // Shortcut 3: Kunci Kasir
-            IconButton(
-                onClick = onLockScreen,
-                modifier = Modifier
-                    .size(34.dp)
-                    .clip(CircleShape)
-                    .background(Color.White)
-                    .border(1.dp, Slate200, CircleShape)
-            ) {
-                Icon(
-                    imageVector = Icons.Outlined.Lock,
-                    contentDescription = "Kunci Layar Kasir",
-                    tint = Slate500,
-                    modifier = Modifier.size(16.dp)
-                )
             }
         }
     }
 }
 
 // ═════════════════════════════════════════════════════════════════════════════
-// SUB-KOMPONEN 2: SEARCH & BARCODE SCANNER BAR
+// SUB-KOMPONEN 2: EXPANDABLE SEARCH & BARCODE SCANNER BAR
 // ═════════════════════════════════════════════════════════════════════════════
 @Composable
 private fun PosSearchBar(
     query: String,
     onQueryChanged: (String) -> Unit,
-    onOpenCameraScanner: () -> Unit
+    onOpenCameraScanner: () -> Unit,
+    onCloseSearch: () -> Unit
 ) {
     OutlinedTextField(
         value = query,
@@ -534,33 +527,33 @@ private fun PosSearchBar(
             Icon(
                 imageVector = Icons.Outlined.Search,
                 contentDescription = null,
-                tint = Slate500,
-                modifier = Modifier.size(20.dp)
+                tint = BrandForest,
+                modifier = Modifier.size(18.dp)
             )
         },
         trailingIcon = {
             Row(
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(2.dp),
-                modifier = Modifier.padding(end = 6.dp)
+                modifier = Modifier.padding(end = 4.dp)
             ) {
                 if (query.isNotBlank()) {
                     IconButton(
                         onClick = { onQueryChanged("") },
-                        modifier = Modifier.size(30.dp)
+                        modifier = Modifier.size(28.dp)
                     ) {
                         Icon(
                             imageVector = Icons.Outlined.Clear,
                             contentDescription = "Hapus Pencarian",
                             tint = Slate400,
-                            modifier = Modifier.size(18.dp)
+                            modifier = Modifier.size(16.dp)
                         )
                     }
                 }
                 IconButton(
                     onClick = onOpenCameraScanner,
                     modifier = Modifier
-                        .size(36.dp)
+                        .size(32.dp)
                         .clip(RoundedCornerShape(8.dp))
                         .background(BrandGreenLight)
                 ) {
@@ -568,14 +561,25 @@ private fun PosSearchBar(
                         imageVector = Icons.Outlined.QrCodeScanner,
                         contentDescription = "Scan Barcode Kamera",
                         tint = BrandForest,
-                        modifier = Modifier.size(20.dp)
+                        modifier = Modifier.size(18.dp)
+                    )
+                }
+                IconButton(
+                    onClick = onCloseSearch,
+                    modifier = Modifier.size(28.dp)
+                ) {
+                    Icon(
+                        imageVector = Icons.Outlined.Clear,
+                        contentDescription = "Tutup Pencarian",
+                        tint = Slate400,
+                        modifier = Modifier.size(16.dp)
                     )
                 }
             }
         },
         modifier = Modifier
             .fillMaxWidth()
-            .height(52.dp),
+            .height(48.dp),
         shape = RoundedCornerShape(12.dp),
         colors = OutlinedTextFieldDefaults.colors(
             unfocusedContainerColor = Color.White,
@@ -585,6 +589,242 @@ private fun PosSearchBar(
         ),
         singleLine = true
     )
+}
+
+// ═════════════════════════════════════════════════════════════════════════════
+// SUB-KOMPONEN 2B: POS FILTER DIALOG (KATEGORI & STATUS STOK)
+// ═════════════════════════════════════════════════════════════════════════════
+@Composable
+private fun PosFilterDialog(
+    categories: List<String>,
+    selectedCategory: String,
+    onlyInStock: Boolean,
+    onApplyFilter: (category: String, onlyInStock: Boolean) -> Unit,
+    onResetFilter: () -> Unit,
+    onDismiss: () -> Unit
+) {
+    var tempCategory by remember(selectedCategory) { mutableStateOf(selectedCategory) }
+    var tempOnlyInStock by remember(onlyInStock) { mutableStateOf(onlyInStock) }
+
+    Dialog(onDismissRequest = onDismiss) {
+        Surface(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 4.dp),
+            shape = RoundedCornerShape(20.dp),
+            color = Color.White,
+            shadowElevation = 8.dp
+        ) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(20.dp),
+                verticalArrangement = Arrangement.spacedBy(16.dp)
+            ) {
+                // Header Dialog
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(10.dp)
+                    ) {
+                        Surface(
+                            modifier = Modifier.size(36.dp),
+                            shape = RoundedCornerShape(10.dp),
+                            color = Color(0xFFE8F6ED),
+                            border = BorderStroke(1.dp, Color(0xFF1B5E3C))
+                        ) {
+                            Box(contentAlignment = Alignment.Center) {
+                                Icon(
+                                    imageVector = Icons.Outlined.Tune,
+                                    contentDescription = null,
+                                    tint = Color(0xFF004528),
+                                    modifier = Modifier.size(18.dp)
+                                )
+                            }
+                        }
+                        Column {
+                            Text(
+                                text = "Filter Katalog Produk",
+                                fontSize = 15.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = Color(0xFF0F172A)
+                            )
+                            Text(
+                                text = "Saring produk berdasarkan kategori & ketersediaan",
+                                fontSize = 11.sp,
+                                color = Color(0xFF64748B)
+                            )
+                        }
+                    }
+
+                    IconButton(
+                        onClick = onDismiss,
+                        modifier = Modifier.size(32.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Outlined.Clear,
+                            contentDescription = "Tutup",
+                            tint = Color(0xFF94A3B8),
+                            modifier = Modifier.size(18.dp)
+                        )
+                    }
+                }
+
+                HorizontalDivider(color = Color(0xFFF1F5F9))
+
+                // Section 1: Ketersediaan Stok
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text(
+                        text = "Ketersediaan Stok",
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = Color(0xFF334155)
+                    )
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        // Option A: Semua Produk
+                        Surface(
+                            onClick = { tempOnlyInStock = false },
+                            shape = RoundedCornerShape(10.dp),
+                            color = if (!tempOnlyInStock) Color(0xFFE8F6ED) else Color(0xFFF8FAFC),
+                            border = BorderStroke(1.dp, if (!tempOnlyInStock) Color(0xFF1B5E3C) else Color(0xFFE2E8F0)),
+                            modifier = Modifier.weight(1f)
+                        ) {
+                            Box(
+                                modifier = Modifier.padding(vertical = 10.dp),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Text(
+                                    text = "Semua Produk",
+                                    fontSize = 12.sp,
+                                    fontWeight = if (!tempOnlyInStock) FontWeight.Bold else FontWeight.Medium,
+                                    color = if (!tempOnlyInStock) Color(0xFF004528) else Color(0xFF475569)
+                                )
+                            }
+                        }
+
+                        // Option B: Hanya Stok Tersedia
+                        Surface(
+                            onClick = { tempOnlyInStock = true },
+                            shape = RoundedCornerShape(10.dp),
+                            color = if (tempOnlyInStock) Color(0xFFE8F6ED) else Color(0xFFF8FAFC),
+                            border = BorderStroke(1.dp, if (tempOnlyInStock) Color(0xFF1B5E3C) else Color(0xFFE2E8F0)),
+                            modifier = Modifier.weight(1f)
+                        ) {
+                            Box(
+                                modifier = Modifier.padding(vertical = 10.dp),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Text(
+                                    text = "Stok Tersedia (>0)",
+                                    fontSize = 12.sp,
+                                    fontWeight = if (tempOnlyInStock) FontWeight.Bold else FontWeight.Medium,
+                                    color = if (tempOnlyInStock) Color(0xFF004528) else Color(0xFF475569)
+                                )
+                            }
+                        }
+                    }
+                }
+
+                // Section 2: Kategori Produk
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text(
+                        text = "Kategori Produk",
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = Color(0xFF334155)
+                    )
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .heightIn(max = 200.dp)
+                    ) {
+                        LazyColumn(
+                            verticalArrangement = Arrangement.spacedBy(6.dp)
+                        ) {
+                            items(categories) { category ->
+                                val isSelected = category == tempCategory
+                                Surface(
+                                    onClick = { tempCategory = category },
+                                    shape = RoundedCornerShape(8.dp),
+                                    color = if (isSelected) Color(0xFFF0FDF4) else Color(0xFFF8FAFC),
+                                    border = BorderStroke(1.dp, if (isSelected) Color(0xFF1B5E3C) else Color(0xFFE2E8F0)),
+                                    modifier = Modifier.fillMaxWidth()
+                                ) {
+                                    Row(
+                                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 9.dp),
+                                        horizontalArrangement = Arrangement.SpaceBetween,
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        Text(
+                                            text = category,
+                                            fontSize = 12.sp,
+                                            fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
+                                            color = if (isSelected) Color(0xFF004528) else Color(0xFF334155)
+                                        )
+                                        if (isSelected) {
+                                            Icon(
+                                                imageVector = Icons.Filled.CheckCircle,
+                                                contentDescription = null,
+                                                tint = Color(0xFF1B5E3C),
+                                                modifier = Modifier.size(16.dp)
+                                            )
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+
+                HorizontalDivider(color = Color(0xFFF1F5F9))
+
+                // Footer Buttons: Reset & Terapkan
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
+                    OutlinedButton(
+                        onClick = onResetFilter,
+                        shape = RoundedCornerShape(12.dp),
+                        border = BorderStroke(1.dp, Color(0xFFE2E8F0)),
+                        modifier = Modifier
+                            .weight(1f)
+                            .height(42.dp)
+                    ) {
+                        Text(
+                            text = "Reset",
+                            color = Color(0xFF64748B),
+                            fontWeight = FontWeight.SemiBold,
+                            fontSize = 13.sp
+                        )
+                    }
+
+                    Button(
+                        onClick = { onApplyFilter(tempCategory, tempOnlyInStock) },
+                        shape = RoundedCornerShape(12.dp),
+                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF004528)),
+                        modifier = Modifier
+                            .weight(1f)
+                            .height(42.dp)
+                    ) {
+                        Text(
+                            text = "Terapkan",
+                            color = Color.White,
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 13.sp
+                        )
+                    }
+                }
+            }
+        }
+    }
 }
 
 // ═════════════════════════════════════════════════════════════════════════════
