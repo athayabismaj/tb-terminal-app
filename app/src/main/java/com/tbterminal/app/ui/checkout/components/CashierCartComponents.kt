@@ -22,6 +22,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.AccountBalance
 import androidx.compose.material.icons.outlined.AccountBalanceWallet
 import androidx.compose.material.icons.outlined.Add
+import androidx.compose.material.icons.outlined.Close
 import androidx.compose.material.icons.outlined.Delete
 import androidx.compose.material.icons.outlined.LocalOffer
 import androidx.compose.material.icons.outlined.Payments
@@ -43,14 +44,17 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.tbterminal.app.ui.checkout.CartItem
 import com.tbterminal.app.ui.checkout.PaymentMethod
 import com.tbterminal.app.ui.checkout.displayName
+import com.tbterminal.app.ui.checkout.estimateDiscountAmount
 import com.tbterminal.app.data.model.DiscountType
 import java.math.BigDecimal
 import java.text.NumberFormat
@@ -78,12 +82,16 @@ fun CartItemCard(
     onRemove: () -> Unit,
     onDiscountClick: () -> Unit,
     onToggleUnit: ((Boolean) -> Unit)? = null,
+    onRemoveDiscount: (() -> Unit)? = null,
 ) {
-    val subtotal = item.unitPrice.multiply(item.quantity.toBigDecimal())
+    val lineGross = item.unitPrice.multiply(item.quantity.toBigDecimal())
+    val discountAmount = estimateDiscountAmount(lineGross, item.discountRequest)
+    val hasDiscount = item.discountRequest != null && discountAmount > BigDecimal.ZERO
+    val lineNet = lineGross.subtract(discountAmount).coerceAtLeast(BigDecimal.ZERO)
 
     Surface(
         modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(14.dp),
+        shape = RoundedCornerShape(16.dp),
         color = Color.White,
         border = BorderStroke(1.dp, Color(0xFFE2E8F0)),
         shadowElevation = 0.5.dp
@@ -92,7 +100,7 @@ fun CartItemCard(
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(14.dp),
-            verticalArrangement = Arrangement.spacedBy(10.dp)
+            verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
             // ── BARIS 1: Info Produk & Subtotal Harga ──
             Row(
@@ -100,71 +108,94 @@ fun CartItemCard(
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.Top
             ) {
-                // Info Produk (Nama, Harga Satuan, SKU)
-                Column(
+                // Sisi Kiri: Avatar Inisial & Info Produk
+                Row(
                     modifier = Modifier
                         .weight(1f)
                         .padding(end = 12.dp),
-                    verticalArrangement = Arrangement.spacedBy(3.dp)
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
-                    Text(
-                        text = item.productName,
-                        fontSize = 14.5.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = Color(0xFF0F172A),
-                        maxLines = 2,
-                        overflow = TextOverflow.Ellipsis,
-                        lineHeight = 19.sp
-                    )
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(4.dp)
+                    // Kotak Inisial Produk (40dp x 40dp, rounded-xl 12dp)
+                    Surface(
+                        modifier = Modifier.size(40.dp),
+                        shape = RoundedCornerShape(12.dp),
+                        color = Color.White,
+                        border = BorderStroke(1.dp, Color(0xFFE2E8F0))
                     ) {
-                        Text(
-                            text = "@ ${formatRupiah(item.unitPrice)}",
-                            fontSize = 12.sp,
-                            fontWeight = FontWeight.Medium,
-                            color = Color(0xFF64748B)
-                        )
-                        if (unitName.isNotBlank()) {
+                        Box(contentAlignment = Alignment.Center) {
                             Text(
-                                text = "/ $unitName",
+                                text = item.productName.take(2).uppercase(),
                                 fontSize = 12.sp,
-                                color = Color(0xFF94A3B8)
+                                fontWeight = FontWeight.Bold,
+                                color = if (hasDiscount) Color(0xFF92400E) else Color(0xFF10533C)
                             )
                         }
-                        if (sku.isNotBlank()) {
+                    }
+
+                    Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                        Text(
+                            text = item.productName,
+                            fontSize = 14.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = Color(0xFF0F172A),
+                            maxLines = 2,
+                            overflow = TextOverflow.Ellipsis,
+                            lineHeight = 18.sp
+                        )
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(4.dp)
+                        ) {
                             Text(
-                                text = "• SKU: $sku",
-                                fontSize = 11.sp,
-                                color = Color(0xFF94A3B8)
+                                text = "@ ${formatRupiah(item.unitPrice)}",
+                                fontSize = 12.sp,
+                                fontWeight = FontWeight.Medium,
+                                color = Color(0xFF64748B)
                             )
+                            if (unitName.isNotBlank()) {
+                                Text(
+                                    text = "/ $unitName",
+                                    fontSize = 12.sp,
+                                    color = Color(0xFF94A3B8)
+                                )
+                            }
+                            if (sku.isNotBlank()) {
+                                Text(
+                                    text = "• SKU: $sku",
+                                    fontSize = 11.sp,
+                                    color = Color(0xFF94A3B8)
+                                )
+                            }
                         }
                     }
                 }
 
-                // Sisi Kanan: Subtotal Nominal Produk
+                // Sisi Kanan: Subtotal Nominal Produk (Dengan harga coret jika ada diskon)
                 Column(horizontalAlignment = Alignment.End) {
-                    Text(
-                        text = formatRupiah(subtotal),
-                        fontSize = 15.5.sp,
-                        fontWeight = FontWeight.ExtraBold,
-                        color = Color(0xFF004528)
-                    )
-                    if (item.discountRequest != null) {
+                    if (hasDiscount) {
                         Text(
-                            text = "Diskon diterapkan",
-                            fontSize = 10.5.sp,
-                            fontWeight = FontWeight.SemiBold,
-                            color = Color(0xFFB45309)
+                            text = formatRupiah(lineGross),
+                            fontSize = 11.5.sp,
+                            color = Color(0xFF94A3B8),
+                            style = TextStyle(textDecoration = TextDecoration.LineThrough)
                         )
                     }
+                    Text(
+                        text = formatRupiah(if (hasDiscount) lineNet else lineGross),
+                        fontSize = 14.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = Color(0xFF0F172A),
+                        letterSpacing = (-0.3).sp
+                    )
                 }
             }
 
-            // ── BARIS 2: Satuan & Diskon (Kiri) + Stepper Qty (Kanan) ──
+            // ── BARIS 2: Modifiers / Diskon (Kiri) + Stepper Qty (Kanan) ──
             Row(
-                modifier = Modifier.fillMaxWidth(),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(top = 4.dp),
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
@@ -179,8 +210,8 @@ fun CartItemCard(
                         Surface(
                             onClick = { onToggleUnit(!item.isSecondaryUnit) },
                             shape = RoundedCornerShape(8.dp),
-                            color = if (item.isSecondaryUnit) Color(0xFFF0FDF4) else Color(0xFFF8FAFC),
-                            border = BorderStroke(1.dp, if (item.isSecondaryUnit) Color(0xFF86EFAC) else Color(0xFFE2E8F0))
+                            color = if (item.isSecondaryUnit) Color(0xFFF0FDF4) else Color.White,
+                            border = BorderStroke(1.dp, if (item.isSecondaryUnit) Color(0xFFBBF7D0) else Color(0xFFE2E8F0))
                         ) {
                             Row(
                                 modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
@@ -190,106 +221,152 @@ fun CartItemCard(
                                 Icon(
                                     imageVector = Icons.Outlined.SyncAlt,
                                     contentDescription = null,
-                                    tint = if (item.isSecondaryUnit) Color(0xFF004528) else Color(0xFF64748B),
-                                    modifier = Modifier.size(13.dp)
+                                    tint = if (item.isSecondaryUnit) Color(0xFF10533C) else Color(0xFF64748B),
+                                    modifier = Modifier.size(12.dp)
                                 )
                                 Text(
                                     text = if (item.isSecondaryUnit) (item.secondaryUnitName ?: "Satuan 2") else (item.baseUnitName.ifBlank { "Utama" }),
                                     fontSize = 11.sp,
                                     fontWeight = FontWeight.Bold,
-                                    color = if (item.isSecondaryUnit) Color(0xFF004528) else Color(0xFF475569)
+                                    color = if (item.isSecondaryUnit) Color(0xFF10533C) else Color(0xFF475569)
                                 )
                             }
                         }
                     }
 
-                    // Tombol Diskon Item
+                    // Modifiers Diskon
                     val request = item.discountRequest
-                    Surface(
-                        onClick = onDiscountClick,
-                        shape = RoundedCornerShape(8.dp),
-                        color = if (request != null) Color(0xFFFEF3C7) else Color(0xFFF8FAFC),
-                        border = BorderStroke(1.dp, if (request != null) Color(0xFFFCD34D) else Color(0xFFE2E8F0))
-                    ) {
+                    if (request == null) {
                         Row(
-                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+                            modifier = Modifier
+                                .clickable { onDiscountClick() }
+                                .padding(vertical = 4.dp),
                             verticalAlignment = Alignment.CenterVertically,
                             horizontalArrangement = Arrangement.spacedBy(4.dp)
                         ) {
                             Icon(
                                 imageVector = Icons.Outlined.LocalOffer,
                                 contentDescription = null,
-                                tint = if (request != null) Color(0xFFB45309) else Color(0xFF64748B),
-                                modifier = Modifier.size(12.dp)
+                                tint = Color(0xFF94A3B8),
+                                modifier = Modifier.size(13.dp)
                             )
                             Text(
-                                text = if (request == null) "+ Diskon" else when (request.type) {
-                                    DiscountType.PERCENTAGE -> "-${request.value.stripTrailingZeros().toPlainString()}%"
-                                    DiscountType.FIXED_AMOUNT -> "-${formatRupiah(request.value)}"
-                                },
-                                fontSize = 11.sp,
-                                fontWeight = FontWeight.Bold,
-                                color = if (request != null) Color(0xFFB45309) else Color(0xFF475569)
+                                text = "+ Diskon",
+                                fontSize = 12.sp,
+                                fontWeight = FontWeight.Medium,
+                                color = Color(0xFF64748B)
                             )
+                        }
+                    } else {
+                        Surface(
+                            shape = RoundedCornerShape(8.dp),
+                            color = Color.White,
+                            border = BorderStroke(1.dp, Color(0xFFE2E8F0)),
+                            shadowElevation = 0.5.dp
+                        ) {
+                            Row(
+                                modifier = Modifier.padding(horizontal = 7.dp, vertical = 3.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(4.dp)
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Outlined.LocalOffer,
+                                    contentDescription = null,
+                                    tint = Color(0xFFD97706),
+                                    modifier = Modifier.size(12.dp)
+                                )
+                                Text(
+                                    text = when (request.type) {
+                                        DiscountType.PERCENTAGE -> "Diskon ${request.value.stripTrailingZeros().toPlainString()}%"
+                                        DiscountType.FIXED_AMOUNT -> "Diskon ${formatRupiah(request.value)}"
+                                    },
+                                    fontSize = 11.sp,
+                                    fontWeight = FontWeight.Medium,
+                                    color = Color(0xFF334155),
+                                    modifier = Modifier.clickable { onDiscountClick() }
+                                )
+                                if (onRemoveDiscount != null) {
+                                    Icon(
+                                        imageVector = Icons.Outlined.Close,
+                                        contentDescription = "Hapus diskon",
+                                        tint = Color(0xFF94A3B8),
+                                        modifier = Modifier
+                                            .size(13.dp)
+                                            .clickable { onRemoveDiscount() }
+                                    )
+                                }
+                            }
                         }
                     }
                 }
 
-                // Sisi Kanan: Stepper Quantity [ - ] [ qty ] [ + ] Ergonomis
+                // Sisi Kanan: Quantity Stepper (flex items-center gap-1 bg-slate-50 p-0.5 rounded-xl border border-slate-200)
                 Surface(
-                    shape = RoundedCornerShape(10.dp),
+                    shape = RoundedCornerShape(12.dp),
                     color = Color(0xFFF8FAFC),
                     border = BorderStroke(1.dp, Color(0xFFE2E8F0))
                 ) {
                     Row(
                         verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(4.dp),
                         modifier = Modifier.padding(2.dp)
                     ) {
                         // Tombol Kurang / Hapus
                         Surface(
                             onClick = if (item.quantity <= 1) onRemove else onDecrease,
                             shape = RoundedCornerShape(8.dp),
-                            color = if (item.quantity <= 1) Color(0xFFFEF2F2) else Color.White,
-                            border = BorderStroke(1.dp, if (item.quantity <= 1) Color(0xFFFECACA) else Color(0xFFE2E8F0)),
-                            modifier = Modifier.size(30.dp)
+                            color = Color.White,
+                            border = BorderStroke(1.dp, Color(0xFFE2E8F0)),
+                            shadowElevation = 0.5.dp,
+                            modifier = Modifier.size(28.dp)
                         ) {
                             Box(contentAlignment = Alignment.Center) {
-                                Icon(
-                                    imageVector = if (item.quantity <= 1) Icons.Outlined.Delete else Icons.Outlined.Remove,
-                                    contentDescription = if (item.quantity <= 1) "Hapus item" else "Kurang jumlah",
-                                    tint = if (item.quantity <= 1) Color(0xFFDC2626) else Color(0xFF334155),
-                                    modifier = Modifier.size(15.dp)
-                                )
+                                if (item.quantity <= 1) {
+                                    Icon(
+                                        imageVector = Icons.Outlined.Delete,
+                                        contentDescription = "Hapus Item",
+                                        tint = Color(0xFFE11D48),
+                                        modifier = Modifier.size(14.dp)
+                                    )
+                                } else {
+                                    Icon(
+                                        imageVector = Icons.Outlined.Remove,
+                                        contentDescription = "Kurang Qty",
+                                        tint = Color(0xFF334155),
+                                        modifier = Modifier.size(14.dp)
+                                    )
+                                }
                             }
                         }
 
                         // Angka Kuantitas
                         Box(
-                            modifier = Modifier.width(36.dp),
+                            modifier = Modifier.width(30.dp),
                             contentAlignment = Alignment.Center
                         ) {
                             Text(
                                 text = item.quantity.toString(),
-                                fontSize = 14.sp,
+                                fontSize = 12.sp,
                                 fontWeight = FontWeight.Bold,
-                                color = Color(0xFF0F172A),
+                                color = Color(0xFF1E293B),
                                 textAlign = TextAlign.Center
                             )
                         }
 
-                        // Tombol Tambah
+                        // Tombol Tambah (Hijau Forest #10533C)
                         Surface(
                             onClick = onIncrease,
                             shape = RoundedCornerShape(8.dp),
-                            color = Color(0xFF004528),
-                            modifier = Modifier.size(30.dp)
+                            color = Color(0xFF10533C),
+                            shadowElevation = 0.5.dp,
+                            modifier = Modifier.size(28.dp)
                         ) {
                             Box(contentAlignment = Alignment.Center) {
                                 Icon(
                                     imageVector = Icons.Outlined.Add,
-                                    contentDescription = "Tambah jumlah",
+                                    contentDescription = "Tambah Qty",
                                     tint = Color.White,
-                                    modifier = Modifier.size(15.dp)
+                                    modifier = Modifier.size(14.dp)
                                 )
                             }
                         }
