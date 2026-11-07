@@ -223,7 +223,7 @@ fun CashierPosRoute(
 
             Scaffold(
                 snackbarHost = { SnackbarHost(snackbarHostState) },
-                containerColor = SurfaceBright,
+                containerColor = Color(0xFFF8FAF9),
                 contentWindowInsets = WindowInsets(0.dp),
                 modifier = Modifier.fillMaxSize()
             ) { contentPadding ->

@@ -201,7 +201,7 @@ fun CashierPosScreen(
                     modifier = Modifier
                         .fillMaxSize()
                         .padding(horizontal = if (compact) 14.dp else 24.dp)
-                        .padding(top = 8.dp)
+                        .padding(top = 2.dp)
                 ) {
                     // ── 1. OPERATIONAL NOTA STATUS ROW (Hadir di bagian atas katalog produk seperti HTML mockup) ──
                     PosOperationalStatusRow(
@@ -210,7 +210,7 @@ fun CashierPosScreen(
                         onOpenHeldCarts = onOpenHeldCarts,
                         onOpenHoldCartDialog = onOpenHoldCartDialog
                     )
-                    Spacer(modifier = Modifier.height(8.dp))
+                    Spacer(modifier = Modifier.height(4.dp))
 
                     // ── 2. EXPANDABLE SEARCH & SCANNER INPUT BAR (Hanya nampak ketika icon cari di-trigger atau teks query terisi) ──
                     AnimatedVisibility(
@@ -218,7 +218,7 @@ fun CashierPosScreen(
                         enter = expandVertically() + fadeIn(),
                         exit = shrinkVertically() + fadeOut()
                     ) {
-                        Column(modifier = Modifier.padding(bottom = 8.dp)) {
+                        Column(modifier = Modifier.padding(bottom = 4.dp)) {
                             PosSearchBar(
                                 query = state.searchQuery,
                                 onQueryChanged = onSearchChanged,
@@ -236,7 +236,7 @@ fun CashierPosScreen(
                         Row(
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .padding(bottom = 6.dp),
+                                .padding(bottom = 4.dp),
                             verticalAlignment = Alignment.CenterVertically,
                             horizontalArrangement = Arrangement.spacedBy(6.dp)
                         ) {
@@ -305,7 +305,7 @@ fun CashierPosScreen(
                             delay(2500)
                             onClearScanNotification()
                         }
-                        Spacer(modifier = Modifier.height(8.dp))
+                        Spacer(modifier = Modifier.height(4.dp))
                         Surface(
                             modifier = Modifier.fillMaxWidth(),
                             shape = RoundedCornerShape(12.dp),
@@ -332,8 +332,6 @@ fun CashierPosScreen(
                             }
                         }
                     }
-
-                    Spacer(modifier = Modifier.height(10.dp))
 
                     // ── 4. PRODUCT CATALOG GRID WITH LAZY LOAD ──
                     Box(
@@ -471,7 +469,7 @@ private fun PosOperationalStatusRow(
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(vertical = 2.dp),
+            .padding(vertical = 1.dp),
         horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.CenterVertically
     ) {
