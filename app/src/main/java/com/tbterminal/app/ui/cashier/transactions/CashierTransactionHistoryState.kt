@@ -71,4 +71,4 @@ data class CashierTransactionHistoryUiState(
         get() = minOf(page.toLong() * limit, total)
 }
 
-const val CASHIER_TRANSACTION_PAGE_SIZE = 10
+const val CASHIER_TRANSACTION_PAGE_SIZE = 50

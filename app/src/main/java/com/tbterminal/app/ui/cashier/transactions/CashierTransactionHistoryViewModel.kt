@@ -17,6 +17,7 @@ import com.tbterminal.app.data.sync.OfflineCheckoutSyncResult
 import com.tbterminal.app.data.sync.OfflineCheckoutSyncService
 import com.tbterminal.app.ui.common.viewModelFactory
 import com.tbterminal.app.ui.offline.toLocalPendingTransactionUi
+import com.tbterminal.app.ui.salestransactions.SalesSortOrder
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.collect
@@ -46,10 +47,10 @@ class CashierTransactionHistoryViewModel(
     val uiState: StateFlow<CashierTransactionHistoryUiState> = _uiState.asStateFlow()
 
     private var searchJob: Job? = null
-    private var allTransactions: List<CashTransaction> = emptyList()
 
     init {
         observeLocalPendingTransactions()
+        loadTransactions()
     }
 
     private fun observeLocalPendingTransactions() {
@@ -73,42 +74,177 @@ class CashierTransactionHistoryViewModel(
         }
     }
 
+    private fun sortTransactions(
+        list: List<CashTransaction>,
+        order: SalesSortOrder
+    ): List<CashTransaction> {
+        return when (order) {
+            SalesSortOrder.Newest -> list.sortedByDescending { it.createdAt }
+            SalesSortOrder.HighestAmount -> list.sortedByDescending { it.total }
+            SalesSortOrder.ReceiptAsc -> list.sortedBy { it.receiptNumber().lowercase() }
+        }
+    }
+
     fun loadTransactions(page: Int = _uiState.value.page) {
         viewModelScope.launch {
-            _uiState.update { state ->
-                state.copy(isLoading = true, errorMessage = null)
+            _uiState.update { it.copy(isLoading = true, errorMessage = null) }
+
+            val statusParam = when (_uiState.value.statusFilter.lowercase()) {
+                "semua" -> null
+                "belum lunas", "hutang" -> "hutang"
+                "dibatalkan", "voided" -> "voided"
+                else -> _uiState.value.statusFilter
+            }
+            val searchParam = _uiState.value.query.takeIf { it.isNotBlank() }
+
+            val isAllPreset = _uiState.value.selectedPreset == "Semua"
+            val startOfDay = if (isAllPreset) null else (_uiState.value.startDate ?: _uiState.value.selectedDate)?.take(10)
+            val endOfDay = if (isAllPreset) null else (_uiState.value.endDate ?: _uiState.value.selectedDate)?.take(10)
+            val paymentParam = when (_uiState.value.paymentMethodFilter.lowercase()) {
+                "semua" -> null
+                "cash", "tunai" -> "tunai"
+                else -> _uiState.value.paymentMethodFilter
             }
 
-            when (val sessionResult = repository.getActiveSession()) {
+            when (
+                val result = repository.getTransactions(
+                    page = page,
+                    limit = CASHIER_TRANSACTION_PAGE_SIZE,
+                    sessionId = null,
+                    search = searchParam,
+                    paymentMethod = paymentParam,
+                    status = statusParam,
+                    startDate = startOfDay,
+                    endDate = endOfDay
+                )
+            ) {
                 is RepositoryResult.Success -> {
-                    val session = sessionResult.data
-                    val sessionDate = session?.openedAt
-                        ?.toLocalDateOrNull()
-                        ?.format(DateTimeFormatter.ISO_LOCAL_DATE)
-                    _uiState.update { state ->
-                        val isPresetToday = state.selectedPreset == "Hari ini"
-                        val resolvedDate = if (isPresetToday && sessionDate != null) sessionDate else state.selectedDate
-                        state.copy(
-                            activeSession = session,
-                            page = page,
-                            selectedDate = resolvedDate,
-                            startDate = if (isPresetToday && sessionDate != null) sessionDate else state.startDate,
-                            endDate = if (isPresetToday && sessionDate != null) sessionDate else state.endDate,
-                            total = 0,
-                            totalPages = 1,
-                            transactions = emptyList()
+                    _uiState.update {
+                        val data = result.data.data
+                        val mergedData = if (page == 1) {
+                            mergeActiveSessionTransactions(data)
+                        } else {
+                            data
+                        }
+                        val sortedData = sortTransactions(mergedData, it.sortOrder)
+
+                        val totalSales = sortedData.fold(java.math.BigDecimal.ZERO) { acc, tx -> acc + tx.total }
+                        val totalPaid = sortedData.fold(java.math.BigDecimal.ZERO) { acc, tx -> acc + tx.paidAmount }
+                        val totalRemaining = sortedData.fold(java.math.BigDecimal.ZERO) { acc, tx ->
+                            val rem = tx.remainingAmount ?: (tx.total.subtract(tx.paidAmount)).max(java.math.BigDecimal.ZERO)
+                            acc + rem
+                        }
+                        val paidCount = sortedData.count { tx -> tx.status.lowercase() in listOf("lunas", "paid", "success", "completed") }
+                        val debtCount = sortedData.count { tx -> tx.status.lowercase() in listOf("hutang", "tempo", "unpaid", "dp", "partial") }
+
+                        it.copy(
+                            transactions = sortedData,
+                            page = result.data.page,
+                            totalPages = result.data.totalPages,
+                            total = maxOf(result.data.total, sortedData.size.toLong()),
+                            summaryTotalSales = totalSales,
+                            summaryTotalPaid = totalPaid,
+                            summaryTotalRemaining = totalRemaining,
+                            summaryTransactionCount = sortedData.size,
+                            summaryPaidCount = paidCount,
+                            summaryDebtCount = debtCount,
+                            isLoading = false
                         )
                     }
-
-                    val state = _uiState.value
-                    val isOnlyTodaySession = state.selectedPreset == "Hari ini" && session != null
-                    loadSessionTransactions(if (isOnlyTodaySession) session.id else null)
                 }
-
-                is RepositoryResult.Error -> setListError(sessionResult.message)
-                is RepositoryResult.Exception -> setListError("Koneksi bermasalah. Riwayat transaksi gagal dimuat.")
+                is RepositoryResult.Error -> {
+                    _uiState.update { it.copy(isLoading = false, errorMessage = result.message) }
+                }
+                is RepositoryResult.Exception -> {
+                    _uiState.update { it.copy(isLoading = false, errorMessage = "Koneksi ke server gagal") }
+                }
             }
         }
+    }
+
+    private suspend fun mergeActiveSessionTransactions(
+        remoteTransactions: List<CashTransaction>
+    ): List<CashTransaction> {
+        val activeSession = when (val sessionResult = repository.getActiveSession()) {
+            is RepositoryResult.Success -> sessionResult.data
+            else -> null
+        }
+        if (activeSession != null) {
+            _uiState.update { it.copy(activeSession = activeSession) }
+        } else {
+            return remoteTransactions
+        }
+
+        val activeTransactions = when (
+            val sessionTransactions = repository.getTransactions(
+                page = 1,
+                limit = 200,
+                sessionId = activeSession.id,
+                search = null,
+                status = null,
+                startDate = null,
+                endDate = null
+            )
+        ) {
+            is RepositoryResult.Success -> sessionTransactions.data.data
+            else -> emptyList()
+        }
+
+        if (activeTransactions.isEmpty()) return remoteTransactions
+
+        val state = _uiState.value
+        val merged = (activeTransactions.filter { it.matchesCurrentFilter(state) } + remoteTransactions)
+            .distinctBy { it.id }
+        return sortTransactions(merged, state.sortOrder).take(CASHIER_TRANSACTION_PAGE_SIZE)
+    }
+
+    private fun CashTransaction.matchesCurrentFilter(state: CashierTransactionHistoryUiState): Boolean {
+        val query = state.query.trim()
+        if (query.isNotBlank()) {
+            val matchesQuery = receiptId.contains(query, ignoreCase = true) ||
+                id.contains(query, ignoreCase = true) ||
+                (customerName?.contains(query, ignoreCase = true) == true)
+            if (!matchesQuery) return false
+        }
+
+        if (state.statusFilter != "Semua") {
+            val targetStatus = state.statusFilter.lowercase()
+            val normalizedStatus = status.lowercase()
+            val matchesStatus = normalizedStatus == targetStatus ||
+                (targetStatus == "lunas" && normalizedStatus in listOf("lunas", "paid", "success", "completed")) ||
+                (targetStatus == "dp" && normalizedStatus in listOf("dp", "partial")) ||
+                (targetStatus in listOf("hutang", "tempo", "belum lunas") && normalizedStatus in listOf("hutang", "tempo", "unpaid", "belum lunas")) ||
+                (targetStatus in listOf("voided", "void", "dibatalkan", "cancelled", "batal") && normalizedStatus in listOf("voided", "void", "dibatalkan", "cancelled", "batal"))
+            if (!matchesStatus) return false
+        }
+
+        if (state.paymentMethodFilter != "Semua") {
+            val targetMethod = state.paymentMethodFilter.lowercase()
+            val matchesMethod = paymentMethods.any { method ->
+                val m = method.lowercase()
+                when (targetMethod) {
+                    "tunai", "cash" -> m in listOf("tunai", "cash")
+                    "transfer" -> m in listOf("transfer", "bank", "transfer bank", "bank_transfer")
+                    "qris" -> m in listOf("qris", "qr")
+                    "hutang", "bon" -> m in listOf("hutang", "tempo", "credit", "bon")
+                    "dp" -> m in listOf("dp", "down_payment")
+                    else -> m == targetMethod
+                }
+            } || (targetMethod in listOf("hutang", "bon", "tempo") && (status.lowercase() in listOf("hutang", "tempo", "unpaid") || remainingAmount?.let { it > java.math.BigDecimal.ZERO } == true))
+            if (!matchesMethod) return false
+        }
+
+        if (state.selectedPreset != "Semua") {
+            val start = (state.startDate ?: state.selectedDate)?.let { runCatching { LocalDate.parse(it) }.getOrNull() }
+            val end = (state.endDate ?: state.selectedDate)?.let { runCatching { LocalDate.parse(it) }.getOrNull() }
+            if (start != null || end != null) {
+                val transactionDate = createdAt.toLocalDateOrNull() ?: return false
+                if (start != null && transactionDate.isBefore(start)) return false
+                if (end != null && transactionDate.isAfter(end)) return false
+            }
+        }
+
+        return true
     }
 
     fun refresh() = loadTransactions(_uiState.value.page)
@@ -177,7 +313,7 @@ class CashierTransactionHistoryViewModel(
         val previous = (_uiState.value.page - 1).coerceAtLeast(1)
         if (previous != _uiState.value.page) {
             _uiState.update { it.copy(page = previous) }
-            applyClientFilters()
+            loadTransactions(page = previous)
         }
     }
 
@@ -186,7 +322,7 @@ class CashierTransactionHistoryViewModel(
         val next = (state.page + 1).coerceAtMost(state.totalPages.coerceAtLeast(1))
         if (next != state.page) {
             _uiState.update { it.copy(page = next) }
-            applyClientFilters()
+            loadTransactions(page = next)
         }
     }
 
@@ -194,50 +330,51 @@ class CashierTransactionHistoryViewModel(
         _uiState.update { it.copy(query = query, page = 1) }
         searchJob?.cancel()
         searchJob = viewModelScope.launch {
-            delay(300)
-            applyClientFilters()
+            delay(500)
+            loadTransactions(page = 1)
         }
     }
 
     fun updateStatusFilter(status: String) {
         _uiState.update { it.copy(statusFilter = status, page = 1) }
-        applyClientFilters()
+        loadTransactions(page = 1)
     }
 
     fun updatePaymentMethodFilter(method: String) {
         _uiState.update { it.copy(paymentMethodFilter = method, page = 1) }
-        applyClientFilters()
+        loadTransactions(page = 1)
     }
 
-    fun updateSortOrder(order: com.tbterminal.app.ui.salestransactions.SalesSortOrder) {
-        _uiState.update { it.copy(sortOrder = order, page = 1) }
-        applyClientFilters()
+    fun updateSortOrder(order: SalesSortOrder) {
+        _uiState.update { state ->
+            val sorted = sortTransactions(state.transactions, order)
+            state.copy(sortOrder = order, transactions = sorted)
+        }
     }
 
     fun applyFilters(
         status: String,
         paymentMethod: String,
-        startDate: String?,
-        endDate: String?,
+        startDateStr: String?,
+        endDateStr: String?,
         preset: String?,
-        sortOrder: com.tbterminal.app.ui.salestransactions.SalesSortOrder
+        sortOrder: SalesSortOrder = _uiState.value.sortOrder
     ) {
-        val todayStr = LocalDate.now(WIB_ZONE).toString()
-        val finalStart = startDate ?: todayStr
-        val finalEnd = endDate ?: todayStr
+        val start = startDateStr?.take(10)
+        val end = endDateStr?.take(10)
         _uiState.update {
             it.copy(
                 statusFilter = status,
                 paymentMethodFilter = paymentMethod,
-                startDate = finalStart,
-                endDate = finalEnd,
-                selectedDate = finalEnd,
+                startDate = start,
+                endDate = end,
+                selectedDate = end ?: it.selectedDate,
                 selectedPreset = preset,
                 sortOrder = sortOrder,
                 page = 1
             )
         }
-        applyClientFilters()
+        loadTransactions(page = 1)
     }
 
     fun setDate(date: String?) {
@@ -256,26 +393,37 @@ class CashierTransactionHistoryViewModel(
 
     fun setDatePreset(preset: String) {
         val today = LocalDate.now(WIB_ZONE)
-        val startDate = when (preset) {
-            "Minggu ini", "Minggu", "7 hari" -> today.minusDays(6)
-            "Bulan ini", "Bulan", "30 hari" -> today.minusDays(29)
-            "Semua" -> LocalDate.of(2020, 1, 1)
-            else -> today
+        val (startDate, endDate) = when (preset) {
+            "Semua" -> null to null
+            "Minggu ini", "Minggu", "7 hari" -> today.minusDays(6) to today
+            "Bulan ini", "Bulan", "30 hari" -> today.minusDays(29) to today
+            else -> today to today
         }
-        setDateRange(startDate, today, preset)
+        _uiState.update {
+            it.copy(
+                selectedPreset = preset,
+                startDate = startDate?.toString(),
+                endDate = endDate?.toString(),
+                selectedDate = endDate?.toString() ?: it.selectedDate,
+                page = 1
+            )
+        }
+        loadTransactions(page = 1)
     }
 
     fun setDateRange(startDateStr: String, endDateStr: String, preset: String?) {
+        val start = startDateStr.take(10)
+        val end = endDateStr.take(10)
         _uiState.update {
             it.copy(
-                startDate = startDateStr,
-                endDate = endDateStr,
-                selectedDate = endDateStr,
+                startDate = start,
+                endDate = end,
+                selectedDate = end,
                 selectedPreset = preset,
                 page = 1
             )
         }
-        applyClientFilters()
+        loadTransactions(page = 1)
     }
 
     fun previousDate() {
@@ -291,97 +439,9 @@ class CashierTransactionHistoryViewModel(
         val nextStart = startDate.plusDays(rangeLength)
         val nextEnd = endDate.plusDays(rangeLength)
         if (nextEnd > today) {
-            setDateRange(today.minusDays(rangeLength - 1), today, null)
+            setDateRange(today.minusDays(rangeLength - 1).toString(), today.toString(), null)
         } else {
-            setDateRange(nextStart, nextEnd, null)
-        }
-    }
-
-    private fun applyClientFilters() {
-        val state = _uiState.value
-        var filtered = allTransactions
-
-        // Filter by status
-        if (state.statusFilter != "Semua") {
-            val targetStatus = state.statusFilter.lowercase()
-            filtered = filtered.filter { tx ->
-                tx.status.lowercase() == targetStatus ||
-                (targetStatus == "lunas" && tx.status.lowercase() in listOf("lunas", "paid", "success", "completed")) ||
-                (targetStatus == "dp" && tx.status.lowercase() in listOf("dp", "partial")) ||
-                (targetStatus == "hutang" && tx.status.lowercase() in listOf("hutang", "unpaid"))
-            }
-        }
-
-        // Filter by search query
-        val query = state.query.trim()
-        if (query.isNotBlank()) {
-            filtered = filtered.filter { tx ->
-                tx.receiptId.contains(query, ignoreCase = true) ||
-                (tx.customerName?.contains(query, ignoreCase = true) == true)
-            }
-        }
-
-        // Filter by payment method
-        if (state.paymentMethodFilter != "Semua") {
-            val targetMethod = state.paymentMethodFilter.lowercase()
-            filtered = filtered.filter { tx ->
-                tx.paymentMethods.any { method ->
-                    method.lowercase().contains(targetMethod) ||
-                    (targetMethod == "tunai" && method.lowercase() in listOf("tunai", "cash")) ||
-                    (targetMethod == "qris" && method.lowercase() in listOf("qris", "qr")) ||
-                    (targetMethod == "transfer" && method.lowercase() in listOf("transfer", "bank", "bca", "mandiri", "bri")) ||
-                    (targetMethod == "bon" && method.lowercase() in listOf("hutang", "bon", "tempo", "credit"))
-                }
-            }
-        }
-
-        val startDate = (state.startDate ?: state.selectedDate)?.let(LocalDate::parse)
-        val endDate = (state.endDate ?: state.selectedDate)?.let(LocalDate::parse)
-        if (startDate != null || endDate != null) {
-            filtered = filtered.filter { tx ->
-                val txDate = tx.createdAt.toLocalDateOrNull()
-                txDate != null && (startDate == null || !txDate.isBefore(startDate)) && (endDate == null || !txDate.isAfter(endDate))
-            }
-        }
-
-        // Sorting
-        filtered = when (state.sortOrder) {
-            com.tbterminal.app.ui.salestransactions.SalesSortOrder.Newest -> filtered.sortedByDescending { it.createdAt }
-            com.tbterminal.app.ui.salestransactions.SalesSortOrder.HighestAmount -> filtered.sortedByDescending { it.total }
-            com.tbterminal.app.ui.salestransactions.SalesSortOrder.ReceiptAsc -> filtered.sortedBy { it.receiptId }
-        }
-
-        // Calculate summary metrics for filtered set
-        val totalSales = filtered.fold(java.math.BigDecimal.ZERO) { acc, tx -> acc + tx.total }
-        val totalPaid = filtered.fold(java.math.BigDecimal.ZERO) { acc, tx -> acc + tx.paidAmount }
-        val totalRemaining = filtered.fold(java.math.BigDecimal.ZERO) { acc, tx ->
-            val rem = tx.remainingAmount ?: (tx.total.subtract(tx.paidAmount)).max(java.math.BigDecimal.ZERO)
-            acc + rem
-        }
-        val paidCount = filtered.count { tx -> tx.status.lowercase() in listOf("lunas", "paid", "success", "completed") }
-        val debtCount = filtered.count { tx -> tx.status.lowercase() in listOf("hutang", "unpaid", "dp", "partial") }
-
-        // Paginate
-        val total = filtered.size.toLong()
-        val totalPages = ((total + CASHIER_TRANSACTION_PAGE_SIZE - 1) / CASHIER_TRANSACTION_PAGE_SIZE).toInt().coerceAtLeast(1)
-        val page = state.page.coerceIn(1, totalPages)
-        val startIndex = (page - 1) * CASHIER_TRANSACTION_PAGE_SIZE
-        val pageData = filtered.drop(startIndex).take(CASHIER_TRANSACTION_PAGE_SIZE)
-
-        _uiState.update {
-            it.copy(
-                transactions = pageData,
-                total = total,
-                totalPages = totalPages,
-                page = page,
-                isLoading = false,
-                summaryTotalSales = totalSales,
-                summaryTotalPaid = totalPaid,
-                summaryTotalRemaining = totalRemaining,
-                summaryTransactionCount = filtered.size,
-                summaryPaidCount = paidCount,
-                summaryDebtCount = debtCount
-            )
+            setDateRange(nextStart.toString(), nextEnd.toString(), null)
         }
     }
 
@@ -392,7 +452,7 @@ class CashierTransactionHistoryViewModel(
                 query = "",
                 statusFilter = "Semua",
                 paymentMethodFilter = "Semua",
-                sortOrder = com.tbterminal.app.ui.salestransactions.SalesSortOrder.Newest,
+                sortOrder = SalesSortOrder.Newest,
                 selectedPreset = "Hari ini",
                 selectedDate = today,
                 startDate = today,
@@ -773,26 +833,6 @@ class CashierTransactionHistoryViewModel(
         }
     }
 
-    private suspend fun loadSessionTransactions(sessionId: String?) {
-        when (
-            val result = repository.getTransactions(
-                page = 1,
-                limit = 200,
-                sessionId = sessionId,
-                startDate = if (sessionId == null) _uiState.value.startDate ?: _uiState.value.selectedDate else null,
-                endDate = if (sessionId == null) _uiState.value.endDate ?: _uiState.value.selectedDate else null
-            )
-        ) {
-            is RepositoryResult.Success -> {
-                allTransactions = result.data.data
-                applyClientFilters()
-            }
-
-            is RepositoryResult.Error -> setListError(result.message)
-            is RepositoryResult.Exception -> setListError("Koneksi bermasalah. Riwayat transaksi gagal dimuat.")
-        }
-    }
-
     private fun setListError(message: String) {
         _uiState.update { state ->
             state.copy(isLoading = false, errorMessage = message)
@@ -805,23 +845,10 @@ class CashierTransactionHistoryViewModel(
         }
     }
 
-    private fun setDateRange(startDate: LocalDate, endDate: LocalDate, preset: String?) {
-        _uiState.update {
-            it.copy(
-                selectedDate = endDate.format(DateTimeFormatter.ISO_LOCAL_DATE),
-                startDate = startDate.format(DateTimeFormatter.ISO_LOCAL_DATE),
-                endDate = endDate.format(DateTimeFormatter.ISO_LOCAL_DATE),
-                selectedPreset = preset,
-                page = 1
-            )
-        }
-        loadTransactions(page = 1)
-    }
-
     private fun currentDateRange(): Pair<LocalDate, LocalDate> {
         val state = _uiState.value
-        val endDate = (state.endDate ?: state.selectedDate)?.let(LocalDate::parse) ?: LocalDate.now(WIB_ZONE)
-        val startDate = (state.startDate ?: state.selectedDate)?.let(LocalDate::parse) ?: endDate
+        val endDate = (state.endDate ?: state.selectedDate)?.let { runCatching { LocalDate.parse(it) }.getOrNull() } ?: LocalDate.now(WIB_ZONE)
+        val startDate = (state.startDate ?: state.selectedDate)?.let { runCatching { LocalDate.parse(it) }.getOrNull() } ?: endDate
         return startDate to endDate
     }
 
@@ -830,7 +857,7 @@ class CashierTransactionHistoryViewModel(
         val rangeLength = ChronoUnit.DAYS.between(startDate, endDate).coerceAtLeast(0) + 1
         val shiftedStart = startDate.plusDays(rangeLength * daysDirection)
         val shiftedEnd = endDate.plusDays(rangeLength * daysDirection)
-        setDateRange(shiftedStart, shiftedEnd, null)
+        setDateRange(shiftedStart.toString(), shiftedEnd.toString(), null)
     }
 
     fun showPayDebtDialog() {
@@ -876,7 +903,7 @@ class CashierTransactionHistoryViewModel(
                         )
                     }
                     // Refresh history transactions silently
-                    loadSessionTransactions(state.activeSession?.id)
+                    loadTransactions(_uiState.value.page)
                 }
                 is RepositoryResult.Error -> {
                     _uiState.update { it.copy(isSubmittingDebt = false, errorMessage = result.message) }
@@ -910,6 +937,8 @@ class CashierTransactionHistoryViewModel(
         }
     }
 }
+
+private fun CashTransaction.receiptNumber(): String = receiptId.ifBlank { id }
 
 private fun String.toLocalDateOrNull(): LocalDate? {
     val value = trim()
