@@ -277,6 +277,12 @@ internal fun String.displayTime(): String = runCatching {
     parseToWib(this)?.format(DateTimeFormatter.ofPattern("HH:mm", Locale.forLanguageTag("id-ID"))) ?: "-"
 }.getOrDefault("-")
 
+internal fun String.displayShortDateTime(): String = runCatching {
+    parseToWib(this)?.format(
+        DateTimeFormatter.ofPattern("dd MMM, HH:mm", Locale.forLanguageTag("id-ID"))
+    ) ?: "${displayDate().take(6)}, ${displayTime()}"
+}.getOrDefault("-")
+
 internal fun String.statusColor(): Color = when (lowercase()) {
     "lunas", "paid", "success", "completed" -> DashboardBrandGreenDark
     "dp", "partial" -> DashboardWarningOrange

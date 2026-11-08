@@ -269,14 +269,21 @@ internal fun TransactionHistoryContent(
                         }
                     }
 
-                    // Active Filter Chips (if any filter is active)
-                    if (isFiltered) {
+                    // Quick Filter Bar matching HTML
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(top = 2.dp)
+                            .testTag("sales-history-quick-filters"),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                    ) {
                         Row(
                             modifier = Modifier
-                                .fillMaxWidth()
+                                .weight(1f, fill = false)
                                 .horizontalScroll(rememberScrollState()),
                             verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(6.dp)
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
                         ) {
                             Text(
                                 text = "Filter:",
@@ -284,156 +291,191 @@ internal fun TransactionHistoryContent(
                                 fontWeight = FontWeight.Medium,
                                 color = Color(0xFF64748B)
                             )
-                            if (isDateFiltered) {
-                                val periodLabel = formatSalesPeriodDisplayDate(state.startDate, state.endDate, state.selectedPreset)
+                            if (isFiltered) {
+                                if (isDateFiltered) {
+                                    val periodLabel = formatSalesPeriodDisplayDate(state.startDate, state.endDate, state.selectedPreset)
+                                    Surface(
+                                        shape = RoundedCornerShape(100.dp),
+                                        color = Color(0xFFF1F5F9),
+                                        border = BorderStroke(1.dp, Color(0xFFE2E8F0))
+                                    ) {
+                                        Row(
+                                            modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp),
+                                            verticalAlignment = Alignment.CenterVertically,
+                                            horizontalArrangement = Arrangement.spacedBy(6.dp)
+                                        ) {
+                                            Icon(Icons.Outlined.CalendarMonth, null, tint = Color(0xFF64748B), modifier = Modifier.size(14.dp))
+                                            Text(
+                                                text = periodLabel,
+                                                fontSize = 12.sp,
+                                                fontWeight = FontWeight.Medium,
+                                                color = Color(0xFF334155),
+                                                maxLines = 1,
+                                                overflow = TextOverflow.Ellipsis
+                                            )
+                                            Box(
+                                                modifier = Modifier
+                                                    .size(16.dp)
+                                                    .clip(CircleShape)
+                                                    .clickable {
+                                                        val today = LocalDate.now(WIB_ZONE).toString()
+                                                        onApplyFilter(state.statusFilter, state.paymentMethodFilter, today, today, "Hari ini", state.sortOrder)
+                                                    },
+                                                contentAlignment = Alignment.Center
+                                            ) {
+                                                Icon(Icons.Outlined.Close, null, tint = Color(0xFF94A3B8), modifier = Modifier.size(12.dp))
+                                            }
+                                        }
+                                    }
+                                }
+                                if (isStatusFiltered) {
+                                    Surface(
+                                        shape = RoundedCornerShape(100.dp),
+                                        color = Color(0xFFF1F5F9),
+                                        border = BorderStroke(1.dp, Color(0xFFE2E8F0))
+                                    ) {
+                                        Row(
+                                            modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp),
+                                            verticalAlignment = Alignment.CenterVertically,
+                                            horizontalArrangement = Arrangement.spacedBy(6.dp)
+                                        ) {
+                                            Icon(Icons.Outlined.CheckCircle, null, tint = Color(0xFF64748B), modifier = Modifier.size(14.dp))
+                                            Text(
+                                                text = state.statusFilter.salesStatusLabel(),
+                                                fontSize = 12.sp,
+                                                fontWeight = FontWeight.Medium,
+                                                color = Color(0xFF334155),
+                                                maxLines = 1,
+                                                overflow = TextOverflow.Ellipsis
+                                            )
+                                            Box(
+                                                modifier = Modifier
+                                                    .size(16.dp)
+                                                    .clip(CircleShape)
+                                                    .clickable { onStatusChanged("Semua") },
+                                                contentAlignment = Alignment.Center
+                                            ) {
+                                                Icon(Icons.Outlined.Close, null, tint = Color(0xFF94A3B8), modifier = Modifier.size(12.dp))
+                                            }
+                                        }
+                                    }
+                                }
+                                if (isPaymentFiltered) {
+                                    val paymentLabel = salesPaymentChoices.firstOrNull { it.first.equals(state.paymentMethodFilter, true) }?.second
+                                        ?: state.paymentMethodFilter
+                                    Surface(
+                                        shape = RoundedCornerShape(100.dp),
+                                        color = Color(0xFFF1F5F9),
+                                        border = BorderStroke(1.dp, Color(0xFFE2E8F0))
+                                    ) {
+                                        Row(
+                                            modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp),
+                                            verticalAlignment = Alignment.CenterVertically,
+                                            horizontalArrangement = Arrangement.spacedBy(6.dp)
+                                        ) {
+                                            Icon(Icons.Outlined.Payments, null, tint = Color(0xFF64748B), modifier = Modifier.size(14.dp))
+                                            Text(
+                                                text = paymentLabel,
+                                                fontSize = 12.sp,
+                                                fontWeight = FontWeight.Medium,
+                                                color = Color(0xFF334155),
+                                                maxLines = 1,
+                                                overflow = TextOverflow.Ellipsis
+                                            )
+                                            Box(
+                                                modifier = Modifier
+                                                    .size(16.dp)
+                                                    .clip(CircleShape)
+                                                    .clickable { onPaymentMethodChanged("Semua") },
+                                                contentAlignment = Alignment.Center
+                                            ) {
+                                                Icon(Icons.Outlined.Close, null, tint = Color(0xFF94A3B8), modifier = Modifier.size(12.dp))
+                                            }
+                                        }
+                                    }
+                                }
+                                if (isSortFiltered) {
+                                    val sortLabel = when (state.sortOrder) {
+                                        SalesSortOrder.HighestAmount -> "Nominal Terbesar"
+                                        SalesSortOrder.ReceiptAsc -> "Nomor Nota"
+                                        SalesSortOrder.Newest -> "Terbaru"
+                                    }
+                                    Surface(
+                                        shape = RoundedCornerShape(100.dp),
+                                        color = Color(0xFFF1F5F9),
+                                        border = BorderStroke(1.dp, Color(0xFFE2E8F0))
+                                    ) {
+                                        Row(
+                                            modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp),
+                                            verticalAlignment = Alignment.CenterVertically,
+                                            horizontalArrangement = Arrangement.spacedBy(6.dp)
+                                        ) {
+                                            Icon(Icons.AutoMirrored.Outlined.Sort, null, tint = Color(0xFF64748B), modifier = Modifier.size(14.dp))
+                                            Text(
+                                                text = sortLabel,
+                                                fontSize = 12.sp,
+                                                fontWeight = FontWeight.Medium,
+                                                color = Color(0xFF334155),
+                                                maxLines = 1,
+                                                overflow = TextOverflow.Ellipsis
+                                            )
+                                            Box(
+                                                modifier = Modifier
+                                                    .size(16.dp)
+                                                    .clip(CircleShape)
+                                                    .clickable { onSortOrderChanged(SalesSortOrder.Newest) },
+                                                contentAlignment = Alignment.Center
+                                            ) {
+                                                Icon(Icons.Outlined.Close, null, tint = Color(0xFF94A3B8), modifier = Modifier.size(12.dp))
+                                            }
+                                        }
+                                    }
+                                }
+                            } else {
+                                // Default "Semua" pill matching HTML
                                 Surface(
                                     shape = RoundedCornerShape(100.dp),
                                     color = Color(0xFFF1F5F9),
-                                    border = BorderStroke(1.dp, Color(0xFFCBD5E1))
+                                    border = BorderStroke(1.dp, Color(0xFFE2E8F0))
                                 ) {
                                     Row(
-                                        modifier = Modifier.padding(start = 10.dp, end = 6.dp, top = 4.dp, bottom = 4.dp),
+                                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp),
                                         verticalAlignment = Alignment.CenterVertically,
-                                        horizontalArrangement = Arrangement.spacedBy(4.dp)
+                                        horizontalArrangement = Arrangement.spacedBy(6.dp)
                                     ) {
-                                        Icon(Icons.Outlined.CalendarMonth, null, tint = Color(0xFF64748B), modifier = Modifier.size(13.dp))
+                                        Icon(Icons.Outlined.CalendarMonth, null, tint = Color(0xFF64748B), modifier = Modifier.size(14.dp))
                                         Text(
-                                            text = periodLabel,
-                                            fontSize = 11.sp,
+                                            text = "Semua",
+                                            fontSize = 12.sp,
                                             fontWeight = FontWeight.Medium,
-                                            color = Color(0xFF334155),
-                                            maxLines = 1,
-                                            overflow = TextOverflow.Ellipsis
+                                            color = Color(0xFF334155)
                                         )
                                         Box(
                                             modifier = Modifier
                                                 .size(16.dp)
                                                 .clip(CircleShape)
-                                                .clickable {
-                                                    val today = LocalDate.now(WIB_ZONE).toString()
-                                                    onApplyFilter(state.statusFilter, state.paymentMethodFilter, today, today, "Hari ini", state.sortOrder)
-                                                },
+                                                .clickable(onClick = onResetAllFilters),
                                             contentAlignment = Alignment.Center
                                         ) {
-                                            Icon(Icons.Outlined.Close, null, tint = Color(0xFF94A3B8), modifier = Modifier.size(11.dp))
+                                            Icon(Icons.Outlined.Close, null, tint = Color(0xFF94A3B8), modifier = Modifier.size(12.dp))
                                         }
                                     }
                                 }
                             }
-                            if (isStatusFiltered) {
-                                Surface(
-                                    shape = RoundedCornerShape(100.dp),
-                                    color = Color(0xFFF1F5F9),
-                                    border = BorderStroke(1.dp, Color(0xFFCBD5E1))
-                                ) {
-                                    Row(
-                                        modifier = Modifier.padding(start = 10.dp, end = 6.dp, top = 4.dp, bottom = 4.dp),
-                                        verticalAlignment = Alignment.CenterVertically,
-                                        horizontalArrangement = Arrangement.spacedBy(4.dp)
-                                    ) {
-                                        Icon(Icons.Outlined.CheckCircle, null, tint = Color(0xFF64748B), modifier = Modifier.size(13.dp))
-                                        Text(
-                                            text = state.statusFilter.salesStatusLabel(),
-                                            fontSize = 11.sp,
-                                            fontWeight = FontWeight.Medium,
-                                            color = Color(0xFF334155),
-                                            maxLines = 1,
-                                            overflow = TextOverflow.Ellipsis
-                                        )
-                                        Box(
-                                            modifier = Modifier
-                                                .size(16.dp)
-                                                .clip(CircleShape)
-                                                .clickable { onStatusChanged("Semua") },
-                                            contentAlignment = Alignment.Center
-                                        ) {
-                                            Icon(Icons.Outlined.Close, null, tint = Color(0xFF94A3B8), modifier = Modifier.size(11.dp))
-                                        }
-                                    }
-                                }
-                            }
-                            if (isPaymentFiltered) {
-                                val paymentLabel = salesPaymentChoices.firstOrNull { it.first.equals(state.paymentMethodFilter, true) }?.second
-                                    ?: state.paymentMethodFilter
-                                Surface(
-                                    shape = RoundedCornerShape(100.dp),
-                                    color = Color(0xFFF1F5F9),
-                                    border = BorderStroke(1.dp, Color(0xFFCBD5E1))
-                                ) {
-                                    Row(
-                                        modifier = Modifier.padding(start = 10.dp, end = 6.dp, top = 4.dp, bottom = 4.dp),
-                                        verticalAlignment = Alignment.CenterVertically,
-                                        horizontalArrangement = Arrangement.spacedBy(4.dp)
-                                    ) {
-                                        Icon(Icons.Outlined.Payments, null, tint = Color(0xFF64748B), modifier = Modifier.size(13.dp))
-                                        Text(
-                                            text = paymentLabel,
-                                            fontSize = 11.sp,
-                                            fontWeight = FontWeight.Medium,
-                                            color = Color(0xFF334155),
-                                            maxLines = 1,
-                                            overflow = TextOverflow.Ellipsis
-                                        )
-                                        Box(
-                                            modifier = Modifier
-                                                .size(16.dp)
-                                                .clip(CircleShape)
-                                                .clickable { onPaymentMethodChanged("Semua") },
-                                            contentAlignment = Alignment.Center
-                                        ) {
-                                            Icon(Icons.Outlined.Close, null, tint = Color(0xFF94A3B8), modifier = Modifier.size(11.dp))
-                                        }
-                                    }
-                                }
-                            }
-                            if (isSortFiltered) {
-                                val sortLabel = when (state.sortOrder) {
-                                    SalesSortOrder.HighestAmount -> "Nominal Terbesar"
-                                    SalesSortOrder.ReceiptAsc -> "Nomor Nota"
-                                    SalesSortOrder.Newest -> "Terbaru"
-                                }
-                                Surface(
-                                    shape = RoundedCornerShape(100.dp),
-                                    color = Color(0xFFF1F5F9),
-                                    border = BorderStroke(1.dp, Color(0xFFCBD5E1))
-                                ) {
-                                    Row(
-                                        modifier = Modifier.padding(start = 10.dp, end = 6.dp, top = 4.dp, bottom = 4.dp),
-                                        verticalAlignment = Alignment.CenterVertically,
-                                        horizontalArrangement = Arrangement.spacedBy(4.dp)
-                                    ) {
-                                        Icon(Icons.AutoMirrored.Outlined.Sort, null, tint = Color(0xFF64748B), modifier = Modifier.size(13.dp))
-                                        Text(
-                                            text = sortLabel,
-                                            fontSize = 11.sp,
-                                            fontWeight = FontWeight.Medium,
-                                            color = Color(0xFF334155),
-                                            maxLines = 1,
-                                            overflow = TextOverflow.Ellipsis
-                                        )
-                                        Box(
-                                            modifier = Modifier
-                                                .size(16.dp)
-                                                .clip(CircleShape)
-                                                .clickable { onSortOrderChanged(SalesSortOrder.Newest) },
-                                            contentAlignment = Alignment.Center
-                                        ) {
-                                            Icon(Icons.Outlined.Close, null, tint = Color(0xFF94A3B8), modifier = Modifier.size(11.dp))
-                                        }
-                                    }
-                                }
-                            }
-                            Text(
-                                text = "Reset",
-                                fontSize = 11.sp,
-                                fontWeight = FontWeight.SemiBold,
-                                color = Color(0xFFEF4444),
-                                modifier = Modifier
-                                    .clip(RoundedCornerShape(6.dp))
-                                    .clickable(onClick = onResetAllFilters)
-                                    .padding(horizontal = 6.dp, vertical = 4.dp)
-                            )
                         }
+
+                        // Reset button
+                        Text(
+                            text = "Reset",
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.SemiBold,
+                            color = Color(0xFFF43F5E),
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(6.dp))
+                                .clickable(onClick = onResetAllFilters)
+                                .padding(horizontal = 6.dp, vertical = 4.dp)
+                                .testTag("sales-history-reset-filters")
+                        )
                     }
                 }
             } else {
@@ -480,8 +522,8 @@ internal fun TransactionHistoryContent(
                                 .testTag("sales-transaction-grouped-list"),
                             shape = RoundedCornerShape(16.dp),
                             color = Color.White,
-                            border = BorderStroke(1.dp, Color(0xFFF1F5F9)),
-                            shadowElevation = 0.5.dp,
+                            border = BorderStroke(1.dp, Color(0xFFE2E8F0).copy(alpha = 0.8f)),
+                            shadowElevation = 1.dp,
                         ) {
                             Column {
                                 state.transactions.forEachIndexed { index, transaction ->
@@ -1491,30 +1533,20 @@ private fun SalesHistorySectionHeader(
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(horizontal = 2.dp),
+            .padding(top = 2.dp, bottom = 2.dp),
         horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.CenterVertically,
     ) {
         if (isLoading) {
             SkeletonBox(Modifier.width(110.dp).height(20.dp), shape = RoundedCornerShape(4.dp))
         } else {
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                Box(
-                    modifier = Modifier
-                        .size(8.dp)
-                        .background(Color(0xFF1B5E3C), CircleShape)
-                )
-                Text(
-                    text = "Daftar Transaksi",
-                    fontSize = 13.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = Color(0xFF0F172A),
-                    letterSpacing = (-0.2).sp
-                )
-            }
+            Text(
+                text = "Daftar Transaksi",
+                fontSize = 14.sp,
+                fontWeight = FontWeight.Bold,
+                color = Color(0xFF0F172A),
+                letterSpacing = (-0.2).sp
+            )
         }
     }
 }
@@ -1531,152 +1563,107 @@ private fun SalesTransactionMobileItem(
     val isVoided = statusClean in listOf("voided", "void", "refunded", "cancelled")
     val isUnpaid = statusClean in listOf("hutang", "unpaid")
 
-    val (badgeBg, badgeText, badgeBorder) = when {
-        isPaid -> Triple(Color(0xFFEEF7F2), Color(0xFF1B5E3C), Color(0xFFC7E0D6))
-        isPartial -> Triple(Color(0xFFFFFBEB), Color(0xFFD97706), Color(0xFFFDE68A))
-        isUnpaid -> Triple(Color(0xFFFEF2F2), Color(0xFFDC2626), Color(0xFFFECACA))
-        isVoided -> Triple(Color(0xFFF1F5F9), Color(0xFF64748B), Color(0xFFE2E8F0))
-        else -> Triple(Color(0xFFEEF7F2), Color(0xFF1B5E3C), Color(0xFFC7E0D6))
+    val dotColor = when {
+        isPaid -> Color(0xFF10533C)
+        isPartial -> Color(0xFFD97706)
+        isUnpaid -> Color(0xFFDC2626)
+        isVoided -> Color(0xFF64748B)
+        else -> Color(0xFF10533C)
     }
 
-    val customerName = transaction.customerName?.takeIf { it.isNotBlank() } ?: "Pelanggan umum"
-    val cashierName = transaction.cashierName?.takeIf { it.isNotBlank() }
+    val customerName = transaction.customerName?.takeIf { it.isNotBlank() } ?: "Pelanggan Umum"
     val paymentLabel = transaction.paymentMethods.salesPaymentMethodsLabel(transaction.status)
+    val remaining = transaction.remainingAmount ?: transaction.total.subtract(transaction.paidAmount).max(BigDecimal.ZERO)
+    val subtitle = if (remaining > BigDecimal.ZERO && !isPaid) {
+        "$customerName · $paymentLabel (Sisa ${remaining.moneyText()})"
+    } else {
+        "$customerName · $paymentLabel"
+    }
 
-    Row(
+    val dateTimeText = transaction.createdAt.displayShortDateTime()
+
+    Column(
         modifier = Modifier
             .fillMaxWidth()
             .clickable { onReceiptClick(transaction.id) }
             .testTag("sales-transaction-${transaction.id}")
             .padding(horizontal = 16.dp, vertical = 14.dp),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.SpaceBetween,
     ) {
+        // Line 1: Status dot + Receipt number on left, Total amount + Chevron on right
         Row(
-            modifier = Modifier.weight(1f).padding(end = 12.dp),
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(14.dp)
         ) {
-            // 42x42dp rounded-12dp icon container (matches Beranda, Keuangan & Stok)
-            Box(
-                modifier = Modifier
-                    .size(42.dp)
-                    .clip(RoundedCornerShape(12.dp))
-                    .background(Color(0xFFEEF7F2)),
-                contentAlignment = Alignment.Center,
+            Row(
+                modifier = Modifier.weight(1f, fill = false),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                Icon(
-                    imageVector = Icons.AutoMirrored.Outlined.ReceiptLong,
-                    contentDescription = null,
-                    tint = Color(0xFF1B5E3C),
-                    modifier = Modifier.size(20.dp),
+                Box(
+                    modifier = Modifier
+                        .size(8.dp)
+                        .background(dotColor, CircleShape)
                 )
-            }
-
-            Column(
-                modifier = Modifier.weight(1f),
-                verticalArrangement = Arrangement.spacedBy(2.dp)
-            ) {
-                // Receipt Number
                 Text(
                     text = transaction.receiptNumber(),
                     fontSize = 14.sp,
                     fontWeight = FontWeight.SemiBold,
-                    color = Color(0xFF0F172A),
+                    color = Color(0xFF1E293B),
+                    letterSpacing = (-0.3).sp,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                 )
-
-                // Customer & Cashier info
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(4.dp)
-                ) {
-                    Text(
-                        text = customerName,
-                        fontSize = 12.sp,
-                        fontWeight = FontWeight.Medium,
-                        color = Color(0xFF334155),
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                        modifier = Modifier.weight(1f, fill = false)
-                    )
-                    if (cashierName != null) {
-                        Text(
-                            text = "·",
-                            fontSize = 12.sp,
-                            color = Color(0xFF94A3B8)
-                        )
-                        Text(
-                            text = cashierName,
-                            fontSize = 11.sp,
-                            color = Color(0xFF64748B),
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis,
-                            modifier = Modifier.weight(1f, fill = false)
-                        )
-                    }
-                }
-
-                // Date, Time & Payment Method
-                Text(
-                    text = "${transaction.createdAt.displayDate()} · ${transaction.createdAt.displayTime()} WIB · $paymentLabel",
-                    fontSize = 11.sp,
-                    color = Color(0xFF94A3B8),
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
-                )
             }
-        }
 
-        // Right side: Nominal, Status Capsule, Sisa & Chevron
-        Row(
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(8.dp)
-        ) {
-            Column(
-                horizontalAlignment = Alignment.End,
-                verticalArrangement = Arrangement.spacedBy(3.dp)
+            Spacer(Modifier.width(8.dp))
+
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(6.dp)
             ) {
                 Text(
                     text = transaction.total.moneyText(),
                     fontSize = 14.sp,
                     fontWeight = FontWeight.Bold,
                     color = Color(0xFF0F172A),
-                    textAlign = TextAlign.End,
+                    letterSpacing = (-0.3).sp,
                 )
-
-                Surface(
-                    shape = RoundedCornerShape(999.dp),
-                    color = badgeBg,
-                    border = BorderStroke(1.dp, badgeBorder.copy(alpha = 0.5f))
-                ) {
-                    Text(
-                        text = transaction.status.salesStatusDisplay(),
-                        fontSize = 10.5.sp,
-                        fontWeight = FontWeight.SemiBold,
-                        color = badgeText,
-                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp)
-                    )
-                }
-
-                val remaining = transaction.remainingAmount ?: transaction.total.subtract(transaction.paidAmount).max(BigDecimal.ZERO)
-                if (remaining > BigDecimal.ZERO && !isPaid) {
-                    Text(
-                        text = "Sisa: ${remaining.moneyText()}",
-                        fontSize = 10.sp,
-                        fontWeight = FontWeight.Medium,
-                        color = Color(0xFFD97706),
-                        textAlign = TextAlign.End,
-                    )
-                }
+                Icon(
+                    imageVector = Icons.AutoMirrored.Outlined.KeyboardArrowRight,
+                    contentDescription = null,
+                    tint = Color(0xFFCBD5E1),
+                    modifier = Modifier.size(16.dp),
+                )
             }
+        }
 
-            Icon(
-                imageVector = Icons.AutoMirrored.Outlined.KeyboardArrowRight,
-                contentDescription = null,
-                tint = Color(0xFFCBD5E1),
-                modifier = Modifier.size(16.dp),
+        // Line 2: Customer & Payment Method on left, Date & Time on right
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(top = 4.dp, start = 16.dp),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Text(
+                text = subtitle,
+                fontSize = 12.sp,
+                fontWeight = FontWeight.Normal,
+                color = Color(0xFF64748B),
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.weight(1f, fill = false),
+            )
+
+            Spacer(Modifier.width(8.dp))
+
+            Text(
+                text = dateTimeText,
+                fontSize = 12.sp,
+                fontWeight = FontWeight.Normal,
+                color = Color(0xFF94A3B8),
+                maxLines = 1,
             )
         }
     }
@@ -1939,23 +1926,123 @@ private fun SalesHistoryPagination(
     onPreviousPage: () -> Unit,
     onNextPage: () -> Unit,
 ) {
-    val countText = if (state.total == 0L) {
-        "0 transaksi"
-    } else if (state.transactions.size.toLong() >= state.total) {
-        "${state.total} transaksi"
+    if (compact) {
+        val canPrev = state.page > 1 && !state.isLoading
+        val canNext = state.page < state.totalPages && !state.isLoading
+
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(vertical = 12.dp)
+                .testTag("sales-history-pagination"),
+            horizontalArrangement = Arrangement.Center,
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            // Pill 1: Total transactions
+            Surface(
+                shape = RoundedCornerShape(12.dp),
+                color = Color.White,
+                border = BorderStroke(1.dp, Color(0xFF10533C).copy(alpha = 0.3f)),
+                shadowElevation = 0.5.dp,
+            ) {
+                Text(
+                    text = "${state.total} transaksi",
+                    fontSize = 12.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    color = Color(0xFF10533C),
+                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp)
+                )
+            }
+
+            Spacer(Modifier.width(12.dp))
+
+            // Pill 2: Page controller
+            Surface(
+                shape = RoundedCornerShape(12.dp),
+                color = Color.White,
+                border = BorderStroke(1.dp, Color(0xFF10533C).copy(alpha = 0.3f)),
+                shadowElevation = 0.5.dp,
+            ) {
+                Row(
+                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .size(18.dp)
+                            .clip(CircleShape)
+                            .clickable(enabled = canPrev, onClick = onPreviousPage),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(
+                            imageVector = Icons.Filled.ChevronLeft,
+                            contentDescription = "Halaman sebelumnya",
+                            tint = if (canPrev) Color(0xFF10533C) else Color(0xFF94A3B8).copy(alpha = 0.4f),
+                            modifier = Modifier.size(16.dp)
+                        )
+                    }
+
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(3.dp)
+                    ) {
+                        Text(
+                            text = "${state.page}",
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.SemiBold,
+                            color = Color(0xFF1E293B)
+                        )
+                        Text(
+                            text = "/",
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.Normal,
+                            color = Color(0xFF94A3B8)
+                        )
+                        Text(
+                            text = "${state.totalPages.coerceAtLeast(1)}",
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.SemiBold,
+                            color = Color(0xFF1E293B)
+                        )
+                    }
+
+                    Box(
+                        modifier = Modifier
+                            .size(18.dp)
+                            .clip(CircleShape)
+                            .clickable(enabled = canNext, onClick = onNextPage),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(
+                            imageVector = Icons.Filled.ChevronRight,
+                            contentDescription = "Halaman selanjutnya",
+                            tint = if (canNext) Color(0xFF10533C) else Color(0xFF94A3B8).copy(alpha = 0.4f),
+                            modifier = Modifier.size(16.dp)
+                        )
+                    }
+                }
+            }
+        }
     } else {
-        "${state.transactions.size} dari ${state.total} transaksi"
+        val countText = if (state.total == 0L) {
+            "0 transaksi"
+        } else if (state.transactions.size.toLong() >= state.total) {
+            "${state.total} transaksi"
+        } else {
+            "${state.transactions.size} dari ${state.total} transaksi"
+        }
+        TbPagination(
+            currentPage = state.page,
+            totalPages = state.totalPages,
+            onPreviousPage = onPreviousPage,
+            onNextPage = onNextPage,
+            supportingText = countText,
+            isLoading = state.isLoading,
+            compact = compact,
+            testTag = "sales-history-pagination",
+        )
     }
-    TbPagination(
-        currentPage = state.page,
-        totalPages = state.totalPages,
-        onPreviousPage = onPreviousPage,
-        onNextPage = onNextPage,
-        supportingText = countText,
-        isLoading = state.isLoading,
-        compact = compact,
-        testTag = "sales-history-pagination",
-    )
 }
 
 private fun buildSalesMeta(transaction: CashTransaction): String = buildList {
