@@ -124,9 +124,13 @@ object DeliveryOrderFormatter {
             addr = addrMatch.groupValues[1].trim()
         }
 
-        val courMatch = Regex("""(?:Armada|Supir|Sopir|Kurir):\s*([^|]+)""", RegexOption.IGNORE_CASE).find(notes)
-        if (courMatch != null) {
-            cour = courMatch.groupValues[1].trim()
+        val supirMatch = Regex("""(?:Supir|Sopir|Driver):\s*([^|]+)""", RegexOption.IGNORE_CASE).find(notes)
+        val armadaMatch = Regex("""(?:Armada|Kendaraan|Kurir):\s*([^|]+)""", RegexOption.IGNORE_CASE).find(notes)
+        cour = when {
+            supirMatch != null && armadaMatch != null -> "${supirMatch.groupValues[1].trim()} (${armadaMatch.groupValues[1].trim()})"
+            supirMatch != null -> supirMatch.groupValues[1].trim()
+            armadaMatch != null -> armadaMatch.groupValues[1].trim()
+            else -> null
         }
 
         val phoneMatch = Regex("""(?:Telp|WA|No HP|Telepon):\s*([^|]+)""", RegexOption.IGNORE_CASE).find(notes)

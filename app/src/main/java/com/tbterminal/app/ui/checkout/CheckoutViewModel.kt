@@ -438,10 +438,18 @@ class CheckoutViewModel(
 
     fun selectCustomer(customer: Customer) {
         _uiState.update { state ->
+            val updatedRecipientPhone = customer.phone?.takeIf { it.isNotBlank() } ?: state.deliveryRecipientPhone
+            val updatedAddress = if (state.deliveryAddress.isBlank() && !customer.address.isNullOrBlank()) {
+                customer.address
+            } else {
+                state.deliveryAddress
+            }
             state.copy(
                 selectedCustomer = customer,
                 customerSearchQuery = customer.name,
-                customerError = null
+                customerError = null,
+                deliveryRecipientPhone = updatedRecipientPhone,
+                deliveryAddress = updatedAddress
             )
         }
     }
@@ -508,6 +516,12 @@ class CheckoutViewModel(
                     val created = result.data
                     val updatedCustomers = listOf(created) + _uiState.value.customers.filter { it.id != created.id }
                     _uiState.update {
+                        val updatedRecipientPhone = created.phone?.takeIf { p -> p.isNotBlank() } ?: it.deliveryRecipientPhone
+                        val updatedAddress = if (it.deliveryAddress.isBlank() && !created.address.isNullOrBlank()) {
+                            created.address
+                        } else {
+                            it.deliveryAddress
+                        }
                         it.copy(
                             customers = updatedCustomers,
                             selectedCustomer = created,
@@ -515,6 +529,8 @@ class CheckoutViewModel(
                             isQuickAddCustomerOpen = false,
                             isQuickCustomerSubmitting = false,
                             customerError = null,
+                            deliveryRecipientPhone = updatedRecipientPhone,
+                            deliveryAddress = updatedAddress,
                             quickFeedbackMessage = "Pelanggan \"${created.name}\" berhasil didaftarkan!"
                         )
                     }
@@ -880,6 +896,10 @@ class CheckoutViewModel(
             deliveryFee = state.deliveryFee,
             deliveryAddress = state.deliveryAddress,
             deliveryCourier = state.deliveryCourier,
+            deliveryFleet = state.deliveryFleet,
+            deliveryRecipientPhone = state.deliveryRecipientPhone,
+            deliveryVehiclePlate = state.deliveryVehiclePlate,
+            deliverySpecialInstructions = state.deliverySpecialInstructions,
             isDeliveryEnabled = state.isDeliveryEnabled,
             subtotal = state.subtotal,
             finalTotal = state.finalTotal
@@ -901,6 +921,10 @@ class CheckoutViewModel(
                 deliveryFeeInput = "",
                 deliveryAddress = "",
                 deliveryCourier = "",
+                deliveryFleet = "",
+                deliveryRecipientPhone = "",
+                deliveryVehiclePlate = "",
+                deliverySpecialInstructions = "",
             )
         }
     }
@@ -1022,6 +1046,10 @@ class CheckoutViewModel(
                     deliveryFee = state.deliveryFee,
                     deliveryAddress = state.deliveryAddress,
                     deliveryCourier = state.deliveryCourier,
+                    deliveryFleet = state.deliveryFleet,
+                    deliveryRecipientPhone = state.deliveryRecipientPhone,
+                    deliveryVehiclePlate = state.deliveryVehiclePlate,
+                    deliverySpecialInstructions = state.deliverySpecialInstructions,
                     isDeliveryEnabled = state.isDeliveryEnabled,
                     subtotal = state.subtotal,
                     finalTotal = state.finalTotal
@@ -1040,6 +1068,10 @@ class CheckoutViewModel(
                 deliveryFeeInput = if (target.deliveryFee > BigDecimal.ZERO) target.deliveryFee.toPlainString() else "",
                 deliveryAddress = target.deliveryAddress,
                 deliveryCourier = target.deliveryCourier,
+                deliveryFleet = target.deliveryFleet,
+                deliveryRecipientPhone = target.deliveryRecipientPhone,
+                deliveryVehiclePlate = target.deliveryVehiclePlate,
+                deliverySpecialInstructions = target.deliverySpecialInstructions,
                 quickFeedbackMessage = "Pesanan \"${target.note}\" dimuat ke keranjang."
             ).recalculateCheckoutState(
                 items = target.items,
@@ -1090,6 +1122,10 @@ class CheckoutViewModel(
 
     fun updateDeliveryCourier(courier: String) {
         _uiState.update { it.copy(deliveryCourier = courier) }
+    }
+
+    fun updateDeliveryFleet(fleet: String) {
+        _uiState.update { it.copy(deliveryFleet = fleet) }
     }
 
     fun updateDeliveryRecipientPhone(phone: String) {
@@ -1535,7 +1571,8 @@ class CheckoutViewModel(
             val deliveryInfo = buildString {
                 append("[PENGIRIMAN] Ongkir: Rp ${state.deliveryFee.toPlainString()}")
                 if (state.deliveryAddress.isNotBlank()) append(" | Alamat: ${state.deliveryAddress.trim()}")
-                if (state.deliveryCourier.isNotBlank()) append(" | Armada: ${state.deliveryCourier.trim()}")
+                if (state.deliveryFleet.isNotBlank()) append(" | Armada: ${state.deliveryFleet.trim()}")
+                if (state.deliveryCourier.isNotBlank()) append(" | Supir: ${state.deliveryCourier.trim()}")
                 if (state.deliveryRecipientPhone.isNotBlank()) append(" | Telp: ${state.deliveryRecipientPhone.trim()}")
                 if (state.deliveryVehiclePlate.isNotBlank()) append(" | Plat: ${state.deliveryVehiclePlate.trim()}")
                 if (state.deliverySpecialInstructions.isNotBlank()) append(" | Catatan: ${state.deliverySpecialInstructions.trim()}")
