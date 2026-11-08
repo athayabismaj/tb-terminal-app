@@ -1858,11 +1858,11 @@ internal fun printTransactionReceipt(
 internal fun printTransactionReceiptPdf(context: Context, transaction: CashTransactionDetail) {
     val printManager = context.getSystemService(Context.PRINT_SERVICE) as PrintManager
     printManager.print(
-        "${if (transaction.status.equals("voided", true)) "Void" else "Struk"}-${transaction.receiptNumber()}",
+        "${if (transaction.status.equals("voided", true)) "Void" else "Faktur"}-${transaction.receiptNumber()}",
         TransactionReceiptPrintAdapter(context, transaction),
         PrintAttributes.Builder()
             .setMediaSize(PrintAttributes.MediaSize.ISO_A5)
-            .setColorMode(PrintAttributes.COLOR_MODE_MONOCHROME)
+            .setColorMode(PrintAttributes.COLOR_MODE_COLOR)
             .build()
     )
 }
@@ -1873,89 +1873,457 @@ private class TransactionReceiptPrintAdapter(
 ) : PrintDocumentAdapter() {
     private lateinit var attributes: PrintAttributes
 
-    override fun onLayout(oldAttributes: PrintAttributes?, newAttributes: PrintAttributes, signal: CancellationSignal, callback: LayoutResultCallback, extras: Bundle?) {
+    override fun onLayout(
+        oldAttributes: PrintAttributes?,
+        newAttributes: PrintAttributes,
+        signal: CancellationSignal,
+        callback: LayoutResultCallback,
+        extras: Bundle?
+    ) {
         if (signal.isCanceled) return callback.onLayoutCancelled()
         attributes = newAttributes
         callback.onLayoutFinished(
-            PrintDocumentInfo.Builder("struk-${transaction.receiptNumber()}.pdf")
-                .setContentType(PrintDocumentInfo.CONTENT_TYPE_DOCUMENT).setPageCount(1).build(),
+            PrintDocumentInfo.Builder("faktur-${transaction.receiptNumber()}.pdf")
+                .setContentType(PrintDocumentInfo.CONTENT_TYPE_DOCUMENT)
+                .setPageCount(1)
+                .build(),
             true
         )
     }
 
-    override fun onWrite(pages: Array<out PageRange>, destination: ParcelFileDescriptor, signal: CancellationSignal, callback: WriteResultCallback) {
+    override fun onWrite(
+        pages: Array<out PageRange>,
+        destination: ParcelFileDescriptor,
+        signal: CancellationSignal,
+        callback: WriteResultCallback
+    ) {
         val document = PrintedPdfDocument(context, attributes)
         try {
             if (signal.isCanceled) return callback.onWriteCancelled()
             val page = document.startPage(0)
-            draw(page)
+            drawInvoice(page)
             document.finishPage(page)
             FileOutputStream(destination.fileDescriptor).use(document::writeTo)
             callback.onWriteFinished(arrayOf(PageRange.ALL_PAGES))
         } catch (error: Exception) {
-            callback.onWriteFailed(error.message ?: "Struk gagal dicetak")
+            callback.onWriteFailed(error.message ?: "Faktur gagal dicetak")
         } finally {
             document.close()
         }
     }
 
-    private fun draw(page: PdfDocument.Page) {
-        val normal = Paint().apply { color = android.graphics.Color.BLACK; textSize = 11f }
-        val bold = Paint(normal).apply { isFakeBoldText = true; textSize = 15f }
-        val titleBold = Paint(normal).apply { isFakeBoldText = true; textSize = 18f }
+    private fun drawInvoice(page: PdfDocument.Page) {
         val canvas = page.canvas
-        var y = 42f
+        val pageWidth = page.info.pageWidth.toFloat()
+        val pageHeight = page.info.pageHeight.toFloat()
+
+        val left = 28f
+        val right = pageWidth - 28f
+        val printableWidth = right - left
+
         val isVoided = transaction.status.equals("voided", true)
         val isSettled = !isVoided && transaction.remainingAmount() <= BigDecimal.ZERO
-        val displayStatus = if (isSettled) "LUNAS" else transaction.status.uppercase()
-        canvas.drawText(if (isVoided) "STRUK VOID - TB TERMINAL" else "TB TERMINAL", 32f, y, titleBold)
-        y += 20f
-        canvas.drawText("Toko Bahan Bangunan & Material", 32f, y, normal)
-        y += 20f
-        canvas.drawLine(32f, y, page.info.pageWidth - 32f, y, normal)
-        y += 18f
-        listOf(
-            "Nomor     : ${transaction.receiptNumber()}",
-            "Tanggal   : ${transaction.createdAt.formatReceiptDateTime()}",
-            "Kasir     : ${transaction.cashierName ?: "-"}",
-            "Pelanggan : ${transaction.customerName ?: "Pelanggan Umum"}",
-            "Status    : $displayStatus"
-        ).forEach { canvas.drawText(it.take(82), 32f, y, normal); y += 18f }
-        if (isVoided) {
-            canvas.drawText("Alasan void: ${transaction.voidReason ?: "-"}".take(82), 32f, y, normal)
-            y += 20f
+
+        // Color palette
+        val colorBrand = android.graphics.Color.rgb(16, 83, 60) // Forest Green #10533C
+        val colorDark = android.graphics.Color.rgb(15, 23, 42) // Slate 900
+        val colorMuted = android.graphics.Color.rgb(100, 116, 139) // Slate 500
+        val colorBorder = android.graphics.Color.rgb(203, 213, 225) // Slate 300
+        val colorHeaderBg = android.graphics.Color.rgb(241, 245, 249) // Slate 100
+        val colorAltRow = android.graphics.Color.rgb(248, 250, 252) // Slate 50
+        val colorLunas = android.graphics.Color.rgb(21, 128, 61) // Green 700
+        val colorTempo = android.graphics.Color.rgb(194, 65, 12) // Amber 700
+        val colorVoid = android.graphics.Color.rgb(185, 28, 28) // Red 700
+
+        // Paints
+        val storeTitlePaint = Paint().apply {
+            color = colorBrand
+            textSize = 14f
+            typeface = android.graphics.Typeface.create(android.graphics.Typeface.DEFAULT, android.graphics.Typeface.BOLD)
+            isAntiAlias = true
         }
-        y += 4f
-        canvas.drawLine(32f, y, page.info.pageWidth - 32f, y, normal)
+        val storeSubPaint = Paint().apply {
+            color = colorMuted
+            textSize = 7.5f
+            typeface = android.graphics.Typeface.DEFAULT
+            isAntiAlias = true
+        }
+        val docTitlePaint = Paint().apply {
+            color = if (isVoided) colorVoid else colorDark
+            textSize = 15f
+            typeface = android.graphics.Typeface.create(android.graphics.Typeface.DEFAULT, android.graphics.Typeface.BOLD)
+            textAlign = Paint.Align.RIGHT
+            isAntiAlias = true
+        }
+        val badgeTextPaint = Paint().apply {
+            textSize = 8f
+            typeface = android.graphics.Typeface.create(android.graphics.Typeface.DEFAULT, android.graphics.Typeface.BOLD)
+            textAlign = Paint.Align.CENTER
+            isAntiAlias = true
+        }
+        val rightMutedPaint = Paint().apply {
+            color = colorMuted
+            textSize = 7.5f
+            typeface = android.graphics.Typeface.DEFAULT
+            textAlign = Paint.Align.RIGHT
+            isAntiAlias = true
+        }
+        val linePaint = Paint().apply {
+            color = colorBorder
+            strokeWidth = 0.75f
+            style = Paint.Style.STROKE
+            isAntiAlias = true
+        }
+        val thickLinePaint = Paint().apply {
+            color = colorBrand
+            strokeWidth = 1.5f
+            style = Paint.Style.STROKE
+            isAntiAlias = true
+        }
+        val metaLabelPaint = Paint().apply {
+            color = colorMuted
+            textSize = 7.5f
+            typeface = android.graphics.Typeface.DEFAULT
+            isAntiAlias = true
+        }
+        val metaValPaint = Paint().apply {
+            color = colorDark
+            textSize = 8f
+            typeface = android.graphics.Typeface.create(android.graphics.Typeface.DEFAULT, android.graphics.Typeface.BOLD)
+            isAntiAlias = true
+        }
+        val tableHeaderPaint = Paint().apply {
+            color = colorDark
+            textSize = 8f
+            typeface = android.graphics.Typeface.create(android.graphics.Typeface.DEFAULT, android.graphics.Typeface.BOLD)
+            isAntiAlias = true
+        }
+        val tableCellPaint = Paint().apply {
+            color = colorDark
+            textSize = 8f
+            typeface = android.graphics.Typeface.DEFAULT
+            isAntiAlias = true
+        }
+        val tableCellBoldPaint = Paint().apply {
+            color = colorDark
+            textSize = 8f
+            typeface = android.graphics.Typeface.create(android.graphics.Typeface.DEFAULT, android.graphics.Typeface.BOLD)
+            isAntiAlias = true
+        }
+        val fillPaint = Paint().apply {
+            style = Paint.Style.FILL
+            isAntiAlias = true
+        }
+
+        var y = 28f
+
+        // 1. Header Bagian Atas
+        canvas.drawText("TB TERMINAL BAROKAH JAYA", left, y, storeTitlePaint)
+        canvas.drawText(if (isVoided) "FAKTUR PENJUALAN (BATAL)" else "FAKTUR PENJUALAN", right, y, docTitlePaint)
+        y += 11f
+
+        canvas.drawText("Pusat Perlengkapan & Bahan Bangunan Berkualitas", left, y, storeSubPaint)
+
+        // Status Badge di sebelah kanan
+        val statusText: String
+        val badgeBgColor: Int
+        val badgeBorderColor: Int
+        val badgeTextColor: Int
+
+        when {
+            isVoided -> {
+                statusText = "BATAL / VOID"
+                badgeBgColor = android.graphics.Color.rgb(254, 242, 242)
+                badgeBorderColor = android.graphics.Color.rgb(254, 202, 202)
+                badgeTextColor = colorVoid
+            }
+            isSettled -> {
+                statusText = "LUNAS"
+                badgeBgColor = android.graphics.Color.rgb(240, 253, 244)
+                badgeBorderColor = android.graphics.Color.rgb(187, 247, 208)
+                badgeTextColor = colorLunas
+            }
+            else -> {
+                statusText = "TEMPO / BELUM LUNAS"
+                badgeBgColor = android.graphics.Color.rgb(254, 243, 199)
+                badgeBorderColor = android.graphics.Color.rgb(253, 230, 138)
+                badgeTextColor = colorTempo
+            }
+        }
+
+        val badgeWidth = 92f
+        val badgeHeight = 13f
+        val badgeRect = android.graphics.RectF(right - badgeWidth, y - 9f, right, y - 9f + badgeHeight)
+        fillPaint.color = badgeBgColor
+        canvas.drawRoundRect(badgeRect, 3f, 3f, fillPaint)
+        val badgeStroke = Paint().apply {
+            color = badgeBorderColor
+            strokeWidth = 0.5f
+            style = Paint.Style.STROKE
+            isAntiAlias = true
+        }
+        canvas.drawRoundRect(badgeRect, 3f, 3f, badgeStroke)
+        badgeTextPaint.color = badgeTextColor
+        canvas.drawText(statusText, badgeRect.centerX(), y + 1f, badgeTextPaint)
+        y += 10f
+
+        canvas.drawText("Jl. Raya Terminal No. 45 | Telp: (031) 8921123 / WA: 0812-3456-7890", left, y, storeSubPaint)
+        canvas.drawText("Dicetak: ${java.text.SimpleDateFormat("dd/MM/yyyy HH:mm", java.util.Locale("id", "ID")).format(java.util.Date())}", right, y, rightMutedPaint)
+        y += 8f
+
+        // Garis pemisah header
+        canvas.drawLine(left, y, right, y, thickLinePaint)
+        y += 8f
+
+        // 2. Kotak Metadata Faktur & Pelanggan (2 Kolom)
+        val metaBoxHeight = 44f
+        fillPaint.color = android.graphics.Color.rgb(250, 250, 250)
+        canvas.drawRoundRect(android.graphics.RectF(left, y, right, y + metaBoxHeight), 4f, 4f, fillPaint)
+        canvas.drawRoundRect(android.graphics.RectF(left, y, right, y + metaBoxHeight), 4f, 4f, linePaint)
+
+        val splitX = left + (printableWidth * 0.52f)
+        canvas.drawLine(splitX, y, splitX, y + metaBoxHeight, linePaint)
+
+        // Kolom Kiri: Info Nota
+        val leftPad = left + 8f
+        canvas.drawText("No. Faktur", leftPad, y + 12f, metaLabelPaint)
+        canvas.drawText(": ${transaction.receiptNumber()}", leftPad + 52f, y + 12f, metaValPaint)
+        canvas.drawText("Tanggal", leftPad, y + 24f, metaLabelPaint)
+        canvas.drawText(": ${transaction.createdAt.formatReceiptDateTime()}", leftPad + 52f, y + 24f, metaValPaint)
+        canvas.drawText("Kasir", leftPad, y + 36f, metaLabelPaint)
+        canvas.drawText(": ${transaction.cashierName ?: "Kasir Toko"}", leftPad + 52f, y + 36f, metaValPaint)
+
+        // Kolom Kanan: Pelanggan & Pembayaran
+        val rightPad = splitX + 8f
+        canvas.drawText("Kepada Yth", rightPad, y + 12f, metaLabelPaint)
+        val customerName = transaction.customerName?.ifBlank { null } ?: "Pelanggan Umum"
+        canvas.drawText(": $customerName", rightPad + 58f, y + 12f, metaValPaint)
+        canvas.drawText("Pembayaran", rightPad, y + 24f, metaLabelPaint)
+        val paymentMethodStr = transaction.paymentMethods.joinToString(", ") { it.replaceFirstChar { c -> c.uppercase() } }.ifBlank { "Tunai" }
+        canvas.drawText(": $paymentMethodStr", rightPad + 58f, y + 24f, metaValPaint)
+        canvas.drawText("Keterangan", rightPad, y + 36f, metaLabelPaint)
+        val noteDisplay = if (isVoided) {
+            "Void: " + (transaction.voidReason ?: "-")
+        } else {
+            transaction.notes?.replace(Regex("""\[PENGIRIMAN\].*"""), "")?.trim()?.take(30)?.ifBlank { null } ?: "Penjualan Toko"
+        }
+        canvas.drawText(": $noteDisplay", rightPad + 58f, y + 36f, metaValPaint)
+
+        y += metaBoxHeight + 10f
+
+        // 3. Tabel Rincian Barang (Data Grid Table)
+        val colNoW = 20f
+        val colQtyW = 34f
+        val colUnitW = 38f
+        val colPriceW = 68f
+        val colTotalW = 74f
+        val colNameW = printableWidth - (colNoW + colQtyW + colUnitW + colPriceW + colTotalW)
+
+        val xNo = left
+        val xName = xNo + colNoW
+        val xQty = xName + colNameW
+        val xUnit = xQty + colQtyW
+        val xPrice = xUnit + colUnitW
+        val xTotal = xPrice + colPriceW
+
+        // Header Tabel
+        fillPaint.color = colorHeaderBg
+        canvas.drawRect(left, y, right, y + 18f, fillPaint)
+        canvas.drawRect(left, y, right, y + 18f, linePaint)
+
+        canvas.drawText("NO", xNo + (colNoW / 2f), y + 12f, tableHeaderPaint.apply { textAlign = Paint.Align.CENTER })
+        canvas.drawText("NAMA BARANG / MATERIAL", xName + 4f, y + 12f, tableHeaderPaint.apply { textAlign = Paint.Align.LEFT })
+        canvas.drawText("QTY", xQty + colQtyW - 4f, y + 12f, tableHeaderPaint.apply { textAlign = Paint.Align.RIGHT })
+        canvas.drawText("SATUAN", xUnit + 4f, y + 12f, tableHeaderPaint.apply { textAlign = Paint.Align.LEFT })
+        canvas.drawText("HARGA", xPrice + colPriceW - 4f, y + 12f, tableHeaderPaint.apply { textAlign = Paint.Align.RIGHT })
+        canvas.drawText("SUBTOTAL", right - 4f, y + 12f, tableHeaderPaint.apply { textAlign = Paint.Align.RIGHT })
+
         y += 18f
-        transaction.items.forEach { item ->
-            if (y < page.info.pageHeight - 140) {
-                val qtyText = if (item.quantity.stripTrailingZeros().scale() <= 0) {
-                    item.quantity.setScale(0).toPlainString()
+
+        // Baris Item
+        val rowHeight = 16f
+        transaction.items.forEachIndexed { index, item ->
+            if (y < pageHeight - 145f) {
+                if (index % 2 == 1) {
+                    fillPaint.color = colorAltRow
+                    canvas.drawRect(left, y, right, y + rowHeight, fillPaint)
+                }
+                canvas.drawLine(left, y + rowHeight, right, y + rowHeight, linePaint)
+
+                // Kolom No
+                canvas.drawText("${index + 1}", xNo + (colNoW / 2f), y + 11.5f, tableCellPaint.apply { textAlign = Paint.Align.CENTER })
+
+                // Kolom Nama Barang
+                canvas.drawText(item.productName.take(36), xName + 4f, y + 11.5f, tableCellBoldPaint.apply { textAlign = Paint.Align.LEFT })
+
+                // Kolom Qty
+                val qtyStr = if (item.quantity.stripTrailingZeros().scale() <= 0) {
+                    item.quantity.setScale(0, java.math.RoundingMode.HALF_UP).toPlainString()
                 } else {
                     item.quantity.stripTrailingZeros().toPlainString()
                 }
-                canvas.drawText(item.productName.take(48), 32f, y, bold)
-                y += 16f
-                canvas.drawText("  $qtyText x ${item.priceAtTransaction.formatReceiptMoney()} = ${item.subtotal.formatReceiptMoney()}".take(82), 32f, y, normal)
-                y += 18f
+                canvas.drawText(qtyStr, xQty + colQtyW - 4f, y + 11.5f, tableCellBoldPaint.apply { textAlign = Paint.Align.RIGHT })
+
+                // Kolom Satuan
+                val unitStr = item.unitName?.takeIf { it.isNotBlank() } ?: "pcs"
+                canvas.drawText(unitStr, xUnit + 4f, y + 11.5f, tableCellPaint.apply { textAlign = Paint.Align.LEFT })
+
+                // Kolom Harga
+                canvas.drawText(item.priceAtTransaction.formatReceiptMoney(), xPrice + colPriceW - 4f, y + 11.5f, tableCellPaint.apply { textAlign = Paint.Align.RIGHT })
+
+                // Kolom Total
+                canvas.drawText(item.subtotal.formatReceiptMoney(), right - 4f, y + 11.5f, tableCellBoldPaint.apply { textAlign = Paint.Align.RIGHT })
+
+                y += rowHeight
             }
         }
-        y += 6f
-        canvas.drawLine(32f, y, page.info.pageWidth - 32f, y, normal)
-        y += 22f
-        canvas.drawText("TOTAL: ${transaction.total.formatReceiptMoney()}", 32f, y, bold); y += 22f
-        canvas.drawText("Dibayar: ${transaction.paidAmount.formatReceiptMoney()}", 32f, y, normal); y += 18f
+
+        // Garis batas tabel vertikal luar
+        canvas.drawLine(left, y, right, y, thickLinePaint)
+        y += 8f
+
+        // 4. Ringkasan Keuangan (Kanan) & Terbilang + Syarat (Kiri)
+        val summarySplitX = left + (printableWidth * 0.54f)
+
+        // Sisi Kiri: Terbilang & Ketentuan
+        var yLeft = y
+        val terbilangText = "Terbilang: " + com.tbterminal.app.data.printer.DeliveryOrderFormatter.numberToWordsIndonesian(transaction.total.toLong()) + " Rupiah"
+        val terbilangPaint = Paint().apply {
+            color = colorBrand
+            textSize = 7.5f
+            typeface = android.graphics.Typeface.create(android.graphics.Typeface.DEFAULT, android.graphics.Typeface.BOLD_ITALIC)
+            isAntiAlias = true
+        }
+        canvas.drawText(terbilangText.take(55), left, yLeft + 8f, terbilangPaint)
+        yLeft += 16f
+
+        val policyHeaderPaint = Paint().apply {
+            color = colorDark
+            textSize = 7f
+            typeface = android.graphics.Typeface.create(android.graphics.Typeface.DEFAULT, android.graphics.Typeface.BOLD)
+            isAntiAlias = true
+        }
+        val policyTextPaint = Paint().apply {
+            color = colorMuted
+            textSize = 6.5f
+            typeface = android.graphics.Typeface.DEFAULT
+            isAntiAlias = true
+        }
+        canvas.drawText("KETENTUAN TRANSAKSI:", left, yLeft + 4f, policyHeaderPaint)
+        yLeft += 10f
+        canvas.drawText("1. Barang yang sudah dibeli tidak dapat ditukar/dikembalikan tanpa bukti faktur sah.", left, yLeft + 2f, policyTextPaint)
+        yLeft += 9f
+        canvas.drawText("2. Klaim kerusakan/kekurangan fisik maksimal 1x24 jam sejak barang diterima.", left, yLeft + 2f, policyTextPaint)
+        yLeft += 9f
+        canvas.drawText("3. Faktur ini merupakan bukti pembayaran resmi yang sah dari TB Terminal.", left, yLeft + 2f, policyTextPaint)
+
+        // Sisi Kanan: Rincian Keuangan
+        var yRight = y
+        val totalLabelPaint = Paint().apply {
+            color = colorDark
+            textSize = 8f
+            typeface = android.graphics.Typeface.DEFAULT
+            isAntiAlias = true
+        }
+        val totalValPaint = Paint().apply {
+            color = colorDark
+            textSize = 8f
+            typeface = android.graphics.Typeface.create(android.graphics.Typeface.DEFAULT, android.graphics.Typeface.BOLD)
+            textAlign = Paint.Align.RIGHT
+            isAntiAlias = true
+        }
+
+        // Subtotal
+        canvas.drawText("Subtotal", summarySplitX + 12f, yRight + 8f, totalLabelPaint)
+        canvas.drawText(transaction.total.formatReceiptMoney(), right - 4f, yRight + 8f, totalValPaint)
+        yRight += 13f
+
+        // Total Akhir (Boxed Shaded Highlight)
+        val totalBoxRect = android.graphics.RectF(summarySplitX + 8f, yRight, right, yRight + 16f)
+        fillPaint.color = android.graphics.Color.rgb(241, 245, 249)
+        canvas.drawRoundRect(totalBoxRect, 3f, 3f, fillPaint)
+        canvas.drawRoundRect(totalBoxRect, 3f, 3f, linePaint)
+
+        val grandLabelPaint = Paint().apply {
+            color = colorBrand
+            textSize = 8.5f
+            typeface = android.graphics.Typeface.create(android.graphics.Typeface.DEFAULT, android.graphics.Typeface.BOLD)
+            isAntiAlias = true
+        }
+        val grandValPaint = Paint().apply {
+            color = colorBrand
+            textSize = 9.5f
+            typeface = android.graphics.Typeface.create(android.graphics.Typeface.DEFAULT, android.graphics.Typeface.BOLD)
+            textAlign = Paint.Align.RIGHT
+            isAntiAlias = true
+        }
+        canvas.drawText("TOTAL TAGIHAN", summarySplitX + 12f, yRight + 11.5f, grandLabelPaint)
+        canvas.drawText(transaction.total.formatReceiptMoney(), right - 4f, yRight + 11.5f, grandValPaint)
+        yRight += 21f
+
+        // Dibayar
+        canvas.drawText("Jumlah Dibayar", summarySplitX + 12f, yRight + 4f, totalLabelPaint)
+        canvas.drawText(transaction.paidAmount.formatReceiptMoney(), right - 4f, yRight + 4f, totalValPaint)
+        yRight += 12f
+
+        // Kembalian (jika ada)
         if (transaction.changeAmount > BigDecimal.ZERO) {
-            canvas.drawText("Kembalian: ${transaction.changeAmount.formatReceiptMoney()}", 32f, y, normal); y += 18f
+            val changePaint = Paint(totalValPaint).apply { color = colorLunas }
+            canvas.drawText("Kembalian", summarySplitX + 12f, yRight + 4f, totalLabelPaint)
+            canvas.drawText(transaction.changeAmount.formatReceiptMoney(), right - 4f, yRight + 4f, changePaint)
+            yRight += 12f
         }
+
+        // Sisa Tagihan (jika tempo)
         if (transaction.remainingAmount() > BigDecimal.ZERO) {
-            canvas.drawText("Sisa Tagihan: ${transaction.remainingAmount().formatReceiptMoney()}", 32f, y, bold); y += 18f
+            val tempoPaint = Paint(totalValPaint).apply { color = colorTempo }
+            canvas.drawText("Sisa Piutang / Tempo", summarySplitX + 12f, yRight + 4f, totalLabelPaint)
+            canvas.drawText(transaction.remainingAmount().formatReceiptMoney(), right - 4f, yRight + 4f, tempoPaint)
+            yRight += 12f
         }
-        y += 10f
-        canvas.drawLine(32f, y, page.info.pageWidth - 32f, y, normal)
-        y += 20f
-        canvas.drawText("Terima kasih telah berbelanja di TB Terminal.", 32f, y, normal)
+
+        y = maxOf(yLeft + 14f, yRight + 14f)
+
+        // 5. Kotak Tanda Tangan (2 Kolom: Pelanggan & Kasir)
+        val sigColW = printableWidth * 0.42f
+        val xSigLeft = left + (sigColW * 0.5f)
+        val xSigRight = right - (sigColW * 0.5f)
+
+        val sigHeaderPaint = Paint().apply {
+            color = colorDark
+            textSize = 8f
+            typeface = android.graphics.Typeface.create(android.graphics.Typeface.DEFAULT, android.graphics.Typeface.BOLD)
+            textAlign = Paint.Align.CENTER
+            isAntiAlias = true
+        }
+        val sigLinePaint = Paint().apply {
+            color = colorDark
+            textSize = 7.5f
+            typeface = android.graphics.Typeface.DEFAULT
+            textAlign = Paint.Align.CENTER
+            isAntiAlias = true
+        }
+
+        canvas.drawText("Tanda Terima Pelanggan,", xSigLeft, y, sigHeaderPaint)
+        canvas.drawText("Hormat Kami / Kasir,", xSigRight, y, sigHeaderPaint)
+
+        y += 32f
+
+        val custSign = if (customerName != "Pelanggan Umum") "( ${customerName.take(22)} )" else "( ................................... )"
+        canvas.drawText(custSign, xSigLeft, y, sigLinePaint)
+        val cashierSign = "( ${transaction.cashierName ?: "Kasir TB Terminal"} )"
+        canvas.drawText(cashierSign, xSigRight, y, sigLinePaint)
+
+        y += 14f
+
+        // 6. Footer Terima Kasih
+        val footerPaint = Paint().apply {
+            color = colorMuted
+            textSize = 7f
+            typeface = android.graphics.Typeface.DEFAULT
+            textAlign = Paint.Align.CENTER
+            isAntiAlias = true
+        }
+        canvas.drawText("*** Terima Kasih Atas Kunjungan & Kepercayaan Anda Berbelanja di TB Terminal ***", pageWidth / 2f, y, footerPaint)
     }
 }
-
