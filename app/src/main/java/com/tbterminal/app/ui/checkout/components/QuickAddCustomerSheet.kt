@@ -37,6 +37,7 @@ import androidx.compose.material3.SheetState
 import androidx.compose.material3.Switch
 import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -80,7 +81,8 @@ fun QuickAddCustomerSheet(
         onDismissRequest = onDismiss,
         sheetState = sheetState,
         containerColor = Color.White,
-        shape = RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp)
+        shape = RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp),
+        scrimColor = Color(0xFF0F172A).copy(alpha = 0.5f)
     ) {
         Column(
             modifier = Modifier
@@ -95,37 +97,18 @@ fun QuickAddCustomerSheet(
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(12.dp)
-                ) {
-                    Box(
-                        modifier = Modifier
-                            .size(42.dp)
-                            .clip(CircleShape)
-                            .background(BrandGreenLight),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Icon(
-                            Icons.Outlined.PersonAdd,
-                            contentDescription = null,
-                            tint = BrandGreen,
-                            modifier = Modifier.size(24.dp)
-                        )
-                    }
-                    Column {
-                        Text(
-                            text = "Tambah Pelanggan Baru",
-                            fontSize = 18.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = TextDark
-                        )
-                        Text(
-                            text = "Daftarkan pelanggan cepat untuk nota & riwayat",
-                            fontSize = 12.sp,
-                            color = TextMuted
-                        )
-                    }
+                Column {
+                    Text(
+                        text = "Tambah Pelanggan Baru",
+                        fontSize = 18.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = TextDark
+                    )
+                    Text(
+                        text = "Daftarkan pelanggan cepat untuk nota & riwayat",
+                        fontSize = 12.sp,
+                        color = TextMuted
+                    )
                 }
 
                 IconButton(onClick = onDismiss) {
@@ -329,16 +312,19 @@ fun QuickAddCustomerSheet(
                 }
             }
 
-            OutlinedButton(
+            TextButton(
                 onClick = onDismiss,
+                shape = RoundedCornerShape(12.dp),
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(44.dp),
-                shape = RoundedCornerShape(12.dp),
-                border = BorderStroke(1.dp, BorderColor),
-                colors = ButtonDefaults.outlinedButtonColors(contentColor = TextMuted)
+                    .height(38.dp)
             ) {
-                Text("BATAL", fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
+                Text(
+                    text = "Batal",
+                    fontSize = 13.5.sp,
+                    fontWeight = FontWeight.Medium,
+                    color = Color(0xFF64748B)
+                )
             }
         }
     }

@@ -1,6 +1,7 @@
 package com.tbterminal.app.ui.checkout
 
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.expandVertically
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -87,6 +88,7 @@ import com.tbterminal.app.data.repository.RepositoryResult
 import kotlinx.coroutines.delay
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.blur
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
@@ -162,6 +164,11 @@ fun CashierPaymentScreen(
     val creditCustomerIsValid = !isCustomerRequired || state.selectedCustomer != null
 
     var showCustomerPickerDialog by remember { mutableStateOf(false) }
+    val isAnyPopupOpen = showCustomerPickerDialog || state.isQuickAddCustomerOpen
+    val popupBlurRadius by animateDpAsState(
+        targetValue = if (isAnyPopupOpen) 16.dp else 0.dp,
+        label = "popup_blur_animation"
+    )
 
     CashierDashboardShell(
         userName = name,
@@ -188,6 +195,7 @@ fun CashierPaymentScreen(
                 modifier = Modifier
                     .fillMaxSize()
                     .padding(contentPadding)
+                    .then(if (popupBlurRadius > 0.dp) Modifier.blur(popupBlurRadius) else Modifier)
             ) {
                 // ── 1. TOP BAR SESUAI MOCKUP HTML ──
                 PaymentTopBar(
@@ -1842,7 +1850,7 @@ private fun CustomerModalBottomSheet(
                                 )
                                 Spacer(Modifier.width(6.dp))
                                 Text(
-                                    text = "+ Tambah Pelanggan Baru",
+                                    text = "Tambah Pelanggan Baru",
                                     fontSize = 13.5.sp,
                                     fontWeight = FontWeight.SemiBold,
                                     color = Color(0xFF334155)
