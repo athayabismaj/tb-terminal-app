@@ -44,6 +44,9 @@ import androidx.compose.material.icons.outlined.LocalShipping
 import androidx.compose.material.icons.outlined.LocationOn
 import androidx.compose.material.icons.outlined.Payments
 import androidx.compose.material.icons.outlined.Person
+import androidx.compose.material.icons.outlined.Phone
+import androidx.compose.material.icons.outlined.Description
+import androidx.compose.material.icons.outlined.Edit
 import androidx.compose.material.icons.outlined.QrCode2
 import androidx.compose.material.icons.outlined.Search
 import androidx.compose.material.icons.outlined.ShoppingBag
@@ -117,6 +120,9 @@ fun CashierPaymentScreen(
     onDeliveryFeeChanged: (String) -> Unit = {},
     onDeliveryAddressChanged: (String) -> Unit = {},
     onDeliveryCourierChanged: (String) -> Unit = {},
+    onDeliveryRecipientPhoneChanged: (String) -> Unit = {},
+    onDeliveryVehiclePlateChanged: (String) -> Unit = {},
+    onDeliverySpecialInstructionsChanged: (String) -> Unit = {},
     onOpenHoldCartDialog: () -> Unit = {},
     onDashboardClick: () -> Unit = {},
     onPosClick: () -> Unit = {},
@@ -1230,7 +1236,7 @@ fun CashierPaymentScreen(
                                         modifier = Modifier.fillMaxWidth(),
                                         verticalArrangement = Arrangement.spacedBy(8.dp)
                                     ) {
-                                        // Biaya Pengiriman (Ongkir)
+                                        // 1. Biaya Pengiriman (Ongkir)
                                         Surface(
                                             shape = RoundedCornerShape(12.dp),
                                             color = Color.White,
@@ -1270,7 +1276,7 @@ fun CashierPaymentScreen(
                                             }
                                         }
 
-                                        // Alamat Pengiriman
+                                        // 2. Alamat Pengiriman
                                         Surface(
                                             shape = RoundedCornerShape(12.dp),
                                             color = Color.White,
@@ -1295,7 +1301,7 @@ fun CashierPaymentScreen(
                                                     value = state.deliveryAddress,
                                                     onValueChange = onDeliveryAddressChanged,
                                                     placeholder = {
-                                                        Text("Alamat Pengiriman", fontSize = 12.sp, color = Color(0xFF94A3B8))
+                                                        Text("Alamat Pengiriman & Patokan Proyek", fontSize = 12.sp, color = Color(0xFF94A3B8))
                                                     },
                                                     textStyle = TextStyle(fontSize = 12.sp, color = PaymentTextPrimary),
                                                     singleLine = true,
@@ -1310,7 +1316,72 @@ fun CashierPaymentScreen(
                                             }
                                         }
 
-                                        // Armada / Supir
+                                        // 3. No. Telepon / WhatsApp Penerima
+                                        Surface(
+                                            shape = RoundedCornerShape(12.dp),
+                                            color = Color.White,
+                                            border = BorderStroke(1.dp, PaymentOutline),
+                                            modifier = Modifier.fillMaxWidth()
+                                        ) {
+                                            Row(
+                                                modifier = Modifier
+                                                    .fillMaxWidth()
+                                                    .padding(horizontal = 14.dp, vertical = 2.dp),
+                                                verticalAlignment = Alignment.CenterVertically
+                                            ) {
+                                                Icon(
+                                                    imageVector = Icons.Outlined.Phone,
+                                                    contentDescription = null,
+                                                    tint = Color(0xFF94A3B8),
+                                                    modifier = Modifier
+                                                        .size(16.dp)
+                                                        .padding(end = 2.dp)
+                                                )
+                                                OutlinedTextField(
+                                                    value = state.deliveryRecipientPhone,
+                                                    onValueChange = onDeliveryRecipientPhoneChanged,
+                                                    placeholder = {
+                                                        Text("No. Telepon / WhatsApp Penerima", fontSize = 12.sp, color = Color(0xFF94A3B8))
+                                                    },
+                                                    textStyle = TextStyle(fontSize = 12.sp, color = PaymentTextPrimary),
+                                                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Phone),
+                                                    singleLine = true,
+                                                    modifier = Modifier.weight(1f),
+                                                    colors = OutlinedTextFieldDefaults.colors(
+                                                        focusedContainerColor = Color.Transparent,
+                                                        unfocusedContainerColor = Color.Transparent,
+                                                        focusedBorderColor = Color.Transparent,
+                                                        unfocusedBorderColor = Color.Transparent
+                                                    )
+                                                )
+                                            }
+                                        }
+
+                                        // 4. Quick Chips Armada
+                                        Row(
+                                            modifier = Modifier.fillMaxWidth(),
+                                            horizontalArrangement = Arrangement.spacedBy(6.dp)
+                                        ) {
+                                            listOf("Pick-up Toko", "Truk Engkel", "Motor Viar", "Ambil Sendiri").forEach { fleet ->
+                                                val isSelected = state.deliveryCourier.contains(fleet, ignoreCase = true)
+                                                Surface(
+                                                    color = if (isSelected) Color(0xFFE8F2EE) else Color(0xFFF8FAFC),
+                                                    shape = RoundedCornerShape(8.dp),
+                                                    border = BorderStroke(1.dp, if (isSelected) PaymentBrand else PaymentOutline),
+                                                    modifier = Modifier.clickable { onDeliveryCourierChanged(fleet) }
+                                                ) {
+                                                    Text(
+                                                        text = fleet,
+                                                        fontSize = 10.sp,
+                                                        fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
+                                                        color = if (isSelected) PaymentBrand else Color(0xFF475569),
+                                                        modifier = Modifier.padding(horizontal = 7.dp, vertical = 4.dp)
+                                                    )
+                                                }
+                                            }
+                                        }
+
+                                        // 5. Armada & Nama Supir
                                         Surface(
                                             shape = RoundedCornerShape(12.dp),
                                             color = Color.White,
@@ -1336,6 +1407,86 @@ fun CashierPaymentScreen(
                                                     onValueChange = onDeliveryCourierChanged,
                                                     placeholder = {
                                                         Text("Armada / Nama Supir (Opsional)", fontSize = 12.sp, color = Color(0xFF94A3B8))
+                                                    },
+                                                    textStyle = TextStyle(fontSize = 12.sp, color = PaymentTextPrimary),
+                                                    singleLine = true,
+                                                    modifier = Modifier.weight(1f),
+                                                    colors = OutlinedTextFieldDefaults.colors(
+                                                        focusedContainerColor = Color.Transparent,
+                                                        unfocusedContainerColor = Color.Transparent,
+                                                        focusedBorderColor = Color.Transparent,
+                                                        unfocusedBorderColor = Color.Transparent
+                                                    )
+                                                )
+                                            }
+                                        }
+
+                                        // 6. No. Plat Kendaraan
+                                        Surface(
+                                            shape = RoundedCornerShape(12.dp),
+                                            color = Color.White,
+                                            border = BorderStroke(1.dp, PaymentOutline),
+                                            modifier = Modifier.fillMaxWidth()
+                                        ) {
+                                            Row(
+                                                modifier = Modifier
+                                                    .fillMaxWidth()
+                                                    .padding(horizontal = 14.dp, vertical = 2.dp),
+                                                verticalAlignment = Alignment.CenterVertically
+                                            ) {
+                                                Icon(
+                                                    imageVector = Icons.Outlined.Description,
+                                                    contentDescription = null,
+                                                    tint = Color(0xFF94A3B8),
+                                                    modifier = Modifier
+                                                        .size(16.dp)
+                                                        .padding(end = 2.dp)
+                                                )
+                                                OutlinedTextField(
+                                                    value = state.deliveryVehiclePlate,
+                                                    onValueChange = onDeliveryVehiclePlateChanged,
+                                                    placeholder = {
+                                                        Text("No. Plat / Nopol Kendaraan (Opsional)", fontSize = 12.sp, color = Color(0xFF94A3B8))
+                                                    },
+                                                    textStyle = TextStyle(fontSize = 12.sp, color = PaymentTextPrimary),
+                                                    singleLine = true,
+                                                    modifier = Modifier.weight(1f),
+                                                    colors = OutlinedTextFieldDefaults.colors(
+                                                        focusedContainerColor = Color.Transparent,
+                                                        unfocusedContainerColor = Color.Transparent,
+                                                        focusedBorderColor = Color.Transparent,
+                                                        unfocusedBorderColor = Color.Transparent
+                                                    )
+                                                )
+                                            }
+                                        }
+
+                                        // 7. Catatan Khusus / Instruksi Lapangan
+                                        Surface(
+                                            shape = RoundedCornerShape(12.dp),
+                                            color = Color.White,
+                                            border = BorderStroke(1.dp, PaymentOutline),
+                                            modifier = Modifier.fillMaxWidth()
+                                        ) {
+                                            Row(
+                                                modifier = Modifier
+                                                    .fillMaxWidth()
+                                                    .padding(horizontal = 14.dp, vertical = 2.dp),
+                                                verticalAlignment = Alignment.CenterVertically
+                                            ) {
+                                                Icon(
+                                                    imageVector = Icons.Outlined.Edit,
+                                                    contentDescription = null,
+                                                    tint = Color(0xFF94A3B8),
+                                                    modifier = Modifier
+                                                        .size(16.dp)
+                                                        .padding(end = 2.dp)
+                                                )
+                                                OutlinedTextField(
+                                                    value = state.deliverySpecialInstructions,
+                                                    onValueChange = onDeliverySpecialInstructionsChanged,
+                                                    placeholder = {
+                                                        Text("Catatan Khusus Lapangan / Instruksi Supir", fontSize = 12.sp, color = Color(0xFF94A3B8))
                                                     },
                                                     textStyle = TextStyle(fontSize = 12.sp, color = PaymentTextPrimary),
                                                     singleLine = true,

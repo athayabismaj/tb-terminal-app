@@ -1092,6 +1092,18 @@ class CheckoutViewModel(
         _uiState.update { it.copy(deliveryCourier = courier) }
     }
 
+    fun updateDeliveryRecipientPhone(phone: String) {
+        _uiState.update { it.copy(deliveryRecipientPhone = phone) }
+    }
+
+    fun updateDeliveryVehiclePlate(plate: String) {
+        _uiState.update { it.copy(deliveryVehiclePlate = plate) }
+    }
+
+    fun updateDeliverySpecialInstructions(instructions: String) {
+        _uiState.update { it.copy(deliverySpecialInstructions = instructions) }
+    }
+
     fun lockScreen() {
         _uiState.update { it.copy(isScreenLocked = true, lockPinInput = "", lockPinError = null) }
     }
@@ -1524,6 +1536,9 @@ class CheckoutViewModel(
                 append("[PENGIRIMAN] Ongkir: Rp ${state.deliveryFee.toPlainString()}")
                 if (state.deliveryAddress.isNotBlank()) append(" | Alamat: ${state.deliveryAddress.trim()}")
                 if (state.deliveryCourier.isNotBlank()) append(" | Armada: ${state.deliveryCourier.trim()}")
+                if (state.deliveryRecipientPhone.isNotBlank()) append(" | Telp: ${state.deliveryRecipientPhone.trim()}")
+                if (state.deliveryVehiclePlate.isNotBlank()) append(" | Plat: ${state.deliveryVehiclePlate.trim()}")
+                if (state.deliverySpecialInstructions.isNotBlank()) append(" | Catatan: ${state.deliverySpecialInstructions.trim()}")
             }
             parts.add(deliveryInfo)
         }

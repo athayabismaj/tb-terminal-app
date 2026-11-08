@@ -666,18 +666,18 @@ fun DeliveryOrderDialog(
 
                                 HorizontalDivider(color = Color(0xFFE2E8F0), modifier = Modifier.padding(vertical = 6.dp))
 
-                                // Kolom 3 Tanda Tangan
+                                // Kolom 3 Tanda Tangan: Kasir Toko, Sopir (Gudang & Armada), Penerima
                                 Row(
                                     modifier = Modifier.fillMaxWidth(),
                                     horizontalArrangement = Arrangement.SpaceBetween
                                 ) {
                                     Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                                        Text("Gudang/Pengirim", fontSize = 9.sp, color = Color(0xFF64748B))
+                                        Text("Kasir (Toko)", fontSize = 9.sp, color = Color(0xFF64748B))
                                         Spacer(Modifier.height(26.dp))
-                                        Text("( ............... )", fontSize = 9.5.sp, color = Color(0xFF0F172A))
+                                        Text("( ${transaction.cashierName ?: "Kasir"} )", fontSize = 9.5.sp, color = Color(0xFF0F172A))
                                     }
                                     Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                                        Text("Sopir/Armada", fontSize = 9.sp, color = Color(0xFF64748B))
+                                        Text("Sopir (Gudang/Armada)", fontSize = 9.sp, color = Color(0xFF64748B))
                                         Spacer(Modifier.height(26.dp))
                                         Text(
                                             text = if (currentDeliveryData.courier.isNotBlank() && !currentDeliveryData.courier.contains("Toko", true)) {
@@ -690,7 +690,7 @@ fun DeliveryOrderDialog(
                                         )
                                     }
                                     Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                                        Text("Penerima/Proyek", fontSize = 9.sp, color = Color(0xFF64748B))
+                                        Text("Penerima / Proyek", fontSize = 9.sp, color = Color(0xFF64748B))
                                         Spacer(Modifier.height(26.dp))
                                         Text(
                                             text = if (currentDeliveryData.recipientName.isNotBlank() && currentDeliveryData.recipientName != "Pelanggan Umum") {

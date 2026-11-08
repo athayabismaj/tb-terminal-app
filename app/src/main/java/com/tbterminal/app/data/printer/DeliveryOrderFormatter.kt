@@ -31,8 +31,10 @@ import java.util.Locale
  *
  * Khusus toko bahan bangunan & ritel material konstruksi, surat jalan
  * memuat daftar fisik barang yang dikirim, alamat proyek/tujuan,
- * identitas armada & supir, serta 3 kolom tanda tangan resmi
- * (Pengirim Gudang, Sopir Armada, dan Penerima Barang).
+ * identitas armada & supir, serta 3 tanda tangan resmi:
+ * 1. Kasir / Toko (Pengirim yang menerbitkan nota)
+ * 2. Sopir / Pengemudi (Bagian gudang & armada pengangkut)
+ * 3. Penerima Barang / Mandor Proyek di lokasi
  */
 object DeliveryOrderFormatter {
 
@@ -105,7 +107,6 @@ object DeliveryOrderFormatter {
             return DeliveryParsedInfo(false, null, null, null)
         }
 
-        // Contoh: [PENGIRIMAN] Ongkir: Rp 50.000 | Alamat: Jl. Merdeka No. 45 | Armada: Pick-up Engkel Toko
         var fee: String? = null
         var addr: String? = null
         var cour: String? = null
@@ -157,7 +158,7 @@ object DeliveryOrderFormatter {
     private fun formatTimestamp(isoDate: String): String {
         return try {
             val inputFormat = SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss", Locale.US)
-            val outputFormat = SimpleDateFormat("dd/MM/yyyy HH:mm", Locale("id", "ID"))
+            val outputFormat = SimpleDateFormat("dd/MM/yyyy HH:mm", Locale.forLanguageTag("id-ID"))
             val date = inputFormat.parse(isoDate.take(19)) ?: Date()
             outputFormat.format(date)
         } catch (_: Exception) {
@@ -262,20 +263,20 @@ object DeliveryOrderFormatter {
 
         builder.feed(1)
 
-        // 6. Kolom Tanda Tangan Fisik (Pengirim, Sopir, Penerima)
+        // 6. Kolom Tanda Tangan Fisik (Kasir Toko, Sopir/Gudang, Penerima)
         builder.align(EscPosBuilder.Alignment.CENTER)
         builder.textLine("TANDA TERIMA PENGIRIMAN:")
         builder.feed(1)
 
         if (paperSize.equals("80mm", ignoreCase = true)) {
-            builder.threeColumn("Pengirim/Gudang", "Sopir/Armada", "Penerima")
+            builder.threeColumn("Kasir Toko", "Sopir/Gudang", "Penerima")
             builder.feed(2)
             builder.threeColumn("(............)", "(............)", "(............)")
         } else {
             // 58mm: Vertikal bertingkat
             builder.align(EscPosBuilder.Alignment.LEFT)
-            builder.twoColumn("1. Pengirim / Kasir", ": (..............)")
-            builder.twoColumn("2. Sopir / Armada", ": (..............)")
+            builder.twoColumn("1. Kasir (Toko)", ": (..............)")
+            builder.twoColumn("2. Sopir / Gudang", ": (..............)")
             builder.twoColumn("3. Penerima Barang", ": (..............)")
         }
 
@@ -363,6 +364,11 @@ object DeliveryOrderFormatter {
 /**
  * Android PrintDocumentAdapter untuk mencetak dokumen Surat Jalan resmi A5/A4
  * standar logistik perdagangan bahan bangunan di Indonesia.
+ *
+ * Kolom Tanda Tangan:
+ * 1. Kasir / Toko (Pengirim nota)
+ * 2. Sopir / Pengemudi (Bagian gudang & armada pengangkut jadi satu)
+ * 3. Penerima Barang / Mandor Proyek di lokasi
  */
 class DeliveryOrderPrintAdapter(
     private val context: Context,
@@ -676,7 +682,7 @@ class DeliveryOrderPrintAdapter(
         canvas.drawText("Barang yang telah diterima dan ditandatangani dianggap lengkap dan baik. Klaim setelah serah terima tidak dilayani.", left + 6f, y + 18f, disclaimerPaint)
         y += 32f
 
-        // 5. 3 Kolom Tanda Tangan Resmi (Gudang, Sopir, Penerima)
+        // 5. 3 Kolom Tanda Tangan Resmi: Kasir Toko, Sopir/Gudang, Penerima Proyek
         val sigColW = printableWidth / 3f
         val xSig1 = left + (sigColW * 0.5f)
         val xSig2 = left + sigColW + (sigColW * 0.5f)
@@ -697,13 +703,14 @@ class DeliveryOrderPrintAdapter(
             isAntiAlias = true
         }
 
-        canvas.drawText("Pengirim / Bag. Gudang,", xSig1, y, sigHeaderPaint)
-        canvas.drawText("Pengemudi / Sopir Armada,", xSig2, y, sigHeaderPaint)
+        canvas.drawText("Kasir / Toko (Pengirim),", xSig1, y, sigHeaderPaint)
+        canvas.drawText("Sopir / Pengantar (Gudang),", xSig2, y, sigHeaderPaint)
         canvas.drawText("Penerima / Mandor Proyek,", xSig3, y, sigHeaderPaint)
 
         y += 34f
 
-        canvas.drawText("( ................................... )", xSig1, y, sigLinePaint)
+        val cashierSign = "( ${transaction.cashierName ?: "Kasir TB Terminal"} )"
+        canvas.drawText(cashierSign, xSig1, y, sigLinePaint)
         val driverSign = if (deliveryData.courier.isNotBlank() && !deliveryData.courier.contains("Toko", true)) {
             "( ${deliveryData.courier.take(18)} )"
         } else {
@@ -732,6 +739,6 @@ class DeliveryOrderPrintAdapter(
             textAlign = Paint.Align.CENTER
             isAntiAlias = true
         }
-        canvas.drawText("Lembar 1: Kantor/Arsip Toko (Putih)   |   Lembar 2: Pelanggan/Proyek (Merah)   |   Lembar 3: Supir/Ekspedisi (Kuning)", pageWidth / 2f, y, footerPaint)
+        canvas.drawText("Lembar 1: Kasir / Arsip Toko (Putih)   |   Lembar 2: Penerima / Pelanggan (Merah)   |   Lembar 3: Sopir / Pengantar (Kuning)", pageWidth / 2f, y, footerPaint)
     }
 }
