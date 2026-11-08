@@ -44,7 +44,7 @@ import com.tbterminal.app.ui.salestransactions.WhatsAppReceiptDialog
 import com.tbterminal.app.ui.salestransactions.WhatsAppReceiptHelper
 import com.tbterminal.app.ui.salestransactions.DeliveryOrderDialog
 
-private val SurfaceBackground = Color(0xFFF8F9FA)
+private val SurfaceBackground = Color(0xFFF8FAFC)
 
 @Composable
 fun CashierReceiptDetailScreen(

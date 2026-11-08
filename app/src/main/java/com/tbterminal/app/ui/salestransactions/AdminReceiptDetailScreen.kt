@@ -118,8 +118,8 @@ import java.time.OffsetDateTime
 import java.time.format.DateTimeFormatter
 import java.util.Locale
 
-private val BrandGreen = Color(0xFF256B57)
-private val BrandGreenDark = Color(0xFF1D5545)
+private val BrandGreen = Color(0xFF10533C)
+private val BrandGreenDark = Color(0xFF0D4331)
 private val TextPrimary = Color(0xFF0F172A)
 private val TextSlate800 = Color(0xFF1E293B)
 private val TextSlate700 = Color(0xFF334155)
@@ -127,7 +127,7 @@ private val TextSecondary = Color(0xFF64748B)
 private val TextMuted = Color(0xFF94A3B8)
 private val BorderSlate200 = Color(0xFFE2E8F0)
 private val SurfaceSlate100 = Color(0xFFF1F5F9)
-private val SurfaceBackground = Color(0xFFF8F9FA)
+private val SurfaceBackground = Color(0xFFF8FAFC)
 
 private fun String.formatReceiptDateTime(): String = runCatching {
     OffsetDateTime.parse(this).format(
@@ -566,17 +566,19 @@ internal fun ReceiptSummaryCard(
                 verticalArrangement = Arrangement.spacedBy(4.dp)
             ) {
                 Text(
-                    text = "TB TERMINAL",
+                    text = "TB TERMINAL BAROKAH JAYA",
                     color = TextPrimary,
-                    fontSize = 20.sp,
+                    fontSize = 18.sp,
                     fontWeight = FontWeight.ExtraBold,
-                    letterSpacing = (-0.4).sp
+                    letterSpacing = (-0.3).sp,
+                    textAlign = TextAlign.Center
                 )
                 Text(
-                    text = "Toko Bahan Bangunan & Material",
+                    text = "Bahan Bangunan & Material",
                     color = TextSecondary,
                     fontSize = 12.sp,
-                    fontWeight = FontWeight.Medium
+                    fontWeight = FontWeight.Medium,
+                    textAlign = TextAlign.Center
                 )
                 Spacer(modifier = Modifier.height(4.dp))
 
@@ -648,8 +650,9 @@ internal fun ReceiptSummaryCard(
                         Text(
                             text = transaction.receiptNumber(),
                             color = TextSlate800,
-                            fontSize = 13.sp,
-                            fontWeight = FontWeight.Bold
+                            fontSize = 14.sp,
+                            fontWeight = FontWeight.Bold,
+                            letterSpacing = (-0.2).sp
                         )
                     }
                 }
@@ -676,7 +679,7 @@ internal fun ReceiptSummaryCard(
 
             HorizontalDivider(color = SurfaceSlate100, thickness = 1.dp)
 
-            // 3. Metadata Transaksi (Grid 2 Kolom)
+            // 3. Metadata Transaksi (Waktu, Kasir, Pelanggan)
             Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                 Row(modifier = Modifier.fillMaxWidth()) {
                     Column(modifier = Modifier.weight(1f)) {
@@ -719,7 +722,7 @@ internal fun ReceiptSummaryCard(
                     }
                 }
                 Row(modifier = Modifier.fillMaxWidth()) {
-                    Column(modifier = Modifier.weight(1f)) {
+                    Column(modifier = Modifier.fillMaxWidth()) {
                         Text(
                             text = "PELANGGAN",
                             color = TextMuted,
@@ -733,28 +736,6 @@ internal fun ReceiptSummaryCard(
                             color = TextSlate800,
                             fontSize = 13.sp,
                             fontWeight = FontWeight.Medium
-                        )
-                    }
-                    Spacer(modifier = Modifier.width(16.dp))
-                    Column(
-                        modifier = Modifier.weight(1f),
-                        horizontalAlignment = Alignment.End
-                    ) {
-                        Text(
-                            text = "TIPE TRANSAKSI",
-                            color = TextMuted,
-                            fontSize = 11.sp,
-                            fontWeight = FontWeight.SemiBold,
-                            letterSpacing = 0.5.sp,
-                            textAlign = TextAlign.End
-                        )
-                        Spacer(modifier = Modifier.height(2.dp))
-                        Text(
-                            text = transaction.type.ifBlank { "Penjualan" },
-                            color = TextSlate800,
-                            fontSize = 13.sp,
-                            fontWeight = FontWeight.Medium,
-                            textAlign = TextAlign.End
                         )
                     }
                 }
@@ -781,7 +762,7 @@ internal fun ReceiptSummaryCard(
                         color = SurfaceSlate100,
                     ) {
                         Text(
-                            text = "${transaction.items.size} macam ($totalQtyText item)",
+                            text = "${transaction.items.size} item ($totalQtyText total)",
                             color = TextSecondary,
                             fontSize = 11.sp,
                             fontWeight = FontWeight.SemiBold,
@@ -803,7 +784,7 @@ internal fun ReceiptSummaryCard(
                                 Text(
                                     text = item.productName.ifBlank { "Produk ${item.productId.take(8)}" },
                                     color = TextSlate800,
-                                    fontSize = 14.sp,
+                                    fontSize = 13.5.sp,
                                     fontWeight = FontWeight.SemiBold
                                 )
                                 Spacer(modifier = Modifier.height(2.dp))
@@ -818,7 +799,7 @@ internal fun ReceiptSummaryCard(
                             Text(
                                 text = item.subtotal.formatReceiptMoney(),
                                 color = TextSlate800,
-                                fontSize = 14.sp,
+                                fontSize = 13.5.sp,
                                 fontWeight = FontWeight.SemiBold
                             )
                         }
@@ -831,7 +812,7 @@ internal fun ReceiptSummaryCard(
 
             DashedDivider(color = BorderSlate200)
 
-            // 5. Rincian Pembayaran
+            // 5. Rincian Pembayaran (Ringkas, Standar Industri)
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 Text(
                     text = "RINCIAN PEMBAYARAN",
@@ -842,25 +823,17 @@ internal fun ReceiptSummaryCard(
                 )
                 Spacer(modifier = Modifier.height(2.dp))
 
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Text("Subtotal", color = TextSecondary, fontSize = 13.sp)
-                    Text(transaction.total.formatReceiptMoney(), color = TextSlate800, fontSize = 13.sp, fontWeight = FontWeight.Medium)
+                // Subtotal hanya jika item lebih dari 1
+                if (transaction.items.size > 1) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text("Subtotal (${transaction.items.size} item)", color = TextSecondary, fontSize = 13.sp)
+                        Text(transaction.total.formatReceiptMoney(), color = TextSlate800, fontSize = 13.sp, fontWeight = FontWeight.Medium)
+                    }
                 }
-
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Text("Diskon", color = TextSecondary, fontSize = 13.sp)
-                    Text(BigDecimal.ZERO.formatReceiptMoney(), color = TextMuted, fontSize = 13.sp, fontWeight = FontWeight.Medium)
-                }
-
-                HorizontalDivider(color = SurfaceSlate100, thickness = 1.dp, modifier = Modifier.padding(vertical = 2.dp))
 
                 Row(
                     modifier = Modifier.fillMaxWidth(),
@@ -868,7 +841,7 @@ internal fun ReceiptSummaryCard(
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Text("TOTAL BELANJA", color = TextPrimary, fontSize = 14.sp, fontWeight = FontWeight.Bold)
-                    Text(transaction.total.formatReceiptMoney(), color = BrandGreen, fontSize = 17.sp, fontWeight = FontWeight.ExtraBold)
+                    Text(transaction.total.formatReceiptMoney(), color = BrandGreen, fontSize = 18.sp, fontWeight = FontWeight.ExtraBold)
                 }
 
                 DashedDivider(color = BorderSlate200)
@@ -904,15 +877,6 @@ internal fun ReceiptSummaryCard(
                     )
                 }
 
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Text("Total Dibayar", color = TextSecondary, fontSize = 13.sp)
-                    Text(transaction.paidAmount.formatReceiptMoney(), color = TextSlate800, fontSize = 13.sp, fontWeight = FontWeight.Medium)
-                }
-
                 if (transaction.amountTendered > BigDecimal.ZERO) {
                     Row(
                         modifier = Modifier.fillMaxWidth(),
@@ -937,7 +901,17 @@ internal fun ReceiptSummaryCard(
 
                 val remaining = transaction.remainingAmount()
                 if (remaining > BigDecimal.ZERO) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text("Sudah Dibayar", color = TextSecondary, fontSize = 13.sp)
+                        Text(transaction.paidAmount.formatReceiptMoney(), color = TextSlate800, fontSize = 13.sp, fontWeight = FontWeight.Medium)
+                    }
+
                     HorizontalDivider(color = SurfaceSlate100, thickness = 1.dp, modifier = Modifier.padding(vertical = 2.dp))
+
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.SpaceBetween,
@@ -996,7 +970,7 @@ internal fun ReceiptSummaryCard(
                     textAlign = TextAlign.Center
                 )
                 Text(
-                    text = "Barang yang sudah dibeli dapat ditukar 1x24 jam dengan membawa struk ini.",
+                    text = "Simpan struk ini sebagai bukti transaksi yang sah.",
                     fontSize = 10.sp,
                     color = TextMuted,
                     textAlign = TextAlign.Center
@@ -1038,11 +1012,14 @@ internal fun ReceiptActions(
     onShowVoid: () -> Unit,
     onShowRefund: () -> Unit
 ) {
+    val remaining = transaction.remainingAmount()
+    val canAcceptPayment = role.equals("KASIR", ignoreCase = true) || role.equals("OWNER", ignoreCase = true)
+
     Column(
         modifier = Modifier.fillMaxWidth(),
         verticalArrangement = Arrangement.spacedBy(10.dp)
     ) {
-        // Tombol Utama Cetak Struk (Sage Green #256B57)
+        // 1. Tombol Utama: Cetak Struk (Printer Thermal)
         Button(
             onClick = onPrintClick,
             modifier = Modifier
@@ -1060,127 +1037,22 @@ internal fun ReceiptActions(
             )
             Spacer(modifier = Modifier.width(8.dp))
             Text(
-                text = if (transaction.status.equals("voided", true)) "Cetak Struk Void" else "Cetak Struk (Printer Thermal)",
-                color = Color.White,
-                fontSize = 14.sp,
-                fontWeight = FontWeight.SemiBold
-            )
-        }
-
-        // Tombol WhatsApp (Brand WhatsApp Green #25D366)
-        Button(
-            onClick = onWhatsAppClick,
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(46.dp),
-            shape = RoundedCornerShape(12.dp),
-            colors = ButtonDefaults.buttonColors(containerColor = WhatsAppGreen),
-            elevation = ButtonDefaults.buttonElevation(defaultElevation = 0.dp)
-        ) {
-            Icon(
-                imageVector = Icons.Outlined.Phone,
-                contentDescription = null,
-                tint = Color.White,
-                modifier = Modifier.size(18.dp)
-            )
-            Spacer(modifier = Modifier.width(8.dp))
-            Text(
-                text = "Kirim Struk via WhatsApp",
+                text = if (transaction.status.equals("voided", true)) "Cetak Struk Void" else "Cetak Struk",
                 color = Color.White,
                 fontSize = 14.sp,
                 fontWeight = FontWeight.Bold
             )
         }
 
-        // Tombol Surat Jalan / Pengiriman (Ocean Blue #0284C7)
-        OutlinedButton(
-            onClick = onDeliveryOrderClick,
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(46.dp),
-            shape = RoundedCornerShape(12.dp),
-            border = BorderStroke(1.dp, Color(0xFF0284C7)),
-            colors = ButtonDefaults.outlinedButtonColors(contentColor = Color(0xFF0284C7))
-        ) {
-            Icon(
-                imageVector = Icons.Outlined.LocalShipping,
-                contentDescription = null,
-                tint = Color(0xFF0284C7),
-                modifier = Modifier.size(18.dp)
-            )
-            Spacer(modifier = Modifier.width(8.dp))
-            Text(
-                text = "Surat Jalan / Bukti Kirim",
-                color = Color(0xFF0284C7),
-                fontSize = 14.sp,
-                fontWeight = FontWeight.Bold
-            )
-        }
-
-        // Tombol Sekunder: Bagikan Umum & Cetak Dokumen PDF
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(10.dp)
-        ) {
-            OutlinedButton(
-                onClick = onShareClick,
-                modifier = Modifier
-                    .weight(1f)
-                    .height(44.dp),
-                shape = RoundedCornerShape(12.dp),
-                border = BorderStroke(1.dp, BorderSlate200),
-                colors = ButtonDefaults.outlinedButtonColors(containerColor = Color.White)
-            ) {
-                Icon(
-                    imageVector = Icons.Outlined.Share,
-                    contentDescription = null,
-                    tint = TextSlate700,
-                    modifier = Modifier.size(16.dp)
-                )
-                Spacer(modifier = Modifier.width(6.dp))
-                Text(
-                    text = "Bagikan Struk",
-                    color = TextSlate700,
-                    fontSize = 13.sp,
-                    fontWeight = FontWeight.Medium
-                )
-            }
-
-            OutlinedButton(
-                onClick = onPrintPdfClick,
-                modifier = Modifier
-                    .weight(1f)
-                    .height(44.dp),
-                shape = RoundedCornerShape(12.dp),
-                border = BorderStroke(1.dp, BorderSlate200),
-                colors = ButtonDefaults.outlinedButtonColors(containerColor = Color.White)
-            ) {
-                Icon(
-                    imageVector = Icons.Outlined.PictureAsPdf,
-                    contentDescription = null,
-                    tint = TextSlate700,
-                    modifier = Modifier.size(16.dp)
-                )
-                Spacer(modifier = Modifier.width(6.dp))
-                Text(
-                    text = "Cetak PDF",
-                    color = TextSlate700,
-                    fontSize = 13.sp,
-                    fontWeight = FontWeight.Medium
-                )
-            }
-        }
-
-        // Tombol Terima Pelunasan jika masih ada sisa tagihan
-        val canAcceptPayment = role.equals("KASIR", ignoreCase = true) || role.equals("OWNER", ignoreCase = true)
-        if (!transaction.status.equals("voided", true) && transaction.remainingAmount() > BigDecimal.ZERO && canAcceptPayment) {
+        // 2. Tombol Terima Pelunasan jika masih ada sisa tagihan (Contextual)
+        if (!transaction.status.equals("voided", true) && remaining > BigDecimal.ZERO && canAcceptPayment) {
             Button(
                 onClick = onShowPayDebt,
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(48.dp),
                 shape = RoundedCornerShape(12.dp),
-                colors = ButtonDefaults.buttonColors(containerColor = BrandGreenDark),
+                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFD97706)),
                 elevation = ButtonDefaults.buttonElevation(defaultElevation = 0.dp)
             ) {
                 Icon(
@@ -1191,19 +1063,140 @@ internal fun ReceiptActions(
                 )
                 Spacer(modifier = Modifier.width(8.dp))
                 Text(
-                    text = "Terima Pelunasan Sisa Tagihan",
+                    text = "Terima Pelunasan (${remaining.formatReceiptMoney()})",
                     color = Color.White,
                     fontSize = 14.sp,
-                    fontWeight = FontWeight.SemiBold
+                    fontWeight = FontWeight.Bold
                 )
             }
         }
 
-        // Tombol Sekunder Berdampingan (Void & Refund)
+        // 3. Quick Action Grid (2x2): WhatsApp, PDF, Surat Jalan, Bagikan
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(10.dp)
+        ) {
+            // WhatsApp
+            OutlinedButton(
+                onClick = onWhatsAppClick,
+                modifier = Modifier
+                    .weight(1f)
+                    .height(44.dp),
+                shape = RoundedCornerShape(12.dp),
+                border = BorderStroke(1.dp, Color(0xFF25D366).copy(alpha = 0.5f)),
+                colors = ButtonDefaults.outlinedButtonColors(
+                    containerColor = Color(0xFFF0FDF4),
+                    contentColor = Color(0xFF15803D)
+                )
+            ) {
+                Icon(
+                    imageVector = Icons.Outlined.Phone,
+                    contentDescription = null,
+                    tint = Color(0xFF15803D),
+                    modifier = Modifier.size(16.dp)
+                )
+                Spacer(modifier = Modifier.width(6.dp))
+                Text(
+                    text = "WhatsApp",
+                    fontSize = 13.sp,
+                    fontWeight = FontWeight.SemiBold
+                )
+            }
+
+            // Cetak PDF
+            OutlinedButton(
+                onClick = onPrintPdfClick,
+                modifier = Modifier
+                    .weight(1f)
+                    .height(44.dp),
+                shape = RoundedCornerShape(12.dp),
+                border = BorderStroke(1.dp, BorderSlate200),
+                colors = ButtonDefaults.outlinedButtonColors(
+                    containerColor = Color.White,
+                    contentColor = TextSlate700
+                )
+            ) {
+                Icon(
+                    imageVector = Icons.Outlined.PictureAsPdf,
+                    contentDescription = null,
+                    tint = TextSlate700,
+                    modifier = Modifier.size(16.dp)
+                )
+                Spacer(modifier = Modifier.width(6.dp))
+                Text(
+                    text = "Cetak PDF",
+                    fontSize = 13.sp,
+                    fontWeight = FontWeight.Medium
+                )
+            }
+        }
+
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(10.dp)
+        ) {
+            // Surat Jalan
+            OutlinedButton(
+                onClick = onDeliveryOrderClick,
+                modifier = Modifier
+                    .weight(1f)
+                    .height(44.dp),
+                shape = RoundedCornerShape(12.dp),
+                border = BorderStroke(1.dp, Color(0xFF0284C7).copy(alpha = 0.4f)),
+                colors = ButtonDefaults.outlinedButtonColors(
+                    containerColor = Color(0xFFF0F9FF),
+                    contentColor = Color(0xFF0284C7)
+                )
+            ) {
+                Icon(
+                    imageVector = Icons.Outlined.LocalShipping,
+                    contentDescription = null,
+                    tint = Color(0xFF0284C7),
+                    modifier = Modifier.size(16.dp)
+                )
+                Spacer(modifier = Modifier.width(6.dp))
+                Text(
+                    text = "Surat Jalan",
+                    fontSize = 13.sp,
+                    fontWeight = FontWeight.SemiBold
+                )
+            }
+
+            // Bagikan Struk
+            OutlinedButton(
+                onClick = onShareClick,
+                modifier = Modifier
+                    .weight(1f)
+                    .height(44.dp),
+                shape = RoundedCornerShape(12.dp),
+                border = BorderStroke(1.dp, BorderSlate200),
+                colors = ButtonDefaults.outlinedButtonColors(
+                    containerColor = Color.White,
+                    contentColor = TextSlate700
+                )
+            ) {
+                Icon(
+                    imageVector = Icons.Outlined.Share,
+                    contentDescription = null,
+                    tint = TextSlate700,
+                    modifier = Modifier.size(16.dp)
+                )
+                Spacer(modifier = Modifier.width(6.dp))
+                Text(
+                    text = "Bagikan",
+                    fontSize = 13.sp,
+                    fontWeight = FontWeight.Medium
+                )
+            }
+        }
+
+        // 4. Tindakan Khusus Administratif: Void & Refund (Hanya jika role berwenang)
         val access = transactionActionAccess(role, transaction.status, transaction.type)
         if (access.canVoid || access.canRefund) {
             Row(
-                modifier = Modifier.fillMaxWidth(),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(top = 4.dp),
                 horizontalArrangement = Arrangement.spacedBy(10.dp)
             ) {
                 if (access.canVoid) {
@@ -1211,22 +1204,22 @@ internal fun ReceiptActions(
                         onClick = onShowVoid,
                         modifier = Modifier
                             .weight(1f)
-                            .height(44.dp),
-                        shape = RoundedCornerShape(12.dp),
-                        border = BorderStroke(1.dp, Color(0xFFFECDD3)), // rose-200
-                        colors = ButtonDefaults.outlinedButtonColors(containerColor = Color(0xFFFFF1F2)) // rose-50
+                            .height(40.dp),
+                        shape = RoundedCornerShape(10.dp),
+                        border = BorderStroke(1.dp, Color(0xFFFECDD3)),
+                        colors = ButtonDefaults.outlinedButtonColors(containerColor = Color(0xFFFFF1F2))
                     ) {
                         Icon(
                             imageVector = Icons.Outlined.DeleteOutline,
                             contentDescription = null,
                             tint = Color(0xFFE11D48),
-                            modifier = Modifier.size(16.dp)
+                            modifier = Modifier.size(15.dp)
                         )
                         Spacer(modifier = Modifier.width(6.dp))
                         Text(
-                            text = "Void transaksi",
+                            text = "Batal / Void",
                             color = Color(0xFFE11D48),
-                            fontSize = 13.sp,
+                            fontSize = 12.5.sp,
                             fontWeight = FontWeight.Medium
                         )
                     }
@@ -1236,22 +1229,22 @@ internal fun ReceiptActions(
                         onClick = onShowRefund,
                         modifier = Modifier
                             .weight(1f)
-                            .height(44.dp),
-                        shape = RoundedCornerShape(12.dp),
-                        border = BorderStroke(1.dp, Color(0xFFFECDD3)), // rose-200
-                        colors = ButtonDefaults.outlinedButtonColors(containerColor = Color(0xFFFFF1F2)) // rose-50
+                            .height(40.dp),
+                        shape = RoundedCornerShape(10.dp),
+                        border = BorderStroke(1.dp, Color(0xFFFECDD3)),
+                        colors = ButtonDefaults.outlinedButtonColors(containerColor = Color(0xFFFFF1F2))
                     ) {
                         Icon(
                             imageVector = Icons.AutoMirrored.Outlined.Undo,
                             contentDescription = null,
                             tint = Color(0xFFE11D48),
-                            modifier = Modifier.size(16.dp)
+                            modifier = Modifier.size(15.dp)
                         )
                         Spacer(modifier = Modifier.width(6.dp))
                         Text(
-                            text = "Refund transaksi",
+                            text = "Refund Barang",
                             color = Color(0xFFE11D48),
-                            fontSize = 13.sp,
+                            fontSize = 12.5.sp,
                             fontWeight = FontWeight.Medium
                         )
                     }
