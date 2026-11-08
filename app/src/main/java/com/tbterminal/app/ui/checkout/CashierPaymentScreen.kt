@@ -1236,7 +1236,61 @@ fun CashierPaymentScreen(
                                         modifier = Modifier.fillMaxWidth(),
                                         verticalArrangement = Arrangement.spacedBy(8.dp)
                                     ) {
-                                        // 1. Biaya Pengiriman (Ongkir)
+                                        // 1. Jenis Armada (3 Chips Cepat Sesuai Mockup HTML)
+                                        Column(
+                                            modifier = Modifier.fillMaxWidth(),
+                                            verticalArrangement = Arrangement.spacedBy(6.dp)
+                                        ) {
+                                            Text(
+                                                text = "Jenis Armada",
+                                                fontSize = 11.sp,
+                                                fontWeight = FontWeight.SemiBold,
+                                                color = Color(0xFF64748B)
+                                            )
+                                            Row(
+                                                modifier = Modifier.fillMaxWidth(),
+                                                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                            ) {
+                                                listOf("Pick-up", "Truk Engkel", "Motor Viar").forEach { fleet ->
+                                                    val isSelected = state.deliveryCourier.contains(fleet, ignoreCase = true)
+                                                    Surface(
+                                                        onClick = { onDeliveryCourierChanged(fleet) },
+                                                        shape = RoundedCornerShape(12.dp),
+                                                        color = Color.White,
+                                                        border = BorderStroke(
+                                                            if (isSelected) 2.dp else 1.dp,
+                                                            if (isSelected) Color(0xFF10B981) else PaymentOutline
+                                                        ),
+                                                        shadowElevation = 0.5.dp,
+                                                        modifier = Modifier.weight(1f)
+                                                    ) {
+                                                        Row(
+                                                            modifier = Modifier.padding(vertical = 8.dp, horizontal = 6.dp),
+                                                            verticalAlignment = Alignment.CenterVertically,
+                                                            horizontalArrangement = Arrangement.Center
+                                                        ) {
+                                                            if (isSelected) {
+                                                                Box(
+                                                                    modifier = Modifier
+                                                                        .size(6.dp)
+                                                                        .background(Color(0xFF10B981), CircleShape)
+                                                                )
+                                                                Spacer(Modifier.width(6.dp))
+                                                            }
+                                                            Text(
+                                                                text = fleet,
+                                                                fontSize = 12.sp,
+                                                                fontWeight = if (isSelected) FontWeight.Bold else FontWeight.SemiBold,
+                                                                color = if (isSelected) Color(0xFF065F46) else Color(0xFF334155),
+                                                                maxLines = 1
+                                                            )
+                                                        }
+                                                    }
+                                                }
+                                            }
+                                        }
+
+                                        // 2. Biaya Pengiriman (Ongkir)
                                         Surface(
                                             shape = RoundedCornerShape(12.dp),
                                             color = Color.White,
@@ -1276,7 +1330,7 @@ fun CashierPaymentScreen(
                                             }
                                         }
 
-                                        // 2. Alamat Pengiriman
+                                        // 3. Alamat Pengiriman
                                         Surface(
                                             shape = RoundedCornerShape(12.dp),
                                             color = Color.White,
@@ -1316,7 +1370,7 @@ fun CashierPaymentScreen(
                                             }
                                         }
 
-                                        // 3. No. Telepon / WhatsApp Penerima
+                                        // 4. No. Telepon / WhatsApp Penerima
                                         Surface(
                                             shape = RoundedCornerShape(12.dp),
                                             color = Color.White,
@@ -1357,111 +1411,93 @@ fun CashierPaymentScreen(
                                             }
                                         }
 
-                                        // 4. Quick Chips Armada
+                                        // 5. Grid 2 Kolom: Nama Supir / Armada + No. Plat / Nopol
                                         Row(
                                             modifier = Modifier.fillMaxWidth(),
-                                            horizontalArrangement = Arrangement.spacedBy(6.dp)
+                                            horizontalArrangement = Arrangement.spacedBy(10.dp)
                                         ) {
-                                            listOf("Pick-up Toko", "Truk Engkel", "Motor Viar", "Ambil Sendiri").forEach { fleet ->
-                                                val isSelected = state.deliveryCourier.contains(fleet, ignoreCase = true)
-                                                Surface(
-                                                    color = if (isSelected) Color(0xFFE8F2EE) else Color(0xFFF8FAFC),
-                                                    shape = RoundedCornerShape(8.dp),
-                                                    border = BorderStroke(1.dp, if (isSelected) PaymentBrand else PaymentOutline),
-                                                    modifier = Modifier.clickable { onDeliveryCourierChanged(fleet) }
+                                            // Nama Supir / Armada
+                                            Surface(
+                                                shape = RoundedCornerShape(12.dp),
+                                                color = Color.White,
+                                                border = BorderStroke(1.dp, PaymentOutline),
+                                                modifier = Modifier.weight(1f)
+                                            ) {
+                                                Row(
+                                                    modifier = Modifier
+                                                        .fillMaxWidth()
+                                                        .padding(horizontal = 12.dp, vertical = 2.dp),
+                                                    verticalAlignment = Alignment.CenterVertically
                                                 ) {
-                                                    Text(
-                                                        text = fleet,
-                                                        fontSize = 10.sp,
-                                                        fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
-                                                        color = if (isSelected) PaymentBrand else Color(0xFF475569),
-                                                        modifier = Modifier.padding(horizontal = 7.dp, vertical = 4.dp)
+                                                    Icon(
+                                                        imageVector = Icons.Outlined.Badge,
+                                                        contentDescription = null,
+                                                        tint = Color(0xFF94A3B8),
+                                                        modifier = Modifier
+                                                            .size(16.dp)
+                                                            .padding(end = 2.dp)
+                                                    )
+                                                    OutlinedTextField(
+                                                        value = state.deliveryCourier,
+                                                        onValueChange = onDeliveryCourierChanged,
+                                                        placeholder = {
+                                                            Text("Nama Supir / Armada", fontSize = 12.sp, color = Color(0xFF94A3B8))
+                                                        },
+                                                        textStyle = TextStyle(fontSize = 12.sp, color = PaymentTextPrimary),
+                                                        singleLine = true,
+                                                        modifier = Modifier.weight(1f),
+                                                        colors = OutlinedTextFieldDefaults.colors(
+                                                            focusedContainerColor = Color.Transparent,
+                                                            unfocusedContainerColor = Color.Transparent,
+                                                            focusedBorderColor = Color.Transparent,
+                                                            unfocusedBorderColor = Color.Transparent
+                                                        )
+                                                    )
+                                                }
+                                            }
+
+                                            // No. Plat / Nopol
+                                            Surface(
+                                                shape = RoundedCornerShape(12.dp),
+                                                color = Color.White,
+                                                border = BorderStroke(1.dp, PaymentOutline),
+                                                modifier = Modifier.weight(1f)
+                                            ) {
+                                                Row(
+                                                    modifier = Modifier
+                                                        .fillMaxWidth()
+                                                        .padding(horizontal = 12.dp, vertical = 2.dp),
+                                                    verticalAlignment = Alignment.CenterVertically
+                                                ) {
+                                                    Icon(
+                                                        imageVector = Icons.Outlined.Description,
+                                                        contentDescription = null,
+                                                        tint = Color(0xFF94A3B8),
+                                                        modifier = Modifier
+                                                            .size(16.dp)
+                                                            .padding(end = 2.dp)
+                                                    )
+                                                    OutlinedTextField(
+                                                        value = state.deliveryVehiclePlate,
+                                                        onValueChange = onDeliveryVehiclePlateChanged,
+                                                        placeholder = {
+                                                            Text("No. Plat / Nopol", fontSize = 12.sp, color = Color(0xFF94A3B8))
+                                                        },
+                                                        textStyle = TextStyle(fontSize = 12.sp, color = PaymentTextPrimary),
+                                                        singleLine = true,
+                                                        modifier = Modifier.weight(1f),
+                                                        colors = OutlinedTextFieldDefaults.colors(
+                                                            focusedContainerColor = Color.Transparent,
+                                                            unfocusedContainerColor = Color.Transparent,
+                                                            focusedBorderColor = Color.Transparent,
+                                                            unfocusedBorderColor = Color.Transparent
+                                                        )
                                                     )
                                                 }
                                             }
                                         }
 
-                                        // 5. Armada & Nama Supir
-                                        Surface(
-                                            shape = RoundedCornerShape(12.dp),
-                                            color = Color.White,
-                                            border = BorderStroke(1.dp, PaymentOutline),
-                                            modifier = Modifier.fillMaxWidth()
-                                        ) {
-                                            Row(
-                                                modifier = Modifier
-                                                    .fillMaxWidth()
-                                                    .padding(horizontal = 14.dp, vertical = 2.dp),
-                                                verticalAlignment = Alignment.CenterVertically
-                                            ) {
-                                                Icon(
-                                                    imageVector = Icons.Outlined.Badge,
-                                                    contentDescription = null,
-                                                    tint = Color(0xFF94A3B8),
-                                                    modifier = Modifier
-                                                        .size(16.dp)
-                                                        .padding(end = 2.dp)
-                                                )
-                                                OutlinedTextField(
-                                                    value = state.deliveryCourier,
-                                                    onValueChange = onDeliveryCourierChanged,
-                                                    placeholder = {
-                                                        Text("Armada / Nama Supir (Opsional)", fontSize = 12.sp, color = Color(0xFF94A3B8))
-                                                    },
-                                                    textStyle = TextStyle(fontSize = 12.sp, color = PaymentTextPrimary),
-                                                    singleLine = true,
-                                                    modifier = Modifier.weight(1f),
-                                                    colors = OutlinedTextFieldDefaults.colors(
-                                                        focusedContainerColor = Color.Transparent,
-                                                        unfocusedContainerColor = Color.Transparent,
-                                                        focusedBorderColor = Color.Transparent,
-                                                        unfocusedBorderColor = Color.Transparent
-                                                    )
-                                                )
-                                            }
-                                        }
-
-                                        // 6. No. Plat Kendaraan
-                                        Surface(
-                                            shape = RoundedCornerShape(12.dp),
-                                            color = Color.White,
-                                            border = BorderStroke(1.dp, PaymentOutline),
-                                            modifier = Modifier.fillMaxWidth()
-                                        ) {
-                                            Row(
-                                                modifier = Modifier
-                                                    .fillMaxWidth()
-                                                    .padding(horizontal = 14.dp, vertical = 2.dp),
-                                                verticalAlignment = Alignment.CenterVertically
-                                            ) {
-                                                Icon(
-                                                    imageVector = Icons.Outlined.Description,
-                                                    contentDescription = null,
-                                                    tint = Color(0xFF94A3B8),
-                                                    modifier = Modifier
-                                                        .size(16.dp)
-                                                        .padding(end = 2.dp)
-                                                )
-                                                OutlinedTextField(
-                                                    value = state.deliveryVehiclePlate,
-                                                    onValueChange = onDeliveryVehiclePlateChanged,
-                                                    placeholder = {
-                                                        Text("No. Plat / Nopol Kendaraan (Opsional)", fontSize = 12.sp, color = Color(0xFF94A3B8))
-                                                    },
-                                                    textStyle = TextStyle(fontSize = 12.sp, color = PaymentTextPrimary),
-                                                    singleLine = true,
-                                                    modifier = Modifier.weight(1f),
-                                                    colors = OutlinedTextFieldDefaults.colors(
-                                                        focusedContainerColor = Color.Transparent,
-                                                        unfocusedContainerColor = Color.Transparent,
-                                                        focusedBorderColor = Color.Transparent,
-                                                        unfocusedBorderColor = Color.Transparent
-                                                    )
-                                                )
-                                            }
-                                        }
-
-                                        // 7. Catatan Khusus / Instruksi Lapangan
+                                        // 6. Catatan Khusus / Instruksi Lapangan
                                         Surface(
                                             shape = RoundedCornerShape(12.dp),
                                             color = Color.White,
@@ -1486,7 +1522,7 @@ fun CashierPaymentScreen(
                                                     value = state.deliverySpecialInstructions,
                                                     onValueChange = onDeliverySpecialInstructionsChanged,
                                                     placeholder = {
-                                                        Text("Catatan Khusus Lapangan / Instruksi Supir", fontSize = 12.sp, color = Color(0xFF94A3B8))
+                                                        Text("Instruksi Lapangan / Catatan Supir", fontSize = 12.sp, color = Color(0xFF94A3B8))
                                                     },
                                                     textStyle = TextStyle(fontSize = 12.sp, color = PaymentTextPrimary),
                                                     singleLine = true,
