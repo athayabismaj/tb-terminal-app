@@ -9,6 +9,7 @@ import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -75,11 +76,15 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
 import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import com.tbterminal.app.data.repository.RepositoryResult
+import kotlinx.coroutines.delay
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -508,7 +513,7 @@ fun CashierPaymentScreen(
                                                 onAmountPaidChanged(state.finalTotal.stripTrailingZeros().toPlainString())
                                             },
                                             shape = RoundedCornerShape(12.dp),
-                                            color = if (isUangPasSelected) Color(0xFFF0FDF4) else Color.White,
+                                            color = Color.White,
                                             border = BorderStroke(
                                                 if (isUangPasSelected) 2.dp else 1.dp,
                                                 if (isUangPasSelected) Color(0xFF10B981) else PaymentOutline
@@ -524,7 +529,7 @@ fun CashierPaymentScreen(
                                                     text = "Uang Pas",
                                                     fontSize = 12.sp,
                                                     fontWeight = if (isUangPasSelected) FontWeight.Bold else FontWeight.SemiBold,
-                                                    color = if (isUangPasSelected) PaymentBrand else Color(0xFF334155)
+                                                    color = if (isUangPasSelected) Color(0xFF0F172A) else Color(0xFF334155)
                                                 )
                                             }
                                         }
@@ -536,7 +541,7 @@ fun CashierPaymentScreen(
                                                     onAmountPaidChanged(preset.stripTrailingZeros().toPlainString())
                                                 },
                                                 shape = RoundedCornerShape(12.dp),
-                                                color = if (isPresetSelected) Color(0xFFF0FDF4) else Color.White,
+                                                color = Color.White,
                                                 border = BorderStroke(
                                                     if (isPresetSelected) 2.dp else 1.dp,
                                                     if (isPresetSelected) Color(0xFF10B981) else PaymentOutline
@@ -552,7 +557,7 @@ fun CashierPaymentScreen(
                                                         text = formatRupiah(preset).replace("Rp ", ""),
                                                         fontSize = 12.sp,
                                                         fontWeight = if (isPresetSelected) FontWeight.Bold else FontWeight.SemiBold,
-                                                        color = if (isPresetSelected) PaymentBrand else Color(0xFF334155)
+                                                        color = if (isPresetSelected) Color(0xFF0F172A) else Color(0xFF334155)
                                                     )
                                                 }
                                             }
@@ -833,7 +838,7 @@ fun CashierPaymentScreen(
                         else -> Unit
                     }
 
-                    // E. Data Pelanggan (Card Selector Sesuai Halaman Penyesuaian Piutang & Pop-up)
+                    // E. Data Pelanggan (Card Selector Persis Mockup HTML)
                     Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
                         Row(
                             modifier = Modifier
@@ -857,181 +862,99 @@ fun CashierPaymentScreen(
                             )
                         }
 
-                        if (state.selectedCustomer != null) {
-                            // Selected Customer Card (Sesuai Desain Standar Sesuaikan Piutang)
-                            Surface(
-                                shape = RoundedCornerShape(14.dp),
-                                color = Color.White,
-                                border = BorderStroke(1.5.dp, Color(0xFF10B981)),
-                                shadowElevation = 0.5.dp,
-                                modifier = Modifier.fillMaxWidth()
-                            ) {
-                                Row(
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .padding(14.dp),
-                                    verticalAlignment = Alignment.CenterVertically,
-                                    horizontalArrangement = Arrangement.SpaceBetween
-                                ) {
-                                    Row(
-                                        modifier = Modifier.weight(1f),
-                                        verticalAlignment = Alignment.CenterVertically,
-                                        horizontalArrangement = Arrangement.spacedBy(12.dp)
-                                    ) {
-                                        Box(
-                                            modifier = Modifier
-                                                .size(42.dp)
-                                                .clip(RoundedCornerShape(12.dp))
-                                                .background(Color(0xFFDCFCE7))
-                                                .border(1.dp, Color(0xFFBBF7D0), RoundedCornerShape(12.dp)),
-                                            contentAlignment = Alignment.Center
-                                        ) {
-                                            Text(
-                                                text = state.selectedCustomer.name.take(2).uppercase(),
-                                                fontWeight = FontWeight.Bold,
-                                                color = Color(0xFF065F46),
-                                                fontSize = 15.sp
-                                            )
-                                        }
-                                        Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                                            Row(
-                                                verticalAlignment = Alignment.CenterVertically,
-                                                horizontalArrangement = Arrangement.spacedBy(6.dp)
-                                            ) {
-                                                Text(
-                                                    text = state.selectedCustomer.name,
-                                                    fontSize = 14.sp,
-                                                    fontWeight = FontWeight.Bold,
-                                                    color = PaymentTextPrimary,
-                                                    maxLines = 1,
-                                                    overflow = TextOverflow.Ellipsis
-                                                )
-                                                if (state.selectedCustomer.isContractor) {
-                                                    Surface(
-                                                        color = Color(0xFFDCFCE7),
-                                                        shape = RoundedCornerShape(4.dp)
-                                                    ) {
-                                                        Text(
-                                                            text = "KONTRAKTOR",
-                                                            fontSize = 9.sp,
-                                                            fontWeight = FontWeight.ExtraBold,
-                                                            color = Color(0xFF065F46),
-                                                            modifier = Modifier.padding(horizontal = 5.dp, vertical = 1.5.dp)
-                                                        )
-                                                    }
-                                                }
-                                            }
-                                            Text(
-                                                text = state.selectedCustomer.phone?.ifBlank { "Tanpa nomor telepon" } ?: "Tanpa nomor telepon",
-                                                fontSize = 11.5.sp,
-                                                color = Color(0xFF64748B)
-                                            )
-                                        }
-                                    }
-
-                                    Row(
-                                        verticalAlignment = Alignment.CenterVertically,
-                                        horizontalArrangement = Arrangement.spacedBy(4.dp)
-                                    ) {
-                                        Surface(
-                                            onClick = { showCustomerPickerDialog = true },
-                                            shape = RoundedCornerShape(8.dp),
-                                            color = Color(0xFFF0FDF4),
-                                            border = BorderStroke(1.dp, Color(0xFFBBF7D0))
-                                        ) {
-                                            Row(
-                                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
-                                                verticalAlignment = Alignment.CenterVertically,
-                                                horizontalArrangement = Arrangement.spacedBy(4.dp)
-                                            ) {
-                                                Text(
-                                                    text = "Ganti",
-                                                    fontSize = 11.sp,
-                                                    fontWeight = FontWeight.Bold,
-                                                    color = PaymentBrand
-                                                )
-                                            }
-                                        }
-                                        IconButton(
-                                            onClick = onClearCustomer,
-                                            modifier = Modifier.size(28.dp)
-                                        ) {
-                                            Icon(
-                                                Icons.Default.Close,
-                                                contentDescription = "Hapus",
-                                                tint = Color(0xFF94A3B8),
-                                                modifier = Modifier.size(16.dp)
-                                            )
-                                        }
-                                    }
-                                }
-                            }
-
-                            if (isCustomerRequired) {
-                                CustomerCreditInspectorCard(
-                                    customer = state.selectedCustomer,
-                                    currentBillTotal = state.finalTotal
-                                )
-                            }
-                        } else {
-                            // Unselected State Card (Klik untuk Membuka Pop Up Pilihan Pelanggan)
-                            Surface(
-                                shape = RoundedCornerShape(14.dp),
-                                color = Color.White,
-                                border = BorderStroke(1.dp, if (isCustomerRequired) Color(0xFFFCA5A5) else PaymentOutline),
-                                shadowElevation = 0.5.dp,
+                        // Card Pelanggan (Persis Mockup HTML: bg-white rounded-2xl border border-slate-200)
+                        Surface(
+                            shape = RoundedCornerShape(16.dp),
+                            color = Color.White,
+                            border = BorderStroke(
+                                1.dp,
+                                if (isCustomerRequired && state.selectedCustomer == null) Color(0xFFFCA5A5) else PaymentOutline
+                            ),
+                            shadowElevation = 0.5.dp,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clip(RoundedCornerShape(16.dp))
+                                .clickable { showCustomerPickerDialog = true }
+                        ) {
+                            Row(
                                 modifier = Modifier
                                     .fillMaxWidth()
-                                    .clip(RoundedCornerShape(14.dp))
-                                    .clickable { showCustomerPickerDialog = true }
+                                    .padding(horizontal = 14.dp, vertical = 13.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.SpaceBetween
                             ) {
                                 Row(
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .padding(horizontal = 14.dp, vertical = 13.dp),
+                                    modifier = Modifier.weight(1f),
                                     verticalAlignment = Alignment.CenterVertically,
-                                    horizontalArrangement = Arrangement.SpaceBetween
+                                    horizontalArrangement = Arrangement.spacedBy(12.dp)
                                 ) {
-                                    Row(
-                                        verticalAlignment = Alignment.CenterVertically,
-                                        horizontalArrangement = Arrangement.spacedBy(12.dp)
+                                    // Avatar: 40x40 rounded-xl bg-slate-100 border border-slate-200/80
+                                    Surface(
+                                        shape = RoundedCornerShape(12.dp),
+                                        color = Color(0xFFF1F5F9),
+                                        border = BorderStroke(1.dp, Color(0xFFE2E8F0)),
+                                        modifier = Modifier.size(40.dp)
                                     ) {
-                                        Box(
-                                            modifier = Modifier
-                                                .size(38.dp)
-                                                .clip(RoundedCornerShape(10.dp))
-                                                .background(if (isCustomerRequired) Color(0xFFFEF2F2) else Color(0xFFF1F5F9)),
-                                            contentAlignment = Alignment.Center
-                                        ) {
-                                            Icon(
-                                                Icons.Outlined.Person,
-                                                contentDescription = null,
-                                                tint = if (isCustomerRequired) Color(0xFFDC2626) else Color(0xFF64748B),
-                                                modifier = Modifier.size(20.dp)
-                                            )
-                                        }
-                                        Column {
-                                            Text(
-                                                text = "Pilih Pelanggan",
-                                                fontSize = 13.5.sp,
-                                                fontWeight = FontWeight.SemiBold,
-                                                color = PaymentTextPrimary
-                                            )
-                                            Text(
-                                                text = if (isCustomerRequired) "Wajib pilih pelanggan untuk ${state.selectedPaymentMethod.displayName()}" else "Cari pelanggan atau tambah baru",
-                                                fontSize = 11.5.sp,
-                                                color = if (isCustomerRequired) Color(0xFFDC2626) else Color(0xFF94A3B8)
-                                            )
+                                        Box(contentAlignment = Alignment.Center) {
+                                            if (state.selectedCustomer != null) {
+                                                Text(
+                                                    text = state.selectedCustomer.name.take(2).uppercase(),
+                                                    fontWeight = FontWeight.Bold,
+                                                    fontSize = 12.5.sp,
+                                                    color = Color(0xFF334155),
+                                                    letterSpacing = 0.5.sp
+                                                )
+                                            } else {
+                                                Icon(
+                                                    imageVector = Icons.Outlined.Person,
+                                                    contentDescription = null,
+                                                    tint = if (isCustomerRequired) Color(0xFFDC2626) else Color(0xFF64748B),
+                                                    modifier = Modifier.size(20.dp)
+                                                )
+                                            }
                                         }
                                     }
-                                    Icon(
-                                        Icons.AutoMirrored.Filled.ArrowForward,
-                                        contentDescription = null,
-                                        tint = Color(0xFF94A3B8),
-                                        modifier = Modifier.size(16.dp)
-                                    )
+
+                                    Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                                        Text(
+                                            text = state.selectedCustomer?.name ?: "Pilih Pelanggan",
+                                            fontSize = 14.sp,
+                                            fontWeight = FontWeight.Bold,
+                                            color = Color(0xFF1E293B),
+                                            maxLines = 1,
+                                            overflow = TextOverflow.Ellipsis
+                                        )
+                                        Text(
+                                            text = if (state.selectedCustomer != null) {
+                                                val cat = if (state.selectedCustomer.isContractor) "Kontraktor" else "Pelanggan Biasa"
+                                                val phone = state.selectedCustomer.phone?.ifBlank { "Tanpa nomor telepon" } ?: "Tanpa nomor telepon"
+                                                "$cat • $phone"
+                                            } else {
+                                                if (isCustomerRequired) "Wajib untuk ${state.selectedPaymentMethod.displayName()}"
+                                                else "Pelanggan Biasa • Transaksi tanpa member"
+                                            },
+                                            fontSize = 12.sp,
+                                            color = if (isCustomerRequired && state.selectedCustomer == null) Color(0xFFDC2626) else Color(0xFF94A3B8),
+                                            maxLines = 1,
+                                            overflow = TextOverflow.Ellipsis
+                                        )
+                                    }
                                 }
+
+                                Icon(
+                                    imageVector = Icons.AutoMirrored.Filled.ArrowForward,
+                                    contentDescription = null,
+                                    tint = Color(0xFF94A3B8),
+                                    modifier = Modifier.size(16.dp)
+                                )
                             }
+                        }
+
+                        if (isCustomerRequired && state.selectedCustomer != null) {
+                            CustomerCreditInspectorCard(
+                                customer = state.selectedCustomer,
+                                currentBillTotal = state.finalTotal
+                            )
                         }
                     }
 
@@ -1594,35 +1517,24 @@ fun CashierPaymentScreen(
     }
 
     if (showCustomerPickerDialog) {
-        if (customerRepository != null) {
-            CustomerSelectionDialog(
-                customerRepository = customerRepository,
-                selectedCustomerId = state.selectedCustomer?.id.orEmpty(),
-                onCustomerSelected = { customer ->
+        CustomerModalBottomSheet(
+            customerRepository = customerRepository,
+            initialCustomers = state.customers,
+            currentSelectedCustomer = state.selectedCustomer,
+            onCustomerSelected = { customer ->
+                if (customer != null) {
                     onSelectCustomer(customer)
-                    showCustomerPickerDialog = false
-                },
-                onAddCustomerClick = {
-                    showCustomerPickerDialog = false
-                    onOpenQuickAddCustomer()
-                },
-                onDismiss = { showCustomerPickerDialog = false }
-            )
-        } else {
-            LocalCustomerSelectionDialog(
-                customers = state.customers,
-                selectedCustomerId = state.selectedCustomer?.id.orEmpty(),
-                onCustomerSelected = { customer ->
-                    onSelectCustomer(customer)
-                    showCustomerPickerDialog = false
-                },
-                onAddCustomerClick = {
-                    showCustomerPickerDialog = false
-                    onOpenQuickAddCustomer()
-                },
-                onDismiss = { showCustomerPickerDialog = false }
-            )
-        }
+                } else {
+                    onClearCustomer()
+                }
+                showCustomerPickerDialog = false
+            },
+            onAddNewCustomerClick = {
+                showCustomerPickerDialog = false
+                onOpenQuickAddCustomer()
+            },
+            onDismiss = { showCustomerPickerDialog = false }
+        )
     }
 
     if (state.isQuickAddCustomerOpen) {
@@ -1636,20 +1548,47 @@ fun CashierPaymentScreen(
     }
 }
 
+// ═════════════════════════════════════════════════════════════════════════════
+// SUB-KOMPONEN: MODAL BOTTOM SHEET PILIH PELANGGAN (PERSIS MOCKUP HTML)
+// ═════════════════════════════════════════════════════════════════════════════
 @Composable
-private fun LocalCustomerSelectionDialog(
-    customers: List<Customer>,
-    selectedCustomerId: String,
-    onCustomerSelected: (Customer) -> Unit,
-    onAddCustomerClick: () -> Unit,
+private fun CustomerModalBottomSheet(
+    customerRepository: CustomerRepository?,
+    initialCustomers: List<Customer>,
+    currentSelectedCustomer: Customer?,
+    onCustomerSelected: (Customer?) -> Unit,
+    onAddNewCustomerClick: () -> Unit,
     onDismiss: () -> Unit
 ) {
     var searchQuery by remember { mutableStateOf("") }
-    val filtered = remember(customers, searchQuery) {
-        if (searchQuery.isBlank()) customers
-        else customers.filter {
-            it.name.contains(searchQuery.trim(), ignoreCase = true) ||
-            (it.phone?.contains(searchQuery.trim(), ignoreCase = true) == true)
+    var isSearchVisible by remember { mutableStateOf(false) }
+    var customersList by remember { mutableStateOf(initialCustomers) }
+    var tempSelectedCustomer by remember { mutableStateOf<Customer?>(currentSelectedCustomer) }
+    var isGeneralSelected by remember { mutableStateOf(currentSelectedCustomer == null) }
+
+    LaunchedEffect(searchQuery, customerRepository) {
+        if (customerRepository != null) {
+            if (searchQuery.isNotBlank()) delay(250)
+            when (val result = customerRepository.getCustomers(
+                page = 1,
+                limit = 50,
+                search = searchQuery.trim().takeIf(String::isNotBlank)
+            )) {
+                is RepositoryResult.Success -> {
+                    customersList = result.data.data
+                }
+                else -> Unit
+            }
+        } else {
+            customersList = if (searchQuery.isBlank()) {
+                initialCustomers
+            } else {
+                initialCustomers.filter {
+                    it.name.contains(searchQuery.trim(), ignoreCase = true) ||
+                    (it.phone?.contains(searchQuery.trim(), ignoreCase = true) == true) ||
+                    (it.address?.contains(searchQuery.trim(), ignoreCase = true) == true)
+                }
+            }
         }
     }
 
@@ -1657,211 +1596,440 @@ private fun LocalCustomerSelectionDialog(
         onDismissRequest = onDismiss,
         properties = DialogProperties(usePlatformDefaultWidth = false)
     ) {
-        Surface(
+        Box(
             modifier = Modifier
-                .fillMaxWidth(0.92f)
-                .heightIn(max = 560.dp),
-            shape = RoundedCornerShape(20.dp),
-            color = Color.White,
-            shadowElevation = 8.dp
+                .fillMaxSize()
+                .background(Color(0xFF0F172A).copy(alpha = 0.6f))
+                .clickable(
+                    interactionSource = remember { MutableInteractionSource() },
+                    indication = null
+                ) { onDismiss() },
+            contentAlignment = Alignment.BottomCenter
         ) {
-            Column(
+            Surface(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(20.dp),
-                verticalArrangement = Arrangement.spacedBy(14.dp)
+                    .clickable(
+                        interactionSource = remember { MutableInteractionSource() },
+                        indication = null
+                    ) { /* prevent backdrop dismissal */ }
+                    .heightIn(max = 680.dp),
+                shape = RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp),
+                color = Color.White,
+                shadowElevation = 16.dp
             ) {
-                // Header
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Column {
-                        Text(
-                            text = "Pilih Pelanggan",
-                            fontSize = 17.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = PaymentTextPrimary
-                        )
-                        Text(
-                            text = "Pilih atau cari dari data terdaftar",
-                            fontSize = 12.sp,
-                            color = PaymentTextMuted
-                        )
-                    }
-                    IconButton(
-                        onClick = onDismiss,
-                        modifier = Modifier.size(32.dp)
-                    ) {
-                        Icon(Icons.Default.Close, contentDescription = "Tutup", tint = PaymentTextMuted)
-                    }
-                }
-
-                // Search Bar
-                Surface(
-                    shape = RoundedCornerShape(12.dp),
-                    color = Color(0xFFF8FAFC),
-                    border = BorderStroke(1.dp, PaymentOutline),
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    Row(
+                Column(modifier = Modifier.fillMaxWidth()) {
+                    // 1. Sheet Header
+                    Column(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .padding(horizontal = 12.dp, vertical = 2.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                            .padding(horizontal = 16.dp, vertical = 14.dp)
                     ) {
-                        Icon(
-                            imageVector = Icons.Outlined.Search,
-                            contentDescription = null,
-                            tint = PaymentTextMuted,
-                            modifier = Modifier.size(18.dp)
-                        )
-                        OutlinedTextField(
-                            value = searchQuery,
-                            onValueChange = { searchQuery = it },
-                            placeholder = { Text("Cari nama atau no. telepon...", fontSize = 12.5.sp, color = PaymentTextMuted) },
-                            textStyle = TextStyle(fontSize = 13.sp, color = PaymentTextPrimary),
-                            singleLine = true,
-                            modifier = Modifier.weight(1f),
-                            colors = OutlinedTextFieldDefaults.colors(
-                                focusedContainerColor = Color.Transparent,
-                                unfocusedContainerColor = Color.Transparent,
-                                focusedBorderColor = Color.Transparent,
-                                unfocusedBorderColor = Color.Transparent
-                            )
-                        )
-                    }
-                }
-
-                // Quick Add Button
-                OutlinedButton(
-                    onClick = onAddCustomerClick,
-                    shape = RoundedCornerShape(12.dp),
-                    border = BorderStroke(1.dp, Color(0xFF10B981).copy(alpha = 0.5f)),
-                    colors = ButtonDefaults.outlinedButtonColors(
-                        containerColor = Color(0xFFF0FDF4),
-                        contentColor = PaymentBrand
-                    ),
-                    modifier = Modifier.fillMaxWidth().height(42.dp)
-                ) {
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(6.dp)
-                    ) {
-                        Icon(Icons.Outlined.Add, contentDescription = null, modifier = Modifier.size(16.dp))
-                        Text("+ Tambah Pelanggan Baru", fontSize = 12.5.sp, fontWeight = FontWeight.Bold)
-                    }
-                }
-
-                // Customer List
-                Column(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .weight(1f, fill = false)
-                        .verticalScroll(rememberScrollState()),
-                    verticalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    if (filtered.isEmpty()) {
+                        // Drag Handle Hint
                         Box(
                             modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(vertical = 24.dp),
-                            contentAlignment = Alignment.Center
+                                .align(Alignment.CenterHorizontally)
+                                .size(width = 36.dp, height = 4.dp)
+                                .background(Color(0xFFE2E8F0), RoundedCornerShape(2.dp))
+                        )
+                        Spacer(Modifier.height(10.dp))
+
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.Top
                         ) {
-                            Text(
-                                text = "Tidak ada pelanggan ditemukan",
-                                fontSize = 12.5.sp,
-                                color = PaymentTextMuted
-                            )
-                        }
-                    } else {
-                        filtered.forEach { customer ->
-                            val isSelected = customer.id == selectedCustomerId
-                            Surface(
-                                onClick = { onCustomerSelected(customer) },
-                                shape = RoundedCornerShape(12.dp),
-                                color = if (isSelected) Color(0xFFF0FDF4) else Color.White,
-                                border = BorderStroke(
-                                    if (isSelected) 1.5.dp else 1.dp,
-                                    if (isSelected) Color(0xFF10B981) else PaymentOutline
-                                ),
-                                modifier = Modifier.fillMaxWidth()
+                            Column {
+                                Text(
+                                    text = "Pilih Pelanggan",
+                                    fontSize = 18.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = Color(0xFF0F172A),
+                                    letterSpacing = (-0.3).sp
+                                )
+                                Text(
+                                    text = "Pilih pelanggan untuk mencatat piutang",
+                                    fontSize = 12.sp,
+                                    color = Color(0xFF64748B)
+                                )
+                            }
+
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(8.dp)
                             ) {
-                                Row(
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .padding(12.dp),
-                                    verticalAlignment = Alignment.CenterVertically,
-                                    horizontalArrangement = Arrangement.SpaceBetween
+                                // Search Toggle Button
+                                Surface(
+                                    onClick = { isSearchVisible = !isSearchVisible },
+                                    shape = CircleShape,
+                                    color = if (isSearchVisible) Color(0xFFDCFCE7) else Color(0xFFF1F5F9),
+                                    modifier = Modifier.size(32.dp)
                                 ) {
-                                    Row(
-                                        verticalAlignment = Alignment.CenterVertically,
-                                        horizontalArrangement = Arrangement.spacedBy(10.dp),
-                                        modifier = Modifier.weight(1f)
-                                    ) {
-                                        Surface(
-                                            shape = RoundedCornerShape(10.dp),
-                                            color = if (isSelected) Color(0xFFDCFCE7) else Color(0xFFF1F5F9),
-                                            modifier = Modifier.size(36.dp)
-                                        ) {
-                                            Box(contentAlignment = Alignment.Center) {
-                                                Text(
-                                                    text = customer.name.take(2).uppercase(),
-                                                    fontWeight = FontWeight.Bold,
-                                                    color = if (isSelected) Color(0xFF065F46) else Color(0xFF475569),
-                                                    fontSize = 13.sp
-                                                )
-                                            }
-                                        }
-
-                                        Column {
-                                            Row(
-                                                verticalAlignment = Alignment.CenterVertically,
-                                                horizontalArrangement = Arrangement.spacedBy(6.dp)
-                                            ) {
-                                                Text(
-                                                    text = customer.name,
-                                                    fontSize = 13.5.sp,
-                                                    fontWeight = FontWeight.Bold,
-                                                    color = PaymentTextPrimary
-                                                )
-                                                if (customer.isContractor) {
-                                                    Surface(
-                                                        color = Color(0xFFDCFCE7),
-                                                        shape = RoundedCornerShape(4.dp)
-                                                    ) {
-                                                        Text(
-                                                            text = "KONTRAKTOR",
-                                                            fontSize = 9.sp,
-                                                            fontWeight = FontWeight.Bold,
-                                                            color = Color(0xFF065F46),
-                                                            modifier = Modifier.padding(horizontal = 4.dp, vertical = 1.dp)
-                                                        )
-                                                    }
-                                                }
-                                            }
-                                            Text(
-                                                text = customer.phone?.ifBlank { "Tanpa nomor telepon" } ?: "Tanpa nomor telepon",
-                                                fontSize = 11.5.sp,
-                                                color = PaymentTextMuted
-                                            )
-                                        }
-                                    }
-
-                                    if (isSelected) {
+                                    Box(contentAlignment = Alignment.Center) {
                                         Icon(
-                                            imageVector = Icons.Outlined.Check,
-                                            contentDescription = null,
-                                            tint = Color(0xFF10B981),
-                                            modifier = Modifier.size(18.dp)
+                                            imageVector = Icons.Outlined.Search,
+                                            contentDescription = "Buka Pencarian",
+                                            tint = if (isSearchVisible) PaymentBrand else Color(0xFF64748B),
+                                            modifier = Modifier.size(16.dp)
+                                        )
+                                    }
+                                }
+
+                                // Close Button
+                                Surface(
+                                    onClick = onDismiss,
+                                    shape = CircleShape,
+                                    color = Color(0xFFF1F5F9),
+                                    modifier = Modifier.size(32.dp)
+                                ) {
+                                    Box(contentAlignment = Alignment.Center) {
+                                        Icon(
+                                            imageVector = Icons.Outlined.Close,
+                                            contentDescription = "Tutup",
+                                            tint = Color(0xFF64748B),
+                                            modifier = Modifier.size(16.dp)
                                         )
                                     }
                                 }
                             }
                         }
+
+                        // Collapsible Search Field
+                        AnimatedVisibility(visible = isSearchVisible) {
+                            Column(modifier = Modifier.padding(top = 12.dp)) {
+                                Surface(
+                                    shape = RoundedCornerShape(12.dp),
+                                    color = Color(0xFFF8FAFC),
+                                    border = BorderStroke(1.dp, Color(0xFFE2E8F0)),
+                                    modifier = Modifier.fillMaxWidth()
+                                ) {
+                                    Row(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .padding(horizontal = 12.dp, vertical = 2.dp),
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                    ) {
+                                        Icon(
+                                            imageVector = Icons.Outlined.Search,
+                                            contentDescription = null,
+                                            tint = Color(0xFF94A3B8),
+                                            modifier = Modifier.size(16.dp)
+                                        )
+                                        OutlinedTextField(
+                                            value = searchQuery,
+                                            onValueChange = { searchQuery = it },
+                                            placeholder = {
+                                                Text(
+                                                    text = "Cari nama, telepon, atau alamat...",
+                                                    fontSize = 12.5.sp,
+                                                    color = Color(0xFF94A3B8)
+                                                )
+                                            },
+                                            textStyle = TextStyle(fontSize = 13.sp, color = Color(0xFF0F172A)),
+                                            singleLine = true,
+                                            modifier = Modifier.weight(1f),
+                                            colors = OutlinedTextFieldDefaults.colors(
+                                                focusedContainerColor = Color.Transparent,
+                                                unfocusedContainerColor = Color.Transparent,
+                                                focusedBorderColor = Color.Transparent,
+                                                unfocusedBorderColor = Color.Transparent
+                                            )
+                                        )
+                                        if (searchQuery.isNotEmpty()) {
+                                            IconButton(
+                                                onClick = { searchQuery = "" },
+                                                modifier = Modifier.size(24.dp)
+                                            ) {
+                                                Icon(
+                                                    imageVector = Icons.Default.Close,
+                                                    contentDescription = "Hapus",
+                                                    tint = Color(0xFF94A3B8),
+                                                    modifier = Modifier.size(14.dp)
+                                                )
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
                     }
+
+                    HorizontalDivider(color = Color(0xFFF1F5F9))
+
+                    // 2. List Header Info
+                    val totalDataCount = customersList.size + (if (searchQuery.isBlank()) 1 else 0)
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 16.dp, vertical = 8.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            text = "Daftar Pelanggan",
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.SemiBold,
+                            color = Color(0xFF64748B)
+                        )
+                        Text(
+                            text = "$totalDataCount Data",
+                            fontSize = 12.sp,
+                            color = Color(0xFF94A3B8)
+                        )
+                    }
+
+                    // 3. Scrollable Customer Options List
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .weight(1f, fill = false)
+                            .verticalScroll(rememberScrollState())
+                            .padding(horizontal = 16.dp),
+                        verticalArrangement = Arrangement.spacedBy(10.dp)
+                    ) {
+                        // Option 1: Pelanggan Umum (Tanpa Member)
+                        if (searchQuery.isBlank()) {
+                            CustomerOptionCard(
+                                initials = "PU",
+                                name = "Pelanggan Umum",
+                                category = "Biasa",
+                                phoneOrDesc = "• Transaksi Tunai Tanpa Member",
+                                address = null,
+                                isSelected = isGeneralSelected,
+                                onClick = {
+                                    isGeneralSelected = true
+                                    tempSelectedCustomer = null
+                                }
+                            )
+                        }
+
+                        // Option 2..N: Registered Customers
+                        customersList.forEach { customer ->
+                            val isSelected = !isGeneralSelected && tempSelectedCustomer?.id == customer.id
+                            CustomerOptionCard(
+                                initials = customer.name.take(2).uppercase(),
+                                name = customer.name,
+                                category = if (customer.isContractor) "Kontraktor" else "Biasa",
+                                phoneOrDesc = customer.phone?.takeIf { it.isNotBlank() }?.let { "• $it" } ?: "• Tanpa telepon",
+                                address = customer.address?.takeIf { it.isNotBlank() },
+                                isSelected = isSelected,
+                                onClick = {
+                                    isGeneralSelected = false
+                                    tempSelectedCustomer = customer
+                                }
+                            )
+                        }
+
+                        // Option 3: Add New Customer Action Button (Dashed Border Card)
+                        Surface(
+                            onClick = onAddNewCustomerClick,
+                            shape = RoundedCornerShape(16.dp),
+                            color = Color(0xFFF8FAFC),
+                            border = BorderStroke(1.5.dp, Color(0xFFCBD5E1)),
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Row(
+                                modifier = Modifier.padding(vertical = 13.dp, horizontal = 16.dp),
+                                horizontalArrangement = Arrangement.Center,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Outlined.Add,
+                                    contentDescription = null,
+                                    tint = Color(0xFF475569),
+                                    modifier = Modifier.size(16.dp)
+                                )
+                                Spacer(Modifier.width(6.dp))
+                                Text(
+                                    text = "+ Tambah Pelanggan Baru",
+                                    fontSize = 13.5.sp,
+                                    fontWeight = FontWeight.SemiBold,
+                                    color = Color(0xFF334155)
+                                )
+                            }
+                        }
+
+                        Spacer(Modifier.height(4.dp))
+                    }
+
+                    // 4. Bottom Action CTA Buttons
+                    Surface(
+                        color = Color.White,
+                        border = BorderStroke(1.dp, Color(0xFFF1F5F9)),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Column(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = 16.dp, vertical = 12.dp),
+                            verticalArrangement = Arrangement.spacedBy(6.dp)
+                        ) {
+                            Button(
+                                onClick = {
+                                    if (isGeneralSelected || tempSelectedCustomer == null) {
+                                        onCustomerSelected(null)
+                                    } else {
+                                        onCustomerSelected(tempSelectedCustomer)
+                                    }
+                                    onDismiss()
+                                },
+                                shape = RoundedCornerShape(12.dp),
+                                colors = ButtonDefaults.buttonColors(
+                                    containerColor = Color(0xFF10533C),
+                                    contentColor = Color.White
+                                ),
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .height(46.dp)
+                            ) {
+                                Text("Pilih", fontSize = 14.sp, fontWeight = FontWeight.Bold)
+                            }
+
+                            TextButton(
+                                onClick = onDismiss,
+                                shape = RoundedCornerShape(12.dp),
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .height(38.dp)
+                            ) {
+                                Text(
+                                    text = "Batal",
+                                    fontSize = 13.5.sp,
+                                    fontWeight = FontWeight.Medium,
+                                    color = Color(0xFF64748B)
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun CustomerOptionCard(
+    initials: String,
+    name: String,
+    category: String,
+    phoneOrDesc: String,
+    address: String?,
+    isSelected: Boolean,
+    onClick: () -> Unit
+) {
+    Surface(
+        onClick = onClick,
+        shape = RoundedCornerShape(16.dp),
+        color = Color.White,
+        border = BorderStroke(
+            if (isSelected) 2.dp else 1.dp,
+            if (isSelected) Color(0xFF10B981) else Color(0xFFE2E8F0)
+        ),
+        shadowElevation = 0.5.dp,
+        modifier = Modifier.fillMaxWidth()
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(14.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.SpaceBetween
+        ) {
+            Row(
+                modifier = Modifier.weight(1f),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                // Avatar: w-10 h-10 rounded-xl bg-slate-100 text-slate-700
+                Surface(
+                    shape = RoundedCornerShape(12.dp),
+                    color = Color(0xFFF1F5F9),
+                    border = BorderStroke(1.dp, Color(0xFFE2E8F0)),
+                    modifier = Modifier.size(40.dp)
+                ) {
+                    Box(contentAlignment = Alignment.Center) {
+                        Text(
+                            text = initials,
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 12.sp,
+                            color = Color(0xFF334155),
+                            letterSpacing = 0.5.sp
+                        )
+                    }
+                }
+
+                // Info Column
+                Column(
+                    verticalArrangement = Arrangement.spacedBy(3.dp),
+                    modifier = Modifier.weight(1f)
+                ) {
+                    Text(
+                        text = name,
+                        fontSize = 14.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = Color(0xFF0F172A),
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                    ) {
+                        Text(
+                            text = category,
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.SemiBold,
+                            color = if (category.equals("Kontraktor", ignoreCase = true)) Color(0xFF059669) else Color(0xFF475569)
+                        )
+                        Text(
+                            text = phoneOrDesc,
+                            fontSize = 12.sp,
+                            color = Color(0xFF94A3B8),
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                    }
+                    if (!address.isNullOrBlank()) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(4.dp)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Outlined.LocationOn,
+                                contentDescription = null,
+                                tint = Color(0xFF94A3B8),
+                                modifier = Modifier.size(12.dp)
+                            )
+                            Text(
+                                text = address,
+                                fontSize = 11.sp,
+                                color = Color(0xFF94A3B8),
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis
+                            )
+                        }
+                    }
+                }
+            }
+
+            // Radio Circle
+            Surface(
+                shape = CircleShape,
+                color = Color.White,
+                border = BorderStroke(
+                    2.dp,
+                    if (isSelected) Color(0xFF059669) else Color(0xFFCBD5E1)
+                ),
+                modifier = Modifier.size(20.dp)
+            ) {
+                if (isSelected) {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .padding(4.dp)
+                            .background(Color(0xFF059669), CircleShape)
+                    )
                 }
             }
         }
@@ -1972,7 +2140,7 @@ private fun PaymentMethodGridCard(
     Surface(
         onClick = onClick,
         shape = RoundedCornerShape(12.dp),
-        color = if (isSelected) Color(0xFFF0FDF4).copy(alpha = 0.6f) else Color.White,
+        color = Color.White,
         border = BorderStroke(
             if (isSelected) 2.dp else 1.dp,
             if (isSelected) Color(0xFF10B981) else PaymentOutline
