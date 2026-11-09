@@ -50,14 +50,11 @@ internal fun ReceivableScreen(
 
     BoxWithConstraints(modifier = modifier.fillMaxSize().background(ReceivableBackground)) {
         val compact = maxWidth < 720.dp
-        val showMetrics = uiState.receivables.isNotEmpty() ||
-            (!uiState.isLoading && uiState.errorMessage == null)
         Column(
             modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState())
                 .padding(horizontal = if (compact) 16.dp else 28.dp, vertical = if (compact) 14.dp else 20.dp),
             verticalArrangement = Arrangement.spacedBy(if (compact) 12.dp else 16.dp)
         ) {
-            if (showMetrics) ReceivableMetrics(uiState, compact = compact)
             ReceivableTableCard(
                 canAdjust = canAdjust,
                 onOpenActionMenu = { showActionBottomSheet = true },
