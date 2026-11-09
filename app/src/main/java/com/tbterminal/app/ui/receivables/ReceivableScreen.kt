@@ -55,6 +55,11 @@ internal fun ReceivableScreen(
                 .padding(horizontal = if (compact) 16.dp else 28.dp, vertical = if (compact) 14.dp else 20.dp),
             verticalArrangement = Arrangement.spacedBy(if (compact) 12.dp else 16.dp)
         ) {
+            ReceivableSummaryCard(
+                uiState = uiState,
+                onQuickBillClick = { showActionBottomSheet = true }
+            )
+
             ReceivableTableCard(
                 canAdjust = canAdjust,
                 onOpenActionMenu = { showActionBottomSheet = true },

@@ -41,6 +41,8 @@ import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.ArrowForward
+import androidx.compose.material.icons.outlined.AccountBalanceWallet
 import androidx.compose.material.icons.outlined.Shield
 import androidx.compose.material.icons.outlined.Tune
 import androidx.compose.material.icons.outlined.Description
@@ -464,44 +466,45 @@ private fun ReceivableHeaderToolbar(
 
         // 3. Title & Action Row (selalu tampil)
         Row(
-            modifier = Modifier.fillMaxWidth(),
+            modifier = Modifier.fillMaxWidth().padding(horizontal = 2.dp),
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically
         ) {
             Text(
                 text = "Daftar Piutang",
-                fontSize = 15.sp,
+                fontSize = 14.sp,
                 fontWeight = FontWeight.Bold,
-                color = Color(0xFF0F172A)
+                color = Color(0xFF1E293B)
             )
 
             // Action Button "Kelola"
             Surface(
                 onClick = onOpenActionMenu,
                 modifier = Modifier
-                    .height(34.dp)
+                    .height(32.dp)
                     .testTag("receivable-manage-btn"),
-                shape = RoundedCornerShape(10.dp),
-                color = Color(0xFF256B57),
-                contentColor = Color.White,
-                shadowElevation = 1.dp
+                shape = RoundedCornerShape(8.dp),
+                color = Color.White,
+                border = BorderStroke(1.dp, Color(0xFFE2E8F0)),
+                contentColor = Color(0xFF475569),
+                shadowElevation = 0.5.dp
             ) {
                 Row(
-                    modifier = Modifier.padding(horizontal = 12.dp),
+                    modifier = Modifier.padding(horizontal = 10.dp),
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(6.dp)
                 ) {
                     Icon(
                         imageVector = Icons.Outlined.Tune,
                         contentDescription = null,
-                        tint = Color.White,
-                        modifier = Modifier.size(15.dp)
+                        tint = Color(0xFF64748B),
+                        modifier = Modifier.size(14.dp)
                     )
                     Text(
                         text = "Kelola",
                         fontSize = 12.sp,
-                        fontWeight = FontWeight.SemiBold,
-                        color = Color.White
+                        fontWeight = FontWeight.Medium,
+                        color = Color(0xFF475569)
                     )
                 }
             }
@@ -975,7 +978,6 @@ private fun CustomerReceivableGroupCard(
     val allPaid = totalRemaining <= java.math.BigDecimal.ZERO
     var isExpanded by remember { mutableStateOf(defaultExpanded) }
     
-    val brand600 = Color(0xFF256B57)
     val slate100 = Color(0xFFF1F5F9)
     val slate200 = Color(0xFFE2E8F0)
     val slate400 = Color(0xFF94A3B8)
@@ -1017,10 +1019,10 @@ private fun CustomerReceivableGroupCard(
                         verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.spacedBy(12.dp)
                     ) {
-                        // Customer Avatar Pill (44.dp x 44.dp, bg #F1F5F9, border #E2E8F0, text #334155)
+                        // Customer Avatar Pill (40.dp x 40.dp, bg #F1F5F9, border #E2E8F0, text #334155)
                         Box(
                             modifier = Modifier
-                                .size(44.dp)
+                                .size(40.dp)
                                 .background(slate100, CircleShape)
                                 .border(1.dp, slate200, CircleShape),
                             contentAlignment = Alignment.Center
@@ -1035,32 +1037,49 @@ private fun CustomerReceivableGroupCard(
                         
                         Column(
                             modifier = Modifier.weight(1f),
-                            verticalArrangement = Arrangement.spacedBy(4.dp)
+                            verticalArrangement = Arrangement.spacedBy(3.dp)
                         ) {
-                            Text(
-                                text = customerName,
-                                fontSize = 14.sp,
-                                fontWeight = FontWeight.SemiBold,
-                                color = slate900,
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis
-                            )
-                            
                             Row(
                                 verticalAlignment = Alignment.CenterVertically,
                                 horizontalArrangement = Arrangement.spacedBy(6.dp)
                             ) {
                                 Text(
+                                    text = customerName,
+                                    fontSize = 14.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = slate900,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis
+                                )
+                                Surface(
+                                    shape = RoundedCornerShape(4.dp),
+                                    color = slate100,
+                                ) {
+                                    Text(
+                                        text = "Umum",
+                                        fontSize = 10.sp,
+                                        fontWeight = FontWeight.Normal,
+                                        color = slate500,
+                                        modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                                    )
+                                }
+                            }
+                            
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(4.dp)
+                            ) {
+                                Text(
                                     text = totalRemaining.currencyText(),
                                     fontSize = 12.sp,
-                                    fontWeight = FontWeight.Bold,
-                                    color = brand600,
+                                    fontWeight = FontWeight.SemiBold,
+                                    color = slate900,
                                     maxLines = 1
                                 )
                                 Text(
                                     text = if (allPaid) "(Semua lunas)" else "(Belum lunas)",
-                                    fontSize = 12.sp,
-                                    fontWeight = FontWeight.Medium,
+                                    fontSize = 11.sp,
+                                    fontWeight = FontWeight.Normal,
                                     color = slate400,
                                     maxLines = 1
                                 )
@@ -1071,13 +1090,16 @@ private fun CustomerReceivableGroupCard(
                     // Header Badge & Chevron Action
                     Row(
                         verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(4.dp)
+                        horizontalArrangement = Arrangement.spacedBy(4.dp),
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(8.dp))
+                            .padding(horizontal = 4.dp, vertical = 4.dp)
                     ) {
                         Icon(
                             imageVector = Icons.AutoMirrored.Outlined.ReceiptLong,
                             contentDescription = null,
                             tint = slate400,
-                            modifier = Modifier.size(14.dp)
+                            modifier = Modifier.size(15.dp)
                         )
                         Text(
                             text = "${receivables.size} Nota",
@@ -1092,7 +1114,7 @@ private fun CustomerReceivableGroupCard(
                             contentDescription = if (isExpanded) "Tutup nota" else "Buka nota",
                             tint = slate400,
                             modifier = Modifier
-                                .size(20.dp)
+                                .size(18.dp)
                                 .rotate(rotationState)
                         )
                     }
@@ -1140,28 +1162,37 @@ private fun CustomerReceivableGroupCard(
                         )
                     }
                     
-                    // Show "Buku Piutang" / Ledger button
+                    // Show "Detail Riwayat Piutang" Card Footer
                     HorizontalDivider(color = slate100)
                     Surface(
                         onClick = { onOpenLedger(customerId, customerName) },
                         color = Color.White,
+                        modifier = Modifier.fillMaxWidth()
                     ) {
-                        Box(
+                        Row(
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .padding(vertical = 12.dp),
-                            contentAlignment = Alignment.Center
+                                .padding(vertical = 14.dp),
+                            horizontalArrangement = Arrangement.Center,
+                            verticalAlignment = Alignment.CenterVertically
                         ) {
-                            val text = if (remainingCount > 0) {
-                                "Lihat $remainingCount nota lainnya & detail →"
+                            val footerText = if (remainingCount > 0) {
+                                "Lihat $remainingCount nota lainnya & riwayat piutang"
                             } else {
-                                "Lihat Detail Piutang →"
+                                "Lihat Detail Riwayat Piutang"
                             }
                             Text(
-                                text = text,
+                                text = footerText,
                                 fontSize = 12.sp,
                                 fontWeight = FontWeight.SemiBold,
-                                color = brand600
+                                color = slate700
+                            )
+                            Spacer(Modifier.width(6.dp))
+                            Icon(
+                                imageVector = Icons.AutoMirrored.Filled.ArrowForward,
+                                contentDescription = null,
+                                tint = slate700,
+                                modifier = Modifier.size(13.dp)
                             )
                         }
                     }
@@ -1176,20 +1207,10 @@ private fun MobileReceivableAccordionItem(
     receivable: Receivable,
     cardinalNumber: Int,
     onPayClick: (Receivable) -> Unit,
-    @Suppress("UNUSED_PARAMETER") onOpenLedger: (String, String) -> Unit
+    onOpenLedger: (String, String) -> Unit
 ) {
     val isPaid = receivable.isPaid()
-    val brand600 = Color(0xFF256B57)
-    val slate50 = Color(0xFFF8FAFC)
-    val slate100 = Color(0xFFF1F5F9)
-    val slate400 = Color(0xFF94A3B8)
-    val slate500 = Color(0xFF64748B)
-    val slate700 = Color(0xFF334155)
-    val slate800 = Color(0xFF1E293B)
-    val amber700 = Color(0xFFB45309)
-    val emerald500 = Color(0xFF10B981)
-    val emerald600 = Color(0xFF059669)
-    val red600 = Color(0xFFDC2626)
+    val isPartial = !isPaid && (receivable.paidAmount > java.math.BigDecimal.ZERO || receivable.status.equals("sebagian", true) || receivable.status.equals("partial", true))
 
     val isOverdue = remember(receivable.dueDate) {
         val date = runCatching { java.time.LocalDate.parse(receivable.dueDate.take(10)) }.getOrNull()
@@ -1198,10 +1219,25 @@ private fun MobileReceivableAccordionItem(
         } else false
     }
 
-    val itemBg = if (isPaid) slate50.copy(alpha = 0.5f) else Color.White
+    val slate50 = Color(0xFFF8FAFC)
+    val slate100 = Color(0xFFF1F5F9)
+    val slate200 = Color(0xFFE2E8F0)
+    val slate400 = Color(0xFF94A3B8)
+    val slate500 = Color(0xFF64748B)
+    val slate600 = Color(0xFF475569)
+    val slate700 = Color(0xFF334155)
+    val slate800 = Color(0xFF1E293B)
+    val slate900 = Color(0xFF0F172A)
+    val rose500 = Color(0xFFF43F5E)
+    val rose600 = Color(0xFFE11D48)
+    val amber500 = Color(0xFFF59E0B)
+    val amber700 = Color(0xFFB45309)
+    val emerald500 = Color(0xFF10B981)
+    val emerald700 = Color(0xFF047857)
+
+    val itemBg = if (isPaid) slate50.copy(alpha = 0.7f) else Color.White
 
     Surface(
-        onClick = { if (!isPaid) onPayClick(receivable) },
         color = itemBg,
         modifier = Modifier
             .fillMaxWidth()
@@ -1210,10 +1246,10 @@ private fun MobileReceivableAccordionItem(
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 16.dp, vertical = 14.dp),
+                .padding(horizontal = 14.dp, vertical = 12.dp),
             verticalArrangement = Arrangement.spacedBy(10.dp)
         ) {
-            // Line 1: Nota Number / ID & Index
+            // Line 1: Invoice ID & Status Badge
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
@@ -1231,140 +1267,25 @@ private fun MobileReceivableAccordionItem(
                     )
                     Text(
                         text = receivable.mobileReference(),
-                        fontSize = 14.sp,
-                        fontWeight = FontWeight.SemiBold,
-                        color = slate800,
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = if (isPaid) slate700 else slate900,
                         fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace
                     )
-                }
-                Text(
-                    text = "Nota $cardinalNumber",
-                    fontSize = 12.sp,
-                    fontWeight = FontWeight.Medium,
-                    color = slate500
-                )
-            }
-            
-            // Line 2: Sisa Piutang (Left) & Status (Right)
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(top = 2.dp),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.Bottom
-            ) {
-                Column {
                     Text(
-                        text = "Sisa Piutang",
-                        fontSize = 12.sp,
+                        text = "Nota $cardinalNumber",
+                        fontSize = 11.sp,
                         fontWeight = FontWeight.Medium,
-                        color = slate500
-                    )
-                    Text(
-                        text = receivable.remainingAmount.currencyText(),
-                        fontSize = 16.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = if (isPaid) slate700 else brand600,
-                        modifier = Modifier.padding(top = 2.dp)
+                        color = slate400
                     )
                 }
-                Column(horizontalAlignment = Alignment.End) {
-                    Text(
-                        text = "Status",
-                        fontSize = 12.sp,
-                        fontWeight = FontWeight.Medium,
-                        color = slate500
-                    )
-                    val (statusText, statusColor) = when {
-                        isPaid -> "Terbayar Penuh" to brand600
-                        receivable.paidAmount > java.math.BigDecimal.ZERO -> "Sebagian" to amber700
-                        else -> "Belum Bayar" to red600
-                    }
-                    Text(
-                        text = statusText,
-                        fontSize = 12.sp,
-                        fontWeight = FontWeight.SemiBold,
-                        color = statusColor,
-                        modifier = Modifier.padding(top = 2.dp)
-                    )
+
+                val (badgeDotColor, badgeTextColor, badgeLabel) = when {
+                    isPaid -> Triple(emerald500, emerald700, "Terbayar Penuh")
+                    isPartial -> Triple(amber500, amber700, "Sebagian")
+                    else -> Triple(rose500, rose600, "Belum Bayar")
                 }
-            }
-            
-            // Line 3: Total Tagihan & Sudah Dibayar
-            HorizontalDivider(color = slate100)
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(top = 2.dp),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Column(modifier = Modifier.weight(1f)) {
-                    Text(
-                        text = "Total Tagihan",
-                        fontSize = 12.sp,
-                        color = slate500
-                    )
-                    Text(
-                        text = receivable.amount.currencyText(),
-                        fontSize = 14.sp,
-                        fontWeight = FontWeight.Medium,
-                        color = slate700,
-                        modifier = Modifier.padding(top = 2.dp)
-                    )
-                }
-                Column(
-                    modifier = Modifier.weight(1f),
-                    horizontalAlignment = Alignment.End
-                ) {
-                    Text(
-                        text = "Sudah Dibayar",
-                        fontSize = 12.sp,
-                        color = slate500
-                    )
-                    val paidColor = if (receivable.paidAmount > java.math.BigDecimal.ZERO) brand600 else slate700
-                    Text(
-                        text = receivable.paidAmount.currencyText(),
-                        fontSize = 14.sp,
-                        fontWeight = if (receivable.paidAmount > java.math.BigDecimal.ZERO) FontWeight.SemiBold else FontWeight.Medium,
-                        color = paidColor,
-                        modifier = Modifier.padding(top = 2.dp)
-                    )
-                }
-            }
-            
-            // Line 4: Jatuh tempo & Status Dot
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(top = 2.dp),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(4.dp)
-                ) {
-                    Text(
-                        text = "Jatuh tempo: ",
-                        fontSize = 12.sp,
-                        color = slate500
-                    )
-                    Text(
-                        text = receivable.dueDate.simpleDate(),
-                        fontSize = 12.sp,
-                        fontWeight = FontWeight.Medium,
-                        color = slate700
-                    )
-                }
-                
-                val isPartial = !isPaid && (receivable.paidAmount > java.math.BigDecimal.ZERO || receivable.status.equals("sebagian", true) || receivable.status.equals("partial", true))
-                val (dotColor, dotTextColor, dotText) = when {
-                    isPaid -> Triple(emerald500, emerald600, "Lunas")
-                    isOverdue -> Triple(red600, red600, "Lewat Jatuh Tempo")
-                    isPartial -> Triple(amber700, amber700, "Sebagian")
-                    else -> Triple(red600, red600, "Belum Lunas")
-                }
+
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(6.dp)
@@ -1372,13 +1293,159 @@ private fun MobileReceivableAccordionItem(
                     Box(
                         modifier = Modifier
                             .size(6.dp)
-                            .background(dotColor, CircleShape)
+                            .background(badgeDotColor, CircleShape)
                     )
                     Text(
-                        text = dotText,
+                        text = badgeLabel,
                         fontSize = 12.sp,
                         fontWeight = FontWeight.Medium,
-                        color = dotTextColor
+                        color = badgeTextColor
+                    )
+                }
+            }
+
+            // Line 2: Grid 2 Cols (Sisa Piutang & Total Tagihan)
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(vertical = 2.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                // Col 1: Sisa Piutang
+                Column {
+                    Text(
+                        text = "Sisa Piutang",
+                        fontSize = 11.sp,
+                        color = slate500
+                    )
+                    Text(
+                        text = receivable.remainingAmount.currencyText(),
+                        fontSize = 14.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = if (isPaid) slate700 else slate900,
+                        modifier = Modifier.padding(top = 2.dp)
+                    )
+                }
+
+                // Col 2: Total Tagihan
+                Column(horizontalAlignment = Alignment.End) {
+                    Text(
+                        text = "Total Tagihan",
+                        fontSize = 11.sp,
+                        color = slate500
+                    )
+                    if (isPaid) {
+                        Text(
+                            text = receivable.amount.currencyText(),
+                            fontSize = 13.sp,
+                            fontWeight = FontWeight.SemiBold,
+                            color = slate600,
+                            modifier = Modifier.padding(top = 2.dp)
+                        )
+                    } else {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            modifier = Modifier.padding(top = 2.dp)
+                        ) {
+                            Text(
+                                text = receivable.amount.currencyText(),
+                                fontSize = 13.sp,
+                                fontWeight = FontWeight.SemiBold,
+                                color = slate800
+                            )
+                            Text(
+                                text = " / ${receivable.paidAmount.currencyText()}",
+                                fontSize = 12.sp,
+                                fontWeight = FontWeight.Normal,
+                                color = slate400
+                            )
+                        }
+                    }
+                }
+            }
+
+            // Line 3: Due date / Lunas & Action button
+            HorizontalDivider(color = if (isPaid) slate200.copy(alpha = 0.6f) else slate100)
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(top = 2.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                // Left: Due Date or Lunas Date
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .size(6.dp)
+                            .background(if (isPaid) emerald500 else if (isOverdue) rose500 else amber500, CircleShape)
+                    )
+                    if (isPaid) {
+                        Text(
+                            text = "Lunas: ${receivable.dueDate.simpleDate()}",
+                            fontSize = 11.sp,
+                            color = slate500
+                        )
+                    } else {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Text(
+                                text = "Jatuh tempo: ",
+                                fontSize = 11.sp,
+                                color = slate500
+                            )
+                            Text(
+                                text = receivable.dueDate.simpleDate(),
+                                fontSize = 11.sp,
+                                fontWeight = FontWeight.Medium,
+                                color = slate700
+                            )
+                        }
+                    }
+                }
+
+                // Right: Action
+                if (!isPaid) {
+                    Surface(
+                        onClick = { onPayClick(receivable) },
+                        shape = RoundedCornerShape(12.dp),
+                        color = slate900,
+                        contentColor = Color.White,
+                        shadowElevation = 0.5.dp,
+                        modifier = Modifier.height(34.dp)
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(horizontal = 14.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(6.dp)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Outlined.AccountBalanceWallet,
+                                contentDescription = null,
+                                tint = Color.White,
+                                modifier = Modifier.size(14.dp)
+                            )
+                            Text(
+                                text = "Bayar",
+                                fontSize = 12.sp,
+                                fontWeight = FontWeight.SemiBold,
+                                color = Color.White
+                            )
+                        }
+                    }
+                } else {
+                    Text(
+                        text = "Lihat Bukti →",
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.Medium,
+                        color = slate400,
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(4.dp))
+                            .clickable { onOpenLedger(receivable.customerId, receivable.customerName) }
+                            .padding(4.dp)
                     )
                 }
             }
