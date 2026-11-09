@@ -131,9 +131,11 @@ internal fun ReceivableTableCard(
 ) {
     if (compact) {
         var userPage by rememberSaveable { mutableIntStateOf(1) }
+        var expandedCustomerId by rememberSaveable { mutableStateOf<String?>(null) }
 
         LaunchedEffect(uiState.searchQuery, uiState.statusFilter, uiState.dueFilter) {
             userPage = 1
+            expandedCustomerId = null
         }
         Column(
             modifier = modifier.fillMaxWidth().testTag("receivable-list-content"),
@@ -170,8 +172,6 @@ internal fun ReceivableTableCard(
                         }
 
                         // Solusi 1: List Ramping Terpadu (Unified Card Container + Single-Expanded Accordion)
-                        var expandedCustomerId by rememberSaveable { mutableStateOf<String?>(null) }
-
                         Surface(
                             modifier = Modifier
                                 .fillMaxWidth()
