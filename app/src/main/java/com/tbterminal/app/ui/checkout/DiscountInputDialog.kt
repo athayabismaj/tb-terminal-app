@@ -258,61 +258,66 @@ internal fun DiscountInputDialog(
                 }
             }
 
-            // Jenis Diskon (Segmented Control Tabs)
-            Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                Text(
-                    text = "Jenis Diskon *",
-                    fontSize = 12.sp,
-                    fontWeight = FontWeight.SemiBold,
-                    color = TextDark
+            // Jenis Diskon (Underline Tab Switcher persis gaya Kas Keluar & Kas Masuk)
+            Box(
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                HorizontalDivider(
+                    modifier = Modifier.align(Alignment.BottomCenter),
+                    color = BorderColor,
+                    thickness = 1.dp
                 )
-
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .clip(RoundedCornerShape(12.dp))
-                        .background(Color(0xFFF1F5F9))
-                        .padding(4.dp),
-                    horizontalArrangement = Arrangement.spacedBy(4.dp)
-                ) {
-                    val isPercent = type == DiscountType.PERCENTAGE
-                    Box(
+                val isPercent = type == DiscountType.PERCENTAGE
+                Row(modifier = Modifier.fillMaxWidth()) {
+                    // Tab Persentase (%)
+                    Column(
                         modifier = Modifier
                             .weight(1f)
-                            .height(40.dp)
-                            .clip(RoundedCornerShape(10.dp))
-                            .background(if (isPercent) BrandGreen else Color.Transparent)
                             .clickable {
                                 type = DiscountType.PERCENTAGE
                                 error = null
-                            },
-                        contentAlignment = Alignment.Center
+                            }
+                            .padding(top = 4.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally
                     ) {
                         Text(
                             text = "Persentase (%)",
-                            fontSize = 13.sp,
+                            fontSize = 13.5.sp,
                             fontWeight = if (isPercent) FontWeight.Bold else FontWeight.Medium,
-                            color = if (isPercent) Color.White else TextDark
+                            color = if (isPercent) BrandGreen else TextMuted,
+                            modifier = Modifier.padding(bottom = 8.dp)
+                        )
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(2.5.dp)
+                                .background(if (isPercent) BrandGreen else Color.Transparent)
                         )
                     }
 
-                    Box(
+                    // Tab Nominal (Rp)
+                    Column(
                         modifier = Modifier
                             .weight(1f)
-                            .height(40.dp)
-                            .clip(RoundedCornerShape(10.dp))
-                            .background(if (!isPercent) BrandGreen else Color.Transparent)
                             .clickable {
                                 type = DiscountType.FIXED_AMOUNT
                                 error = null
-                            },
-                        contentAlignment = Alignment.Center
+                            }
+                            .padding(top = 4.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally
                     ) {
                         Text(
                             text = "Nominal Rupiah (Rp)",
-                            fontSize = 13.sp,
+                            fontSize = 13.5.sp,
                             fontWeight = if (!isPercent) FontWeight.Bold else FontWeight.Medium,
-                            color = if (!isPercent) Color.White else TextDark
+                            color = if (!isPercent) BrandGreen else TextMuted,
+                            modifier = Modifier.padding(bottom = 8.dp)
+                        )
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(2.5.dp)
+                                .background(if (!isPercent) BrandGreen else Color.Transparent)
                         )
                     }
                 }

@@ -715,25 +715,7 @@ private fun CartContent(
                                 }
                             }
 
-                            // Pajak Restitusi / Non-PKP
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.SpaceBetween,
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                Text(
-                                    text = "Pajak Restitusi / Non-PKP",
-                                    fontSize = 12.sp,
-                                    fontWeight = FontWeight.Medium,
-                                    color = Color(0xFF64748B)
-                                )
-                                Text(
-                                    text = "Rp 0",
-                                    fontSize = 12.sp,
-                                    fontWeight = FontWeight.SemiBold,
-                                    color = Color(0xFF475569)
-                                )
-                            }
+
                         }
 
                         // Dashed divider
@@ -772,43 +754,43 @@ private fun CartContent(
                             )
                         }
 
-                        // Buttons Row: Parkir (col-span-4) & Lanjut Pembayaran (col-span-8)
+                        // Buttons Row: Parkir & Lanjut Pembayaran
                         Row(
                             modifier = Modifier.fillMaxWidth(),
                             horizontalArrangement = Arrangement.spacedBy(10.dp),
                             verticalAlignment = Alignment.CenterVertically
                         ) {
-                            // Parkir Button (approx 35-40% width)
-                            OutlinedButton(
-                                onClick = onOpenParkir,
-                                modifier = Modifier
-                                    .weight(0.42f)
-                                    .height(48.dp),
-                                shape = RoundedCornerShape(12.dp),
-                                border = BorderStroke(1.dp, Color(0xFFE2E8F0)),
-                                colors = ButtonDefaults.outlinedButtonColors(
-                                    containerColor = Color.White,
-                                    contentColor = Color(0xFF1E293B)
-                                ),
-                                contentPadding = PaddingValues(horizontal = 8.dp)
-                            ) {
-                                Row(
-                                    verticalAlignment = Alignment.CenterVertically,
-                                    horizontalArrangement = Arrangement.spacedBy(4.dp)
+                            if (state.heldCarts.isNotEmpty()) {
+                                // Parkir Button (tampil hanya jika terdapat antrean transaksi terparkir)
+                                OutlinedButton(
+                                    onClick = onOpenParkir,
+                                    modifier = Modifier
+                                        .weight(0.42f)
+                                        .height(48.dp),
+                                    shape = RoundedCornerShape(12.dp),
+                                    border = BorderStroke(1.dp, Color(0xFFE2E8F0)),
+                                    colors = ButtonDefaults.outlinedButtonColors(
+                                        containerColor = Color.White,
+                                        contentColor = Color(0xFF1E293B)
+                                    ),
+                                    contentPadding = PaddingValues(horizontal = 8.dp)
                                 ) {
-                                    Icon(
-                                        imageVector = Icons.Outlined.PauseCircleOutline,
-                                        contentDescription = null,
-                                        tint = Color(0xFFD97706),
-                                        modifier = Modifier.size(16.dp)
-                                    )
-                                    Text(
-                                        text = "Parkir",
-                                        fontWeight = FontWeight.SemiBold,
-                                        fontSize = 12.sp,
-                                        color = Color(0xFF1E293B)
-                                    )
-                                    if (state.heldCarts.isNotEmpty()) {
+                                    Row(
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        horizontalArrangement = Arrangement.spacedBy(4.dp)
+                                    ) {
+                                        Icon(
+                                            imageVector = Icons.Outlined.PauseCircleOutline,
+                                            contentDescription = null,
+                                            tint = Color(0xFFD97706),
+                                            modifier = Modifier.size(16.dp)
+                                        )
+                                        Text(
+                                            text = "Parkir",
+                                            fontWeight = FontWeight.SemiBold,
+                                            fontSize = 12.sp,
+                                            color = Color(0xFF1E293B)
+                                        )
                                         Text(
                                             text = "(${state.heldCarts.size})",
                                             fontWeight = FontWeight.Bold,
@@ -819,12 +801,12 @@ private fun CartContent(
                                 }
                             }
 
-                            // Lanjut Pembayaran Button (dominant)
+                            // Lanjut Pembayaran Button (penuh jika tidak ada parkir, atau proporsional jika ada)
                             Button(
                                 onClick = onNavigateToPayment,
                                 enabled = state.cartItems.isNotEmpty(),
                                 modifier = Modifier
-                                    .weight(0.78f)
+                                    .then(if (state.heldCarts.isNotEmpty()) Modifier.weight(0.78f) else Modifier.fillMaxWidth())
                                     .height(48.dp),
                                 shape = RoundedCornerShape(12.dp),
                                 colors = ButtonDefaults.buttonColors(
@@ -1391,25 +1373,27 @@ private fun CartSummaryPanel(
             verticalAlignment = Alignment.CenterVertically,
             modifier = Modifier.fillMaxWidth()
         ) {
-            OutlinedButton(
-                onClick = onOpenHoldCartDialog,
-                modifier = Modifier.height(48.dp),
-                shape = RoundedCornerShape(12.dp),
-                border = BorderStroke(1.dp, CartOutlineVariant),
-                colors = ButtonDefaults.outlinedButtonColors(
-                    containerColor = Color.White,
-                    contentColor = CartOnSurface
-                ),
-                contentPadding = PaddingValues(horizontal = 16.dp)
-            ) {
-                Icon(
-                    imageVector = Icons.Outlined.BookmarkAdd,
-                    contentDescription = null,
-                    tint = CartSecondary,
-                    modifier = Modifier.size(17.dp)
-                )
-                Spacer(modifier = Modifier.width(6.dp))
-                Text("Parkir", fontWeight = FontWeight.SemiBold, fontSize = 13.sp)
+            if (state.heldCarts.isNotEmpty()) {
+                OutlinedButton(
+                    onClick = onOpenHoldCartDialog,
+                    modifier = Modifier.height(48.dp),
+                    shape = RoundedCornerShape(12.dp),
+                    border = BorderStroke(1.dp, CartOutlineVariant),
+                    colors = ButtonDefaults.outlinedButtonColors(
+                        containerColor = Color.White,
+                        contentColor = CartOnSurface
+                    ),
+                    contentPadding = PaddingValues(horizontal = 16.dp)
+                ) {
+                    Icon(
+                        imageVector = Icons.Outlined.BookmarkAdd,
+                        contentDescription = null,
+                        tint = CartSecondary,
+                        modifier = Modifier.size(17.dp)
+                    )
+                    Spacer(modifier = Modifier.width(6.dp))
+                    Text("Parkir (${state.heldCarts.size})", fontWeight = FontWeight.SemiBold, fontSize = 13.sp)
+                }
             }
 
             Button(

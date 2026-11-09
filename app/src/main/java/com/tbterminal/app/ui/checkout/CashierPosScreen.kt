@@ -500,37 +500,37 @@ private fun PosOperationalStatusRow(
             }
         }
 
-        // Action Parkir & Tunda Transaksi (Selalu hadir stabil agar layout & jarak konsisten sebelum dan sesudah tambah produk)
-        Row(
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(6.dp)
-        ) {
-            // Tombol Parkir Nota (selalu tampil stabil)
-            Surface(
-                onClick = onOpenHeldCarts,
-                shape = RoundedCornerShape(100.dp),
-                color = Color.White,
-                border = BorderStroke(1.dp, Slate200),
-                shadowElevation = 0.5.dp
+        // Action Parkir & Tunda Transaksi (Disembunyikan jika belum ada transaksi terparkir)
+        if (heldCartsCount > 0) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(6.dp)
             ) {
-                Row(
-                    modifier = Modifier.padding(start = 10.dp, end = 8.dp, top = 4.dp, bottom = 4.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(4.dp)
+                // Tombol Parkir Nota (tampil jika terdapat antrean transaksi terparkir)
+                Surface(
+                    onClick = onOpenHeldCarts,
+                    shape = RoundedCornerShape(100.dp),
+                    color = Color.White,
+                    border = BorderStroke(1.dp, Slate200),
+                    shadowElevation = 0.5.dp
                 ) {
-                    Icon(
-                        imageVector = Icons.Outlined.PauseCircleOutline,
-                        contentDescription = "Buka transaksi diparkir",
-                        tint = Slate500,
-                        modifier = Modifier.size(14.dp)
-                    )
-                    Text(
-                        text = "Parkir",
-                        color = Slate700,
-                        fontWeight = FontWeight.Medium,
-                        fontSize = 11.sp
-                    )
-                    if (heldCartsCount > 0) {
+                    Row(
+                        modifier = Modifier.padding(start = 10.dp, end = 8.dp, top = 4.dp, bottom = 4.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(4.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Outlined.PauseCircleOutline,
+                            contentDescription = "Buka transaksi diparkir",
+                            tint = Color(0xFFD97706),
+                            modifier = Modifier.size(14.dp)
+                        )
+                        Text(
+                            text = "Parkir",
+                            color = Slate700,
+                            fontWeight = FontWeight.Medium,
+                            fontSize = 11.sp
+                        )
                         Text(
                             text = "($heldCartsCount)",
                             color = Color(0xFFD97706),
@@ -538,39 +538,6 @@ private fun PosOperationalStatusRow(
                             fontSize = 11.5.sp
                         )
                     }
-                }
-            }
-
-            // Tombol Tunda Transaksi (selalu tampil stabil, aktif saat keranjang ada isi)
-            Surface(
-                onClick = {
-                    if (cartItemCount > 0) {
-                        onOpenHoldCartDialog()
-                    }
-                },
-                enabled = cartItemCount > 0,
-                shape = RoundedCornerShape(100.dp),
-                color = if (cartItemCount > 0) Color.White else Color.White.copy(alpha = 0.6f),
-                border = BorderStroke(1.dp, if (cartItemCount > 0) Slate200 else Slate200.copy(alpha = 0.6f)),
-                shadowElevation = if (cartItemCount > 0) 0.5.dp else 0.dp
-            ) {
-                Row(
-                    modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(4.dp)
-                ) {
-                    Icon(
-                        imageVector = Icons.Outlined.BookmarkAdd,
-                        contentDescription = "Tunda transaksi saat ini",
-                        tint = if (cartItemCount > 0) Slate500 else Slate400,
-                        modifier = Modifier.size(14.dp)
-                    )
-                    Text(
-                        text = "Tunda",
-                        color = if (cartItemCount > 0) Slate700 else Slate400,
-                        fontWeight = FontWeight.Medium,
-                        fontSize = 11.sp
-                    )
                 }
             }
         }
