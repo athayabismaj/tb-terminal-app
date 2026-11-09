@@ -115,6 +115,36 @@ object ReceiptEscPosFormatter {
         builder.lineSeparator('-')
 
         // 5. Totals & Payment Summary
+        val grossSubtotal = transaction.items.fold(BigDecimal.ZERO) { acc, item ->
+            acc.add(item.priceAtTransaction.multiply(item.quantity))
+        }
+        val totalItemSubtotal = transaction.items.fold(BigDecimal.ZERO) { acc, item ->
+            acc.add(item.subtotal)
+        }
+        val itemDiscount = grossSubtotal.subtract(totalItemSubtotal).coerceAtLeast(BigDecimal.ZERO)
+        val deliveryInfo = DeliveryOrderFormatter.parseDeliveryInfo(transaction.notes)
+        val deliveryFee = deliveryInfo.deliveryFeeText
+            ?.replace("Rp", "", ignoreCase = true)
+            ?.replace(".", "")
+            ?.replace(",", ".")
+            ?.trim()
+            ?.toBigDecimalOrNull() ?: BigDecimal.ZERO
+        val baseForNoteDiscount = totalItemSubtotal.add(deliveryFee)
+        val diskonNota = baseForNoteDiscount.subtract(transaction.total).coerceAtLeast(BigDecimal.ZERO)
+
+        if (itemDiscount > BigDecimal.ZERO || diskonNota > BigDecimal.ZERO || deliveryFee > BigDecimal.ZERO) {
+            builder.twoColumn("Subtotal", formatMoney(grossSubtotal))
+            if (itemDiscount > BigDecimal.ZERO) {
+                builder.twoColumn("Diskon Item", "-${formatMoney(itemDiscount)}")
+            }
+            if (diskonNota > BigDecimal.ZERO) {
+                builder.twoColumn("Diskon Nota", "-${formatMoney(diskonNota)}")
+            }
+            if (deliveryFee > BigDecimal.ZERO) {
+                builder.twoColumn("Ongkos Kirim", "+${formatMoney(deliveryFee)}")
+            }
+        }
+
         builder.bold(true)
             .twoColumn("TOTAL", formatMoney(transaction.total))
             .bold(false)
@@ -133,13 +163,17 @@ object ReceiptEscPosFormatter {
         } else "Tunai"
         builder.twoColumn("Metode Bayar", paymentMethodDisplay)
 
+        val isCash = transaction.paymentMethods.any { it.lowercase() in setOf("tunai", "cash") } || transaction.paymentMethods.isEmpty()
+        val tenderedAmount = if (transaction.amountTendered > BigDecimal.ZERO) transaction.amountTendered else transaction.paidAmount
+
         if (!isVoided) {
-            builder.twoColumn("Dibayar", formatMoney(transaction.paidAmount))
-            if (transaction.amountTendered > BigDecimal.ZERO && transaction.amountTendered != transaction.paidAmount) {
-                builder.twoColumn("Diterima", formatMoney(transaction.amountTendered))
-            }
-            if (transaction.changeAmount > BigDecimal.ZERO) {
-                builder.twoColumn("Kembalian", formatMoney(transaction.changeAmount))
+            if (isCash || transaction.amountTendered > BigDecimal.ZERO) {
+                builder.twoColumn("Uang Diterima", formatMoney(tenderedAmount))
+                if (transaction.changeAmount > BigDecimal.ZERO || isCash) {
+                    builder.twoColumn("Kembalian", formatMoney(transaction.changeAmount))
+                }
+            } else {
+                builder.twoColumn("Dibayar", formatMoney(transaction.paidAmount))
             }
             if (transaction.remainingAmount() > BigDecimal.ZERO) {
                 builder.bold(true)

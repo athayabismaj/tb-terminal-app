@@ -25,6 +25,7 @@ import androidx.compose.ui.window.Dialog
 import com.tbterminal.app.data.model.CashTransactionDetail
 import com.tbterminal.app.data.model.receiptNumber
 import com.tbterminal.app.data.model.remainingAmount
+import com.tbterminal.app.data.printer.DeliveryOrderFormatter
 import com.tbterminal.app.ui.common.toDisplayDateTime
 import com.tbterminal.app.ui.common.toRupiahText
 import java.math.BigDecimal
@@ -84,6 +85,35 @@ object WhatsAppReceiptHelper {
             sb.appendLine("  $qtyText x ${item.priceAtTransaction.toRupiahText()} = ${item.subtotal.toRupiahText()}")
         }
         sb.appendLine("--------------------------------")
+        val grossSubtotal = transaction.items.fold(BigDecimal.ZERO) { acc, item ->
+            acc.add(item.priceAtTransaction.multiply(item.quantity))
+        }
+        val totalItemSubtotal = transaction.items.fold(BigDecimal.ZERO) { acc, item ->
+            acc.add(item.subtotal)
+        }
+        val itemDiscount = grossSubtotal.subtract(totalItemSubtotal).coerceAtLeast(BigDecimal.ZERO)
+        val deliveryInfo = DeliveryOrderFormatter.parseDeliveryInfo(transaction.notes)
+        val deliveryFee = deliveryInfo.deliveryFeeText
+            ?.replace("Rp", "", ignoreCase = true)
+            ?.replace(".", "")
+            ?.replace(",", ".")
+            ?.trim()
+            ?.toBigDecimalOrNull() ?: BigDecimal.ZERO
+        val baseForNoteDiscount = totalItemSubtotal.add(deliveryFee)
+        val diskonNota = baseForNoteDiscount.subtract(transaction.total).coerceAtLeast(BigDecimal.ZERO)
+
+        if (itemDiscount > BigDecimal.ZERO || diskonNota > BigDecimal.ZERO || deliveryFee > BigDecimal.ZERO) {
+            sb.appendLine("Subtotal      : ${grossSubtotal.toRupiahText()}")
+            if (itemDiscount > BigDecimal.ZERO) {
+                sb.appendLine("Diskon Item   : -${itemDiscount.toRupiahText()}")
+            }
+            if (diskonNota > BigDecimal.ZERO) {
+                sb.appendLine("Diskon Nota   : -${diskonNota.toRupiahText()}")
+            }
+            if (deliveryFee > BigDecimal.ZERO) {
+                sb.appendLine("Ongkos Kirim  : +${deliveryFee.toRupiahText()}")
+            }
+        }
         sb.appendLine("*TOTAL BELANJA : ${transaction.total.toRupiahText()}*")
 
         val methods = transaction.paymentMethods.joinToString(" + ") { m ->
@@ -98,9 +128,15 @@ object WhatsAppReceiptHelper {
         }.ifBlank { "Tunai" }
 
         sb.appendLine("Metode Bayar  : $methods")
-        sb.appendLine("Uang Diterima : ${transaction.paidAmount.toRupiahText()}")
-        if (transaction.changeAmount > BigDecimal.ZERO) {
-            sb.appendLine("Kembalian     : ${transaction.changeAmount.toRupiahText()}")
+        val isCash = transaction.paymentMethods.any { it.lowercase() in setOf("tunai", "cash") } || transaction.paymentMethods.isEmpty()
+        val tenderedAmount = if (transaction.amountTendered > BigDecimal.ZERO) transaction.amountTendered else transaction.paidAmount
+        if (isCash || transaction.amountTendered > BigDecimal.ZERO) {
+            sb.appendLine("Uang Diterima : ${tenderedAmount.toRupiahText()}")
+            if (transaction.changeAmount > BigDecimal.ZERO || isCash) {
+                sb.appendLine("Kembalian     : ${transaction.changeAmount.toRupiahText()}")
+            }
+        } else {
+            sb.appendLine("Jumlah Dibayar: ${transaction.paidAmount.toRupiahText()}")
         }
         if (remaining > BigDecimal.ZERO) {
             sb.appendLine("Sisa Tagihan  : ${remaining.toRupiahText()}")

@@ -223,7 +223,7 @@ fun CashierCartScreen(
     if (showTransactionDiscount) {
         val afterItemDiscount = state.subtotal.subtract(state.itemDiscountTotal)
         DiscountInputDialog(
-            title = "Diskon transaksi",
+            title = "Diskon Nota",
             baseAmount = afterItemDiscount,
             initialValue = state.transactionDiscount,
             onDismiss = { showTransactionDiscount = false },
@@ -679,7 +679,7 @@ private fun CartContent(
                                         modifier = Modifier.size(14.dp)
                                     )
                                     Text(
-                                        text = if (state.transactionDiscountAmount > BigDecimal.ZERO) "Diskon Transaksi" else "Tambah Diskon Transaksi",
+                                        text = if (state.transactionDiscountAmount > BigDecimal.ZERO) "Diskon Nota" else "Tambah Diskon Nota",
                                         fontSize = 12.sp,
                                         fontWeight = FontWeight.SemiBold,
                                         color = Color(0xFF10533C)
@@ -1322,7 +1322,7 @@ private fun CartSummaryPanel(
 
                 if (state.transactionDiscountAmount > BigDecimal.ZERO) {
                     CartCalculationRow(
-                        "Diskon Transaksi",
+                        "Diskon Nota",
                         "-${formatRupiah(state.transactionDiscountAmount)}",
                         isDiscount = true
                     )
