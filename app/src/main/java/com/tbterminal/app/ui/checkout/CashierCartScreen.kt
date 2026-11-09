@@ -755,13 +755,14 @@ private fun CartContent(
                         }
 
                         // Buttons Row: Parkir & Lanjut Pembayaran
+                        val showParkirButton = state.cartItems.isNotEmpty() || state.heldCarts.isNotEmpty()
                         Row(
                             modifier = Modifier.fillMaxWidth(),
                             horizontalArrangement = Arrangement.spacedBy(10.dp),
                             verticalAlignment = Alignment.CenterVertically
                         ) {
-                            if (state.heldCarts.isNotEmpty()) {
-                                // Parkir Button (tampil hanya jika terdapat antrean transaksi terparkir)
+                            if (showParkirButton) {
+                                // Parkir Button (tampil saat produk sudah di-klik / ada di keranjang, atau ada antrean parkir)
                                 OutlinedButton(
                                     onClick = onOpenParkir,
                                     modifier = Modifier
@@ -791,22 +792,24 @@ private fun CartContent(
                                             fontSize = 12.sp,
                                             color = Color(0xFF1E293B)
                                         )
-                                        Text(
-                                            text = "(${state.heldCarts.size})",
-                                            fontWeight = FontWeight.Bold,
-                                            fontSize = 11.sp,
-                                            color = Color(0xFF64748B)
-                                        )
+                                        if (state.heldCarts.isNotEmpty()) {
+                                            Text(
+                                                text = "(${state.heldCarts.size})",
+                                                fontWeight = FontWeight.Bold,
+                                                fontSize = 11.sp,
+                                                color = Color(0xFF64748B)
+                                            )
+                                        }
                                     }
                                 }
                             }
 
-                            // Lanjut Pembayaran Button (penuh jika tidak ada parkir, atau proporsional jika ada)
+                            // Lanjut Pembayaran Button (penuh jika keranjang kosong/belum ada parkir, proporsional jika ada tombol parkir)
                             Button(
                                 onClick = onNavigateToPayment,
                                 enabled = state.cartItems.isNotEmpty(),
                                 modifier = Modifier
-                                    .then(if (state.heldCarts.isNotEmpty()) Modifier.weight(0.78f) else Modifier.fillMaxWidth())
+                                    .then(if (showParkirButton) Modifier.weight(0.78f) else Modifier.fillMaxWidth())
                                     .height(48.dp),
                                 shape = RoundedCornerShape(12.dp),
                                 colors = ButtonDefaults.buttonColors(
@@ -1373,7 +1376,7 @@ private fun CartSummaryPanel(
             verticalAlignment = Alignment.CenterVertically,
             modifier = Modifier.fillMaxWidth()
         ) {
-            if (state.heldCarts.isNotEmpty()) {
+            if (state.cartItems.isNotEmpty() || state.heldCarts.isNotEmpty()) {
                 OutlinedButton(
                     onClick = onOpenHoldCartDialog,
                     modifier = Modifier.height(48.dp),
@@ -1392,7 +1395,7 @@ private fun CartSummaryPanel(
                         modifier = Modifier.size(17.dp)
                     )
                     Spacer(modifier = Modifier.width(6.dp))
-                    Text("Parkir (${state.heldCarts.size})", fontWeight = FontWeight.SemiBold, fontSize = 13.sp)
+                    Text(if (state.heldCarts.isNotEmpty()) "Parkir (${state.heldCarts.size})" else "Parkir", fontWeight = FontWeight.SemiBold, fontSize = 13.sp)
                 }
             }
 

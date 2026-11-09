@@ -500,43 +500,77 @@ private fun PosOperationalStatusRow(
             }
         }
 
-        // Action Parkir & Tunda Transaksi (Disembunyikan jika belum ada transaksi terparkir)
-        if (heldCartsCount > 0) {
+        // Action Parkir & Tunda Transaksi
+        // Disembunyikan saat kasir belum mengklik produk (cartItemCount == 0 dan belum ada yang diparkir).
+        // Tombol baru muncul jika kasir sudah memilih produk (cartItemCount > 0) atau ada antrean transaksi terparkir (heldCartsCount > 0).
+        if (cartItemCount > 0 || heldCartsCount > 0) {
             Row(
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(6.dp)
             ) {
-                // Tombol Parkir Nota (tampil jika terdapat antrean transaksi terparkir)
-                Surface(
-                    onClick = onOpenHeldCarts,
-                    shape = RoundedCornerShape(100.dp),
-                    color = Color.White,
-                    border = BorderStroke(1.dp, Slate200),
-                    shadowElevation = 0.5.dp
-                ) {
-                    Row(
-                        modifier = Modifier.padding(start = 10.dp, end = 8.dp, top = 4.dp, bottom = 4.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(4.dp)
+                // 1. Tombol Buka Daftar Parkir (jika terdapat transaksi yang sedang diparkir)
+                if (heldCartsCount > 0) {
+                    Surface(
+                        onClick = onOpenHeldCarts,
+                        shape = RoundedCornerShape(100.dp),
+                        color = Color.White,
+                        border = BorderStroke(1.dp, Slate200),
+                        shadowElevation = 0.5.dp
                     ) {
-                        Icon(
-                            imageVector = Icons.Outlined.PauseCircleOutline,
-                            contentDescription = "Buka transaksi diparkir",
-                            tint = Color(0xFFD97706),
-                            modifier = Modifier.size(14.dp)
-                        )
-                        Text(
-                            text = "Parkir",
-                            color = Slate700,
-                            fontWeight = FontWeight.Medium,
-                            fontSize = 11.sp
-                        )
-                        Text(
-                            text = "($heldCartsCount)",
-                            color = Color(0xFFD97706),
-                            fontWeight = FontWeight.Bold,
-                            fontSize = 11.5.sp
-                        )
+                        Row(
+                            modifier = Modifier.padding(start = 10.dp, end = 8.dp, top = 4.dp, bottom = 4.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(4.dp)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Outlined.PauseCircleOutline,
+                                contentDescription = "Buka transaksi diparkir",
+                                tint = Color(0xFFD97706),
+                                modifier = Modifier.size(14.dp)
+                            )
+                            Text(
+                                text = "Parkir",
+                                color = Slate700,
+                                fontWeight = FontWeight.Medium,
+                                fontSize = 11.sp
+                            )
+                            Text(
+                                text = "($heldCartsCount)",
+                                color = Color(0xFFD97706),
+                                fontWeight = FontWeight.Bold,
+                                fontSize = 11.5.sp
+                            )
+                        }
+                    }
+                }
+
+                // 2. Tombol Parkir / Tunda Pesanan Ini (muncul saat produk sudah di-klik / ada di keranjang)
+                if (cartItemCount > 0) {
+                    Surface(
+                        onClick = onOpenHoldCartDialog,
+                        shape = RoundedCornerShape(100.dp),
+                        color = Color.White,
+                        border = BorderStroke(1.dp, Slate200),
+                        shadowElevation = 0.5.dp
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(4.dp)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Outlined.BookmarkAdd,
+                                contentDescription = "Parkir pesanan saat ini",
+                                tint = Color(0xFF10533C),
+                                modifier = Modifier.size(14.dp)
+                            )
+                            Text(
+                                text = if (heldCartsCount > 0) "Tunda" else "Parkir",
+                                color = Slate700,
+                                fontWeight = FontWeight.SemiBold,
+                                fontSize = 11.sp
+                            )
+                        }
                     }
                 }
             }
