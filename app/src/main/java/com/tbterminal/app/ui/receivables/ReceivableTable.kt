@@ -131,11 +131,9 @@ internal fun ReceivableTableCard(
 ) {
     if (compact) {
         var userPage by rememberSaveable { mutableIntStateOf(1) }
-        var expandedCustomerId by rememberSaveable { mutableStateOf<String?>(null) }
 
         LaunchedEffect(uiState.searchQuery, uiState.statusFilter, uiState.dueFilter) {
             userPage = 1
-            expandedCustomerId = null
         }
         Column(
             modifier = modifier.fillMaxWidth().testTag("receivable-list-content"),
@@ -171,33 +169,19 @@ internal fun ReceivableTableCard(
                             groupedByCustomer.drop((safeUserPage - 1) * RECEIVABLE_USERS_PER_PAGE).take(RECEIVABLE_USERS_PER_PAGE)
                         }
 
-                        // Solusi 1: List Ramping Terpadu (Unified Card Container + Single-Expanded Accordion)
-                        Surface(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .testTag("receivable-unified-card"),
-                            shape = RoundedCornerShape(16.dp),
-                            color = Color.White,
-                            border = BorderStroke(1.dp, Color(0xFFE2E8F0)),
-                            shadowElevation = 0.5.dp
+                        // CustomerReceivablesList (Per-customer Card Container)
+                        Column(
+                            verticalArrangement = Arrangement.spacedBy(10.dp),
+                            modifier = Modifier.fillMaxWidth().testTag("receivables-list")
                         ) {
-                            Column(modifier = Modifier.fillMaxWidth()) {
-                                pageCustomers.forEachIndexed { index, (customerId, customerReceivables) ->
-                                    if (index > 0) {
-                                        HorizontalDivider(color = Color(0xFFF1F5F9), thickness = 1.dp)
-                                    }
-                                    CustomerReceivableGroupCard(
-                                        customerId = customerId,
-                                        receivables = customerReceivables,
-                                        isExpanded = expandedCustomerId == customerId,
-                                        onToggleExpand = {
-                                            expandedCustomerId = if (expandedCustomerId == customerId) null else customerId
-                                        },
-                                        onPayClick = onPayClick,
-                                        onOpenLedger = { id, _ -> onCustomerDetailClick(id) },
-                                        onQuickBill = { onQuickBillCustomer(customerId) }
-                                    )
-                                }
+                            pageCustomers.forEach { (customerId, customerReceivables) ->
+                                CustomerReceivableGroupCard(
+                                    customerId = customerId,
+                                    receivables = customerReceivables,
+                                    onPayClick = onPayClick,
+                                    onOpenLedger = { id, _ -> onCustomerDetailClick(id) },
+                                    defaultExpanded = false
+                                )
                             }
                         }
                         
@@ -997,177 +981,170 @@ private fun ReceivableDueFilter.compactLabel(): String = when (this) {
 private fun CustomerReceivableGroupCard(
     customerId: String,
     receivables: List<Receivable>,
-    isExpanded: Boolean,
-    onToggleExpand: () -> Unit,
     onPayClick: (Receivable) -> Unit,
     onOpenLedger: (String, String) -> Unit,
-    onQuickBill: () -> Unit = {},
+    defaultExpanded: Boolean = false,
 ) {
     val customerName = receivables.firstOrNull()?.customerName ?: "Unknown"
     val totalRemaining = receivables.sumOf { it.remainingAmount }
     val allPaid = totalRemaining <= java.math.BigDecimal.ZERO
-    
+    var isExpanded by remember { mutableStateOf(defaultExpanded) }
+
     val slate100 = Color(0xFFF1F5F9)
     val slate200 = Color(0xFFE2E8F0)
     val slate400 = Color(0xFF94A3B8)
     val slate500 = Color(0xFF64748B)
     val slate700 = Color(0xFF334155)
     val slate900 = Color(0xFF0F172A)
-    
+
     val rotationState by animateFloatAsState(
         targetValue = if (isExpanded) 180f else 0f,
         label = "customerChevronRotation"
     )
 
-    val today = remember { java.time.LocalDate.now() }
-    val overdueCount = remember(receivables) {
-        receivables.count {
-            if (it.remainingAmount <= java.math.BigDecimal.ZERO) return@count false
-            val d = runCatching { java.time.LocalDate.parse(it.dueDate.take(10)) }.getOrNull()
-            d != null && d.isBefore(today)
-        }
-    }
-
-    Column(
+    Surface(
         modifier = Modifier
             .fillMaxWidth()
-            .testTag("customer-group-$customerId")
+            .testTag("customer-group-$customerId"),
+        shape = RoundedCornerShape(16.dp),
+        color = Color.White,
+        border = BorderStroke(1.dp, slate200),
+        shadowElevation = 0.5.dp
     ) {
-        // Baris Ramping Pelanggan (Compact Row)
-        Surface(
-            onClick = onToggleExpand,
-            color = if (isExpanded) Color(0xFFF8FAFC) else Color.White,
-        ) {
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 14.dp, vertical = 11.dp),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
+        Column(modifier = Modifier.fillMaxWidth()) {
+            // Customer Header Summary (Collapsible Trigger)
+            Surface(
+                onClick = { isExpanded = !isExpanded },
+                color = Color.White,
             ) {
-                // Info Pelanggan di Kiri
                 Row(
                     modifier = Modifier
-                        .weight(1f)
-                        .padding(end = 8.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(10.dp)
+                        .fillMaxWidth()
+                        .padding(16.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Box(
+                    Row(
                         modifier = Modifier
-                            .size(36.dp)
-                            .background(slate100, CircleShape)
-                            .border(1.dp, slate200, CircleShape),
-                        contentAlignment = Alignment.Center
+                            .weight(1f)
+                            .padding(end = 8.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(12.dp)
                     ) {
-                        Text(
-                            text = customerName.take(1).uppercase(),
-                            fontSize = 13.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = slate700
-                        )
-                    }
-                    
-                    Column(
-                        modifier = Modifier.weight(1f),
-                        verticalArrangement = Arrangement.spacedBy(2.dp)
-                    ) {
-                        Text(
-                            text = customerName,
-                            fontSize = 13.5.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = slate900,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis
-                        )
-                        
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(4.dp)
+                        // Customer Avatar (w-10 h-10 = 40.dp)
+                        Box(
+                            modifier = Modifier
+                                .size(40.dp)
+                                .background(slate100, CircleShape)
+                                .border(1.dp, slate200, CircleShape),
+                            contentAlignment = Alignment.Center
                         ) {
                             Text(
-                                text = "${receivables.size} Nota",
-                                fontSize = 11.sp,
-                                fontWeight = FontWeight.Normal,
-                                color = slate500
+                                text = customerName.take(1).uppercase(),
+                                fontSize = 14.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = slate700
                             )
-                            if (overdueCount > 0) {
-                                Text(
-                                    text = "• $overdueCount Jatuh tempo",
-                                    fontSize = 11.sp,
-                                    fontWeight = FontWeight.SemiBold,
-                                    color = Color(0xFFE11D48)
-                                )
-                            }
                         }
-                    }
-                }
-                
-                // Nominal & Aksi Cepat di Kanan
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    Column(
-                        horizontalAlignment = Alignment.End,
-                        verticalArrangement = Arrangement.spacedBy(1.dp)
-                    ) {
-                        Text(
-                            text = totalRemaining.currencyText(),
-                            fontSize = 13.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = slate900,
-                            maxLines = 1
-                        )
-                        Text(
-                            text = if (allPaid) "Lunas" else "Belum lunas",
-                            fontSize = 10.sp,
-                            fontWeight = FontWeight.Normal,
-                            color = if (allPaid) Color(0xFF15803D) else slate400,
-                            maxLines = 1
-                        )
-                    }
 
-                    if (!allPaid) {
-                        Surface(
-                            onClick = onQuickBill,
-                            shape = RoundedCornerShape(8.dp),
-                            color = Color(0xFFDCFCE7),
-                            contentColor = Color(0xFF15803D),
-                            modifier = Modifier.size(28.dp)
+                        Column(
+                            modifier = Modifier.weight(1f),
+                            verticalArrangement = Arrangement.spacedBy(3.dp)
                         ) {
-                            Box(contentAlignment = Alignment.Center) {
-                                Icon(
-                                    imageVector = Icons.Outlined.Share,
-                                    contentDescription = "Tagih WhatsApp",
-                                    tint = Color(0xFF15803D),
-                                    modifier = Modifier.size(14.dp)
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(6.dp)
+                            ) {
+                                Text(
+                                    text = customerName,
+                                    fontSize = 14.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = slate900,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis
+                                )
+                                Surface(
+                                    shape = RoundedCornerShape(4.dp),
+                                    color = slate100,
+                                ) {
+                                    Text(
+                                        text = "Umum",
+                                        fontSize = 10.sp,
+                                        fontWeight = FontWeight.Normal,
+                                        color = slate500,
+                                        modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                                    )
+                                }
+                            }
+
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(4.dp)
+                            ) {
+                                Text(
+                                    text = totalRemaining.currencyText(),
+                                    fontSize = 12.sp,
+                                    fontWeight = FontWeight.SemiBold,
+                                    color = slate900,
+                                    maxLines = 1
+                                )
+                                Text(
+                                    text = if (allPaid) "(Semua lunas)" else "(Belum lunas)",
+                                    fontSize = 11.sp,
+                                    fontWeight = FontWeight.Normal,
+                                    color = slate400,
+                                    maxLines = 1
                                 )
                             }
                         }
                     }
 
-                    Icon(
-                        imageVector = Icons.Default.ExpandMore,
-                        contentDescription = if (isExpanded) "Tutup nota" else "Buka nota",
-                        tint = slate400,
-                        modifier = Modifier
-                            .size(18.dp)
-                            .rotate(rotationState)
-                    )
+                    // Header Badge & Chevron Action: [ 📄 3 Nota ⌄ ]
+                    Surface(
+                        shape = RoundedCornerShape(8.dp),
+                        color = Color.Transparent,
+                    ) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(4.dp),
+                            modifier = Modifier.padding(horizontal = 4.dp, vertical = 4.dp)
+                        ) {
+                            Icon(
+                                imageVector = Icons.AutoMirrored.Outlined.ReceiptLong,
+                                contentDescription = null,
+                                tint = slate400,
+                                modifier = Modifier.size(15.dp)
+                            )
+                            Text(
+                                text = "${receivables.size} Nota",
+                                fontSize = 12.sp,
+                                fontWeight = FontWeight.Medium,
+                                color = slate500,
+                                maxLines = 1,
+                                softWrap = false
+                            )
+                            Icon(
+                                imageVector = Icons.Default.ExpandMore,
+                                contentDescription = if (isExpanded) "Tutup nota" else "Buka nota",
+                                tint = slate400,
+                                modifier = Modifier
+                                    .size(18.dp)
+                                    .rotate(rotationState)
+                            )
+                        }
+                    }
                 }
             }
-        }
-            
-            // Expanded Content
+
+            // Expanded Invoices List
             AnimatedVisibility(
                 visible = isExpanded,
                 enter = expandVertically() + fadeIn(),
                 exit = shrinkVertically() + fadeOut()
             ) {
-                Column(modifier = Modifier.fillMaxWidth()) {
+                Column(modifier = Modifier.fillMaxWidth().background(Color(0xFFF8FAFC).copy(alpha = 0.5f))) {
                     HorizontalDivider(color = slate100)
-                    
+
                     val chronological = remember(receivables) {
                         receivables.sortedWith(
                             compareBy<Receivable> { it.debtDate }
@@ -1185,8 +1162,7 @@ private fun CustomerReceivableGroupCard(
 
                     val limit = 3
                     val itemsToDisplay = sortedReceivables.take(limit)
-                    val remainingCount = sortedReceivables.size - limit
-                    
+
                     itemsToDisplay.forEachIndexed { index, receivable ->
                         if (index > 0) {
                             HorizontalDivider(color = slate100)
@@ -1199,83 +1175,43 @@ private fun CustomerReceivableGroupCard(
                             onOpenLedger = onOpenLedger
                         )
                     }
-                    
-                    // Show "Detail Riwayat Piutang" and "Tagih WhatsApp" Footer
+
+                    // Bottom Card Action Footer: "Lihat Detail Riwayat Piutang ->"
                     HorizontalDivider(color = slate100)
-                    Row(
+                    Surface(
+                        onClick = { onOpenLedger(customerId, customerName) },
+                        color = Color.White,
                         modifier = Modifier
                             .fillMaxWidth()
-                            .padding(horizontal = 14.dp, vertical = 10.dp),
-                        horizontalArrangement = Arrangement.spacedBy(8.dp),
-                        verticalAlignment = Alignment.CenterVertically
+                            .height(46.dp)
                     ) {
-                        if (!allPaid) {
-                            Surface(
-                                onClick = onQuickBill,
-                                shape = RoundedCornerShape(10.dp),
-                                color = Color(0xFF15803D),
-                                contentColor = Color.White,
-                                modifier = Modifier
-                                    .weight(1f)
-                                    .height(36.dp)
-                            ) {
-                                Row(
-                                    modifier = Modifier.padding(horizontal = 8.dp),
-                                    horizontalArrangement = Arrangement.Center,
-                                    verticalAlignment = Alignment.CenterVertically
-                                ) {
-                                    Icon(
-                                        imageVector = Icons.Outlined.Share,
-                                        contentDescription = null,
-                                        tint = Color.White,
-                                        modifier = Modifier.size(14.dp)
-                                    )
-                                    Spacer(Modifier.width(6.dp))
-                                    Text(
-                                        text = "Tagih WhatsApp",
-                                        fontSize = 12.sp,
-                                        fontWeight = FontWeight.Bold,
-                                        color = Color.White
-                                    )
-                                }
-                            }
-                        }
-
-                        Surface(
-                            onClick = { onOpenLedger(customerId, customerName) },
-                            color = Color.White,
-                            shape = RoundedCornerShape(10.dp),
-                            border = BorderStroke(1.dp, slate200),
+                        Row(
                             modifier = Modifier
-                                .weight(if (!allPaid) 1f else 2f)
-                                .height(36.dp)
+                                .fillMaxSize()
+                                .padding(horizontal = 16.dp),
+                            horizontalArrangement = Arrangement.Center,
+                            verticalAlignment = Alignment.CenterVertically
                         ) {
-                            Row(
-                                modifier = Modifier.padding(horizontal = 8.dp),
-                                horizontalArrangement = Arrangement.Center,
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                val footerText = if (remainingCount > 0) "Riwayat ($remainingCount+)" else "Riwayat Piutang"
-                                Text(
-                                    text = footerText,
-                                    fontSize = 12.sp,
-                                    fontWeight = FontWeight.SemiBold,
-                                    color = slate700
-                                )
-                                Spacer(Modifier.width(4.dp))
-                                Icon(
-                                    imageVector = Icons.AutoMirrored.Filled.ArrowForward,
-                                    contentDescription = null,
-                                    tint = slate700,
-                                    modifier = Modifier.size(13.dp)
-                                )
-                            }
+                            Text(
+                                text = "Lihat Detail Riwayat Piutang",
+                                fontSize = 12.sp,
+                                fontWeight = FontWeight.SemiBold,
+                                color = slate700
+                            )
+                            Spacer(Modifier.width(6.dp))
+                            Icon(
+                                imageVector = Icons.AutoMirrored.Filled.ArrowForward,
+                                contentDescription = null,
+                                tint = slate700,
+                                modifier = Modifier.size(14.dp)
+                            )
                         }
                     }
                 }
             }
         }
     }
+}
 
 @Composable
 private fun MobileReceivableAccordionItem(
