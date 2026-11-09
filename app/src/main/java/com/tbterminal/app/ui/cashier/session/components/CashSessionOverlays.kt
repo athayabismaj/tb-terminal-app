@@ -20,9 +20,12 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.outlined.CheckCircle
 import androidx.compose.material.icons.outlined.Print
 import androidx.compose.material.icons.outlined.Share
+import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
@@ -91,212 +94,244 @@ fun SuccessModalOverlay(
     onPrint: () -> Unit,
     onShareWhatsApp: () -> Unit = {}
 ) {
-    Box(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(Color.Black.copy(alpha = 0.55f))
-            .clickable(enabled = false) {},
-        contentAlignment = Alignment.Center
+    Dialog(
+        onDismissRequest = onDismiss,
+        properties = DialogProperties(usePlatformDefaultWidth = false)
     ) {
-        Card(
+        Box(
             modifier = Modifier
-                .widthIn(max = 420.dp)
-                .padding(20.dp),
-            shape = RoundedCornerShape(24.dp),
-            colors = CardDefaults.cardColors(containerColor = Color.White),
-            elevation = CardDefaults.cardElevation(defaultElevation = 16.dp)
+                .fillMaxSize()
+                .background(Color.Black.copy(alpha = 0.45f))
+                .clickable(enabled = false) {},
+            contentAlignment = Alignment.Center
         ) {
-            Column(
-                modifier = Modifier.padding(24.dp),
-                horizontalAlignment = Alignment.CenterHorizontally
+            Card(
+                modifier = Modifier
+                    .widthIn(max = 480.dp)
+                    .fillMaxWidth()
+                    .padding(16.dp),
+                shape = RoundedCornerShape(20.dp),
+                colors = CardDefaults.cardColors(containerColor = Color.White),
+                border = BorderStroke(1.dp, Color(0xFFE2E8F0)),
+                elevation = CardDefaults.cardElevation(defaultElevation = 16.dp)
             ) {
-                // Icon Header
-                Box(
+                Column(
                     modifier = Modifier
-                        .size(72.dp)
-                        .clip(CircleShape)
-                        .background(Color(0xFFE8F5E9)),
-                    contentAlignment = Alignment.Center
+                        .fillMaxWidth()
+                        .padding(20.dp)
                 ) {
-                    Icon(
-                        Icons.Outlined.CheckCircle,
-                        contentDescription = null,
-                        tint = Color(0xFF10533C),
-                        modifier = Modifier.size(42.dp)
-                    )
-                }
+                    // Header: Matching QuickAddCustomerDialog Header
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Row(
+                            modifier = Modifier.weight(1f),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(10.dp)
+                        ) {
+                            Box(
+                                modifier = Modifier
+                                    .size(36.dp)
+                                    .clip(CircleShape)
+                                    .background(Color(0xFFDCFCE7)),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Icon(
+                                    Icons.Outlined.CheckCircle,
+                                    contentDescription = null,
+                                    tint = Color(0xFF15803D),
+                                    modifier = Modifier.size(20.dp)
+                                )
+                            }
+                            Column {
+                                Text(
+                                    text = "Tutup Shift Berhasil",
+                                    fontSize = 16.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = Color(0xFF0F172A)
+                                )
+                                Text(
+                                    text = "Sesi kasir telah dibukukan ke dalam sistem",
+                                    fontSize = 11.sp,
+                                    color = Color(0xFF64748B)
+                                )
+                            }
+                        }
 
-                Spacer(modifier = Modifier.height(16.dp))
-                Text(
-                    text = "Tutup Shift Berhasil",
-                    fontSize = 22.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = Color(0xFF0F172A)
-                )
-                Spacer(modifier = Modifier.height(6.dp))
-                Text(
-                    text = "Laporan sesi kasir telah divalidasi dan dibukukan ke dalam sistem.",
-                    fontSize = 13.sp,
-                    color = Color(0xFF64748B),
-                    textAlign = TextAlign.Center,
-                    lineHeight = 18.sp
-                )
+                        Box(
+                            modifier = Modifier
+                                .size(28.dp)
+                                .clip(CircleShape)
+                                .background(Color(0xFFF1F5F9))
+                                .clickable { onDismiss() },
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Icon(
+                                Icons.Default.Close,
+                                contentDescription = "Tutup",
+                                tint = Color(0xFF64748B),
+                                modifier = Modifier.size(14.dp)
+                            )
+                        }
+                    }
 
-                // Ringkasan KPI Rekap Shift
-                if (session != null) {
-                    Spacer(modifier = Modifier.height(20.dp))
+                    Spacer(modifier = Modifier.height(16.dp))
+
+                    // Ringkasan Rekap Shift
+                    if (session != null) {
+                        Column(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clip(RoundedCornerShape(12.dp))
+                                .background(Color(0xFFF8FAFC))
+                                .border(BorderStroke(1.dp, Color(0xFFE2E8F0)), RoundedCornerShape(12.dp))
+                                .padding(14.dp),
+                            verticalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween
+                            ) {
+                                Text("Kasir", fontSize = 12.sp, color = Color(0xFF64748B))
+                                Text(
+                                    session.userName ?: session.userId ?: "-",
+                                    fontSize = 12.sp,
+                                    fontWeight = FontWeight.SemiBold,
+                                    color = Color(0xFF0F172A)
+                                )
+                            }
+
+                            HorizontalDivider(color = Color(0xFFE2E8F0), thickness = 0.5.dp)
+
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween
+                            ) {
+                                Text("Uang Fisik Kasir", fontSize = 12.sp, color = Color(0xFF64748B))
+                                Text(
+                                    formatRupiah(session.closingCash),
+                                    fontSize = 12.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = Color(0xFF0F172A)
+                                )
+                            }
+
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween
+                            ) {
+                                Text("Total Kas Sistem", fontSize = 12.sp, color = Color(0xFF64748B))
+                                Text(
+                                    formatRupiah(session.systemCash ?: session.openingCash),
+                                    fontSize = 12.sp,
+                                    fontWeight = FontWeight.SemiBold,
+                                    color = Color(0xFF334155)
+                                )
+                            }
+
+                            val diff = session.difference ?: BigDecimal.ZERO
+                            val (diffText, diffColor) = when {
+                                diff.compareTo(BigDecimal.ZERO) == 0 -> "Pas (Rp 0)" to Color(0xFF16A34A)
+                                diff > BigDecimal.ZERO -> "Lebih (+${formatRupiah(diff)})" to Color(0xFF16A34A)
+                                else -> "Kurang (-${formatRupiah(diff.abs())})" to Color(0xFFDC2626)
+                            }
+
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween
+                            ) {
+                                Text("Status Selisih", fontSize = 12.sp, color = Color(0xFF64748B))
+                                Text(
+                                    diffText,
+                                    fontSize = 12.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = diffColor
+                                )
+                            }
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.height(16.dp))
+
+                    // Action Buttons (Matching QuickAddCustomerDialog Button Style)
                     Column(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .clip(RoundedCornerShape(14.dp))
-                            .background(Color(0xFFF8FAFC))
-                            .border(BorderStroke(1.dp, Color(0xFFE2E8F0)), RoundedCornerShape(14.dp))
-                            .padding(14.dp),
+                        modifier = Modifier.fillMaxWidth(),
                         verticalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
                         Row(
                             modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.SpaceBetween
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
                         ) {
-                            Text("Kasir", fontSize = 12.sp, color = Color(0xFF64748B))
-                            Text(
-                                session.userName ?: session.userId ?: "-",
-                                fontSize = 12.sp,
-                                fontWeight = FontWeight.SemiBold,
-                                color = Color(0xFF0F172A)
-                            )
+                            Button(
+                                onClick = onPrint,
+                                enabled = !isPrinting,
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .height(42.dp),
+                                shape = RoundedCornerShape(10.dp),
+                                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF15803D))
+                            ) {
+                                if (isPrinting) {
+                                    CircularProgressIndicator(
+                                        modifier = Modifier.size(16.dp),
+                                        color = Color.White,
+                                        strokeWidth = 2.dp
+                                    )
+                                    Spacer(modifier = Modifier.width(6.dp))
+                                    Text("Mencetak...", fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                                } else {
+                                    Icon(
+                                        Icons.Outlined.Print,
+                                        contentDescription = null,
+                                        modifier = Modifier.size(16.dp)
+                                    )
+                                    Spacer(modifier = Modifier.width(6.dp))
+                                    Text("Cetak Slip", fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                                }
+                            }
+
+                            OutlinedButton(
+                                onClick = onShareWhatsApp,
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .height(42.dp),
+                                shape = RoundedCornerShape(10.dp),
+                                border = BorderStroke(1.dp, Color(0xFF10B981)),
+                                colors = ButtonDefaults.outlinedButtonColors(contentColor = Color(0xFF047857))
+                            ) {
+                                Icon(
+                                    Icons.Outlined.Share,
+                                    contentDescription = null,
+                                    modifier = Modifier.size(16.dp),
+                                    tint = Color(0xFF047857)
+                                )
+                                Spacer(modifier = Modifier.width(6.dp))
+                                Text("Kirim WA", fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                            }
                         }
 
-                        HorizontalDivider(color = Color(0xFFE2E8F0), thickness = 0.5.dp)
-
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.SpaceBetween
+                        Button(
+                            onClick = onDismiss,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(42.dp),
+                            shape = RoundedCornerShape(10.dp),
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = Color(0xFFF1F5F9),
+                                contentColor = Color(0xFF334155)
+                            ),
+                            elevation = ButtonDefaults.buttonElevation(defaultElevation = 0.dp)
                         ) {
-                            Text("Uang Fisik Kasir", fontSize = 12.sp, color = Color(0xFF64748B))
                             Text(
-                                formatRupiah(session.closingCash),
-                                fontSize = 12.sp,
-                                fontWeight = FontWeight.Bold,
-                                color = Color(0xFF0F172A)
-                            )
-                        }
-
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.SpaceBetween
-                        ) {
-                            Text("Total Kas Sistem", fontSize = 12.sp, color = Color(0xFF64748B))
-                            Text(
-                                formatRupiah(session.systemCash ?: session.openingCash),
+                                "Selesai & Tutup",
                                 fontSize = 12.sp,
                                 fontWeight = FontWeight.SemiBold,
                                 color = Color(0xFF334155)
                             )
                         }
-
-                        val diff = session.difference ?: BigDecimal.ZERO
-                        val (diffText, diffColor) = when {
-                            diff.compareTo(BigDecimal.ZERO) == 0 -> "Pas (Rp 0)" to Color(0xFF16A34A)
-                            diff > BigDecimal.ZERO -> "Lebih (+${formatRupiah(diff)})" to Color(0xFF16A34A)
-                            else -> "Kurang (-${formatRupiah(diff.abs())})" to Color(0xFFDC2626)
-                        }
-
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.SpaceBetween
-                        ) {
-                            Text("Status Selisih", fontSize = 12.sp, color = Color(0xFF64748B))
-                            Text(
-                                diffText,
-                                fontSize = 12.sp,
-                                fontWeight = FontWeight.Bold,
-                                color = diffColor
-                            )
-                        }
                     }
-                }
-
-                Spacer(modifier = Modifier.height(24.dp))
-
-                // Tombol Cetak Slip Rekap
-                Button(
-                    onClick = onPrint,
-                    enabled = !isPrinting,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(48.dp),
-                    shape = RoundedCornerShape(12.dp),
-                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF10533C))
-                ) {
-                    if (isPrinting) {
-                        CircularProgressIndicator(
-                            modifier = Modifier.size(18.dp),
-                            color = Color.White,
-                            strokeWidth = 2.dp
-                        )
-                        Spacer(modifier = Modifier.width(10.dp))
-                        Text("MENCETAK STRUK...", fontSize = 12.sp, fontWeight = FontWeight.Bold)
-                    } else {
-                        Icon(
-                            Icons.Outlined.Print,
-                            contentDescription = null,
-                            modifier = Modifier.size(18.dp)
-                        )
-                        Spacer(modifier = Modifier.width(8.dp))
-                        Text(
-                            "CETAK SLIP REKAP (PRINTER)",
-                            fontSize = 12.sp,
-                            fontWeight = FontWeight.Bold,
-                            letterSpacing = 0.5.sp
-                        )
-                    }
-                }
-
-                Spacer(modifier = Modifier.height(10.dp))
-
-                // Tombol Bagikan ke WhatsApp Owner
-                OutlinedButton(
-                    onClick = onShareWhatsApp,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(48.dp),
-                    shape = RoundedCornerShape(12.dp),
-                    border = BorderStroke(1.5.dp, Color(0xFF10B981)),
-                    colors = ButtonDefaults.outlinedButtonColors(contentColor = Color(0xFF047857))
-                ) {
-                    Icon(
-                        Icons.Outlined.Share,
-                        contentDescription = null,
-                        modifier = Modifier.size(18.dp),
-                        tint = Color(0xFF047857)
-                    )
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Text(
-                        "KIRIM RINGKASAN KE WHATSAPP",
-                        fontSize = 12.sp,
-                        fontWeight = FontWeight.Bold,
-                        letterSpacing = 0.5.sp
-                    )
-                }
-
-                Spacer(modifier = Modifier.height(10.dp))
-
-                // Tombol Kembali ke Beranda
-                OutlinedButton(
-                    onClick = onDismiss,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(46.dp),
-                    shape = RoundedCornerShape(12.dp),
-                    border = BorderStroke(1.dp, Color(0xFFE2E8F0)),
-                    colors = ButtonDefaults.outlinedButtonColors(contentColor = Color(0xFF64748B))
-                ) {
-                    Text(
-                        "KEMBALI KE BERANDA",
-                        fontSize = 12.sp,
-                        fontWeight = FontWeight.SemiBold
-                    )
                 }
             }
         }

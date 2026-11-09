@@ -1142,72 +1142,92 @@ private fun CustomerReceivableGroupCard(
                 enter = expandVertically() + fadeIn(),
                 exit = shrinkVertically() + fadeOut()
             ) {
-                Column(modifier = Modifier.fillMaxWidth().background(Color(0xFFF8FAFC).copy(alpha = 0.5f))) {
-                    HorizontalDivider(color = slate100)
+                CustomerGroupExpandedContent(
+                    customerId = customerId,
+                    customerName = customerName,
+                    receivables = receivables,
+                    onPayClick = onPayClick,
+                    onOpenLedger = onOpenLedger
+                )
+            }
+        }
+    }
+}
 
-                    val chronological = remember(receivables) {
-                        receivables.sortedWith(
-                            compareBy<Receivable> { it.debtDate }
-                                .thenBy { it.createdAt }
-                                .thenBy { it.id }
-                        )
-                    }
-                    val sortedReceivables = remember(receivables) {
-                        receivables.sortedWith(
-                            compareByDescending<Receivable> { it.debtDate }
-                                .thenByDescending { it.createdAt }
-                                .thenByDescending { it.id }
-                        )
-                    }
+@Composable
+private fun CustomerGroupExpandedContent(
+    customerId: String,
+    customerName: String,
+    receivables: List<Receivable>,
+    onPayClick: (Receivable) -> Unit,
+    onOpenLedger: (String, String) -> Unit
+) {
+    val slate100 = Color(0xFFF1F5F9)
+    val slate700 = Color(0xFF334155)
 
-                    val limit = 3
-                    val itemsToDisplay = sortedReceivables.take(limit)
+    Column(modifier = Modifier.fillMaxWidth().background(Color(0xFFF8FAFC).copy(alpha = 0.5f))) {
+        HorizontalDivider(color = slate100)
 
-                    itemsToDisplay.forEachIndexed { index, receivable ->
-                        if (index > 0) {
-                            HorizontalDivider(color = slate100)
-                        }
-                        val cardinalNumber = chronological.indexOfFirst { it.id == receivable.id } + 1
-                        MobileReceivableAccordionItem(
-                            receivable = receivable,
-                            cardinalNumber = cardinalNumber,
-                            onPayClick = onPayClick,
-                            onOpenLedger = onOpenLedger
-                        )
-                    }
+        val chronological = remember(receivables) {
+            receivables.sortedWith(
+                compareBy<Receivable> { it.debtDate }
+                    .thenBy { it.createdAt }
+                    .thenBy { it.id }
+            )
+        }
+        val sortedReceivables = remember(receivables) {
+            receivables.sortedWith(
+                compareByDescending<Receivable> { it.debtDate }
+                    .thenByDescending { it.createdAt }
+                    .thenByDescending { it.id }
+            )
+        }
 
-                    // Bottom Card Action Footer: "Lihat Detail Riwayat Piutang ->"
-                    HorizontalDivider(color = slate100)
-                    Surface(
-                        onClick = { onOpenLedger(customerId, customerName) },
-                        color = Color.White,
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(46.dp)
-                    ) {
-                        Row(
-                            modifier = Modifier
-                                .fillMaxSize()
-                                .padding(horizontal = 16.dp),
-                            horizontalArrangement = Arrangement.Center,
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Text(
-                                text = "Lihat Detail Riwayat Piutang",
-                                fontSize = 12.sp,
-                                fontWeight = FontWeight.SemiBold,
-                                color = slate700
-                            )
-                            Spacer(Modifier.width(6.dp))
-                            Icon(
-                                imageVector = Icons.AutoMirrored.Filled.ArrowForward,
-                                contentDescription = null,
-                                tint = slate700,
-                                modifier = Modifier.size(14.dp)
-                            )
-                        }
-                    }
-                }
+        val limit = 3
+        val itemsToDisplay = sortedReceivables.take(limit)
+
+        itemsToDisplay.forEachIndexed { index, receivable ->
+            if (index > 0) {
+                HorizontalDivider(color = slate100)
+            }
+            val cardinalNumber = chronological.indexOfFirst { it.id == receivable.id } + 1
+            MobileReceivableAccordionItem(
+                receivable = receivable,
+                cardinalNumber = cardinalNumber,
+                onPayClick = onPayClick,
+                onOpenLedger = onOpenLedger
+            )
+        }
+
+        // Bottom Card Action Footer: "Lihat Detail Riwayat Piutang ->"
+        HorizontalDivider(color = slate100)
+        Surface(
+            onClick = { onOpenLedger(customerId, customerName) },
+            color = Color.White,
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(46.dp)
+        ) {
+            Row(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(horizontal = 16.dp),
+                horizontalArrangement = Arrangement.Center,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = "Lihat Detail Riwayat Piutang",
+                    fontSize = 12.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    color = slate700
+                )
+                Spacer(Modifier.width(6.dp))
+                Icon(
+                    imageVector = Icons.AutoMirrored.Filled.ArrowForward,
+                    contentDescription = null,
+                    tint = slate700,
+                    modifier = Modifier.size(14.dp)
+                )
             }
         }
     }
@@ -1231,21 +1251,6 @@ private fun MobileReceivableAccordionItem(
     }
 
     val slate50 = Color(0xFFF8FAFC)
-    val slate100 = Color(0xFFF1F5F9)
-    val slate200 = Color(0xFFE2E8F0)
-    val slate400 = Color(0xFF94A3B8)
-    val slate500 = Color(0xFF64748B)
-    val slate600 = Color(0xFF475569)
-    val slate700 = Color(0xFF334155)
-    val slate800 = Color(0xFF1E293B)
-    val slate900 = Color(0xFF0F172A)
-    val rose500 = Color(0xFFF43F5E)
-    val rose600 = Color(0xFFE11D48)
-    val amber500 = Color(0xFFF59E0B)
-    val amber700 = Color(0xFFB45309)
-    val emerald500 = Color(0xFF10B981)
-    val emerald700 = Color(0xFF047857)
-
     val itemBg = if (isPaid) slate50.copy(alpha = 0.7f) else Color.White
 
     Surface(
@@ -1260,206 +1265,267 @@ private fun MobileReceivableAccordionItem(
                 .padding(horizontal = 14.dp, vertical = 12.dp),
             verticalArrangement = Arrangement.spacedBy(10.dp)
         ) {
-            // Line 1: Invoice ID & Status Badge
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
+            AccordionItemHeader(
+                receivable = receivable,
+                cardinalNumber = cardinalNumber,
+                isPaid = isPaid,
+                isPartial = isPartial
+            )
+            AccordionItemAmountGrid(
+                receivable = receivable,
+                isPaid = isPaid
+            )
+            AccordionItemFooter(
+                receivable = receivable,
+                isPaid = isPaid,
+                isOverdue = isOverdue,
+                onPayClick = onPayClick,
+                onOpenLedger = onOpenLedger
+            )
+        }
+    }
+}
+
+@Composable
+private fun AccordionItemHeader(
+    receivable: Receivable,
+    cardinalNumber: Int,
+    isPaid: Boolean,
+    isPartial: Boolean
+) {
+    val slate400 = Color(0xFF94A3B8)
+    val slate700 = Color(0xFF334155)
+    val slate900 = Color(0xFF0F172A)
+    val rose500 = Color(0xFFF43F5E)
+    val rose600 = Color(0xFFE11D48)
+    val amber500 = Color(0xFFF59E0B)
+    val amber700 = Color(0xFFB45309)
+    val emerald500 = Color(0xFF10B981)
+    val emerald700 = Color(0xFF047857)
+
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            Icon(
+                imageVector = Icons.AutoMirrored.Outlined.ReceiptLong,
+                contentDescription = null,
+                tint = slate400,
+                modifier = Modifier.size(16.dp)
+            )
+            Text(
+                text = receivable.mobileReference(),
+                fontSize = 12.sp,
+                fontWeight = FontWeight.Bold,
+                color = if (isPaid) slate700 else slate900,
+                fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace
+            )
+            Text(
+                text = "Nota $cardinalNumber",
+                fontSize = 11.sp,
+                fontWeight = FontWeight.Medium,
+                color = slate400
+            )
+        }
+
+        val (badgeDotColor, badgeTextColor, badgeLabel) = when {
+            isPaid -> Triple(emerald500, emerald700, "Terbayar Penuh")
+            isPartial -> Triple(amber500, amber700, "Sebagian")
+            else -> Triple(rose500, rose600, "Belum Bayar")
+        }
+
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(6.dp)
+        ) {
+            Box(
+                modifier = Modifier
+                    .size(6.dp)
+                    .background(badgeDotColor, CircleShape)
+            )
+            Text(
+                text = badgeLabel,
+                fontSize = 12.sp,
+                fontWeight = FontWeight.Medium,
+                color = badgeTextColor
+            )
+        }
+    }
+}
+
+@Composable
+private fun AccordionItemAmountGrid(
+    receivable: Receivable,
+    isPaid: Boolean
+) {
+    val slate400 = Color(0xFF94A3B8)
+    val slate500 = Color(0xFF64748B)
+    val slate600 = Color(0xFF475569)
+    val slate700 = Color(0xFF334155)
+    val slate800 = Color(0xFF1E293B)
+    val slate900 = Color(0xFF0F172A)
+
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(vertical = 2.dp),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Column {
+            Text(
+                text = "Sisa Piutang",
+                fontSize = 11.sp,
+                color = slate500
+            )
+            Text(
+                text = receivable.remainingAmount.currencyText(),
+                fontSize = 14.sp,
+                fontWeight = FontWeight.Bold,
+                color = if (isPaid) slate700 else slate900,
+                modifier = Modifier.padding(top = 2.dp)
+            )
+        }
+
+        Column(horizontalAlignment = Alignment.End) {
+            Text(
+                text = "Total Tagihan",
+                fontSize = 11.sp,
+                color = slate500
+            )
+            if (isPaid) {
+                Text(
+                    text = receivable.amount.currencyText(),
+                    fontSize = 13.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    color = slate600,
+                    modifier = Modifier.padding(top = 2.dp)
+                )
+            } else {
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    modifier = Modifier.padding(top = 2.dp)
                 ) {
-                    Icon(
-                        imageVector = Icons.AutoMirrored.Outlined.ReceiptLong,
-                        contentDescription = null,
-                        tint = slate400,
-                        modifier = Modifier.size(16.dp)
+                    Text(
+                        text = receivable.amount.currencyText(),
+                        fontSize = 13.sp,
+                        fontWeight = FontWeight.SemiBold,
+                        color = slate800
                     )
                     Text(
-                        text = receivable.mobileReference(),
+                        text = " / ${receivable.paidAmount.currencyText()}",
                         fontSize = 12.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = if (isPaid) slate700 else slate900,
-                        fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace
-                    )
-                    Text(
-                        text = "Nota $cardinalNumber",
-                        fontSize = 11.sp,
-                        fontWeight = FontWeight.Medium,
+                        fontWeight = FontWeight.Normal,
                         color = slate400
                     )
                 }
+            }
+        }
+    }
+}
 
-                val (badgeDotColor, badgeTextColor, badgeLabel) = when {
-                    isPaid -> Triple(emerald500, emerald700, "Terbayar Penuh")
-                    isPartial -> Triple(amber500, amber700, "Sebagian")
-                    else -> Triple(rose500, rose600, "Belum Bayar")
+@Composable
+private fun AccordionItemFooter(
+    receivable: Receivable,
+    isPaid: Boolean,
+    isOverdue: Boolean,
+    onPayClick: (Receivable) -> Unit,
+    onOpenLedger: (String, String) -> Unit
+) {
+    val slate100 = Color(0xFFF1F5F9)
+    val slate200 = Color(0xFFE2E8F0)
+    val slate400 = Color(0xFF94A3B8)
+    val slate500 = Color(0xFF64748B)
+    val slate700 = Color(0xFF334155)
+    val slate900 = Color(0xFF0F172A)
+    val rose500 = Color(0xFFF43F5E)
+    val amber500 = Color(0xFFF59E0B)
+    val emerald500 = Color(0xFF10B981)
+
+    HorizontalDivider(color = if (isPaid) slate200.copy(alpha = 0.6f) else slate100)
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(top = 2.dp),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(6.dp)
+        ) {
+            Box(
+                modifier = Modifier
+                    .size(6.dp)
+                    .background(if (isPaid) emerald500 else if (isOverdue) rose500 else amber500, CircleShape)
+            )
+            if (isPaid) {
+                Text(
+                    text = "Lunas: ${receivable.dueDate.simpleDate()}",
+                    fontSize = 11.sp,
+                    color = slate500
+                )
+            } else {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text(
+                        text = "Jatuh tempo: ",
+                        fontSize = 11.sp,
+                        color = slate500
+                    )
+                    Text(
+                        text = receivable.dueDate.simpleDate(),
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.Medium,
+                        color = slate700
+                    )
                 }
+            }
+        }
 
+        if (!isPaid) {
+            Surface(
+                onClick = { onPayClick(receivable) },
+                shape = RoundedCornerShape(12.dp),
+                color = slate900,
+                contentColor = Color.White,
+                shadowElevation = 0.5.dp,
+                modifier = Modifier.height(34.dp)
+            ) {
                 Row(
+                    modifier = Modifier.padding(horizontal = 14.dp),
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(6.dp)
                 ) {
-                    Box(
-                        modifier = Modifier
-                            .size(6.dp)
-                            .background(badgeDotColor, CircleShape)
+                    Icon(
+                        imageVector = Icons.Outlined.AccountBalanceWallet,
+                        contentDescription = null,
+                        tint = Color.White,
+                        modifier = Modifier.size(14.dp)
                     )
                     Text(
-                        text = badgeLabel,
+                        text = "Bayar",
                         fontSize = 12.sp,
-                        fontWeight = FontWeight.Medium,
-                        color = badgeTextColor
+                        fontWeight = FontWeight.SemiBold,
+                        color = Color.White
                     )
                 }
             }
-
-            // Line 2: Grid 2 Cols (Sisa Piutang & Total Tagihan)
-            Row(
+        } else {
+            Text(
+                text = "Lihat Bukti →",
+                fontSize = 11.sp,
+                fontWeight = FontWeight.Medium,
+                color = slate400,
                 modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(vertical = 2.dp),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                // Col 1: Sisa Piutang
-                Column {
-                    Text(
-                        text = "Sisa Piutang",
-                        fontSize = 11.sp,
-                        color = slate500
-                    )
-                    Text(
-                        text = receivable.remainingAmount.currencyText(),
-                        fontSize = 14.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = if (isPaid) slate700 else slate900,
-                        modifier = Modifier.padding(top = 2.dp)
-                    )
-                }
-
-                // Col 2: Total Tagihan
-                Column(horizontalAlignment = Alignment.End) {
-                    Text(
-                        text = "Total Tagihan",
-                        fontSize = 11.sp,
-                        color = slate500
-                    )
-                    if (isPaid) {
-                        Text(
-                            text = receivable.amount.currencyText(),
-                            fontSize = 13.sp,
-                            fontWeight = FontWeight.SemiBold,
-                            color = slate600,
-                            modifier = Modifier.padding(top = 2.dp)
-                        )
-                    } else {
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            modifier = Modifier.padding(top = 2.dp)
-                        ) {
-                            Text(
-                                text = receivable.amount.currencyText(),
-                                fontSize = 13.sp,
-                                fontWeight = FontWeight.SemiBold,
-                                color = slate800
-                            )
-                            Text(
-                                text = " / ${receivable.paidAmount.currencyText()}",
-                                fontSize = 12.sp,
-                                fontWeight = FontWeight.Normal,
-                                color = slate400
-                            )
-                        }
-                    }
-                }
-            }
-
-            // Line 3: Due date / Lunas & Action button
-            HorizontalDivider(color = if (isPaid) slate200.copy(alpha = 0.6f) else slate100)
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(top = 2.dp),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                // Left: Due Date or Lunas Date
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(6.dp)
-                ) {
-                    Box(
-                        modifier = Modifier
-                            .size(6.dp)
-                            .background(if (isPaid) emerald500 else if (isOverdue) rose500 else amber500, CircleShape)
-                    )
-                    if (isPaid) {
-                        Text(
-                            text = "Lunas: ${receivable.dueDate.simpleDate()}",
-                            fontSize = 11.sp,
-                            color = slate500
-                        )
-                    } else {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Text(
-                                text = "Jatuh tempo: ",
-                                fontSize = 11.sp,
-                                color = slate500
-                            )
-                            Text(
-                                text = receivable.dueDate.simpleDate(),
-                                fontSize = 11.sp,
-                                fontWeight = FontWeight.Medium,
-                                color = slate700
-                            )
-                        }
-                    }
-                }
-
-                // Right: Action
-                if (!isPaid) {
-                    Surface(
-                        onClick = { onPayClick(receivable) },
-                        shape = RoundedCornerShape(12.dp),
-                        color = slate900,
-                        contentColor = Color.White,
-                        shadowElevation = 0.5.dp,
-                        modifier = Modifier.height(34.dp)
-                    ) {
-                        Row(
-                            modifier = Modifier.padding(horizontal = 14.dp),
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(6.dp)
-                        ) {
-                            Icon(
-                                imageVector = Icons.Outlined.AccountBalanceWallet,
-                                contentDescription = null,
-                                tint = Color.White,
-                                modifier = Modifier.size(14.dp)
-                            )
-                            Text(
-                                text = "Bayar",
-                                fontSize = 12.sp,
-                                fontWeight = FontWeight.SemiBold,
-                                color = Color.White
-                            )
-                        }
-                    }
-                } else {
-                    Text(
-                        text = "Lihat Bukti →",
-                        fontSize = 11.sp,
-                        fontWeight = FontWeight.Medium,
-                        color = slate400,
-                        modifier = Modifier
-                            .clip(RoundedCornerShape(4.dp))
-                            .clickable { onOpenLedger(receivable.customerId, receivable.customerName) }
-                            .padding(4.dp)
-                    )
-                }
-            }
+                    .clip(RoundedCornerShape(4.dp))
+                    .clickable { onOpenLedger(receivable.customerId, receivable.customerName) }
+                    .padding(4.dp)
+            )
         }
     }
 }
