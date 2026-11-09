@@ -43,6 +43,7 @@ import androidx.compose.foundation.border
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.ArrowForward
 import androidx.compose.material.icons.outlined.AccountBalanceWallet
+import androidx.compose.material.icons.outlined.Share
 import androidx.compose.material.icons.outlined.Shield
 import androidx.compose.material.icons.outlined.Tune
 import androidx.compose.material.icons.outlined.Description
@@ -126,6 +127,7 @@ internal fun ReceivableTableCard(
     onNextPage: () -> Unit,
     compact: Boolean = false,
     onCustomerDetailClick: (String) -> Unit = {},
+    onQuickBillCustomer: (String) -> Unit = {},
 ) {
     if (compact) {
         var userPage by rememberSaveable { mutableIntStateOf(1) }
@@ -169,7 +171,14 @@ internal fun ReceivableTableCard(
 
                         Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
                             pageCustomers.forEach { (customerId, customerReceivables) ->
-                                CustomerReceivableGroupCard(customerId, customerReceivables, onPayClick, { id, _ -> onCustomerDetailClick(id) }, defaultExpanded = false)
+                                CustomerReceivableGroupCard(
+                                    customerId = customerId,
+                                    receivables = customerReceivables,
+                                    onPayClick = onPayClick,
+                                    onOpenLedger = { id, _ -> onCustomerDetailClick(id) },
+                                    onQuickBill = { onQuickBillCustomer(customerId) },
+                                    defaultExpanded = false
+                                )
                             }
                         }
                         
@@ -971,6 +980,7 @@ private fun CustomerReceivableGroupCard(
     receivables: List<Receivable>,
     onPayClick: (Receivable) -> Unit,
     onOpenLedger: (String, String) -> Unit,
+    onQuickBill: () -> Unit = {},
     defaultExpanded: Boolean = false,
 ) {
     val customerName = receivables.firstOrNull()?.customerName ?: "Unknown"
@@ -1162,38 +1172,76 @@ private fun CustomerReceivableGroupCard(
                         )
                     }
                     
-                    // Show "Detail Riwayat Piutang" Card Footer
+                    // Show "Detail Riwayat Piutang" and "Tagih WhatsApp" Footer
                     HorizontalDivider(color = slate100)
-                    Surface(
-                        onClick = { onOpenLedger(customerId, customerName) },
-                        color = Color.White,
-                        modifier = Modifier.fillMaxWidth()
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 14.dp, vertical = 10.dp),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(vertical = 14.dp),
-                            horizontalArrangement = Arrangement.Center,
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            val footerText = if (remainingCount > 0) {
-                                "Lihat $remainingCount nota lainnya & riwayat piutang"
-                            } else {
-                                "Lihat Detail Riwayat Piutang"
+                        if (!allPaid) {
+                            Surface(
+                                onClick = onQuickBill,
+                                shape = RoundedCornerShape(10.dp),
+                                color = Color(0xFF15803D),
+                                contentColor = Color.White,
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .height(36.dp)
+                            ) {
+                                Row(
+                                    modifier = Modifier.padding(horizontal = 8.dp),
+                                    horizontalArrangement = Arrangement.Center,
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Outlined.Share,
+                                        contentDescription = null,
+                                        tint = Color.White,
+                                        modifier = Modifier.size(14.dp)
+                                    )
+                                    Spacer(Modifier.width(6.dp))
+                                    Text(
+                                        text = "Tagih WhatsApp",
+                                        fontSize = 12.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        color = Color.White
+                                    )
+                                }
                             }
-                            Text(
-                                text = footerText,
-                                fontSize = 12.sp,
-                                fontWeight = FontWeight.SemiBold,
-                                color = slate700
-                            )
-                            Spacer(Modifier.width(6.dp))
-                            Icon(
-                                imageVector = Icons.AutoMirrored.Filled.ArrowForward,
-                                contentDescription = null,
-                                tint = slate700,
-                                modifier = Modifier.size(13.dp)
-                            )
+                        }
+
+                        Surface(
+                            onClick = { onOpenLedger(customerId, customerName) },
+                            color = Color.White,
+                            shape = RoundedCornerShape(10.dp),
+                            border = BorderStroke(1.dp, slate200),
+                            modifier = Modifier
+                                .weight(if (!allPaid) 1f else 2f)
+                                .height(36.dp)
+                        ) {
+                            Row(
+                                modifier = Modifier.padding(horizontal = 8.dp),
+                                horizontalArrangement = Arrangement.Center,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                val footerText = if (remainingCount > 0) "Riwayat ($remainingCount+)" else "Riwayat Piutang"
+                                Text(
+                                    text = footerText,
+                                    fontSize = 12.sp,
+                                    fontWeight = FontWeight.SemiBold,
+                                    color = slate700
+                                )
+                                Spacer(Modifier.width(4.dp))
+                                Icon(
+                                    imageVector = Icons.AutoMirrored.Filled.ArrowForward,
+                                    contentDescription = null,
+                                    tint = slate700,
+                                    modifier = Modifier.size(13.dp)
+                                )
+                            }
                         }
                     }
                 }

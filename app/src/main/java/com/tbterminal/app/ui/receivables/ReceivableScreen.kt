@@ -47,6 +47,8 @@ internal fun ReceivableScreen(
     onCustomerDetailClick: (String) -> Unit = {}
 ) {
     var showActionBottomSheet by rememberSaveable { mutableStateOf(false) }
+    var showQuickBillSheet by rememberSaveable { mutableStateOf(false) }
+    var quickBillCustomerId by rememberSaveable { mutableStateOf<String?>(null) }
 
     BoxWithConstraints(modifier = modifier.fillMaxSize().background(ReceivableBackground)) {
         val compact = maxWidth < 720.dp
@@ -57,7 +59,10 @@ internal fun ReceivableScreen(
         ) {
             ReceivableSummaryCard(
                 uiState = uiState,
-                onQuickBillClick = { showActionBottomSheet = true }
+                onQuickBillClick = {
+                    quickBillCustomerId = null
+                    showQuickBillSheet = true
+                }
             )
 
             ReceivableTableCard(
@@ -78,7 +83,11 @@ internal fun ReceivableScreen(
                 onPreviousPage = onPreviousPage,
                 onNextPage = onNextPage,
                 compact = compact,
-                onCustomerDetailClick = onCustomerDetailClick
+                onCustomerDetailClick = onCustomerDetailClick,
+                onQuickBillCustomer = { customerId ->
+                    quickBillCustomerId = customerId
+                    showQuickBillSheet = true
+                }
             )
         }
 
@@ -126,6 +135,14 @@ internal fun ReceivableScreen(
         ReceivableSummaryBottomSheet(
             uiState = uiState,
             onDismiss = onDismissSummary
+        )
+    }
+
+    if (showQuickBillSheet) {
+        QuickBillBottomSheet(
+            uiState = uiState,
+            initialCustomerId = quickBillCustomerId,
+            onDismiss = { showQuickBillSheet = false }
         )
     }
 }
