@@ -54,6 +54,7 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import com.tbterminal.app.data.model.Receivable
+import java.math.BigDecimal
 
 @Composable
 internal fun ReceivablePaymentDialog(
@@ -519,3 +520,11 @@ private fun PaymentMethodRow(
         }
     }
 }
+
+private fun Receivable.mobileReference(): String =
+    legacyInvoiceNumber?.takeIf(String::isNotBlank)
+        ?: transactionId?.shortTransactionId()
+        ?: source
+
+private fun BigDecimal.toInputText(): String =
+    stripTrailingZeros().toPlainString()
