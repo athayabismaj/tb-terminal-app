@@ -486,10 +486,17 @@ private fun ReceivableHeaderToolbar(
                 contentColor = Color.White,
                 shadowElevation = 1.dp
             ) {
-                Box(
-                    modifier = Modifier.padding(horizontal = 14.dp),
-                    contentAlignment = Alignment.Center
+                Row(
+                    modifier = Modifier.padding(horizontal = 12.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(6.dp)
                 ) {
+                    Icon(
+                        imageVector = Icons.Outlined.Tune,
+                        contentDescription = null,
+                        tint = Color.White,
+                        modifier = Modifier.size(15.dp)
+                    )
                     Text(
                         text = "Kelola",
                         fontSize = 12.sp,
@@ -1064,8 +1071,14 @@ private fun CustomerReceivableGroupCard(
                     // Header Badge & Chevron Action
                     Row(
                         verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                        horizontalArrangement = Arrangement.spacedBy(4.dp)
                     ) {
+                        Icon(
+                            imageVector = Icons.AutoMirrored.Outlined.ReceiptLong,
+                            contentDescription = null,
+                            tint = slate400,
+                            modifier = Modifier.size(14.dp)
+                        )
                         Text(
                             text = "${receivables.size} Nota",
                             fontSize = 12.sp,

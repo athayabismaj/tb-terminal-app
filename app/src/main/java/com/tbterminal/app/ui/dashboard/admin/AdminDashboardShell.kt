@@ -11,6 +11,8 @@ import com.tbterminal.app.ui.dashboard.BackofficeSection
 import com.tbterminal.app.ui.dashboard.isOwnerPersona
 import com.tbterminal.app.ui.dashboard.cashier.CashierDashboardShell
 import com.tbterminal.app.ui.dashboard.cashier.CashierDestination
+import androidx.compose.foundation.layout.Row
+import androidx.compose.ui.Alignment
 import com.tbterminal.app.navigation.AppAccessPolicy
 import com.tbterminal.app.navigation.AppCapability
 
@@ -90,6 +92,7 @@ fun AdminDashboardShell(
             userName = userName,
             role = role,
             activeDestination = cashierDestination,
+            pageTitle = pageTitle,
             onDashboardClick = navigateOrFallback(AdminDestination.Dashboard, onDashboardClick),
             onPosClick = navigateOrFallback(AdminDestination.NewTransaction, onSalesTransactionsClick),
             onCashSessionClick = onCashReconciliationClick,
@@ -100,6 +103,11 @@ fun AdminDashboardShell(
             onProfileClick = navigateOrFallback(AdminDestination.Profile, onProfileClick),
             onSettingsClick = navigateOrFallback(AdminDestination.Settings, onSettingsClick),
             onLogout = onLogout,
+            topBarActions = {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    topBarActions()
+                }
+            },
             content = content,
         )
         return

@@ -138,6 +138,7 @@ fun CashierDashboardShell(
     onLogout: () -> Unit,
     onLockScreen: (() -> Unit)? = null,
     showHeader: Boolean = true,
+    pageTitle: String? = null,
     topBarActions: (@Composable () -> Unit)? = null,
     content: @Composable (Modifier) -> Unit
 ) {
@@ -211,14 +212,17 @@ fun CashierDashboardShell(
                     CashierCompactTopBar(
                         userName = userName,
                         role = role,
-                        title = when (activeDestination) {
+                        title = pageTitle ?: when (activeDestination) {
                             CashierDestination.CashSession -> "Kas Harian & Shift"
                             CashierDestination.TransactionHistory -> "Riwayat Transaksi"
                             CashierDestination.Pos -> "Transaksi Kasir (POS)"
+                            CashierDestination.Receivables -> "Piutang Pelanggan"
+                            CashierDestination.ReceivablePayments -> "Riwayat Pembayaran Piutang"
+                            CashierDestination.Customers -> "Pelanggan"
                             else -> "Dashboard"
                         },
                         subtitle = when (activeDestination) {
-                            CashierDestination.CashSession, CashierDestination.TransactionHistory -> "Terminal Barokah Jaya"
+                            CashierDestination.CashSession, CashierDestination.TransactionHistory, CashierDestination.Receivables, CashierDestination.ReceivablePayments, CashierDestination.Customers -> "Terminal Barokah Jaya"
                             else -> "Terminal Barokah Jaya"
                         },
                         topBarActions = topBarActions,
@@ -358,8 +362,9 @@ private fun CashierCompactTopBar(
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.SpaceBetween
         ) {
-            // Sisi Kiri: Badge Logo TB + Title "Transaksi Kasir (POS)" + Subtitle "Terminal Barokah Jaya"
+            // Sisi Kiri: Badge Logo TB + Title + Subtitle
             Row(
+                modifier = Modifier.weight(1f, fill = false),
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(10.dp)
             ) {
@@ -382,7 +387,7 @@ private fun CashierCompactTopBar(
                 }
 
                 // Title & Subtitle (dinamis sesuai layar kasir)
-                Column(modifier = Modifier.widthIn(max = 210.dp)) {
+                Column(modifier = Modifier.weight(1f, fill = false)) {
                     Text(
                         text = title,
                         color = Color(0xFF0F172A),
