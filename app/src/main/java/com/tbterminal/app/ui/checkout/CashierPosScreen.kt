@@ -753,10 +753,7 @@ private fun PosFilterDialog(
         properties = DialogProperties(usePlatformDefaultWidth = false)
     ) {
         Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .background(Color.Black.copy(alpha = 0.55f))
-                .clickable(enabled = false) {},
+            modifier = Modifier.fillMaxSize(),
             contentAlignment = Alignment.Center
         ) {
             Card(
@@ -775,44 +772,25 @@ private fun PosFilterDialog(
                         .padding(20.dp)
                         .testTag("pos-filter-sheet")
                 ) {
-                    // Header: Icon badge + Title/Subtitle + Close (X) button
+                    // Header: Title + Subtitle on left, Circular Close (X) button on right (matching Tambah Pelanggan)
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.SpaceBetween,
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Row(
-                            modifier = Modifier.weight(1f),
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(10.dp)
-                        ) {
-                            Box(
-                                modifier = Modifier
-                                    .size(36.dp)
-                                    .clip(CircleShape)
-                                    .background(BrandGreenLight),
-                                contentAlignment = Alignment.Center
-                            ) {
-                                Icon(
-                                    imageVector = Icons.Outlined.Tune,
-                                    contentDescription = null,
-                                    tint = BrandForest,
-                                    modifier = Modifier.size(20.dp)
-                                )
-                            }
-                            Column {
-                                Text(
-                                    text = "Filter Katalog Produk",
-                                    fontSize = 16.sp,
-                                    fontWeight = FontWeight.Bold,
-                                    color = Slate900
-                                )
-                                Text(
-                                    text = "Atur kategori dan ketersediaan stok produk",
-                                    fontSize = 11.sp,
-                                    color = Slate500
-                                )
-                            }
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                text = "Filter Katalog Produk",
+                                fontSize = 16.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = Slate900
+                            )
+                            Spacer(modifier = Modifier.height(2.dp))
+                            Text(
+                                text = "Atur kategori dan ketersediaan stok produk",
+                                fontSize = 11.sp,
+                                color = Slate500
+                            )
                         }
 
                         Box(
@@ -832,9 +810,7 @@ private fun PosFilterDialog(
                         }
                     }
 
-                    Spacer(modifier = Modifier.height(14.dp))
-                    HorizontalDivider(color = Slate200, thickness = 0.5.dp)
-                    Spacer(modifier = Modifier.height(14.dp))
+                    Spacer(modifier = Modifier.height(16.dp))
 
                     // Scrollable Filter Options
                     Column(
@@ -842,16 +818,16 @@ private fun PosFilterDialog(
                             .fillMaxWidth()
                             .heightIn(max = 420.dp)
                             .verticalScroll(rememberScrollState()),
-                        verticalArrangement = Arrangement.spacedBy(16.dp)
+                        verticalArrangement = Arrangement.spacedBy(18.dp)
                     ) {
                         // Section 1: Ketersediaan Stok
-                        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                             Text(
                                 text = "KETERSEDIAAN STOK",
                                 fontSize = 11.sp,
                                 fontWeight = FontWeight.Bold,
-                                color = Slate700,
-                                letterSpacing = 0.5.sp
+                                color = Color(0xFF64748B),
+                                letterSpacing = 0.8.sp
                             )
                             Row(
                                 modifier = Modifier.fillMaxWidth(),
@@ -861,25 +837,27 @@ private fun PosFilterDialog(
                                     label = "Semua Produk",
                                     isSelected = !tempOnlyInStock,
                                     onClick = { tempOnlyInStock = false },
-                                    modifier = Modifier.weight(1f)
+                                    modifier = Modifier.weight(1f),
+                                    testTag = "pos-filter-stock-all"
                                 )
                                 PosFilterOptionCard(
                                     label = "Stok Tersedia (>0)",
                                     isSelected = tempOnlyInStock,
                                     onClick = { tempOnlyInStock = true },
-                                    modifier = Modifier.weight(1f)
+                                    modifier = Modifier.weight(1f),
+                                    testTag = "pos-filter-stock-available"
                                 )
                             }
                         }
 
                         // Section 2: Kategori Produk
-                        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                             Text(
                                 text = "KATEGORI PRODUK",
                                 fontSize = 11.sp,
                                 fontWeight = FontWeight.Bold,
-                                color = Slate700,
-                                letterSpacing = 0.5.sp
+                                color = Color(0xFF64748B),
+                                letterSpacing = 0.8.sp
                             )
                             val categoryPairs = categories.chunked(2)
                             categoryPairs.forEach { rowCategories ->
@@ -892,7 +870,8 @@ private fun PosFilterDialog(
                                             label = category,
                                             isSelected = category == tempCategory,
                                             onClick = { tempCategory = category },
-                                            modifier = Modifier.weight(1f)
+                                            modifier = Modifier.weight(1f),
+                                            testTag = "pos-filter-cat-$category"
                                         )
                                     }
                                     if (rowCategories.size == 1) {
@@ -903,11 +882,9 @@ private fun PosFilterDialog(
                         }
                     }
 
-                    Spacer(modifier = Modifier.height(14.dp))
-                    HorizontalDivider(color = Slate200, thickness = 0.5.dp)
-                    Spacer(modifier = Modifier.height(14.dp))
+                    Spacer(modifier = Modifier.height(18.dp))
 
-                    // Footer: Tombol Terapkan di bagian bawah (tanpa tombol batal & tombol reset dihapus)
+                    // Footer: Tombol Terapkan (Full-width, bold text, tanpa icon, tanpa batal/reset)
                     Button(
                         onClick = {
                             onApplyFilter(tempCategory, tempOnlyInStock)
@@ -916,21 +893,15 @@ private fun PosFilterDialog(
                             .fillMaxWidth()
                             .height(46.dp)
                             .testTag("pos-filter-apply"),
-                        shape = RoundedCornerShape(10.dp),
+                        shape = RoundedCornerShape(12.dp),
                         colors = ButtonDefaults.buttonColors(
                             containerColor = Color(0xFF15803D),
                             contentColor = Color.White
                         )
                     ) {
-                        Icon(
-                            imageVector = Icons.Outlined.Check,
-                            contentDescription = null,
-                            modifier = Modifier.size(16.dp)
-                        )
-                        Spacer(Modifier.width(6.dp))
                         Text(
                             text = "Terapkan Filter",
-                            fontSize = 13.sp,
+                            fontSize = 14.sp,
                             fontWeight = FontWeight.Bold
                         )
                     }
@@ -951,45 +922,33 @@ private fun PosFilterOptionCard(
     Surface(
         onClick = onClick,
         modifier = modifier
-            .height(44.dp)
+            .height(46.dp)
             .then(if (testTag != null) Modifier.testTag(testTag) else Modifier),
-        shape = RoundedCornerShape(10.dp),
+        shape = RoundedCornerShape(12.dp),
         color = if (isSelected) Color(0xFFF0FDF4) else Color.White,
         border = BorderStroke(
             if (isSelected) 1.5.dp else 1.dp,
-            if (isSelected) Color(0xFF15803D) else Slate200
+            if (isSelected) Color(0xFF15803D) else Color(0xFFE2E8F0)
         ),
         shadowElevation = if (isSelected) 0.5.dp else 0.dp
     ) {
-        Row(
+        Box(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(horizontal = 12.dp),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
+            contentAlignment = Alignment.Center
         ) {
             Text(
                 text = label,
-                fontSize = 12.5.sp,
+                fontSize = 13.sp,
                 fontWeight = if (isSelected) FontWeight.SemiBold else FontWeight.Medium,
-                color = if (isSelected) Color(0xFF15803D) else Slate700,
+                color = if (isSelected) Color(0xFF15803D) else Color(0xFF334155),
                 maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-                modifier = Modifier.weight(1f, fill = false)
+                overflow = TextOverflow.Ellipsis
             )
-            if (isSelected) {
-                Spacer(Modifier.width(6.dp))
-                Icon(
-                    imageVector = Icons.Outlined.Check,
-                    contentDescription = null,
-                    tint = Color(0xFF15803D),
-                    modifier = Modifier.size(16.dp)
-                )
-            }
         }
     }
 }
-
 // ═════════════════════════════════════════════════════════════════════════════
 // SUB-KOMPONEN 4: FLOATING BOTTOM CART DOCK (MATCHING HTML MOCKUP)
 // Anchored at bottom with live price, item count, and direct review CTA
