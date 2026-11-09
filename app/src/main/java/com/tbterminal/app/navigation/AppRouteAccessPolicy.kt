@@ -85,6 +85,7 @@ internal object AppAccessPolicy {
         AppCapability.DASHBOARD,
         AppCapability.POS,
         AppCapability.CUSTOMERS,
+        AppCapability.MANAGE_CUSTOMERS,
         AppCapability.RECEIVABLES,
         AppCapability.RECEIVABLE_PAYMENTS,
         AppCapability.OWN_TRANSACTIONS,

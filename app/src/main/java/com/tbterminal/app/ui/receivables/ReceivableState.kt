@@ -132,4 +132,4 @@ enum class ReceivablePaymentMethod(
 }
 
 internal const val RECEIVABLE_PAGE_SIZE = 100
-internal const val RECEIVABLE_USERS_PER_PAGE = 5
+internal const val RECEIVABLE_USERS_PER_PAGE = 10

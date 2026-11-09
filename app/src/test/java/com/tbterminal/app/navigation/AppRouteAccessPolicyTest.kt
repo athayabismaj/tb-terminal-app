@@ -120,7 +120,7 @@ class AppRouteAccessPolicyTest {
 
     @Test
     fun sharedActionsUseCentralCapabilities() {
-        assertFalse(AppAccessPolicy.can("KASIR", AppCapability.MANAGE_CUSTOMERS))
+        assertTrue(AppAccessPolicy.can("KASIR", AppCapability.MANAGE_CUSTOMERS))
         assertFalse(AppAccessPolicy.can("KASIR", AppCapability.MANAGE_INVENTORY))
         assertFalse(AppAccessPolicy.can("KASIR", AppCapability.ADJUST_RECEIVABLES))
         assertFalse(AppAccessPolicy.can("KASIR", AppCapability.REVERSE_RECEIVABLE_PAYMENTS))

@@ -169,16 +169,35 @@ internal fun ReceivableTableCard(
                             groupedByCustomer.drop((safeUserPage - 1) * RECEIVABLE_USERS_PER_PAGE).take(RECEIVABLE_USERS_PER_PAGE)
                         }
 
-                        Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
-                            pageCustomers.forEach { (customerId, customerReceivables) ->
-                                CustomerReceivableGroupCard(
-                                    customerId = customerId,
-                                    receivables = customerReceivables,
-                                    onPayClick = onPayClick,
-                                    onOpenLedger = { id, _ -> onCustomerDetailClick(id) },
-                                    onQuickBill = { onQuickBillCustomer(customerId) },
-                                    defaultExpanded = false
-                                )
+                        // Solusi 1: List Ramping Terpadu (Unified Card Container + Single-Expanded Accordion)
+                        var expandedCustomerId by rememberSaveable { mutableStateOf<String?>(null) }
+
+                        Surface(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .testTag("receivable-unified-card"),
+                            shape = RoundedCornerShape(16.dp),
+                            color = Color.White,
+                            border = BorderStroke(1.dp, Color(0xFFE2E8F0)),
+                            shadowElevation = 0.5.dp
+                        ) {
+                            Column(modifier = Modifier.fillMaxWidth()) {
+                                pageCustomers.forEachIndexed { index, (customerId, customerReceivables) ->
+                                    if (index > 0) {
+                                        HorizontalDivider(color = Color(0xFFF1F5F9), thickness = 1.dp)
+                                    }
+                                    CustomerReceivableGroupCard(
+                                        customerId = customerId,
+                                        receivables = customerReceivables,
+                                        isExpanded = expandedCustomerId == customerId,
+                                        onToggleExpand = {
+                                            expandedCustomerId = if (expandedCustomerId == customerId) null else customerId
+                                        },
+                                        onPayClick = onPayClick,
+                                        onOpenLedger = { id, _ -> onCustomerDetailClick(id) },
+                                        onQuickBill = { onQuickBillCustomer(customerId) }
+                                    )
+                                }
                             }
                         }
                         
@@ -978,15 +997,15 @@ private fun ReceivableDueFilter.compactLabel(): String = when (this) {
 private fun CustomerReceivableGroupCard(
     customerId: String,
     receivables: List<Receivable>,
+    isExpanded: Boolean,
+    onToggleExpand: () -> Unit,
     onPayClick: (Receivable) -> Unit,
     onOpenLedger: (String, String) -> Unit,
     onQuickBill: () -> Unit = {},
-    defaultExpanded: Boolean = false,
 ) {
     val customerName = receivables.firstOrNull()?.customerName ?: "Unknown"
     val totalRemaining = receivables.sumOf { it.remainingAmount }
     val allPaid = totalRemaining <= java.math.BigDecimal.ZERO
-    var isExpanded by remember { mutableStateOf(defaultExpanded) }
     
     val slate100 = Color(0xFFF1F5F9)
     val slate200 = Color(0xFFE2E8F0)
@@ -1000,136 +1019,145 @@ private fun CustomerReceivableGroupCard(
         label = "customerChevronRotation"
     )
 
-    Surface(
+    val today = remember { java.time.LocalDate.now() }
+    val overdueCount = remember(receivables) {
+        receivables.count {
+            if (it.remainingAmount <= java.math.BigDecimal.ZERO) return@count false
+            val d = runCatching { java.time.LocalDate.parse(it.dueDate.take(10)) }.getOrNull()
+            d != null && d.isBefore(today)
+        }
+    }
+
+    Column(
         modifier = Modifier
             .fillMaxWidth()
-            .testTag("customer-group-$customerId"),
-        shape = RoundedCornerShape(16.dp),
-        color = Color.White,
-        border = BorderStroke(1.dp, slate200),
-        shadowElevation = 0.5.dp
+            .testTag("customer-group-$customerId")
     ) {
-        Column {
-            // Header Accordion
-            Surface(
-                onClick = { isExpanded = !isExpanded },
-                color = Color.White,
+        // Baris Ramping Pelanggan (Compact Row)
+        Surface(
+            onClick = onToggleExpand,
+            color = if (isExpanded) Color(0xFFF8FAFC) else Color.White,
+        ) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 14.dp, vertical = 11.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
             ) {
+                // Info Pelanggan di Kiri
                 Row(
                     modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(14.dp),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
+                        .weight(1f)
+                        .padding(end = 8.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(10.dp)
                 ) {
-                    Row(
+                    Box(
                         modifier = Modifier
-                            .weight(1f)
-                            .padding(end = 8.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(12.dp)
+                            .size(36.dp)
+                            .background(slate100, CircleShape)
+                            .border(1.dp, slate200, CircleShape),
+                        contentAlignment = Alignment.Center
                     ) {
-                        // Customer Avatar Pill (40.dp x 40.dp, bg #F1F5F9, border #E2E8F0, text #334155)
-                        Box(
-                            modifier = Modifier
-                                .size(40.dp)
-                                .background(slate100, CircleShape)
-                                .border(1.dp, slate200, CircleShape),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Text(
-                                text = customerName.take(1).uppercase(),
-                                fontSize = 14.sp,
-                                fontWeight = FontWeight.Bold,
-                                color = slate700
-                            )
-                        }
-                        
-                        Column(
-                            modifier = Modifier.weight(1f),
-                            verticalArrangement = Arrangement.spacedBy(3.dp)
-                        ) {
-                            Row(
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.spacedBy(6.dp)
-                            ) {
-                                Text(
-                                    text = customerName,
-                                    fontSize = 14.sp,
-                                    fontWeight = FontWeight.Bold,
-                                    color = slate900,
-                                    maxLines = 1,
-                                    overflow = TextOverflow.Ellipsis
-                                )
-                                Surface(
-                                    shape = RoundedCornerShape(4.dp),
-                                    color = slate100,
-                                ) {
-                                    Text(
-                                        text = "Umum",
-                                        fontSize = 10.sp,
-                                        fontWeight = FontWeight.Normal,
-                                        color = slate500,
-                                        modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
-                                    )
-                                }
-                            }
-                            
-                            Row(
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.spacedBy(4.dp)
-                            ) {
-                                Text(
-                                    text = totalRemaining.currencyText(),
-                                    fontSize = 12.sp,
-                                    fontWeight = FontWeight.SemiBold,
-                                    color = slate900,
-                                    maxLines = 1
-                                )
-                                Text(
-                                    text = if (allPaid) "(Semua lunas)" else "(Belum lunas)",
-                                    fontSize = 11.sp,
-                                    fontWeight = FontWeight.Normal,
-                                    color = slate400,
-                                    maxLines = 1
-                                )
-                            }
-                        }
+                        Text(
+                            text = customerName.take(1).uppercase(),
+                            fontSize = 13.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = slate700
+                        )
                     }
                     
-                    // Header Badge & Chevron Action
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(4.dp),
-                        modifier = Modifier
-                            .clip(RoundedCornerShape(8.dp))
-                            .padding(horizontal = 4.dp, vertical = 4.dp)
+                    Column(
+                        modifier = Modifier.weight(1f),
+                        verticalArrangement = Arrangement.spacedBy(2.dp)
                     ) {
-                        Icon(
-                            imageVector = Icons.AutoMirrored.Outlined.ReceiptLong,
-                            contentDescription = null,
-                            tint = slate400,
-                            modifier = Modifier.size(15.dp)
-                        )
                         Text(
-                            text = "${receivables.size} Nota",
-                            fontSize = 12.sp,
-                            fontWeight = FontWeight.Medium,
-                            color = slate500,
+                            text = customerName,
+                            fontSize = 13.5.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = slate900,
                             maxLines = 1,
-                            softWrap = false
+                            overflow = TextOverflow.Ellipsis
                         )
-                        Icon(
-                            imageVector = Icons.Default.ExpandMore,
-                            contentDescription = if (isExpanded) "Tutup nota" else "Buka nota",
-                            tint = slate400,
-                            modifier = Modifier
-                                .size(18.dp)
-                                .rotate(rotationState)
-                        )
+                        
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(4.dp)
+                        ) {
+                            Text(
+                                text = "${receivables.size} Nota",
+                                fontSize = 11.sp,
+                                fontWeight = FontWeight.Normal,
+                                color = slate500
+                            )
+                            if (overdueCount > 0) {
+                                Text(
+                                    text = "• $overdueCount Jatuh tempo",
+                                    fontSize = 11.sp,
+                                    fontWeight = FontWeight.SemiBold,
+                                    color = Color(0xFFE11D48)
+                                )
+                            }
+                        }
                     }
                 }
+                
+                // Nominal & Aksi Cepat di Kanan
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    Column(
+                        horizontalAlignment = Alignment.End,
+                        verticalArrangement = Arrangement.spacedBy(1.dp)
+                    ) {
+                        Text(
+                            text = totalRemaining.currencyText(),
+                            fontSize = 13.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = slate900,
+                            maxLines = 1
+                        )
+                        Text(
+                            text = if (allPaid) "Lunas" else "Belum lunas",
+                            fontSize = 10.sp,
+                            fontWeight = FontWeight.Normal,
+                            color = if (allPaid) Color(0xFF15803D) else slate400,
+                            maxLines = 1
+                        )
+                    }
+
+                    if (!allPaid) {
+                        Surface(
+                            onClick = onQuickBill,
+                            shape = RoundedCornerShape(8.dp),
+                            color = Color(0xFFDCFCE7),
+                            contentColor = Color(0xFF15803D),
+                            modifier = Modifier.size(28.dp)
+                        ) {
+                            Box(contentAlignment = Alignment.Center) {
+                                Icon(
+                                    imageVector = Icons.Outlined.Share,
+                                    contentDescription = "Tagih WhatsApp",
+                                    tint = Color(0xFF15803D),
+                                    modifier = Modifier.size(14.dp)
+                                )
+                            }
+                        }
+                    }
+
+                    Icon(
+                        imageVector = Icons.Default.ExpandMore,
+                        contentDescription = if (isExpanded) "Tutup nota" else "Buka nota",
+                        tint = slate400,
+                        modifier = Modifier
+                            .size(18.dp)
+                            .rotate(rotationState)
+                    )
+                }
             }
+        }
             
             // Expanded Content
             AnimatedVisibility(
@@ -1248,7 +1276,6 @@ private fun CustomerReceivableGroupCard(
             }
         }
     }
-}
 
 @Composable
 private fun MobileReceivableAccordionItem(
