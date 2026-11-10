@@ -273,9 +273,8 @@ fun BrandedRoleTopBar(
                     Row(
                         verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.spacedBy(4.dp),
-                    ) {
-                        actions()
-                    }
+                        content = actions,
+                    )
                 }
 
                 Box {

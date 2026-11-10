@@ -387,7 +387,7 @@ private fun BackofficeTopBar(
         }
     }
 
-    val menuItems = buildList {
+    val menuItems = buildList<RoleHeaderMenuItem> {
         add(
             RoleHeaderMenuItem(
                 icon = Icons.Outlined.Person,
@@ -465,7 +465,7 @@ private fun BackofficeTopBar(
         onBrandClick = onSystemInfoClick,
         pillAvatarBgColor = if (isOwner) Color(0xFFE8F3EC) else Color(0xFFE2E8F0),
         pillAvatarTextColor = if (isOwner) Color(0xFF10533C) else Color(0xFF334155),
-        actions = actions,
+        actions = { actions() },
         menuItems = menuItems,
     )
 }
