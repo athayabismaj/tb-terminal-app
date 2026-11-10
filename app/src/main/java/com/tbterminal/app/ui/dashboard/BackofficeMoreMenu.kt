@@ -24,7 +24,6 @@ internal enum class MoreMenuAction(
     DEVICE_SETTINGS("Perangkat & struk", "Printer dan nota kasir", AppCapability.DEVICE_SETTINGS, AdminDestination.DeviceSettings),
     SETTINGS("Pengaturan aplikasi", "Printer, toko, dan perangkat", AppCapability.DEVICE_SETTINGS, AdminDestination.Settings),
     SYNC("Sinkronisasi", "Status data offline", AppCapability.SYNC, AdminDestination.SyncCenter),
-    PROFILE("Profil & keamanan", "Profil, password, dan PIN", AppCapability.ACCOUNT, AdminDestination.Profile),
     LOGOUT("Keluar", "Akhiri sesi akun", AppCapability.ACCOUNT),
 }
 
@@ -39,7 +38,7 @@ internal fun moreMenuSections(role: String): List<MoreMenuSection> {
             MoreMenuAction.USERS, MoreMenuAction.SECURITY_LOG, MoreMenuAction.BACKUP,
         )),
         MoreMenuSection("Pengaturan & sinkronisasi", listOf(MoreMenuAction.STORE_SETTINGS, MoreMenuAction.DEVICE_SETTINGS, MoreMenuAction.SYNC)),
-        MoreMenuSection("Akun", listOf(MoreMenuAction.PROFILE, MoreMenuAction.LOGOUT)),
+        MoreMenuSection("Akun", listOf(MoreMenuAction.LOGOUT)),
     ).map { section ->
         section.copy(actions = section.actions.filter { AppAccessPolicy.can(role, it.capability) })
     }.filter { it.actions.isNotEmpty() }

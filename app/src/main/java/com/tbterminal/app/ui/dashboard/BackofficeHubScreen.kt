@@ -220,7 +220,6 @@ fun BackofficeHubScreen(
                     )
                     BackofficeSection.MORE -> BackofficeMoreContent(
                         layout = layout,
-                        userName = name,
                         role = role,
                         onNavigate = navigate,
                         onUserManagementClick = onUserManagementClick,

@@ -70,7 +70,6 @@ internal data class RoleMenuItemSpec(
 @Composable
 internal fun BackofficeMoreContent(
     layout: TbLayoutInfo,
-    userName: String = "Admin",
     role: String,
     onNavigate: (AdminDestination) -> Unit,
     onUserManagementClick: () -> Unit,
@@ -88,14 +87,6 @@ internal fun BackofficeMoreContent(
         }
     }
 
-    val displayName = remember(userName) {
-        val trimmed = userName.trim()
-        when {
-            trimmed.isEmpty() || trimmed.equals("admin", ignoreCase = true) -> "Admin Operasional"
-            else -> trimmed
-        }
-    }
-
     Column(
         modifier = Modifier
             .fillMaxWidth()
@@ -103,13 +94,6 @@ internal fun BackofficeMoreContent(
             .padding(top = 6.dp, bottom = 24.dp),
         verticalArrangement = Arrangement.spacedBy(20.dp),
     ) {
-        RoleMenuProfileCard(
-            displayName = displayName,
-            roleLabel = "Admin · TB Barokah Jaya",
-            onClick = { onNavigate(AdminDestination.Profile) },
-            testTag = "more-menu-profile",
-        )
-
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(20.dp)) {
             columns.forEach { column ->
                 Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(20.dp)) {
@@ -304,7 +288,7 @@ private fun MoreMenuAction.icon(): ImageVector = when (this) {
     MoreMenuAction.SUPPLIERS -> Icons.Outlined.Group
     MoreMenuAction.REPORTS -> Icons.Outlined.Summarize
     MoreMenuAction.LOCAL_REPORTS -> Icons.AutoMirrored.Outlined.ReceiptLong
-    MoreMenuAction.USERS, MoreMenuAction.PROFILE -> Icons.Outlined.Person
+    MoreMenuAction.USERS -> Icons.Outlined.Person
     MoreMenuAction.ACTIVITY -> Icons.Outlined.Security
     MoreMenuAction.SECURITY_LOG -> Icons.Outlined.Lock
     MoreMenuAction.BACKUP -> Icons.Outlined.Backup

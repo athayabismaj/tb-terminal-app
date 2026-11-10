@@ -24,7 +24,8 @@ class BackofficeMoreMenuTest {
         assertTrue(MoreMenuAction.LOCAL_REPORTS in actions)
         assertTrue(MoreMenuAction.ACTIVITY in actions)
         assertTrue(MoreMenuAction.DEVICE_SETTINGS in actions)
-        assertEquals(8, actions.size)
+        assertTrue(MoreMenuAction.LOGOUT in actions)
+        assertEquals(7, actions.size)
     }
 
     @Test
