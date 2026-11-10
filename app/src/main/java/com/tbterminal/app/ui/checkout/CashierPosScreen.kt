@@ -267,7 +267,7 @@ fun CashierPosScreen(
                                 if (selectedCategory != allCategory) {
                                     Surface(
                                         shape = RoundedCornerShape(100.dp),
-                                        color = Slate100,
+                                        color = Color.Transparent,
                                         border = BorderStroke(1.dp, Slate200)
                                     ) {
                                         Row(
@@ -310,7 +310,7 @@ fun CashierPosScreen(
                                 if (onlyInStock) {
                                     Surface(
                                         shape = RoundedCornerShape(100.dp),
-                                        color = Slate100,
+                                        color = Color.Transparent,
                                         border = BorderStroke(1.dp, Slate200)
                                     ) {
                                         Row(
@@ -542,12 +542,12 @@ private fun PosOperationalStatusRow(
         horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.CenterVertically
     ) {
-        // Tag Identitas Mesin Kasir POS-01 (White pill dengan pulse dot hijau sesuai HTML mockup)
+        // Tag Identitas Mesin Kasir POS-01 (Transparan pill dengan pulse dot hijau)
         Surface(
             shape = RoundedCornerShape(100.dp),
-            color = Color.White,
+            color = Color.Transparent,
             border = BorderStroke(1.dp, Slate200),
-            shadowElevation = 0.5.dp
+            shadowElevation = 0.dp
         ) {
             Row(
                 modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp),
@@ -582,9 +582,9 @@ private fun PosOperationalStatusRow(
                     Surface(
                         onClick = onOpenHeldCarts,
                         shape = RoundedCornerShape(100.dp),
-                        color = Color.White,
+                        color = Color.Transparent,
                         border = BorderStroke(1.dp, Slate200),
-                        shadowElevation = 0.5.dp
+                        shadowElevation = 0.dp
                     ) {
                         Row(
                             modifier = Modifier.padding(start = 10.dp, end = 8.dp, top = 4.dp, bottom = 4.dp),
@@ -618,9 +618,9 @@ private fun PosOperationalStatusRow(
                     Surface(
                         onClick = onOpenHoldCartDialog,
                         shape = RoundedCornerShape(100.dp),
-                        color = Color.White,
+                        color = Color.Transparent,
                         border = BorderStroke(1.dp, Slate200),
-                        shadowElevation = 0.5.dp
+                        shadowElevation = 0.dp
                     ) {
                         Row(
                             modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp),
@@ -707,8 +707,8 @@ private fun PosSearchBar(
             .height(48.dp),
         shape = RoundedCornerShape(12.dp),
         colors = OutlinedTextFieldDefaults.colors(
-            unfocusedContainerColor = Color.White,
-            focusedContainerColor = Color.White,
+            unfocusedContainerColor = Color.Transparent,
+            focusedContainerColor = Color.Transparent,
             unfocusedBorderColor = Slate200,
             focusedBorderColor = BrandForest
         ),
@@ -938,12 +938,12 @@ private fun PosFilterOptionCard(
             .height(46.dp)
             .then(if (testTag != null) Modifier.testTag(testTag) else Modifier),
         shape = RoundedCornerShape(12.dp),
-        color = Color.White,
+        color = Color.Transparent,
         border = BorderStroke(
             if (isSelected) 1.5.dp else 1.dp,
             if (isSelected) Color(0xFF256B57) else Color(0xFFE2E8F0)
         ),
-        shadowElevation = if (isSelected) 0.5.dp else 0.dp
+        shadowElevation = 0.dp
     ) {
         Row(
             modifier = Modifier

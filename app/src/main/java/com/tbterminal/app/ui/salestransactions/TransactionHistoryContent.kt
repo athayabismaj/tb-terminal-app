@@ -207,7 +207,7 @@ internal fun TransactionHistoryContent(
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .height(44.dp),
-                            color = Color.White,
+                            color = Color.Transparent,
                             shape = RoundedCornerShape(12.dp),
                             border = BorderStroke(1.dp, Color(0xFF256B57).copy(alpha = 0.5f)),
                             shadowElevation = 0.dp
@@ -298,7 +298,7 @@ internal fun TransactionHistoryContent(
                                     val periodLabel = formatSalesPeriodDisplayDate(state.startDate, state.endDate, state.selectedPreset)
                                     Surface(
                                         shape = RoundedCornerShape(100.dp),
-                                        color = Color(0xFFF1F5F9),
+                                        color = Color.Transparent,
                                         border = BorderStroke(1.dp, Color(0xFFE2E8F0))
                                     ) {
                                         Row(
@@ -333,7 +333,7 @@ internal fun TransactionHistoryContent(
                                 if (isStatusFiltered) {
                                     Surface(
                                         shape = RoundedCornerShape(100.dp),
-                                        color = Color(0xFFF1F5F9),
+                                        color = Color.Transparent,
                                         border = BorderStroke(1.dp, Color(0xFFE2E8F0))
                                     ) {
                                         Row(
@@ -367,7 +367,7 @@ internal fun TransactionHistoryContent(
                                         ?: state.paymentMethodFilter
                                     Surface(
                                         shape = RoundedCornerShape(100.dp),
-                                        color = Color(0xFFF1F5F9),
+                                        color = Color.Transparent,
                                         border = BorderStroke(1.dp, Color(0xFFE2E8F0))
                                     ) {
                                         Row(
@@ -404,7 +404,7 @@ internal fun TransactionHistoryContent(
                                     }
                                     Surface(
                                         shape = RoundedCornerShape(100.dp),
-                                        color = Color(0xFFF1F5F9),
+                                        color = Color.Transparent,
                                         border = BorderStroke(1.dp, Color(0xFFE2E8F0))
                                     ) {
                                         Row(
@@ -1213,12 +1213,12 @@ private fun SalesFilterOptionCard(
             .height(46.dp)
             .then(if (testTag != null) Modifier.testTag(testTag) else Modifier),
         shape = RoundedCornerShape(12.dp),
-        color = Color.White,
+        color = Color.Transparent,
         border = BorderStroke(
             if (isSelected) 1.5.dp else 1.dp,
             if (isSelected) Color(0xFF256B57) else Color(0xFFE2E8F0)
         ),
-        shadowElevation = if (isSelected) 0.5.dp else 0.dp
+        shadowElevation = 0.dp
     ) {
         if (isCentered) {
             Row(
