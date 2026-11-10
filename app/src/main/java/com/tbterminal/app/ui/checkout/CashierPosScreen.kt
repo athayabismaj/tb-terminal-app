@@ -230,7 +230,16 @@ fun CashierPosScreen(
                         }
                     }
 
-                    // ── 2. QUICK FILTER BAR MATCHING RIWAYAT TRANSAKSI (Di atas POS-01) ──
+                    // ── 2. OPERATIONAL NOTA STATUS ROW (Text POS-01 dan tombol parkir) ──
+                    PosOperationalStatusRow(
+                        heldCartsCount = state.heldCarts.size,
+                        cartItemCount = cartItemCount,
+                        onOpenHeldCarts = onOpenHeldCarts,
+                        onOpenHoldCartDialog = onOpenHoldCartDialog
+                    )
+                    Spacer(modifier = Modifier.height(6.dp))
+
+                    // ── 3. QUICK FILTER BAR MATCHING RIWAYAT & PIUTANG (Di bawah POS-01, tepat di atas katalog produk) ──
                     val isPosFiltered = selectedCategory != allCategory || onlyInStock
                     AnimatedVisibility(
                         visible = isPosFiltered,
@@ -346,7 +355,7 @@ fun CashierPosScreen(
                                 }
                             }
 
-                            // Tombol Reset aksi paling kanan (persis halaman Riwayat Transaksi)
+                            // Tombol Reset aksi paling kanan (persis halaman Riwayat Transaksi & Piutang)
                             Text(
                                 text = "Reset",
                                 fontSize = 12.sp,
@@ -362,15 +371,6 @@ fun CashierPosScreen(
                             )
                         }
                     }
-
-                    // ── 3. OPERATIONAL NOTA STATUS ROW (Text POS-01 dan tombol parkir) ──
-                    PosOperationalStatusRow(
-                        heldCartsCount = state.heldCarts.size,
-                        cartItemCount = cartItemCount,
-                        onOpenHeldCarts = onOpenHeldCarts,
-                        onOpenHoldCartDialog = onOpenHoldCartDialog
-                    )
-                    Spacer(modifier = Modifier.height(6.dp))
 
                     // ── 3. BARCODE SCAN NOTIFICATION TOAST PILL ──
                     state.scanNotification?.let { notification ->
