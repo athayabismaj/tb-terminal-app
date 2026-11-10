@@ -48,9 +48,9 @@
     <string name="hub_group_stock_catalog">Katalog &amp; Nilai Jual</string>
     <string name="hub_group_stock_audit">Audit &amp; Kontrol Stok</string>
     <string name="hub_group_product_settings">Data produk</string>
-    <string name="hub_sales_history">Riwayat penjualan</string>
+    <string name="hub_sales_history">Riwayat Penjualan</string>
     <string name="hub_new_sale">Transaksi baru</string>
-    <string name="hub_purchase_history">Riwayat pembelian</string>
+    <string name="hub_purchase_history">Riwayat Pembelian</string>
     <string name="hub_incoming_goods">Barang masuk</string>
     <string name="hub_sales_history_description">Cari dan periksa transaksi penjualan</string>
     <string name="hub_new_sale_description">Mulai transaksi penjualan baru</string>

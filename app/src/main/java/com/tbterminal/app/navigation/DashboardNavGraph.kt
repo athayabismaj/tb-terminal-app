@@ -1,5 +1,8 @@
 package com.tbterminal.app.navigation
 
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.remember
@@ -392,7 +395,25 @@ internal fun NavGraphBuilder.dashboardGraph(navController: NavHostController, se
             AppRoute.BackofficeStock.route to BackofficeSection.STOCK,
             AppRoute.BackofficeMore.route to BackofficeSection.MORE
         ).forEach { (route, section) ->
-            composable(route) {
+            val isTransactions = section == BackofficeSection.TRANSACTIONS
+            composable(
+                route = route,
+                enterTransition = if (isTransactions) {
+                    { fadeIn(animationSpec = tween(durationMillis = 150)) }
+                } else {
+                    null
+                },
+                exitTransition = if (isTransactions) {
+                    { fadeOut(animationSpec = tween(durationMillis = 120)) }
+                } else {
+                    null
+                },
+                popEnterTransition = if (isTransactions) {
+                    { fadeIn(animationSpec = tween(durationMillis = 150)) }
+                } else {
+                    null
+                },
+            ) {
                 val sessionUser = sessionManager.readSessionUser()
                 if (sessionUser == null) {
                     LaunchedEffect(Unit) {

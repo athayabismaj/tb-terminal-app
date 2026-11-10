@@ -1,10 +1,24 @@
 package com.tbterminal.app.ui.dashboard
 
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.CubicBezierEasing
+import androidx.compose.animation.core.animateDpAsState
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInHorizontally
+import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.slideOutHorizontally
+import androidx.compose.animation.slideOutVertically
+import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
@@ -12,6 +26,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -25,6 +40,7 @@ import androidx.compose.material.icons.automirrored.outlined.ListAlt
 import androidx.compose.material.icons.automirrored.outlined.ReceiptLong
 import androidx.compose.material.icons.automirrored.outlined.TrendingUp
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material.icons.outlined.AccountBalanceWallet
 import androidx.compose.material.icons.outlined.Assessment
 import androidx.compose.material.icons.outlined.AssignmentTurnedIn
@@ -54,14 +70,18 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -88,6 +108,9 @@ import java.math.BigDecimal
 import java.text.NumberFormat
 import java.time.LocalDate
 import java.util.Locale
+import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 
 @Composable
 fun BackofficeHubScreen(
@@ -260,6 +283,27 @@ private val HubBrand100 = Color(0xFFD1FAE5)
 private val HubBrand500 = Color(0xFF16A34A)
 private val HubBrand600 = Color(0xFF1B5E3C)
 private val HubBrand700 = Color(0xFF15803D)
+
+private val HubKasiraBrand = Color(0xFF10533C)
+private val HubEmerald50 = Color(0xFFECFDF5)
+private val HubEmerald600 = Color(0xFF059669)
+private val HubEmerald700 = Color(0xFF047857)
+private val HubSlate700 = Color(0xFF334155)
+private val HubMotionEaseOut = CubicBezierEasing(0.16f, 1f, 0.3f, 1f)
+
+private const val TX_STEP_TAB = 0
+private const val TX_STEP_SUMMARY = 1
+private const val TX_STEP_CTA = 2
+private const val TX_STEP_LIST = 3
+
+private fun Modifier.staggeredEntrance(
+    slideDistancePx: Float,
+    progress: () -> Float,
+): Modifier = graphicsLayer {
+    val current = progress()
+    alpha = current
+    translationY = (1f - current) * slideDistancePx
+}
 
 private data class HubActionBadge(
     val text: String,
@@ -1160,8 +1204,8 @@ private fun TransactionsHub(
     purchasingRepository: PurchasingRepository? = null,
     onNavigate: (AdminDestination) -> Unit,
 ) {
-    var selectedTab by remember { mutableStateOf(BackofficeTransactionTab.SALES) }
-    val content = remember(role, selectedTab) { transactionHubContent(role, selectedTab) }
+    var selectedTab by rememberSaveable { mutableStateOf(BackofficeTransactionTab.SALES) }
+    var isNominalHidden by rememberSaveable { mutableStateOf(false) }
 
     var todayRevenue by remember { mutableStateOf(BigDecimal.ZERO) }
     var todayTrxCount by remember { mutableIntStateOf(0) }
@@ -1170,340 +1214,552 @@ private fun TransactionsHub(
     var monthlyPurchases by remember { mutableStateOf(BigDecimal.ZERO) }
     var monthlyPurchasesCount by remember { mutableIntStateOf(0) }
     var purchaseLoadFailed by remember { mutableStateOf(false) }
+    var isLoading by remember {
+        mutableStateOf(
+            analyticsRepository != null ||
+                cashReconciliationRepository != null ||
+                purchasingRepository != null,
+        )
+    }
+
+    val entranceSteps = remember { List(4) { Animatable(0f) } }
+    LaunchedEffect(Unit) {
+        coroutineScope {
+            entranceSteps.forEachIndexed { index, anim ->
+                launch {
+                    delay(index * 45L)
+                    anim.animateTo(
+                        targetValue = 1f,
+                        animationSpec = tween(
+                            durationMillis = 320,
+                            easing = HubMotionEaseOut,
+                        ),
+                    )
+                }
+            }
+        }
+    }
 
     LaunchedEffect(analyticsRepository, cashReconciliationRepository, purchasingRepository) {
-        if (analyticsRepository != null) {
-            runCatching {
-                val metrics = analyticsRepository.getDashboardMetrics()
-                todayRevenue = BigDecimal.valueOf(metrics.totalRevenueToday)
-            }
-        }
-        if (cashReconciliationRepository != null) {
-            runCatching {
-                when (val sessionRes = cashReconciliationRepository.getActiveSession()) {
-                    is RepositoryResult.Success -> hasActiveSession = sessionRes.data != null
-                    else -> Unit
+        isLoading = analyticsRepository != null ||
+            cashReconciliationRepository != null ||
+            purchasingRepository != null
+        try {
+            if (analyticsRepository != null) {
+                runCatching {
+                    val metrics = analyticsRepository.getDashboardMetrics()
+                    todayRevenue = BigDecimal.valueOf(metrics.totalRevenueToday)
                 }
             }
-            runCatching {
-                val todayStr = LocalDate.now().toString()
-                when (
-                    val trxRes = cashReconciliationRepository.getTransactions(
-                        page = 1,
-                        limit = 50,
-                        sessionId = null,
-                        startDate = todayStr,
-                        endDate = todayStr,
-                    )
-                ) {
-                    is RepositoryResult.Success -> {
-                        todayTrxCount = trxRes.data.total.toInt().coerceAtLeast(trxRes.data.data.size)
-                        if (todayRevenue == BigDecimal.ZERO && trxRes.data.data.isNotEmpty()) {
-                            todayRevenue = trxRes.data.data.fold(BigDecimal.ZERO) { acc, t -> acc.add(t.total) }
+            if (cashReconciliationRepository != null) {
+                runCatching {
+                    when (val sessionRes = cashReconciliationRepository.getActiveSession()) {
+                        is RepositoryResult.Success -> hasActiveSession = sessionRes.data != null
+                        else -> Unit
+                    }
+                }
+                runCatching {
+                    val todayStr = LocalDate.now().toString()
+                    when (
+                        val trxRes = cashReconciliationRepository.getTransactions(
+                            page = 1,
+                            limit = 50,
+                            sessionId = null,
+                            startDate = todayStr,
+                            endDate = todayStr,
+                        )
+                    ) {
+                        is RepositoryResult.Success -> {
+                            todayTrxCount = trxRes.data.total.toInt().coerceAtLeast(trxRes.data.data.size)
+                            if (todayRevenue == BigDecimal.ZERO && trxRes.data.data.isNotEmpty()) {
+                                todayRevenue = trxRes.data.data.fold(BigDecimal.ZERO) { acc, t -> acc.add(t.total) }
+                            }
+                        }
+                        else -> Unit
+                    }
+                }
+            }
+
+            if (purchasingRepository != null) {
+                runCatching {
+                    val startOfMonth = LocalDate.now().withDayOfMonth(1).toString()
+                    when (val purchasesRes = purchasingRepository.getPurchases(page = 1, limit = 50, startDate = startOfMonth)) {
+                        is RepositoryResult.Success -> {
+                            purchaseLoadFailed = false
+                            monthlyPurchasesCount = purchasesRes.data.total.toInt().coerceAtLeast(purchasesRes.data.data.size)
+                            monthlyPurchases = purchasesRes.data.data.fold(BigDecimal.ZERO) { acc, p -> acc.add(p.total) }
+                        }
+                        else -> {
+                            purchaseLoadFailed = true
                         }
                     }
-                    else -> Unit
+                }.onFailure {
+                    purchaseLoadFailed = true
                 }
             }
-        }
-
-        if (purchasingRepository != null) {
-            runCatching {
-                val startOfMonth = LocalDate.now().withDayOfMonth(1).toString()
-                when (val purchasesRes = purchasingRepository.getPurchases(page = 1, limit = 50, startDate = startOfMonth)) {
-                    is RepositoryResult.Success -> {
-                        purchaseLoadFailed = false
-                        monthlyPurchasesCount = purchasesRes.data.total.toInt().coerceAtLeast(purchasesRes.data.data.size)
-                        monthlyPurchases = purchasesRes.data.data.fold(BigDecimal.ZERO) { acc, p -> acc.add(p.total) }
-                    }
-                    else -> {
-                        purchaseLoadFailed = true
-                    }
-                }
-            }.onFailure {
-                purchaseLoadFailed = true
-            }
+        } finally {
+            isLoading = false
         }
     }
 
     val formattedSalesToday = formatIdCurrency(todayRevenue)
     val formattedPurchasesMonth = formatIdCurrency(monthlyPurchases)
+    val density = LocalDensity.current
+    val tabSlidePx = remember(density) { with(density) { 6.dp.toPx() } }
+    val summarySlidePx = remember(density) { with(density) { 16.dp.toPx() } }
+    val ctaSlidePx = remember(density) { with(density) { 20.dp.toPx() } }
+    val listSlidePx = remember(density) { with(density) { 24.dp.toPx() } }
 
     Column(
         modifier = Modifier
             .fillMaxWidth()
             .testTag("transaction-hub-content")
             .padding(bottom = 24.dp),
-        verticalArrangement = Arrangement.spacedBy(if (compact) 14.dp else 18.dp)
+        verticalArrangement = Arrangement.spacedBy(if (compact) 16.dp else 18.dp),
     ) {
-        // Clean White Underline Tab Strip
-        Column(
+        TransactionSegmentedTabStrip(
+            selectedTab = selectedTab,
+            compact = compact,
+            onSelectTab = { selectedTab = it },
+            modifier = Modifier.staggeredEntrance(tabSlidePx) { entranceSteps[TX_STEP_TAB].value },
+        )
+
+        AnimatedContent(
+            targetState = selectedTab,
+            transitionSpec = {
+                val movingForward = targetState.ordinal > initialState.ordinal
+                val slideOffset: (Int) -> Int = { fullWidth ->
+                    val delta = (fullWidth / 10).coerceAtLeast(24)
+                    if (movingForward) delta else -delta
+                }
+                (
+                    fadeIn(tween(durationMillis = 220, easing = HubMotionEaseOut)) +
+                        slideInHorizontally(tween(durationMillis = 260, easing = HubMotionEaseOut), slideOffset)
+                    ) togetherWith (
+                    fadeOut(tween(durationMillis = 150)) +
+                        slideOutHorizontally(tween(durationMillis = 180)) { -slideOffset(it) }
+                    )
+            },
+            label = "TransactionsTabContent",
+        ) { tab ->
+            val tabContent = remember(role, tab) { transactionHubContent(role, tab) }
+            val bodyModifier = if (compact) Modifier.padding(horizontal = 16.dp) else Modifier
+
+            Column(
+                modifier = bodyModifier.fillMaxWidth(),
+                verticalArrangement = Arrangement.spacedBy(16.dp),
+            ) {
+                when (tab) {
+                    BackofficeTransactionTab.SALES -> TransactionSummaryCard(
+                        title = "Ringkasan Penjualan",
+                        statusText = if (hasActiveSession) "Kasir Aktif" else "Hari Ini",
+                        statusDotColor = HubEmerald600,
+                        statusTextColor = HubSlate500,
+                        nominalText = if (isNominalHidden) "Rp••••••" else formattedSalesToday,
+                        isNominalHidden = isNominalHidden,
+                        isLoading = isLoading,
+                        onToggleNominal = { isNominalHidden = !isNominalHidden },
+                        footerLabel = "Total Transaksi",
+                        footerValue = "$todayTrxCount Struk",
+                        footerValueColor = HubSlate700,
+                        modifier = Modifier.staggeredEntrance(summarySlidePx) {
+                            entranceSteps[TX_STEP_SUMMARY].value
+                        },
+                    )
+                    BackofficeTransactionTab.PURCHASES -> TransactionSummaryCard(
+                        title = "Total Pembelian Bulan Ini",
+                        statusText = if (purchaseLoadFailed) "Perlu Muat Ulang" else "Bulan Berjalan",
+                        statusDotColor = if (purchaseLoadFailed) Color(0xFFD97706) else HubSlate400,
+                        statusTextColor = if (purchaseLoadFailed) HubAmberText else HubSlate500,
+                        nominalText = when {
+                            isNominalHidden -> "Rp••••••"
+                            purchaseLoadFailed -> "—"
+                            else -> formattedPurchasesMonth
+                        },
+                        isNominalHidden = isNominalHidden,
+                        isLoading = isLoading && !purchaseLoadFailed,
+                        onToggleNominal = { isNominalHidden = !isNominalHidden },
+                        footerLabel = "Total Faktur Masuk",
+                        footerValue = if (purchaseLoadFailed) "Gagal memuat" else "$monthlyPurchasesCount Faktur",
+                        footerValueColor = if (purchaseLoadFailed) HubAmberText else HubSlate700,
+                        modifier = Modifier.staggeredEntrance(summarySlidePx) {
+                            entranceSteps[TX_STEP_SUMMARY].value
+                        },
+                    )
+                }
+
+                tabContent.primaryAction?.let { primary ->
+                    TransactionPrimaryCtaButton(
+                        action = primary,
+                        onClick = { onNavigate(primary.destination) },
+                        modifier = Modifier.staggeredEntrance(ctaSlidePx) {
+                            entranceSteps[TX_STEP_CTA].value
+                        },
+                    )
+                }
+
+                tabContent.groups.forEach { group ->
+                    TransactionActivityGroupSection(
+                        title = stringResource(group.titleRes).uppercase(Locale.ROOT),
+                        actions = group.actions,
+                        onActionClick = { action -> onNavigate(action.destination) },
+                        modifier = Modifier.staggeredEntrance(listSlidePx) {
+                            entranceSteps[TX_STEP_LIST].value
+                        },
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun TransactionSegmentedTabStrip(
+    selectedTab: BackofficeTransactionTab,
+    compact: Boolean,
+    onSelectTab: (BackofficeTransactionTab) -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Column(
+        modifier = modifier
+            .fillMaxWidth()
+            .background(Color.White)
+            .then(if (!compact) Modifier.clip(RoundedCornerShape(14.dp)) else Modifier),
+    ) {
+        BoxWithConstraints(
             modifier = Modifier
                 .fillMaxWidth()
-                .background(Color.White)
-                .then(if (!compact) Modifier.clip(RoundedCornerShape(14.dp)) else Modifier),
+                .padding(horizontal = if (compact) 20.dp else 8.dp),
         ) {
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = if (compact) 16.dp else 8.dp),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                BackofficeTransactionTab.entries.forEach { tab ->
-                    val isSelected = selectedTab == tab
-                    Column(
-                        modifier = Modifier
-                            .weight(1f)
-                            .testTag("transactions-tab-${tab.name}")
-                            .clickable { selectedTab = tab },
-                        horizontalAlignment = Alignment.CenterHorizontally,
-                    ) {
-                        Text(
-                            text = stringResource(tab.labelRes),
-                            color = if (isSelected) HubBrand600 else HubSlate500,
-                            fontWeight = if (isSelected) FontWeight.SemiBold else FontWeight.Medium,
-                            fontSize = 14.sp,
-                            modifier = Modifier.padding(vertical = 12.dp),
+            val tabCount = BackofficeTransactionTab.entries.size.coerceAtLeast(1)
+            val tabWidth = maxWidth / tabCount
+            val indicatorOffset by animateDpAsState(
+                targetValue = tabWidth * selectedTab.ordinal,
+                animationSpec = tween(durationMillis = 250, easing = HubMotionEaseOut),
+                label = "TransactionsTabIndicatorOffset",
+            )
+
+            Column(modifier = Modifier.fillMaxWidth()) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    BackofficeTransactionTab.entries.forEach { tab ->
+                        val isSelected = selectedTab == tab
+                        val textColor by animateColorAsState(
+                            targetValue = if (isSelected) HubKasiraBrand else HubSlate400,
+                            animationSpec = tween(durationMillis = 200),
+                            label = "TransactionsTabTextColor",
                         )
                         Box(
                             modifier = Modifier
-                                .fillMaxWidth()
-                                .height(2.dp)
-                                .background(if (isSelected) HubBrand600 else Color.Transparent),
-                        )
-                    }
-                }
-            }
-            HorizontalDivider(color = HubCardBorder.copy(alpha = 0.75f), thickness = 1.dp)
-        }
-
-        Column(
-            modifier = if (compact) {
-                Modifier.padding(horizontal = 16.dp)
-            } else {
-                Modifier
-            },
-            verticalArrangement = Arrangement.spacedBy(14.dp),
-        ) {
-            if (selectedTab == BackofficeTransactionTab.SALES) {
-                Surface(
-                    modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(16.dp),
-                    color = Color.White,
-                    border = BorderStroke(1.dp, HubCardBorder.copy(alpha = 0.75f)),
-                    shadowElevation = 0.5.dp
-                ) {
-                Column(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(16.dp),
-                    verticalArrangement = Arrangement.spacedBy(10.dp)
-                ) {
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Text(
-                            text = "Ringkasan Hari Ini",
-                            color = HubSlate500,
-                            fontSize = 12.sp,
-                            fontWeight = FontWeight.Medium
-                        )
-                        Surface(
-                            shape = RoundedCornerShape(999.dp),
-                            color = HubBrand50,
-                            border = BorderStroke(1.dp, HubBrand100)
-                        ) {
-                            Row(
-                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp),
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.spacedBy(4.dp)
-                            ) {
-                                Box(
-                                    modifier = Modifier
-                                        .size(6.dp)
-                                        .clip(CircleShape)
-                                        .background(HubBrand600)
-                                )
-                                Text(
-                                    text = if (hasActiveSession) "Kasir Aktif" else "Hari Ini",
-                                    color = HubBrand600,
-                                    fontSize = 11.sp,
-                                    fontWeight = FontWeight.SemiBold
-                                )
-                            }
-                        }
-                    }
-
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.Bottom
-                    ) {
-                        Column {
-                            Text(
-                                text = formattedSalesToday,
-                                color = HubSlate900,
-                                fontSize = 24.sp,
-                                fontWeight = FontWeight.Bold,
-                                letterSpacing = (-0.5).sp
-                            )
-                            Text(
-                                text = if (todayTrxCount > 0) "$todayTrxCount Transaksi Berhasil" else "Belum ada transaksi hari ini",
-                                color = HubSlate500,
-                                fontSize = 12.sp,
-                                modifier = Modifier.padding(top = 2.dp)
-                            )
-                        }
-
-                        Surface(
-                            shape = RoundedCornerShape(8.dp),
-                            color = HubBrand50,
-                            border = BorderStroke(1.dp, HubBrand100)
+                                .weight(1f)
+                                .testTag("transactions-tab-${tab.name}")
+                                .clickable(role = Role.Tab) { onSelectTab(tab) },
+                            contentAlignment = Alignment.Center,
                         ) {
                             Text(
-                                text = if (hasActiveSession) "Shift Aktif" else "Total Penjualan",
-                                color = HubBrand600,
-                                fontSize = 11.sp,
-                                fontWeight = FontWeight.Medium,
-                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+                                text = stringResource(tab.labelRes),
+                                color = textColor,
+                                fontWeight = if (isSelected) FontWeight.Bold else FontWeight.SemiBold,
+                                fontSize = 14.sp,
+                                modifier = Modifier.padding(vertical = 12.dp),
                             )
                         }
                     }
                 }
-            }
-            } else {
-                Surface(
-                    modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(16.dp),
-                    color = Color.White,
-                    border = BorderStroke(1.dp, HubCardBorder.copy(alpha = 0.75f)),
-                    shadowElevation = 0.5.dp
-                ) {
-                Column(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(16.dp),
-                    verticalArrangement = Arrangement.spacedBy(10.dp)
-                ) {
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Text(
-                            text = "Total Pembelian Bulan Ini",
-                            color = HubSlate500,
-                            fontSize = 12.sp,
-                            fontWeight = FontWeight.Medium
-                        )
-                        Surface(
-                            shape = RoundedCornerShape(999.dp),
-                            color = if (purchaseLoadFailed) Color(0xFFFEF3C7) else HubBrand50,
-                            border = BorderStroke(1.dp, if (purchaseLoadFailed) Color(0xFFFDE68A) else HubBrand100)
-                        ) {
-                            Row(
-                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp),
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.spacedBy(4.dp)
-                            ) {
-                                Box(
-                                    modifier = Modifier
-                                        .size(6.dp)
-                                        .clip(CircleShape)
-                                        .background(if (purchaseLoadFailed) Color(0xFFD97706) else HubBrand600)
-                                )
-                                Text(
-                                    text = if (purchaseLoadFailed) "Perlu Muat Ulang" else "Bulan Berjalan",
-                                    color = if (purchaseLoadFailed) Color(0xFFB45309) else HubBrand600,
-                                    fontSize = 11.sp,
-                                    fontWeight = FontWeight.SemiBold
-                                )
-                            }
-                        }
-                    }
-
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.Bottom
-                    ) {
-                        Column {
-                            Text(
-                                text = if (purchaseLoadFailed) "—" else formattedPurchasesMonth,
-                                color = HubSlate900,
-                                fontSize = 24.sp,
-                                fontWeight = FontWeight.Bold,
-                                letterSpacing = (-0.5).sp
-                            )
-                            Text(
-                                text = when {
-                                    purchaseLoadFailed -> "Data pembelian belum tersedia, buka Riwayat pembelian"
-                                    monthlyPurchasesCount > 0 -> "$monthlyPurchasesCount Faktur dari Supplier"
-                                    else -> "Belum ada pembelian bulan ini"
-                                },
-                                color = HubSlate500,
-                                fontSize = 12.sp,
-                                modifier = Modifier.padding(top = 2.dp)
-                            )
-                        }
-
-                        Surface(
-                            shape = RoundedCornerShape(8.dp),
-                            color = HubBrand50,
-                            border = BorderStroke(1.dp, HubBrand100)
-                        ) {
-                            Text(
-                                text = "Pengadaan",
-                                color = HubBrand600,
-                                fontSize = 11.sp,
-                                fontWeight = FontWeight.Medium,
-                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
-                            )
-                        }
-                    }
-                }
-            }
-        }
-
-            content.primaryAction?.let { primary ->
-                Button(
-                    onClick = { onNavigate(primary.destination) },
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(48.dp)
-                        .testTag("transactions-primary-${primary.name}"),
-                    shape = RoundedCornerShape(14.dp),
-                    colors = ButtonDefaults.buttonColors(
-                        containerColor = HubBrand600,
-                        contentColor = Color.White,
-                    ),
-                ) {
-                    Icon(
-                        imageVector = primary.icon(),
-                        contentDescription = null,
-                        modifier = Modifier.size(18.dp),
+                Box(modifier = Modifier.fillMaxWidth().height(2.dp)) {
+                    Box(
+                        modifier = Modifier
+                            .offset(x = indicatorOffset)
+                            .width(tabWidth)
+                            .height(2.dp)
+                            .background(HubKasiraBrand),
                     )
-                    Spacer(Modifier.width(8.dp))
+                }
+            }
+        }
+        HorizontalDivider(color = HubCardBorder.copy(alpha = 0.9f), thickness = 1.dp)
+    }
+}
+
+@Composable
+private fun TransactionSummaryCard(
+    title: String,
+    statusText: String,
+    statusDotColor: Color,
+    statusTextColor: Color,
+    nominalText: String,
+    isNominalHidden: Boolean,
+    isLoading: Boolean,
+    onToggleNominal: () -> Unit,
+    footerLabel: String,
+    footerValue: String,
+    footerValueColor: Color,
+    modifier: Modifier = Modifier,
+) {
+    Surface(
+        modifier = modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(16.dp),
+        color = Color.White,
+        border = BorderStroke(1.dp, HubCardBorder.copy(alpha = 0.6f)),
+        shadowElevation = 0.5.dp,
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(20.dp),
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(4.dp),
+                ) {
                     Text(
-                        text = stringResource(primary.titleRes),
-                        fontSize = 14.sp,
+                        text = title,
+                        color = HubSlate500,
+                        fontSize = 12.sp,
                         fontWeight = FontWeight.SemiBold,
                     )
+                    IconButton(
+                        onClick = onToggleNominal,
+                        modifier = Modifier
+                            .size(26.dp)
+                            .testTag("transactions-toggle-nominal"),
+                    ) {
+                        Icon(
+                            imageVector = if (isNominalHidden) {
+                                Icons.Outlined.VisibilityOff
+                            } else {
+                                Icons.Outlined.Visibility
+                            },
+                            contentDescription = if (isNominalHidden) {
+                                "Tampilkan nominal"
+                            } else {
+                                "Sembunyikan nominal"
+                            },
+                            tint = HubSlate500,
+                            modifier = Modifier.size(16.dp),
+                        )
+                    }
+                }
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .size(6.dp)
+                            .clip(CircleShape)
+                            .background(statusDotColor),
+                    )
+                    Text(
+                        text = statusText,
+                        color = statusTextColor,
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.Medium,
+                    )
+                }
+            }
+
+            Spacer(Modifier.height(12.dp))
+
+            if (isLoading && !isNominalHidden) {
+                SkeletonBox(
+                    modifier = Modifier
+                        .fillMaxWidth(0.55f)
+                        .height(34.dp),
+                )
+            } else {
+                AnimatedContent(
+                    targetState = nominalText,
+                    transitionSpec = {
+                        (
+                            fadeIn(tween(durationMillis = 180)) +
+                                slideInVertically(tween(durationMillis = 180)) { it / 4 }
+                            ) togetherWith (
+                            fadeOut(tween(durationMillis = 120)) +
+                                slideOutVertically(tween(durationMillis = 120)) { -it / 4 }
+                            )
+                    },
+                    label = "TransactionNominalDisplay",
+                ) { displayValue ->
+                    Text(
+                        text = displayValue,
+                        color = HubSlate900,
+                        fontSize = 28.sp,
+                        fontWeight = FontWeight.ExtraBold,
+                        letterSpacing = (-0.5).sp,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                }
+            }
+
+            Spacer(Modifier.height(14.dp))
+            HorizontalDivider(color = HubSlate100, thickness = 1.dp)
+            Spacer(Modifier.height(10.dp))
+
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text(
+                    text = footerLabel,
+                    color = HubSlate500,
+                    fontSize = 12.sp,
+                    fontWeight = FontWeight.Medium,
+                )
+                Text(
+                    text = footerValue,
+                    color = footerValueColor,
+                    fontSize = 12.sp,
+                    fontWeight = FontWeight.SemiBold,
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun TransactionPrimaryCtaButton(
+    action: BackofficeHubAction,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val label = if (action == BackofficeHubAction.INCOMING_GOODS) {
+        "Tambah Barang Masuk"
+    } else {
+        stringResource(action.titleRes)
+    }
+    val icon = if (action == BackofficeHubAction.INCOMING_GOODS) {
+        Icons.Default.Add
+    } else {
+        action.icon()
+    }
+    Button(
+        onClick = onClick,
+        modifier = modifier
+            .fillMaxWidth()
+            .height(46.dp)
+            .testTag("transactions-primary-${action.name}"),
+        shape = RoundedCornerShape(12.dp),
+        colors = ButtonDefaults.buttonColors(
+            containerColor = HubKasiraBrand,
+            contentColor = Color.White,
+        ),
+        contentPadding = PaddingValues(horizontal = 16.dp),
+    ) {
+        Icon(
+            imageVector = icon,
+            contentDescription = null,
+            modifier = Modifier.size(18.dp),
+        )
+        Spacer(Modifier.width(8.dp))
+        Text(
+            text = label,
+            fontSize = 14.sp,
+            fontWeight = FontWeight.SemiBold,
+        )
+    }
+}
+
+@Composable
+private fun TransactionActivityGroupSection(
+    title: String,
+    actions: List<BackofficeHubAction>,
+    onActionClick: (BackofficeHubAction) -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Column(
+        modifier = modifier.fillMaxWidth(),
+        verticalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        Text(
+            text = title,
+            color = HubSlate400,
+            fontSize = 11.sp,
+            fontWeight = FontWeight.Bold,
+            letterSpacing = 0.7.sp,
+            modifier = Modifier.padding(horizontal = 4.dp),
+        )
+        Surface(
+            modifier = Modifier.fillMaxWidth(),
+            shape = RoundedCornerShape(16.dp),
+            color = Color.White,
+            border = BorderStroke(1.dp, HubCardBorder.copy(alpha = 0.8f)),
+            shadowElevation = 0.5.dp,
+        ) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(16.dp)),
+            ) {
+                actions.forEachIndexed { index, action ->
+                    TransactionActivityRow(
+                        action = action,
+                        onClick = { onActionClick(action) },
+                    )
+                    if (index < actions.lastIndex) {
+                        HorizontalDivider(
+                            color = HubSlate100,
+                            thickness = 1.dp,
+                        )
+                    }
                 }
             }
         }
+    }
+}
 
-        content.groups.forEach { group ->
-            HubActionGroupCard(
-                title = stringResource(group.titleRes).uppercase(Locale.ROOT),
-                actions = group.actions,
-                role = role,
-                compact = compact,
-                onActionClick = { action -> onNavigate(action.destination) },
+@Composable
+private fun TransactionActivityRow(
+    action: BackofficeHubAction,
+    onClick: () -> Unit,
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .testTag("hub-action-${action.name}")
+            .clickable(role = Role.Button, onClick = onClick)
+            .padding(16.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(14.dp),
+    ) {
+        Box(
+            modifier = Modifier
+                .size(40.dp)
+                .clip(RoundedCornerShape(12.dp))
+                .background(HubEmerald50),
+            contentAlignment = Alignment.Center,
+        ) {
+            Icon(
+                imageVector = action.icon(),
+                contentDescription = null,
+                tint = HubEmerald700,
+                modifier = Modifier.size(20.dp),
             )
         }
+        Text(
+            text = stringResource(action.titleRes),
+            color = HubSlate800,
+            fontSize = 14.sp,
+            fontWeight = FontWeight.Bold,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+            modifier = Modifier.weight(1f),
+        )
+        Icon(
+            imageVector = Icons.Default.ChevronRight,
+            contentDescription = null,
+            tint = HubSlate400,
+            modifier = Modifier.size(20.dp),
+        )
     }
 }
 
