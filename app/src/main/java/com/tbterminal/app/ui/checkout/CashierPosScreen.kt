@@ -211,22 +211,13 @@ fun CashierPosScreen(
                         .padding(horizontal = if (compact) 14.dp else 24.dp)
                         .padding(top = 6.dp)
                 ) {
-                    // ── 1. OPERATIONAL NOTA STATUS ROW (Hadir di bagian atas katalog produk seperti HTML mockup) ──
-                    PosOperationalStatusRow(
-                        heldCartsCount = state.heldCarts.size,
-                        cartItemCount = cartItemCount,
-                        onOpenHeldCarts = onOpenHeldCarts,
-                        onOpenHoldCartDialog = onOpenHoldCartDialog
-                    )
-                    Spacer(modifier = Modifier.height(6.dp))
-
-                    // ── 2. EXPANDABLE SEARCH & SCANNER INPUT BAR (Hanya nampak ketika icon cari di-trigger atau teks query terisi) ──
+                    // ── 1. EXPANDABLE SEARCH & SCANNER INPUT BAR (Muncul di atas text POS-01 dan tombol parkir) ──
                     AnimatedVisibility(
                         visible = isSearchExpanded || state.searchQuery.isNotEmpty(),
                         enter = expandVertically() + fadeIn(),
                         exit = shrinkVertically() + fadeOut()
                     ) {
-                        Column(modifier = Modifier.padding(bottom = 4.dp)) {
+                        Column(modifier = Modifier.padding(bottom = 6.dp)) {
                             PosSearchBar(
                                 query = state.searchQuery,
                                 onQueryChanged = onSearchChanged,
@@ -238,6 +229,15 @@ fun CashierPosScreen(
                             )
                         }
                     }
+
+                    // ── 2. OPERATIONAL NOTA STATUS ROW (Text POS-01 dan tombol parkir) ──
+                    PosOperationalStatusRow(
+                        heldCartsCount = state.heldCarts.size,
+                        cartItemCount = cartItemCount,
+                        onOpenHeldCarts = onOpenHeldCarts,
+                        onOpenHoldCartDialog = onOpenHoldCartDialog
+                    )
+                    Spacer(modifier = Modifier.height(6.dp))
 
                     // ── QUICK FILTER BAR MATCHING RIWAYAT TRANSAKSI ──
                     val isPosFiltered = selectedCategory != allCategory || onlyInStock
@@ -655,7 +655,7 @@ private fun PosSearchBar(
     query: String,
     onQueryChanged: (String) -> Unit,
     onOpenCameraScanner: () -> Unit,
-    onCloseSearch: () -> Unit
+    onCloseSearch: () -> Unit = {}
 ) {
     OutlinedTextField(
         value = query,
@@ -676,47 +676,28 @@ private fun PosSearchBar(
             )
         },
         trailingIcon = {
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(2.dp),
-                modifier = Modifier.padding(end = 4.dp)
-            ) {
-                if (query.isNotBlank()) {
-                    IconButton(
-                        onClick = { onQueryChanged("") },
-                        modifier = Modifier.size(28.dp)
-                    ) {
-                        Icon(
-                            imageVector = Icons.Outlined.Clear,
-                            contentDescription = "Hapus Pencarian",
-                            tint = Slate400,
-                            modifier = Modifier.size(16.dp)
-                        )
-                    }
+            if (query.isNotEmpty()) {
+                IconButton(
+                    onClick = { onQueryChanged("") },
+                    modifier = Modifier.size(32.dp)
+                ) {
+                    Icon(
+                        imageVector = Icons.Outlined.Clear,
+                        contentDescription = "Hapus Pencarian",
+                        tint = Slate400,
+                        modifier = Modifier.size(18.dp)
+                    )
                 }
+            } else {
                 IconButton(
                     onClick = onOpenCameraScanner,
-                    modifier = Modifier
-                        .size(32.dp)
-                        .clip(RoundedCornerShape(8.dp))
-                        .background(BrandGreenLight)
+                    modifier = Modifier.size(32.dp)
                 ) {
                     Icon(
                         imageVector = Icons.Outlined.QrCodeScanner,
                         contentDescription = "Scan Barcode Kamera",
                         tint = BrandForest,
-                        modifier = Modifier.size(18.dp)
-                    )
-                }
-                IconButton(
-                    onClick = onCloseSearch,
-                    modifier = Modifier.size(28.dp)
-                ) {
-                    Icon(
-                        imageVector = Icons.Outlined.Clear,
-                        contentDescription = "Tutup Pencarian",
-                        tint = Slate400,
-                        modifier = Modifier.size(16.dp)
+                        modifier = Modifier.size(20.dp)
                     )
                 }
             }

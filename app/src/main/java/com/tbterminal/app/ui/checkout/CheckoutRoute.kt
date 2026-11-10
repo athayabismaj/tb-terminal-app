@@ -128,7 +128,14 @@ fun CashierPosRoute(
         topBarActions = {
             // Button 1: Search [ 🔍 ] (Rounded-full 32x32 dp matching HTML mockup)
             Surface(
-                onClick = { isSearchExpanded = !isSearchExpanded },
+                onClick = {
+                    if (isSearchExpanded || uiState.searchQuery.isNotEmpty()) {
+                        isSearchExpanded = false
+                        viewModel.onSearchChanged("")
+                    } else {
+                        isSearchExpanded = true
+                    }
+                },
                 shape = CircleShape,
                 color = Color.Transparent,
                 modifier = Modifier
