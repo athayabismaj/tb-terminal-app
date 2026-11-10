@@ -230,22 +230,17 @@ fun CashierPosScreen(
                         }
                     }
 
-                    // ── 2. OPERATIONAL NOTA STATUS ROW (Text POS-01 dan tombol parkir) ──
-                    PosOperationalStatusRow(
-                        heldCartsCount = state.heldCarts.size,
-                        cartItemCount = cartItemCount,
-                        onOpenHeldCarts = onOpenHeldCarts,
-                        onOpenHoldCartDialog = onOpenHoldCartDialog
-                    )
-                    Spacer(modifier = Modifier.height(6.dp))
-
-                    // ── QUICK FILTER BAR MATCHING RIWAYAT TRANSAKSI ──
+                    // ── 2. QUICK FILTER BAR MATCHING RIWAYAT TRANSAKSI (Di atas POS-01) ──
                     val isPosFiltered = selectedCategory != allCategory || onlyInStock
-                    if (isPosFiltered) {
+                    AnimatedVisibility(
+                        visible = isPosFiltered,
+                        enter = expandVertically() + fadeIn(),
+                        exit = shrinkVertically() + fadeOut()
+                    ) {
                         Row(
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .padding(top = 2.dp, bottom = 4.dp)
+                                .padding(bottom = 6.dp)
                                 .testTag("pos-quick-filters"),
                             verticalAlignment = Alignment.CenterVertically,
                             horizontalArrangement = Arrangement.SpaceBetween,
@@ -367,6 +362,15 @@ fun CashierPosScreen(
                             )
                         }
                     }
+
+                    // ── 3. OPERATIONAL NOTA STATUS ROW (Text POS-01 dan tombol parkir) ──
+                    PosOperationalStatusRow(
+                        heldCartsCount = state.heldCarts.size,
+                        cartItemCount = cartItemCount,
+                        onOpenHeldCarts = onOpenHeldCarts,
+                        onOpenHoldCartDialog = onOpenHoldCartDialog
+                    )
+                    Spacer(modifier = Modifier.height(6.dp))
 
                     // ── 3. BARCODE SCAN NOTIFICATION TOAST PILL ──
                     state.scanNotification?.let { notification ->
