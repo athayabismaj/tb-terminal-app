@@ -108,12 +108,23 @@ fun BackofficeHubScreen(
 ) {
     val globalNavigator = LocalAdminDestinationNavigator.current
     val navigate: (AdminDestination) -> Unit = onNavigate ?: { destination -> globalNavigator?.invoke(destination) }
+    var showStockBarcodeScanner by remember { mutableStateOf(false) }
     val activeDestination = when (section) {
         BackofficeSection.TRANSACTIONS -> AdminDestination.TransactionsHub
         BackofficeSection.FINANCE -> AdminDestination.FinanceHub
         BackofficeSection.STOCK -> AdminDestination.StockHub
         BackofficeSection.MORE, BackofficeSection.MENU -> AdminDestination.MoreHub
         BackofficeSection.HOME -> AdminDestination.Dashboard
+    }
+
+    if (showStockBarcodeScanner) {
+        CameraBarcodeScannerDialog(
+            onDismissRequest = { showStockBarcodeScanner = false },
+            onBarcodeScanned = { _ ->
+                showStockBarcodeScanner = false
+                navigate(AdminDestination.Products)
+            }
+        )
     }
 
     AdminDashboardShell(
@@ -124,6 +135,47 @@ fun BackofficeHubScreen(
         onProductsClick = { navigate(AdminDestination.Products) },
         onProfileClick = { navigate(AdminDestination.Profile) },
         onSettingsClick = { navigate(AdminDestination.Settings) },
+        topBarActions = {
+            when (section) {
+                BackofficeSection.TRANSACTIONS -> {
+                    HubTopBarIconButton(
+                        icon = Icons.Outlined.Search,
+                        contentDescription = "Cari transaksi",
+                        onClick = { navigate(AdminDestination.SalesTransactions) },
+                        testTag = "hub-transactions-search",
+                    )
+                }
+                BackofficeSection.FINANCE -> {
+                    HubTopBarIconButton(
+                        icon = Icons.Outlined.Search,
+                        contentDescription = "Cari transaksi",
+                        onClick = { navigate(AdminDestination.SalesTransactions) },
+                        testTag = "hub-finance-search",
+                    )
+                    HubTopBarIconButton(
+                        icon = Icons.Outlined.Assessment,
+                        contentDescription = if (isOwnerPersona(role)) "Analitik & Laporan" else "Audit & Laporan Cepat",
+                        onClick = { navigate(AdminDestination.Reports) },
+                        testTag = "hub-finance-reports",
+                    )
+                }
+                BackofficeSection.STOCK -> {
+                    HubTopBarIconButton(
+                        icon = Icons.Outlined.Search,
+                        contentDescription = "Cari produk",
+                        onClick = { navigate(AdminDestination.Products) },
+                        testTag = "hub-stock-search",
+                    )
+                    HubTopBarIconButton(
+                        icon = Icons.Outlined.QrCodeScanner,
+                        contentDescription = "Scan barcode",
+                        onClick = { showStockBarcodeScanner = true },
+                        testTag = "hub-stock-scan",
+                    )
+                }
+                else -> Unit
+            }
+        },
         onLogout = onLogout,
     ) { contentModifier ->
         TbPageSurface(modifier = contentModifier, maxContentWidth = 1120.dp) { layout, pageModifier ->
@@ -312,75 +364,9 @@ private fun FinanceHub(
         modifier = Modifier
             .fillMaxWidth()
             .testTag("finance-hub-content")
-            .padding(bottom = 24.dp),
+            .padding(top = 4.dp, bottom = 24.dp),
         verticalArrangement = Arrangement.spacedBy(20.dp)
     ) {
-        // BEGIN: ScreenHeader
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(top = 4.dp),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Column {
-                Text(
-                    text = "Kelola Keuangan",
-                    color = StockSlate900,
-                    fontSize = 24.sp,
-                    fontWeight = FontWeight.Bold,
-                    letterSpacing = (-0.5).sp,
-                )
-                Text(
-                    text = "Arus kas, piutang pelanggan & hutang supplier",
-                    color = StockSlate500,
-                    fontSize = 12.sp,
-                    modifier = Modifier.padding(top = 2.dp),
-                )
-            }
-
-            Row(
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                // Search Button (Circle 40dp, white, border Slate 200)
-                Box(
-                    modifier = Modifier
-                        .size(40.dp)
-                        .clip(CircleShape)
-                        .background(Color.White)
-                        .border(BorderStroke(1.dp, StockSlate200.copy(alpha = 0.8f)), CircleShape)
-                        .clickable { onNavigate(AdminDestination.SalesTransactions) },
-                    contentAlignment = Alignment.Center
-                ) {
-                    Icon(
-                        imageVector = Icons.Outlined.Search,
-                        contentDescription = "Cari transaksi",
-                        tint = StockSlate700,
-                        modifier = Modifier.size(18.dp)
-                    )
-                }
-
-                // Quick Insight / Audit Action Button (Circle 40dp, bg #064E3B, white icon)
-                Box(
-                    modifier = Modifier
-                        .size(40.dp)
-                        .clip(CircleShape)
-                        .background(FinanceBrand900)
-                        .clickable { onNavigate(AdminDestination.Reports) },
-                    contentAlignment = Alignment.Center
-                ) {
-                    Icon(
-                        imageVector = Icons.Outlined.Assessment,
-                        contentDescription = "Audit & Laporan Cepat",
-                        tint = Color.White,
-                        modifier = Modifier.size(18.dp)
-                    )
-                }
-            }
-        }
-        // END: ScreenHeader
-
         // BEGIN: HeroFinancialCard
         HeroFinancialCard(
             totalCashBalance = totalCashBalance,
@@ -821,6 +807,32 @@ private val StockBrand700 = Color(0xFF1B5E3C)
 private val StockBrand800 = Color(0xFF14532D)
 
 @Composable
+private fun HubTopBarIconButton(
+    icon: ImageVector,
+    contentDescription: String,
+    onClick: () -> Unit,
+    testTag: String,
+) {
+    Surface(
+        onClick = onClick,
+        shape = CircleShape,
+        color = Color.Transparent,
+        modifier = Modifier
+            .size(32.dp)
+            .testTag(testTag),
+    ) {
+        Box(contentAlignment = Alignment.Center) {
+            Icon(
+                imageVector = icon,
+                contentDescription = contentDescription,
+                tint = Color(0xFF475569),
+                modifier = Modifier.size(18.dp),
+            )
+        }
+    }
+}
+
+@Composable
 private fun StockHub(
     layout: TbLayoutInfo,
     content: BackofficeHubContent,
@@ -828,18 +840,6 @@ private fun StockHub(
     syncMonitoringRepository: SyncMonitoringRepository? = null,
     onNavigate: (AdminDestination) -> Unit,
 ) {
-    var showBarcodeScanner by remember { mutableStateOf(false) }
-
-    if (showBarcodeScanner) {
-        CameraBarcodeScannerDialog(
-            onDismissRequest = { showBarcodeScanner = false },
-            onBarcodeScanned = { _ ->
-                showBarcodeScanner = false
-                onNavigate(AdminDestination.Products)
-            }
-        )
-    }
-
     // Load inventory valuation and stats
     var valuationSummary by remember { mutableStateOf<com.tbterminal.app.data.costing.InventoryValuationSummary?>(null) }
     var lowStockCount by remember { mutableIntStateOf(0) }
@@ -904,75 +904,9 @@ private fun StockHub(
         modifier = Modifier
             .fillMaxWidth()
             .testTag("stock-hub-content")
-            .padding(bottom = 24.dp),
+            .padding(top = 4.dp, bottom = 24.dp),
         verticalArrangement = Arrangement.spacedBy(20.dp)
     ) {
-        // BEGIN: PageHeader
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(top = 4.dp),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Column {
-                Text(
-                    text = "Manajemen Stok",
-                    color = StockSlate900,
-                    fontSize = 24.sp,
-                    fontWeight = FontWeight.Bold,
-                    letterSpacing = (-0.5).sp,
-                )
-                Text(
-                    text = "Inventaris & Valuasi Gudang",
-                    color = StockSlate500,
-                    fontSize = 12.sp,
-                    modifier = Modifier.padding(top = 2.dp),
-                )
-            }
-
-            Row(
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                // Search Button (Circle 40dp, white, border Slate 200)
-                Box(
-                    modifier = Modifier
-                        .size(40.dp)
-                        .clip(CircleShape)
-                        .background(Color.White)
-                        .border(BorderStroke(1.dp, StockSlate200.copy(alpha = 0.8f)), CircleShape)
-                        .clickable { onNavigate(AdminDestination.Products) },
-                    contentAlignment = Alignment.Center
-                ) {
-                    Icon(
-                        imageVector = Icons.Outlined.Search,
-                        contentDescription = "Cari Produk",
-                        tint = StockSlate700,
-                        modifier = Modifier.size(18.dp)
-                    )
-                }
-
-                // Barcode Scan Button (Circle 40dp, emerald 800, white icon)
-                Box(
-                    modifier = Modifier
-                        .size(40.dp)
-                        .clip(CircleShape)
-                        .background(StockBrand800)
-                        .clickable { showBarcodeScanner = true },
-                    contentAlignment = Alignment.Center
-                ) {
-                    Icon(
-                        imageVector = Icons.Outlined.QrCodeScanner,
-                        contentDescription = "Scan Barcode",
-                        tint = Color.White,
-                        modifier = Modifier.size(18.dp)
-                    )
-                }
-            }
-        }
-        // END: PageHeader
-
         // BEGIN: ValuationDashboardCard
         StockValuationDashboardCard(
             valuationSummary = valuationSummary,

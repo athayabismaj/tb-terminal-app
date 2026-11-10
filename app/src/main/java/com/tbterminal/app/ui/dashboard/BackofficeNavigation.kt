@@ -20,14 +20,16 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.Logout
 import androidx.compose.material.icons.automirrored.outlined.ReceiptLong
 import androidx.compose.material.icons.outlined.AccountBalanceWallet
+import androidx.compose.material.icons.outlined.Assessment
 import androidx.compose.material.icons.outlined.GridView
 import androidx.compose.material.icons.outlined.Home
 import androidx.compose.material.icons.outlined.Inventory2
 import androidx.compose.material.icons.outlined.ChevronLeft
 import androidx.compose.material.icons.outlined.ChevronRight
 import androidx.compose.material.icons.outlined.Person
+import androidx.compose.material.icons.outlined.Settings
 import androidx.compose.material.icons.outlined.Storefront
-import androidx.compose.material.icons.automirrored.outlined.ArrowBack
+import androidx.compose.material.icons.outlined.Sync
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -43,6 +45,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.Stable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.Saver
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
@@ -144,7 +147,11 @@ fun BackofficeAdaptiveShell(
     onProfileClick: () -> Unit,
     onLogout: () -> Unit,
     pageTitle: String? = null,
+    pageSubtitle: String? = null,
     onBack: (() -> Unit)? = null,
+    onSettingsClick: () -> Unit = {},
+    onSyncCenterClick: () -> Unit = {},
+    onReportsClick: () -> Unit = {},
     showPageHeader: Boolean = true,
     topBarActions: @Composable androidx.compose.foundation.layout.RowScope.() -> Unit = {},
     modifier: Modifier = Modifier,
@@ -153,9 +160,12 @@ fun BackofficeAdaptiveShell(
     val ownerNavigation = isOwnerPersona(role)
     val pageNavigation = LocalBackofficePageNavigation.current
     val sidebarState = LocalBackofficeSidebarState.current
-    val effectiveTitle = pageTitle ?: pageNavigation.title ?: stringResource(activeSection.labelRes)
+    val effectiveTitle = pageTitle ?: pageNavigation.title ?: activeSection.defaultRootTitle(ownerNavigation)
+    val effectiveSubtitle = pageSubtitle ?: activeSection.defaultRootSubtitle(ownerNavigation)
     val effectiveBack = onBack ?: pageNavigation.onBack
     val navigationDividerColor = MaterialTheme.colorScheme.outlineVariant
+    var showSystemInfoSheet by rememberSaveable { mutableStateOf(false) }
+
     BoxWithConstraints(modifier = modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
         val navigationMode = backofficeNavigationMode(maxWidth.value, maxHeight.value)
         val expandedNavigation = navigationMode == BackofficeNavigationMode.DRAWER
@@ -169,12 +179,17 @@ fun BackofficeAdaptiveShell(
                 topBar = {
                     if (showPageHeader) {
                         BackofficeTopBar(
-                            activeSection = activeSection,
+                            userName = userName,
+                            role = role,
                             pageTitle = effectiveTitle,
+                            pageSubtitle = effectiveSubtitle,
                             onBack = effectiveBack,
-                            compact = true,
+                            onSystemInfoClick = { showSystemInfoSheet = true },
                             onProfileClick = onProfileClick,
-                            showProfile = !ownerNavigation,
+                            onSettingsClick = onSettingsClick,
+                            onSyncCenterClick = onSyncCenterClick,
+                            onReportsClick = onReportsClick,
+                            onLogout = onLogout,
                             actions = topBarActions
                         )
                     }
@@ -297,12 +312,17 @@ fun BackofficeAdaptiveShell(
                 Column(modifier = Modifier.weight(1f).fillMaxHeight()) {
                     if (showPageHeader) {
                         BackofficeTopBar(
-                            activeSection = activeSection,
+                            userName = userName,
+                            role = role,
                             pageTitle = effectiveTitle,
+                            pageSubtitle = effectiveSubtitle,
                             onBack = effectiveBack,
-                            compact = false,
+                            onSystemInfoClick = { showSystemInfoSheet = true },
                             onProfileClick = onProfileClick,
-                            showProfile = !ownerNavigation,
+                            onSettingsClick = onSettingsClick,
+                            onSyncCenterClick = onSyncCenterClick,
+                            onReportsClick = onReportsClick,
+                            onLogout = onLogout,
                             actions = topBarActions
                         )
                     }
@@ -313,34 +333,140 @@ fun BackofficeAdaptiveShell(
                 }
             }
         }
+
+        if (showSystemInfoSheet) {
+            BackofficeSystemInfoModalSheet(
+                userName = userName,
+                role = role,
+                onSecondaryActionClick = if (ownerNavigation) onReportsClick else onSyncCenterClick,
+                onDismiss = { showSystemInfoSheet = false },
+            )
+        }
     }
+}
+
+private fun BackofficeSection.defaultRootTitle(isOwner: Boolean): String = when (this) {
+    BackofficeSection.HOME -> if (isOwner) "Dashboard Eksekutif" else "Dashboard Operasional"
+    BackofficeSection.TRANSACTIONS -> "Pusat Transaksi"
+    BackofficeSection.FINANCE -> "Kelola Keuangan"
+    BackofficeSection.STOCK -> "Manajemen Stok"
+    BackofficeSection.MORE, BackofficeSection.MENU -> if (isOwner) "Menu Pemilik" else "Menu Lainnya"
+}
+
+private fun BackofficeSection.defaultRootSubtitle(isOwner: Boolean): String = when (this) {
+    BackofficeSection.HOME -> if (isOwner) "Pemilik · TB Barokah Jaya" else "Admin · TB Barokah Jaya"
+    BackofficeSection.TRANSACTIONS -> if (isOwner) "Monitoring penjualan & pembelian" else "Penjualan & barang masuk toko"
+    BackofficeSection.FINANCE -> "Arus kas, piutang & hutang supplier"
+    BackofficeSection.STOCK -> "Inventaris & valuasi gudang"
+    BackofficeSection.MORE, BackofficeSection.MENU -> if (isOwner) "Kendali toko, pengguna & laporan" else "Pengaturan, laporan & akun"
 }
 
 @Composable
 private fun BackofficeTopBar(
-    activeSection: BackofficeSection,
-    pageTitle: String?,
+    userName: String,
+    role: String,
+    pageTitle: String,
+    pageSubtitle: String,
     onBack: (() -> Unit)?,
-    compact: Boolean,
+    onSystemInfoClick: () -> Unit,
     onProfileClick: () -> Unit,
-    showProfile: Boolean = true,
+    onSettingsClick: () -> Unit,
+    onSyncCenterClick: () -> Unit,
+    onReportsClick: () -> Unit,
+    onLogout: () -> Unit,
     actions: @Composable androidx.compose.foundation.layout.RowScope.() -> Unit = {}
 ) {
-    com.tbterminal.app.ui.components.TBTopAppBar(
-        title = pageTitle ?: stringResource(activeSection.labelRes),
-        onBackClick = onBack,
-        actions = {
-            actions()
-            if (showProfile) {
-                IconButton(onClick = onProfileClick) {
-                    Icon(
-                        imageVector = Icons.Outlined.Person,
-                        contentDescription = "Buka profil",
-                        tint = Color(0xFF1E293B) // Slate 800
-                    )
-                }
-            }
+    val isOwner = isOwnerPersona(role)
+    val displayName = remember(userName, isOwner) {
+        val trimmed = userName.trim()
+        when {
+            trimmed.isEmpty() -> if (isOwner) "Pemilik Toko" else "Admin"
+            isOwner && (trimmed.equals("owner", ignoreCase = true) || trimmed.equals("pemilik", ignoreCase = true)) -> "Pemilik Toko"
+            !isOwner && trimmed.equals("admin", ignoreCase = true) -> "Admin"
+            else -> trimmed
         }
+    }
+
+    val menuItems = buildList {
+        add(
+            RoleHeaderMenuItem(
+                icon = Icons.Outlined.Person,
+                label = "Profil Saya",
+                textColor = Color(0xFF334155),
+                iconColor = Color(0xFF475569),
+                iconBgColor = Color(0xFFF1F5F9),
+                onClick = onProfileClick,
+            )
+        )
+        add(
+            RoleHeaderMenuItem(
+                icon = Icons.Outlined.Settings,
+                label = "Pengaturan",
+                textColor = Color(0xFF334155),
+                iconColor = Color(0xFF475569),
+                iconBgColor = Color(0xFFF1F5F9),
+                onClick = onSettingsClick,
+            )
+        )
+        if (isOwner) {
+            add(
+                RoleHeaderMenuItem(
+                    icon = Icons.Outlined.Assessment,
+                    label = "Laporan Bisnis",
+                    textColor = Color(0xFF10533C),
+                    iconColor = Color(0xFF10533C),
+                    iconBgColor = Color(0xFFE8F3EC),
+                    onClick = onReportsClick,
+                )
+            )
+        } else {
+            add(
+                RoleHeaderMenuItem(
+                    icon = Icons.Outlined.Sync,
+                    label = "Pusat Sinkronisasi",
+                    textColor = Color(0xFF10533C),
+                    iconColor = Color(0xFF10533C),
+                    iconBgColor = Color(0xFFE8F3EC),
+                    onClick = onSyncCenterClick,
+                )
+            )
+        }
+        add(
+            RoleHeaderMenuItem(
+                icon = Icons.Outlined.Storefront,
+                label = if (isOwner) "Info Sistem & Toko" else "Info Operasional & Toko",
+                textColor = Color(0xFF334155),
+                iconColor = Color(0xFF475569),
+                iconBgColor = Color(0xFFF1F5F9),
+                onClick = onSystemInfoClick,
+            )
+        )
+        add(
+            RoleHeaderMenuItem(
+                icon = Icons.AutoMirrored.Outlined.Logout,
+                label = "Keluar",
+                textColor = Color(0xFFE11D48),
+                iconColor = Color(0xFFE11D48),
+                iconBgColor = Color(0xFFFFF1F2),
+                showDividerBefore = true,
+                onClick = onLogout,
+            )
+        )
+    }
+
+    BrandedRoleTopBar(
+        displayName = displayName,
+        defaultInitial = if (isOwner) "P" else "A",
+        roleSubtitle = if (isOwner) "PEMILIK · BAROKAH JAYA" else "ADMIN · BAROKAH JAYA",
+        statusBadgeText = if (isOwner) "Online · Akses Penuh" else "Online · Operasional",
+        title = pageTitle,
+        subtitle = pageSubtitle,
+        onBackClick = onBack,
+        onBrandClick = onSystemInfoClick,
+        pillAvatarBgColor = if (isOwner) Color(0xFFE8F3EC) else Color(0xFFE2E8F0),
+        pillAvatarTextColor = if (isOwner) Color(0xFF10533C) else Color(0xFF334155),
+        actions = actions,
+        menuItems = menuItems,
     )
 }
 

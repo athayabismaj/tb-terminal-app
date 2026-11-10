@@ -51,7 +51,7 @@ fun AppNavGraph(
                 backofficeRouteTitleRes(currentRoute, sessionRole)?.let { stringResource(it) }
                     ?: backofficeRouteTitle(currentRoute, sessionRole)
             } else null,
-            onBack = if (isOwnerPersona(sessionRole) && currentRoute != null &&
+            onBack = if (AppAccessPolicy.can(sessionRole, AppCapability.BACKOFFICE) && currentRoute != null &&
                 !isBackofficePrimaryRoute(currentRoute, sessionRole)) ({
                 val menuParent = ownerMenuParentRoute(currentRoute, sessionRole)
                 if (menuParent != null) {

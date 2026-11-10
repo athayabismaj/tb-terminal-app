@@ -164,22 +164,28 @@ fun OwnerExecutiveDashboardContent(
                 .fillMaxWidth()
                 .widthIn(max = 480.dp)
                 .verticalScroll(rememberScrollState())
-                .padding(horizontal = 16.dp, vertical = 16.dp)
+                .padding(horizontal = 16.dp, vertical = 12.dp)
                 .padding(bottom = 32.dp),
-            verticalArrangement = Arrangement.spacedBy(20.dp)
+            verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
             // ── 1. TOP GREETING ──
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(top = 4.dp)
+                    .padding(top = 2.dp),
+                verticalArrangement = Arrangement.spacedBy(2.dp)
             ) {
                 Text(
                     text = "Halo, $displayName",
-                    fontSize = 22.sp,
+                    fontSize = 18.sp,
                     fontWeight = FontWeight.Bold,
                     color = Slate900,
-                    letterSpacing = (-0.5).sp
+                    letterSpacing = (-0.4).sp
+                )
+                Text(
+                    text = "Ringkasan performa & arus kas toko",
+                    fontSize = 12.sp,
+                    color = Slate500
                 )
             }
 

@@ -195,50 +195,76 @@ private fun AdminHeaderSection(
     activeCashierName: String?,
     compact: Boolean
 ) {
-    if (compact) {
-        Column(
-            modifier = Modifier.fillMaxWidth().padding(horizontal = 2.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp)
-        ) {
-            Text(
-                text = "Dashboard Operasional",
-                fontSize = 22.sp,
-                fontWeight = FontWeight.Bold,
-                color = Slate900
-            )
+    val displayName = adminName.trim().let {
+        if (it.isEmpty() || it.equals("admin", ignoreCase = true)) "Admin" else it
+    }
+    Surface(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(16.dp),
+        color = Color.White,
+        border = BorderStroke(1.dp, SlateBorder.copy(alpha = 0.8f)),
+        shadowElevation = 0.5.dp
+    ) {
+        if (compact) {
             Row(
-                modifier = Modifier.fillMaxWidth(),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 14.dp, vertical = 12.dp),
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Text(
-                    text = "Admin: $adminName",
-                    fontSize = 13.sp,
-                    color = Slate500
-                )
+                Column(
+                    modifier = Modifier.weight(1f).padding(end = 10.dp),
+                    verticalArrangement = Arrangement.spacedBy(2.dp)
+                ) {
+                    Text(
+                        text = "Halo, $displayName",
+                        fontSize = 15.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = Slate900,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                    Text(
+                        text = "Pantau transaksi, stok & kas harian",
+                        fontSize = 11.5.sp,
+                        color = Slate500,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                }
                 ShiftStatusBadge(hasActiveSession, activeCashierName)
             }
-        }
-    } else {
-        Row(
-            modifier = Modifier.fillMaxWidth().padding(horizontal = 2.dp),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Column {
-                Text(
-                    text = "Dashboard Operasional Toko",
-                    fontSize = 26.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = Slate900
-                )
-                Text(
-                    text = "Kelola transaksi kasir, stok gudang, dan penerimaan barang harian",
-                    fontSize = 14.sp,
-                    color = Slate500
-                )
+        } else {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 18.dp, vertical = 14.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Column(
+                    modifier = Modifier.weight(1f).padding(end = 12.dp),
+                    verticalArrangement = Arrangement.spacedBy(2.dp)
+                ) {
+                    Text(
+                        text = "Halo, $displayName",
+                        fontSize = 18.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = Slate900,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                    Text(
+                        text = "Kelola transaksi kasir, stok gudang, dan penerimaan barang harian",
+                        fontSize = 13.sp,
+                        color = Slate500,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                }
+                ShiftStatusBadge(hasActiveSession, activeCashierName)
             }
-            ShiftStatusBadge(hasActiveSession, activeCashierName)
         }
     }
 }

@@ -66,25 +66,13 @@ internal fun BackofficeMoreContent(
         }
     }
     
-    // Add header to Menu page
-    Column(modifier = Modifier.fillMaxWidth().testTag("more-hub-content").padding(bottom = 24.dp)) {
-        Column(modifier = Modifier.fillMaxWidth().padding(top = 16.dp, bottom = 24.dp)) {
-            Text(
-                "Menu lainnya",
-                color = Color(0xFF0F172A),
-                fontSize = 24.sp,
-                fontWeight = FontWeight.Bold,
-                letterSpacing = (-0.5).sp,
-                lineHeight = 28.sp
-            )
-            Text(
-                "Pengaturan, laporan, dan preferensi akun",
-                color = Color(0xFF64748B),
-                fontSize = 12.sp,
-                modifier = Modifier.padding(top = 4.dp)
-            )
-        }
-        
+    // Menu lainnya content (judul sudah ditampilkan di Top Bar header)
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .testTag("more-hub-content")
+            .padding(top = 6.dp, bottom = 24.dp)
+    ) {
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(20.dp)) {
             columns.forEach { column ->
                 Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(24.dp)) {
