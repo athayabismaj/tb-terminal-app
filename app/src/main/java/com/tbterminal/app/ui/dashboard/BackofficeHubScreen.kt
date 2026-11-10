@@ -799,6 +799,7 @@ private fun StockHub(
             )
         }
 
+        val adminPriceDescription = stringResource(R.string.hub_product_prices_admin_description)
         content.groups.forEach { group ->
             HubActionGroupCard(
                 title = stringResource(group.titleRes).uppercase(Locale.ROOT),
@@ -813,7 +814,7 @@ private fun StockHub(
                         BackofficeHubAction.UNITS ->
                             if (totalUnitsCount > 0) "$totalUnitsCount satuan ukuran terdaftar" else null
                         BackofficeHubAction.PRODUCT_PRICES ->
-                            if (!canViewFinancialValuation) stringResource(R.string.hub_product_prices_admin_description) else null
+                            if (!canViewFinancialValuation) adminPriceDescription else null
                         else -> null
                     }
                 },
