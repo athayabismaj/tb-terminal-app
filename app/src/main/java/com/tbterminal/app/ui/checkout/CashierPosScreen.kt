@@ -755,77 +755,81 @@ private fun PosFilterDialog(
         onDismissRequest = onDismiss,
         sheetState = sheetState,
         containerColor = Color.White,
-        shape = RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp),
+        shape = RoundedCornerShape(topStart = 32.dp, topEnd = 32.dp),
         dragHandle = {
             Box(
                 modifier = Modifier
                     .padding(top = 12.dp, bottom = 4.dp)
-                    .size(width = 36.dp, height = 4.dp)
-                    .background(Color(0xFFE2E8F0), CircleShape)
+                    .width(40.dp)
+                    .height(5.dp)
+                    .background(Color(0xFFCBD5E1), CircleShape)
             )
         }
     ) {
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 20.dp)
-                .padding(bottom = 24.dp)
                 .testTag("pos-filter-sheet")
         ) {
-            // Header: Title + Subtitle on left, Circular Close (X) button on right
+            // Modal Header (matching Filter Penjualan)
             Row(
-                modifier = Modifier.fillMaxWidth(),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(start = 24.dp, end = 20.dp, top = 4.dp, bottom = 12.dp),
                 horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
+                verticalAlignment = Alignment.Top
             ) {
-                Column(modifier = Modifier.weight(1f)) {
+                Column(modifier = Modifier.weight(1f).padding(end = 12.dp)) {
                     Text(
                         text = "Filter Katalog Produk",
-                        fontSize = 18.sp,
+                        fontSize = 20.sp,
                         fontWeight = FontWeight.Bold,
-                        color = Slate900,
+                        color = Color(0xFF0F172A),
                         letterSpacing = (-0.3).sp
                     )
-                    Spacer(modifier = Modifier.height(2.dp))
+                    Spacer(Modifier.height(2.dp))
                     Text(
                         text = "Atur kategori dan ketersediaan stok produk",
-                        fontSize = 12.sp,
-                        color = Slate500
+                        fontSize = 13.sp,
+                        color = Color(0xFF64748B),
+                        lineHeight = 17.sp
                     )
                 }
 
                 Box(
                     modifier = Modifier
-                        .size(28.dp)
+                        .size(32.dp)
                         .clip(CircleShape)
-                        .background(Slate100)
+                        .background(Color(0xFFF1F5F9))
                         .clickable(onClick = onDismiss),
                     contentAlignment = Alignment.Center
                 ) {
                     Icon(
                         imageVector = Icons.Outlined.Close,
                         contentDescription = "Tutup Filter",
-                        tint = Slate500,
-                        modifier = Modifier.size(14.dp)
+                        tint = Color(0xFF64748B),
+                        modifier = Modifier.size(16.dp)
                     )
                 }
             }
 
-            Spacer(modifier = Modifier.height(16.dp))
+            HorizontalDivider(color = Color(0xFFF1F5F9), thickness = 1.dp)
 
-            // Scrollable Filter Options
+            // Scrollable Filter Options (matching Filter Penjualan)
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .heightIn(max = 420.dp)
-                    .verticalScroll(rememberScrollState()),
-                verticalArrangement = Arrangement.spacedBy(18.dp)
+                    .weight(1f, fill = false)
+                    .heightIn(max = 440.dp)
+                    .verticalScroll(rememberScrollState())
+                    .padding(horizontal = 24.dp, vertical = 18.dp),
+                verticalArrangement = Arrangement.spacedBy(22.dp)
             ) {
                 // Section 1: Ketersediaan Stok
                 Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                     Text(
                         text = "KETERSEDIAAN STOK",
-                        fontSize = 11.sp,
+                        fontSize = 12.sp,
                         fontWeight = FontWeight.Bold,
                         color = Color(0xFF64748B),
                         letterSpacing = 0.8.sp
@@ -855,7 +859,7 @@ private fun PosFilterDialog(
                 Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                     Text(
                         text = "KATEGORI PRODUK",
-                        fontSize = 11.sp,
+                        fontSize = 12.sp,
                         fontWeight = FontWeight.Bold,
                         color = Color(0xFF64748B),
                         letterSpacing = 0.8.sp
@@ -872,7 +876,7 @@ private fun PosFilterDialog(
                                     isSelected = category == tempCategory,
                                     onClick = { tempCategory = category },
                                     modifier = Modifier.weight(1f),
-                                    testTag = "pos-filter-cat-"
+                                    testTag = "pos-filter-cat-" + category
                                 )
                             }
                             if (rowCategories.size == 1) {
@@ -883,28 +887,68 @@ private fun PosFilterDialog(
                 }
             }
 
-            Spacer(modifier = Modifier.height(18.dp))
+            HorizontalDivider(color = Color(0xFFF1F5F9), thickness = 1.dp)
 
-            // Footer: Tombol Terapkan (Full-width, bold text, tanpa icon, tanpa batal/reset)
-            Button(
-                onClick = {
-                    onApplyFilter(tempCategory, tempOnlyInStock)
-                },
+            // Footer Action Buttons: Reset & Terapkan (matching Filter Penjualan)
+            Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(46.dp)
-                    .testTag("pos-filter-apply"),
-                shape = RoundedCornerShape(12.dp),
-                colors = ButtonDefaults.buttonColors(
-                    containerColor = Color(0xFF15803D),
-                    contentColor = Color.White
-                )
+                    .padding(horizontal = 20.dp, vertical = 14.dp),
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
+                verticalAlignment = Alignment.CenterVertically
             ) {
-                Text(
-                    text = "Terapkan Filter",
-                    fontSize = 14.sp,
-                    fontWeight = FontWeight.Bold
-                )
+                // Reset Button (Outline)
+                Surface(
+                    onClick = {
+                        tempCategory = "Semua"
+                        tempOnlyInStock = false
+                        onResetFilter()
+                        onDismiss()
+                    },
+                    modifier = Modifier
+                        .weight(2f)
+                        .height(48.dp)
+                        .testTag("pos-filter-reset"),
+                    shape = RoundedCornerShape(12.dp),
+                    color = Color.White,
+                    border = BorderStroke(1.5.dp, Color(0xFF256B57))
+                ) {
+                    Box(
+                        modifier = Modifier.fillMaxSize(),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text(
+                            text = "Reset",
+                            fontSize = 15.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = Color(0xFF256B57)
+                        )
+                    }
+                }
+
+                // Apply Button (Solid Dark Emerald 0xFF256B57)
+                Button(
+                    onClick = {
+                        onApplyFilter(tempCategory, tempOnlyInStock)
+                        onDismiss()
+                    },
+                    modifier = Modifier
+                        .weight(3f)
+                        .height(48.dp)
+                        .testTag("pos-filter-apply"),
+                    shape = RoundedCornerShape(12.dp),
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = Color(0xFF256B57),
+                        contentColor = Color.White
+                    ),
+                    elevation = ButtonDefaults.buttonElevation(defaultElevation = 1.dp)
+                ) {
+                    Text(
+                        text = "Terapkan",
+                        fontSize = 15.sp,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
             }
         }
     }
@@ -924,30 +968,41 @@ private fun PosFilterOptionCard(
             .height(46.dp)
             .then(if (testTag != null) Modifier.testTag(testTag) else Modifier),
         shape = RoundedCornerShape(12.dp),
-        color = if (isSelected) Color(0xFFF0FDF4) else Color.White,
+        color = Color.White,
         border = BorderStroke(
             if (isSelected) 1.5.dp else 1.dp,
-            if (isSelected) Color(0xFF15803D) else Color(0xFFE2E8F0)
+            if (isSelected) Color(0xFF256B57) else Color(0xFFE2E8F0)
         ),
         shadowElevation = if (isSelected) 0.5.dp else 0.dp
     ) {
-        Box(
+        Row(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(horizontal = 12.dp),
-            contentAlignment = Alignment.Center
+                .padding(horizontal = 14.dp),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
         ) {
             Text(
                 text = label,
-                fontSize = 13.sp,
+                fontSize = 14.sp,
                 fontWeight = if (isSelected) FontWeight.SemiBold else FontWeight.Medium,
-                color = if (isSelected) Color(0xFF15803D) else Color(0xFF334155),
+                color = if (isSelected) Color(0xFF256B57) else Color(0xFF334155),
                 maxLines = 1,
-                overflow = TextOverflow.Ellipsis
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.weight(1f, fill = false)
             )
+            if (isSelected) {
+                Icon(
+                    imageVector = Icons.Outlined.Check,
+                    contentDescription = null,
+                    tint = Color(0xFF256B57),
+                    modifier = Modifier.size(16.dp)
+                )
+            }
         }
     }
 }
+
 // ═════════════════════════════════════════════════════════════════════════════
 // SUB-KOMPONEN 4: FLOATING BOTTOM CART DOCK (MATCHING HTML MOCKUP)
 // Anchored at bottom with live price, item count, and direct review CTA
