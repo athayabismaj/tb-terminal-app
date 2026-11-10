@@ -53,9 +53,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
-import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
@@ -366,7 +364,6 @@ private fun EstimatorUnderlineTabs(
     selectedIndex: Int,
     onSelect: (Int) -> Unit
 ) {
-    val density = LocalDensity.current
     Column(
         modifier = Modifier
             .fillMaxWidth()
@@ -375,14 +372,14 @@ private fun EstimatorUnderlineTabs(
     ) {
         Row(
             modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(24.dp),
             verticalAlignment = Alignment.Bottom
         ) {
             tabs.forEachIndexed { index, title ->
                 val isSelected = selectedIndex == index
-                var textWidthPx by remember { mutableIntStateOf(0) }
                 Column(
                     modifier = Modifier
+                        .weight(1f)
+                        .clip(RoundedCornerShape(topStart = 8.dp, topEnd = 8.dp))
                         .clickable { onSelect(index) },
                     horizontalAlignment = Alignment.CenterHorizontally
                 ) {
@@ -392,15 +389,12 @@ private fun EstimatorUnderlineTabs(
                         fontWeight = if (isSelected) FontWeight.SemiBold else FontWeight.Medium,
                         color = if (isSelected) BrandPrimary else Slate500,
                         maxLines = 1,
-                        modifier = Modifier
-                            .padding(bottom = 10.dp)
-                            .onGloballyPositioned { coords ->
-                                textWidthPx = coords.size.width
-                            }
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.padding(start = 4.dp, end = 4.dp, top = 6.dp, bottom = 10.dp)
                     )
                     Box(
                         modifier = Modifier
-                            .width(with(density) { textWidthPx.toDp() })
+                            .fillMaxWidth()
                             .height(2.dp)
                             .background(if (isSelected) BrandPrimary else Color.Transparent)
                     )
