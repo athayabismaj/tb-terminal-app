@@ -358,7 +358,7 @@ private fun CashierCompactTopBar(
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 16.dp, vertical = 8.dp),
+                .padding(horizontal = 16.dp, vertical = 9.dp),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.SpaceBetween
         ) {
@@ -371,8 +371,8 @@ private fun CashierCompactTopBar(
                 // Button Badge TB (Logo Hijau Pekat BrandForest)
                 Box(
                     modifier = Modifier
-                        .size(36.dp)
-                        .clip(RoundedCornerShape(12.dp))
+                        .size(38.dp)
+                        .clip(RoundedCornerShape(11.dp))
                         .background(Color(0xFF10533C))
                         .clickable(onClick = onTerminalInfoClick),
                     contentAlignment = Alignment.Center
@@ -380,29 +380,36 @@ private fun CashierCompactTopBar(
                     Text(
                         text = "TB",
                         color = Color.White,
-                        fontSize = 13.5.sp,
+                        fontSize = 14.sp,
                         fontWeight = FontWeight.Bold,
                         letterSpacing = 0.5.sp
                     )
                 }
 
-                // Title & Subtitle (dinamis sesuai layar kasir)
-                Column(modifier = Modifier.weight(1f, fill = false)) {
+                // Title & Subtitle (dinamis sesuai layar kasir - jarak antar teks dirapatkan standar industri)
+                Column(
+                    modifier = Modifier.weight(1f, fill = false),
+                    verticalArrangement = Arrangement.spacedBy((-1).dp)
+                ) {
                     Text(
                         text = title,
                         color = Color(0xFF0F172A),
-                        fontSize = 14.sp,
+                        fontSize = 15.sp,
                         fontWeight = FontWeight.Bold,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
-                        letterSpacing = (-0.2).sp
+                        letterSpacing = (-0.3).sp,
+                        lineHeight = 18.sp
                     )
                     Text(
                         text = subtitle,
                         color = Color(0xFF64748B),
-                        fontSize = 11.sp,
+                        fontSize = 11.5.sp,
                         fontWeight = FontWeight.Medium,
-                        modifier = Modifier.padding(top = 1.dp)
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        letterSpacing = (-0.15).sp,
+                        lineHeight = 14.sp
                     )
                 }
             }
@@ -425,30 +432,30 @@ private fun CashierCompactTopBar(
                         }
                     },
                     shape = RoundedCornerShape(100.dp),
-                    color = Color.White,
+                    color = Color(0xFFF8FAFC),
                     border = BorderStroke(
                         1.dp,
                         if (expanded) Color(0xFF10533C) else Color(0xFFE2E8F0)
                     ),
-                    shadowElevation = 0.5.dp
+                    modifier = Modifier.height(32.dp)
                 ) {
                     Row(
-                        modifier = Modifier.padding(start = 3.dp, top = 2.dp, end = 6.dp, bottom = 2.dp),
+                        modifier = Modifier.padding(start = 4.dp, end = 7.dp),
                         verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(4.dp)
+                        horizontalArrangement = Arrangement.spacedBy(5.dp)
                     ) {
-                        // Avatar bulat inisial pengguna sesuai mockup HTML
+                        // Avatar bulat inisial kasir
                         Box(
                             modifier = Modifier
-                                .size(20.dp)
+                                .size(22.dp)
                                 .clip(CircleShape)
-                                .background(Color(0xFFE7EFEA)),
+                                .background(Color(0xFFE2E8F0)),
                             contentAlignment = Alignment.Center
                         ) {
                             Text(
                                 text = userInitial,
-                                color = Color(0xFF10533C),
-                                fontSize = 11.sp,
+                                color = Color(0xFF334155),
+                                fontSize = 11.5.sp,
                                 fontWeight = FontWeight.Bold
                             )
                         }
@@ -456,7 +463,7 @@ private fun CashierCompactTopBar(
                         Icon(
                             imageVector = Icons.Outlined.ExpandMore,
                             contentDescription = "User profile menu",
-                            tint = if (expanded) Color(0xFF10533C) else Color(0xFF94A3B8),
+                            tint = if (expanded) Color(0xFF10533C) else Color(0xFF64748B),
                             modifier = Modifier
                                 .size(14.dp)
                                 .graphicsLayer { rotationZ = chevronRotation }
@@ -680,7 +687,7 @@ private fun CashierCompactTopBar(
                 }
             }
         }
-        HorizontalDivider(color = Color(0xFFE7ECE9), thickness = 1.dp)
+        HorizontalDivider(color = Color(0xFFF1F5F9), thickness = 1.dp)
     }
 }
 
@@ -994,20 +1001,24 @@ private fun CashierSidebarBrand(
             }
         }
         Spacer(modifier = Modifier.width(11.dp))
-        Column {
+        Column(verticalArrangement = Arrangement.spacedBy((-1).dp)) {
             Text(
                 text = "Terminal Barokah Jaya",
                 color = Color(0xFF0F172A),
                 fontSize = 15.sp,
                 fontWeight = FontWeight.Bold,
                 maxLines = 1,
-                overflow = TextOverflow.Ellipsis
+                overflow = TextOverflow.Ellipsis,
+                letterSpacing = (-0.3).sp,
+                lineHeight = 18.sp
             )
             Text(
                 text = "Terminal Kasir",
                 color = Color(0xFF64748B),
-                fontSize = 11.sp,
-                fontWeight = FontWeight.Medium
+                fontSize = 11.5.sp,
+                fontWeight = FontWeight.Medium,
+                letterSpacing = (-0.15).sp,
+                lineHeight = 14.sp
             )
         }
     }
