@@ -270,29 +270,30 @@ internal fun TransactionHistoryContent(
                         }
                     }
 
-                    // Quick Filter Bar matching HTML
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(top = 2.dp)
-                            .testTag("sales-history-quick-filters"),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                    ) {
+                    // Quick Filter Bar: Hanya muncul ketika filter diterapkan
+                    if (isFiltered) {
                         Row(
                             modifier = Modifier
-                                .weight(1f, fill = false)
-                                .horizontalScroll(rememberScrollState()),
+                                .fillMaxWidth()
+                                .padding(top = 2.dp)
+                                .testTag("sales-history-quick-filters"),
                             verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                            horizontalArrangement = Arrangement.SpaceBetween,
                         ) {
-                            Text(
-                                text = "Filter:",
-                                fontSize = 12.sp,
-                                fontWeight = FontWeight.Medium,
-                                color = Color(0xFF64748B)
-                            )
-                            if (isFiltered) {
+                            Row(
+                                modifier = Modifier
+                                    .weight(1f, fill = false)
+                                    .horizontalScroll(rememberScrollState()),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                            ) {
+                                Text(
+                                    text = "Filter:",
+                                    fontSize = 12.sp,
+                                    fontWeight = FontWeight.Medium,
+                                    color = Color(0xFF64748B)
+                                )
+
                                 if (isDateFiltered) {
                                     val periodLabel = formatSalesPeriodDisplayDate(state.startDate, state.endDate, state.selectedPreset)
                                     Surface(
@@ -432,51 +433,21 @@ internal fun TransactionHistoryContent(
                                         }
                                     }
                                 }
-                            } else {
-                                // Default "Semua" pill matching HTML
-                                Surface(
-                                    shape = RoundedCornerShape(100.dp),
-                                    color = Color(0xFFF1F5F9),
-                                    border = BorderStroke(1.dp, Color(0xFFE2E8F0))
-                                ) {
-                                    Row(
-                                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp),
-                                        verticalAlignment = Alignment.CenterVertically,
-                                        horizontalArrangement = Arrangement.spacedBy(6.dp)
-                                    ) {
-                                        Icon(Icons.Outlined.CalendarMonth, null, tint = Color(0xFF64748B), modifier = Modifier.size(14.dp))
-                                        Text(
-                                            text = "Semua",
-                                            fontSize = 12.sp,
-                                            fontWeight = FontWeight.Medium,
-                                            color = Color(0xFF334155)
-                                        )
-                                        Box(
-                                            modifier = Modifier
-                                                .size(16.dp)
-                                                .clip(CircleShape)
-                                                .clickable(onClick = onResetAllFilters),
-                                            contentAlignment = Alignment.Center
-                                        ) {
-                                            Icon(Icons.Outlined.Close, null, tint = Color(0xFF94A3B8), modifier = Modifier.size(12.dp))
-                                        }
-                                    }
-                                }
                             }
-                        }
 
-                        // Reset button
-                        Text(
-                            text = "Reset",
-                            fontSize = 12.sp,
-                            fontWeight = FontWeight.SemiBold,
-                            color = Color(0xFFF43F5E),
-                            modifier = Modifier
-                                .clip(RoundedCornerShape(6.dp))
-                                .clickable(onClick = onResetAllFilters)
-                                .padding(horizontal = 6.dp, vertical = 4.dp)
-                                .testTag("sales-history-reset-filters")
-                        )
+                            // Reset button: Hanya muncul ketika ada filter aktif
+                            Text(
+                                text = "Reset",
+                                fontSize = 12.sp,
+                                fontWeight = FontWeight.SemiBold,
+                                color = Color(0xFFF43F5E),
+                                modifier = Modifier
+                                    .clip(RoundedCornerShape(6.dp))
+                                    .clickable(onClick = onResetAllFilters)
+                                    .padding(horizontal = 6.dp, vertical = 4.dp)
+                                    .testTag("sales-history-reset-filters")
+                            )
+                        }
                     }
                 }
             } else {
