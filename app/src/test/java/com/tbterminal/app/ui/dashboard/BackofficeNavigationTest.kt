@@ -120,16 +120,22 @@ class BackofficeNavigationTest {
 
     @Test
     fun `header titles and subtitles adapt to admin and owner roles and pages`() {
-        assertEquals("Dashboard Operasional", AdminDestination.Dashboard.backofficeHeaderTitle("ADMIN"))
-        assertEquals("Admin · TB Barokah Jaya", AdminDestination.Dashboard.backofficeHeaderSubtitle("ADMIN"))
-        assertEquals("Menu Lainnya", AdminDestination.MoreHub.backofficeHeaderTitle("ADMIN"))
-        assertEquals("Riwayat & detail nota penjualan", AdminDestination.SalesTransactions.backofficeHeaderSubtitle("ADMIN"))
+        assertEquals("Dashboard", AdminDestination.Dashboard.backofficeHeaderTitle("ADMIN"))
+        assertEquals("Transaksi", AdminDestination.TransactionsHub.backofficeHeaderTitle("ADMIN"))
+        assertEquals("Keuangan", AdminDestination.FinanceHub.backofficeHeaderTitle("ADMIN"))
+        assertEquals("Stok", AdminDestination.StockHub.backofficeHeaderTitle("ADMIN"))
+        assertEquals("Lainnya", AdminDestination.MoreHub.backofficeHeaderTitle("ADMIN"))
+        assertEquals("Terminal Barokah Jaya", AdminDestination.Dashboard.backofficeHeaderSubtitle("ADMIN"))
+        assertEquals("Terminal Barokah Jaya", AdminDestination.SalesTransactions.backofficeHeaderSubtitle("ADMIN"))
 
-        assertEquals("Dashboard Eksekutif", AdminDestination.Dashboard.backofficeHeaderTitle("OWNER"))
-        assertEquals("Pemilik · TB Barokah Jaya", AdminDestination.Dashboard.backofficeHeaderSubtitle("OWNER"))
-        assertEquals("Menu Pemilik", AdminDestination.MoreHub.backofficeHeaderTitle("OWNER"))
-        assertEquals("Monitoring transaksi penjualan", AdminDestination.SalesTransactions.backofficeHeaderSubtitle("OWNER"))
-        assertEquals("Analitik & rekap performa toko", AdminDestination.Reports.backofficeHeaderSubtitle("OWNER"))
-        assertEquals("Rekap operasional toko", AdminDestination.Reports.backofficeHeaderSubtitle("ADMIN"))
+        assertEquals("Dashboard", AdminDestination.Dashboard.backofficeHeaderTitle("OWNER"))
+        assertEquals("Transaksi", AdminDestination.TransactionsHub.backofficeHeaderTitle("OWNER"))
+        assertEquals("Keuangan", AdminDestination.FinanceHub.backofficeHeaderTitle("OWNER"))
+        assertEquals("Stok", AdminDestination.StockHub.backofficeHeaderTitle("OWNER"))
+        assertEquals("Menu", AdminDestination.MoreHub.backofficeHeaderTitle("OWNER"))
+        assertEquals("Terminal Barokah Jaya", AdminDestination.Dashboard.backofficeHeaderSubtitle("OWNER"))
+        assertEquals("Terminal Barokah Jaya", AdminDestination.SalesTransactions.backofficeHeaderSubtitle("OWNER"))
+        assertEquals("Terminal Barokah Jaya", AdminDestination.Reports.backofficeHeaderSubtitle("OWNER"))
+        assertEquals("Terminal Barokah Jaya", AdminDestination.Reports.backofficeHeaderSubtitle("ADMIN"))
     }
 }

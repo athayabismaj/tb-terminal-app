@@ -327,54 +327,14 @@ internal fun AdminDestination.backofficePageTitleRes(): Int? = when (this) {
 internal fun AdminDestination.backofficeHeaderTitle(role: String? = null): String? {
     val owner = isOwnerPersona(role)
     return when (this) {
-        AdminDestination.Dashboard -> if (owner) "Dashboard Eksekutif" else "Dashboard Operasional"
-        AdminDestination.TransactionsHub -> "Pusat Transaksi"
-        AdminDestination.FinanceHub -> "Kelola Keuangan"
-        AdminDestination.StockHub -> "Manajemen Stok"
-        AdminDestination.MoreHub -> if (owner) "Menu Pemilik" else "Menu Lainnya"
+        AdminDestination.Dashboard -> "Dashboard"
+        AdminDestination.TransactionsHub -> "Transaksi"
+        AdminDestination.FinanceHub -> "Keuangan"
+        AdminDestination.StockHub -> "Stok"
+        AdminDestination.MoreHub -> if (owner) "Menu" else "Lainnya"
         else -> null
     } ?: backofficePageTitle()
 }
 
-internal fun AdminDestination.backofficeHeaderSubtitle(role: String? = null): String {
-    val owner = isOwnerPersona(role)
-    return when (this) {
-        AdminDestination.Dashboard -> if (owner) "Pemilik · TB Barokah Jaya" else "Admin · TB Barokah Jaya"
-        AdminDestination.TransactionsHub -> if (owner) "Monitoring penjualan & pembelian" else "Penjualan & barang masuk toko"
-        AdminDestination.FinanceHub -> "Arus kas, piutang & hutang supplier"
-        AdminDestination.StockHub -> "Inventaris & valuasi gudang"
-        AdminDestination.MoreHub -> if (owner) "Kendali toko, pengguna & laporan" else "Pengaturan, laporan & akun"
-        AdminDestination.SalesTransactions -> if (owner) "Monitoring transaksi penjualan" else "Riwayat & detail nota penjualan"
-        AdminDestination.PurchaseHistory -> "Riwayat faktur & pembelian supplier"
-        AdminDestination.IncomingGoods, AdminDestination.IncomingGoodsForm -> "Penerimaan & input stok masuk"
-        AdminDestination.Receivables,
-        AdminDestination.OpeningReceivableForm,
-        AdminDestination.AdjustmentReceivableForm -> "Tagihan & jatuh tempo pelanggan"
-        AdminDestination.ReceivablePayments -> "Riwayat cicilan & pelunasan"
-        AdminDestination.SupplierDebts,
-        AdminDestination.OpeningSupplierDebtForm,
-        AdminDestination.AdjustmentSupplierDebtForm -> "Kewajiban & pembayaran supplier"
-        AdminDestination.CashReconciliation,
-        AdminDestination.CashReconciliationDetail,
-        AdminDestination.CashSessionHistory,
-        AdminDestination.CashExpenses -> "Shift kasir & rekonsiliasi kas"
-        AdminDestination.Products, AdminDestination.AddProduct -> "Katalog & ketersediaan stok"
-        AdminDestination.ProductCategories, AdminDestination.ProductUnits -> "Master data katalog produk"
-        AdminDestination.PriceManagement -> "Atur harga jual & margin produk"
-        AdminDestination.StockOpname, AdminDestination.StockOpnameForm -> "Pencocokan stok fisik gudang"
-        AdminDestination.StockReport -> "Mutasi keluar-masuk barang"
-        AdminDestination.Customers, AdminDestination.CustomerForm -> "Data & batas kredit pelanggan"
-        AdminDestination.Suppliers, AdminDestination.SupplierForm -> "Data & kontak supplier toko"
-        AdminDestination.Reports, AdminDestination.LocalReports -> if (owner) "Analitik & rekap performa toko" else "Rekap operasional toko"
-        AdminDestination.UserManagement -> "Akun kasir, admin & hak akses"
-        AdminDestination.OperationalAudit -> "Jejak perubahan data operasional"
-        AdminDestination.SecurityLog -> "Riwayat login & aktivitas keamanan"
-        AdminDestination.SyncCenter -> "Antrean & sinkronisasi data lokal"
-        AdminDestination.BackupRestore -> "Cadangan & pemulihan database"
-        AdminDestination.StoreSettings -> "Identitas toko, alamat & struk"
-        AdminDestination.DeviceSettings -> "Printer thermal, toleransi & kunci layar"
-        AdminDestination.Settings -> "Konfigurasi toko & perangkat"
-        AdminDestination.Profile -> "Informasi akun & keamanan"
-        else -> if (owner) "Pemilik · TB Barokah Jaya" else "Admin · TB Barokah Jaya"
-    }
-}
+@Suppress("UNUSED_PARAMETER")
+internal fun AdminDestination.backofficeHeaderSubtitle(role: String? = null): String = "Terminal Barokah Jaya"

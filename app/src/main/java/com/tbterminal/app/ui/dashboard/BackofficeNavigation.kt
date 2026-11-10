@@ -161,7 +161,7 @@ fun BackofficeAdaptiveShell(
     val pageNavigation = LocalBackofficePageNavigation.current
     val sidebarState = LocalBackofficeSidebarState.current
     val effectiveTitle = pageTitle ?: pageNavigation.title ?: activeSection.defaultRootTitle(ownerNavigation)
-    val effectiveSubtitle = pageSubtitle ?: activeSection.defaultRootSubtitle(ownerNavigation)
+    val effectiveSubtitle = pageSubtitle ?: activeSection.defaultRootSubtitle()
     val effectiveBack = onBack ?: pageNavigation.onBack
     val navigationDividerColor = MaterialTheme.colorScheme.outlineVariant
     var showSystemInfoSheet by rememberSaveable { mutableStateOf(false) }
@@ -346,20 +346,14 @@ fun BackofficeAdaptiveShell(
 }
 
 private fun BackofficeSection.defaultRootTitle(isOwner: Boolean): String = when (this) {
-    BackofficeSection.HOME -> if (isOwner) "Dashboard Eksekutif" else "Dashboard Operasional"
-    BackofficeSection.TRANSACTIONS -> "Pusat Transaksi"
-    BackofficeSection.FINANCE -> "Kelola Keuangan"
-    BackofficeSection.STOCK -> "Manajemen Stok"
-    BackofficeSection.MORE, BackofficeSection.MENU -> if (isOwner) "Menu Pemilik" else "Menu Lainnya"
+    BackofficeSection.HOME -> "Dashboard"
+    BackofficeSection.TRANSACTIONS -> "Transaksi"
+    BackofficeSection.FINANCE -> "Keuangan"
+    BackofficeSection.STOCK -> "Stok"
+    BackofficeSection.MORE, BackofficeSection.MENU -> if (isOwner) "Menu" else "Lainnya"
 }
 
-private fun BackofficeSection.defaultRootSubtitle(isOwner: Boolean): String = when (this) {
-    BackofficeSection.HOME -> if (isOwner) "Pemilik · TB Barokah Jaya" else "Admin · TB Barokah Jaya"
-    BackofficeSection.TRANSACTIONS -> if (isOwner) "Monitoring penjualan & pembelian" else "Penjualan & barang masuk toko"
-    BackofficeSection.FINANCE -> "Arus kas, piutang & hutang supplier"
-    BackofficeSection.STOCK -> "Inventaris & valuasi gudang"
-    BackofficeSection.MORE, BackofficeSection.MENU -> if (isOwner) "Kendali toko, pengguna & laporan" else "Pengaturan, laporan & akun"
-}
+private fun BackofficeSection.defaultRootSubtitle(): String = "Terminal Barokah Jaya"
 
 @Composable
 private fun BackofficeTopBar(
