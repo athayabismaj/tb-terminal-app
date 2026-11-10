@@ -11,8 +11,10 @@ import com.tbterminal.app.ui.dashboard.BackofficeSection
 import com.tbterminal.app.ui.dashboard.isOwnerPersona
 import com.tbterminal.app.ui.dashboard.cashier.CashierDashboardShell
 import com.tbterminal.app.ui.dashboard.cashier.CashierDestination
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Row
 import androidx.compose.ui.Alignment
+import androidx.compose.ui.unit.dp
 import com.tbterminal.app.navigation.AppAccessPolicy
 import com.tbterminal.app.navigation.AppCapability
 
@@ -97,7 +99,10 @@ fun AdminDashboardShell(
             onSettingsClick = navigateOrFallback(AdminDestination.Settings, onSettingsClick),
             onLogout = onLogout,
             topBarActions = {
-                Row(verticalAlignment = Alignment.CenterVertically) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                ) {
                     topBarActions()
                 }
             },

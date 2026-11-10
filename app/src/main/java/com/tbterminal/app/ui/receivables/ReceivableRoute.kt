@@ -17,7 +17,7 @@ import androidx.compose.material.icons.outlined.Description
 
 import androidx.compose.ui.graphics.Color
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
+import androidx.compose.material3.Surface
 import androidx.compose.material.icons.outlined.Tune
 import androidx.compose.material.icons.Icons
 import androidx.compose.foundation.layout.size
@@ -111,58 +111,78 @@ fun AdminReceivableScreen(
                 showPageHeader = true,
         pageTitle = "Piutang Pelanggan",
         topBarActions = {
+            val isSearchActive = isSearchExpanded || uiState.searchQuery.isNotEmpty()
+
             // Button 1: Search [ 🔍 ]
-            IconButton(
+            Surface(
                 onClick = { isSearchExpanded = !isSearchExpanded },
-                modifier = Modifier.size(36.dp).testTag("receivable-toggle-search")
+                shape = CircleShape,
+                color = Color.Transparent,
+                modifier = Modifier
+                    .size(32.dp)
+                    .testTag("receivable-toggle-search")
             ) {
-                Icon(
-                    imageVector = Icons.Outlined.Search,
-                    contentDescription = "Cari piutang",
-                    tint = if (isSearchExpanded || uiState.searchQuery.isNotEmpty()) Color(0xFF256B57) else Color(0xFF475569),
-                    modifier = Modifier.size(20.dp)
-                )
+                Box(contentAlignment = Alignment.Center) {
+                    Icon(
+                        imageVector = Icons.Outlined.Search,
+                        contentDescription = "Cari piutang",
+                        tint = if (isSearchActive) Color(0xFF004528) else Color(0xFF475569),
+                        modifier = Modifier.size(16.dp)
+                    )
+                }
             }
 
             // Button 2: Filter [ ⚙️ ]
             Box(
-                modifier = Modifier.size(36.dp),
+                modifier = Modifier.size(32.dp),
                 contentAlignment = Alignment.Center
             ) {
-                IconButton(
+                Surface(
                     onClick = { showFilterPopup = true },
-                    modifier = Modifier.size(36.dp).testTag("receivable-open-filters")
+                    shape = CircleShape,
+                    color = Color.Transparent,
+                    modifier = Modifier
+                        .size(32.dp)
+                        .testTag("receivable-open-filters")
                 ) {
-                    Icon(
-                        imageVector = Icons.Outlined.Tune,
-                        contentDescription = "Filter piutang",
-                        tint = if (isFiltered) Color(0xFF256B57) else Color(0xFF475569),
-                        modifier = Modifier.size(20.dp)
-                    )
+                    Box(contentAlignment = Alignment.Center) {
+                        Icon(
+                            imageVector = Icons.Outlined.Tune,
+                            contentDescription = "Filter piutang",
+                            tint = if (isFiltered) Color(0xFF004528) else Color(0xFF475569),
+                            modifier = Modifier.size(16.dp)
+                        )
+                    }
                 }
                 if (isFiltered) {
                     Box(
                         modifier = Modifier
                             .align(Alignment.TopEnd)
-                            .padding(top = 4.dp, end = 4.dp)
-                            .size(8.dp)
+                            .padding(top = 2.dp, end = 2.dp)
+                            .size(7.dp)
                             .background(Color(0xFFE5A93C), CircleShape)
-                            .border(1.5.dp, Color.White, CircleShape)
+                            .border(1.dp, Color.White, CircleShape)
                     )
                 }
             }
 
             // Button 3: Rekap / Ringkasan [ 📑 ]
-            IconButton(
+            Surface(
                 onClick = { showSummaryPopup = true },
-                modifier = Modifier.size(36.dp).testTag("receivable-summary")
+                shape = CircleShape,
+                color = Color.Transparent,
+                modifier = Modifier
+                    .size(32.dp)
+                    .testTag("receivable-summary")
             ) {
-                Icon(
-                    imageVector = Icons.Outlined.Description,
-                    contentDescription = "Tampilkan ringkasan piutang",
-                    tint = Color(0xFF475569),
-                    modifier = Modifier.size(20.dp)
-                )
+                Box(contentAlignment = Alignment.Center) {
+                    Icon(
+                        imageVector = Icons.Outlined.Description,
+                        contentDescription = "Tampilkan ringkasan piutang",
+                        tint = if (showSummaryPopup) Color(0xFF004528) else Color(0xFF475569),
+                        modifier = Modifier.size(16.dp)
+                    )
+                }
             }
         },
         onBack = onBack,

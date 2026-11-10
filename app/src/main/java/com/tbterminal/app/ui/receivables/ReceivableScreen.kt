@@ -7,6 +7,7 @@ import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.runtime.Composable
@@ -51,10 +52,17 @@ internal fun ReceivableScreen(
     var quickBillCustomerId by rememberSaveable { mutableStateOf<String?>(null) }
 
     BoxWithConstraints(modifier = modifier.fillMaxSize().background(ReceivableBackground)) {
-        val compact = maxWidth < 720.dp
+        val compact = maxWidth < 700.dp
         Column(
-            modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState())
-                .padding(horizontal = if (compact) 16.dp else 28.dp, vertical = if (compact) 14.dp else 20.dp),
+            modifier = Modifier
+                .align(Alignment.TopCenter)
+                .fillMaxSize()
+                .widthIn(max = 1280.dp)
+                .verticalScroll(rememberScrollState())
+                .padding(
+                    horizontal = if (compact) 16.dp else 28.dp,
+                    vertical = if (compact) 12.dp else 20.dp
+                ),
             verticalArrangement = Arrangement.spacedBy(if (compact) 12.dp else 16.dp)
         ) {
             ReceivableSummaryCard(

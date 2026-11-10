@@ -170,40 +170,131 @@ internal fun ReceivableTableCard(
                             groupedByCustomer.drop((safeUserPage - 1) * RECEIVABLE_USERS_PER_PAGE).take(RECEIVABLE_USERS_PER_PAGE)
                         }
 
-                        // CustomerReceivablesList (Per-customer Card Container)
-                        Column(
-                            verticalArrangement = Arrangement.spacedBy(10.dp),
-                            modifier = Modifier.fillMaxWidth().testTag("receivables-list")
+                        // CustomerReceivablesList (Grouped rounded white container matching Riwayat Transaksi)
+                        Surface(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .testTag("receivables-list"),
+                            shape = RoundedCornerShape(16.dp),
+                            color = Color.White,
+                            border = BorderStroke(1.dp, Color(0xFFE2E8F0).copy(alpha = 0.8f)),
+                            shadowElevation = 1.dp,
                         ) {
-                            pageCustomers.forEach { (customerId, customerReceivables) ->
-                                CustomerReceivableGroupCard(
-                                    customerId = customerId,
-                                    receivables = customerReceivables,
-                                    onPayClick = onPayClick,
-                                    onOpenLedger = { id, _ -> onCustomerDetailClick(id) },
-                                    defaultExpanded = false
-                                )
+                            Column(modifier = Modifier.fillMaxWidth()) {
+                                pageCustomers.forEachIndexed { index, (customerId, customerReceivables) ->
+                                    CustomerReceivableGroupCard(
+                                        customerId = customerId,
+                                        receivables = customerReceivables,
+                                        onPayClick = onPayClick,
+                                        onOpenLedger = { id, _ -> onCustomerDetailClick(id) },
+                                        defaultExpanded = false
+                                    )
+                                    if (index < pageCustomers.lastIndex) {
+                                        HorizontalDivider(color = Color(0xFFF1F5F9))
+                                    }
+                                }
                             }
                         }
-                        
-                        // Mobile Pagination
-                        val startUser = if (totalUsers == 0) 0 else ((safeUserPage - 1) * RECEIVABLE_USERS_PER_PAGE) + 1
-                        val endUser = minOf(safeUserPage * RECEIVABLE_USERS_PER_PAGE, totalUsers)
-                        val userRangeText = if (totalUsers == 0) {
-                            "0 pelanggan"
-                        } else if (totalUsers <= RECEIVABLE_USERS_PER_PAGE) {
-                            "$totalUsers pelanggan"
-                        } else {
-                            "$startUser-$endUser dari $totalUsers pelanggan"
+
+                        // Compact Mobile Pagination (matching SalesHistoryPagination)
+                        val canPrevUser = safeUserPage > 1 && !uiState.isLoading
+                        val canNextUser = safeUserPage < totalUserPages && !uiState.isLoading
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(vertical = 12.dp)
+                                .testTag("receivable-user-pagination"),
+                            horizontalArrangement = Arrangement.Center,
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            Surface(
+                                shape = RoundedCornerShape(12.dp),
+                                color = Color.White,
+                                border = BorderStroke(1.dp, Color(0xFF10533C).copy(alpha = 0.3f)),
+                                shadowElevation = 0.5.dp,
+                            ) {
+                                Text(
+                                    text = "$totalUsers pelanggan",
+                                    fontSize = 12.sp,
+                                    fontWeight = FontWeight.SemiBold,
+                                    color = Color(0xFF10533C),
+                                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp)
+                                )
+                            }
+
+                            Spacer(Modifier.width(12.dp))
+
+                            Surface(
+                                shape = RoundedCornerShape(12.dp),
+                                color = Color.White,
+                                border = BorderStroke(1.dp, Color(0xFF10533C).copy(alpha = 0.3f)),
+                                shadowElevation = 0.5.dp,
+                            ) {
+                                Row(
+                                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(12.dp)
+                                ) {
+                                    Box(
+                                        modifier = Modifier
+                                            .size(18.dp)
+                                            .clip(CircleShape)
+                                            .clickable(enabled = canPrevUser) {
+                                                userPage = (safeUserPage - 1).coerceAtLeast(1)
+                                            },
+                                        contentAlignment = Alignment.Center
+                                    ) {
+                                        Icon(
+                                            imageVector = Icons.Filled.ChevronLeft,
+                                            contentDescription = "Halaman sebelumnya",
+                                            tint = if (canPrevUser) Color(0xFF10533C) else Color(0xFF94A3B8).copy(alpha = 0.4f),
+                                            modifier = Modifier.size(16.dp)
+                                        )
+                                    }
+
+                                    Row(
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        horizontalArrangement = Arrangement.spacedBy(3.dp)
+                                    ) {
+                                        Text(
+                                            text = "$safeUserPage",
+                                            fontSize = 12.sp,
+                                            fontWeight = FontWeight.SemiBold,
+                                            color = Color(0xFF1E293B)
+                                        )
+                                        Text(
+                                            text = "/",
+                                            fontSize = 12.sp,
+                                            fontWeight = FontWeight.Normal,
+                                            color = Color(0xFF94A3B8)
+                                        )
+                                        Text(
+                                            text = "$totalUserPages",
+                                            fontSize = 12.sp,
+                                            fontWeight = FontWeight.SemiBold,
+                                            color = Color(0xFF1E293B)
+                                        )
+                                    }
+
+                                    Box(
+                                        modifier = Modifier
+                                            .size(18.dp)
+                                            .clip(CircleShape)
+                                            .clickable(enabled = canNextUser) {
+                                                userPage = (safeUserPage + 1).coerceAtMost(totalUserPages)
+                                            },
+                                        contentAlignment = Alignment.Center
+                                    ) {
+                                        Icon(
+                                            imageVector = Icons.Filled.ChevronRight,
+                                            contentDescription = "Halaman selanjutnya",
+                                            tint = if (canNextUser) Color(0xFF10533C) else Color(0xFF94A3B8).copy(alpha = 0.4f),
+                                            modifier = Modifier.size(16.dp)
+                                        )
+                                    }
+                                }
+                            }
                         }
-                        TbPagination(
-                            currentPage = safeUserPage,
-                            totalPages = totalUserPages,
-                            onPreviousPage = { userPage = (safeUserPage - 1).coerceAtLeast(1) },
-                            onNextPage = { userPage = (safeUserPage + 1).coerceAtMost(totalUserPages) },
-                            supportingText = userRangeText,
-                            testTag = "receivable-user-pagination"
-                        )
                     }
                 }
             }
@@ -491,7 +582,7 @@ private fun ReceivableHeaderToolbar(
 
         // 3. Title & Action Row (selalu tampil)
         Row(
-            modifier = Modifier.fillMaxWidth().padding(horizontal = 2.dp),
+            modifier = Modifier.fillMaxWidth().padding(top = 2.dp, bottom = 2.dp),
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically
         ) {
@@ -499,7 +590,8 @@ private fun ReceivableHeaderToolbar(
                 text = "Daftar Piutang",
                 fontSize = 14.sp,
                 fontWeight = FontWeight.Bold,
-                color = Color(0xFF1E293B)
+                color = Color(0xFF0F172A),
+                letterSpacing = (-0.2).sp
             )
 
             // Action Button "Kelola"
@@ -762,89 +854,44 @@ private fun ReceivableFooter(
 @Composable
 private fun ReceivableLoading(compact: Boolean) {
     if (compact) {
-        Column(
-            modifier = Modifier.fillMaxWidth().testTag("receivable-skeleton"),
-            verticalArrangement = Arrangement.spacedBy(14.dp),
+        Surface(
+            modifier = Modifier
+                .fillMaxWidth()
+                .testTag("receivable-skeleton"),
+            shape = RoundedCornerShape(16.dp),
+            color = Color.White,
+            border = BorderStroke(1.dp, Color(0xFFE2E8F0).copy(alpha = 0.8f)),
+            shadowElevation = 1.dp,
         ) {
-            repeat(3) {
-                CustomerReceivableGroupCardSkeleton()
+            Column(modifier = Modifier.fillMaxWidth()) {
+                repeat(4) { index ->
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 16.dp, vertical = 14.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Row(
+                            modifier = Modifier.weight(1f).padding(end = 8.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(10.dp)
+                        ) {
+                            SkeletonBox(Modifier.size(36.dp), shape = CircleShape)
+                            Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                                SkeletonBox(Modifier.fillMaxWidth(0.55f).height(14.dp), shape = RoundedCornerShape(4.dp))
+                                SkeletonBox(Modifier.width(110.dp).height(12.dp), shape = RoundedCornerShape(3.dp))
+                            }
+                        }
+                        SkeletonBox(Modifier.width(56.dp).height(14.dp), shape = RoundedCornerShape(4.dp))
+                    }
+                    if (index < 3) HorizontalDivider(color = Color(0xFFF1F5F9))
+                }
             }
         }
     } else {
         Box(modifier = Modifier.fillMaxWidth().testTag("receivable-skeleton")) {
             ReceivableTableDesktopSkeleton()
-        }
-    }
-}
-
-@Composable
-private fun CustomerReceivableGroupCardSkeleton() {
-    Surface(
-        modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(16.dp),
-        color = Color.White,
-        border = BorderStroke(1.dp, Color(0xFFE2E8F0)),
-        shadowElevation = 0.5.dp
-    ) {
-        Column {
-            Row(
-                modifier = Modifier.fillMaxWidth().padding(14.dp),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Row(
-                    modifier = Modifier.weight(1f).padding(end = 8.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(12.dp)
-                ) {
-                    SkeletonBox(Modifier.size(44.dp), shape = CircleShape)
-                    Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                        SkeletonBox(Modifier.fillMaxWidth(0.55f).height(15.dp), shape = RoundedCornerShape(4.dp))
-                        Row(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
-                            SkeletonBox(Modifier.width(90.dp).height(12.dp), shape = RoundedCornerShape(3.dp))
-                            SkeletonBox(Modifier.width(60.dp).height(10.dp), shape = RoundedCornerShape(3.dp))
-                        }
-                    }
-                }
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(6.dp)
-                ) {
-                    SkeletonBox(Modifier.width(46.dp).height(14.dp), shape = RoundedCornerShape(4.dp))
-                    SkeletonBox(Modifier.size(20.dp), shape = CircleShape)
-                }
-            }
-            HorizontalDivider(color = Color(0xFFF1F5F9))
-            Column(
-                modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 14.dp),
-                verticalArrangement = Arrangement.spacedBy(10.dp)
-            ) {
-                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
-                    SkeletonBox(Modifier.width(100.dp).height(14.dp), shape = RoundedCornerShape(4.dp))
-                    SkeletonBox(Modifier.width(50.dp).height(14.dp), shape = RoundedCornerShape(4.dp))
-                }
-                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.Bottom) {
-                    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                        SkeletonBox(Modifier.width(70.dp).height(12.dp), shape = RoundedCornerShape(3.dp))
-                        SkeletonBox(Modifier.width(100.dp).height(18.dp), shape = RoundedCornerShape(4.dp))
-                    }
-                    Column(horizontalAlignment = Alignment.End, verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                        SkeletonBox(Modifier.width(45.dp).height(12.dp), shape = RoundedCornerShape(3.dp))
-                        SkeletonBox(Modifier.width(65.dp).height(14.dp), shape = RoundedCornerShape(4.dp))
-                    }
-                }
-                HorizontalDivider(color = Color(0xFFF1F5F9))
-                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
-                    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                        SkeletonBox(Modifier.width(80.dp).height(12.dp), shape = RoundedCornerShape(3.dp))
-                        SkeletonBox(Modifier.width(90.dp).height(14.dp), shape = RoundedCornerShape(4.dp))
-                    }
-                    Column(horizontalAlignment = Alignment.End, verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                        SkeletonBox(Modifier.width(80.dp).height(12.dp), shape = RoundedCornerShape(3.dp))
-                        SkeletonBox(Modifier.width(50.dp).height(14.dp), shape = RoundedCornerShape(4.dp))
-                    }
-                }
-            }
         }
     }
 }
@@ -1015,154 +1062,139 @@ private fun CustomerReceivableGroupCard(
         label = "customerChevronRotation"
     )
 
-    Surface(
+    Column(
         modifier = Modifier
             .fillMaxWidth()
-            .testTag("customer-group-$customerId"),
-        shape = RoundedCornerShape(16.dp),
-        color = Color.White,
-        border = BorderStroke(1.dp, slate200),
-        shadowElevation = 0.5.dp
+            .testTag("customer-group-$customerId")
     ) {
-        Column(modifier = Modifier.fillMaxWidth()) {
-            // Customer Header Summary (Collapsible Trigger)
-            Surface(
-                onClick = { isExpanded = !isExpanded },
-                color = Color.White,
+        // Customer Header Summary (Collapsible Trigger, matching SalesTransactionMobileItem proportions)
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clickable { isExpanded = !isExpanded }
+                .padding(horizontal = 16.dp, vertical = 14.dp),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Row(
+                modifier = Modifier
+                    .weight(1f)
+                    .padding(end = 8.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(10.dp)
             ) {
-                Row(
+                Box(
                     modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(16.dp),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
+                        .size(36.dp)
+                        .background(slate100, CircleShape)
+                        .border(1.dp, slate200, CircleShape),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(
+                        text = customerName.take(1).uppercase(),
+                        fontSize = 13.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = slate700
+                    )
+                }
+
+                Column(
+                    modifier = Modifier.weight(1f),
+                    verticalArrangement = Arrangement.spacedBy(4.dp)
                 ) {
                     Row(
-                        modifier = Modifier
-                            .weight(1f)
-                            .padding(end = 8.dp),
                         verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(12.dp)
+                        horizontalArrangement = Arrangement.spacedBy(6.dp)
                     ) {
-                        // Customer Avatar (w-10 h-10 = 40.dp)
-                        Box(
-                            modifier = Modifier
-                                .size(40.dp)
-                                .background(slate100, CircleShape)
-                                .border(1.dp, slate200, CircleShape),
-                            contentAlignment = Alignment.Center
+                        Text(
+                            text = customerName,
+                            fontSize = 14.sp,
+                            fontWeight = FontWeight.SemiBold,
+                            color = slate900,
+                            letterSpacing = (-0.3).sp,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                        Surface(
+                            shape = RoundedCornerShape(4.dp),
+                            color = slate100,
                         ) {
                             Text(
-                                text = customerName.take(1).uppercase(),
-                                fontSize = 14.sp,
-                                fontWeight = FontWeight.Bold,
-                                color = slate700
+                                text = "Umum",
+                                fontSize = 10.sp,
+                                fontWeight = FontWeight.Normal,
+                                color = slate500,
+                                modifier = Modifier.padding(horizontal = 5.dp, vertical = 1.5.dp)
                             )
-                        }
-
-                        Column(
-                            modifier = Modifier.weight(1f),
-                            verticalArrangement = Arrangement.spacedBy(3.dp)
-                        ) {
-                            Row(
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.spacedBy(6.dp)
-                            ) {
-                                Text(
-                                    text = customerName,
-                                    fontSize = 14.sp,
-                                    fontWeight = FontWeight.Bold,
-                                    color = slate900,
-                                    maxLines = 1,
-                                    overflow = TextOverflow.Ellipsis
-                                )
-                                Surface(
-                                    shape = RoundedCornerShape(4.dp),
-                                    color = slate100,
-                                ) {
-                                    Text(
-                                        text = "Umum",
-                                        fontSize = 10.sp,
-                                        fontWeight = FontWeight.Normal,
-                                        color = slate500,
-                                        modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
-                                    )
-                                }
-                            }
-
-                            Row(
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.spacedBy(4.dp)
-                            ) {
-                                Text(
-                                    text = totalRemaining.currencyText(),
-                                    fontSize = 12.sp,
-                                    fontWeight = FontWeight.SemiBold,
-                                    color = slate900,
-                                    maxLines = 1
-                                )
-                                Text(
-                                    text = if (allPaid) "(Semua lunas)" else "(Belum lunas)",
-                                    fontSize = 11.sp,
-                                    fontWeight = FontWeight.Normal,
-                                    color = slate400,
-                                    maxLines = 1
-                                )
-                            }
                         }
                     }
 
-                    // Header Badge & Chevron Action: [ 📄 3 Nota ⌄ ]
-                    Surface(
-                        shape = RoundedCornerShape(8.dp),
-                        color = Color.Transparent,
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(4.dp)
                     ) {
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(4.dp),
-                            modifier = Modifier.padding(horizontal = 4.dp, vertical = 4.dp)
-                        ) {
-                            Icon(
-                                imageVector = Icons.AutoMirrored.Outlined.ReceiptLong,
-                                contentDescription = null,
-                                tint = slate400,
-                                modifier = Modifier.size(15.dp)
-                            )
-                            Text(
-                                text = "${receivables.size} Nota",
-                                fontSize = 12.sp,
-                                fontWeight = FontWeight.Medium,
-                                color = slate500,
-                                maxLines = 1,
-                                softWrap = false
-                            )
-                            Icon(
-                                imageVector = Icons.Default.ExpandMore,
-                                contentDescription = if (isExpanded) "Tutup nota" else "Buka nota",
-                                tint = slate400,
-                                modifier = Modifier
-                                    .size(18.dp)
-                                    .rotate(rotationState)
-                            )
-                        }
+                        Text(
+                            text = totalRemaining.currencyText(),
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.SemiBold,
+                            color = slate900,
+                            maxLines = 1
+                        )
+                        Text(
+                            text = if (allPaid) "(Semua lunas)" else "(Belum lunas)",
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.Normal,
+                            color = slate400,
+                            maxLines = 1
+                        )
                     }
                 }
             }
 
-            // Expanded Invoices List
-            AnimatedVisibility(
-                visible = isExpanded,
-                enter = expandVertically() + fadeIn(),
-                exit = shrinkVertically() + fadeOut()
+            // Header Badge & Chevron Action: [ 📄 3 Nota ⌄ ]
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(4.dp),
+                modifier = Modifier.padding(vertical = 2.dp)
             ) {
-                CustomerGroupExpandedContent(
-                    customerId = customerId,
-                    customerName = customerName,
-                    receivables = receivables,
-                    onPayClick = onPayClick,
-                    onOpenLedger = onOpenLedger
+                Icon(
+                    imageVector = Icons.AutoMirrored.Outlined.ReceiptLong,
+                    contentDescription = null,
+                    tint = slate400,
+                    modifier = Modifier.size(14.dp)
+                )
+                Text(
+                    text = "${receivables.size} Nota",
+                    fontSize = 12.sp,
+                    fontWeight = FontWeight.Medium,
+                    color = slate500,
+                    maxLines = 1,
+                    softWrap = false
+                )
+                Icon(
+                    imageVector = Icons.Default.ExpandMore,
+                    contentDescription = if (isExpanded) "Tutup nota" else "Buka nota",
+                    tint = slate400,
+                    modifier = Modifier
+                        .size(16.dp)
+                        .rotate(rotationState)
                 )
             }
+        }
+
+        // Expanded Invoices List
+        AnimatedVisibility(
+            visible = isExpanded,
+            enter = expandVertically() + fadeIn(),
+            exit = shrinkVertically() + fadeOut()
+        ) {
+            CustomerGroupExpandedContent(
+                customerId = customerId,
+                customerName = customerName,
+                receivables = receivables,
+                onPayClick = onPayClick,
+                onOpenLedger = onOpenLedger
+            )
         }
     }
 }
@@ -1560,37 +1592,31 @@ internal fun ReceivableFilterBottomSheet(
         onDismissRequest = onDismiss,
         containerColor = Color.White,
         dragHandle = {
-            Column(
+            Box(
                 modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(top = 10.dp, bottom = 4.dp),
-                horizontalAlignment = Alignment.CenterHorizontally
-            ) {
-                Box(
-                    modifier = Modifier
-                        .width(40.dp)
-                        .height(4.dp)
-                        .background(Color(0xFFE2E8F0), CircleShape)
-                )
-            }
+                    .padding(top = 12.dp, bottom = 4.dp)
+                    .width(40.dp)
+                    .height(5.dp)
+                    .background(Color(0xFFCBD5E1), CircleShape)
+            )
         },
-        shape = RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp)
+        shape = RoundedCornerShape(topStart = 32.dp, topEnd = 32.dp)
     ) {
         Column(
             modifier = Modifier.fillMaxWidth()
         ) {
-            // Modal Header
+            // Modal Header (matching SalesFilterBottomSheet)
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(horizontal = 20.dp, vertical = 12.dp),
+                    .padding(start = 24.dp, end = 20.dp, top = 4.dp, bottom = 12.dp),
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.Top,
             ) {
-                Column {
+                Column(modifier = Modifier.weight(1f).padding(end = 12.dp)) {
                     Text(
                         text = "Filter Piutang",
-                        fontSize = 18.sp,
+                        fontSize = 20.sp,
                         fontWeight = FontWeight.Bold,
                         color = Color(0xFF0F172A),
                         letterSpacing = (-0.3).sp,
@@ -1598,8 +1624,9 @@ internal fun ReceivableFilterBottomSheet(
                     Spacer(Modifier.height(2.dp))
                     Text(
                         text = "Atur status pelunasan dan filter piutang pelanggan",
-                        fontSize = 12.sp,
+                        fontSize = 13.sp,
                         color = Color(0xFF64748B),
+                        lineHeight = 17.sp,
                     )
                 }
                 Box(
@@ -1613,26 +1640,28 @@ internal fun ReceivableFilterBottomSheet(
                     Icon(
                         Icons.Outlined.Close,
                         contentDescription = "Tutup Filter",
-                        tint = Color(0xFF94A3B8),
-                        modifier = Modifier.size(18.dp),
+                        tint = Color(0xFF64748B),
+                        modifier = Modifier.size(16.dp),
                     )
                 }
             }
 
             HorizontalDivider(color = Color(0xFFF1F5F9), thickness = 1.dp)
 
-            // Scrollable Content Body
+            // Scrollable Content Body (matching SalesFilterBottomSheet)
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(horizontal = 20.dp, vertical = 16.dp),
-                verticalArrangement = Arrangement.spacedBy(18.dp),
+                    .weight(1f, fill = false)
+                    .verticalScroll(rememberScrollState())
+                    .padding(horizontal = 24.dp, vertical = 18.dp),
+                verticalArrangement = Arrangement.spacedBy(22.dp),
             ) {
                 // 1. Section: STATUS PELUNASAN (Grid 2x2 with white bg & green border on active)
                 Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                     Text(
                         text = "STATUS PELUNASAN",
-                        fontSize = 11.sp,
+                        fontSize = 12.sp,
                         fontWeight = FontWeight.Bold,
                         color = Color(0xFF64748B),
                         letterSpacing = 0.8.sp,
@@ -1657,9 +1686,12 @@ internal fun ReceivableFilterBottomSheet(
                                             .height(46.dp)
                                             .clickable { selectedStatus = status },
                                         shape = RoundedCornerShape(12.dp),
-                                        color = Color.White,
-                                        border = BorderStroke(1.dp, if (isSelected) Color(0xFF256B57) else Color(0xFFE2E8F0)),
-                                        shadowElevation = if (isSelected) 0.5.dp else 0.dp
+                                        color = Color.Transparent,
+                                        border = BorderStroke(
+                                            if (isSelected) 1.5.dp else 1.dp,
+                                            if (isSelected) Color(0xFF256B57) else Color(0xFFE2E8F0)
+                                        ),
+                                        shadowElevation = 0.dp
                                     ) {
                                         Row(
                                             modifier = Modifier
@@ -1670,10 +1702,11 @@ internal fun ReceivableFilterBottomSheet(
                                         ) {
                                             Text(
                                                 text = label,
-                                                fontSize = 13.sp,
+                                                fontSize = 14.sp,
                                                 fontWeight = if (isSelected) FontWeight.SemiBold else FontWeight.Medium,
                                                 color = if (isSelected) Color(0xFF256B57) else Color(0xFF334155),
-                                                maxLines = 1
+                                                maxLines = 1,
+                                                overflow = TextOverflow.Ellipsis
                                             )
                                             if (isSelected) {
                                                 Icon(
@@ -1695,7 +1728,7 @@ internal fun ReceivableFilterBottomSheet(
                 Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                     Text(
                         text = "JATUH TEMPO",
-                        fontSize = 11.sp,
+                        fontSize = 12.sp,
                         fontWeight = FontWeight.Bold,
                         color = Color(0xFF64748B),
                         letterSpacing = 0.8.sp,
@@ -1720,9 +1753,12 @@ internal fun ReceivableFilterBottomSheet(
                                             .height(46.dp)
                                             .clickable { selectedDue = filter },
                                         shape = RoundedCornerShape(12.dp),
-                                        color = Color.White,
-                                        border = BorderStroke(1.dp, if (isSelected) Color(0xFF256B57) else Color(0xFFE2E8F0)),
-                                        shadowElevation = if (isSelected) 0.5.dp else 0.dp
+                                        color = Color.Transparent,
+                                        border = BorderStroke(
+                                            if (isSelected) 1.5.dp else 1.dp,
+                                            if (isSelected) Color(0xFF256B57) else Color(0xFFE2E8F0)
+                                        ),
+                                        shadowElevation = 0.dp
                                     ) {
                                         Row(
                                             modifier = Modifier
@@ -1733,10 +1769,11 @@ internal fun ReceivableFilterBottomSheet(
                                         ) {
                                             Text(
                                                 text = label,
-                                                fontSize = 13.sp,
+                                                fontSize = 14.sp,
                                                 fontWeight = if (isSelected) FontWeight.SemiBold else FontWeight.Medium,
                                                 color = if (isSelected) Color(0xFF256B57) else Color(0xFF334155),
-                                                maxLines = 1
+                                                maxLines = 1,
+                                                overflow = TextOverflow.Ellipsis
                                             )
                                             if (isSelected) {
                                                 Icon(
@@ -1758,7 +1795,7 @@ internal fun ReceivableFilterBottomSheet(
                 Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                     Text(
                         text = "URUTKAN BERDASARKAN",
-                        fontSize = 11.sp,
+                        fontSize = 12.sp,
                         fontWeight = FontWeight.Bold,
                         color = Color(0xFF64748B),
                         letterSpacing = 0.8.sp,
@@ -1774,15 +1811,18 @@ internal fun ReceivableFilterBottomSheet(
                         Surface(
                             modifier = Modifier
                                 .weight(1f)
-                                .height(40.dp)
+                                .height(46.dp)
                                 .clickable { selectedSortOrder = ReceivableSortOrder.NearestDueDate },
                             shape = RoundedCornerShape(12.dp),
-                            color = Color.White,
-                            border = BorderStroke(1.dp, if (isDueDateSelected) Color(0xFF256B57) else Color(0xFFE2E8F0)),
-                            shadowElevation = if (isDueDateSelected) 0.5.dp else 0.dp
+                            color = Color.Transparent,
+                            border = BorderStroke(
+                                if (isDueDateSelected) 1.5.dp else 1.dp,
+                                if (isDueDateSelected) Color(0xFF256B57) else Color(0xFFE2E8F0)
+                            ),
+                            shadowElevation = 0.dp
                         ) {
                             Row(
-                                modifier = Modifier.fillMaxSize(),
+                                modifier = Modifier.fillMaxSize().padding(horizontal = 12.dp),
                                 horizontalArrangement = Arrangement.Center,
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
@@ -1790,14 +1830,16 @@ internal fun ReceivableFilterBottomSheet(
                                     imageVector = Icons.Outlined.Schedule,
                                     contentDescription = null,
                                     tint = if (isDueDateSelected) Color(0xFF256B57) else Color(0xFF64748B),
-                                    modifier = Modifier.size(14.dp)
+                                    modifier = Modifier.size(16.dp)
                                 )
-                                Spacer(Modifier.width(6.dp))
+                                Spacer(Modifier.width(8.dp))
                                 Text(
                                     text = "Tempo Terdekat",
-                                    fontSize = 12.sp,
+                                    fontSize = 13.5.sp,
                                     fontWeight = if (isDueDateSelected) FontWeight.SemiBold else FontWeight.Medium,
-                                    color = if (isDueDateSelected) Color(0xFF256B57) else Color(0xFF475569)
+                                    color = if (isDueDateSelected) Color(0xFF256B57) else Color(0xFF334155),
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis
                                 )
                             }
                         }
@@ -1807,15 +1849,18 @@ internal fun ReceivableFilterBottomSheet(
                         Surface(
                             modifier = Modifier
                                 .weight(1f)
-                                .height(40.dp)
+                                .height(46.dp)
                                 .clickable { selectedSortOrder = ReceivableSortOrder.HighestAmount },
                             shape = RoundedCornerShape(12.dp),
-                            color = Color.White,
-                            border = BorderStroke(1.dp, if (isAmountSelected) Color(0xFF256B57) else Color(0xFFE2E8F0)),
-                            shadowElevation = if (isAmountSelected) 0.5.dp else 0.dp
+                            color = Color.Transparent,
+                            border = BorderStroke(
+                                if (isAmountSelected) 1.5.dp else 1.dp,
+                                if (isAmountSelected) Color(0xFF256B57) else Color(0xFFE2E8F0)
+                            ),
+                            shadowElevation = 0.dp
                         ) {
                             Row(
-                                modifier = Modifier.fillMaxSize(),
+                                modifier = Modifier.fillMaxSize().padding(horizontal = 12.dp),
                                 horizontalArrangement = Arrangement.Center,
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
@@ -1823,14 +1868,16 @@ internal fun ReceivableFilterBottomSheet(
                                     imageVector = Icons.AutoMirrored.Outlined.TrendingUp,
                                     contentDescription = null,
                                     tint = if (isAmountSelected) Color(0xFF256B57) else Color(0xFF64748B),
-                                    modifier = Modifier.size(14.dp)
+                                    modifier = Modifier.size(16.dp)
                                 )
-                                Spacer(Modifier.width(6.dp))
+                                Spacer(Modifier.width(8.dp))
                                 Text(
                                     text = "Nominal Terbesar",
-                                    fontSize = 12.sp,
+                                    fontSize = 13.5.sp,
                                     fontWeight = if (isAmountSelected) FontWeight.SemiBold else FontWeight.Medium,
-                                    color = if (isAmountSelected) Color(0xFF256B57) else Color(0xFF475569)
+                                    color = if (isAmountSelected) Color(0xFF256B57) else Color(0xFF334155),
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis
                                 )
                             }
                         }
@@ -1841,15 +1888,18 @@ internal fun ReceivableFilterBottomSheet(
                     Surface(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .height(40.dp)
+                            .height(46.dp)
                             .clickable { selectedSortOrder = ReceivableSortOrder.CustomerNameAsc },
                         shape = RoundedCornerShape(12.dp),
-                        color = Color.White,
-                        border = BorderStroke(1.dp, if (isNameSelected) Color(0xFF256B57) else Color(0xFFE2E8F0)),
-                        shadowElevation = if (isNameSelected) 0.5.dp else 0.dp
+                        color = Color.Transparent,
+                        border = BorderStroke(
+                            if (isNameSelected) 1.5.dp else 1.dp,
+                            if (isNameSelected) Color(0xFF256B57) else Color(0xFFE2E8F0)
+                        ),
+                        shadowElevation = 0.dp
                     ) {
                         Row(
-                            modifier = Modifier.fillMaxSize(),
+                            modifier = Modifier.fillMaxSize().padding(horizontal = 12.dp),
                             horizontalArrangement = Arrangement.Center,
                             verticalAlignment = Alignment.CenterVertically
                         ) {
@@ -1857,14 +1907,16 @@ internal fun ReceivableFilterBottomSheet(
                                 imageVector = Icons.Outlined.FilterList,
                                 contentDescription = null,
                                 tint = if (isNameSelected) Color(0xFF256B57) else Color(0xFF64748B),
-                                modifier = Modifier.size(14.dp)
+                                modifier = Modifier.size(16.dp)
                             )
-                            Spacer(Modifier.width(6.dp))
+                            Spacer(Modifier.width(8.dp))
                             Text(
                                 text = "Nama Pelanggan (A–Z)",
-                                fontSize = 12.sp,
+                                fontSize = 13.5.sp,
                                 fontWeight = if (isNameSelected) FontWeight.SemiBold else FontWeight.Medium,
-                                color = if (isNameSelected) Color(0xFF256B57) else Color(0xFF475569)
+                                color = if (isNameSelected) Color(0xFF256B57) else Color(0xFF334155),
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis
                             )
                         }
                     }
@@ -1873,13 +1925,12 @@ internal fun ReceivableFilterBottomSheet(
 
             HorizontalDivider(color = Color(0xFFF1F5F9), thickness = 1.dp)
 
-            // Footer Actions: Terapkan (Green Filled) di atas & Batal (Borderless TextButton) di bawah
+            // Footer Actions: Terapkan (Green Filled) di atas & Batal (Borderless TextButton) di bawah (matching SalesFilterBottomSheet)
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(horizontal = 20.dp)
-                    .padding(top = 8.dp, bottom = 16.dp),
-                verticalArrangement = Arrangement.spacedBy(8.dp),
+                    .padding(horizontal = 20.dp, vertical = 12.dp),
+                verticalArrangement = Arrangement.spacedBy(4.dp),
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
                 // Terapkan Button: Full Width bg-brand text-white font-bold
@@ -1954,12 +2005,13 @@ internal fun ReceivableSummaryBottomSheet(
         onDismissRequest = onDismiss,
         containerColor = Color.White,
         dragHandle = {
-            Column(
-                modifier = Modifier.fillMaxWidth().padding(top = 12.dp, bottom = 4.dp),
-                horizontalAlignment = Alignment.CenterHorizontally
-            ) {
-                Box(modifier = Modifier.width(40.dp).height(4.dp).background(Color(0xFFE2E8F0), CircleShape))
-            }
+            Box(
+                modifier = Modifier
+                    .padding(top = 12.dp, bottom = 4.dp)
+                    .width(48.dp)
+                    .height(6.dp)
+                    .background(Color(0xFFE2E8F0), CircleShape)
+            )
         },
         shape = RoundedCornerShape(topStart = 32.dp, topEnd = 32.dp)
     ) {
@@ -2020,7 +2072,7 @@ internal fun ReceivableSummaryBottomSheet(
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(vertical = 16.dp),
+                        .padding(vertical = 12.dp),
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
@@ -2052,7 +2104,7 @@ internal fun ReceivableSummaryBottomSheet(
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(vertical = 16.dp),
+                        .padding(vertical = 12.dp),
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
@@ -2095,7 +2147,7 @@ internal fun ReceivableSummaryBottomSheet(
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(vertical = 16.dp),
+                        .padding(vertical = 12.dp),
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
@@ -2138,7 +2190,7 @@ internal fun ReceivableSummaryBottomSheet(
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(vertical = 16.dp),
+                        .padding(vertical = 12.dp),
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {

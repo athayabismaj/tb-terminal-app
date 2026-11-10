@@ -59,14 +59,14 @@ internal fun ReceivableSummaryCard(
             .testTag("receivable-summary-metric"),
         shape = RoundedCornerShape(16.dp),
         color = Color.White,
-        border = BorderStroke(1.dp, Color(0xFFE2E8F0)),
-        shadowElevation = 0.5.dp
+        border = BorderStroke(1.dp, Color(0xFFE2E8F0).copy(alpha = 0.8f)),
+        shadowElevation = 1.dp
     ) {
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(10.dp)
+                .padding(horizontal = 16.dp, vertical = 14.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
             // Line 1: Header (TOTAL PIUTANG BERJALAN & Overdue status badge)
             Row(
@@ -130,7 +130,7 @@ internal fun ReceivableSummaryCard(
                 Column(modifier = Modifier.weight(1f, fill = false)) {
                     Text(
                         text = uiState.pageRemainingTotal.currencyText(),
-                        fontSize = 24.sp,
+                        fontSize = 22.sp,
                         fontWeight = FontWeight.Bold,
                         color = Color(0xFF0F172A),
                         letterSpacing = (-0.5).sp
@@ -145,14 +145,14 @@ internal fun ReceivableSummaryCard(
 
                 Surface(
                     onClick = onQuickBillClick,
-                    shape = RoundedCornerShape(12.dp),
+                    shape = RoundedCornerShape(8.dp),
                     color = Color.White,
                     border = BorderStroke(1.dp, Color(0xFFE2E8F0)),
                     shadowElevation = 0.5.dp,
-                    modifier = Modifier.height(36.dp)
+                    modifier = Modifier.height(32.dp)
                 ) {
                     Row(
-                        modifier = Modifier.padding(horizontal = 14.dp),
+                        modifier = Modifier.padding(horizontal = 10.dp),
                         verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.spacedBy(6.dp)
                     ) {
