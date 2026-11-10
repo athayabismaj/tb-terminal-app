@@ -9,11 +9,13 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -85,6 +87,7 @@ import com.tbterminal.app.navigation.AppCapability
 import com.tbterminal.app.navigation.LocalPendingProductSearch
 import com.tbterminal.app.ui.barcode.CameraBarcodeScannerDialog
 import com.tbterminal.app.ui.components.SkeletonBox
+import com.tbterminal.app.ui.components.TbAdaptiveBox
 import com.tbterminal.app.ui.components.TbPageSurface
 import com.tbterminal.app.ui.dashboard.admin.AdminDashboardShell
 import com.tbterminal.app.ui.dashboard.admin.AdminDestination
@@ -189,46 +192,67 @@ fun BackofficeHubScreen(
         },
         onLogout = onLogout,
     ) { contentModifier ->
-        TbPageSurface(modifier = contentModifier, maxContentWidth = 1120.dp) { layout, pageModifier ->
-            Column(
-                modifier = pageModifier.verticalScroll(rememberScrollState()),
-                verticalArrangement = Arrangement.spacedBy(if (layout.isCompact) 20.dp else 24.dp),
-            ) {
-                when (section) {
-                    BackofficeSection.TRANSACTIONS -> TransactionsHub(
-                        role = role,
-                        analyticsRepository = analyticsRepository,
-                        cashReconciliationRepository = cashReconciliationRepository,
-                        purchasingRepository = purchasingRepository,
-                        onNavigate = navigate,
-                    )
-                    BackofficeSection.FINANCE -> FinanceHub(
-                        role = role,
-                        content = financeHubContent(role),
-                        cashReconciliationRepository = cashReconciliationRepository,
-                        receivableRepository = receivableRepository,
-                        purchasingRepository = purchasingRepository,
-                        analyticsRepository = analyticsRepository,
-                        onNavigate = navigate,
-                    )
-                    BackofficeSection.STOCK -> StockHub(
-                        role = role,
-                        content = stockHubContent(role),
-                        inventoryRepository = inventoryRepository,
-                        syncMonitoringRepository = syncMonitoringRepository,
-                        onNavigate = navigate,
-                    )
-                    BackofficeSection.MORE -> BackofficeMoreContent(
-                        layout = layout,
-                        role = role,
-                        onNavigate = navigate,
-                        onUserManagementClick = onUserManagementClick,
-                        onSecurityLogClick = onSecurityLogClick,
-                        onLogout = onLogout,
-                    )
-                    BackofficeSection.HOME, BackofficeSection.MENU -> Unit
+        if (section == BackofficeSection.MORE) {
+            TbAdaptiveBox(
+                modifier = contentModifier
+                    .fillMaxSize()
+                    .background(Color(0xFFF8FAFC)),
+            ) { layout ->
+                Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.TopCenter) {
+                    val containerModifier = if (layout.isCompact) {
+                        Modifier.fillMaxWidth()
+                    } else {
+                        Modifier
+                            .fillMaxWidth()
+                            .widthIn(max = 1120.dp)
+                            .padding(horizontal = layout.horizontalPadding, vertical = layout.verticalSpacing)
+                    }
+                    Column(modifier = containerModifier.verticalScroll(rememberScrollState())) {
+                        BackofficeMoreContent(
+                            layout = layout,
+                            role = role,
+                            onNavigate = navigate,
+                            onUserManagementClick = onUserManagementClick,
+                            onSecurityLogClick = onSecurityLogClick,
+                            onLogout = onLogout,
+                        )
+                    }
                 }
-                Spacer(Modifier.height(8.dp))
+            }
+        } else {
+            TbPageSurface(modifier = contentModifier, maxContentWidth = 1120.dp) { layout, pageModifier ->
+                Column(
+                    modifier = pageModifier.verticalScroll(rememberScrollState()),
+                    verticalArrangement = Arrangement.spacedBy(if (layout.isCompact) 20.dp else 24.dp),
+                ) {
+                    when (section) {
+                        BackofficeSection.TRANSACTIONS -> TransactionsHub(
+                            role = role,
+                            analyticsRepository = analyticsRepository,
+                            cashReconciliationRepository = cashReconciliationRepository,
+                            purchasingRepository = purchasingRepository,
+                            onNavigate = navigate,
+                        )
+                        BackofficeSection.FINANCE -> FinanceHub(
+                            role = role,
+                            content = financeHubContent(role),
+                            cashReconciliationRepository = cashReconciliationRepository,
+                            receivableRepository = receivableRepository,
+                            purchasingRepository = purchasingRepository,
+                            analyticsRepository = analyticsRepository,
+                            onNavigate = navigate,
+                        )
+                        BackofficeSection.STOCK -> StockHub(
+                            role = role,
+                            content = stockHubContent(role),
+                            inventoryRepository = inventoryRepository,
+                            syncMonitoringRepository = syncMonitoringRepository,
+                            onNavigate = navigate,
+                        )
+                        else -> Unit
+                    }
+                    Spacer(Modifier.height(8.dp))
+                }
             }
         }
     }

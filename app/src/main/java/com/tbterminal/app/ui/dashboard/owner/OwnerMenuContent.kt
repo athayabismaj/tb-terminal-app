@@ -52,8 +52,8 @@ internal fun OwnerMenuContent(
     Column(
         modifier = modifier
             .fillMaxWidth()
-            .padding(top = 6.dp, bottom = 24.dp),
-        verticalArrangement = Arrangement.spacedBy(20.dp),
+            .padding(bottom = 24.dp),
+        verticalArrangement = Arrangement.spacedBy(if (layout.isCompact) 12.dp else 20.dp),
     ) {
         RoleMenuProfileCard(
             displayName = displayName,
@@ -62,17 +62,17 @@ internal fun OwnerMenuContent(
             testTag = "owner-menu-profile",
         )
         if (layout.isCompact) {
-            Column(verticalArrangement = Arrangement.spacedBy(20.dp)) {
+            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 groups.forEach { group ->
-                    OwnerMenuGroupSection(group = group, onNavigate = onNavigate, onLogout = onLogout)
+                    OwnerMenuGroupSection(group = group, compact = true, onNavigate = onNavigate, onLogout = onLogout)
                 }
             }
         } else {
-            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(20.dp)) {
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(24.dp)) {
                 columns.forEach { column ->
                     Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(20.dp)) {
                         column.forEach { group ->
-                            OwnerMenuGroupSection(group = group, onNavigate = onNavigate, onLogout = onLogout)
+                            OwnerMenuGroupSection(group = group, compact = false, onNavigate = onNavigate, onLogout = onLogout)
                         }
                     }
                 }
@@ -84,6 +84,7 @@ internal fun OwnerMenuContent(
 @Composable
 private fun OwnerMenuGroupSection(
     group: OwnerMenuGroup,
+    compact: Boolean,
     onNavigate: (AdminDestination) -> Unit,
     onLogout: () -> Unit,
 ) {
@@ -105,7 +106,7 @@ private fun OwnerMenuGroupSection(
             },
         )
     }
-    RoleMenuGroupCard(title = groupTitle, items = items)
+    RoleMenuGroupCard(title = groupTitle, items = items, compact = compact)
 }
 
 private fun OwnerMenuAction.icon(): ImageVector = when (this) {
