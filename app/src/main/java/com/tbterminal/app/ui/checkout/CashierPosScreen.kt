@@ -59,6 +59,7 @@ import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.ModalBottomSheet
+import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
@@ -736,6 +737,7 @@ private fun PosSearchBar(
 // ═════════════════════════════════════════════════════════════════════════════
 // SUB-KOMPONEN 2B: POS FILTER BOTTOM SHEET (DESAIN FILTER PENJUALAN)
 // ═════════════════════════════════════════════════════════════════════════════
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun PosFilterDialog(
     categories: List<String>,
@@ -747,165 +749,162 @@ private fun PosFilterDialog(
 ) {
     var tempCategory by remember(selectedCategory) { mutableStateOf(selectedCategory) }
     var tempOnlyInStock by remember(onlyInStock) { mutableStateOf(onlyInStock) }
+    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
 
-    Dialog(
+    ModalBottomSheet(
         onDismissRequest = onDismiss,
-        properties = DialogProperties(usePlatformDefaultWidth = false)
-    ) {
-        Box(
-            modifier = Modifier.fillMaxSize(),
-            contentAlignment = Alignment.Center
-        ) {
-            Card(
+        sheetState = sheetState,
+        containerColor = Color.White,
+        shape = RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp),
+        dragHandle = {
+            Box(
                 modifier = Modifier
-                    .widthIn(max = 480.dp)
-                    .fillMaxWidth()
-                    .padding(16.dp),
-                shape = RoundedCornerShape(20.dp),
-                colors = CardDefaults.cardColors(containerColor = Color.White),
-                border = BorderStroke(1.dp, Slate200),
-                elevation = CardDefaults.cardElevation(defaultElevation = 16.dp)
+                    .padding(top = 12.dp, bottom = 4.dp)
+                    .size(width = 36.dp, height = 4.dp)
+                    .background(Color(0xFFE2E8F0), CircleShape)
+            )
+        }
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 20.dp)
+                .padding(bottom = 24.dp)
+                .testTag("pos-filter-sheet")
+        ) {
+            // Header: Title + Subtitle on left, Circular Close (X) button on right
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
             ) {
-                Column(
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = "Filter Katalog Produk",
+                        fontSize = 18.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = Slate900,
+                        letterSpacing = (-0.3).sp
+                    )
+                    Spacer(modifier = Modifier.height(2.dp))
+                    Text(
+                        text = "Atur kategori dan ketersediaan stok produk",
+                        fontSize = 12.sp,
+                        color = Slate500
+                    )
+                }
+
+                Box(
                     modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(20.dp)
-                        .testTag("pos-filter-sheet")
+                        .size(28.dp)
+                        .clip(CircleShape)
+                        .background(Slate100)
+                        .clickable(onClick = onDismiss),
+                    contentAlignment = Alignment.Center
                 ) {
-                    // Header: Title + Subtitle on left, Circular Close (X) button on right (matching Tambah Pelanggan)
+                    Icon(
+                        imageVector = Icons.Outlined.Close,
+                        contentDescription = "Tutup Filter",
+                        tint = Slate500,
+                        modifier = Modifier.size(14.dp)
+                    )
+                }
+            }
+
+            Spacer(modifier = Modifier.height(16.dp))
+
+            // Scrollable Filter Options
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .heightIn(max = 420.dp)
+                    .verticalScroll(rememberScrollState()),
+                verticalArrangement = Arrangement.spacedBy(18.dp)
+            ) {
+                // Section 1: Ketersediaan Stok
+                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                    Text(
+                        text = "KETERSEDIAAN STOK",
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = Color(0xFF64748B),
+                        letterSpacing = 0.8.sp
+                    )
                     Row(
                         modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
+                        horizontalArrangement = Arrangement.spacedBy(10.dp)
                     ) {
-                        Column(modifier = Modifier.weight(1f)) {
-                            Text(
-                                text = "Filter Katalog Produk",
-                                fontSize = 16.sp,
-                                fontWeight = FontWeight.Bold,
-                                color = Slate900
-                            )
-                            Spacer(modifier = Modifier.height(2.dp))
-                            Text(
-                                text = "Atur kategori dan ketersediaan stok produk",
-                                fontSize = 11.sp,
-                                color = Slate500
-                            )
-                        }
-
-                        Box(
-                            modifier = Modifier
-                                .size(28.dp)
-                                .clip(CircleShape)
-                                .background(Slate100)
-                                .clickable(onClick = onDismiss),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Icon(
-                                imageVector = Icons.Outlined.Close,
-                                contentDescription = "Tutup Filter",
-                                tint = Slate500,
-                                modifier = Modifier.size(14.dp)
-                            )
-                        }
-                    }
-
-                    Spacer(modifier = Modifier.height(16.dp))
-
-                    // Scrollable Filter Options
-                    Column(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .heightIn(max = 420.dp)
-                            .verticalScroll(rememberScrollState()),
-                        verticalArrangement = Arrangement.spacedBy(18.dp)
-                    ) {
-                        // Section 1: Ketersediaan Stok
-                        Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                            Text(
-                                text = "KETERSEDIAAN STOK",
-                                fontSize = 11.sp,
-                                fontWeight = FontWeight.Bold,
-                                color = Color(0xFF64748B),
-                                letterSpacing = 0.8.sp
-                            )
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.spacedBy(10.dp)
-                            ) {
-                                PosFilterOptionCard(
-                                    label = "Semua Produk",
-                                    isSelected = !tempOnlyInStock,
-                                    onClick = { tempOnlyInStock = false },
-                                    modifier = Modifier.weight(1f),
-                                    testTag = "pos-filter-stock-all"
-                                )
-                                PosFilterOptionCard(
-                                    label = "Stok Tersedia (>0)",
-                                    isSelected = tempOnlyInStock,
-                                    onClick = { tempOnlyInStock = true },
-                                    modifier = Modifier.weight(1f),
-                                    testTag = "pos-filter-stock-available"
-                                )
-                            }
-                        }
-
-                        // Section 2: Kategori Produk
-                        Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                            Text(
-                                text = "KATEGORI PRODUK",
-                                fontSize = 11.sp,
-                                fontWeight = FontWeight.Bold,
-                                color = Color(0xFF64748B),
-                                letterSpacing = 0.8.sp
-                            )
-                            val categoryPairs = categories.chunked(2)
-                            categoryPairs.forEach { rowCategories ->
-                                Row(
-                                    modifier = Modifier.fillMaxWidth(),
-                                    horizontalArrangement = Arrangement.spacedBy(10.dp)
-                                ) {
-                                    rowCategories.forEach { category ->
-                                        PosFilterOptionCard(
-                                            label = category,
-                                            isSelected = category == tempCategory,
-                                            onClick = { tempCategory = category },
-                                            modifier = Modifier.weight(1f),
-                                            testTag = "pos-filter-cat-$category"
-                                        )
-                                    }
-                                    if (rowCategories.size == 1) {
-                                        Spacer(modifier = Modifier.weight(1f))
-                                    }
-                                }
-                            }
-                        }
-                    }
-
-                    Spacer(modifier = Modifier.height(18.dp))
-
-                    // Footer: Tombol Terapkan (Full-width, bold text, tanpa icon, tanpa batal/reset)
-                    Button(
-                        onClick = {
-                            onApplyFilter(tempCategory, tempOnlyInStock)
-                        },
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(46.dp)
-                            .testTag("pos-filter-apply"),
-                        shape = RoundedCornerShape(12.dp),
-                        colors = ButtonDefaults.buttonColors(
-                            containerColor = Color(0xFF15803D),
-                            contentColor = Color.White
+                        PosFilterOptionCard(
+                            label = "Semua Produk",
+                            isSelected = !tempOnlyInStock,
+                            onClick = { tempOnlyInStock = false },
+                            modifier = Modifier.weight(1f),
+                            testTag = "pos-filter-stock-all"
                         )
-                    ) {
-                        Text(
-                            text = "Terapkan Filter",
-                            fontSize = 14.sp,
-                            fontWeight = FontWeight.Bold
+                        PosFilterOptionCard(
+                            label = "Stok Tersedia (>0)",
+                            isSelected = tempOnlyInStock,
+                            onClick = { tempOnlyInStock = true },
+                            modifier = Modifier.weight(1f),
+                            testTag = "pos-filter-stock-available"
                         )
                     }
                 }
+
+                // Section 2: Kategori Produk
+                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                    Text(
+                        text = "KATEGORI PRODUK",
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = Color(0xFF64748B),
+                        letterSpacing = 0.8.sp
+                    )
+                    val categoryPairs = categories.chunked(2)
+                    categoryPairs.forEach { rowCategories ->
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(10.dp)
+                        ) {
+                            rowCategories.forEach { category ->
+                                PosFilterOptionCard(
+                                    label = category,
+                                    isSelected = category == tempCategory,
+                                    onClick = { tempCategory = category },
+                                    modifier = Modifier.weight(1f),
+                                    testTag = "pos-filter-cat-"
+                                )
+                            }
+                            if (rowCategories.size == 1) {
+                                Spacer(modifier = Modifier.weight(1f))
+                            }
+                        }
+                    }
+                }
+            }
+
+            Spacer(modifier = Modifier.height(18.dp))
+
+            // Footer: Tombol Terapkan (Full-width, bold text, tanpa icon, tanpa batal/reset)
+            Button(
+                onClick = {
+                    onApplyFilter(tempCategory, tempOnlyInStock)
+                },
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(46.dp)
+                    .testTag("pos-filter-apply"),
+                shape = RoundedCornerShape(12.dp),
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = Color(0xFF15803D),
+                    contentColor = Color.White
+                )
+            ) {
+                Text(
+                    text = "Terapkan Filter",
+                    fontSize = 14.sp,
+                    fontWeight = FontWeight.Bold
+                )
             }
         }
     }
