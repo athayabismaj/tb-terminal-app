@@ -4,6 +4,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.remember
 import androidx.lifecycle.viewmodel.compose.viewModel
+import androidx.navigation.NavBackStackEntry
 import androidx.navigation.NavGraphBuilder
 import androidx.navigation.NavHostController
 import androidx.navigation.NavType
@@ -772,10 +773,11 @@ internal fun NavGraphBuilder.dashboardGraph(navController: NavHostController, se
             )
         }
 
-        composable(AppRoute.SupplierForm.route) {
+        composable(AppRoute.SupplierForm.route) { backStackEntry ->
             AdminSupplierFormRoute(
                 sessionManager = sessionManager,
                 navController = navController,
+                backStackEntry = backStackEntry,
                 appContainer = appContainer,
             )
         }
@@ -895,6 +897,7 @@ private fun AdminSupplierRoute(
 private fun AdminSupplierFormRoute(
     sessionManager: SessionManager,
     navController: NavHostController,
+    backStackEntry: NavBackStackEntry,
     appContainer: AppContainer,
 ) {
     val sessionUser = sessionManager.readSessionUser()
@@ -902,8 +905,9 @@ private fun AdminSupplierFormRoute(
         RedirectToLogin(sessionManager, navController)
         return
     }
-    val supplierListEntry = remember(navController.currentBackStackEntry) {
-        navController.getBackStackEntry(AppRoute.Suppliers.route)
+    val supplierListEntry = remember(backStackEntry) {
+        runCatching { navController.getBackStackEntry(AppRoute.Suppliers.route) }
+            .getOrElse { backStackEntry }
     }
     val supplierViewModel: SupplierViewModel = viewModel(
         viewModelStoreOwner = supplierListEntry,

@@ -2,14 +2,13 @@ package com.tbterminal.app.navigation
 
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.lifecycle.viewmodel.compose.viewModel
+import androidx.navigation.NavBackStackEntry
 import androidx.navigation.NavGraphBuilder
 import androidx.navigation.NavHostController
 import androidx.navigation.NavType
 import androidx.navigation.compose.composable
-import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.navArgument
 import com.tbterminal.app.data.di.AppContainer
 import com.tbterminal.app.data.session.SessionManager
@@ -60,7 +59,7 @@ import com.tbterminal.app.ui.users.OwnerUserCredentialScreen
 import com.tbterminal.app.ui.users.OwnerUserManagementScreen
 import com.tbterminal.app.ui.users.UserCredentialMode
 internal fun NavGraphBuilder.checkoutGraph(navController: NavHostController, sessionManager: SessionManager, appContainer: AppContainer) {
-        composable(AppRoute.CashierPos.route) {
+        composable(AppRoute.CashierPos.route) { backStackEntry ->
             val sessionUser = sessionManager.readSessionUser()
 
             if (sessionUser == null) {
@@ -81,6 +80,7 @@ internal fun NavGraphBuilder.checkoutGraph(navController: NavHostController, ses
                 }
                 val checkoutViewModel = cashierCheckoutViewModel(
                     navController = navController,
+                    backStackEntry = backStackEntry,
                     appContainer = appContainer
                 )
 
@@ -140,7 +140,7 @@ internal fun NavGraphBuilder.checkoutGraph(navController: NavHostController, ses
             }
         }
 
-        composable(AppRoute.CashierCart.route) {
+        composable(AppRoute.CashierCart.route) { backStackEntry ->
             val sessionUser = sessionManager.readSessionUser()
 
             if (sessionUser == null) {
@@ -170,6 +170,7 @@ internal fun NavGraphBuilder.checkoutGraph(navController: NavHostController, ses
                     managerApprovalRepository = appContainer.managerApprovalRepository,
                     viewModel = cashierCheckoutViewModel(
                         navController = navController,
+                        backStackEntry = backStackEntry,
                         appContainer = appContainer
                     ),
                     onBackToPos = {
@@ -227,7 +228,7 @@ internal fun NavGraphBuilder.checkoutGraph(navController: NavHostController, ses
             }
         }
 
-        composable(AppRoute.CashierPayment.route) {
+        composable(AppRoute.CashierPayment.route) { backStackEntry ->
             val sessionUser = sessionManager.readSessionUser()
 
             if (sessionUser == null) {
@@ -257,6 +258,7 @@ internal fun NavGraphBuilder.checkoutGraph(navController: NavHostController, ses
                     managerApprovalRepository = appContainer.managerApprovalRepository,
                     viewModel = cashierCheckoutViewModel(
                         navController = navController,
+                        backStackEntry = backStackEntry,
                         appContainer = appContainer
                     ),
                     onBackToCart = {
@@ -314,11 +316,16 @@ internal fun NavGraphBuilder.checkoutGraph(navController: NavHostController, ses
 @Composable
 private fun cashierCheckoutViewModel(
     navController: NavHostController,
+    backStackEntry: NavBackStackEntry,
     appContainer: AppContainer
 ): CheckoutViewModel {
-    val currentBackStackEntry by navController.currentBackStackEntryAsState()
-    val cashierOwner = remember(currentBackStackEntry) {
-        navController.getBackStackEntry(AppRoute.CashierPos.route)
+    val cashierOwner = remember(backStackEntry) {
+        if (backStackEntry.destination.route == AppRoute.CashierPos.route) {
+            backStackEntry
+        } else {
+            runCatching { navController.getBackStackEntry(AppRoute.CashierPos.route) }
+                .getOrElse { backStackEntry }
+        }
     }
 
     return viewModel(
