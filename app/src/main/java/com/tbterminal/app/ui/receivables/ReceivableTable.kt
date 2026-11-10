@@ -84,6 +84,7 @@ import androidx.compose.material3.LocalTextStyle
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -289,10 +290,10 @@ private fun ReceivableHeaderToolbar(
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(44.dp),
-                color = Color.White,
+                color = Color.Transparent,
                 shape = RoundedCornerShape(12.dp),
                 border = BorderStroke(1.dp, Color(0xFF256B57).copy(alpha = 0.5f)),
-                shadowElevation = 1.dp
+                shadowElevation = 0.dp
             ) {
                 Row(
                     modifier = Modifier
@@ -352,126 +353,138 @@ private fun ReceivableHeaderToolbar(
             }
         }
 
-        // 2. Active Filters Row (jika filter aktif)
+        // 2. Active Filters Row: Hanya muncul ketika filter diterapkan (Di atas text Daftar Piutang)
         if (isFiltered) {
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .horizontalScroll(rememberScrollState()),
+                    .padding(top = 2.dp)
+                    .testTag("receivable-quick-filters"),
                 verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(6.dp)
+                horizontalArrangement = Arrangement.SpaceBetween,
             ) {
-                Text(
-                    text = "Filter:",
-                    fontSize = 12.sp,
-                    fontWeight = FontWeight.Medium,
-                    color = Color(0xFF64748B)
-                )
-                if (hasStatusFilter) {
-                    Surface(
-                        shape = RoundedCornerShape(100.dp),
-                        color = Color(0xFFF1F5F9),
-                        border = BorderStroke(1.dp, Color(0xFFCBD5E1))
-                    ) {
-                        Row(
-                            modifier = Modifier.padding(start = 10.dp, end = 6.dp, top = 4.dp, bottom = 4.dp),
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(4.dp)
+                Row(
+                    modifier = Modifier
+                        .weight(1f, fill = false)
+                        .horizontalScroll(rememberScrollState()),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    Text(
+                        text = "Filter:",
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.Medium,
+                        color = Color(0xFF64748B)
+                    )
+                    if (hasStatusFilter) {
+                        Surface(
+                            shape = RoundedCornerShape(100.dp),
+                            color = Color.Transparent,
+                            border = BorderStroke(1.dp, Color(0xFFE2E8F0))
                         ) {
-                            Icon(Icons.Outlined.Receipt, null, tint = Color(0xFF64748B), modifier = Modifier.size(13.dp))
-                            Text(
-                                text = "Status: ${uiState.statusFilter.label}",
-                                fontSize = 11.sp,
-                                fontWeight = FontWeight.Medium,
-                                color = Color(0xFF334155),
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis
-                            )
-                            Box(
-                                modifier = Modifier
-                                    .size(16.dp)
-                                    .clip(CircleShape)
-                                    .clickable(onClick = onClearStatusFilter),
-                                contentAlignment = Alignment.Center
+                            Row(
+                                modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(6.dp)
                             ) {
-                                Icon(Icons.Outlined.Close, null, tint = Color(0xFF94A3B8), modifier = Modifier.size(11.dp))
+                                Icon(Icons.Outlined.Receipt, null, tint = Color(0xFF64748B), modifier = Modifier.size(13.dp))
+                                Text(
+                                    text = "Status: ${uiState.statusFilter.label}",
+                                    fontSize = 12.sp,
+                                    fontWeight = FontWeight.Medium,
+                                    color = Color(0xFF334155),
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis
+                                )
+                                Box(
+                                    modifier = Modifier
+                                        .size(16.dp)
+                                        .clip(CircleShape)
+                                        .clickable(onClick = onClearStatusFilter),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Icon(Icons.Outlined.Close, null, tint = Color(0xFF94A3B8), modifier = Modifier.size(11.dp))
+                                }
+                            }
+                        }
+                    }
+                    if (hasDueFilter) {
+                        Surface(
+                            shape = RoundedCornerShape(100.dp),
+                            color = Color.Transparent,
+                            border = BorderStroke(1.dp, Color(0xFFE2E8F0))
+                        ) {
+                            Row(
+                                modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(6.dp)
+                            ) {
+                                Icon(Icons.Outlined.CalendarMonth, null, tint = Color(0xFF64748B), modifier = Modifier.size(13.dp))
+                                Text(
+                                    text = "Jatuh Tempo: ${uiState.dueFilter.label}",
+                                    fontSize = 12.sp,
+                                    fontWeight = FontWeight.Medium,
+                                    color = Color(0xFF334155),
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis
+                                )
+                                Box(
+                                    modifier = Modifier
+                                        .size(16.dp)
+                                        .clip(CircleShape)
+                                        .clickable(onClick = onClearDueFilter),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Icon(Icons.Outlined.Close, null, tint = Color(0xFF94A3B8), modifier = Modifier.size(11.dp))
+                                }
+                            }
+                        }
+                    }
+                    if (hasSortFilter) {
+                        Surface(
+                            shape = RoundedCornerShape(100.dp),
+                            color = Color.Transparent,
+                            border = BorderStroke(1.dp, Color(0xFFE2E8F0))
+                        ) {
+                            Row(
+                                modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(6.dp)
+                            ) {
+                                Icon(Icons.Outlined.FilterList, null, tint = Color(0xFF64748B), modifier = Modifier.size(13.dp))
+                                Text(
+                                    text = "Urutkan: ${uiState.sortOrder.label}",
+                                    fontSize = 12.sp,
+                                    fontWeight = FontWeight.Medium,
+                                    color = Color(0xFF334155),
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis
+                                )
+                                Box(
+                                    modifier = Modifier
+                                        .size(16.dp)
+                                        .clip(CircleShape)
+                                        .clickable(onClick = onClearSortFilter),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Icon(Icons.Outlined.Close, null, tint = Color(0xFF94A3B8), modifier = Modifier.size(11.dp))
+                                }
                             }
                         }
                     }
                 }
-                if (hasDueFilter) {
-                    Surface(
-                        shape = RoundedCornerShape(100.dp),
-                        color = Color(0xFFF1F5F9),
-                        border = BorderStroke(1.dp, Color(0xFFCBD5E1))
-                    ) {
-                        Row(
-                            modifier = Modifier.padding(start = 10.dp, end = 6.dp, top = 4.dp, bottom = 4.dp),
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(4.dp)
-                        ) {
-                            Icon(Icons.Outlined.CalendarMonth, null, tint = Color(0xFF64748B), modifier = Modifier.size(13.dp))
-                            Text(
-                                text = "Jatuh Tempo: ${uiState.dueFilter.label}",
-                                fontSize = 11.sp,
-                                fontWeight = FontWeight.Medium,
-                                color = Color(0xFF334155),
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis
-                            )
-                            Box(
-                                modifier = Modifier
-                                    .size(16.dp)
-                                    .clip(CircleShape)
-                                    .clickable(onClick = onClearDueFilter),
-                                contentAlignment = Alignment.Center
-                            ) {
-                                Icon(Icons.Outlined.Close, null, tint = Color(0xFF94A3B8), modifier = Modifier.size(11.dp))
-                            }
-                        }
-                    }
-                }
-                if (hasSortFilter) {
-                    Surface(
-                        shape = RoundedCornerShape(100.dp),
-                        color = Color(0xFFF1F5F9),
-                        border = BorderStroke(1.dp, Color(0xFFCBD5E1))
-                    ) {
-                        Row(
-                            modifier = Modifier.padding(start = 10.dp, end = 6.dp, top = 4.dp, bottom = 4.dp),
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(4.dp)
-                        ) {
-                            Icon(Icons.Outlined.FilterList, null, tint = Color(0xFF64748B), modifier = Modifier.size(13.dp))
-                            Text(
-                                text = "Urutkan: ${uiState.sortOrder.label}",
-                                fontSize = 11.sp,
-                                fontWeight = FontWeight.Medium,
-                                color = Color(0xFF334155),
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis
-                            )
-                            Box(
-                                modifier = Modifier
-                                    .size(16.dp)
-                                    .clip(CircleShape)
-                                    .clickable(onClick = onClearSortFilter),
-                                contentAlignment = Alignment.Center
-                            ) {
-                                Icon(Icons.Outlined.Close, null, tint = Color(0xFF94A3B8), modifier = Modifier.size(11.dp))
-                            }
-                        }
-                    }
-                }
+
+                // Reset button: sebelah kanan (persis seperti halaman riwayat)
                 Text(
                     text = "Reset",
-                    fontSize = 11.sp,
+                    fontSize = 12.sp,
                     fontWeight = FontWeight.SemiBold,
-                    color = Color(0xFFEF4444),
+                    color = Color(0xFFF43F5E),
                     modifier = Modifier
                         .clip(RoundedCornerShape(6.dp))
                         .clickable(onClick = onResetAllFilters)
                         .padding(horizontal = 6.dp, vertical = 4.dp)
+                        .testTag("receivable-reset-filters")
                 )
             }
         }
@@ -1860,42 +1873,16 @@ internal fun ReceivableFilterBottomSheet(
 
             HorizontalDivider(color = Color(0xFFF1F5F9), thickness = 1.dp)
 
-            // Footer Actions: Reset (Green Outlined) & Terapkan (Green Filled)
-            Row(
+            // Footer Actions: Terapkan (Green Filled) di atas & Batal (Borderless TextButton) di bawah
+            Column(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(horizontal = 20.dp, vertical = 14.dp),
-                horizontalArrangement = Arrangement.spacedBy(12.dp),
-                verticalAlignment = Alignment.CenterVertically
+                    .padding(horizontal = 20.dp)
+                    .padding(top = 8.dp, bottom = 16.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp),
+                horizontalAlignment = Alignment.CenterHorizontally
             ) {
-                // Reset Button: border border-[#256B57] text-[#256B57] font-semibold
-                Surface(
-                    onClick = {
-                        selectedStatus = ReceivableStatusFilter.All
-                        selectedDue = ReceivableDueFilter.All
-                        selectedSortOrder = ReceivableSortOrder.NearestDueDate
-                    },
-                    modifier = Modifier
-                        .weight(1f)
-                        .height(48.dp),
-                    shape = RoundedCornerShape(12.dp),
-                    color = Color.White,
-                    border = BorderStroke(1.dp, Color(0xFF256B57))
-                ) {
-                    Box(
-                        modifier = Modifier.fillMaxSize(),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Text(
-                            text = "Reset",
-                            fontSize = 14.sp,
-                            fontWeight = FontWeight.SemiBold,
-                            color = Color(0xFF256B57)
-                        )
-                    }
-                }
-
-                // Terapkan Button: bg-brand text-white font-semibold
+                // Terapkan Button: Full Width bg-brand text-white font-bold
                 Button(
                     onClick = {
                         onApplyStatusFilter(selectedStatus)
@@ -1904,8 +1891,9 @@ internal fun ReceivableFilterBottomSheet(
                         onDismiss()
                     },
                     modifier = Modifier
-                        .weight(2f)
-                        .height(48.dp),
+                        .fillMaxWidth()
+                        .height(48.dp)
+                        .testTag("receivable-filter-apply"),
                     shape = RoundedCornerShape(12.dp),
                     colors = ButtonDefaults.buttonColors(
                         containerColor = Color(0xFF256B57),
@@ -1915,8 +1903,25 @@ internal fun ReceivableFilterBottomSheet(
                 ) {
                     Text(
                         text = "Terapkan",
-                        fontSize = 14.sp,
-                        fontWeight = FontWeight.SemiBold
+                        fontSize = 15.sp,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
+
+                // Batal Button: TextButton tanpa border
+                TextButton(
+                    onClick = onDismiss,
+                    shape = RoundedCornerShape(12.dp),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(38.dp)
+                        .testTag("receivable-filter-cancel")
+                ) {
+                    Text(
+                        text = "Batal",
+                        fontSize = 13.5.sp,
+                        fontWeight = FontWeight.Medium,
+                        color = Color(0xFF64748B)
                     )
                 }
             }
