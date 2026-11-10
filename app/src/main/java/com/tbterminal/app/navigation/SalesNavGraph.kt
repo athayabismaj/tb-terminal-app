@@ -90,6 +90,7 @@ internal fun NavGraphBuilder.salesGraph(navController: NavHostController, sessio
                     cashierNameFallback = sessionUser.name,
                     onDashboardClick = {
                         navController.navigate(AppRoute.Dashboard.route) {
+                            popUpTo(AppRoute.Dashboard.route)
                             launchSingleTop = true
                         }
                     },
@@ -151,6 +152,7 @@ internal fun NavGraphBuilder.salesGraph(navController: NavHostController, sessio
                     offlineCheckoutSyncService = appContainer.offlineCheckoutSyncService,
                     onDashboardClick = {
                         navController.navigate(AppRoute.Dashboard.route) {
+                            popUpTo(AppRoute.Dashboard.route)
                             launchSingleTop = true
                         }
                     },
@@ -229,6 +231,7 @@ internal fun NavGraphBuilder.salesGraph(navController: NavHostController, sessio
                     onBackClick = { navController.popBackStack() },
                     onDashboardClick = {
                         navController.navigate(AppRoute.Dashboard.route) {
+                            popUpTo(AppRoute.Dashboard.route)
                             launchSingleTop = true
                         }
                     },
@@ -287,6 +290,52 @@ internal fun NavGraphBuilder.salesGraph(navController: NavHostController, sessio
                     }
                 }
 
+                if (sessionUser.role.trim().equals("kasir", ignoreCase = true)) {
+                    CashierCloseShiftScreen(
+                        name = sessionUser.name,
+                        role = sessionUser.role,
+                        cashReconciliationRepository = appContainer.cashReconciliationRepository,
+                        cashSessionLocalDataSource = appContainer.cashSessionLocalDataSource,
+                        localCashSessionService = appContainer.localCashSessionService,
+                        localCashExpenseService = appContainer.localCashExpenseService,
+                        offlineStatusRepository = appContainer.offlineStatusRepository,
+                        thermalPrinterManager = appContainer.thermalPrinterManager,
+                        cashierUserId = sessionUser.userId ?: sessionUser.name,
+                        cashierNameFallback = sessionUser.name,
+                        onDashboardClick = {
+                            navController.navigate(AppRoute.Dashboard.route) {
+                                popUpTo(AppRoute.Dashboard.route)
+                                launchSingleTop = true
+                            }
+                        },
+                        onPosClick = {
+                            navController.navigate(AppRoute.CashierPos.route) {
+                                launchSingleTop = true
+                            }
+                        },
+                        onTransactionHistoryClick = {
+                            navController.navigate(AppRoute.CashierTransactionHistory.route) {
+                                launchSingleTop = true
+                            }
+                        },
+                        onStockCheckClick = {
+                            navController.navigate(AppRoute.CashierStockCheck.route) {
+                                launchSingleTop = true
+                            }
+                        },
+                        onProfileClick = {
+                            navController.navigate(AppRoute.CashierProfile.route) {
+                                launchSingleTop = true
+                            }
+                        },
+                        onSettingsClick = {
+                            navController.navigate(AppRoute.CashierSettings.route) {
+                                launchSingleTop = true
+                            }
+                        },
+                        onLogout = logout
+                    )
+                } else {
                 AdminCashReconciliationScreen(
                     name = sessionUser.name,
                     role = sessionUser.role,
@@ -394,6 +443,7 @@ internal fun NavGraphBuilder.salesGraph(navController: NavHostController, sessio
                     },
                     onLogout = logout
                 )
+                }
             }
         }
 

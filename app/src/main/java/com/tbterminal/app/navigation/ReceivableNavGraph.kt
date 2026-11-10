@@ -104,7 +104,9 @@ internal fun NavGraphBuilder.receivableGraph(navController: NavHostController, s
                         }
                     },
                     onCashReconciliationClick = {
-                        navController.navigate(AppRoute.CashReconciliation.route) {
+                        val isCashier = sessionUser.role.trim().equals("kasir", ignoreCase = true)
+                        val target = if (isCashier) AppRoute.CashierCashSession.route else AppRoute.CashReconciliation.route
+                        navController.navigate(target) {
                             launchSingleTop = true
                         }
                     },
@@ -424,7 +426,9 @@ internal fun NavGraphBuilder.receivableGraph(navController: NavHostController, s
                         }
                     },
                     onCashReconciliationClick = {
-                        navController.navigate(AppRoute.CashReconciliation.route) {
+                        val isCashier = sessionUser.role.trim().equals("kasir", ignoreCase = true)
+                        val target = if (isCashier) AppRoute.CashierCashSession.route else AppRoute.CashReconciliation.route
+                        navController.navigate(target) {
                             launchSingleTop = true
                         }
                     },
@@ -542,7 +546,9 @@ internal fun NavGraphBuilder.receivableGraph(navController: NavHostController, s
                         }
                     },
                     onCashReconciliationClick = {
-                        navController.navigate(AppRoute.CashReconciliation.route) {
+                        val isCashier = sessionUser.role.trim().equals("kasir", ignoreCase = true)
+                        val target = if (isCashier) AppRoute.CashierCashSession.route else AppRoute.CashReconciliation.route
+                        navController.navigate(target) {
                             launchSingleTop = true
                         }
                     },
@@ -677,7 +683,9 @@ internal fun NavGraphBuilder.receivableGraph(navController: NavHostController, s
                         }
                     },
                     onCashReconciliationClick = {
-                        navController.navigate(AppRoute.CashReconciliation.route) {
+                        val isCashier = sessionUser.role.trim().equals("kasir", ignoreCase = true)
+                        val target = if (isCashier) AppRoute.CashierCashSession.route else AppRoute.CashReconciliation.route
+                        navController.navigate(target) {
                             launchSingleTop = true
                         }
                     },
@@ -812,7 +820,9 @@ internal fun NavGraphBuilder.receivableGraph(navController: NavHostController, s
                         }
                     },
                     onCashReconciliationClick = {
-                        navController.navigate(AppRoute.CashReconciliation.route) {
+                        val isCashier = sessionUser.role.trim().equals("kasir", ignoreCase = true)
+                        val target = if (isCashier) AppRoute.CashierCashSession.route else AppRoute.CashReconciliation.route
+                        navController.navigate(target) {
                             launchSingleTop = true
                         }
                     },

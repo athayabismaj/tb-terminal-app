@@ -80,14 +80,7 @@ fun AdminDashboardShell(
     }
 
     if (!AppAccessPolicy.can(role, AppCapability.BACKOFFICE)) {
-        val cashierDestination = when (activeDestination) {
-            AdminDestination.Receivables,
-            AdminDestination.Receivables -> CashierDestination.Receivables
-            AdminDestination.ReceivablePayments -> CashierDestination.ReceivablePayments
-            AdminDestination.Customers,
-            AdminDestination.CustomerForm -> CashierDestination.Customers
-            else -> CashierDestination.Dashboard
-        }
+        val cashierDestination = activeDestination.toCashierDestination()
         CashierDashboardShell(
             userName = userName,
             role = role,
@@ -95,7 +88,7 @@ fun AdminDashboardShell(
             pageTitle = pageTitle,
             onDashboardClick = navigateOrFallback(AdminDestination.Dashboard, onDashboardClick),
             onPosClick = navigateOrFallback(AdminDestination.NewTransaction, onSalesTransactionsClick),
-            onCashSessionClick = onCashReconciliationClick,
+            onCashSessionClick = navigateOrFallback(AdminDestination.CashierCashSession, onCashReconciliationClick),
             onTransactionHistoryClick = navigateOrFallback(AdminDestination.CashierTransactionHistory, onSalesTransactionsClick),
             onReceivablesClick = navigateOrFallback(AdminDestination.Receivables, onReceivablesClick),
             onCustomersClick = navigateOrFallback(AdminDestination.Customers, onCustomersClick),
@@ -128,6 +121,27 @@ fun AdminDashboardShell(
     ) { contentModifier ->
         content(contentModifier)
     }
+}
+
+internal fun AdminDestination.toCashierDestination(): CashierDestination = when (this) {
+    AdminDestination.NewTransaction -> CashierDestination.Pos
+    AdminDestination.CashierCashSession,
+    AdminDestination.CashReconciliation,
+    AdminDestination.CashSessionHistory,
+    AdminDestination.CashReconciliationDetail,
+    AdminDestination.CashExpenses -> CashierDestination.CashSession
+    AdminDestination.CashierTransactionHistory,
+    AdminDestination.SalesTransactions -> CashierDestination.TransactionHistory
+    AdminDestination.Receivables,
+    AdminDestination.OpeningReceivableForm,
+    AdminDestination.AdjustmentReceivableForm -> CashierDestination.Receivables
+    AdminDestination.ReceivablePayments -> CashierDestination.ReceivablePayments
+    AdminDestination.Customers,
+    AdminDestination.CustomerForm -> CashierDestination.Customers
+    AdminDestination.Profile -> CashierDestination.Profile
+    AdminDestination.Settings,
+    AdminDestination.DeviceSettings -> CashierDestination.Settings
+    else -> CashierDestination.Dashboard
 }
 
 internal fun AdminDestination.isBackofficeRootDestination(): Boolean = when (this) {

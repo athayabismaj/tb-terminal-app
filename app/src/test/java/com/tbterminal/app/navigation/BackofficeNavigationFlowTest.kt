@@ -1,6 +1,9 @@
 package com.tbterminal.app.navigation
 
 import com.tbterminal.app.R
+import com.tbterminal.app.ui.dashboard.admin.AdminDestination
+import com.tbterminal.app.ui.dashboard.admin.toCashierDestination
+import com.tbterminal.app.ui.dashboard.cashier.CashierDestination
 import org.junit.Assert.*
 import org.junit.Test
 
@@ -48,5 +51,20 @@ class BackofficeNavigationFlowTest {
         assertEquals(R.string.owner_menu_settings, backofficeRouteTitleRes(AppRoute.AdminSettings.route, "OWNER"))
         assertEquals(R.string.owner_menu_store_settings, backofficeRouteTitleRes(AppRoute.AdminStoreSettings.route, "OWNER"))
         assertEquals(R.string.owner_menu_device_settings, backofficeRouteTitleRes(AppRoute.AdminDeviceSettings.route, "OWNER"))
+    }
+
+    @Test fun `cashier route and navbar destination map cash session properly`() {
+        assertEquals(AppRoute.CashierCashSession.route, AdminDestination.CashierCashSession.adminRouteOrNull("kasir"))
+        assertEquals(AppRoute.CashierCashSession.route, AdminDestination.CashReconciliation.adminRouteOrNull("kasir"))
+        assertEquals(AppRoute.CashierCashSession.route, AdminDestination.CashSessionHistory.adminRouteOrNull("kasir"))
+        assertEquals(AppRoute.CashierTransactionHistory.route, AdminDestination.SalesTransactions.adminRouteOrNull("kasir"))
+        assertEquals(AppRoute.CashReconciliation.route, AdminDestination.CashReconciliation.adminRouteOrNull("admin"))
+        assertEquals(AppRoute.CashReconciliation.route, AdminDestination.CashReconciliation.adminRouteOrNull("owner"))
+
+        assertEquals(CashierDestination.CashSession, AdminDestination.CashierCashSession.toCashierDestination())
+        assertEquals(CashierDestination.CashSession, AdminDestination.CashReconciliation.toCashierDestination())
+        assertEquals(CashierDestination.CashSession, AdminDestination.CashSessionHistory.toCashierDestination())
+        assertEquals(CashierDestination.TransactionHistory, AdminDestination.CashierTransactionHistory.toCashierDestination())
+        assertEquals(CashierDestination.Receivables, AdminDestination.Receivables.toCashierDestination())
     }
 }

@@ -71,9 +71,10 @@ fun AppNavGraph(
                 if (AppAccessPolicy.can(sessionRole, AppCapability.BACKOFFICE)) {
                     navController.navigateBackofficePage(destinationRoute, sessionRole)
                 } else {
+                    if (navController.currentBackStackEntry?.destination?.route == destinationRoute) return@provides
                     navController.navigate(destinationRoute) {
                         launchSingleTop = true
-                        if (destinationRoute != AppRoute.Dashboard.route) popUpTo(AppRoute.Dashboard.route)
+                        popUpTo(AppRoute.Dashboard.route)
                     }
                 }
             }
@@ -119,14 +120,14 @@ internal fun AdminDestination.adminRouteOrNull(role: String?): String? {
         AdminDestination.StockReport -> AppRoute.StockReport.route
         AdminDestination.Customers -> AppRoute.Customers.route
         AdminDestination.Receivables -> AppRoute.Receivables.route
-        AdminDestination.CashReconciliation -> AppRoute.CashReconciliation.route
-        AdminDestination.SalesTransactions -> AppRoute.SalesTransactions.route
+        AdminDestination.CashReconciliation -> if (isCashier) AppRoute.CashierCashSession.route else AppRoute.CashReconciliation.route
+        AdminDestination.SalesTransactions -> if (isCashier) AppRoute.CashierTransactionHistory.route else AppRoute.SalesTransactions.route
         AdminDestination.SupplierDebts -> AppRoute.SupplierDebts.route
         AdminDestination.OpeningSupplierDebtForm -> AppRoute.OpeningSupplierDebtForm.createRoute()
         AdminDestination.AdjustmentSupplierDebtForm -> AppRoute.AdjustmentSupplierDebtForm.createRoute()
-        AdminDestination.CashSessionHistory -> AppRoute.CashSessionHistory.route
-        AdminDestination.CashReconciliationDetail -> AppRoute.CashReconciliationDetail.createRoute()
-        AdminDestination.CashExpenses -> AppRoute.CashExpenses.route
+        AdminDestination.CashSessionHistory -> if (isCashier) AppRoute.CashierCashSession.route else AppRoute.CashSessionHistory.route
+        AdminDestination.CashReconciliationDetail -> if (isCashier) AppRoute.CashierCashSession.route else AppRoute.CashReconciliationDetail.createRoute()
+        AdminDestination.CashExpenses -> if (isCashier) AppRoute.CashierCashSession.route else AppRoute.CashExpenses.route
         AdminDestination.ReceivablePayments -> AppRoute.ReceivablePayments.route
         AdminDestination.OpeningReceivableForm -> AppRoute.OpeningReceivableForm.createRoute()
         AdminDestination.AdjustmentReceivableForm -> AppRoute.AdjustmentReceivableForm.createRoute()

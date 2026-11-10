@@ -94,6 +94,7 @@ internal fun NavGraphBuilder.checkoutGraph(navController: NavHostController, ses
                     managerApprovalRepository = appContainer.managerApprovalRepository,
                     onDashboardClick = {
                         navController.navigate(AppRoute.Dashboard.route) {
+                            popUpTo(AppRoute.Dashboard.route)
                             launchSingleTop = true
                         }
                     },
@@ -181,6 +182,7 @@ internal fun NavGraphBuilder.checkoutGraph(navController: NavHostController, ses
                     },
                     onDashboardClick = {
                         navController.navigate(AppRoute.Dashboard.route) {
+                            popUpTo(AppRoute.Dashboard.route)
                             launchSingleTop = true
                         }
                     },
@@ -262,6 +264,7 @@ internal fun NavGraphBuilder.checkoutGraph(navController: NavHostController, ses
                     },
                     onDashboardClick = {
                         navController.navigate(AppRoute.Dashboard.route) {
+                            popUpTo(AppRoute.Dashboard.route)
                             launchSingleTop = true
                         }
                     },
