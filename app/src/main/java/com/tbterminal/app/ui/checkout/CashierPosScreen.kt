@@ -66,6 +66,7 @@ import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -889,46 +890,22 @@ private fun PosFilterDialog(
 
             HorizontalDivider(color = Color(0xFFF1F5F9), thickness = 1.dp)
 
-            // Footer Action Buttons: Reset & Terapkan (matching Filter Penjualan)
-            Row(
+            // Footer Action Buttons (Terapkan di atas full-width, Batal tanpa border di bawah seperti filter parkir)
+            Column(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(horizontal = 20.dp, vertical = 14.dp),
-                horizontalArrangement = Arrangement.spacedBy(12.dp),
-                verticalAlignment = Alignment.CenterVertically
+                    .padding(horizontal = 20.dp, vertical = 12.dp),
+                verticalArrangement = Arrangement.spacedBy(4.dp),
+                horizontalAlignment = Alignment.CenterHorizontally
             ) {
-                // Batal Button (Outline)
-                Surface(
-                    onClick = onDismiss,
-                    modifier = Modifier
-                        .weight(2f)
-                        .height(48.dp)
-                        .testTag("pos-filter-cancel"),
-                    shape = RoundedCornerShape(12.dp),
-                    color = Color.White,
-                    border = BorderStroke(1.5.dp, Color(0xFFCBD5E1))
-                ) {
-                    Box(
-                        modifier = Modifier.fillMaxSize(),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Text(
-                            text = "Batal",
-                            fontSize = 15.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = Color(0xFF475569)
-                        )
-                    }
-                }
-
-                // Apply Button (Solid Dark Emerald 0xFF256B57)
+                // Apply Button (Solid Dark Emerald 0xFF256B57, full width)
                 Button(
                     onClick = {
                         onApplyFilter(tempCategory, tempOnlyInStock)
                         onDismiss()
                     },
                     modifier = Modifier
-                        .weight(3f)
+                        .fillMaxWidth()
                         .height(48.dp)
                         .testTag("pos-filter-apply"),
                     shape = RoundedCornerShape(12.dp),
@@ -942,6 +919,23 @@ private fun PosFilterDialog(
                         text = "Terapkan",
                         fontSize = 15.sp,
                         fontWeight = FontWeight.Bold
+                    )
+                }
+
+                // Batal Button (TextButton tanpa border persis seperti filter parkir)
+                TextButton(
+                    onClick = onDismiss,
+                    shape = RoundedCornerShape(12.dp),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(38.dp)
+                        .testTag("pos-filter-cancel")
+                ) {
+                    Text(
+                        text = "Batal",
+                        fontSize = 13.5.sp,
+                        fontWeight = FontWeight.Medium,
+                        color = Color(0xFF64748B)
                     )
                 }
             }
