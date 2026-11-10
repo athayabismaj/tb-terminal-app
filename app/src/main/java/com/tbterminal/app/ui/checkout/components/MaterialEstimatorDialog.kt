@@ -920,7 +920,7 @@ private fun PlasterEstimatorBody(
         }
 
         // Hasil Estimasi
-        val breakdown = buildList {
+        val breakdown = buildList<Pair<String, String>> {
             add("Pasir Pasang" to "${String.format(Locale.US, "%.2f", sandM3)} m³")
             if (workType == 1) {
                 add("Bata Merah" to "$bricksCount Pcs")

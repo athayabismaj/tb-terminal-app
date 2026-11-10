@@ -70,8 +70,7 @@ fun AppNavGraph(
                 }
                 if (AppAccessPolicy.can(sessionRole, AppCapability.BACKOFFICE)) {
                     navController.navigateBackofficePage(destinationRoute, sessionRole)
-                } else {
-                    if (navController.currentBackStackEntry?.destination?.route == destinationRoute) return@provides
+                } else if (navController.currentBackStackEntry?.destination?.route != destinationRoute) {
                     navController.navigate(destinationRoute) {
                         launchSingleTop = true
                         popUpTo(AppRoute.Dashboard.route)
