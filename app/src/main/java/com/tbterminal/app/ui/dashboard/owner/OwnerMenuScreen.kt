@@ -55,7 +55,7 @@ fun OwnerMenuScreen(
         TbAdaptiveBox(
             modifier = contentModifier
                 .fillMaxSize()
-                .background(Color.White),
+                .background(Color(0xFFF2F4F7)),
         ) { layout ->
             Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.TopCenter) {
                 val containerModifier = if (layout.isCompact) {

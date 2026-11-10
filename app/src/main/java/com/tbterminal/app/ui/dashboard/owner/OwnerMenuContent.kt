@@ -52,8 +52,8 @@ internal fun OwnerMenuContent(
     Column(
         modifier = modifier
             .fillMaxWidth()
-            .padding(top = if (layout.isCompact) 12.dp else 0.dp, bottom = 24.dp),
-        verticalArrangement = Arrangement.spacedBy(if (layout.isCompact) 12.dp else 20.dp),
+            .padding(top = if (layout.isCompact) 14.dp else 0.dp, bottom = 24.dp),
+        verticalArrangement = Arrangement.spacedBy(if (layout.isCompact) 16.dp else 20.dp),
     ) {
         RoleMenuProfileCard(
             displayName = displayName,
@@ -63,12 +63,11 @@ internal fun OwnerMenuContent(
             modifier = if (layout.isCompact) Modifier.padding(horizontal = 16.dp) else Modifier,
         )
         if (layout.isCompact) {
-            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                groups.forEachIndexed { index, group ->
+            Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
+                groups.forEach { group ->
                     OwnerMenuGroupSection(
                         group = group,
                         compact = true,
-                        showBottomDivider = index < groups.lastIndex,
                         onNavigate = onNavigate,
                         onLogout = onLogout,
                     )
@@ -78,11 +77,10 @@ internal fun OwnerMenuContent(
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(24.dp)) {
                 columns.forEach { column ->
                     Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(20.dp)) {
-                        column.forEachIndexed { index, group ->
+                        column.forEach { group ->
                             OwnerMenuGroupSection(
                                 group = group,
                                 compact = false,
-                                showBottomDivider = index < column.lastIndex,
                                 onNavigate = onNavigate,
                                 onLogout = onLogout,
                             )
@@ -98,7 +96,6 @@ internal fun OwnerMenuContent(
 private fun OwnerMenuGroupSection(
     group: OwnerMenuGroup,
     compact: Boolean,
-    showBottomDivider: Boolean,
     onNavigate: (AdminDestination) -> Unit,
     onLogout: () -> Unit,
 ) {
@@ -124,7 +121,6 @@ private fun OwnerMenuGroupSection(
         title = groupTitle,
         items = items,
         compact = compact,
-        showBottomDivider = showBottomDivider,
     )
 }
 

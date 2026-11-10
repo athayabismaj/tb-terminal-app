@@ -51,14 +51,13 @@ import java.util.Locale
 
 private val MenuBrandGreen = Color(0xFF1B5E3C)
 private val MenuBrandTint = Color(0xFFEAF3ED)
-private val MenuSoftSurface = Color(0xFFF6F9F7)
-private val MenuSoftBorder = Color(0xFFE6ECE8)
+private val MenuCardBorder = Color(0xFFE2E8F0)
 private val MenuRowDivider = Color(0xFFF1F5F9)
-private val MenuSectionDivider = Color(0xFFE2E8F0)
+private val MenuBadgeBg = Color(0xFFF1F5F9)
 private val MenuTextPrimary = Color(0xFF0F172A)
 private val MenuTextSecondary = Color(0xFF64748B)
 private val MenuBadgeText = Color(0xFF475569)
-private val MenuChevron = Color(0xFFCBD5E1)
+private val MenuChevron = Color(0xFF94A3B8)
 private val MenuDestructiveRed = Color(0xFFE11D48)
 
 internal data class RoleMenuItemSpec(
@@ -68,6 +67,8 @@ internal data class RoleMenuItemSpec(
     val subtitle: String = "",
     val badgeText: String? = null,
     val badgeDotColor: Color? = null,
+    val badgeBgColor: Color? = null,
+    val badgeTextColor: Color? = null,
     val isDestructive: Boolean = false,
     val testTag: String,
     val onClick: () -> Unit,
@@ -97,28 +98,26 @@ internal fun BackofficeMoreContent(
         modifier = Modifier
             .fillMaxWidth()
             .testTag("more-hub-content")
-            .padding(top = if (layout.isCompact) 8.dp else 0.dp, bottom = 24.dp),
-        verticalArrangement = Arrangement.spacedBy(if (layout.isCompact) 8.dp else 20.dp),
+            .padding(top = if (layout.isCompact) 14.dp else 0.dp, bottom = 24.dp),
+        verticalArrangement = Arrangement.spacedBy(if (layout.isCompact) 16.dp else 20.dp),
     ) {
         if (layout.isCompact) {
-            sections.forEachIndexed { index, section ->
+            sections.forEach { section ->
                 RoleMenuGroupCard(
                     title = section.title,
                     items = section.toMenuItemSpecs(onSelect),
                     compact = true,
-                    showBottomDivider = index < sections.lastIndex,
                 )
             }
         } else {
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(24.dp)) {
                 columns.forEach { column ->
                     Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(20.dp)) {
-                        column.forEachIndexed { index, section ->
+                        column.forEach { section ->
                             RoleMenuGroupCard(
                                 title = section.title,
                                 items = section.toMenuItemSpecs(onSelect),
                                 compact = false,
-                                showBottomDivider = index < column.lastIndex,
                             )
                         }
                     }
@@ -155,14 +154,15 @@ internal fun RoleMenuProfileCard(
             .fillMaxWidth()
             .testTag(testTag)
             .clickable(role = Role.Button, onClick = onClick),
-        shape = RoundedCornerShape(14.dp),
-        color = MenuSoftSurface,
-        border = BorderStroke(1.dp, MenuSoftBorder),
+        shape = RoundedCornerShape(16.dp),
+        color = Color.White,
+        border = BorderStroke(1.dp, MenuCardBorder.copy(alpha = 0.75f)),
+        shadowElevation = 0.5.dp,
     ) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 14.dp, vertical = 12.dp),
+                .padding(horizontal = 16.dp, vertical = 14.dp),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(12.dp),
         ) {
@@ -200,7 +200,7 @@ internal fun RoleMenuProfileCard(
             Icon(
                 imageVector = Icons.Default.ChevronRight,
                 contentDescription = "Buka profil",
-                tint = MenuTextSecondary,
+                tint = MenuChevron,
                 modifier = Modifier.size(18.dp),
             )
         }
@@ -213,52 +213,46 @@ internal fun RoleMenuGroupCard(
     items: List<RoleMenuItemSpec>,
     modifier: Modifier = Modifier,
     compact: Boolean = true,
-    showBottomDivider: Boolean = true,
 ) {
-    val horizontalPad = if (compact) 16.dp else 4.dp
-    val dividerStart = if (compact) 52.dp else 40.dp
-
-    Column(modifier = modifier.fillMaxWidth()) {
+    Column(
+        modifier = modifier
+            .fillMaxWidth()
+            .then(if (compact) Modifier.padding(horizontal = 16.dp) else Modifier),
+        verticalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
         Text(
             text = title.uppercase(Locale.ROOT),
-            modifier = Modifier.padding(
-                start = horizontalPad,
-                end = horizontalPad,
-                top = if (compact) 12.dp else 0.dp,
-                bottom = 6.dp,
-            ),
+            modifier = Modifier.padding(horizontal = 4.dp),
             color = MenuTextSecondary,
             fontSize = 11.sp,
             fontWeight = FontWeight.SemiBold,
             letterSpacing = 0.7.sp,
         )
-        Column(modifier = Modifier.fillMaxWidth()) {
-            items.forEachIndexed { index, item ->
-                RoleMenuRow(item = item, horizontalPadding = horizontalPad)
-                if (index < items.lastIndex) {
-                    HorizontalDivider(
-                        modifier = Modifier.padding(start = dividerStart, end = horizontalPad),
-                        color = MenuRowDivider,
-                        thickness = 1.dp,
-                    )
+        Surface(
+            modifier = Modifier.fillMaxWidth(),
+            shape = RoundedCornerShape(16.dp),
+            color = Color.White,
+            border = BorderStroke(1.dp, MenuCardBorder.copy(alpha = 0.75f)),
+            shadowElevation = 0.5.dp,
+        ) {
+            Column(modifier = Modifier.fillMaxWidth()) {
+                items.forEachIndexed { index, item ->
+                    RoleMenuRow(item = item)
+                    if (index < items.lastIndex) {
+                        HorizontalDivider(
+                            modifier = Modifier.padding(start = 52.dp, end = 16.dp),
+                            color = MenuRowDivider,
+                            thickness = 1.dp,
+                        )
+                    }
                 }
-            }
-            if (showBottomDivider) {
-                HorizontalDivider(
-                    modifier = Modifier.padding(horizontal = horizontalPad, vertical = 4.dp),
-                    color = MenuSectionDivider.copy(alpha = 0.75f),
-                    thickness = 0.75.dp,
-                )
             }
         }
     }
 }
 
 @Composable
-private fun RoleMenuRow(
-    item: RoleMenuItemSpec,
-    horizontalPadding: androidx.compose.ui.unit.Dp,
-) {
+private fun RoleMenuRow(item: RoleMenuItemSpec) {
     val iconTint = if (item.isDestructive) MenuDestructiveRed else MenuBrandGreen
     val textColor = if (item.isDestructive) MenuDestructiveRed else MenuTextPrimary
 
@@ -268,7 +262,7 @@ private fun RoleMenuRow(
             .heightIn(min = 50.dp)
             .testTag(item.testTag)
             .clickable(role = Role.Button, onClick = item.onClick)
-            .padding(horizontal = horizontalPadding, vertical = 13.dp),
+            .padding(horizontal = 16.dp, vertical = 13.dp),
         horizontalArrangement = Arrangement.spacedBy(16.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
@@ -288,26 +282,32 @@ private fun RoleMenuRow(
             modifier = Modifier.weight(1f),
         )
         if (item.badgeText != null) {
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(6.dp),
+            Surface(
+                shape = CircleShape,
+                color = item.badgeBgColor ?: MenuBadgeBg,
             ) {
-                if (item.badgeDotColor != null) {
-                    Box(
-                        modifier = Modifier
-                            .size(6.dp)
-                            .clip(CircleShape)
-                            .background(item.badgeDotColor),
+                Row(
+                    modifier = Modifier.padding(horizontal = 9.dp, vertical = 3.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(5.dp),
+                ) {
+                    if (item.badgeDotColor != null) {
+                        Box(
+                            modifier = Modifier
+                                .size(6.dp)
+                                .clip(CircleShape)
+                                .background(item.badgeDotColor),
+                        )
+                    }
+                    Text(
+                        text = item.badgeText,
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.Medium,
+                        color = item.badgeTextColor ?: MenuBadgeText,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
                     )
                 }
-                Text(
-                    text = item.badgeText,
-                    fontSize = 12.sp,
-                    fontWeight = FontWeight.Medium,
-                    color = MenuBadgeText,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                )
             }
         }
         Icon(
