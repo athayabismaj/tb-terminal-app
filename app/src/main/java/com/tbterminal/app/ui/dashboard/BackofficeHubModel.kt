@@ -38,12 +38,6 @@ internal enum class BackofficeHubAction(
         AppCapability.RECEIVABLE_PAYMENTS,
         AdminDestination.ReceivablePayments,
     ),
-    OPERATIONAL_AUDIT(
-        R.string.hub_operational_audit,
-        R.string.hub_operational_audit_description,
-        AppCapability.AUDIT,
-        AdminDestination.OperationalAudit,
-    ),
     PURCHASE_HISTORY(
         R.string.hub_purchase_history,
         R.string.hub_purchase_history_description,
@@ -55,12 +49,6 @@ internal enum class BackofficeHubAction(
         R.string.hub_incoming_goods_description,
         AppCapability.PURCHASES,
         AdminDestination.IncomingGoods,
-    ),
-    SUPPLIERS(
-        R.string.hub_suppliers,
-        R.string.hub_suppliers_description,
-        AppCapability.SUPPLIERS,
-        AdminDestination.Suppliers,
     ),
     RECEIVABLES(
         R.string.hub_receivables,
@@ -85,12 +73,6 @@ internal enum class BackofficeHubAction(
         R.string.hub_cash_expenses_description,
         AppCapability.CASH_SESSIONS,
         AdminDestination.CashExpenses,
-    ),
-    CASH_SESSION_HISTORY(
-        R.string.hub_cash_session_history,
-        R.string.hub_cash_session_history_description,
-        AppCapability.CASH_SESSIONS,
-        AdminDestination.CashSessionHistory,
     ),
     FINANCE_REPORTS(
         R.string.hub_finance_reports,
@@ -149,13 +131,11 @@ internal data class BackofficeHubGroup(
 
 internal data class BackofficeHubContent(
     val primaryAction: BackofficeHubAction? = null,
-    val secondaryQuickAction: BackofficeHubAction? = null,
     val groups: List<BackofficeHubGroup> = emptyList(),
 )
 
 internal fun transactionHubContent(role: String?, tab: BackofficeTransactionTab): BackofficeHubContent {
     if (!AppAccessPolicy.can(role, AppCapability.BACKOFFICE)) return BackofficeHubContent()
-    val isOwner = isOwnerPersona(role)
     return when (tab) {
         BackofficeTransactionTab.SALES -> hubContent(
             role = role,
@@ -163,13 +143,7 @@ internal fun transactionHubContent(role: String?, tab: BackofficeTransactionTab)
             groups = listOf(
                 BackofficeHubGroup(
                     R.string.hub_group_sales,
-                    buildList {
-                        add(BackofficeHubAction.SALES_HISTORY)
-                        add(BackofficeHubAction.RECEIVABLE_PAYMENTS)
-                        if (isOwner) {
-                            add(BackofficeHubAction.OPERATIONAL_AUDIT)
-                        }
-                    },
+                    listOf(BackofficeHubAction.SALES_HISTORY),
                 ),
             ),
         )
@@ -179,11 +153,7 @@ internal fun transactionHubContent(role: String?, tab: BackofficeTransactionTab)
             groups = listOf(
                 BackofficeHubGroup(
                     R.string.hub_group_purchases,
-                    listOf(
-                        BackofficeHubAction.PURCHASE_HISTORY,
-                        BackofficeHubAction.SUPPLIERS,
-                        BackofficeHubAction.SUPPLIER_DEBTS,
-                    ),
+                    listOf(BackofficeHubAction.PURCHASE_HISTORY),
                 ),
             ),
         )
@@ -198,7 +168,6 @@ internal fun financeHubContent(role: String?): BackofficeHubContent = hubContent
             listOf(
                 BackofficeHubAction.DAILY_CASH,
                 BackofficeHubAction.CASH_EXPENSES,
-                BackofficeHubAction.CASH_SESSION_HISTORY,
             ),
         ),
         BackofficeHubGroup(
@@ -220,8 +189,7 @@ internal fun financeHubContent(role: String?): BackofficeHubContent = hubContent
 
 internal fun stockHubContent(role: String?): BackofficeHubContent = hubContent(
     role = role,
-    primary = BackofficeHubAction.INCOMING_GOODS,
-    secondaryQuickAction = BackofficeHubAction.ADD_PRODUCT,
+    primary = BackofficeHubAction.ADD_PRODUCT,
     groups = listOf(
         BackofficeHubGroup(
             R.string.hub_group_stock_catalog,
@@ -306,13 +274,11 @@ internal suspend fun loadAllProductStocks(
 private fun hubContent(
     role: String?,
     primary: BackofficeHubAction? = null,
-    secondaryQuickAction: BackofficeHubAction? = null,
     groups: List<BackofficeHubGroup>,
 ): BackofficeHubContent {
     if (!AppAccessPolicy.can(role, AppCapability.BACKOFFICE)) return BackofficeHubContent()
     return BackofficeHubContent(
         primaryAction = primary?.takeIf { AppAccessPolicy.can(role, it.capability) },
-        secondaryQuickAction = secondaryQuickAction?.takeIf { AppAccessPolicy.can(role, it.capability) },
         groups = groups.map { group ->
             group.copy(actions = group.actions.filter { AppAccessPolicy.can(role, it.capability) })
         }.filter { it.actions.isNotEmpty() },

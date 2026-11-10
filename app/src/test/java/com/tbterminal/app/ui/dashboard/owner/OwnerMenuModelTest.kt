@@ -9,17 +9,19 @@ import org.junit.Test
 
 class OwnerMenuModelTest {
     @Test
-    fun `owner menu contains four clear groups and unique destinations`() {
+    fun `owner menu contains three clear groups without duplicate reports and keeps unique destinations`() {
         val groups = ownerMenuGroups("OWNER")
         val actions = groups.flatMap { it.actions }
         val destinations = actions.mapNotNull { it.destination }
 
-        assertEquals(4, groups.size)
-        assertEquals(12, actions.size)
-        assertEquals(11, destinations.size)
+        assertEquals(3, groups.size)
+        assertEquals(10, actions.size)
+        assertEquals(9, destinations.size)
         assertEquals(destinations.size, destinations.distinct().size)
         assertTrue(OwnerMenuAction.LOGOUT in actions)
         assertTrue(AdminDestination.Profile !in destinations)
+        assertFalse(AdminDestination.Reports in destinations)
+        assertFalse(AdminDestination.LocalReports in destinations)
     }
 
     @Test

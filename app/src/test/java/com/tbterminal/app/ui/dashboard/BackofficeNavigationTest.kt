@@ -68,6 +68,7 @@ class BackofficeNavigationTest {
         assertEquals(BackofficeSection.TRANSACTIONS, AdminDestination.IncomingGoodsForm.backofficeSection())
         assertEquals(BackofficeSection.FINANCE, AdminDestination.SupplierDebts.backofficeSection())
         assertEquals(BackofficeSection.FINANCE, AdminDestination.CashExpenses.backofficeSection())
+        assertEquals(BackofficeSection.FINANCE, AdminDestination.Reports.backofficeSection("OWNER"))
         assertEquals(BackofficeSection.STOCK, AdminDestination.StockOpname.backofficeSection())
         assertEquals(BackofficeSection.STOCK, AdminDestination.ProductUnits.backofficeSection())
         assertEquals(BackofficeSection.MENU, AdminDestination.BackupRestore.backofficeSection("OWNER"))
@@ -112,7 +113,7 @@ class BackofficeNavigationTest {
         listOf(
             AdminDestination.MoreHub, AdminDestination.Customers, AdminDestination.Suppliers,
             AdminDestination.SupplierForm,
-            AdminDestination.UserManagement, AdminDestination.Reports, AdminDestination.LocalReports,
+            AdminDestination.UserManagement, AdminDestination.LocalReports,
             AdminDestination.BackupRestore, AdminDestination.Settings, AdminDestination.SyncCenter,
             AdminDestination.OperationalAudit, AdminDestination.SecurityLog, AdminDestination.Profile,
         ).forEach { assertEquals(BackofficeSection.MENU, it.backofficeSection("OWNER")) }

@@ -22,7 +22,6 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.ListAlt
-import androidx.compose.material.icons.automirrored.outlined.MenuBook
 import androidx.compose.material.icons.automirrored.outlined.ReceiptLong
 import androidx.compose.material.icons.automirrored.outlined.TrendingUp
 import androidx.compose.material.icons.filled.Add
@@ -30,7 +29,6 @@ import androidx.compose.material.icons.outlined.AccountBalanceWallet
 import androidx.compose.material.icons.outlined.Assessment
 import androidx.compose.material.icons.outlined.AssignmentTurnedIn
 import androidx.compose.material.icons.outlined.Category
-import androidx.compose.material.icons.outlined.Group
 import androidx.compose.material.icons.outlined.Inventory2
 import androidx.compose.material.icons.outlined.LocalOffer
 import androidx.compose.material.icons.outlined.LocalShipping
@@ -39,7 +37,6 @@ import androidx.compose.material.icons.outlined.PointOfSale
 import androidx.compose.material.icons.outlined.PriceChange
 import androidx.compose.material.icons.outlined.QrCodeScanner
 import androidx.compose.material.icons.outlined.Search
-import androidx.compose.material.icons.outlined.Security
 import androidx.compose.material.icons.outlined.Straighten
 import androidx.compose.material.icons.outlined.Tune
 import androidx.compose.material.icons.outlined.Visibility
@@ -49,7 +46,6 @@ import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -158,16 +154,14 @@ fun BackofficeHubScreen(
                         onClick = { navigate(AdminDestination.SalesTransactions) },
                         testTag = "hub-finance-search",
                     )
-                    HubTopBarIconButton(
-                        icon = Icons.Outlined.Assessment,
-                        contentDescription = if (canViewReportsAnalytics) "Analitik & Laporan" else "Laporan Perangkat",
-                        onClick = {
-                            navigate(
-                                if (canViewReportsAnalytics) AdminDestination.Reports else AdminDestination.LocalReports
-                            )
-                        },
-                        testTag = "hub-finance-reports",
-                    )
+                    if (canViewReportsAnalytics) {
+                        HubTopBarIconButton(
+                            icon = Icons.Outlined.Assessment,
+                            contentDescription = "Analitik & Laporan",
+                            onClick = { navigate(AdminDestination.Reports) },
+                            testTag = "hub-finance-reports",
+                        )
+                    }
                 }
                 BackofficeSection.STOCK -> {
                     HubTopBarIconButton(
@@ -834,11 +828,9 @@ private fun StockHub(
                 onLowStockClick = { onNavigate(AdminDestination.Products) },
             )
 
-            val quickActions = listOfNotNull(content.primaryAction, content.secondaryQuickAction)
-            if (quickActions.isNotEmpty()) {
+            content.primaryAction?.let { primaryAction ->
                 StockQuickActionStrip(
-                    primaryAction = content.primaryAction,
-                    secondaryAction = content.secondaryQuickAction,
+                    primaryAction = primaryAction,
                     onActionClick = { action -> onNavigate(action.destination) },
                 )
             }
@@ -869,73 +861,35 @@ private fun StockHub(
 
 @Composable
 private fun StockQuickActionStrip(
-    primaryAction: BackofficeHubAction?,
-    secondaryAction: BackofficeHubAction?,
+    primaryAction: BackofficeHubAction,
     onActionClick: (BackofficeHubAction) -> Unit,
 ) {
-    Row(
-        modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.spacedBy(10.dp),
+    Button(
+        onClick = { onActionClick(primaryAction) },
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(46.dp)
+            .testTag("stock-quick-primary"),
+        shape = RoundedCornerShape(12.dp),
+        colors = ButtonDefaults.buttonColors(
+            containerColor = HubBrand600,
+            contentColor = Color.White,
+        ),
+        contentPadding = PaddingValues(horizontal = 14.dp),
     ) {
-        primaryAction?.let { action ->
-            Button(
-                onClick = { onActionClick(action) },
-                modifier = Modifier
-                    .weight(1f)
-                    .height(46.dp)
-                    .testTag("stock-quick-primary"),
-                shape = RoundedCornerShape(12.dp),
-                colors = ButtonDefaults.buttonColors(
-                    containerColor = HubBrand600,
-                    contentColor = Color.White,
-                ),
-                contentPadding = PaddingValues(horizontal = 12.dp),
-            ) {
-                Icon(
-                    imageVector = Icons.Outlined.LocalShipping,
-                    contentDescription = null,
-                    modifier = Modifier.size(18.dp),
-                )
-                Spacer(Modifier.width(8.dp))
-                Text(
-                    text = "Barang Masuk",
-                    fontSize = 13.sp,
-                    fontWeight = FontWeight.SemiBold,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                )
-            }
-        }
-        secondaryAction?.let { action ->
-            OutlinedButton(
-                onClick = { onActionClick(action) },
-                modifier = Modifier
-                    .weight(1f)
-                    .height(46.dp)
-                    .testTag("stock-quick-secondary"),
-                shape = RoundedCornerShape(12.dp),
-                border = BorderStroke(1.dp, HubCardBorder),
-                colors = ButtonDefaults.outlinedButtonColors(
-                    containerColor = Color.White,
-                    contentColor = HubBrand600,
-                ),
-                contentPadding = PaddingValues(horizontal = 12.dp),
-            ) {
-                Icon(
-                    imageVector = Icons.Default.Add,
-                    contentDescription = null,
-                    modifier = Modifier.size(18.dp),
-                )
-                Spacer(Modifier.width(6.dp))
-                Text(
-                    text = stringResource(action.titleRes),
-                    fontSize = 13.sp,
-                    fontWeight = FontWeight.SemiBold,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                )
-            }
-        }
+        Icon(
+            imageVector = primaryAction.icon(),
+            contentDescription = null,
+            modifier = Modifier.size(18.dp),
+        )
+        Spacer(Modifier.width(8.dp))
+        Text(
+            text = stringResource(primaryAction.titleRes),
+            fontSize = 13.sp,
+            fontWeight = FontWeight.SemiBold,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+        )
     }
 }
 
@@ -1593,15 +1547,12 @@ private fun BackofficeHubAction.icon(): ImageVector = when (this) {
     BackofficeHubAction.SALES_HISTORY -> Icons.AutoMirrored.Outlined.ReceiptLong
     BackofficeHubAction.NEW_SALE -> Icons.Outlined.PointOfSale
     BackofficeHubAction.RECEIVABLE_PAYMENTS -> Icons.Outlined.Payments
-    BackofficeHubAction.OPERATIONAL_AUDIT -> Icons.Outlined.Security
     BackofficeHubAction.PURCHASE_HISTORY -> Icons.AutoMirrored.Outlined.ListAlt
     BackofficeHubAction.INCOMING_GOODS -> Icons.Outlined.LocalShipping
-    BackofficeHubAction.SUPPLIERS -> Icons.Outlined.Group
     BackofficeHubAction.RECEIVABLES -> Icons.Outlined.Payments
     BackofficeHubAction.SUPPLIER_DEBTS -> Icons.Outlined.AccountBalanceWallet
     BackofficeHubAction.DAILY_CASH -> Icons.Outlined.AssignmentTurnedIn
     BackofficeHubAction.CASH_EXPENSES -> Icons.Outlined.PriceChange
-    BackofficeHubAction.CASH_SESSION_HISTORY -> Icons.AutoMirrored.Outlined.MenuBook
     BackofficeHubAction.FINANCE_REPORTS -> Icons.AutoMirrored.Outlined.TrendingUp
     BackofficeHubAction.ADD_PRODUCT -> Icons.Default.Add
     BackofficeHubAction.PRODUCTS_STOCK -> Icons.Outlined.Inventory2

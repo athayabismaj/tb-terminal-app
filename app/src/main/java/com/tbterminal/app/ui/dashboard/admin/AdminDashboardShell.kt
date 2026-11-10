@@ -217,7 +217,6 @@ private val ownerMenuDestinations = setOf(
     AdminDestination.CustomerForm,
     AdminDestination.Suppliers,
     AdminDestination.SupplierForm,
-    AdminDestination.Reports,
     AdminDestination.LocalReports,
     AdminDestination.BackupRestore,
     AdminDestination.Settings,
@@ -252,7 +251,8 @@ internal fun AdminDestination.backofficeSection(role: String? = null): Backoffic
     AdminDestination.CashReconciliation,
     AdminDestination.CashSessionHistory,
     AdminDestination.CashReconciliationDetail,
-    AdminDestination.CashExpenses -> BackofficeSection.FINANCE
+    AdminDestination.CashExpenses,
+    AdminDestination.Reports -> BackofficeSection.FINANCE
     AdminDestination.StockHub,
     AdminDestination.Products,
     AdminDestination.AddProduct,

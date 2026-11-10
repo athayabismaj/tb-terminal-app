@@ -7,7 +7,6 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.Logout
-import androidx.compose.material.icons.automirrored.outlined.ReceiptLong
 import androidx.compose.material.icons.outlined.Backup
 import androidx.compose.material.icons.outlined.Group
 import androidx.compose.material.icons.outlined.Groups
@@ -17,7 +16,6 @@ import androidx.compose.material.icons.outlined.Print
 import androidx.compose.material.icons.outlined.Security
 import androidx.compose.material.icons.outlined.Settings
 import androidx.compose.material.icons.outlined.Storefront
-import androidx.compose.material.icons.outlined.Summarize
 import androidx.compose.material.icons.outlined.Sync
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
@@ -128,8 +126,6 @@ private fun OwnerMenuAction.icon(): ImageVector = when (this) {
     OwnerMenuAction.CUSTOMERS -> Icons.Outlined.Groups
     OwnerMenuAction.SUPPLIERS -> Icons.Outlined.Group
     OwnerMenuAction.USERS -> Icons.Outlined.Person
-    OwnerMenuAction.REPORTS -> Icons.Outlined.Summarize
-    OwnerMenuAction.DEVICE_REPORTS -> Icons.AutoMirrored.Outlined.ReceiptLong
     OwnerMenuAction.BACKUP -> Icons.Outlined.Backup
     OwnerMenuAction.STORE_SETTINGS -> Icons.Outlined.Storefront
     OwnerMenuAction.DEVICE_SETTINGS -> Icons.Outlined.Print

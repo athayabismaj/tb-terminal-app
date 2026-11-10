@@ -16,8 +16,6 @@ internal enum class OwnerMenuAction(
     CUSTOMERS(R.string.owner_menu_customers, "Kontak dan batas kredit", AppCapability.CUSTOMERS, AdminDestination.Customers),
     SUPPLIERS(R.string.owner_menu_suppliers, "Kontak supplier toko", AppCapability.SUPPLIERS, AdminDestination.Suppliers),
     USERS(R.string.owner_menu_users, "Kelola akun dan hak akses", AppCapability.USER_MANAGEMENT, AdminDestination.UserManagement),
-    REPORTS(R.string.owner_menu_reports, "Ringkasan bisnis dan ekspor", AppCapability.FINANCIAL_ANALYTICS, AdminDestination.Reports),
-    DEVICE_REPORTS(R.string.owner_menu_device_reports, "Data lokal di perangkat ini", AppCapability.REPORTS, AdminDestination.LocalReports),
     BACKUP(R.string.owner_menu_backup, "Cadangan data server & lokal", AppCapability.SERVER_BACKUP, AdminDestination.BackupRestore),
     STORE_SETTINGS(R.string.owner_menu_store_settings, "Nama, alamat, dan header struk", AppCapability.STORE_SETTINGS, AdminDestination.StoreSettings),
     DEVICE_SETTINGS(R.string.owner_menu_device_settings, "Printer thermal dan nota kasir", AppCapability.DEVICE_SETTINGS, AdminDestination.DeviceSettings),
@@ -39,10 +37,6 @@ internal fun ownerMenuGroups(role: String?): List<OwnerMenuGroup> {
         OwnerMenuGroup(
             R.string.owner_menu_group_store,
             listOf(OwnerMenuAction.CUSTOMERS, OwnerMenuAction.SUPPLIERS, OwnerMenuAction.USERS),
-        ),
-        OwnerMenuGroup(
-            R.string.owner_menu_group_reports,
-            listOf(OwnerMenuAction.REPORTS, OwnerMenuAction.DEVICE_REPORTS),
         ),
         OwnerMenuGroup(
             R.string.owner_menu_group_system,

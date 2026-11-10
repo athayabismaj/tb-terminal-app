@@ -18,6 +18,7 @@ import com.tbterminal.app.data.model.UpdateProductCommand
 import com.tbterminal.app.data.repository.InventoryRepository
 import com.tbterminal.app.data.repository.RepositoryResult
 import com.tbterminal.app.ui.dashboard.admin.AdminDestination
+import com.tbterminal.app.ui.dashboard.owner.ownerMenuGroups
 import java.math.BigDecimal
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
@@ -28,58 +29,37 @@ import org.junit.Test
 
 class BackofficeHubModelTest {
     @Test
-    fun `owner sales keeps history and audit without cashier POS action`() {
+    fun `owner sales keeps only sales history without cashier POS action or duplicates`() {
         val content = transactionHubContent("OWNER", BackofficeTransactionTab.SALES)
 
         assertNull(content.primaryAction)
-        assertEquals(
-            listOf(
-                BackofficeHubAction.SALES_HISTORY,
-                BackofficeHubAction.RECEIVABLE_PAYMENTS,
-                BackofficeHubAction.OPERATIONAL_AUDIT,
-            ),
-            content.groups.single().actions,
-        )
+        assertEquals(listOf(BackofficeHubAction.SALES_HISTORY), content.groups.single().actions)
     }
 
     @Test
-    fun `admin sales includes cashier POS action and receivable payments`() {
+    fun `admin sales includes cashier POS primary action and sales history only`() {
         val content = transactionHubContent("ADMIN", BackofficeTransactionTab.SALES)
 
         assertEquals(BackofficeHubAction.NEW_SALE, content.primaryAction)
-        assertEquals(
-            listOf(
-                BackofficeHubAction.SALES_HISTORY,
-                BackofficeHubAction.RECEIVABLE_PAYMENTS,
-            ),
-            content.groups.single().actions,
-        )
+        assertEquals(listOf(BackofficeHubAction.SALES_HISTORY), content.groups.single().actions)
     }
 
     @Test
-    fun `purchase flow has incoming goods primary action followed by history, suppliers, and debts`() {
+    fun `purchase flow has incoming goods primary action followed by purchase history only`() {
         val content = transactionHubContent("OWNER", BackofficeTransactionTab.PURCHASES)
 
         assertEquals(BackofficeHubAction.INCOMING_GOODS, content.primaryAction)
-        assertEquals(
-            listOf(
-                BackofficeHubAction.PURCHASE_HISTORY,
-                BackofficeHubAction.SUPPLIERS,
-                BackofficeHubAction.SUPPLIER_DEBTS,
-            ),
-            content.groups.single().actions,
-        )
+        assertEquals(listOf(BackofficeHubAction.PURCHASE_HISTORY), content.groups.single().actions)
     }
 
     @Test
-    fun `finance actions separate cash expenses, receivables, and owner analytics`() {
+    fun `finance actions separate cash expenses, receivables, and owner analytics without cash duplicate`() {
         val ownerContent = financeHubContent("OWNER")
         assertEquals(3, ownerContent.groups.size)
         assertEquals(
             listOf(
                 BackofficeHubAction.DAILY_CASH,
                 BackofficeHubAction.CASH_EXPENSES,
-                BackofficeHubAction.CASH_SESSION_HISTORY,
             ),
             ownerContent.groups[0].actions,
         )
@@ -99,12 +79,11 @@ class BackofficeHubModelTest {
     }
 
     @Test
-    fun `stock separates operations from product settings without duplicate destinations`() {
+    fun `stock puts add product as primary action and separates catalog, audit, and product data`() {
         val content = stockHubContent("OWNER")
         val actions = content.groups.flatMap { it.actions }
 
-        assertEquals(BackofficeHubAction.INCOMING_GOODS, content.primaryAction)
-        assertEquals(BackofficeHubAction.ADD_PRODUCT, content.secondaryQuickAction)
+        assertEquals(BackofficeHubAction.ADD_PRODUCT, content.primaryAction)
         assertEquals(
             listOf(
                 BackofficeHubAction.PRODUCTS_STOCK,
@@ -128,7 +107,39 @@ class BackofficeHubModelTest {
         )
         assertEquals(actions.size, actions.distinctBy { it.destination }.size)
         assertTrue(content.primaryAction?.destination !in actions.map { it.destination })
-        assertTrue(content.secondaryQuickAction?.destination !in actions.map { it.destination })
+    }
+
+    @Test
+    fun `backoffice four non-home tabs expose zero duplicate destinations per role`() {
+        listOf("ADMIN", "OWNER").forEach { role ->
+            val sales = transactionHubContent(role, BackofficeTransactionTab.SALES)
+            val purchases = transactionHubContent(role, BackofficeTransactionTab.PURCHASES)
+            val finance = financeHubContent(role)
+            val stock = stockHubContent(role)
+            val menuDestinations = if (role == "OWNER") {
+                ownerMenuGroups(role).flatMap { it.actions }.mapNotNull { it.destination }
+            } else {
+                moreMenuSections(role).flatMap { it.actions }.mapNotNull { it.destination }
+            }
+
+            val allDestinations = buildList {
+                sales.primaryAction?.destination?.let(::add)
+                addAll(sales.groups.flatMap { it.actions }.map { it.destination })
+                purchases.primaryAction?.destination?.let(::add)
+                addAll(purchases.groups.flatMap { it.actions }.map { it.destination })
+                finance.primaryAction?.destination?.let(::add)
+                addAll(finance.groups.flatMap { it.actions }.map { it.destination })
+                stock.primaryAction?.destination?.let(::add)
+                addAll(stock.groups.flatMap { it.actions }.map { it.destination })
+                addAll(menuDestinations)
+            }
+
+            assertEquals(
+                "Duplicate destinations found for role=$role: $allDestinations",
+                allDestinations.size,
+                allDestinations.distinct().size,
+            )
+        }
     }
 
     @Test
