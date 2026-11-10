@@ -7,6 +7,7 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -40,6 +41,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.tbterminal.app.data.model.ProductStock
 import com.tbterminal.app.data.repository.InventoryRepository
+import com.tbterminal.app.navigation.LocalPendingProductSearch
 import com.tbterminal.app.ui.dashboard.admin.AdminDashboardShell
 import com.tbterminal.app.ui.dashboard.admin.AdminDestination
 import com.tbterminal.app.ui.components.RefreshableContent
@@ -78,8 +80,18 @@ fun AdminProductListScreen(
     )
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+    val pendingProductSearch = LocalPendingProductSearch.current
     var productToToggle by remember { mutableStateOf<ProductStock?>(null) }
     var isSearchExpanded by rememberSaveable { mutableStateOf(false) }
+
+    LaunchedEffect(pendingProductSearch.value) {
+        val barcodeQuery = pendingProductSearch.value
+        if (!barcodeQuery.isNullOrBlank()) {
+            pendingProductSearch.value = null
+            isSearchExpanded = true
+            viewModel.onSearchChanged(barcodeQuery)
+        }
+    }
     var showFilterPopup by remember { mutableStateOf(false) }
     var showSummaryPopup by rememberSaveable { mutableStateOf(false) }
     val isFiltered = uiState.selectedCategory != ALL_PRODUCT_CATEGORIES

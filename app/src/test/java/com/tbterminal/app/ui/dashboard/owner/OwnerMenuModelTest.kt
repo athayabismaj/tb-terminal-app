@@ -1,7 +1,7 @@
 package com.tbterminal.app.ui.dashboard.owner
 
-import com.tbterminal.app.ui.dashboard.admin.AdminDestination
 import com.tbterminal.app.navigation.AppAccessPolicy
+import com.tbterminal.app.ui.dashboard.admin.AdminDestination
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
@@ -9,14 +9,17 @@ import org.junit.Test
 
 class OwnerMenuModelTest {
     @Test
-    fun `owner menu contains three clear groups and unique destinations`() {
+    fun `owner menu contains four clear groups and unique destinations`() {
         val groups = ownerMenuGroups("OWNER")
         val actions = groups.flatMap { it.actions }
+        val destinations = actions.mapNotNull { it.destination }
 
-        assertEquals(3, groups.size)
-        assertEquals(11, actions.size)
-        assertEquals(actions.size, actions.distinctBy { it.destination }.size)
-        assertTrue(AdminDestination.Profile !in actions.map { it.destination })
+        assertEquals(4, groups.size)
+        assertEquals(12, actions.size)
+        assertEquals(11, destinations.size)
+        assertEquals(destinations.size, destinations.distinct().size)
+        assertTrue(OwnerMenuAction.LOGOUT in actions)
+        assertTrue(AdminDestination.Profile !in destinations)
     }
 
     @Test
@@ -29,7 +32,7 @@ class OwnerMenuModelTest {
 
     @Test
     fun `policy filters every owner action`() {
-        val destinations = ownerMenuGroups("OWNER").flatMap { it.actions }.map { it.destination }
+        val destinations = ownerMenuGroups("OWNER").flatMap { it.actions }.mapNotNull { it.destination }
         assertTrue(AdminDestination.UserManagement in destinations)
         assertTrue(AdminDestination.SecurityLog in destinations)
         assertTrue(AdminDestination.BackupRestore in destinations)
@@ -46,7 +49,6 @@ class OwnerMenuModelTest {
         val tablet = ownerMenuColumns(groups, expanded = true)
         assertEquals(2, tablet.size)
         assertEquals(groups.toSet(), tablet.flatten().toSet())
-        assertEquals(listOf(groups[0], groups[2]), tablet[0])
-        assertEquals(listOf(groups[1]), tablet[1])
+        assertEquals(groups.size, tablet.flatten().size)
     }
 }

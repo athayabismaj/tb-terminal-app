@@ -3,6 +3,10 @@ package com.tbterminal.app.navigation
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.MutableState
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.res.stringResource
 import androidx.navigation.NavHostController
 import androidx.navigation.compose.NavHost
@@ -18,6 +22,10 @@ import com.tbterminal.app.ui.dashboard.LocalBackofficePageNavigation
 import com.tbterminal.app.ui.dashboard.isOwnerPersona
 import com.tbterminal.app.ui.dashboard.rememberBackofficeSidebarState
 
+internal val LocalPendingProductSearch = staticCompositionLocalOf<MutableState<String?>> {
+    mutableStateOf(null)
+}
+
 @Composable
 fun AppNavGraph(
     navController: NavHostController,
@@ -29,6 +37,7 @@ fun AppNavGraph(
     val currentRoute = navController.currentBackStackEntryAsState().value?.destination?.route
     val sessionRole = sessionManager.readSessionUser()?.role
     val backofficeSidebarState = rememberBackofficeSidebarState()
+    val pendingProductSearch = remember { mutableStateOf<String?>(null) }
 
     LaunchedEffect(currentRoute, sessionRole) {
         if (currentRoute != null && !AppRouteAccessPolicy.isAllowed(currentRoute, sessionRole)) {
@@ -46,6 +55,7 @@ fun AppNavGraph(
 
     CompositionLocalProvider(
         LocalBackofficeSidebarState provides backofficeSidebarState,
+        LocalPendingProductSearch provides pendingProductSearch,
         LocalBackofficePageNavigation provides BackofficePageNavigation(
             title = if (isOwnerPersona(sessionRole)) {
                 backofficeRouteTitleRes(currentRoute, sessionRole)?.let { stringResource(it) }
@@ -108,11 +118,14 @@ internal fun AdminDestination.adminRouteOrNull(role: String?): String? {
         AdminDestination.CashierCashSession -> AppRoute.CashierCashSession.route
         AdminDestination.CashierTransactionHistory -> AppRoute.CashierTransactionHistory.route
         AdminDestination.Products -> AppRoute.Products.route
+        AdminDestination.AddProduct -> AppRoute.AddProduct.route
         AdminDestination.ProductCategories -> AppRoute.ProductCategories.route
         AdminDestination.ProductUnits -> AppRoute.ProductUnits.route
         AdminDestination.PriceManagement -> AppRoute.PriceManagement.route
         AdminDestination.StockOpname -> AppRoute.StockOpname.route
+        AdminDestination.StockOpnameForm -> AppRoute.StockOpnameForm.createRoute()
         AdminDestination.IncomingGoods -> AppRoute.IncomingGoods.route
+        AdminDestination.IncomingGoodsForm -> AppRoute.IncomingGoodsForm.createRoute()
         AdminDestination.Suppliers -> AppRoute.Suppliers.route
         AdminDestination.SupplierForm -> AppRoute.SupplierForm.route
         AdminDestination.PurchaseHistory -> AppRoute.PurchaseHistory.route

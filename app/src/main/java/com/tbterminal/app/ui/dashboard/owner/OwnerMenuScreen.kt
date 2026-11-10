@@ -63,6 +63,7 @@ fun OwnerMenuScreen(
                     profile = uiState.profile,
                     onProfileClick = effectiveOnProfileClick,
                     onNavigate = navigate,
+                    onLogout = onLogout,
                 )
             }
         }

@@ -14,7 +14,7 @@ internal enum class MoreMenuAction(
 ) {
     CUSTOMERS("Pelanggan", "Kontak dan batas kredit", AppCapability.CUSTOMERS, AdminDestination.Customers),
     SUPPLIERS("Supplier", "Kontak supplier toko", AppCapability.SUPPLIERS, AdminDestination.Suppliers),
-    REPORTS("Laporan bisnis", "Ringkasan dan ekspor", AppCapability.REPORTS, AdminDestination.Reports),
+    REPORTS("Laporan bisnis", "Ringkasan dan ekspor", AppCapability.FINANCIAL_ANALYTICS, AdminDestination.Reports),
     LOCAL_REPORTS("Laporan perangkat", "Data di perangkat ini", AppCapability.REPORTS, AdminDestination.LocalReports),
     USERS("Pengguna & akses", "Kelola akun dan akses", AppCapability.USER_MANAGEMENT),
     ACTIVITY("Riwayat aktivitas", "Perubahan data toko", AppCapability.AUDIT, AdminDestination.OperationalAudit),
@@ -22,7 +22,7 @@ internal enum class MoreMenuAction(
     BACKUP("Cadangan data", "Data perangkat dan server", AppCapability.SERVER_BACKUP, AdminDestination.BackupRestore),
     STORE_SETTINGS("Identitas toko", "Nama dan kontak toko", AppCapability.STORE_SETTINGS, AdminDestination.StoreSettings),
     DEVICE_SETTINGS("Perangkat & struk", "Printer dan nota kasir", AppCapability.DEVICE_SETTINGS, AdminDestination.DeviceSettings),
-    SETTINGS("Pengaturan aplikasi", "Printer, toko, dan perangkat", AppCapability.STORE_SETTINGS, AdminDestination.Settings),
+    SETTINGS("Pengaturan aplikasi", "Printer, toko, dan perangkat", AppCapability.DEVICE_SETTINGS, AdminDestination.Settings),
     SYNC("Sinkronisasi", "Status data offline", AppCapability.SYNC, AdminDestination.SyncCenter),
     PROFILE("Profil & keamanan", "Profil, password, dan PIN", AppCapability.ACCOUNT, AdminDestination.Profile),
     LOGOUT("Keluar", "Akhiri sesi akun", AppCapability.ACCOUNT),
@@ -34,11 +34,11 @@ internal fun moreMenuSections(role: String): List<MoreMenuSection> {
     if (isOwnerPersona(role) || !AppAccessPolicy.can(role, AppCapability.BACKOFFICE)) return emptyList()
     return listOf(
         MoreMenuSection("Data toko", listOf(MoreMenuAction.CUSTOMERS, MoreMenuAction.SUPPLIERS)),
-        MoreMenuSection("Laporan", listOf(MoreMenuAction.REPORTS, MoreMenuAction.LOCAL_REPORTS)),
+        MoreMenuSection("Laporan & audit", listOf(MoreMenuAction.REPORTS, MoreMenuAction.LOCAL_REPORTS, MoreMenuAction.ACTIVITY)),
         MoreMenuSection("Administrasi", listOf(
-            MoreMenuAction.USERS, MoreMenuAction.ACTIVITY, MoreMenuAction.SECURITY_LOG, MoreMenuAction.BACKUP,
+            MoreMenuAction.USERS, MoreMenuAction.SECURITY_LOG, MoreMenuAction.BACKUP,
         )),
-        MoreMenuSection("Pengaturan", listOf(MoreMenuAction.STORE_SETTINGS, MoreMenuAction.DEVICE_SETTINGS, MoreMenuAction.SYNC)),
+        MoreMenuSection("Pengaturan & sinkronisasi", listOf(MoreMenuAction.STORE_SETTINGS, MoreMenuAction.DEVICE_SETTINGS, MoreMenuAction.SYNC)),
         MoreMenuSection("Akun", listOf(MoreMenuAction.PROFILE, MoreMenuAction.LOGOUT)),
     ).map { section ->
         section.copy(actions = section.actions.filter { AppAccessPolicy.can(role, it.capability) })
@@ -48,7 +48,7 @@ internal fun moreMenuSections(role: String): List<MoreMenuSection> {
 internal fun moreMenuColumnCount(widthClass: TbWindowWidthClass): Int =
     if (widthClass == TbWindowWidthClass.Compact) 1 else 2
 
-/** Balance whole groups, avoiding empty grid cells beside the longer administration group. */
+/** Balance whole groups, avoiding empty grid cells beside longer groups on tablets. */
 internal fun moreMenuColumns(
     sections: List<MoreMenuSection>,
     widthClass: TbWindowWidthClass,

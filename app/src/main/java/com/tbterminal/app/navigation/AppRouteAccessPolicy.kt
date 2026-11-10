@@ -78,6 +78,7 @@ internal object AppAccessPolicy {
         AppCapability.SERVER_BACKUP,
         AppCapability.SECURITY_SETTINGS,
         AppCapability.FINANCIAL_ANALYTICS,
+        AppCapability.STORE_SETTINGS,
     )
 
     private val cashierCapabilities = setOf(
@@ -168,7 +169,8 @@ internal object AppRouteAccessPolicy {
                 value.matchesRoute(AppRoute.CashReconciliationDetail.route) ||
                 value == AppRoute.CashExpenses.route -> AppCapability.CASH_SESSIONS
 
-            value == AppRoute.Reports.route || value == AppRoute.OfflineReports.route -> AppCapability.REPORTS
+            value == AppRoute.Reports.route -> AppCapability.FINANCIAL_ANALYTICS
+            value == AppRoute.OfflineReports.route -> AppCapability.REPORTS
             value == AppRoute.OperationalAudit.route -> AppCapability.AUDIT
             value == AppRoute.SyncCenter.route -> AppCapability.SYNC
             value == AppRoute.BackupRestore.route -> AppCapability.SERVER_BACKUP
@@ -177,8 +179,8 @@ internal object AppRouteAccessPolicy {
                 value.matchesRoute(AppRoute.EditUser.route) || value.matchesRoute(AppRoute.ChangeUserPassword.route) ||
                 value.matchesRoute(AppRoute.ChangeUserPin.route) -> AppCapability.USER_MANAGEMENT
             value == AppRoute.SecurityLog.route -> AppCapability.SECURITY_SETTINGS
-            value == AppRoute.AdminSettings.route || value == AppRoute.AdminStoreSettings.route -> AppCapability.STORE_SETTINGS
-            value == AppRoute.AdminDeviceSettings.route -> AppCapability.DEVICE_SETTINGS
+            value == AppRoute.AdminStoreSettings.route -> AppCapability.STORE_SETTINGS
+            value == AppRoute.AdminSettings.route || value == AppRoute.AdminDeviceSettings.route -> AppCapability.DEVICE_SETTINGS
             value == AppRoute.CashierSettings.route -> AppCapability.DEVICE_SETTINGS
             value == AppRoute.AdminProfile.route || value == AppRoute.AdminEditProfile.route ||
                 value == AppRoute.CashierProfile.route || value == AppRoute.CashierEditProfile.route -> AppCapability.ACCOUNT

@@ -12,8 +12,10 @@
     <!-- Owner menu -->
     <string name="owner_menu_title">Menu</string>
     <string name="owner_menu_group_store">Kelola toko</string>
-    <string name="owner_menu_group_reports">Laporan &amp; data</string>
+    <string name="owner_menu_group_reports">Laporan</string>
     <string name="owner_menu_group_app">Aplikasi &amp; keamanan</string>
+    <string name="owner_menu_group_system">Sistem &amp; keamanan</string>
+    <string name="owner_menu_group_account">Akun</string>
     <string name="owner_menu_customers">Pelanggan</string>
     <string name="owner_menu_suppliers">Supplier</string>
     <string name="owner_menu_users">Pengguna &amp; akses</string>
@@ -66,4 +68,28 @@
     <string name="hub_product_prices">Harga produk</string>
     <string name="hub_categories">Kategori produk</string>
     <string name="hub_units">Satuan produk</string>
+    <string name="hub_group_cash">Kas &amp; Pengeluaran</string>
+    <string name="hub_group_receivables_payables">Piutang &amp; Hutang</string>
+    <string name="hub_group_finance_analytics">Laporan &amp; Analitik</string>
+    <string name="hub_receivable_payments">Pembayaran piutang</string>
+    <string name="hub_receivable_payments_description">Riwayat cicilan dan pelunasan pelanggan</string>
+    <string name="hub_operational_audit">Audit aktivitas</string>
+    <string name="hub_operational_audit_description">Jejak koreksi dan perubahan data toko</string>
+    <string name="hub_suppliers">Daftar supplier</string>
+    <string name="hub_suppliers_description">Kontak pemasok dan riwayat pengadaan</string>
+    <string name="hub_cash_expenses">Pengeluaran kas</string>
+    <string name="hub_cash_expenses_description">Catatan beban operasional &amp; kas kecil</string>
+    <string name="hub_cash_session_history">Riwayat shift kas</string>
+    <string name="hub_cash_session_history_description">Daftar sesi buka-tutup kasir harian</string>
+    <string name="hub_finance_reports">Laporan bisnis &amp; penjualan</string>
+    <string name="hub_finance_reports_description">Ringkasan performa dan ekspor data</string>
+    <string name="hub_add_product">Tambah produk</string>
+    <string name="hub_add_product_description">Daftarkan SKU baru ke katalog toko</string>
+    <string name="hub_products_stock_description">Katalog seluruh produk &amp; stok fisik</string>
+    <string name="hub_product_prices_description">Kelola margin keuntungan &amp; HPP</string>
+    <string name="hub_product_prices_admin_description">Daftar harga jual katalog toko</string>
+    <string name="hub_stock_card_description">Riwayat &amp; log arus keluar-masuk</string>
+    <string name="hub_adjust_stock_description">Pencocokan &amp; selisih stok fisik</string>
+    <string name="hub_categories_description">Kelompok &amp; rak etalase produk</string>
+    <string name="hub_units_description">Pcs, sak, batang, dus, meter</string>
 </resources>

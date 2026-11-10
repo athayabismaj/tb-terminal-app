@@ -60,6 +60,9 @@ class BackofficeNavigationFlowTest {
         assertEquals(AppRoute.CashierTransactionHistory.route, AdminDestination.SalesTransactions.adminRouteOrNull("kasir"))
         assertEquals(AppRoute.CashReconciliation.route, AdminDestination.CashReconciliation.adminRouteOrNull("admin"))
         assertEquals(AppRoute.CashReconciliation.route, AdminDestination.CashReconciliation.adminRouteOrNull("owner"))
+        assertEquals(AppRoute.AddProduct.route, AdminDestination.AddProduct.adminRouteOrNull("admin"))
+        assertEquals(AppRoute.IncomingGoodsForm.createRoute(), AdminDestination.IncomingGoodsForm.adminRouteOrNull("admin"))
+        assertEquals(AppRoute.StockOpnameForm.createRoute(), AdminDestination.StockOpnameForm.adminRouteOrNull("admin"))
 
         assertEquals(CashierDestination.CashSession, AdminDestination.CashierCashSession.toCashierDestination())
         assertEquals(CashierDestination.CashSession, AdminDestination.CashReconciliation.toCashierDestination())

@@ -27,9 +27,14 @@ class AppRouteAccessPolicyTest {
     fun adminCannotOpenOwnerOnlyRoutes() {
         assertTrue(AppRouteAccessPolicy.isAllowed(AppRoute.Products.route, "admin"))
         assertTrue(AppRouteAccessPolicy.isAllowed(AppRoute.SupplierForm.route, "admin"))
+        assertTrue(AppRouteAccessPolicy.isAllowed(AppRoute.AdminSettings.route, "admin"))
+        assertTrue(AppRouteAccessPolicy.isAllowed(AppRoute.AdminDeviceSettings.route, "admin"))
+        assertTrue(AppRouteAccessPolicy.isAllowed(AppRoute.OfflineReports.route, "admin"))
         assertFalse(AppRouteAccessPolicy.isAllowed(AppRoute.UserManagement.route, "admin"))
         assertFalse(AppRouteAccessPolicy.isAllowed(AppRoute.SecurityLog.route, "admin"))
         assertFalse(AppRouteAccessPolicy.isAllowed(AppRoute.BackupRestore.route, "admin"))
+        assertFalse(AppRouteAccessPolicy.isAllowed(AppRoute.AdminStoreSettings.route, "admin"))
+        assertFalse(AppRouteAccessPolicy.isAllowed(AppRoute.Reports.route, "admin"))
     }
 
     @Test
@@ -37,6 +42,8 @@ class AppRouteAccessPolicyTest {
         assertTrue(AppRouteAccessPolicy.isAllowed(AppRoute.UserManagement.route, "owner"))
         assertTrue(AppRouteAccessPolicy.isAllowed(AppRoute.SupplierForm.route, "owner"))
         assertTrue(AppRouteAccessPolicy.isAllowed(AppRoute.BackupRestore.route, "owner"))
+        assertTrue(AppRouteAccessPolicy.isAllowed(AppRoute.AdminStoreSettings.route, "owner"))
+        assertTrue(AppRouteAccessPolicy.isAllowed(AppRoute.Reports.route, "owner"))
         assertFalse(AppRouteAccessPolicy.isAllowed(AppRoute.CashierPos.route, "owner"))
         assertFalse(AppRouteAccessPolicy.isAllowed(AppRoute.Dashboard.route, "guest"))
     }
@@ -96,8 +103,9 @@ class AppRouteAccessPolicyTest {
         assertFalse(AppMenuFeature.USER_MANAGEMENT in features)
         assertFalse(AppMenuFeature.SERVER_BACKUP in features)
         assertFalse(AppMenuFeature.SECURITY_SETTINGS in features)
+        assertFalse(AppMenuFeature.STORE_SETTINGS in features)
+        assertTrue(AppMenuFeature.DEVICE_SETTINGS in features)
         assertTrue(AppMenuFeature.AUDIT in features)
-        assertTrue(AppMenuFeature.STORE_SETTINGS in features)
     }
 
     @Test
