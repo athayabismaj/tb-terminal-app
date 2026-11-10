@@ -10,12 +10,14 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.imePadding
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -26,12 +28,8 @@ import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.outlined.Check
 import androidx.compose.material.icons.outlined.Close
 import androidx.compose.material.icons.outlined.ContentCopy
-import androidx.compose.material.icons.outlined.FormatPaint
-import androidx.compose.material.icons.outlined.GridView
-import androidx.compose.material.icons.outlined.Layers
 import androidx.compose.material.icons.outlined.Search
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -55,8 +53,9 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
-import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
@@ -68,27 +67,27 @@ import java.util.Locale
 import kotlin.math.ceil
 
 // ═════════════════════════════════════════════════════════════════════════════
-// PALET WARNA MODERN TB TERMINAL
+// PALET WARNA REFERENSI TERMINAL BAROKAH JAYA
 // ═════════════════════════════════════════════════════════════════════════════
-private val BrandEmerald = Color(0xFF256B57)
-private val BrandForest = Color(0xFF10533C)
-private val BrandMintBg = Color(0xFFECFDF5)
-private val BrandMintBorder = Color(0xFFA7F3D0)
+private val BrandPrimary = Color(0xFF10533C)
+private val BrandMintIcon = Color(0xFFA7F3D0)
 
 private val Slate900 = Color(0xFF0F172A)
+private val Slate800 = Color(0xFF1E293B)
 private val Slate700 = Color(0xFF334155)
-private val Slate600 = Color(0xFF475569)
 private val Slate500 = Color(0xFF64748B)
+private val Slate400 = Color(0xFF94A3B8)
+private val Slate300 = Color(0xFFCBD5E1)
 private val Slate200 = Color(0xFFE2E8F0)
 private val Slate100 = Color(0xFFF1F5F9)
 private val Slate50 = Color(0xFFF8FAFC)
 
 /**
  * Kalkulator Cepat Estimasi Kebutuhan Material Bangunan di Layar POS & Dashboard Kasir.
- * Didesain modern dan selaras dengan sistem desain Bottom Sheet TB Terminal:
- * 1. Estimasi Keramik & Granit (Panjang x Lebar -> Dus + Cadangan Waste)
- * 2. Estimasi Plesteran & Pasangan Bata (Panjang x Tinggi -> Sak Semen, Pasir, Bata)
- * 3. Estimasi Cat Dinding (Luas Bidang x Lapisan -> Liter, Galon 2.5L, Pail 20L)
+ * Mengikuti layout desain modern underline-tab bottom sheet:
+ * 1. Keramik (Panjang x Lebar, ukuran ubin 4-kolom, cadangan waste, card hasil)
+ * 2. Semen & Pasir (Panjang x Tinggi dinding, Plesteran / Pasang Bata, card hasil)
+ * 3. Cat Dinding (Luas bidang + preset cepat, 1/2/3 lapisan, card hasil)
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -100,16 +99,16 @@ fun MaterialEstimatorDialog(
     var selectedTab by remember { mutableIntStateOf(0) }
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
 
-    // State Tab 1: Keramik & Granit
+    // State Tab 1: Keramik
     var tileLengthInput by remember { mutableStateOf("4") }
     var tileWidthInput by remember { mutableStateOf("5") }
-    var selectedTilePreset by remember { mutableIntStateOf(2) } // 60x60 cm
+    var selectedTilePreset by remember { mutableIntStateOf(0) } // default 40x40
     var wastePercent by remember { mutableIntStateOf(10) }
 
-    // State Tab 2: Semen & Bata
+    // State Tab 2: Semen & Pasir
     var wallLengthInput by remember { mutableStateOf("10") }
     var wallHeightInput by remember { mutableStateOf("3") }
-    var wallWorkType by remember { mutableIntStateOf(0) } // 0: Plester, 1: Bata
+    var wallWorkType by remember { mutableIntStateOf(0) } // 0: Plesteran, 1: Pasang Bata
 
     // State Tab 3: Cat Dinding
     var paintAreaInput by remember { mutableStateOf("50") }
@@ -117,16 +116,13 @@ fun MaterialEstimatorDialog(
 
     val tilePresets = remember {
         listOf(
-            TilePreset("40×40 cm", "1.0 m²/dus", 1.0, "Keramik 40x40"),
-            TilePreset("50×50 cm", "1.0 m²/dus", 1.0, "Keramik 50x50"),
-            TilePreset("60×60 cm", "1.44 m²/dus", 1.44, "Granit 60x60"),
-            TilePreset("80×80 cm", "1.92 m²/dus", 1.92, "Granit 80x80"),
-            TilePreset("30×60 cm", "1.44 m²/dus", 1.44, "Keramik 30x60"),
-            TilePreset("25×40 cm", "1.0 m²/dus", 1.0, "Keramik Dinding 25x40"),
+            TilePreset("40×40", "40×40 cm", "1.0 m²", 1.0, "Keramik 40x40"),
+            TilePreset("50×50", "50×50 cm", "1.0 m²", 1.0, "Keramik 50x50"),
+            TilePreset("60×60", "60×60 cm", "1.44 m²", 1.44, "Granit 60x60"),
+            TilePreset("80×80", "80×80 cm", "1.92 m²", 1.92, "Granit 80x80"),
         )
     }
 
-    // Active output metadata for pinned footer actions
     val activeActionData = remember(
         selectedTab,
         tileLengthInput, tileWidthInput, selectedTilePreset, wastePercent,
@@ -143,7 +139,7 @@ fun MaterialEstimatorDialog(
                 val boxes = if (preset.coveragePerBox > 0 && areaGross > 0) ceil(areaGross / preset.coveragePerBox).toInt() else 0
                 EstimatorActionData(
                     clipboardLabel = "Estimasi Keramik",
-                    clipboardText = "Estimasi Keramik (${preset.label}): Ruangan ${formatNum(l)}×${formatNum(w)}m (${formatNum(areaNet)} m², waste $wastePercent%) membutuhkan $boxes Dus.",
+                    clipboardText = "[Kalkulator Bahan POS] ${preset.fullLabel} • Waste $wastePercent%\nLuas: ${String.format(Locale.US, "%.2f", areaNet)} m²\nEstimasi: $boxes Dus",
                     searchQuery = preset.searchQuery
                 )
             }
@@ -152,13 +148,10 @@ fun MaterialEstimatorDialog(
                 val h = wallHeightInput.parseDecimalInput()
                 val area = l * h
                 val sacks = if (area > 0) (if (wallWorkType == 0) ceil(area * 0.20).toInt() else ceil(area * 0.23).toInt()) else 0
-                val sand = if (wallWorkType == 0) area * 0.024 else area * 0.043
-                val bricks = if (wallWorkType == 1 && area > 0) ceil(area * 70).toInt() else 0
-                val workLabel = if (wallWorkType == 0) "Plesteran 15mm" else "Pasang Bata Merah"
-                val extra = if (wallWorkType == 1) ", $bricks PCS Bata Merah" else ""
+                val label = if (wallWorkType == 0) "Semen 50kg (Plesteran 1 sisi)" else "Semen 50kg (Pasang Bata 1:5)"
                 EstimatorActionData(
-                    clipboardLabel = "Estimasi Dinding",
-                    clipboardText = "Estimasi $workLabel (${formatNum(l)}×${formatNum(h)}m = ${formatNum(area)} m²): $sacks Sak Semen (50kg), ${String.format(Locale.US, "%.2f", sand)} m³ Pasir$extra.",
+                    clipboardLabel = "Estimasi Semen & Pasir",
+                    clipboardText = "[Kalkulator Bahan POS] $label\nLuas Bidang: ${String.format(Locale.US, "%.1f", area)} m²\nEstimasi: $sacks Sak",
                     searchQuery = "Semen"
                 )
             }
@@ -167,10 +160,9 @@ fun MaterialEstimatorDialog(
                 val totalSweep = area * coatsCount
                 val liters = if (totalSweep > 0) totalSweep / 10.0 else 0.0
                 val gallons = if (liters > 0) ceil(liters / 2.5).toInt() else 0
-                val pails = if (liters > 0) ceil(liters / 20.0).toInt() else 0
                 EstimatorActionData(
                     clipboardLabel = "Estimasi Cat Dinding",
-                    clipboardText = "Estimasi Cat Dinding (${formatNum(area)} m², $coatsCount Lapis): ${String.format(Locale.US, "%.1f", liters)} Liter ($gallons Galon 2.5L atau $pails Pail 20L).",
+                    clipboardText = "[Kalkulator Bahan POS] Kemasan Galon 2.5 Liter ($coatsCount Lapis)\nTotal Sapuan: ${formatNum(totalSweep)} m²\nEstimasi: $gallons Galon",
                     searchQuery = "Cat Tembok"
                 )
             }
@@ -181,14 +173,14 @@ fun MaterialEstimatorDialog(
         onDismissRequest = onDismiss,
         sheetState = sheetState,
         containerColor = Color.White,
-        shape = RoundedCornerShape(topStart = 32.dp, topEnd = 32.dp),
+        shape = RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp),
         dragHandle = {
             Box(
                 modifier = Modifier
                     .padding(top = 12.dp, bottom = 4.dp)
                     .width(40.dp)
-                    .height(5.dp)
-                    .background(Color(0xFFCBD5E1), CircleShape)
+                    .height(4.dp)
+                    .background(Slate300, CircleShape)
             )
         }
     ) {
@@ -196,30 +188,30 @@ fun MaterialEstimatorDialog(
             modifier = Modifier
                 .fillMaxWidth()
                 .imePadding()
+                .navigationBarsPadding()
                 .testTag("material-estimator-sheet")
         ) {
-            // ── 1. HEADER ──
+            // ── 1. MODAL HEADER ──
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(start = 24.dp, end = 20.dp, top = 4.dp, bottom = 12.dp),
+                    .padding(horizontal = 20.dp, vertical = 12.dp),
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.Top
             ) {
                 Column(modifier = Modifier.weight(1f).padding(end = 12.dp)) {
                     Text(
                         text = "Kalkulator Bahan",
-                        fontSize = 20.sp,
+                        fontSize = 18.sp,
                         fontWeight = FontWeight.Bold,
                         color = Slate900,
                         letterSpacing = (-0.3).sp
                     )
                     Spacer(Modifier.height(2.dp))
                     Text(
-                        text = "Hitung cepat estimasi keramik, semen & cat dinding",
-                        fontSize = 13.sp,
-                        color = Slate500,
-                        lineHeight = 17.sp
+                        text = "Estimasi kebutuhan keramik, semen, dan cat",
+                        fontSize = 12.sp,
+                        color = Slate500
                     )
                 }
                 Box(
@@ -232,8 +224,8 @@ fun MaterialEstimatorDialog(
                 ) {
                     Icon(
                         imageVector = Icons.Outlined.Close,
-                        contentDescription = "Tutup Kalkulator",
-                        tint = Slate600,
+                        contentDescription = "Tutup modal",
+                        tint = Slate500,
                         modifier = Modifier.size(16.dp)
                     )
                 }
@@ -241,60 +233,24 @@ fun MaterialEstimatorDialog(
 
             HorizontalDivider(color = Slate100, thickness = 1.dp)
 
-            // ── 2. SEGMENTED PILL TABS ──
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 24.dp)
-                    .padding(top = 14.dp, bottom = 4.dp)
-            ) {
-                Surface(
-                    shape = RoundedCornerShape(12.dp),
-                    color = Slate100,
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(4.dp),
-                        horizontalArrangement = Arrangement.spacedBy(4.dp)
-                    ) {
-                        EstimatorSegmentTab(
-                            title = "Keramik",
-                            icon = Icons.Outlined.GridView,
-                            isSelected = selectedTab == 0,
-                            onClick = { selectedTab = 0 },
-                            modifier = Modifier.weight(1f)
-                        )
-                        EstimatorSegmentTab(
-                            title = "Semen & Bata",
-                            icon = Icons.Outlined.Layers,
-                            isSelected = selectedTab == 1,
-                            onClick = { selectedTab = 1 },
-                            modifier = Modifier.weight(1f)
-                        )
-                        EstimatorSegmentTab(
-                            title = "Cat Dinding",
-                            icon = Icons.Outlined.FormatPaint,
-                            isSelected = selectedTab == 2,
-                            onClick = { selectedTab = 2 },
-                            modifier = Modifier.weight(1f)
-                        )
-                    }
-                }
-            }
+            // ── 2. CLEAN UNDERLINE TAB NAVIGATION ──
+            EstimatorUnderlineTabs(
+                tabs = listOf("Keramik", "Semen & Pasir", "Cat Dinding"),
+                selectedIndex = selectedTab,
+                onSelect = { selectedTab = it }
+            )
 
-            // ── 3. SCROLLABLE BODY ──
+            // ── 3. SCROLLABLE VIEWPORT ──
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
                     .weight(1f, fill = false)
                     .verticalScroll(rememberScrollState())
-                    .padding(horizontal = 24.dp, vertical = 16.dp),
-                verticalArrangement = Arrangement.spacedBy(18.dp)
+                    .padding(horizontal = 20.dp, vertical = 14.dp),
+                verticalArrangement = Arrangement.spacedBy(16.dp)
             ) {
                 when (selectedTab) {
-                    0 -> TileEstimatorBody(
+                    0 -> TileEstimatorTab(
                         lengthInput = tileLengthInput,
                         widthInput = tileWidthInput,
                         onLengthChange = { tileLengthInput = sanitizeDecimalInput(it) },
@@ -305,7 +261,7 @@ fun MaterialEstimatorDialog(
                         wastePercent = wastePercent,
                         onSelectWaste = { wastePercent = it }
                     )
-                    1 -> PlasterEstimatorBody(
+                    1 -> PlasterEstimatorTab(
                         lengthInput = wallLengthInput,
                         heightInput = wallHeightInput,
                         onLengthChange = { wallLengthInput = sanitizeDecimalInput(it) },
@@ -313,7 +269,7 @@ fun MaterialEstimatorDialog(
                         workType = wallWorkType,
                         onSelectWorkType = { wallWorkType = it }
                     )
-                    2 -> PaintEstimatorBody(
+                    else -> PaintEstimatorTab(
                         areaInput = paintAreaInput,
                         onAreaChange = { paintAreaInput = sanitizeDecimalInput(it) },
                         coatsCount = coatsCount,
@@ -324,34 +280,43 @@ fun MaterialEstimatorDialog(
 
             HorizontalDivider(color = Slate100, thickness = 1.dp)
 
-            // ── 4. STICKY ACTION FOOTER ──
+            // ── 4. BOTTOM ACTION BUTTONS (5 : 7 GRID PROPORTION) ──
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(horizontal = 20.dp, vertical = 12.dp),
-                horizontalArrangement = Arrangement.spacedBy(10.dp),
+                    .padding(16.dp),
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 OutlinedButton(
                     onClick = {
                         val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
-                        clipboard.setPrimaryClip(ClipData.newPlainText(activeActionData.clipboardLabel, activeActionData.clipboardText))
-                        Toast.makeText(context, "Hasil estimasi disalin ke clipboard", Toast.LENGTH_SHORT).show()
+                        clipboard.setPrimaryClip(
+                            ClipData.newPlainText(activeActionData.clipboardLabel, activeActionData.clipboardText)
+                        )
+                        Toast.makeText(context, "Hasil kalkulasi berhasil disalin!", Toast.LENGTH_SHORT).show()
                     },
                     modifier = Modifier
-                        .weight(1f)
+                        .weight(5f)
                         .height(48.dp),
                     shape = RoundedCornerShape(12.dp),
                     border = BorderStroke(1.dp, Slate200),
-                    colors = ButtonDefaults.outlinedButtonColors(contentColor = Slate700)
+                    colors = ButtonDefaults.outlinedButtonColors(contentColor = Slate700),
+                    contentPadding = PaddingValues(horizontal = 12.dp)
                 ) {
-                    Icon(Icons.Outlined.ContentCopy, null, modifier = Modifier.size(16.dp))
-                    Spacer(Modifier.width(6.dp))
+                    Icon(
+                        imageVector = Icons.Outlined.ContentCopy,
+                        contentDescription = null,
+                        tint = Slate500,
+                        modifier = Modifier.size(16.dp)
+                    )
+                    Spacer(Modifier.width(8.dp))
                     Text(
                         text = "Salin Hasil",
-                        fontSize = 13.5.sp,
-                        fontWeight = FontWeight.SemiBold,
-                        maxLines = 1
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.Bold,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
                     )
                 }
 
@@ -361,22 +326,29 @@ fun MaterialEstimatorDialog(
                         onApplySearchQuery(activeActionData.searchQuery)
                     },
                     modifier = Modifier
-                        .weight(1.3f)
+                        .weight(7f)
                         .height(48.dp),
                     shape = RoundedCornerShape(12.dp),
                     colors = ButtonDefaults.buttonColors(
-                        containerColor = BrandEmerald,
+                        containerColor = BrandPrimary,
                         contentColor = Color.White
                     ),
-                    elevation = ButtonDefaults.buttonElevation(defaultElevation = 1.dp)
+                    elevation = ButtonDefaults.buttonElevation(defaultElevation = 1.dp),
+                    contentPadding = PaddingValues(horizontal = 14.dp)
                 ) {
-                    Icon(Icons.Outlined.Search, null, modifier = Modifier.size(17.dp))
-                    Spacer(Modifier.width(6.dp))
+                    Icon(
+                        imageVector = Icons.Outlined.Search,
+                        contentDescription = null,
+                        tint = BrandMintIcon,
+                        modifier = Modifier.size(16.dp)
+                    )
+                    Spacer(Modifier.width(8.dp))
                     Text(
                         text = "Cari di POS",
-                        fontSize = 14.sp,
+                        fontSize = 12.sp,
                         fontWeight = FontWeight.Bold,
-                        maxLines = 1
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
                     )
                 }
             }
@@ -385,55 +357,64 @@ fun MaterialEstimatorDialog(
 }
 
 // ═════════════════════════════════════════════════════════════════════════════
-// KOMPONEN REUSABLE MODERN
+// UNDERLINE TAB & SHARED PRIMITIVES
 // ═════════════════════════════════════════════════════════════════════════════
 
 @Composable
-private fun EstimatorSegmentTab(
-    title: String,
-    icon: ImageVector,
-    isSelected: Boolean,
-    onClick: () -> Unit,
-    modifier: Modifier = Modifier
+private fun EstimatorUnderlineTabs(
+    tabs: List<String>,
+    selectedIndex: Int,
+    onSelect: (Int) -> Unit
 ) {
-    Surface(
-        onClick = onClick,
-        modifier = modifier.height(38.dp),
-        shape = RoundedCornerShape(9.dp),
-        color = if (isSelected) Color.White else Color.Transparent,
-        border = if (isSelected) BorderStroke(1.dp, Slate200.copy(alpha = 0.8f)) else null,
-        shadowElevation = if (isSelected) 0.5.dp else 0.dp
+    val density = LocalDensity.current
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 20.dp)
+            .padding(top = 12.dp)
     ) {
         Row(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(horizontal = 6.dp),
-            horizontalArrangement = Arrangement.Center,
-            verticalAlignment = Alignment.CenterVertically
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(24.dp),
+            verticalAlignment = Alignment.Bottom
         ) {
-            Icon(
-                imageVector = icon,
-                contentDescription = null,
-                tint = if (isSelected) BrandEmerald else Slate500,
-                modifier = Modifier.size(15.dp)
-            )
-            Spacer(Modifier.width(5.dp))
-            Text(
-                text = title,
-                fontSize = 12.sp,
-                fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
-                color = if (isSelected) Slate900 else Slate500,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis
-            )
+            tabs.forEachIndexed { index, title ->
+                val isSelected = selectedIndex == index
+                var textWidthPx by remember { mutableIntStateOf(0) }
+                Column(
+                    modifier = Modifier
+                        .clickable { onSelect(index) },
+                    horizontalAlignment = Alignment.CenterHorizontally
+                ) {
+                    Text(
+                        text = title,
+                        fontSize = 12.sp,
+                        fontWeight = if (isSelected) FontWeight.SemiBold else FontWeight.Medium,
+                        color = if (isSelected) BrandPrimary else Slate500,
+                        maxLines = 1,
+                        modifier = Modifier
+                            .padding(bottom = 10.dp)
+                            .onGloballyPositioned { coords ->
+                                textWidthPx = coords.size.width
+                            }
+                    )
+                    Box(
+                        modifier = Modifier
+                            .width(with(density) { textWidthPx.toDp() })
+                            .height(2.dp)
+                            .background(if (isSelected) BrandPrimary else Color.Transparent)
+                    )
+                }
+            }
         }
+        HorizontalDivider(color = Slate200, thickness = 1.dp)
     }
 }
 
 @Composable
 private fun EstimatorSectionHeader(
     title: String,
-    trailingBadge: String? = null
+    trailingText: String? = null
 ) {
     Row(
         modifier = Modifier.fillMaxWidth(),
@@ -443,209 +424,97 @@ private fun EstimatorSectionHeader(
         Text(
             text = title,
             fontSize = 12.sp,
-            fontWeight = FontWeight.Bold,
-            color = Slate500,
-            letterSpacing = 0.8.sp
+            fontWeight = FontWeight.SemiBold,
+            color = Slate700,
+            letterSpacing = 0.4.sp
         )
-        if (!trailingBadge.isNullOrBlank()) {
-            Surface(
-                shape = RoundedCornerShape(100.dp),
-                color = BrandMintBg,
-                border = BorderStroke(1.dp, BrandMintBorder)
-            ) {
-                Text(
-                    text = trailingBadge,
-                    fontSize = 11.sp,
-                    fontWeight = FontWeight.SemiBold,
-                    color = BrandForest,
-                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp)
-                )
-            }
+        if (!trailingText.isNullOrBlank()) {
+            Text(
+                text = trailingText,
+                fontSize = 12.sp,
+                fontWeight = FontWeight.Medium,
+                color = Slate500
+            )
         }
     }
 }
 
 @Composable
-private fun EstimatorNumberField(
-    label: String,
+private fun EstimatorCompactField(
     value: String,
+    placeholder: String,
     unit: String,
     onValueChange: (String) -> Unit,
     modifier: Modifier = Modifier
 ) {
     var isFocused by remember { mutableStateOf(false) }
 
-    Column(
-        modifier = modifier,
-        verticalArrangement = Arrangement.spacedBy(6.dp)
-    ) {
-        Text(
-            text = label,
-            fontSize = 12.sp,
-            fontWeight = FontWeight.Medium,
-            color = Slate600
-        )
-        Surface(
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(46.dp),
-            shape = RoundedCornerShape(12.dp),
-            color = Color.Transparent,
-            border = BorderStroke(
-                width = if (isFocused) 1.5.dp else 1.dp,
-                color = if (isFocused) BrandEmerald else Slate200
-            )
-        ) {
-            Row(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(start = 14.dp, end = 10.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Box(
-                    modifier = Modifier.weight(1f),
-                    contentAlignment = Alignment.CenterStart
-                ) {
-                    if (value.isEmpty()) {
-                        Text(
-                            text = "0",
-                            fontSize = 15.sp,
-                            fontWeight = FontWeight.SemiBold,
-                            color = Color(0xFF94A3B8)
-                        )
-                    }
-                    BasicTextField(
-                        value = value,
-                        onValueChange = onValueChange,
-                        singleLine = true,
-                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
-                        cursorBrush = SolidColor(BrandEmerald),
-                        textStyle = TextStyle(
-                            fontSize = 15.sp,
-                            fontWeight = FontWeight.SemiBold,
-                            color = Slate900
-                        ),
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .onFocusChanged { isFocused = it.isFocused }
-                    )
-                }
-                Spacer(Modifier.width(8.dp))
-                Surface(
-                    shape = RoundedCornerShape(6.dp),
-                    color = Slate100
-                ) {
-                    Text(
-                        text = unit,
-                        fontSize = 11.5.sp,
-                        fontWeight = FontWeight.SemiBold,
-                        color = Slate600,
-                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp)
-                    )
-                }
-            }
-        }
-    }
-}
-
-@Composable
-private fun EstimatorOptionCard(
-    title: String,
-    subtitle: String? = null,
-    isSelected: Boolean,
-    onClick: () -> Unit,
-    modifier: Modifier = Modifier,
-    centered: Boolean = false
-) {
     Surface(
-        onClick = onClick,
-        modifier = modifier.height(if (subtitle != null) 50.dp else 44.dp),
+        modifier = modifier.height(44.dp),
         shape = RoundedCornerShape(12.dp),
-        color = Color.Transparent,
+        color = Color.White,
         border = BorderStroke(
-            width = if (isSelected) 1.5.dp else 1.dp,
-            color = if (isSelected) BrandEmerald else Slate200
-        ),
-        shadowElevation = 0.dp
+            width = if (isFocused) 1.5.dp else 1.dp,
+            color = if (isFocused) BrandPrimary else Slate200
+        )
     ) {
-        if (centered) {
-            Column(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(horizontal = 8.dp),
-                horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.Center
+        Row(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(horizontal = 14.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Box(
+                modifier = Modifier.weight(1f),
+                contentAlignment = Alignment.CenterStart
             ) {
-                Text(
-                    text = title,
-                    fontSize = 13.sp,
-                    fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
-                    color = if (isSelected) BrandEmerald else Slate700,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
+                if (value.isEmpty()) {
+                    Text(
+                        text = placeholder,
+                        fontSize = 14.sp,
+                        fontWeight = FontWeight.Medium,
+                        color = Slate400
+                    )
+                }
+                BasicTextField(
+                    value = value,
+                    onValueChange = onValueChange,
+                    singleLine = true,
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                    cursorBrush = SolidColor(BrandPrimary),
+                    textStyle = TextStyle(
+                        fontSize = 14.sp,
+                        fontWeight = FontWeight.SemiBold,
+                        color = Slate900
+                    ),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .onFocusChanged { isFocused = it.isFocused }
                 )
-                if (subtitle != null) {
-                    Text(
-                        text = subtitle,
-                        fontSize = 10.5.sp,
-                        fontWeight = FontWeight.Normal,
-                        color = if (isSelected) BrandEmerald.copy(alpha = 0.85f) else Slate500,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis
-                    )
-                }
             }
-        } else {
-            Row(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(horizontal = 14.dp),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Column(modifier = Modifier.weight(1f)) {
-                    Text(
-                        text = title,
-                        fontSize = 13.5.sp,
-                        fontWeight = if (isSelected) FontWeight.SemiBold else FontWeight.Medium,
-                        color = if (isSelected) BrandEmerald else Slate700,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis
-                    )
-                    if (subtitle != null) {
-                        Text(
-                            text = subtitle,
-                            fontSize = 11.sp,
-                            color = Slate500,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis
-                        )
-                    }
-                }
-                if (isSelected) {
-                    Icon(
-                        imageVector = Icons.Outlined.Check,
-                        contentDescription = null,
-                        tint = BrandEmerald,
-                        modifier = Modifier.size(16.dp)
-                    )
-                }
-            }
+            Spacer(Modifier.width(8.dp))
+            Text(
+                text = unit,
+                fontSize = 12.sp,
+                fontWeight = FontWeight.Medium,
+                color = Slate400
+            )
         }
     }
 }
 
 @Composable
 private fun EstimatorResultCard(
-    heroSubtitle: String,
+    eyebrow: String,
+    summarySubtitle: String,
     heroValue: String,
-    breakdownItems: List<Pair<String, String>>
+    metrics: List<Pair<String, String>>
 ) {
     Surface(
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(16.dp),
-        color = Slate50,
-        border = BorderStroke(1.dp, Slate200)
+        color = Slate50.copy(alpha = 0.6f),
+        border = BorderStroke(1.dp, Slate200.copy(alpha = 0.8f))
     ) {
         Column(
             modifier = Modifier
@@ -653,7 +522,7 @@ private fun EstimatorResultCard(
                 .padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
-            // Top Hero Row
+            // Top Summary Row
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
@@ -666,46 +535,39 @@ private fun EstimatorResultCard(
                     verticalArrangement = Arrangement.spacedBy(2.dp)
                 ) {
                     Text(
-                        text = "ESTIMASI KEBUTUHAN",
-                        fontSize = 11.sp,
+                        text = eyebrow,
+                        fontSize = 10.sp,
                         fontWeight = FontWeight.Bold,
-                        color = Slate500,
+                        color = Slate400,
                         letterSpacing = 0.8.sp
                     )
                     Text(
-                        text = heroSubtitle,
-                        fontSize = 12.5.sp,
-                        fontWeight = FontWeight.Medium,
+                        text = summarySubtitle,
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.SemiBold,
                         color = Slate700,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis
                     )
                 }
 
-                Surface(
-                    shape = RoundedCornerShape(10.dp),
-                    color = BrandMintBg,
-                    border = BorderStroke(1.dp, BrandMintBorder)
-                ) {
-                    Text(
-                        text = heroValue,
-                        fontSize = 17.sp,
-                        fontWeight = FontWeight.ExtraBold,
-                        color = BrandForest,
-                        letterSpacing = (-0.3).sp,
-                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp)
-                    )
-                }
+                Text(
+                    text = heroValue,
+                    fontSize = 24.sp,
+                    fontWeight = FontWeight.ExtraBold,
+                    color = Slate900,
+                    letterSpacing = (-0.5).sp
+                )
             }
 
-            HorizontalDivider(color = Slate200.copy(alpha = 0.8f), thickness = 1.dp)
+            HorizontalDivider(color = Slate200, thickness = 1.dp)
 
-            // Bottom Breakdown Strip
+            // 3-Column Metrics Grid
             Row(
                 modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                breakdownItems.forEach { (label, valText) ->
+                metrics.forEach { (label, valText) ->
                     Column(
                         modifier = Modifier.weight(1f),
                         verticalArrangement = Arrangement.spacedBy(2.dp)
@@ -719,9 +581,9 @@ private fun EstimatorResultCard(
                         )
                         Text(
                             text = valText,
-                            fontSize = 13.5.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = Slate900,
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.SemiBold,
+                            color = Slate800,
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis
                         )
@@ -733,10 +595,10 @@ private fun EstimatorResultCard(
 }
 
 // ═════════════════════════════════════════════════════════════════════════════
-// TAB 1: KERAMIK & GRANIT
+// TAB 1: KERAMIK
 // ═════════════════════════════════════════════════════════════════════════════
 @Composable
-private fun TileEstimatorBody(
+private fun TileEstimatorTab(
     lengthInput: String,
     widthInput: String,
     onLengthChange: (String) -> Unit,
@@ -749,34 +611,34 @@ private fun TileEstimatorBody(
 ) {
     val length = lengthInput.parseDecimalInput()
     val width = widthInput.parseDecimalInput()
-    val areaNet = length * width
-    val areaGross = areaNet * (1.0 + wastePercent / 100.0)
+    val cleanArea = length * width
+    val totalWithWaste = cleanArea * (1.0 + wastePercent / 100.0)
     val selectedPreset = presets[selectedPresetIndex]
-    val boxesNeeded = if (selectedPreset.coveragePerBox > 0 && areaGross > 0) {
-        ceil(areaGross / selectedPreset.coveragePerBox).toInt()
+    val dusNeeded = if (selectedPreset.coveragePerBox > 0 && totalWithWaste > 0) {
+        ceil(totalWithWaste / selectedPreset.coveragePerBox).toInt()
     } else 0
 
-    Column(verticalArrangement = Arrangement.spacedBy(18.dp)) {
-        // Section 1: Dimensi Ruangan
-        Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+    Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
+        // Ukuran Ruangan
+        Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
             EstimatorSectionHeader(
                 title = "UKURAN RUANGAN",
-                trailingBadge = "Luas: ${formatNum(areaNet)} m²"
+                trailingText = "Luas: ${formatNum(cleanArea)} m²"
             )
             Row(
                 modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(10.dp)
+                horizontalArrangement = Arrangement.spacedBy(12.dp)
             ) {
-                EstimatorNumberField(
-                    label = "Panjang",
+                EstimatorCompactField(
                     value = lengthInput,
+                    placeholder = "Panjang",
                     unit = "m",
                     onValueChange = onLengthChange,
                     modifier = Modifier.weight(1f)
                 )
-                EstimatorNumberField(
-                    label = "Lebar",
+                EstimatorCompactField(
                     value = widthInput,
+                    placeholder = "Lebar",
                     unit = "m",
                     onValueChange = onWidthChange,
                     modifier = Modifier.weight(1f)
@@ -784,24 +646,45 @@ private fun TileEstimatorBody(
             }
         }
 
-        // Section 2: Ukuran Ubin (3x2 Symmetric Grid)
-        Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+        // Pilihan Ukuran Keramik (4-kolom)
+        Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
             EstimatorSectionHeader(title = "UKURAN KERAMIK / GRANIT")
-            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                presets.chunked(3).forEachIndexed { rowIndex, rowPresets ->
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                presets.forEachIndexed { index, preset ->
+                    val isSelected = selectedPresetIndex == index
+                    Surface(
+                        onClick = { onSelectPreset(index) },
+                        modifier = Modifier.weight(1f),
+                        shape = RoundedCornerShape(12.dp),
+                        color = Color.White,
+                        border = BorderStroke(
+                            width = if (isSelected) 2.dp else 1.dp,
+                            color = if (isSelected) BrandPrimary else Slate200
+                        ),
+                        shadowElevation = if (isSelected) 0.5.dp else 0.dp
                     ) {
-                        rowPresets.forEachIndexed { colIndex, preset ->
-                            val index = rowIndex * 3 + colIndex
-                            EstimatorOptionCard(
-                                title = preset.label,
-                                subtitle = preset.coverageLabel,
-                                isSelected = selectedPresetIndex == index,
-                                onClick = { onSelectPreset(index) },
-                                centered = true,
-                                modifier = Modifier.weight(1f)
+                        Column(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = 4.dp, vertical = 8.dp),
+                            horizontalAlignment = Alignment.CenterHorizontally
+                        ) {
+                            Text(
+                                text = preset.shortLabel,
+                                fontSize = 12.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = if (isSelected) BrandPrimary else Slate800,
+                                maxLines = 1
+                            )
+                            Spacer(Modifier.height(2.dp))
+                            Text(
+                                text = preset.coverageLabel,
+                                fontSize = 10.sp,
+                                color = Slate400,
+                                maxLines = 1
                             )
                         }
                     }
@@ -809,47 +692,69 @@ private fun TileEstimatorBody(
             }
         }
 
-        // Section 3: Cadangan Potongan (Waste)
-        Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+        // Pilihan Cadangan / Waste (3-kolom)
+        Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
             EstimatorSectionHeader(title = "CADANGAN POTONGAN (WASTE)")
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
                 listOf(
-                    0 to "0% Pas",
-                    5 to "5% Standar",
-                    10 to "10% Sudut"
+                    0 to "0% (Pas)",
+                    5 to "5% (Standar)",
+                    10 to "10% (Sudut)"
                 ).forEach { (pct, label) ->
-                    EstimatorOptionCard(
-                        title = label,
-                        isSelected = wastePercent == pct,
+                    val isSelected = wastePercent == pct
+                    Surface(
                         onClick = { onSelectWaste(pct) },
-                        centered = true,
-                        modifier = Modifier.weight(1f)
-                    )
+                        modifier = Modifier.weight(1f),
+                        shape = RoundedCornerShape(12.dp),
+                        color = Color.White,
+                        border = BorderStroke(
+                            width = if (isSelected) 2.dp else 1.dp,
+                            color = if (isSelected) BrandPrimary else Slate200
+                        ),
+                        shadowElevation = if (isSelected) 0.5.dp else 0.dp
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = 6.dp, vertical = 10.dp),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Text(
+                                text = label,
+                                fontSize = 12.sp,
+                                fontWeight = if (isSelected) FontWeight.Bold else FontWeight.SemiBold,
+                                color = if (isSelected) BrandPrimary else Slate700,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis
+                            )
+                        }
+                    }
                 }
             }
         }
 
-        // Hasil Estimasi
+        // Card Hasil Estimasi
         EstimatorResultCard(
-            heroSubtitle = "${selectedPreset.label} • Waste $wastePercent%",
-            heroValue = "$boxesNeeded Dus",
-            breakdownItems = listOf(
-                "Luas Bersih" to "${String.format(Locale.US, "%.2f", areaNet)} m²",
-                "Total + Waste" to "${String.format(Locale.US, "%.2f", areaGross)} m²",
-                "Cakupan/Dus" to selectedPreset.coverageLabel.replace("/dus", "")
+            eyebrow = "HASIL ESTIMASI",
+            summarySubtitle = "${selectedPreset.fullLabel} • Waste $wastePercent%",
+            heroValue = "$dusNeeded Dus",
+            metrics = listOf(
+                "Luas Bersih" to "${String.format(Locale.US, "%.2f", cleanArea)} m²",
+                "Total + Waste" to "${String.format(Locale.US, "%.2f", totalWithWaste)} m²",
+                "Isi / Dus" to "${String.format(Locale.US, "%.2f", selectedPreset.coveragePerBox)} m²"
             )
         )
     }
 }
 
 // ═════════════════════════════════════════════════════════════════════════════
-// TAB 2: SEMEN & BATA
+// TAB 2: SEMEN & PASIR
 // ═════════════════════════════════════════════════════════════════════════════
 @Composable
-private fun PlasterEstimatorBody(
+private fun PlasterEstimatorTab(
     lengthInput: String,
     heightInput: String,
     onLengthChange: (String) -> Unit,
@@ -861,33 +766,33 @@ private fun PlasterEstimatorBody(
     val height = heightInput.parseDecimalInput()
     val wallArea = length * height
 
-    val cementSacks = if (wallArea > 0) {
+    val sakNeeded = if (wallArea > 0) {
         if (workType == 0) ceil(wallArea * 0.20).toInt() else ceil(wallArea * 0.23).toInt()
     } else 0
     val sandM3 = if (workType == 0) wallArea * 0.024 else wallArea * 0.043
-    val bricksCount = if (workType == 1 && wallArea > 0) ceil(wallArea * 70).toInt() else 0
+    val bricksNeeded = if (workType == 1 && wallArea > 0) ceil(wallArea * 70).toInt() else 0
 
-    Column(verticalArrangement = Arrangement.spacedBy(18.dp)) {
-        // Section 1: Dimensi Dinding
-        Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+    Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
+        // Dimensi Dinding
+        Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
             EstimatorSectionHeader(
                 title = "DIMENSI DINDING",
-                trailingBadge = "Luas: ${formatNum(wallArea)} m²"
+                trailingText = "Luas: ${formatNum(wallArea)} m²"
             )
             Row(
                 modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(10.dp)
+                horizontalArrangement = Arrangement.spacedBy(12.dp)
             ) {
-                EstimatorNumberField(
-                    label = "Panjang",
+                EstimatorCompactField(
                     value = lengthInput,
+                    placeholder = "Panjang",
                     unit = "m",
                     onValueChange = onLengthChange,
                     modifier = Modifier.weight(1f)
                 )
-                EstimatorNumberField(
-                    label = "Tinggi",
+                EstimatorCompactField(
                     value = heightInput,
+                    placeholder = "Tinggi",
                     unit = "m",
                     onValueChange = onHeightChange,
                     modifier = Modifier.weight(1f)
@@ -895,45 +800,62 @@ private fun PlasterEstimatorBody(
             }
         }
 
-        // Section 2: Jenis Pengerjaan
-        Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+        // Jenis Pengerjaan
+        Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
             EstimatorSectionHeader(title = "JENIS PENGERJAAN")
             Row(
                 modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(10.dp)
+                horizontalArrangement = Arrangement.spacedBy(12.dp)
             ) {
-                EstimatorOptionCard(
-                    title = "Plesteran",
-                    subtitle = "Tebal ±15 mm",
-                    isSelected = workType == 0,
-                    onClick = { onSelectWorkType(0) },
-                    modifier = Modifier.weight(1f)
-                )
-                EstimatorOptionCard(
-                    title = "Pasang Bata",
-                    subtitle = "Bata merah 1:5",
-                    isSelected = workType == 1,
-                    onClick = { onSelectWorkType(1) },
-                    modifier = Modifier.weight(1f)
-                )
+                listOf(
+                    Triple(0, "Plesteran", "Tebal ±15 mm"),
+                    Triple(1, "Pasang Bata", "Bata merah 1:5")
+                ).forEach { (idx, title, subtitle) ->
+                    val isSelected = workType == idx
+                    Surface(
+                        onClick = { onSelectWorkType(idx) },
+                        modifier = Modifier.weight(1f),
+                        shape = RoundedCornerShape(16.dp),
+                        color = Color.White,
+                        border = BorderStroke(
+                            width = if (isSelected) 2.dp else 1.dp,
+                            color = if (isSelected) BrandPrimary else Slate200
+                        ),
+                        shadowElevation = if (isSelected) 0.5.dp else 0.dp
+                    ) {
+                        Column(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(12.dp)
+                        ) {
+                            Text(
+                                text = title,
+                                fontSize = 12.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = if (isSelected) BrandPrimary else Slate800
+                            )
+                            Spacer(Modifier.height(2.dp))
+                            Text(
+                                text = subtitle,
+                                fontSize = 11.sp,
+                                color = Slate500
+                            )
+                        }
+                    }
+                }
             }
         }
 
-        // Hasil Estimasi
-        val breakdown = buildList<Pair<String, String>> {
-            add("Pasir Pasang" to "${String.format(Locale.US, "%.2f", sandM3)} m³")
-            if (workType == 1) {
-                add("Bata Merah" to "$bricksCount Pcs")
-            } else {
-                add("Acian / Plamir" to "Opsional")
-            }
-            add("Luas Bidang" to "${String.format(Locale.US, "%.1f", wallArea)} m²")
-        }
-
+        // Card Hasil Estimasi
         EstimatorResultCard(
-            heroSubtitle = if (workType == 0) "Semen 50kg (Plesteran 1 sisi)" else "Semen 50kg (Pasangan Bata)",
-            heroValue = "$cementSacks Sak",
-            breakdownItems = breakdown
+            eyebrow = "ESTIMASI KEBUTUHAN",
+            summarySubtitle = if (workType == 0) "Semen 50kg (Plesteran 1 sisi)" else "Semen 50kg (Pasang Bata 1:5)",
+            heroValue = "$sakNeeded Sak",
+            metrics = listOf(
+                "Pasir Pasang" to "${String.format(Locale.US, "%.2f", sandM3)} m³",
+                (if (workType == 0) "Acian / Plamir" else "Kebutuhan Bata") to (if (workType == 0) "Opsional" else "$bricksNeeded Bata"),
+                "Luas Bidang" to "${String.format(Locale.US, "%.1f", wallArea)} m²"
+            )
         )
     }
 }
@@ -942,53 +864,62 @@ private fun PlasterEstimatorBody(
 // TAB 3: CAT DINDING
 // ═════════════════════════════════════════════════════════════════════════════
 @Composable
-private fun PaintEstimatorBody(
+private fun PaintEstimatorTab(
     areaInput: String,
     onAreaChange: (String) -> Unit,
     coatsCount: Int,
     onSelectCoats: (Int) -> Unit
 ) {
     val area = areaInput.parseDecimalInput()
-    val totalCoverageArea = area * coatsCount
-    val litersNeeded = if (totalCoverageArea > 0) totalCoverageArea / 10.0 else 0.0
-    val gallonsNeeded = if (litersNeeded > 0) ceil(litersNeeded / 2.5).toInt() else 0
-    val pailsNeeded = if (litersNeeded > 0) ceil(litersNeeded / 20.0).toInt() else 0
+    val totalSapuan = area * coatsCount
+    val totalLiter = if (totalSapuan > 0) totalSapuan / 10.0 else 0.0
+    val galonNeeded = if (totalLiter > 0) ceil(totalLiter / 2.5).toInt() else 0
+    val pailNeeded = if (totalLiter > 0) ceil(totalLiter / 20.0).toInt() else 0
 
-    Column(verticalArrangement = Arrangement.spacedBy(18.dp)) {
-        // Section 1: Luas Permukaan + Quick Area Presets
-        Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-            EstimatorSectionHeader(
-                title = "LUAS PERMUKAAN CAT",
-                trailingBadge = "Daya sebar ~10 m²/L"
-            )
-            EstimatorNumberField(
-                label = "Total Luas Dinding",
-                value = areaInput,
-                unit = "m²",
-                onValueChange = onAreaChange,
-                modifier = Modifier.fillMaxWidth()
-            )
+    Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
+        // Luas Permukaan Cat & Quick Presets
+        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                EstimatorSectionHeader(
+                    title = "LUAS PERMUKAAN CAT",
+                    trailingText = "Daya sebar ~10 m²/L"
+                )
+                EstimatorCompactField(
+                    value = areaInput,
+                    placeholder = "Luas dinding",
+                    unit = "m²",
+                    onValueChange = onAreaChange,
+                    modifier = Modifier.fillMaxWidth()
+                )
+            }
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                listOf("20", "50", "100", "150").forEach { presetArea ->
-                    val isSelected = areaInput.trim() == presetArea
+                listOf("20", "50", "100", "150").forEach { preset ->
+                    val isSelected = areaInput.trim() == preset
                     Surface(
-                        onClick = { onAreaChange(presetArea) },
-                        modifier = Modifier
-                            .weight(1f)
-                            .height(34.dp),
-                        shape = RoundedCornerShape(8.dp),
-                        color = if (isSelected) BrandMintBg else Color.Transparent,
-                        border = BorderStroke(1.dp, if (isSelected) BrandEmerald else Slate200)
+                        onClick = { onAreaChange(preset) },
+                        modifier = Modifier.weight(1f),
+                        shape = RoundedCornerShape(12.dp),
+                        color = Color.White,
+                        border = BorderStroke(
+                            width = if (isSelected) 2.dp else 1.dp,
+                            color = if (isSelected) BrandPrimary else Slate200
+                        ),
+                        shadowElevation = if (isSelected) 0.5.dp else 0.dp
                     ) {
-                        Box(contentAlignment = Alignment.Center) {
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = 4.dp, vertical = 6.dp),
+                            contentAlignment = Alignment.Center
+                        ) {
                             Text(
-                                text = "$presetArea m²",
-                                fontSize = 11.5.sp,
-                                fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
-                                color = if (isSelected) BrandEmerald else Slate600
+                                text = "$preset m²",
+                                fontSize = 12.sp,
+                                fontWeight = if (isSelected) FontWeight.Bold else FontWeight.SemiBold,
+                                color = if (isSelected) BrandPrimary else Slate700
                             )
                         }
                     }
@@ -996,9 +927,9 @@ private fun PaintEstimatorBody(
             }
         }
 
-        // Section 2: Jumlah Lapisan
-        Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-            EstimatorSectionHeader(title = "JUMLAH LAPISAN CAT")
+        // Jumlah Lapisan
+        Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+            EstimatorSectionHeader(title = "JUMLAH LAPISAN")
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.spacedBy(8.dp)
@@ -1007,27 +938,54 @@ private fun PaintEstimatorBody(
                     Triple(1, "1 Lapis", "Refresh"),
                     Triple(2, "2 Lapis", "Standar"),
                     Triple(3, "3 Lapis", "Warna Gelap")
-                ).forEach { (coats, title, sub) ->
-                    EstimatorOptionCard(
-                        title = title,
-                        subtitle = sub,
-                        isSelected = coatsCount == coats,
-                        onClick = { onSelectCoats(coats) },
-                        centered = true,
-                        modifier = Modifier.weight(1f)
-                    )
+                ).forEach { (layers, title, subtitle) ->
+                    val isSelected = coatsCount == layers
+                    Surface(
+                        onClick = { onSelectCoats(layers) },
+                        modifier = Modifier.weight(1f),
+                        shape = RoundedCornerShape(12.dp),
+                        color = Color.White,
+                        border = BorderStroke(
+                            width = if (isSelected) 2.dp else 1.dp,
+                            color = if (isSelected) BrandPrimary else Slate200
+                        ),
+                        shadowElevation = if (isSelected) 0.5.dp else 0.dp
+                    ) {
+                        Column(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = 4.dp, vertical = 8.dp),
+                            horizontalAlignment = Alignment.CenterHorizontally
+                        ) {
+                            Text(
+                                text = title,
+                                fontSize = 12.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = if (isSelected) BrandPrimary else Slate800,
+                                maxLines = 1
+                            )
+                            Spacer(Modifier.height(2.dp))
+                            Text(
+                                text = subtitle,
+                                fontSize = 10.sp,
+                                color = if (isSelected) Slate500 else Slate400,
+                                maxLines = 1
+                            )
+                        }
+                    }
                 }
             }
         }
 
-        // Hasil Estimasi
+        // Card Hasil Estimasi
         EstimatorResultCard(
-            heroSubtitle = "Kemasan Galon 2.5 Liter ($coatsCount Lapis)",
-            heroValue = "$gallonsNeeded Galon",
-            breakdownItems = listOf(
-                "Total Cairan" to "${String.format(Locale.US, "%.1f", litersNeeded)} Liter",
-                "Atau Pail 20L" to "$pailsNeeded Pail",
-                "Total Sapuan" to "${String.format(Locale.US, "%.0f", totalCoverageArea)} m²"
+            eyebrow = "HASIL ESTIMASI",
+            summarySubtitle = "Kemasan Galon 2.5 Liter ($coatsCount Lapis)",
+            heroValue = "$galonNeeded Galon",
+            metrics = listOf(
+                "Total Cairan" to "${String.format(Locale.US, "%.1f", totalLiter)} Liter",
+                "Atau Pail 20L" to "$pailNeeded Pail",
+                "Total Sapuan" to "${formatNum(totalSapuan)} m²"
             )
         )
     }
@@ -1055,7 +1013,8 @@ private fun formatNum(value: Double): String {
 }
 
 private data class TilePreset(
-    val label: String,
+    val shortLabel: String,
+    val fullLabel: String,
     val coverageLabel: String,
     val coveragePerBox: Double,
     val searchQuery: String
