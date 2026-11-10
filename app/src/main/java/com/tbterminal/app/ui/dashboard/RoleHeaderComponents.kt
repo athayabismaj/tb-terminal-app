@@ -1,6 +1,5 @@
 package com.tbterminal.app.ui.dashboard
 
-import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.CubicBezierEasing
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.MutableTransitionState
@@ -335,7 +334,7 @@ fun BrandedRoleTopBar(
                             },
                             properties = PopupProperties(focusable = true),
                         ) {
-                            AnimatedVisibility(
+                            androidx.compose.animation.AnimatedVisibility(
                                 visibleState = menuTransitionState,
                                 enter = fadeIn(
                                     animationSpec = tween(
