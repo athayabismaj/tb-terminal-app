@@ -191,7 +191,7 @@ fun BackofficeHubScreen(
         TbAdaptiveBox(
             modifier = contentModifier
                 .fillMaxSize()
-                .background(Color(0xFFF8FAFC)),
+                .background(Color.White),
         ) { layout ->
             Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.TopCenter) {
                 val containerModifier = if (layout.isCompact) {
@@ -256,9 +256,10 @@ private val HubSlate800 = Color(0xFF1E293B)
 private val HubSlate500 = Color(0xFF64748B)
 private val HubSlate400 = Color(0xFF94A3B8)
 private val HubSlate200 = Color(0xFFE2E8F0)
-private val HubSlate100 = Color(0xFFF1F5F9)
+private val HubSoftSurface = Color(0xFFF6F9F7)
+private val HubSoftBorder = Color(0xFFE6ECE8)
 
-private val HubBrand50 = Color(0xFFEEF7F2)
+private val HubBrand50 = Color(0xFFEAF3ED)
 private val HubBrand100 = Color(0xFFD1FAE5)
 private val HubBrand500 = Color(0xFF16A34A)
 private val HubBrand600 = Color(0xFF1B5E3C)
@@ -439,12 +440,13 @@ private fun FinanceHub(
             )
         }
 
-        content.groups.forEach { group ->
+        content.groups.forEachIndexed { index, group ->
             HubActionGroupCard(
                 title = stringResource(group.titleRes).uppercase(Locale.ROOT),
                 actions = group.actions,
                 role = role,
                 compact = compact,
+                showBottomDivider = index < content.groups.lastIndex,
                 badgeProvider = { action ->
                     when (action) {
                         BackofficeHubAction.DAILY_CASH -> HubActionBadge(
@@ -508,9 +510,9 @@ private fun HeroFinancialCard(
     Surface(
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(16.dp),
-        color = Color.White,
-        border = BorderStroke(1.dp, HubSlate100),
-        shadowElevation = 1.dp
+        color = HubSoftSurface,
+        border = BorderStroke(1.dp, HubSoftBorder),
+        shadowElevation = 0.dp
     ) {
         Column(
             modifier = Modifier.padding(16.dp),
@@ -599,7 +601,7 @@ private fun HeroFinancialCard(
                 }
             }
 
-            HorizontalDivider(color = HubSlate100, thickness = 1.dp)
+            HorizontalDivider(color = HubSoftBorder, thickness = 1.dp)
 
             Row(
                 modifier = Modifier.fillMaxWidth(),
@@ -632,7 +634,7 @@ private fun HeroFinancialCard(
                     modifier = Modifier
                         .width(1.dp)
                         .height(30.dp)
-                        .background(HubSlate100)
+                        .background(HubSoftBorder)
                 )
 
                 Column(
@@ -663,7 +665,7 @@ private fun HeroFinancialCard(
                     modifier = Modifier
                         .width(1.dp)
                         .height(30.dp)
-                        .background(HubSlate100)
+                        .background(HubSoftBorder)
                 )
 
                 Column(
@@ -831,12 +833,13 @@ private fun StockHub(
             }
         }
 
-        content.groups.forEach { group ->
+        content.groups.forEachIndexed { index, group ->
             HubActionGroupCard(
                 title = stringResource(group.titleRes).uppercase(Locale.ROOT),
                 actions = group.actions,
                 role = role,
                 compact = compact,
+                showBottomDivider = index < content.groups.lastIndex,
                 badgeProvider = { action ->
                     when (action) {
                         BackofficeHubAction.PRODUCTS_STOCK ->
@@ -901,9 +904,9 @@ private fun StockQuickActionStrip(
                     .height(46.dp)
                     .testTag("stock-quick-secondary"),
                 shape = RoundedCornerShape(12.dp),
-                border = BorderStroke(1.dp, HubBrand600.copy(alpha = 0.45f)),
+                border = BorderStroke(1.dp, HubSoftBorder),
                 colors = ButtonDefaults.outlinedButtonColors(
-                    containerColor = Color.White,
+                    containerColor = HubSoftSurface,
                     contentColor = HubBrand600,
                 ),
                 contentPadding = PaddingValues(horizontal = 12.dp),
@@ -943,8 +946,8 @@ private fun StockValuationDashboardCard(
     Surface(
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(16.dp),
-        color = Color.White,
-        border = BorderStroke(1.dp, HubSlate200.copy(alpha = 0.8f)),
+        color = HubSoftSurface,
+        border = BorderStroke(1.dp, HubSoftBorder),
     ) {
         Column(
             modifier = Modifier.padding(16.dp),
@@ -1084,7 +1087,7 @@ private fun StockValuationDashboardCard(
                 }
             }
 
-            HorizontalDivider(color = HubSlate100, thickness = 1.dp)
+            HorizontalDivider(color = HubSoftBorder, thickness = 1.dp)
 
             Row(
                 modifier = Modifier.fillMaxWidth(),
@@ -1114,7 +1117,7 @@ private fun StockValuationDashboardCard(
                     modifier = Modifier
                         .width(1.dp)
                         .height(30.dp)
-                        .background(HubSlate100)
+                        .background(HubSoftBorder)
                 )
 
                 Column(
@@ -1143,7 +1146,7 @@ private fun StockValuationDashboardCard(
                     modifier = Modifier
                         .width(1.dp)
                         .height(30.dp)
-                        .background(HubSlate100)
+                        .background(HubSoftBorder)
                 )
 
                 Column(
@@ -1270,67 +1273,54 @@ private fun TransactionsHub(
     ) {
         Column(
             modifier = if (compact) {
-                Modifier.padding(start = 16.dp, end = 16.dp, top = 12.dp)
+                Modifier.padding(start = 16.dp, end = 16.dp, top = 8.dp)
             } else {
                 Modifier
             },
             verticalArrangement = Arrangement.spacedBy(14.dp),
         ) {
-            // Segmented Control
-            Surface(
-            modifier = Modifier.fillMaxWidth(),
-            shape = RoundedCornerShape(16.dp),
-            color = Color.White,
-            border = BorderStroke(1.dp, HubSlate200),
-            shadowElevation = 0.dp
-        ) {
-            Row(
-                modifier = Modifier.fillMaxWidth().padding(6.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                BackofficeTransactionTab.entries.forEach { tab ->
-                    val isSelected = selectedTab == tab
-                    Box(
-                        modifier = Modifier
-                            .weight(1f)
-                            .clip(RoundedCornerShape(12.dp))
-                            .testTag("transactions-tab-${tab.name}")
-                            .clickable { selectedTab = tab },
-                        contentAlignment = Alignment.Center
-                    ) {
+            // Clean Underline Tabs
+            Column(modifier = Modifier.fillMaxWidth()) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    BackofficeTransactionTab.entries.forEach { tab ->
+                        val isSelected = selectedTab == tab
                         Column(
+                            modifier = Modifier
+                                .weight(1f)
+                                .testTag("transactions-tab-${tab.name}")
+                                .clickable { selectedTab = tab },
                             horizontalAlignment = Alignment.CenterHorizontally,
-                            modifier = Modifier.padding(vertical = 10.dp)
                         ) {
                             Text(
                                 text = stringResource(tab.labelRes),
                                 color = if (isSelected) HubBrand600 else HubSlate500,
-                                fontWeight = FontWeight.SemiBold,
-                                fontSize = 14.sp
+                                fontWeight = if (isSelected) FontWeight.SemiBold else FontWeight.Medium,
+                                fontSize = 14.sp,
+                                modifier = Modifier.padding(vertical = 10.dp),
                             )
-                        }
-                        if (isSelected) {
                             Box(
                                 modifier = Modifier
-                                    .align(Alignment.BottomCenter)
-                                    .width(50.dp)
-                                    .height(3.dp)
-                                    .background(HubBrand600, RoundedCornerShape(50))
+                                    .fillMaxWidth()
+                                    .height(2.dp)
+                                    .background(if (isSelected) HubBrand600 else Color.Transparent),
                             )
                         }
                     }
                 }
+                HorizontalDivider(color = HubSlate200, thickness = 1.dp)
             }
-        }
 
-        if (selectedTab == BackofficeTransactionTab.SALES) {
-            Surface(
-                modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(16.dp),
-                color = Color.White,
-                border = BorderStroke(1.dp, HubBrand600),
-                shadowElevation = 0.5.dp
-            ) {
+            if (selectedTab == BackofficeTransactionTab.SALES) {
+                Surface(
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(16.dp),
+                    color = HubSoftSurface,
+                    border = BorderStroke(1.dp, HubSoftBorder),
+                    shadowElevation = 0.dp
+                ) {
                 Column(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -1411,14 +1401,14 @@ private fun TransactionsHub(
                     }
                 }
             }
-        } else {
-            Surface(
-                modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(16.dp),
-                color = Color.White,
-                border = BorderStroke(1.dp, HubBrand600),
-                shadowElevation = 0.5.dp
-            ) {
+            } else {
+                Surface(
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(16.dp),
+                    color = HubSoftSurface,
+                    border = BorderStroke(1.dp, HubSoftBorder),
+                    shadowElevation = 0.dp
+                ) {
                 Column(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -1533,12 +1523,13 @@ private fun TransactionsHub(
             }
         }
 
-        content.groups.forEach { group ->
+        content.groups.forEachIndexed { index, group ->
             HubActionGroupCard(
                 title = stringResource(group.titleRes).uppercase(Locale.ROOT),
                 actions = group.actions,
                 role = role,
                 compact = compact,
+                showBottomDivider = index < content.groups.lastIndex,
                 onActionClick = { action -> onNavigate(action.destination) },
             )
         }
@@ -1551,6 +1542,7 @@ private fun HubActionGroupCard(
     actions: List<BackofficeHubAction>,
     role: String,
     compact: Boolean,
+    showBottomDivider: Boolean = true,
     badgeProvider: (BackofficeHubAction) -> HubActionBadge? = { null },
     onActionClick: (BackofficeHubAction) -> Unit,
 ) {
@@ -1576,6 +1568,7 @@ private fun HubActionGroupCard(
         title = title,
         items = items,
         compact = compact,
+        showBottomDivider = showBottomDivider,
     )
 }
 
