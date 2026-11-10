@@ -1,5 +1,6 @@
 package com.tbterminal.app.ui.dashboard
 
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -28,6 +29,7 @@ import androidx.compose.material.icons.outlined.Summarize
 import androidx.compose.material.icons.outlined.Sync
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
@@ -52,6 +54,7 @@ private val MenuSectionBorder = Color(0xFFE2E8F0)
 private val MenuRowDivider = Color(0xFFF1F5F9)
 private val MenuTextPrimary = Color(0xFF0F172A)
 private val MenuTextSecondary = Color(0xFF64748B)
+private val MenuBadgeText = Color(0xFF334155)
 private val MenuChevron = Color(0xFF94A3B8)
 private val MenuDestructiveRed = Color(0xFFE11D48)
 
@@ -59,7 +62,9 @@ internal data class RoleMenuItemSpec(
     val key: String,
     val icon: ImageVector,
     val title: String,
-    val subtitle: String,
+    val subtitle: String = "",
+    val badgeText: String? = null,
+    val badgeDotColor: Color? = null,
     val isDestructive: Boolean = false,
     val testTag: String,
     val onClick: () -> Unit,
@@ -269,6 +274,36 @@ private fun RoleMenuRow(item: RoleMenuItemSpec) {
             overflow = TextOverflow.Ellipsis,
             modifier = Modifier.weight(1f),
         )
+        if (item.badgeText != null) {
+            Surface(
+                shape = CircleShape,
+                color = Color(0xFFF8FAFC),
+                border = BorderStroke(1.dp, MenuSectionBorder),
+            ) {
+                Row(
+                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(5.dp),
+                ) {
+                    if (item.badgeDotColor != null) {
+                        Box(
+                            modifier = Modifier
+                                .size(6.dp)
+                                .clip(CircleShape)
+                                .background(item.badgeDotColor),
+                        )
+                    }
+                    Text(
+                        text = item.badgeText,
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.Medium,
+                        color = MenuBadgeText,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                }
+            }
+        }
         Icon(
             imageVector = Icons.Default.ChevronRight,
             contentDescription = null,

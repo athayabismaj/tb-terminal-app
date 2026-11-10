@@ -26,7 +26,6 @@ import androidx.compose.material.icons.automirrored.outlined.MenuBook
 import androidx.compose.material.icons.automirrored.outlined.ReceiptLong
 import androidx.compose.material.icons.automirrored.outlined.TrendingUp
 import androidx.compose.material.icons.filled.Add
-import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material.icons.outlined.AccountBalanceWallet
 import androidx.compose.material.icons.outlined.Assessment
 import androidx.compose.material.icons.outlined.AssignmentTurnedIn
@@ -67,12 +66,10 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.tbterminal.app.R
 import com.tbterminal.app.data.costing.InventoryValuationSummary
 import com.tbterminal.app.data.costing.MovingAverageCalculator
 import com.tbterminal.app.data.repository.AnalyticsRepository
@@ -88,7 +85,6 @@ import com.tbterminal.app.navigation.LocalPendingProductSearch
 import com.tbterminal.app.ui.barcode.CameraBarcodeScannerDialog
 import com.tbterminal.app.ui.components.SkeletonBox
 import com.tbterminal.app.ui.components.TbAdaptiveBox
-import com.tbterminal.app.ui.components.TbPageSurface
 import com.tbterminal.app.ui.dashboard.admin.AdminDashboardShell
 import com.tbterminal.app.ui.dashboard.admin.AdminDestination
 import com.tbterminal.app.ui.dashboard.admin.LocalAdminDestinationNavigator
@@ -192,42 +188,28 @@ fun BackofficeHubScreen(
         },
         onLogout = onLogout,
     ) { contentModifier ->
-        if (section == BackofficeSection.MORE) {
-            TbAdaptiveBox(
-                modifier = contentModifier
-                    .fillMaxSize()
-                    .background(Color(0xFFF8FAFC)),
-            ) { layout ->
-                Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.TopCenter) {
-                    val containerModifier = if (layout.isCompact) {
-                        Modifier.fillMaxWidth()
-                    } else {
-                        Modifier
-                            .fillMaxWidth()
-                            .widthIn(max = 1120.dp)
-                            .padding(horizontal = layout.horizontalPadding, vertical = layout.verticalSpacing)
-                    }
-                    Column(modifier = containerModifier.verticalScroll(rememberScrollState())) {
-                        BackofficeMoreContent(
-                            layout = layout,
-                            role = role,
-                            onNavigate = navigate,
-                            onUserManagementClick = onUserManagementClick,
-                            onSecurityLogClick = onSecurityLogClick,
-                            onLogout = onLogout,
-                        )
-                    }
+        TbAdaptiveBox(
+            modifier = contentModifier
+                .fillMaxSize()
+                .background(Color(0xFFF8FAFC)),
+        ) { layout ->
+            Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.TopCenter) {
+                val containerModifier = if (layout.isCompact) {
+                    Modifier.fillMaxWidth()
+                } else {
+                    Modifier
+                        .fillMaxWidth()
+                        .widthIn(max = 1120.dp)
+                        .padding(horizontal = layout.horizontalPadding, vertical = layout.verticalSpacing)
                 }
-            }
-        } else {
-            TbPageSurface(modifier = contentModifier, maxContentWidth = 1120.dp) { layout, pageModifier ->
                 Column(
-                    modifier = pageModifier.verticalScroll(rememberScrollState()),
-                    verticalArrangement = Arrangement.spacedBy(if (layout.isCompact) 20.dp else 24.dp),
+                    modifier = containerModifier.verticalScroll(rememberScrollState()),
+                    verticalArrangement = Arrangement.spacedBy(if (layout.isCompact) 16.dp else 20.dp),
                 ) {
                     when (section) {
                         BackofficeSection.TRANSACTIONS -> TransactionsHub(
                             role = role,
+                            compact = layout.isCompact,
                             analyticsRepository = analyticsRepository,
                             cashReconciliationRepository = cashReconciliationRepository,
                             purchasingRepository = purchasingRepository,
@@ -236,6 +218,7 @@ fun BackofficeHubScreen(
                         BackofficeSection.FINANCE -> FinanceHub(
                             role = role,
                             content = financeHubContent(role),
+                            compact = layout.isCompact,
                             cashReconciliationRepository = cashReconciliationRepository,
                             receivableRepository = receivableRepository,
                             purchasingRepository = purchasingRepository,
@@ -245,9 +228,18 @@ fun BackofficeHubScreen(
                         BackofficeSection.STOCK -> StockHub(
                             role = role,
                             content = stockHubContent(role),
+                            compact = layout.isCompact,
                             inventoryRepository = inventoryRepository,
                             syncMonitoringRepository = syncMonitoringRepository,
                             onNavigate = navigate,
+                        )
+                        BackofficeSection.MORE -> BackofficeMoreContent(
+                            layout = layout,
+                            role = role,
+                            onNavigate = navigate,
+                            onUserManagementClick = onUserManagementClick,
+                            onSecurityLogClick = onSecurityLogClick,
+                            onLogout = onLogout,
                         )
                         else -> Unit
                     }
@@ -261,10 +253,8 @@ fun BackofficeHubScreen(
 // ── COLOR PALETTE: REFINED INDUSTRIAL STANDARD ──
 private val HubSlate900 = Color(0xFF0F172A)
 private val HubSlate800 = Color(0xFF1E293B)
-private val HubSlate700 = Color(0xFF334155)
 private val HubSlate500 = Color(0xFF64748B)
 private val HubSlate400 = Color(0xFF94A3B8)
-private val HubSlate300 = Color(0xFFCBD5E1)
 private val HubSlate200 = Color(0xFFE2E8F0)
 private val HubSlate100 = Color(0xFFF1F5F9)
 
@@ -273,7 +263,6 @@ private val HubBrand100 = Color(0xFFD1FAE5)
 private val HubBrand500 = Color(0xFF16A34A)
 private val HubBrand600 = Color(0xFF1B5E3C)
 private val HubBrand700 = Color(0xFF15803D)
-private val HubBrand800 = Color(0xFF1B5E3C)
 
 private data class HubActionBadge(
     val text: String,
@@ -299,6 +288,7 @@ private fun formatShortCurrency(amount: BigDecimal): String {
 private fun FinanceHub(
     role: String,
     content: BackofficeHubContent,
+    compact: Boolean,
     cashReconciliationRepository: CashReconciliationRepository? = null,
     receivableRepository: ReceivableRepository? = null,
     purchasingRepository: PurchasingRepository? = null,
@@ -425,27 +415,36 @@ private fun FinanceHub(
         modifier = Modifier
             .fillMaxWidth()
             .testTag("finance-hub-content")
-            .padding(top = 4.dp, bottom = 24.dp),
-        verticalArrangement = Arrangement.spacedBy(20.dp)
+            .padding(bottom = 24.dp),
+        verticalArrangement = Arrangement.spacedBy(if (compact) 14.dp else 20.dp)
     ) {
-        HeroFinancialCard(
-            totalCashBalance = totalCashBalance,
-            todayCashInflow = todayCashInflow,
-            totalReceivable = totalReceivables,
-            totalPayable = totalPayables,
-            receivableNotesCount = receivableNotesCount,
-            payableNotesCount = payableNotesCount,
-            hasActiveSession = hasActiveSession,
-            isLoading = isLoading,
-            onReceivablesClick = { onNavigate(AdminDestination.Receivables) },
-            onPayablesClick = { onNavigate(AdminDestination.SupplierDebts) },
-        )
+        Box(
+            modifier = if (compact) {
+                Modifier.padding(start = 16.dp, end = 16.dp, top = 12.dp)
+            } else {
+                Modifier
+            },
+        ) {
+            HeroFinancialCard(
+                totalCashBalance = totalCashBalance,
+                todayCashInflow = todayCashInflow,
+                totalReceivable = totalReceivables,
+                totalPayable = totalPayables,
+                receivableNotesCount = receivableNotesCount,
+                payableNotesCount = payableNotesCount,
+                hasActiveSession = hasActiveSession,
+                isLoading = isLoading,
+                onReceivablesClick = { onNavigate(AdminDestination.Receivables) },
+                onPayablesClick = { onNavigate(AdminDestination.SupplierDebts) },
+            )
+        }
 
         content.groups.forEach { group ->
             HubActionGroupCard(
                 title = stringResource(group.titleRes).uppercase(Locale.ROOT),
                 actions = group.actions,
                 role = role,
+                compact = compact,
                 badgeProvider = { action ->
                     when (action) {
                         BackofficeHubAction.DAILY_CASH -> HubActionBadge(
@@ -725,6 +724,7 @@ private fun HubTopBarIconButton(
 private fun StockHub(
     role: String,
     content: BackofficeHubContent,
+    compact: Boolean,
     inventoryRepository: InventoryRepository? = null,
     syncMonitoringRepository: SyncMonitoringRepository? = null,
     onNavigate: (AdminDestination) -> Unit,
@@ -798,46 +798,53 @@ private fun StockHub(
         modifier = Modifier
             .fillMaxWidth()
             .testTag("stock-hub-content")
-            .padding(top = 4.dp, bottom = 24.dp),
-        verticalArrangement = Arrangement.spacedBy(16.dp)
+            .padding(bottom = 24.dp),
+        verticalArrangement = Arrangement.spacedBy(if (compact) 14.dp else 18.dp)
     ) {
-        StockValuationDashboardCard(
-            showValuationFinancials = canViewFinancialValuation,
-            valuationSummary = valuationSummary,
-            totalProductsCount = totalProductsCount,
-            lowStockCount = lowStockCount,
-            isPartialStockLoad = isPartialStockLoad,
-            syncStatusText = syncStatusText,
-            isSyncHealthy = isSyncHealthy,
-            isLoading = isLoading,
-            onLowStockClick = { onNavigate(AdminDestination.Products) },
-        )
-
-        val quickActions = listOfNotNull(content.primaryAction, content.secondaryQuickAction)
-        if (quickActions.isNotEmpty()) {
-            StockQuickActionStrip(
-                primaryAction = content.primaryAction,
-                secondaryAction = content.secondaryQuickAction,
-                onActionClick = { action -> onNavigate(action.destination) },
+        Column(
+            modifier = if (compact) {
+                Modifier.padding(start = 16.dp, end = 16.dp, top = 12.dp)
+            } else {
+                Modifier
+            },
+            verticalArrangement = Arrangement.spacedBy(14.dp),
+        ) {
+            StockValuationDashboardCard(
+                showValuationFinancials = canViewFinancialValuation,
+                valuationSummary = valuationSummary,
+                totalProductsCount = totalProductsCount,
+                lowStockCount = lowStockCount,
+                isPartialStockLoad = isPartialStockLoad,
+                syncStatusText = syncStatusText,
+                isSyncHealthy = isSyncHealthy,
+                isLoading = isLoading,
+                onLowStockClick = { onNavigate(AdminDestination.Products) },
             )
+
+            val quickActions = listOfNotNull(content.primaryAction, content.secondaryQuickAction)
+            if (quickActions.isNotEmpty()) {
+                StockQuickActionStrip(
+                    primaryAction = content.primaryAction,
+                    secondaryAction = content.secondaryQuickAction,
+                    onActionClick = { action -> onNavigate(action.destination) },
+                )
+            }
         }
 
-        val adminPriceDescription = stringResource(R.string.hub_product_prices_admin_description)
         content.groups.forEach { group ->
             HubActionGroupCard(
                 title = stringResource(group.titleRes).uppercase(Locale.ROOT),
                 actions = group.actions,
                 role = role,
-                subtitleOverride = { action ->
+                compact = compact,
+                badgeProvider = { action ->
                     when (action) {
                         BackofficeHubAction.PRODUCTS_STOCK ->
-                            if (totalProductsCount > 0) "$totalProductsCount produk terdaftar" else null
+                            if (totalProductsCount > 0) HubActionBadge("$totalProductsCount item") else null
                         BackofficeHubAction.CATEGORIES ->
-                            if (totalCategoriesCount > 0) "$totalCategoriesCount kategori terdaftar" else null
+                            if (totalCategoriesCount > 0) HubActionBadge("$totalCategoriesCount kategori") else null
                         BackofficeHubAction.UNITS ->
-                            if (totalUnitsCount > 0) "$totalUnitsCount satuan ukuran terdaftar" else null
-                        BackofficeHubAction.PRODUCT_PRICES ->
-                            if (!canViewFinancialValuation) adminPriceDescription else null
+                            if (totalUnitsCount > 0) HubActionBadge("$totalUnitsCount satuan") else null
                         else -> null
                     }
                 },
@@ -1179,6 +1186,7 @@ private fun StockValuationDashboardCard(
 @Composable
 private fun TransactionsHub(
     role: String,
+    compact: Boolean,
     analyticsRepository: AnalyticsRepository? = null,
     cashReconciliationRepository: CashReconciliationRepository? = null,
     purchasingRepository: PurchasingRepository? = null,
@@ -1257,11 +1265,19 @@ private fun TransactionsHub(
         modifier = Modifier
             .fillMaxWidth()
             .testTag("transaction-hub-content")
-            .padding(vertical = 8.dp),
-        verticalArrangement = Arrangement.spacedBy(16.dp)
+            .padding(bottom = 24.dp),
+        verticalArrangement = Arrangement.spacedBy(if (compact) 14.dp else 18.dp)
     ) {
-        // Segmented Control
-        Surface(
+        Column(
+            modifier = if (compact) {
+                Modifier.padding(start = 16.dp, end = 16.dp, top = 12.dp)
+            } else {
+                Modifier
+            },
+            verticalArrangement = Arrangement.spacedBy(14.dp),
+        ) {
+            // Segmented Control
+            Surface(
             modifier = Modifier.fillMaxWidth(),
             shape = RoundedCornerShape(16.dp),
             color = Color.White,
@@ -1489,30 +1505,31 @@ private fun TransactionsHub(
             }
         }
 
-        content.primaryAction?.let { primary ->
-            Button(
-                onClick = { onNavigate(primary.destination) },
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(48.dp)
-                    .testTag("transactions-primary-${primary.name}"),
-                shape = RoundedCornerShape(14.dp),
-                colors = ButtonDefaults.buttonColors(
-                    containerColor = HubBrand600,
-                    contentColor = Color.White,
-                ),
-            ) {
-                Icon(
-                    imageVector = primary.icon(),
-                    contentDescription = null,
-                    modifier = Modifier.size(18.dp),
-                )
-                Spacer(Modifier.width(8.dp))
-                Text(
-                    text = stringResource(primary.titleRes),
-                    fontSize = 14.sp,
-                    fontWeight = FontWeight.SemiBold,
-                )
+            content.primaryAction?.let { primary ->
+                Button(
+                    onClick = { onNavigate(primary.destination) },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(48.dp)
+                        .testTag("transactions-primary-${primary.name}"),
+                    shape = RoundedCornerShape(14.dp),
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = HubBrand600,
+                        contentColor = Color.White,
+                    ),
+                ) {
+                    Icon(
+                        imageVector = primary.icon(),
+                        contentDescription = null,
+                        modifier = Modifier.size(18.dp),
+                    )
+                    Spacer(Modifier.width(8.dp))
+                    Text(
+                        text = stringResource(primary.titleRes),
+                        fontSize = 14.sp,
+                        fontWeight = FontWeight.SemiBold,
+                    )
+                }
             }
         }
 
@@ -1521,6 +1538,7 @@ private fun TransactionsHub(
                 title = stringResource(group.titleRes).uppercase(Locale.ROOT),
                 actions = group.actions,
                 role = role,
+                compact = compact,
                 onActionClick = { action -> onNavigate(action.destination) },
             )
         }
@@ -1532,154 +1550,33 @@ private fun HubActionGroupCard(
     title: String,
     actions: List<BackofficeHubAction>,
     role: String,
+    compact: Boolean,
     badgeProvider: (BackofficeHubAction) -> HubActionBadge? = { null },
-    subtitleOverride: (BackofficeHubAction) -> String? = { null },
     onActionClick: (BackofficeHubAction) -> Unit,
 ) {
     val showFinancialLabel = AppAccessPolicy.can(role, AppCapability.FINANCIAL_ANALYTICS)
-    Column(modifier = Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        Text(
-            text = title,
-            color = HubSlate500,
-            fontSize = 11.sp,
-            fontWeight = FontWeight.SemiBold,
-            letterSpacing = 0.5.sp,
-            modifier = Modifier.padding(start = 4.dp)
+    val items = actions.map { action ->
+        val itemTitle = if (action == BackofficeHubAction.PRODUCT_PRICES && showFinancialLabel) {
+            "Harga & Margin"
+        } else {
+            stringResource(action.titleRes)
+        }
+        val badge = badgeProvider(action)
+        RoleMenuItemSpec(
+            key = action.name,
+            icon = action.icon(),
+            title = itemTitle,
+            badgeText = badge?.text,
+            badgeDotColor = badge?.dotColor,
+            testTag = "hub-action-${action.name}",
+            onClick = { onActionClick(action) },
         )
-        Surface(
-            modifier = Modifier.fillMaxWidth(),
-            shape = RoundedCornerShape(16.dp),
-            color = Color.White,
-            border = BorderStroke(1.dp, HubSlate200.copy(alpha = 0.7f)),
-            shadowElevation = 0.5.dp
-        ) {
-            Column {
-                actions.forEachIndexed { index, action ->
-                    val itemTitle = if (action == BackofficeHubAction.PRODUCT_PRICES && showFinancialLabel) {
-                        "Harga & Margin"
-                    } else {
-                        stringResource(action.titleRes)
-                    }
-                    val itemSubtitle = subtitleOverride(action) ?: stringResource(action.descriptionRes)
-                    HubActionRow(
-                        icon = action.icon(),
-                        title = itemTitle,
-                        subtitle = itemSubtitle,
-                        badge = badgeProvider(action),
-                        testTag = "hub-action-${action.name}",
-                        onClick = { onActionClick(action) },
-                    )
-                    if (index < actions.lastIndex) {
-                        HorizontalDivider(color = HubSlate100, thickness = 1.dp)
-                    }
-                }
-            }
-        }
     }
-}
-
-@Composable
-private fun HubActionRow(
-    icon: ImageVector,
-    title: String,
-    subtitle: String,
-    badge: HubActionBadge? = null,
-    testTag: String,
-    onClick: () -> Unit,
-) {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .testTag(testTag)
-            .clickable(role = Role.Button, onClick = onClick)
-            .padding(horizontal = 16.dp, vertical = 14.dp),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.SpaceBetween,
-    ) {
-        Row(
-            modifier = Modifier.weight(1f),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(14.dp)
-        ) {
-            Box(
-                modifier = Modifier
-                    .size(40.dp)
-                    .clip(RoundedCornerShape(12.dp))
-                    .background(HubBrand50),
-                contentAlignment = Alignment.Center,
-            ) {
-                Icon(
-                    imageVector = icon,
-                    contentDescription = null,
-                    tint = HubBrand800,
-                    modifier = Modifier.size(20.dp),
-                )
-            }
-            Column(
-                modifier = Modifier.padding(end = 8.dp),
-                verticalArrangement = Arrangement.spacedBy(2.dp)
-            ) {
-                Text(
-                    text = title,
-                    color = HubSlate800,
-                    fontSize = 14.sp,
-                    fontWeight = FontWeight.SemiBold,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
-                )
-                Text(
-                    text = subtitle,
-                    color = HubSlate500,
-                    fontSize = 12.sp,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
-                )
-            }
-        }
-
-        Row(
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(8.dp)
-        ) {
-            if (badge != null) {
-                Surface(
-                    shape = RoundedCornerShape(50),
-                    color = Color(0xFFF8FAFC),
-                    border = BorderStroke(1.dp, HubSlate200)
-                ) {
-                    Row(
-                        modifier = Modifier.padding(horizontal = 9.dp, vertical = 4.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(5.dp)
-                    ) {
-                        if (badge.dotColor != null) {
-                            Box(
-                                modifier = Modifier
-                                    .size(6.dp)
-                                    .clip(CircleShape)
-                                    .background(badge.dotColor)
-                            )
-                        }
-                        Text(
-                            text = badge.text,
-                            fontSize = 11.sp,
-                            fontWeight = FontWeight.Medium,
-                            color = HubSlate700,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis,
-                        )
-                    }
-                }
-            }
-
-            Icon(
-                imageVector = Icons.Default.ChevronRight,
-                contentDescription = null,
-                tint = HubSlate400,
-                modifier = Modifier.size(16.dp),
-            )
-        }
-    }
+    RoleMenuGroupCard(
+        title = title,
+        items = items,
+        compact = compact,
+    )
 }
 
 private fun BackofficeHubAction.icon(): ImageVector = when (this) {
