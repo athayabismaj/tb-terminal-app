@@ -130,8 +130,7 @@ fun CashierPosRoute(
             Surface(
                 onClick = { isSearchExpanded = !isSearchExpanded },
                 shape = CircleShape,
-                color = if (isSearchActive) Color(0xFFE7EFEA) else Color.Transparent,
-                border = if (isSearchActive) BorderStroke(1.dp, Color(0xFF10533C).copy(alpha = 0.4f)) else null,
+                color = Color.Transparent,
                 modifier = Modifier
                     .size(32.dp)
                     .testTag("pos-toggle-search")
@@ -154,8 +153,7 @@ fun CashierPosRoute(
                 Surface(
                     onClick = { showFilterDialog = true },
                     shape = CircleShape,
-                    color = if (isFiltered) Color(0xFFE7EFEA) else Color.Transparent,
-                    border = if (isFiltered) BorderStroke(1.dp, Color(0xFF10533C).copy(alpha = 0.4f)) else null,
+                    color = Color.Transparent,
                     modifier = Modifier
                         .fillMaxSize()
                         .testTag("pos-open-filter")
@@ -185,8 +183,7 @@ fun CashierPosRoute(
             Surface(
                 onClick = { showMaterialEstimator = true },
                 shape = CircleShape,
-                color = if (showMaterialEstimator) Color(0xFFE7EFEA) else Color.Transparent,
-                border = if (showMaterialEstimator) BorderStroke(1.dp, Color(0xFF10533C).copy(alpha = 0.4f)) else null,
+                color = Color.Transparent,
                 modifier = Modifier
                     .size(32.dp)
                     .testTag("pos-open-calculator")

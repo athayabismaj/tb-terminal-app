@@ -432,7 +432,7 @@ private fun CashierCompactTopBar(
                         }
                     },
                     shape = RoundedCornerShape(100.dp),
-                    color = Color(0xFFF8FAFC),
+                    color = Color.Transparent,
                     border = BorderStroke(
                         1.dp,
                         if (expanded) Color(0xFF10533C) else Color(0xFFE2E8F0)

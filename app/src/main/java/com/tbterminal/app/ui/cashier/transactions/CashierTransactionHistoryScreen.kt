@@ -123,10 +123,8 @@ fun CashierTransactionHistoryScreen(
             // Button 1: Search [ 🔍 ]
             Surface(
                 onClick = { isSearchExpanded = !isSearchExpanded },
-                shape = RoundedCornerShape(12.dp),
-                color = if (isSearchActive) Color(0xFFE8F6ED) else Color(0xFFF8FAFC),
-                border = BorderStroke(1.dp, if (isSearchActive) Color(0xFF1B5E3C) else Color(0xFFE2E8F0)),
-                shadowElevation = 0.5.dp,
+                shape = CircleShape,
+                color = Color.Transparent,
                 modifier = Modifier
                     .size(32.dp)
                     .testTag("cashier-history-toggle-search")
@@ -148,10 +146,8 @@ fun CashierTransactionHistoryScreen(
             ) {
                 Surface(
                     onClick = { showFilterPopup = true },
-                    shape = RoundedCornerShape(12.dp),
-                    color = if (isFiltered) Color(0xFFE8F6ED) else Color(0xFFF8FAFC),
-                    border = BorderStroke(1.dp, if (isFiltered) Color(0xFF1B5E3C) else Color(0xFFE2E8F0)),
-                    shadowElevation = 0.5.dp,
+                    shape = CircleShape,
+                    color = Color.Transparent,
                     modifier = Modifier
                         .fillMaxSize()
                         .testTag("cashier-history-open-filters")
@@ -180,10 +176,8 @@ fun CashierTransactionHistoryScreen(
             // Button 3: Rekap / Ringkasan Shift Kasir [ 📑 ]
             Surface(
                 onClick = { showSummaryPopup = true },
-                shape = RoundedCornerShape(12.dp),
-                color = if (showSummaryPopup) Color(0xFFE8F6ED) else Color(0xFFF8FAFC),
-                border = BorderStroke(1.dp, if (showSummaryPopup) Color(0xFF1B5E3C) else Color(0xFFE2E8F0)),
-                shadowElevation = 0.5.dp,
+                shape = CircleShape,
+                color = Color.Transparent,
                 modifier = Modifier
                     .size(32.dp)
                     .testTag("cashier-history-summary")

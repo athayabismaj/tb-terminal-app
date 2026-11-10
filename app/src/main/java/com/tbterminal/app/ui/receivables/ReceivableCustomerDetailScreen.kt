@@ -91,23 +91,25 @@ internal fun AdminReceivableCustomerDetailScreen(
             Box(
                 modifier = Modifier
                     .padding(end = 8.dp)
-                    .size(36.dp)
-                    .background(Brand50, CircleShape)
-                    .border(1.dp, Brand100, CircleShape)
-                    .clickable { showPaymentHistory = true },
+                    .size(36.dp),
                 contentAlignment = Alignment.Center
             ) {
-                Icon(
-                    imageVector = Icons.Outlined.History,
-                    contentDescription = "Riwayat Pembayaran",
-                    tint = Brand700,
-                    modifier = Modifier.size(20.dp)
-                )
+                IconButton(
+                    onClick = { showPaymentHistory = true },
+                    modifier = Modifier.size(36.dp)
+                ) {
+                    Icon(
+                        imageVector = Icons.Outlined.History,
+                        contentDescription = "Riwayat Pembayaran",
+                        tint = Brand700,
+                        modifier = Modifier.size(20.dp)
+                    )
+                }
                 if (uiState.payments.isNotEmpty()) {
                     Box(
                         modifier = Modifier
                             .align(Alignment.TopEnd)
-                            .offset(x = 2.dp, y = (-2).dp)
+                            .padding(top = 2.dp, end = 2.dp)
                             .size(16.dp)
                             .background(Brand700, CircleShape),
                         contentAlignment = Alignment.Center
