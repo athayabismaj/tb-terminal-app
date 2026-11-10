@@ -1153,35 +1153,26 @@ private fun SalesFilterBottomSheet(
                 horizontalArrangement = Arrangement.spacedBy(12.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                // Reset Button (Outline)
+                // Batal Button (Outline)
                 Surface(
-                    onClick = {
-                        selectedPreset = "Hari ini"
-                        startDate = today
-                        endDate = today
-                        selectedStatus = "Semua"
-                        selectedPaymentMethod = "Semua"
-                        selectedSortOrder = SalesSortOrder.Newest
-                        onResetAllFilters()
-                        onDismiss()
-                    },
+                    onClick = onDismiss,
                     modifier = Modifier
                         .weight(2f)
                         .height(48.dp)
-                        .testTag("sales-history-filter-reset"),
+                        .testTag("sales-history-filter-cancel"),
                     shape = RoundedCornerShape(12.dp),
                     color = Color.White,
-                    border = BorderStroke(1.5.dp, Color(0xFF256B57))
+                    border = BorderStroke(1.5.dp, Color(0xFFCBD5E1))
                 ) {
                     Box(
                         modifier = Modifier.fillMaxSize(),
                         contentAlignment = Alignment.Center
                     ) {
                         Text(
-                            text = "Reset",
+                            text = "Batal",
                             fontSize = 15.sp,
                             fontWeight = FontWeight.Bold,
-                            color = Color(0xFF256B57)
+                            color = Color(0xFF475569)
                         )
                     }
                 }
