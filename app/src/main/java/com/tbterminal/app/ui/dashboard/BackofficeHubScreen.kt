@@ -26,6 +26,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -1341,7 +1342,7 @@ private fun TransactionsHub(
 
             Column(
                 modifier = bodyModifier.fillMaxWidth(),
-                verticalArrangement = Arrangement.spacedBy(16.dp),
+                verticalArrangement = Arrangement.spacedBy(14.dp),
             ) {
                 when (tab) {
                     BackofficeTransactionTab.SALES -> TransactionSummaryCard(
@@ -1415,21 +1416,21 @@ private fun TransactionSegmentedTabStrip(
     modifier: Modifier = Modifier,
 ) {
     val containerPadding = if (compact) {
-        Modifier.padding(start = 16.dp, end = 16.dp, top = 14.dp)
+        Modifier.padding(start = 16.dp, end = 16.dp, top = 12.dp)
     } else {
         Modifier
     }
     Box(modifier = modifier.fillMaxWidth().then(containerPadding)) {
         Surface(
             modifier = Modifier.fillMaxWidth(),
-            shape = RoundedCornerShape(14.dp),
+            shape = RoundedCornerShape(12.dp),
             color = HubPillTrackBg,
             border = BorderStroke(0.5.dp, HubCardBorder),
         ) {
             BoxWithConstraints(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(4.dp),
+                    .padding(3.dp),
             ) {
                 val tabCount = BackofficeTransactionTab.entries.size.coerceAtLeast(1)
                 val tabWidth = maxWidth / tabCount
@@ -1444,8 +1445,8 @@ private fun TransactionSegmentedTabStrip(
                         modifier = Modifier
                             .offset(x = thumbOffset)
                             .width(tabWidth)
-                            .height(40.dp),
-                        shape = RoundedCornerShape(10.dp),
+                            .height(38.dp),
+                        shape = RoundedCornerShape(9.dp),
                         color = Color.White,
                         border = BorderStroke(0.5.dp, HubCardBorder.copy(alpha = 0.7f)),
                         shadowElevation = 1.5.dp,
@@ -1454,7 +1455,7 @@ private fun TransactionSegmentedTabStrip(
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .height(40.dp),
+                            .height(38.dp),
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
                         BackofficeTransactionTab.entries.forEach { tab ->
@@ -1467,8 +1468,8 @@ private fun TransactionSegmentedTabStrip(
                             Box(
                                 modifier = Modifier
                                     .weight(1f)
-                                    .height(40.dp)
-                                    .clip(RoundedCornerShape(10.dp))
+                                    .height(38.dp)
+                                    .clip(RoundedCornerShape(9.dp))
                                     .testTag("transactions-tab-${tab.name}")
                                     .clickable(role = Role.Tab) { onSelectTab(tab) },
                                 contentAlignment = Alignment.Center,
@@ -1509,13 +1510,13 @@ private fun TransactionSummaryCard(
         modifier = modifier.fillMaxWidth(),
         shape = RoundedCornerShape(16.dp),
         color = Color.White,
-        border = BorderStroke(1.dp, HubCardBorder.copy(alpha = 0.6f)),
+        border = BorderStroke(1.dp, HubCardBorder.copy(alpha = 0.75f)),
         shadowElevation = 0.5.dp,
     ) {
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(20.dp),
+                .padding(16.dp),
         ) {
             Row(
                 modifier = Modifier.fillMaxWidth(),
@@ -1535,7 +1536,7 @@ private fun TransactionSummaryCard(
                     IconButton(
                         onClick = onToggleNominal,
                         modifier = Modifier
-                            .size(26.dp)
+                            .size(24.dp)
                             .testTag("transactions-toggle-nominal"),
                     ) {
                         Icon(
@@ -1567,19 +1568,19 @@ private fun TransactionSummaryCard(
                     Text(
                         text = statusText,
                         color = statusTextColor,
-                        fontSize = 12.sp,
+                        fontSize = 11.sp,
                         fontWeight = FontWeight.Medium,
                     )
                 }
             }
 
-            Spacer(Modifier.height(12.dp))
+            Spacer(Modifier.height(8.dp))
 
             if (isLoading && !isNominalHidden) {
                 SkeletonBox(
                     modifier = Modifier
                         .fillMaxWidth(0.55f)
-                        .height(34.dp),
+                        .height(28.dp),
                 )
             } else {
                 AnimatedContent(
@@ -1598,8 +1599,8 @@ private fun TransactionSummaryCard(
                     Text(
                         text = displayValue,
                         color = HubSlate900,
-                        fontSize = 28.sp,
-                        fontWeight = FontWeight.ExtraBold,
+                        fontSize = 24.sp,
+                        fontWeight = FontWeight.Bold,
                         letterSpacing = (-0.5).sp,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
@@ -1607,7 +1608,7 @@ private fun TransactionSummaryCard(
                 }
             }
 
-            Spacer(Modifier.height(14.dp))
+            Spacer(Modifier.height(12.dp))
             HorizontalDivider(color = HubSlate100, thickness = 1.dp)
             Spacer(Modifier.height(10.dp))
 
@@ -1689,9 +1690,9 @@ private fun TransactionActivityGroupSection(
     ) {
         Text(
             text = title,
-            color = HubSlate400,
+            color = HubSlate500,
             fontSize = 11.sp,
-            fontWeight = FontWeight.Bold,
+            fontWeight = FontWeight.SemiBold,
             letterSpacing = 0.7.sp,
             modifier = Modifier.padding(horizontal = 4.dp),
         )
@@ -1699,7 +1700,7 @@ private fun TransactionActivityGroupSection(
             modifier = Modifier.fillMaxWidth(),
             shape = RoundedCornerShape(16.dp),
             color = Color.White,
-            border = BorderStroke(1.dp, HubCardBorder.copy(alpha = 0.8f)),
+            border = BorderStroke(1.dp, HubCardBorder.copy(alpha = 0.75f)),
             shadowElevation = 0.5.dp,
         ) {
             Column(
@@ -1714,6 +1715,7 @@ private fun TransactionActivityGroupSection(
                     )
                     if (index < actions.lastIndex) {
                         HorizontalDivider(
+                            modifier = Modifier.padding(start = 62.dp, end = 16.dp),
                             color = HubSlate100,
                             thickness = 1.dp,
                         )
@@ -1732,16 +1734,17 @@ private fun TransactionActivityRow(
     Row(
         modifier = Modifier
             .fillMaxWidth()
+            .heightIn(min = 52.dp)
             .testTag("hub-action-${action.name}")
             .clickable(role = Role.Button, onClick = onClick)
-            .padding(16.dp),
+            .padding(horizontal = 16.dp, vertical = 10.dp),
         verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(14.dp),
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
     ) {
         Box(
             modifier = Modifier
-                .size(40.dp)
-                .clip(RoundedCornerShape(12.dp))
+                .size(34.dp)
+                .clip(RoundedCornerShape(10.dp))
                 .background(HubEmerald50),
             contentAlignment = Alignment.Center,
         ) {
@@ -1749,14 +1752,14 @@ private fun TransactionActivityRow(
                 imageVector = action.icon(),
                 contentDescription = null,
                 tint = HubEmerald700,
-                modifier = Modifier.size(20.dp),
+                modifier = Modifier.size(18.dp),
             )
         }
         Text(
             text = stringResource(action.titleRes),
             color = HubSlate800,
             fontSize = 14.sp,
-            fontWeight = FontWeight.Bold,
+            fontWeight = FontWeight.SemiBold,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
             modifier = Modifier.weight(1f),
@@ -1765,7 +1768,7 @@ private fun TransactionActivityRow(
             imageVector = Icons.Default.ChevronRight,
             contentDescription = null,
             tint = HubSlate400,
-            modifier = Modifier.size(20.dp),
+            modifier = Modifier.size(18.dp),
         )
     }
 }
