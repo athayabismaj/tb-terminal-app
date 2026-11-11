@@ -162,14 +162,6 @@ fun BackofficeHubScreen(
         onSettingsClick = { navigate(AdminDestination.Settings) },
         topBarActions = {
             when (section) {
-                BackofficeSection.TRANSACTIONS -> {
-                    HubTopBarIconButton(
-                        icon = Icons.Outlined.Search,
-                        contentDescription = "Cari transaksi",
-                        onClick = { navigate(AdminDestination.SalesTransactions) },
-                        testTag = "hub-transactions-search",
-                    )
-                }
                 BackofficeSection.FINANCE -> {
                     HubTopBarIconButton(
                         icon = Icons.Outlined.Search,
