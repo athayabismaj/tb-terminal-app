@@ -280,7 +280,9 @@ private val HubKasiraBrand = Color(0xFF10533C)
 private val HubEmerald50 = Color(0xFFECFDF5)
 private val HubEmerald600 = Color(0xFF059669)
 private val HubEmerald700 = Color(0xFF047857)
+private val HubSlate600 = Color(0xFF475569)
 private val HubSlate700 = Color(0xFF334155)
+private val HubPillTrackBg = Color(0xFFE5E9F0)
 private val HubMotionEaseOut = CubicBezierEasing(0.16f, 1f, 0.3f, 1f)
 
 private const val TX_STEP_TAB = 0
@@ -1297,7 +1299,7 @@ private fun TransactionsHub(
     val formattedSalesToday = formatIdCurrency(todayRevenue)
     val formattedPurchasesMonth = formatIdCurrency(monthlyPurchases)
     val density = LocalDensity.current
-    val tabSlidePx = remember(density) { with(density) { 6.dp.toPx() } }
+    val tabSlidePx = remember(density) { with(density) { 10.dp.toPx() } }
     val summarySlidePx = remember(density) { with(density) { 16.dp.toPx() } }
     val ctaSlidePx = remember(density) { with(density) { 20.dp.toPx() } }
     val listSlidePx = remember(density) { with(density) { 24.dp.toPx() } }
@@ -1307,7 +1309,7 @@ private fun TransactionsHub(
             .fillMaxWidth()
             .testTag("transaction-hub-content")
             .padding(bottom = 24.dp),
-        verticalArrangement = Arrangement.spacedBy(if (compact) 16.dp else 18.dp),
+        verticalArrangement = Arrangement.spacedBy(if (compact) 14.dp else 18.dp),
     ) {
         TransactionSegmentedTabStrip(
             selectedTab = selectedTab,
@@ -1412,66 +1414,79 @@ private fun TransactionSegmentedTabStrip(
     onSelectTab: (BackofficeTransactionTab) -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    Column(
-        modifier = modifier
-            .fillMaxWidth()
-            .background(Color.White)
-            .then(if (!compact) Modifier.clip(RoundedCornerShape(14.dp)) else Modifier),
-    ) {
-        BoxWithConstraints(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = if (compact) 20.dp else 8.dp),
+    val containerPadding = if (compact) {
+        Modifier.padding(start = 16.dp, end = 16.dp, top = 14.dp)
+    } else {
+        Modifier
+    }
+    Box(modifier = modifier.fillMaxWidth().then(containerPadding)) {
+        Surface(
+            modifier = Modifier.fillMaxWidth(),
+            shape = RoundedCornerShape(14.dp),
+            color = HubPillTrackBg,
+            border = BorderStroke(0.5.dp, HubCardBorder),
         ) {
-            val tabCount = BackofficeTransactionTab.entries.size.coerceAtLeast(1)
-            val tabWidth = maxWidth / tabCount
-            val indicatorOffset by animateDpAsState(
-                targetValue = tabWidth * selectedTab.ordinal,
-                animationSpec = tween(durationMillis = 250, easing = HubMotionEaseOut),
-                label = "TransactionsTabIndicatorOffset",
-            )
+            BoxWithConstraints(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(4.dp),
+            ) {
+                val tabCount = BackofficeTransactionTab.entries.size.coerceAtLeast(1)
+                val tabWidth = maxWidth / tabCount
+                val thumbOffset by animateDpAsState(
+                    targetValue = tabWidth * selectedTab.ordinal,
+                    animationSpec = tween(durationMillis = 250, easing = HubMotionEaseOut),
+                    label = "TransactionsPillOffset",
+                )
 
-            Column(modifier = Modifier.fillMaxWidth()) {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    BackofficeTransactionTab.entries.forEach { tab ->
-                        val isSelected = selectedTab == tab
-                        val textColor by animateColorAsState(
-                            targetValue = if (isSelected) HubKasiraBrand else HubSlate400,
-                            animationSpec = tween(durationMillis = 200),
-                            label = "TransactionsTabTextColor",
-                        )
-                        Box(
-                            modifier = Modifier
-                                .weight(1f)
-                                .testTag("transactions-tab-${tab.name}")
-                                .clickable(role = Role.Tab) { onSelectTab(tab) },
-                            contentAlignment = Alignment.Center,
-                        ) {
-                            Text(
-                                text = stringResource(tab.labelRes),
-                                color = textColor,
-                                fontWeight = if (isSelected) FontWeight.Bold else FontWeight.SemiBold,
-                                fontSize = 14.sp,
-                                modifier = Modifier.padding(vertical = 12.dp),
+                Box(modifier = Modifier.fillMaxWidth()) {
+                    Surface(
+                        modifier = Modifier
+                            .offset(x = thumbOffset)
+                            .width(tabWidth)
+                            .height(40.dp),
+                        shape = RoundedCornerShape(10.dp),
+                        color = Color.White,
+                        border = BorderStroke(0.5.dp, HubCardBorder.copy(alpha = 0.7f)),
+                        shadowElevation = 1.5.dp,
+                    ) {}
+
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(40.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        BackofficeTransactionTab.entries.forEach { tab ->
+                            val isSelected = selectedTab == tab
+                            val textColor by animateColorAsState(
+                                targetValue = if (isSelected) HubKasiraBrand else HubSlate600,
+                                animationSpec = tween(durationMillis = 200),
+                                label = "TransactionsPillTextColor",
                             )
+                            Box(
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .height(40.dp)
+                                    .clip(RoundedCornerShape(10.dp))
+                                    .testTag("transactions-tab-${tab.name}")
+                                    .clickable(role = Role.Tab) { onSelectTab(tab) },
+                                contentAlignment = Alignment.Center,
+                            ) {
+                                Text(
+                                    text = stringResource(tab.labelRes),
+                                    color = textColor,
+                                    fontWeight = if (isSelected) FontWeight.Bold else FontWeight.SemiBold,
+                                    fontSize = 14.sp,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis,
+                                )
+                            }
                         }
                     }
                 }
-                Box(modifier = Modifier.fillMaxWidth().height(2.dp)) {
-                    Box(
-                        modifier = Modifier
-                            .offset(x = indicatorOffset)
-                            .width(tabWidth)
-                            .height(2.dp)
-                            .background(HubKasiraBrand),
-                    )
-                }
             }
         }
-        HorizontalDivider(color = HubCardBorder.copy(alpha = 0.9f), thickness = 1.dp)
     }
 }
 
