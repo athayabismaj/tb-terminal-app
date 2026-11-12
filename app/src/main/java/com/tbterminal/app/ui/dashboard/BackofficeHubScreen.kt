@@ -271,12 +271,6 @@ private val HubCardBorder = Color(0xFFE2E8F0)
 private val HubAmberBg = Color(0xFFFEF3C7)
 private val HubAmberText = Color(0xFFB45309)
 
-private val HubBrand50 = Color(0xFFEAF3ED)
-private val HubBrand100 = Color(0xFFD1FAE5)
-private val HubBrand500 = Color(0xFF16A34A)
-private val HubBrand600 = Color(0xFF1B5E3C)
-private val HubBrand700 = Color(0xFF15803D)
-
 private val HubKasiraBrand = Color(0xFF10533C)
 private val HubEmerald50 = Color(0xFFECFDF5)
 private val HubEmerald600 = Color(0xFF059669)
@@ -292,14 +286,14 @@ private const val TX_STEP_SUMMARY = 1
 private const val TX_STEP_CTA = 2
 private const val TX_STEP_LIST = 3
 
-private class StaggeredEntranceState(
+internal class StaggeredEntranceState(
     private val steps: List<Animatable<Float, *>>,
 ) {
     fun progress(index: Int): Float = steps.getOrNull(index)?.value ?: 1f
 }
 
 @Composable
-private fun rememberStaggeredEntrance(stepCount: Int): StaggeredEntranceState {
+internal fun rememberStaggeredEntrance(stepCount: Int): StaggeredEntranceState {
     val steps = remember(stepCount) { List(stepCount.coerceAtLeast(1)) { Animatable(0f) } }
     LaunchedEffect(steps) {
         coroutineScope {
@@ -320,7 +314,7 @@ private fun rememberStaggeredEntrance(stepCount: Int): StaggeredEntranceState {
     return remember(steps) { StaggeredEntranceState(steps) }
 }
 
-private fun Modifier.staggeredEntrance(
+internal fun Modifier.staggeredEntrance(
     slideDistancePx: Float,
     progress: () -> Float,
 ): Modifier = graphicsLayer {
@@ -874,6 +868,7 @@ private fun StockHub(
     onNavigate: (AdminDestination) -> Unit,
 ) {
     val canViewFinancialValuation = AppAccessPolicy.can(role, AppCapability.FINANCIAL_ANALYTICS)
+    var isNominalHidden by rememberSaveable { mutableStateOf(false) }
     var valuationSummary by remember { mutableStateOf<InventoryValuationSummary?>(null) }
     var lowStockCount by remember { mutableIntStateOf(0) }
     var totalProductsCount by remember { mutableIntStateOf(0) }
@@ -884,35 +879,41 @@ private fun StockHub(
     var isSyncHealthy by remember { mutableStateOf(true) }
     var isLoading by remember { mutableStateOf(inventoryRepository != null) }
 
+    val ctaOffset = if (content.primaryAction != null) 1 else 0
+    val entrance = rememberStaggeredEntrance(stepCount = 1 + ctaOffset + content.groups.size)
+
     LaunchedEffect(inventoryRepository) {
         if (inventoryRepository != null) {
             isLoading = true
-            runCatching {
-                when (val aggregateResult = loadAllProductStocks(inventoryRepository)) {
-                    is RepositoryResult.Success -> {
-                        val aggregate = aggregateResult.data
-                        val products = aggregate.products
-                        valuationSummary = MovingAverageCalculator.calculateInventoryValuation(products)
-                        lowStockCount = products.count { it.isActive && it.quantity <= it.minStock }
-                        totalProductsCount = aggregate.totalProducts
-                        isPartialStockLoad = aggregate.isPartial
+            try {
+                runCatching {
+                    when (val aggregateResult = loadAllProductStocks(inventoryRepository)) {
+                        is RepositoryResult.Success -> {
+                            val aggregate = aggregateResult.data
+                            val products = aggregate.products
+                            valuationSummary = MovingAverageCalculator.calculateInventoryValuation(products)
+                            lowStockCount = products.count { it.isActive && it.quantity <= it.minStock }
+                            totalProductsCount = aggregate.totalProducts
+                            isPartialStockLoad = aggregate.isPartial
+                        }
+                        else -> Unit
                     }
-                    else -> Unit
                 }
-            }
-            runCatching {
-                when (val catRes = inventoryRepository.getCategories()) {
-                    is RepositoryResult.Success -> totalCategoriesCount = catRes.data.size
-                    else -> Unit
+                runCatching {
+                    when (val catRes = inventoryRepository.getCategories()) {
+                        is RepositoryResult.Success -> totalCategoriesCount = catRes.data.size
+                        else -> Unit
+                    }
                 }
-            }
-            runCatching {
-                when (val unitRes = inventoryRepository.getUnits()) {
-                    is RepositoryResult.Success -> totalUnitsCount = unitRes.data.size
-                    else -> Unit
+                runCatching {
+                    when (val unitRes = inventoryRepository.getUnits()) {
+                        is RepositoryResult.Success -> totalUnitsCount = unitRes.data.size
+                        else -> Unit
+                    }
                 }
+            } finally {
+                isLoading = false
             }
-            isLoading = false
         }
     }
 
@@ -938,12 +939,19 @@ private fun StockHub(
         }
     }
 
+    val density = LocalDensity.current
+    val heroSlidePx = remember(density) { with(density) { 14.dp.toPx() } }
+    val ctaSlidePx = remember(density) { with(density) { 18.dp.toPx() } }
+    val groupBaseSlidePx = remember(density) { with(density) { 20.dp.toPx() } }
+    val groupStepSlidePx = remember(density) { with(density) { 4.dp.toPx() } }
+    val horizontalInsetModifier = if (compact) Modifier.padding(horizontal = 16.dp) else Modifier
+
     Column(
         modifier = Modifier
             .fillMaxWidth()
             .testTag("stock-hub-content")
             .padding(bottom = 24.dp),
-        verticalArrangement = Arrangement.spacedBy(if (compact) 14.dp else 18.dp)
+        verticalArrangement = Arrangement.spacedBy(if (compact) 14.dp else 18.dp),
     ) {
         Column(
             modifier = if (compact) {
@@ -961,36 +969,75 @@ private fun StockHub(
                 isPartialStockLoad = isPartialStockLoad,
                 syncStatusText = syncStatusText,
                 isSyncHealthy = isSyncHealthy,
+                isNominalHidden = isNominalHidden,
                 isLoading = isLoading,
+                onToggleNominal = { isNominalHidden = !isNominalHidden },
                 onLowStockClick = { onNavigate(AdminDestination.Products) },
+                modifier = Modifier.staggeredEntrance(heroSlidePx) { entrance.progress(0) },
             )
 
             content.primaryAction?.let { primaryAction ->
                 StockQuickActionStrip(
                     primaryAction = primaryAction,
                     onActionClick = { action -> onNavigate(action.destination) },
+                    modifier = Modifier.staggeredEntrance(ctaSlidePx) { entrance.progress(1) },
                 )
             }
         }
 
-        content.groups.forEach { group ->
-            HubActionGroupCard(
+        content.groups.forEachIndexed { index, group ->
+            HubActivityGroupSection(
                 title = stringResource(group.titleRes).uppercase(Locale.ROOT),
                 actions = group.actions,
-                role = role,
-                compact = compact,
+                titleProvider = { action ->
+                    if (action == BackofficeHubAction.PRODUCT_PRICES && canViewFinancialValuation) {
+                        "Harga & Margin"
+                    } else {
+                        stringResource(action.titleRes)
+                    }
+                },
                 badgeProvider = { action ->
                     when (action) {
                         BackofficeHubAction.PRODUCTS_STOCK ->
-                            if (totalProductsCount > 0) HubActionBadge("$totalProductsCount item") else null
+                            if (totalProductsCount > 0) {
+                                HubActionBadge(
+                                    text = "$totalProductsCount item",
+                                    dotColor = HubEmerald600,
+                                    bgColor = HubEmerald50,
+                                    textColor = HubEmerald700,
+                                )
+                            } else null
                         BackofficeHubAction.CATEGORIES ->
-                            if (totalCategoriesCount > 0) HubActionBadge("$totalCategoriesCount kategori") else null
+                            if (totalCategoriesCount > 0) {
+                                HubActionBadge(
+                                    text = "$totalCategoriesCount kategori",
+                                    bgColor = HubSlate100,
+                                    textColor = HubSlate600,
+                                )
+                            } else null
                         BackofficeHubAction.UNITS ->
-                            if (totalUnitsCount > 0) HubActionBadge("$totalUnitsCount satuan") else null
+                            if (totalUnitsCount > 0) {
+                                HubActionBadge(
+                                    text = "$totalUnitsCount satuan",
+                                    bgColor = HubSlate100,
+                                    textColor = HubSlate600,
+                                )
+                            } else null
                         else -> null
                     }
                 },
+                iconColorsProvider = { action ->
+                    when (action) {
+                        BackofficeHubAction.ADJUST_STOCK -> HubAmberSoftBg to HubAmberText
+                        else -> HubEmerald50 to HubEmerald700
+                    }
+                },
                 onActionClick = { action -> onNavigate(action.destination) },
+                modifier = horizontalInsetModifier.staggeredEntrance(
+                    groupBaseSlidePx + index * groupStepSlidePx,
+                ) {
+                    entrance.progress(1 + ctaOffset + index)
+                },
             )
         }
     }
@@ -1000,19 +1047,20 @@ private fun StockHub(
 private fun StockQuickActionStrip(
     primaryAction: BackofficeHubAction,
     onActionClick: (BackofficeHubAction) -> Unit,
+    modifier: Modifier = Modifier,
 ) {
     Button(
         onClick = { onActionClick(primaryAction) },
-        modifier = Modifier
+        modifier = modifier
             .fillMaxWidth()
             .height(46.dp)
             .testTag("stock-quick-primary"),
         shape = RoundedCornerShape(12.dp),
         colors = ButtonDefaults.buttonColors(
-            containerColor = HubBrand600,
+            containerColor = HubKasiraBrand,
             contentColor = Color.White,
         ),
-        contentPadding = PaddingValues(horizontal = 14.dp),
+        contentPadding = PaddingValues(horizontal = 16.dp),
     ) {
         Icon(
             imageVector = primaryAction.icon(),
@@ -1022,7 +1070,7 @@ private fun StockQuickActionStrip(
         Spacer(Modifier.width(8.dp))
         Text(
             text = stringResource(primaryAction.titleRes),
-            fontSize = 13.sp,
+            fontSize = 14.sp,
             fontWeight = FontWeight.SemiBold,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
@@ -1039,247 +1087,228 @@ private fun StockValuationDashboardCard(
     isPartialStockLoad: Boolean,
     syncStatusText: String,
     isSyncHealthy: Boolean,
+    isNominalHidden: Boolean,
     isLoading: Boolean,
+    onToggleNominal: () -> Unit,
     onLowStockClick: () -> Unit,
+    modifier: Modifier = Modifier,
 ) {
-    var isValuationVisible by remember { mutableStateOf(true) }
+    val hasLowStock = !isLoading && lowStockCount > 0
+    val statusText = when {
+        isLoading -> "Memuat"
+        hasLowStock -> "$lowStockCount Perlu Restok"
+        else -> "Stok Aman"
+    }
+    val statusDotColor = when {
+        isLoading -> HubSlate400
+        hasLowStock -> Color(0xFFD97706)
+        else -> HubEmerald600
+    }
+    val statusTextColor = if (hasLowStock) HubAmberText else HubSlate500
 
     Surface(
-        modifier = Modifier.fillMaxWidth(),
+        modifier = modifier.fillMaxWidth(),
         shape = RoundedCornerShape(16.dp),
         color = Color.White,
         border = BorderStroke(1.dp, HubCardBorder.copy(alpha = 0.75f)),
         shadowElevation = 0.5.dp,
     ) {
         Column(
-            modifier = Modifier.padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(14.dp)
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(16.dp),
         ) {
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
+                verticalAlignment = Alignment.CenterVertically,
             ) {
-                Text(
-                    text = if (showValuationFinancials) "VALUASI STOK TOKO" else "STATUS INVENTARIS TOKO",
-                    fontSize = 11.sp,
-                    fontWeight = FontWeight.SemiBold,
-                    color = HubSlate400,
-                    letterSpacing = 0.5.sp
-                )
-
-                if (!isLoading && lowStockCount > 0) {
-                    Surface(
-                        shape = RoundedCornerShape(50),
-                        color = Color(0xFFFEF3C7),
-                        border = BorderStroke(1.dp, Color(0xFFFDE68A)),
-                        modifier = Modifier.clickable(onClick = onLowStockClick)
-                    ) {
-                        Row(
-                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp),
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(6.dp)
-                        ) {
-                            Box(modifier = Modifier.size(6.dp).clip(CircleShape).background(Color(0xFFD97706)))
-                            Text(
-                                text = "$lowStockCount Perlu Restok",
-                                fontSize = 11.sp,
-                                fontWeight = FontWeight.Medium,
-                                color = Color(0xFFB45309)
-                            )
-                        }
-                    }
-                } else if (!isLoading) {
-                    Surface(
-                        shape = RoundedCornerShape(50),
-                        color = HubBrand50,
-                        border = BorderStroke(1.dp, HubBrand100)
-                    ) {
-                        Row(
-                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp),
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(6.dp)
-                        ) {
-                            Box(modifier = Modifier.size(6.dp).clip(CircleShape).background(HubBrand500))
-                            Text(
-                                text = "Stok Aman",
-                                fontSize = 11.sp,
-                                fontWeight = FontWeight.Medium,
-                                color = HubBrand700
-                            )
-                        }
-                    }
-                }
-            }
-
-            if (showValuationFinancials) {
-                Column {
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Text(
-                            text = if (isPartialStockLoad) "Total Nilai Aset (Sebagian Data)" else "Total Nilai Aset (HPP)",
-                            fontSize = 12.sp,
-                            fontWeight = FontWeight.Medium,
-                            color = HubSlate500
-                        )
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(4.dp),
+                    modifier = Modifier
+                        .weight(1f)
+                        .padding(end = 8.dp),
+                ) {
+                    Text(
+                        text = when {
+                            !showValuationFinancials -> "Status Inventaris Toko"
+                            isPartialStockLoad -> "Total Nilai Aset (Sebagian)"
+                            else -> "Total Nilai Aset (HPP)"
+                        },
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.SemiBold,
+                        color = HubSlate500,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.weight(1f, fill = false),
+                    )
+                    if (showValuationFinancials) {
                         IconButton(
-                            onClick = { isValuationVisible = !isValuationVisible },
-                            modifier = Modifier.size(24.dp)
+                            onClick = onToggleNominal,
+                            modifier = Modifier
+                                .size(24.dp)
+                                .testTag("stock-toggle-nominal"),
                         ) {
                             Icon(
-                                imageVector = if (isValuationVisible) Icons.Outlined.Visibility else Icons.Outlined.VisibilityOff,
-                                contentDescription = if (isValuationVisible) "Sembunyikan nilai aset" else "Tampilkan nilai aset",
-                                tint = HubSlate400,
-                                modifier = Modifier.size(16.dp)
+                                imageVector = if (isNominalHidden) {
+                                    Icons.Outlined.VisibilityOff
+                                } else {
+                                    Icons.Outlined.Visibility
+                                },
+                                contentDescription = if (isNominalHidden) {
+                                    "Tampilkan nilai aset"
+                                } else {
+                                    "Sembunyikan nilai aset"
+                                },
+                                tint = HubSlate500,
+                                modifier = Modifier.size(16.dp),
                             )
                         }
                     }
-
-                    if (isLoading) {
-                        SkeletonBox(
-                            modifier = Modifier
-                                .fillMaxWidth(0.5f)
-                                .height(28.dp)
-                                .padding(top = 4.dp)
-                        )
-                    } else {
-                        val formattedValuation = valuationSummary?.totalValuation?.let(::formatIdCurrency) ?: "Rp0"
-                        Text(
-                            text = if (isValuationVisible) formattedValuation else "Rp ••••••••",
-                            fontSize = 24.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = HubSlate900,
-                            letterSpacing = (-0.5).sp,
-                            modifier = Modifier.padding(top = 2.dp)
-                        )
-                    }
                 }
-            } else {
-                Column {
-                    Text(
-                        text = "Ringkasan Operasional Gudang",
-                        fontSize = 12.sp,
-                        fontWeight = FontWeight.Medium,
-                        color = HubSlate500
-                    )
-                    if (isLoading) {
-                        SkeletonBox(
-                            modifier = Modifier
-                                .fillMaxWidth(0.45f)
-                                .height(26.dp)
-                                .padding(top = 4.dp)
-                        )
-                    } else {
-                        Text(
-                            text = if (lowStockCount > 0) {
-                                "$lowStockCount SKU Perlu Restok Segera"
+
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(8.dp))
+                        .then(
+                            if (hasLowStock) {
+                                Modifier.clickable(role = Role.Button, onClick = onLowStockClick)
                             } else {
-                                "$totalProductsCount SKU Siap Terpantau"
+                                Modifier
                             },
-                            fontSize = 20.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = if (lowStockCount > 0) Color(0xFFB45309) else HubSlate900,
-                            letterSpacing = (-0.3).sp,
-                            modifier = Modifier.padding(top = 2.dp)
                         )
-                    }
+                        .padding(horizontal = 2.dp, vertical = 2.dp),
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .size(6.dp)
+                            .clip(CircleShape)
+                            .background(statusDotColor),
+                    )
+                    Text(
+                        text = statusText,
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.Medium,
+                        color = statusTextColor,
+                    )
                 }
             }
 
+            Spacer(Modifier.height(8.dp))
+
+            if (showValuationFinancials) {
+                if (isLoading && !isNominalHidden) {
+                    SkeletonBox(
+                        modifier = Modifier
+                            .fillMaxWidth(0.55f)
+                            .height(28.dp),
+                    )
+                } else {
+                    val formattedValuation = valuationSummary?.totalValuation?.let(::formatIdCurrency) ?: "Rp0"
+                    AnimatedNominalValue(
+                        text = if (isNominalHidden) "Rp••••••" else formattedValuation,
+                    )
+                }
+            } else {
+                if (isLoading) {
+                    SkeletonBox(
+                        modifier = Modifier
+                            .fillMaxWidth(0.5f)
+                            .height(26.dp),
+                    )
+                } else {
+                    Text(
+                        text = if (lowStockCount > 0) {
+                            "$lowStockCount SKU Perlu Restok Segera"
+                        } else {
+                            "$totalProductsCount SKU Siap Terpantau"
+                        },
+                        fontSize = 20.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = if (lowStockCount > 0) HubAmberText else HubSlate900,
+                        letterSpacing = (-0.3).sp,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                }
+            }
+
+            Spacer(Modifier.height(12.dp))
             HorizontalDivider(color = HubSlate100, thickness = 1.dp)
+            Spacer(Modifier.height(10.dp))
 
             Row(
                 modifier = Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically
+                verticalAlignment = Alignment.CenterVertically,
             ) {
-                Column(
-                    modifier = Modifier.weight(1f),
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                    verticalArrangement = Arrangement.Center
-                ) {
-                    Text(
-                        text = "Katalog Aktif",
-                        fontSize = 11.sp,
-                        fontWeight = FontWeight.Medium,
-                        color = HubSlate400
-                    )
-                    Text(
-                        text = if (isLoading) "-" else "$totalProductsCount Item",
-                        fontSize = 14.sp,
-                        fontWeight = FontWeight.SemiBold,
-                        color = HubSlate800,
-                        modifier = Modifier.padding(top = 4.dp)
-                    )
-                }
+                HeroFinanceMetricItem(
+                    label = "Katalog Aktif",
+                    value = if (isLoading) "—" else "$totalProductsCount Item",
+                    valueColor = HubSlate800,
+                    modifier = Modifier
+                        .weight(1f)
+                        .padding(end = 6.dp),
+                )
 
                 Box(
                     modifier = Modifier
                         .width(1.dp)
-                        .height(30.dp)
-                        .background(HubSlate100)
+                        .height(28.dp)
+                        .background(HubSlate100),
+                )
+
+                HeroFinanceMetricItem(
+                    label = "Perlu Restok",
+                    value = if (isLoading) "—" else "$lowStockCount Item",
+                    valueColor = if (lowStockCount > 0) HubAmberText else HubSlate800,
+                    onClick = if (lowStockCount > 0) onLowStockClick else null,
+                    modifier = Modifier
+                        .weight(1f)
+                        .padding(horizontal = 6.dp),
+                )
+
+                Box(
+                    modifier = Modifier
+                        .width(1.dp)
+                        .height(28.dp)
+                        .background(HubSlate100),
                 )
 
                 Column(
                     modifier = Modifier
                         .weight(1f)
-                        .clickable(enabled = lowStockCount > 0, onClick = onLowStockClick),
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                    verticalArrangement = Arrangement.Center
-                ) {
-                    Text(
-                        text = "Perlu Restok",
-                        fontSize = 11.sp,
-                        fontWeight = FontWeight.Medium,
-                        color = HubSlate400
-                    )
-                    Text(
-                        text = if (isLoading) "-" else "$lowStockCount Item",
-                        fontSize = 14.sp,
-                        fontWeight = FontWeight.SemiBold,
-                        color = if (lowStockCount > 0) Color(0xFFB45309) else HubSlate800,
-                        modifier = Modifier.padding(top = 4.dp)
-                    )
-                }
-
-                Box(
-                    modifier = Modifier
-                        .width(1.dp)
-                        .height(30.dp)
-                        .background(HubSlate100)
-                )
-
-                Column(
-                    modifier = Modifier.weight(1f),
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                    verticalArrangement = Arrangement.Center
+                        .padding(start = 8.dp),
+                    horizontalAlignment = Alignment.Start,
                 ) {
                     Text(
                         text = "Status Sync",
                         fontSize = 11.sp,
                         fontWeight = FontWeight.Medium,
-                        color = HubSlate400
+                        color = HubSlate500,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
                     )
                     Row(
-                        modifier = Modifier.padding(top = 4.dp),
+                        modifier = Modifier.padding(top = 3.dp),
                         verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                        horizontalArrangement = Arrangement.spacedBy(5.dp),
                     ) {
                         Box(
                             modifier = Modifier
                                 .size(6.dp)
                                 .clip(CircleShape)
-                                .background(if (isSyncHealthy) HubBrand500 else Color(0xFFD97706))
+                                .background(if (isSyncHealthy) HubEmerald600 else Color(0xFFD97706)),
                         )
                         Text(
                             text = syncStatusText,
-                            fontSize = 14.sp,
-                            fontWeight = FontWeight.SemiBold,
+                            fontSize = 13.sp,
+                            fontWeight = FontWeight.Bold,
                             color = HubSlate800,
                             maxLines = 1,
-                            overflow = TextOverflow.Ellipsis
+                            overflow = TextOverflow.Ellipsis,
                         )
                     }
                 }
@@ -1743,6 +1772,7 @@ private fun HubActivityGroupSection(
     actions: List<BackofficeHubAction>,
     onActionClick: (BackofficeHubAction) -> Unit,
     modifier: Modifier = Modifier,
+    titleProvider: @Composable (BackofficeHubAction) -> String = { stringResource(it.titleRes) },
     badgeProvider: (BackofficeHubAction) -> HubActionBadge? = { null },
     iconColorsProvider: (BackofficeHubAction) -> Pair<Color, Color> = { HubEmerald50 to HubEmerald700 },
 ) {
@@ -1774,6 +1804,7 @@ private fun HubActivityGroupSection(
                     val (iconBg, iconTint) = iconColorsProvider(action)
                     HubActivityRow(
                         action = action,
+                        title = titleProvider(action),
                         badge = badgeProvider(action),
                         iconBgColor = iconBg,
                         iconTintColor = iconTint,
@@ -1795,6 +1826,7 @@ private fun HubActivityGroupSection(
 @Composable
 private fun HubActivityRow(
     action: BackofficeHubAction,
+    title: String,
     badge: HubActionBadge?,
     iconBgColor: Color,
     iconTintColor: Color,
@@ -1825,7 +1857,7 @@ private fun HubActivityRow(
             )
         }
         Text(
-            text = stringResource(action.titleRes),
+            text = title,
             color = HubSlate800,
             fontSize = 14.sp,
             fontWeight = FontWeight.SemiBold,
@@ -1869,42 +1901,6 @@ private fun HubActivityRow(
             modifier = Modifier.size(18.dp),
         )
     }
-}
-
-@Composable
-private fun HubActionGroupCard(
-    title: String,
-    actions: List<BackofficeHubAction>,
-    role: String,
-    compact: Boolean,
-    badgeProvider: (BackofficeHubAction) -> HubActionBadge? = { null },
-    onActionClick: (BackofficeHubAction) -> Unit,
-) {
-    val showFinancialLabel = AppAccessPolicy.can(role, AppCapability.FINANCIAL_ANALYTICS)
-    val items = actions.map { action ->
-        val itemTitle = if (action == BackofficeHubAction.PRODUCT_PRICES && showFinancialLabel) {
-            "Harga & Margin"
-        } else {
-            stringResource(action.titleRes)
-        }
-        val badge = badgeProvider(action)
-        RoleMenuItemSpec(
-            key = action.name,
-            icon = action.icon(),
-            title = itemTitle,
-            badgeText = badge?.text,
-            badgeDotColor = badge?.dotColor,
-            badgeBgColor = badge?.bgColor,
-            badgeTextColor = badge?.textColor,
-            testTag = "hub-action-${action.name}",
-            onClick = { onActionClick(action) },
-        )
-    }
-    RoleMenuGroupCard(
-        title = title,
-        items = items,
-        compact = compact,
-    )
 }
 
 private fun BackofficeHubAction.icon(): ImageVector = when (this) {

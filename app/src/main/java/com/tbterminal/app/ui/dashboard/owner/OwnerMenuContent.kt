@@ -21,6 +21,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import com.tbterminal.app.data.model.UserProfile
@@ -29,6 +30,8 @@ import com.tbterminal.app.ui.dashboard.RoleMenuGroupCard
 import com.tbterminal.app.ui.dashboard.RoleMenuItemSpec
 import com.tbterminal.app.ui.dashboard.RoleMenuProfileCard
 import com.tbterminal.app.ui.dashboard.admin.AdminDestination
+import com.tbterminal.app.ui.dashboard.rememberStaggeredEntrance
+import com.tbterminal.app.ui.dashboard.staggeredEntrance
 
 @Composable
 internal fun OwnerMenuContent(
@@ -43,6 +46,11 @@ internal fun OwnerMenuContent(
 ) {
     val groups = remember(role) { ownerMenuGroups(role) }
     val columns = remember(groups, layout.isCompact) { ownerMenuColumns(groups, expanded = !layout.isCompact) }
+    val entrance = rememberStaggeredEntrance(stepCount = 1 + groups.size)
+    val density = LocalDensity.current
+    val profileSlidePx = remember(density) { with(density) { 14.dp.toPx() } }
+    val groupBaseSlidePx = remember(density) { with(density) { 18.dp.toPx() } }
+    val groupStepSlidePx = remember(density) { with(density) { 4.dp.toPx() } }
     val displayName = profile?.name?.takeIf(String::isNotBlank) ?: sessionName
     val username = profile?.username?.takeIf(String::isNotBlank)
     val roleLabel = if (username != null) "@$username · Pemilik Toko" else "Pemilik · TB Barokah Jaya"
@@ -50,37 +58,48 @@ internal fun OwnerMenuContent(
     Column(
         modifier = modifier
             .fillMaxWidth()
-            .padding(top = if (layout.isCompact) 14.dp else 0.dp, bottom = 24.dp),
-        verticalArrangement = Arrangement.spacedBy(if (layout.isCompact) 16.dp else 20.dp),
+            .padding(top = if (layout.isCompact) 12.dp else 0.dp, bottom = 24.dp),
+        verticalArrangement = Arrangement.spacedBy(if (layout.isCompact) 14.dp else 18.dp),
     ) {
         RoleMenuProfileCard(
             displayName = displayName,
             roleLabel = roleLabel,
             onClick = onProfileClick,
             testTag = "owner-menu-profile",
-            modifier = if (layout.isCompact) Modifier.padding(horizontal = 16.dp) else Modifier,
+            modifier = (if (layout.isCompact) Modifier.padding(horizontal = 16.dp) else Modifier)
+                .staggeredEntrance(profileSlidePx) { entrance.progress(0) },
         )
         if (layout.isCompact) {
-            Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
-                groups.forEach { group ->
+            Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
+                groups.forEachIndexed { index, group ->
                     OwnerMenuGroupSection(
                         group = group,
                         compact = true,
                         onNavigate = onNavigate,
                         onLogout = onLogout,
+                        modifier = Modifier.staggeredEntrance(groupBaseSlidePx + index * groupStepSlidePx) {
+                            entrance.progress(1 + index)
+                        },
                     )
                 }
             }
         } else {
+            val groupIndices = remember(groups) {
+                groups.mapIndexed { idx, group -> group.titleRes to idx }.toMap()
+            }
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(24.dp)) {
                 columns.forEach { column ->
-                    Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(20.dp)) {
+                    Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(18.dp)) {
                         column.forEach { group ->
+                            val index = groupIndices[group.titleRes] ?: 0
                             OwnerMenuGroupSection(
                                 group = group,
                                 compact = false,
                                 onNavigate = onNavigate,
                                 onLogout = onLogout,
+                                modifier = Modifier.staggeredEntrance(groupBaseSlidePx + index * groupStepSlidePx) {
+                                    entrance.progress(1 + index)
+                                },
                             )
                         }
                     }
@@ -96,6 +115,7 @@ private fun OwnerMenuGroupSection(
     compact: Boolean,
     onNavigate: (AdminDestination) -> Unit,
     onLogout: () -> Unit,
+    modifier: Modifier = Modifier,
 ) {
     val groupTitle = stringResource(group.titleRes)
     val items = group.actions.map { action ->
@@ -118,6 +138,7 @@ private fun OwnerMenuGroupSection(
     RoleMenuGroupCard(
         title = groupTitle,
         items = items,
+        modifier = modifier,
         compact = compact,
     )
 }

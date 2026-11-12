@@ -39,6 +39,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.font.FontWeight
@@ -49,16 +50,17 @@ import com.tbterminal.app.ui.components.TbLayoutInfo
 import com.tbterminal.app.ui.dashboard.admin.AdminDestination
 import java.util.Locale
 
-private val MenuBrandGreen = Color(0xFF1B5E3C)
-private val MenuBrandTint = Color(0xFFEAF3ED)
+private val MenuBrandGreen = Color(0xFF047857)
+private val MenuBrandTint = Color(0xFFECFDF5)
 private val MenuCardBorder = Color(0xFFE2E8F0)
 private val MenuRowDivider = Color(0xFFF1F5F9)
 private val MenuBadgeBg = Color(0xFFF1F5F9)
-private val MenuTextPrimary = Color(0xFF0F172A)
+private val MenuTextPrimary = Color(0xFF1E293B)
 private val MenuTextSecondary = Color(0xFF64748B)
 private val MenuBadgeText = Color(0xFF475569)
 private val MenuChevron = Color(0xFF94A3B8)
 private val MenuDestructiveRed = Color(0xFFE11D48)
+private val MenuDestructiveTint = Color(0xFFFFF1F2)
 
 internal data class RoleMenuItemSpec(
     val key: String,
@@ -85,6 +87,10 @@ internal fun BackofficeMoreContent(
 ) {
     val sections = remember(role) { moreMenuSections(role) }
     val columns = remember(sections, layout.widthClass) { moreMenuColumns(sections, layout.widthClass) }
+    val entrance = rememberStaggeredEntrance(stepCount = sections.size)
+    val density = LocalDensity.current
+    val groupBaseSlidePx = remember(density) { with(density) { 14.dp.toPx() } }
+    val groupStepSlidePx = remember(density) { with(density) { 4.dp.toPx() } }
     val onSelect: (MoreMenuAction) -> Unit = { action ->
         when (action) {
             MoreMenuAction.USERS -> onUserManagementClick()
@@ -98,26 +104,36 @@ internal fun BackofficeMoreContent(
         modifier = Modifier
             .fillMaxWidth()
             .testTag("more-hub-content")
-            .padding(top = if (layout.isCompact) 14.dp else 0.dp, bottom = 24.dp),
-        verticalArrangement = Arrangement.spacedBy(if (layout.isCompact) 16.dp else 20.dp),
+            .padding(top = if (layout.isCompact) 12.dp else 0.dp, bottom = 24.dp),
+        verticalArrangement = Arrangement.spacedBy(if (layout.isCompact) 14.dp else 18.dp),
     ) {
         if (layout.isCompact) {
-            sections.forEach { section ->
+            sections.forEachIndexed { index, section ->
                 RoleMenuGroupCard(
                     title = section.title,
                     items = section.toMenuItemSpecs(onSelect),
                     compact = true,
+                    modifier = Modifier.staggeredEntrance(groupBaseSlidePx + index * groupStepSlidePx) {
+                        entrance.progress(index)
+                    },
                 )
             }
         } else {
+            val sectionIndices = remember(sections) {
+                sections.mapIndexed { idx, section -> section.title to idx }.toMap()
+            }
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(24.dp)) {
                 columns.forEach { column ->
-                    Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(20.dp)) {
+                    Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(18.dp)) {
                         column.forEach { section ->
+                            val index = sectionIndices[section.title] ?: 0
                             RoleMenuGroupCard(
                                 title = section.title,
                                 items = section.toMenuItemSpecs(onSelect),
                                 compact = false,
+                                modifier = Modifier.staggeredEntrance(groupBaseSlidePx + index * groupStepSlidePx) {
+                                    entrance.progress(index)
+                                },
                             )
                         }
                     }
@@ -235,12 +251,16 @@ internal fun RoleMenuGroupCard(
             border = BorderStroke(1.dp, MenuCardBorder.copy(alpha = 0.75f)),
             shadowElevation = 0.5.dp,
         ) {
-            Column(modifier = Modifier.fillMaxWidth()) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(16.dp)),
+            ) {
                 items.forEachIndexed { index, item ->
                     RoleMenuRow(item = item)
                     if (index < items.lastIndex) {
                         HorizontalDivider(
-                            modifier = Modifier.padding(start = 52.dp, end = 16.dp),
+                            modifier = Modifier.padding(start = 62.dp, end = 16.dp),
                             color = MenuRowDivider,
                             thickness = 1.dp,
                         )
@@ -253,30 +273,39 @@ internal fun RoleMenuGroupCard(
 
 @Composable
 private fun RoleMenuRow(item: RoleMenuItemSpec) {
+    val iconBg = if (item.isDestructive) MenuDestructiveTint else MenuBrandTint
     val iconTint = if (item.isDestructive) MenuDestructiveRed else MenuBrandGreen
     val textColor = if (item.isDestructive) MenuDestructiveRed else MenuTextPrimary
 
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .heightIn(min = 50.dp)
+            .heightIn(min = 52.dp)
             .testTag(item.testTag)
             .clickable(role = Role.Button, onClick = item.onClick)
-            .padding(horizontal = 16.dp, vertical = 13.dp),
-        horizontalArrangement = Arrangement.spacedBy(16.dp),
+            .padding(horizontal = 16.dp, vertical = 10.dp),
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Icon(
-            imageVector = item.icon,
-            contentDescription = null,
-            tint = iconTint,
-            modifier = Modifier.size(20.dp),
-        )
+        Box(
+            modifier = Modifier
+                .size(34.dp)
+                .clip(RoundedCornerShape(10.dp))
+                .background(iconBg),
+            contentAlignment = Alignment.Center,
+        ) {
+            Icon(
+                imageVector = item.icon,
+                contentDescription = null,
+                tint = iconTint,
+                modifier = Modifier.size(18.dp),
+            )
+        }
         Text(
             text = item.title,
             color = textColor,
             fontSize = 14.sp,
-            fontWeight = FontWeight.Medium,
+            fontWeight = FontWeight.SemiBold,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
             modifier = Modifier.weight(1f),
@@ -287,7 +316,7 @@ private fun RoleMenuRow(item: RoleMenuItemSpec) {
                 color = item.badgeBgColor ?: MenuBadgeBg,
             ) {
                 Row(
-                    modifier = Modifier.padding(horizontal = 9.dp, vertical = 3.dp),
+                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp),
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(5.dp),
                 ) {

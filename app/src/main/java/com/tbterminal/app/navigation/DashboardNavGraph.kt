@@ -395,25 +395,11 @@ internal fun NavGraphBuilder.dashboardGraph(navController: NavHostController, se
             AppRoute.BackofficeStock.route to BackofficeSection.STOCK,
             AppRoute.BackofficeMore.route to BackofficeSection.MORE
         ).forEach { (route, section) ->
-            val useSnappyHubTransition = section == BackofficeSection.TRANSACTIONS ||
-                section == BackofficeSection.FINANCE
             composable(
                 route = route,
-                enterTransition = if (useSnappyHubTransition) {
-                    { fadeIn(animationSpec = tween(durationMillis = 150)) }
-                } else {
-                    null
-                },
-                exitTransition = if (useSnappyHubTransition) {
-                    { fadeOut(animationSpec = tween(durationMillis = 120)) }
-                } else {
-                    null
-                },
-                popEnterTransition = if (useSnappyHubTransition) {
-                    { fadeIn(animationSpec = tween(durationMillis = 150)) }
-                } else {
-                    null
-                },
+                enterTransition = { fadeIn(animationSpec = tween(durationMillis = 150)) },
+                exitTransition = { fadeOut(animationSpec = tween(durationMillis = 120)) },
+                popEnterTransition = { fadeIn(animationSpec = tween(durationMillis = 150)) },
             ) {
                 val sessionUser = sessionManager.readSessionUser()
                 if (sessionUser == null) {
