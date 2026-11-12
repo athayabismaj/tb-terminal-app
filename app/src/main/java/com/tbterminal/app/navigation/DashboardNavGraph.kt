@@ -395,20 +395,21 @@ internal fun NavGraphBuilder.dashboardGraph(navController: NavHostController, se
             AppRoute.BackofficeStock.route to BackofficeSection.STOCK,
             AppRoute.BackofficeMore.route to BackofficeSection.MORE
         ).forEach { (route, section) ->
-            val isTransactions = section == BackofficeSection.TRANSACTIONS
+            val useSnappyHubTransition = section == BackofficeSection.TRANSACTIONS ||
+                section == BackofficeSection.FINANCE
             composable(
                 route = route,
-                enterTransition = if (isTransactions) {
+                enterTransition = if (useSnappyHubTransition) {
                     { fadeIn(animationSpec = tween(durationMillis = 150)) }
                 } else {
                     null
                 },
-                exitTransition = if (isTransactions) {
+                exitTransition = if (useSnappyHubTransition) {
                     { fadeOut(animationSpec = tween(durationMillis = 120)) }
                 } else {
                     null
                 },
-                popEnterTransition = if (isTransactions) {
+                popEnterTransition = if (useSnappyHubTransition) {
                     { fadeIn(animationSpec = tween(durationMillis = 150)) }
                 } else {
                     null

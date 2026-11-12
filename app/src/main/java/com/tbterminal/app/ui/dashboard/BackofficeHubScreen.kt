@@ -281,6 +281,7 @@ private val HubKasiraBrand = Color(0xFF10533C)
 private val HubEmerald50 = Color(0xFFECFDF5)
 private val HubEmerald600 = Color(0xFF059669)
 private val HubEmerald700 = Color(0xFF047857)
+private val HubAmberSoftBg = Color(0xFFFFFBEB)
 private val HubSlate600 = Color(0xFF475569)
 private val HubSlate700 = Color(0xFF334155)
 private val HubPillTrackBg = Color(0xFFE5E9F0)
@@ -291,6 +292,34 @@ private const val TX_STEP_SUMMARY = 1
 private const val TX_STEP_CTA = 2
 private const val TX_STEP_LIST = 3
 
+private class StaggeredEntranceState(
+    private val steps: List<Animatable<Float, *>>,
+) {
+    fun progress(index: Int): Float = steps.getOrNull(index)?.value ?: 1f
+}
+
+@Composable
+private fun rememberStaggeredEntrance(stepCount: Int): StaggeredEntranceState {
+    val steps = remember(stepCount) { List(stepCount.coerceAtLeast(1)) { Animatable(0f) } }
+    LaunchedEffect(steps) {
+        coroutineScope {
+            steps.forEachIndexed { index, anim ->
+                launch {
+                    delay(index * 45L)
+                    anim.animateTo(
+                        targetValue = 1f,
+                        animationSpec = tween(
+                            durationMillis = 320,
+                            easing = HubMotionEaseOut,
+                        ),
+                    )
+                }
+            }
+        }
+    }
+    return remember(steps) { StaggeredEntranceState(steps) }
+}
+
 private fun Modifier.staggeredEntrance(
     slideDistancePx: Float,
     progress: () -> Float,
@@ -298,6 +327,37 @@ private fun Modifier.staggeredEntrance(
     val current = progress()
     alpha = current
     translationY = (1f - current) * slideDistancePx
+}
+
+@Composable
+private fun AnimatedNominalValue(
+    text: String,
+    modifier: Modifier = Modifier,
+) {
+    AnimatedContent(
+        targetState = text,
+        transitionSpec = {
+            (
+                fadeIn(tween(durationMillis = 180)) +
+                    slideInVertically(tween(durationMillis = 180)) { it / 4 }
+                ) togetherWith (
+                fadeOut(tween(durationMillis = 120)) +
+                    slideOutVertically(tween(durationMillis = 120)) { -it / 4 }
+                )
+        },
+        modifier = modifier,
+        label = "HubNominalDisplay",
+    ) { displayValue ->
+        Text(
+            text = displayValue,
+            color = HubSlate900,
+            fontSize = 24.sp,
+            fontWeight = FontWeight.Bold,
+            letterSpacing = (-0.5).sp,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+        )
+    }
 }
 
 private data class HubActionBadge(
@@ -333,6 +393,7 @@ private fun FinanceHub(
     analyticsRepository: AnalyticsRepository? = null,
     onNavigate: (AdminDestination) -> Unit,
 ) {
+    var isNominalHidden by rememberSaveable { mutableStateOf(false) }
     var totalCashBalance by remember { mutableStateOf(BigDecimal.ZERO) }
     var todayCashInflow by remember { mutableStateOf(BigDecimal.ZERO) }
     var totalReceivables by remember { mutableStateOf(BigDecimal.ZERO) }
@@ -342,119 +403,134 @@ private fun FinanceHub(
     var todayExpensesTotal by remember { mutableStateOf(BigDecimal.ZERO) }
     var todayExpensesCount by remember { mutableIntStateOf(0) }
     var hasActiveSession by remember { mutableStateOf(false) }
-    var isLoading by remember { mutableStateOf(true) }
+    val hasAnyRepo = cashReconciliationRepository != null ||
+        receivableRepository != null ||
+        purchasingRepository != null ||
+        analyticsRepository != null
+    var isLoading by remember { mutableStateOf(hasAnyRepo) }
+
+    val entrance = rememberStaggeredEntrance(stepCount = 1 + content.groups.size)
 
     LaunchedEffect(cashReconciliationRepository, receivableRepository, purchasingRepository, analyticsRepository) {
-        isLoading = true
-        var loadedBalance = BigDecimal.ZERO
-        var loadedInflow = BigDecimal.ZERO
-        var loadedReceivables = BigDecimal.ZERO
-        var loadedReceivablesCount = 0
-        var loadedPayables = BigDecimal.ZERO
-        var loadedPayablesCount = 0
-        var loadedExpensesTotal = BigDecimal.ZERO
-        var loadedExpensesCount = 0
+        isLoading = hasAnyRepo
+        try {
+            var loadedBalance = BigDecimal.ZERO
+            var loadedInflow = BigDecimal.ZERO
+            var loadedReceivables = BigDecimal.ZERO
+            var loadedReceivablesCount = 0
+            var loadedPayables = BigDecimal.ZERO
+            var loadedPayablesCount = 0
+            var loadedExpensesTotal = BigDecimal.ZERO
+            var loadedExpensesCount = 0
 
-        if (analyticsRepository != null) {
-            runCatching {
-                val metrics = analyticsRepository.getDashboardMetrics()
-                loadedInflow = BigDecimal.valueOf(metrics.totalRevenueToday)
-                loadedReceivables = BigDecimal.valueOf(metrics.totalActiveReceivables)
-                loadedReceivablesCount = metrics.activeReceivableCount.toInt()
+            if (analyticsRepository != null) {
+                runCatching {
+                    val metrics = analyticsRepository.getDashboardMetrics()
+                    loadedInflow = BigDecimal.valueOf(metrics.totalRevenueToday)
+                    loadedReceivables = BigDecimal.valueOf(metrics.totalActiveReceivables)
+                    loadedReceivablesCount = metrics.activeReceivableCount.toInt()
+                }
             }
-        }
 
-        if (cashReconciliationRepository != null) {
-            runCatching {
-                when (val sessionRes = cashReconciliationRepository.getActiveSession()) {
-                    is RepositoryResult.Success -> {
-                        val activeSession = sessionRes.data
-                        hasActiveSession = activeSession != null
-                        if (activeSession != null) {
-                            loadedBalance = activeSession.systemCash ?: activeSession.openingCash
-                            val sessionInflow = activeSession.systemCash?.subtract(activeSession.openingCash)?.max(BigDecimal.ZERO)
-                            if (sessionInflow != null && sessionInflow > BigDecimal.ZERO) {
-                                loadedInflow = sessionInflow
-                            }
-                        } else {
-                            when (val lastSessions = cashReconciliationRepository.getSessions(page = 1, limit = 1)) {
-                                is RepositoryResult.Success -> {
-                                    val last = lastSessions.data.data.firstOrNull()
-                                    if (last != null) {
-                                        loadedBalance = last.closingCash ?: last.systemCash ?: last.openingCash
-                                    }
+            if (cashReconciliationRepository != null) {
+                runCatching {
+                    when (val sessionRes = cashReconciliationRepository.getActiveSession()) {
+                        is RepositoryResult.Success -> {
+                            val activeSession = sessionRes.data
+                            hasActiveSession = activeSession != null
+                            if (activeSession != null) {
+                                loadedBalance = activeSession.systemCash ?: activeSession.openingCash
+                                val sessionInflow = activeSession.systemCash?.subtract(activeSession.openingCash)?.max(BigDecimal.ZERO)
+                                if (sessionInflow != null && sessionInflow > BigDecimal.ZERO) {
+                                    loadedInflow = sessionInflow
                                 }
-                                else -> Unit
+                            } else {
+                                when (val lastSessions = cashReconciliationRepository.getSessions(page = 1, limit = 1)) {
+                                    is RepositoryResult.Success -> {
+                                        val last = lastSessions.data.data.firstOrNull()
+                                        if (last != null) {
+                                            loadedBalance = last.closingCash ?: last.systemCash ?: last.openingCash
+                                        }
+                                    }
+                                    else -> Unit
+                                }
                             }
                         }
+                        else -> Unit
                     }
-                    else -> Unit
+                }
+
+                runCatching {
+                    val todayStr = LocalDate.now().toString()
+                    when (
+                        val expRes = cashReconciliationRepository.getExpenseHistory(
+                            page = 1,
+                            limit = 50,
+                            startDate = todayStr,
+                            endDate = todayStr,
+                        )
+                    ) {
+                        is RepositoryResult.Success -> {
+                            val page = expRes.data
+                            loadedExpensesCount = page.total.toInt().coerceAtLeast(page.data.size)
+                            loadedExpensesTotal = page.data.fold(BigDecimal.ZERO) { acc, item -> acc.add(item.amount) }
+                        }
+                        else -> Unit
+                    }
                 }
             }
 
-            runCatching {
-                val todayStr = LocalDate.now().toString()
-                when (
-                    val expRes = cashReconciliationRepository.getExpenseHistory(
-                        page = 1,
-                        limit = 50,
-                        startDate = todayStr,
-                        endDate = todayStr,
-                    )
-                ) {
-                    is RepositoryResult.Success -> {
-                        val page = expRes.data
-                        loadedExpensesCount = page.total.toInt().coerceAtLeast(page.data.size)
-                        loadedExpensesTotal = page.data.fold(BigDecimal.ZERO) { acc, item -> acc.add(item.amount) }
+            if (receivableRepository != null) {
+                runCatching {
+                    when (val recRes = receivableRepository.getReceivables(page = 1, limit = 50, status = "unpaid")) {
+                        is RepositoryResult.Success -> {
+                            val page = recRes.data
+                            loadedReceivablesCount = page.total.toInt().coerceAtLeast(page.data.size)
+                            loadedReceivables = page.data.fold(BigDecimal.ZERO) { acc, r -> acc.add(r.remainingAmount) }
+                        }
+                        else -> Unit
                     }
-                    else -> Unit
                 }
             }
+
+            if (purchasingRepository != null) {
+                runCatching {
+                    when (val payRes = purchasingRepository.getPayables(page = 1, limit = 50, status = "unpaid")) {
+                        is RepositoryResult.Success -> {
+                            val page = payRes.data
+                            loadedPayablesCount = page.total.toInt().coerceAtLeast(page.data.size)
+                            loadedPayables = page.data.fold(BigDecimal.ZERO) { acc, p -> acc.add(p.remainingAmount) }
+                        }
+                        else -> Unit
+                    }
+                }
+            }
+
+            totalCashBalance = loadedBalance
+            todayCashInflow = loadedInflow
+            totalReceivables = loadedReceivables
+            receivableNotesCount = loadedReceivablesCount
+            totalPayables = loadedPayables
+            payableNotesCount = loadedPayablesCount
+            todayExpensesTotal = loadedExpensesTotal
+            todayExpensesCount = loadedExpensesCount
+        } finally {
+            isLoading = false
         }
-
-        if (receivableRepository != null) {
-            runCatching {
-                when (val recRes = receivableRepository.getReceivables(page = 1, limit = 50, status = "unpaid")) {
-                    is RepositoryResult.Success -> {
-                        val page = recRes.data
-                        loadedReceivablesCount = page.total.toInt().coerceAtLeast(page.data.size)
-                        loadedReceivables = page.data.fold(BigDecimal.ZERO) { acc, r -> acc.add(r.remainingAmount) }
-                    }
-                    else -> Unit
-                }
-            }
-        }
-
-        if (purchasingRepository != null) {
-            runCatching {
-                when (val payRes = purchasingRepository.getPayables(page = 1, limit = 50, status = "unpaid")) {
-                    is RepositoryResult.Success -> {
-                        val page = payRes.data
-                        loadedPayablesCount = page.total.toInt().coerceAtLeast(page.data.size)
-                        loadedPayables = page.data.fold(BigDecimal.ZERO) { acc, p -> acc.add(p.remainingAmount) }
-                    }
-                    else -> Unit
-                }
-            }
-        }
-
-        totalCashBalance = loadedBalance
-        todayCashInflow = loadedInflow
-        totalReceivables = loadedReceivables
-        receivableNotesCount = loadedReceivablesCount
-        totalPayables = loadedPayables
-        payableNotesCount = loadedPayablesCount
-        todayExpensesTotal = loadedExpensesTotal
-        todayExpensesCount = loadedExpensesCount
-        isLoading = false
     }
+
+    val density = LocalDensity.current
+    val heroSlidePx = remember(density) { with(density) { 14.dp.toPx() } }
+    val groupBaseSlidePx = remember(density) { with(density) { 18.dp.toPx() } }
+    val groupStepSlidePx = remember(density) { with(density) { 4.dp.toPx() } }
+    val horizontalInsetModifier = if (compact) Modifier.padding(horizontal = 16.dp) else Modifier
 
     Column(
         modifier = Modifier
             .fillMaxWidth()
             .testTag("finance-hub-content")
             .padding(bottom = 24.dp),
-        verticalArrangement = Arrangement.spacedBy(if (compact) 14.dp else 20.dp)
+        verticalArrangement = Arrangement.spacedBy(if (compact) 14.dp else 18.dp),
     ) {
         Box(
             modifier = if (compact) {
@@ -471,52 +547,66 @@ private fun FinanceHub(
                 receivableNotesCount = receivableNotesCount,
                 payableNotesCount = payableNotesCount,
                 hasActiveSession = hasActiveSession,
+                isNominalHidden = isNominalHidden,
                 isLoading = isLoading,
+                onToggleNominal = { isNominalHidden = !isNominalHidden },
                 onReceivablesClick = { onNavigate(AdminDestination.Receivables) },
                 onPayablesClick = { onNavigate(AdminDestination.SupplierDebts) },
+                modifier = Modifier.staggeredEntrance(heroSlidePx) { entrance.progress(0) },
             )
         }
 
-        content.groups.forEach { group ->
-            HubActionGroupCard(
+        content.groups.forEachIndexed { index, group ->
+            HubActivityGroupSection(
                 title = stringResource(group.titleRes).uppercase(Locale.ROOT),
                 actions = group.actions,
-                role = role,
-                compact = compact,
                 badgeProvider = { action ->
                     when (action) {
                         BackofficeHubAction.DAILY_CASH -> HubActionBadge(
                             text = if (hasActiveSession) "Sesi Aktif" else "Sesi Ditutup",
-                            dotColor = if (hasActiveSession) Color(0xFF10B981) else HubSlate400,
-                            bgColor = if (hasActiveSession) HubBrand50 else HubSlate100,
-                            textColor = if (hasActiveSession) HubBrand700 else HubSlate500,
+                            dotColor = if (hasActiveSession) HubEmerald600 else HubSlate400,
+                            bgColor = if (hasActiveSession) HubEmerald50 else HubSlate100,
+                            textColor = if (hasActiveSession) HubEmerald700 else HubSlate500,
                         )
                         BackofficeHubAction.CASH_EXPENSES -> HubActionBadge(
-                            text = if (todayExpensesCount > 0) {
-                                "$todayExpensesCount Beban · ${formatShortCurrency(todayExpensesTotal)}"
-                            } else {
-                                "Hari Ini Rp0"
+                            text = when {
+                                isNominalHidden && todayExpensesCount > 0 -> "$todayExpensesCount Beban · Rp•••"
+                                isNominalHidden -> "Tersembunyi"
+                                todayExpensesCount > 0 -> "$todayExpensesCount Beban · ${formatShortCurrency(todayExpensesTotal)}"
+                                else -> "Hari Ini Rp0"
                             },
-                            dotColor = if (todayExpensesCount > 0) Color(0xFFF59E0B) else HubSlate400,
+                            dotColor = if (todayExpensesCount > 0) Color(0xFFD97706) else HubSlate400,
                             bgColor = if (todayExpensesCount > 0) HubAmberBg else HubSlate100,
                             textColor = if (todayExpensesCount > 0) HubAmberText else HubSlate500,
                         )
                         BackofficeHubAction.RECEIVABLES -> HubActionBadge(
-                            text = "$receivableNotesCount Nota · ${formatShortCurrency(totalReceivables)}",
-                            dotColor = if (receivableNotesCount > 0) Color(0xFF10B981) else HubSlate400,
-                            bgColor = if (receivableNotesCount > 0) HubBrand50 else HubSlate100,
-                            textColor = if (receivableNotesCount > 0) HubBrand700 else HubSlate500,
+                            text = "$receivableNotesCount Nota · ${if (isNominalHidden) "Rp•••" else formatShortCurrency(totalReceivables)}",
+                            dotColor = if (receivableNotesCount > 0) HubEmerald600 else HubSlate400,
+                            bgColor = if (receivableNotesCount > 0) HubEmerald50 else HubSlate100,
+                            textColor = if (receivableNotesCount > 0) HubEmerald700 else HubSlate500,
                         )
                         BackofficeHubAction.SUPPLIER_DEBTS -> HubActionBadge(
-                            text = "$payableNotesCount Nota · ${formatShortCurrency(totalPayables)}",
-                            dotColor = if (payableNotesCount > 0) Color(0xFFF59E0B) else HubSlate400,
+                            text = "$payableNotesCount Nota · ${if (isNominalHidden) "Rp•••" else formatShortCurrency(totalPayables)}",
+                            dotColor = if (payableNotesCount > 0) Color(0xFFD97706) else HubSlate400,
                             bgColor = if (payableNotesCount > 0) HubAmberBg else HubSlate100,
                             textColor = if (payableNotesCount > 0) HubAmberText else HubSlate500,
                         )
                         else -> null
                     }
                 },
+                iconColorsProvider = { action ->
+                    when (action) {
+                        BackofficeHubAction.CASH_EXPENSES,
+                        BackofficeHubAction.SUPPLIER_DEBTS -> HubAmberSoftBg to HubAmberText
+                        else -> HubEmerald50 to HubEmerald700
+                    }
+                },
                 onActionClick = { action -> onNavigate(action.destination) },
+                modifier = horizontalInsetModifier.staggeredEntrance(
+                    groupBaseSlidePx + index * groupStepSlidePx,
+                ) {
+                    entrance.progress(1 + index)
+                },
             )
         }
     }
@@ -531,212 +621,220 @@ private fun HeroFinancialCard(
     receivableNotesCount: Int,
     payableNotesCount: Int,
     hasActiveSession: Boolean,
+    isNominalHidden: Boolean,
     isLoading: Boolean,
+    onToggleNominal: () -> Unit,
     onReceivablesClick: () -> Unit,
     onPayablesClick: () -> Unit,
+    modifier: Modifier = Modifier,
 ) {
-    var isBalanceVisible by remember { mutableStateOf(true) }
-
     val statusText = when {
-        hasActiveSession -> "Shift Kas Aktif"
-        payableNotesCount > 0 || receivableNotesCount > 0 -> "$receivableNotesCount Piutang · $payableNotesCount Hutang"
+        hasActiveSession -> "Shift Aktif"
+        payableNotesCount > 0 -> "$payableNotesCount Hutang"
+        receivableNotesCount > 0 -> "$receivableNotesCount Piutang"
         else -> "Kas Siap"
     }
-    val statusDotColor = when {
-        hasActiveSession -> HubBrand600
-        payableNotesCount > 0 -> Color(0xFFD97706)
-        else -> HubBrand600
+    val statusDotColor = if (!hasActiveSession && payableNotesCount > 0) {
+        Color(0xFFD97706)
+    } else {
+        HubEmerald600
     }
-    val statusBg = if (!hasActiveSession && payableNotesCount > 0) Color(0xFFFEF3C7) else HubBrand50
-    val statusBorder = if (!hasActiveSession && payableNotesCount > 0) Color(0xFFFDE68A) else HubBrand100.copy(alpha = 0.8f)
-    val statusTextColor = if (!hasActiveSession && payableNotesCount > 0) Color(0xFFB45309) else HubBrand700
+    val statusTextColor = if (!hasActiveSession && payableNotesCount > 0) {
+        HubAmberText
+    } else {
+        HubSlate500
+    }
 
     Surface(
-        modifier = Modifier.fillMaxWidth(),
+        modifier = modifier.fillMaxWidth(),
         shape = RoundedCornerShape(16.dp),
         color = Color.White,
         border = BorderStroke(1.dp, HubCardBorder.copy(alpha = 0.75f)),
-        shadowElevation = 0.5.dp
+        shadowElevation = 0.5.dp,
     ) {
         Column(
-            modifier = Modifier.padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(14.dp)
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(16.dp),
         ) {
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
+                verticalAlignment = Alignment.CenterVertically,
             ) {
-                Text(
-                    text = "RINGKASAN KAS & SALDO",
-                    fontSize = 11.sp,
-                    fontWeight = FontWeight.SemiBold,
-                    color = HubSlate500,
-                    letterSpacing = 0.5.sp
-                )
-
-                Surface(
-                    shape = RoundedCornerShape(50),
-                    color = statusBg,
-                    border = BorderStroke(1.dp, statusBorder)
-                ) {
-                    Row(
-                        modifier = Modifier.padding(horizontal = 9.dp, vertical = 3.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(6.dp)
-                    ) {
-                        Box(
-                            modifier = Modifier
-                                .size(6.dp)
-                                .clip(CircleShape)
-                                .background(statusDotColor)
-                        )
-                        Text(
-                            text = statusText,
-                            fontSize = 11.sp,
-                            fontWeight = FontWeight.Medium,
-                            color = statusTextColor
-                        )
-                    }
-                }
-            }
-
-            Column {
                 Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(4.dp),
+                    modifier = Modifier
+                        .weight(1f)
+                        .padding(end = 8.dp),
                 ) {
                     Text(
                         text = if (hasActiveSession) "Saldo Kas Laci (Shift Aktif)" else "Saldo Kas Sesi Terakhir",
                         fontSize = 12.sp,
-                        fontWeight = FontWeight.Medium,
-                        color = HubSlate400
+                        fontWeight = FontWeight.SemiBold,
+                        color = HubSlate500,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.weight(1f, fill = false),
                     )
                     IconButton(
-                        onClick = { isBalanceVisible = !isBalanceVisible },
-                        modifier = Modifier.size(24.dp)
+                        onClick = onToggleNominal,
+                        modifier = Modifier
+                            .size(24.dp)
+                            .testTag("finance-toggle-nominal"),
                     ) {
                         Icon(
-                            imageVector = if (isBalanceVisible) Icons.Outlined.Visibility else Icons.Outlined.VisibilityOff,
-                            contentDescription = if (isBalanceVisible) "Sembunyikan Saldo" else "Tampilkan Saldo",
-                            tint = HubSlate400,
-                            modifier = Modifier.size(16.dp)
+                            imageVector = if (isNominalHidden) {
+                                Icons.Outlined.VisibilityOff
+                            } else {
+                                Icons.Outlined.Visibility
+                            },
+                            contentDescription = if (isNominalHidden) {
+                                "Tampilkan nominal keuangan"
+                            } else {
+                                "Sembunyikan nominal keuangan"
+                            },
+                            tint = HubSlate500,
+                            modifier = Modifier.size(16.dp),
                         )
                     }
                 }
 
-                if (isLoading) {
-                    SkeletonBox(
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                ) {
+                    Box(
                         modifier = Modifier
-                            .fillMaxWidth(0.55f)
-                            .height(32.dp)
-                            .padding(top = 4.dp)
+                            .size(6.dp)
+                            .clip(CircleShape)
+                            .background(statusDotColor),
                     )
-                } else {
                     Text(
-                        text = if (isBalanceVisible) formatIdCurrency(totalCashBalance) else "Rp ••••••••",
-                        fontSize = 28.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = HubSlate900,
-                        letterSpacing = (-0.5).sp,
-                        modifier = Modifier.padding(top = 2.dp)
+                        text = statusText,
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.Medium,
+                        color = statusTextColor,
                     )
                 }
             }
 
+            Spacer(Modifier.height(8.dp))
+
+            if (isLoading && !isNominalHidden) {
+                SkeletonBox(
+                    modifier = Modifier
+                        .fillMaxWidth(0.55f)
+                        .height(28.dp),
+                )
+            } else {
+                AnimatedNominalValue(
+                    text = if (isNominalHidden) "Rp••••••" else formatIdCurrency(totalCashBalance),
+                )
+            }
+
+            Spacer(Modifier.height(12.dp))
             HorizontalDivider(color = HubSlate100, thickness = 1.dp)
+            Spacer(Modifier.height(10.dp))
 
             Row(
                 modifier = Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically
+                verticalAlignment = Alignment.CenterVertically,
             ) {
-                Column(
+                HeroFinanceMetricItem(
+                    label = "Kas Hari Ini",
+                    value = when {
+                        isLoading && !isNominalHidden -> "—"
+                        isNominalHidden -> "Rp••••"
+                        else -> "+${formatIdCurrency(todayCashInflow)}"
+                    },
+                    valueColor = HubEmerald700,
                     modifier = Modifier
                         .weight(1f)
-                        .padding(end = 4.dp),
-                    horizontalAlignment = Alignment.Start
-                ) {
-                    Text(
-                        text = "Kas Hari Ini",
-                        fontSize = 11.sp,
-                        fontWeight = FontWeight.Medium,
-                        color = HubSlate400
-                    )
-                    Text(
-                        text = if (isLoading) "-" else "+${formatIdCurrency(todayCashInflow)}",
-                        fontSize = 13.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = HubBrand700,
-                        modifier = Modifier.padding(top = 3.dp),
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis
-                    )
-                }
-
+                        .padding(end = 6.dp),
+                )
                 Box(
                     modifier = Modifier
                         .width(1.dp)
-                        .height(30.dp)
-                        .background(HubSlate100)
+                        .height(28.dp)
+                        .background(HubSlate100),
                 )
-
-                Column(
+                HeroFinanceMetricItem(
+                    label = "Piutang Aktif",
+                    value = when {
+                        isLoading && !isNominalHidden -> "—"
+                        isNominalHidden -> "Rp••••"
+                        else -> formatIdCurrency(totalReceivable)
+                    },
+                    valueColor = HubSlate800,
+                    onClick = onReceivablesClick,
                     modifier = Modifier
                         .weight(1f)
-                        .clickable(onClick = onReceivablesClick)
                         .padding(horizontal = 6.dp),
-                    horizontalAlignment = Alignment.Start
-                ) {
-                    Text(
-                        text = "Piutang Aktif",
-                        fontSize = 11.sp,
-                        fontWeight = FontWeight.Medium,
-                        color = HubSlate400
-                    )
-                    Text(
-                        text = if (isLoading) "-" else formatIdCurrency(totalReceivable),
-                        fontSize = 13.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = HubSlate800,
-                        modifier = Modifier.padding(top = 3.dp),
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis
-                    )
-                }
-
+                )
                 Box(
                     modifier = Modifier
                         .width(1.dp)
-                        .height(30.dp)
-                        .background(HubSlate100)
+                        .height(28.dp)
+                        .background(HubSlate100),
                 )
-
-                Column(
+                HeroFinanceMetricItem(
+                    label = "Hutang Tempo",
+                    value = when {
+                        isLoading && !isNominalHidden -> "—"
+                        isNominalHidden -> "Rp••••"
+                        else -> formatIdCurrency(totalPayable)
+                    },
+                    valueColor = if (totalPayable > BigDecimal.ZERO) HubAmberText else HubSlate800,
+                    onClick = onPayablesClick,
                     modifier = Modifier
                         .weight(1f)
-                        .clickable(onClick = onPayablesClick)
                         .padding(start = 6.dp),
-                    horizontalAlignment = Alignment.Start
-                ) {
-                    Text(
-                        text = "Hutang Tempo",
-                        fontSize = 11.sp,
-                        fontWeight = FontWeight.Medium,
-                        color = HubSlate400
-                    )
-                    Text(
-                        text = if (isLoading) "-" else formatIdCurrency(totalPayable),
-                        fontSize = 13.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = HubSlate800,
-                        modifier = Modifier.padding(top = 3.dp),
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis
-                    )
-                }
+                )
             }
         }
+    }
+}
+
+@Composable
+private fun HeroFinanceMetricItem(
+    label: String,
+    value: String,
+    valueColor: Color,
+    modifier: Modifier = Modifier,
+    onClick: (() -> Unit)? = null,
+) {
+    Column(
+        modifier = modifier
+            .clip(RoundedCornerShape(8.dp))
+            .then(
+                if (onClick != null) {
+                    Modifier.clickable(role = Role.Button, onClick = onClick)
+                } else {
+                    Modifier
+                },
+            )
+            .padding(vertical = 2.dp, horizontal = 2.dp),
+        horizontalAlignment = Alignment.Start,
+    ) {
+        Text(
+            text = label,
+            fontSize = 11.sp,
+            fontWeight = FontWeight.Medium,
+            color = HubSlate500,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+        )
+        Text(
+            text = value,
+            fontSize = 13.sp,
+            fontWeight = FontWeight.Bold,
+            color = valueColor,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+            modifier = Modifier.padding(top = 3.dp),
+        )
     }
 }
 
@@ -1217,23 +1315,7 @@ private fun TransactionsHub(
         )
     }
 
-    val entranceSteps = remember { List(4) { Animatable(0f) } }
-    LaunchedEffect(Unit) {
-        coroutineScope {
-            entranceSteps.forEachIndexed { index, anim ->
-                launch {
-                    delay(index * 45L)
-                    anim.animateTo(
-                        targetValue = 1f,
-                        animationSpec = tween(
-                            durationMillis = 320,
-                            easing = HubMotionEaseOut,
-                        ),
-                    )
-                }
-            }
-        }
-    }
+    val entrance = rememberStaggeredEntrance(stepCount = 4)
 
     LaunchedEffect(analyticsRepository, cashReconciliationRepository, purchasingRepository) {
         isLoading = analyticsRepository != null ||
@@ -1316,7 +1398,7 @@ private fun TransactionsHub(
             selectedTab = selectedTab,
             compact = compact,
             onSelectTab = { selectedTab = it },
-            modifier = Modifier.staggeredEntrance(tabSlidePx) { entranceSteps[TX_STEP_TAB].value },
+            modifier = Modifier.staggeredEntrance(tabSlidePx) { entrance.progress(TX_STEP_TAB) },
         )
 
         AnimatedContent(
@@ -1358,7 +1440,7 @@ private fun TransactionsHub(
                         footerValue = "$todayTrxCount Struk",
                         footerValueColor = HubSlate700,
                         modifier = Modifier.staggeredEntrance(summarySlidePx) {
-                            entranceSteps[TX_STEP_SUMMARY].value
+                            entrance.progress(TX_STEP_SUMMARY)
                         },
                     )
                     BackofficeTransactionTab.PURCHASES -> TransactionSummaryCard(
@@ -1378,7 +1460,7 @@ private fun TransactionsHub(
                         footerValue = if (purchaseLoadFailed) "Gagal memuat" else "$monthlyPurchasesCount Faktur",
                         footerValueColor = if (purchaseLoadFailed) HubAmberText else HubSlate700,
                         modifier = Modifier.staggeredEntrance(summarySlidePx) {
-                            entranceSteps[TX_STEP_SUMMARY].value
+                            entrance.progress(TX_STEP_SUMMARY)
                         },
                     )
                 }
@@ -1388,18 +1470,18 @@ private fun TransactionsHub(
                         action = primary,
                         onClick = { onNavigate(primary.destination) },
                         modifier = Modifier.staggeredEntrance(ctaSlidePx) {
-                            entranceSteps[TX_STEP_CTA].value
+                            entrance.progress(TX_STEP_CTA)
                         },
                     )
                 }
 
                 tabContent.groups.forEach { group ->
-                    TransactionActivityGroupSection(
+                    HubActivityGroupSection(
                         title = stringResource(group.titleRes).uppercase(Locale.ROOT),
                         actions = group.actions,
                         onActionClick = { action -> onNavigate(action.destination) },
                         modifier = Modifier.staggeredEntrance(listSlidePx) {
-                            entranceSteps[TX_STEP_LIST].value
+                            entrance.progress(TX_STEP_LIST)
                         },
                     )
                 }
@@ -1583,29 +1665,7 @@ private fun TransactionSummaryCard(
                         .height(28.dp),
                 )
             } else {
-                AnimatedContent(
-                    targetState = nominalText,
-                    transitionSpec = {
-                        (
-                            fadeIn(tween(durationMillis = 180)) +
-                                slideInVertically(tween(durationMillis = 180)) { it / 4 }
-                            ) togetherWith (
-                            fadeOut(tween(durationMillis = 120)) +
-                                slideOutVertically(tween(durationMillis = 120)) { -it / 4 }
-                            )
-                    },
-                    label = "TransactionNominalDisplay",
-                ) { displayValue ->
-                    Text(
-                        text = displayValue,
-                        color = HubSlate900,
-                        fontSize = 24.sp,
-                        fontWeight = FontWeight.Bold,
-                        letterSpacing = (-0.5).sp,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                    )
-                }
+                AnimatedNominalValue(text = nominalText)
             }
 
             Spacer(Modifier.height(12.dp))
@@ -1678,11 +1738,13 @@ private fun TransactionPrimaryCtaButton(
 }
 
 @Composable
-private fun TransactionActivityGroupSection(
+private fun HubActivityGroupSection(
     title: String,
     actions: List<BackofficeHubAction>,
     onActionClick: (BackofficeHubAction) -> Unit,
     modifier: Modifier = Modifier,
+    badgeProvider: (BackofficeHubAction) -> HubActionBadge? = { null },
+    iconColorsProvider: (BackofficeHubAction) -> Pair<Color, Color> = { HubEmerald50 to HubEmerald700 },
 ) {
     Column(
         modifier = modifier.fillMaxWidth(),
@@ -1709,8 +1771,12 @@ private fun TransactionActivityGroupSection(
                     .clip(RoundedCornerShape(16.dp)),
             ) {
                 actions.forEachIndexed { index, action ->
-                    TransactionActivityRow(
+                    val (iconBg, iconTint) = iconColorsProvider(action)
+                    HubActivityRow(
                         action = action,
+                        badge = badgeProvider(action),
+                        iconBgColor = iconBg,
+                        iconTintColor = iconTint,
                         onClick = { onActionClick(action) },
                     )
                     if (index < actions.lastIndex) {
@@ -1727,8 +1793,11 @@ private fun TransactionActivityGroupSection(
 }
 
 @Composable
-private fun TransactionActivityRow(
+private fun HubActivityRow(
     action: BackofficeHubAction,
+    badge: HubActionBadge?,
+    iconBgColor: Color,
+    iconTintColor: Color,
     onClick: () -> Unit,
 ) {
     Row(
@@ -1745,13 +1814,13 @@ private fun TransactionActivityRow(
             modifier = Modifier
                 .size(34.dp)
                 .clip(RoundedCornerShape(10.dp))
-                .background(HubEmerald50),
+                .background(iconBgColor),
             contentAlignment = Alignment.Center,
         ) {
             Icon(
                 imageVector = action.icon(),
                 contentDescription = null,
-                tint = HubEmerald700,
+                tint = iconTintColor,
                 modifier = Modifier.size(18.dp),
             )
         }
@@ -1764,6 +1833,35 @@ private fun TransactionActivityRow(
             overflow = TextOverflow.Ellipsis,
             modifier = Modifier.weight(1f),
         )
+        if (badge != null) {
+            Surface(
+                shape = CircleShape,
+                color = badge.bgColor ?: HubSlate100,
+            ) {
+                Row(
+                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(5.dp),
+                ) {
+                    if (badge.dotColor != null) {
+                        Box(
+                            modifier = Modifier
+                                .size(6.dp)
+                                .clip(CircleShape)
+                                .background(badge.dotColor),
+                        )
+                    }
+                    Text(
+                        text = badge.text,
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.Medium,
+                        color = badge.textColor ?: HubSlate600,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                }
+            }
+        }
         Icon(
             imageVector = Icons.Default.ChevronRight,
             contentDescription = null,
