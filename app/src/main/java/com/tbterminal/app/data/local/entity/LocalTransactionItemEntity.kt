@@ -28,6 +28,7 @@ data class LocalTransactionItemEntity(
     val cogsAtTransaction: Double = 0.0,
     val discount: Double = 0.0,
     val subtotal: Double = 0.0,
+    val note: String? = null,
     val syncStatus: SyncStatus = SyncStatus.PENDING,
     val createdAt: Long = System.currentTimeMillis(),
     val updatedAt: Long = System.currentTimeMillis(),

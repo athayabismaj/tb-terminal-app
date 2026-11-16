@@ -64,6 +64,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.tbterminal.app.ui.dashboard.BrandedRoleTopBar
+import com.tbterminal.app.ui.dashboard.LocalBackofficePageNavigation
 import com.tbterminal.app.ui.dashboard.RoleHeaderDropdownItem
 import com.tbterminal.app.ui.dashboard.RoleHeaderMenuItem
 import com.tbterminal.app.ui.dashboard.admin.AdminDestination
@@ -96,6 +97,19 @@ enum class CashierDestination {
     Settings
 }
 
+internal fun CashierDestination.isCashierRootDestination(): Boolean = when (this) {
+    CashierDestination.Dashboard,
+    CashierDestination.Pos,
+    CashierDestination.CashSession,
+    CashierDestination.TransactionHistory,
+    CashierDestination.Receivables -> true
+    CashierDestination.Customers,
+    CashierDestination.ReceivablePayments,
+    CashierDestination.StockCheck,
+    CashierDestination.Profile,
+    CashierDestination.Settings -> false
+}
+
 @Composable
 fun CashierDashboardShell(
     userName: String,
@@ -114,10 +128,13 @@ fun CashierDashboardShell(
     onLogout: () -> Unit,
     onLockScreen: (() -> Unit)? = null,
     showHeader: Boolean = true,
+    showBottomBar: Boolean = true,
+    showProfileMenu: Boolean = activeDestination.isCashierRootDestination(),
     pageTitle: String? = null,
     topBarActions: (@Composable () -> Unit)? = null,
     content: @Composable (Modifier) -> Unit
 ) {
+    val effectiveShowProfileMenu = showProfileMenu && LocalBackofficePageNavigation.current.onBack == null
     val adminNavigator = LocalAdminDestinationNavigator.current
     val openReceivables: () -> Unit = onReceivablesClick ?: {
         adminNavigator?.invoke(AdminDestination.Receivables)
@@ -202,6 +219,7 @@ fun CashierDashboardShell(
                             else -> "Terminal Barokah Jaya"
                         },
                         topBarActions = topBarActions,
+                        showProfileMenu = effectiveShowProfileMenu,
                         onTerminalInfoClick = { showTerminalModal = true },
                         onProfileClick = onProfileClick,
                         onSettingsClick = onSettingsClick,
@@ -209,18 +227,20 @@ fun CashierDashboardShell(
                         onLockClick = handleLock
                     )
                 }
-                content(Modifier.weight(1f).then(if (showHeader) Modifier else Modifier.statusBarsPadding()))
+                content(Modifier.weight(1f))
                 OfflineStatusIndicatorHost(
                     modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp)
                 )
-                CashierBottomNavigation(
-                    activeDestination = activeDestination,
-                    onDashboardClick = onDashboardClick,
-                    onPosClick = onPosClick,
-                    onCashSessionClick = onCashSessionClick,
-                    onTransactionHistoryClick = onTransactionHistoryClick,
-                    onReceivablesClick = openReceivables
-                )
+                if (showBottomBar) {
+                    CashierBottomNavigation(
+                        activeDestination = activeDestination,
+                        onDashboardClick = onDashboardClick,
+                        onPosClick = onPosClick,
+                        onCashSessionClick = onCashSessionClick,
+                        onTransactionHistoryClick = onTransactionHistoryClick,
+                        onReceivablesClick = openReceivables
+                    )
+                }
             }
         }
 
@@ -261,6 +281,7 @@ private fun CashierCompactTopBar(
     title: String = "Terminal Barokah Jaya",
     subtitle: String = "Terminal Kasir",
     topBarActions: (@Composable () -> Unit)? = null,
+    showProfileMenu: Boolean = true,
     onTerminalInfoClick: () -> Unit,
     onProfileClick: () -> Unit,
     onSettingsClick: () -> Unit,
@@ -290,31 +311,30 @@ private fun CashierCompactTopBar(
         title = title,
         subtitle = subtitle,
         onBrandClick = onTerminalInfoClick,
+        showProfileMenu = showProfileMenu,
         actions = barActions,
         menuItems = listOf(
             RoleHeaderMenuItem(
                 icon = Icons.Outlined.Person,
                 label = "Profil Saya",
                 textColor = Color(0xFF334155),
-                iconColor = Color(0xFF475569),
-                iconBgColor = Color(0xFFF1F5F9),
+                iconColor = Color(0xFF64748B),
                 onClick = onProfileClick,
             ),
             RoleHeaderMenuItem(
                 icon = Icons.Outlined.Settings,
                 label = "Pengaturan",
                 textColor = Color(0xFF334155),
-                iconColor = Color(0xFF475569),
-                iconBgColor = Color(0xFFF1F5F9),
+                iconColor = Color(0xFF64748B),
                 onClick = onSettingsClick,
             ),
             RoleHeaderMenuItem(
                 icon = Icons.Outlined.Lock,
                 label = "Kunci Layar (PIN)",
-                textColor = Color(0xFFD97706),
-                iconColor = Color(0xFFD97706),
-                iconBgColor = Color(0xFFFEF3C7),
+                textColor = Color(0xFF334155),
+                iconColor = Color(0xFF64748B),
                 showDividerBefore = true,
+                trailingBadge = "Shift",
                 onClick = onLockClick,
             ),
             RoleHeaderMenuItem(
@@ -322,7 +342,6 @@ private fun CashierCompactTopBar(
                 label = "Keluar",
                 textColor = Color(0xFFE11D48),
                 iconColor = Color(0xFFE11D48),
-                iconBgColor = Color(0xFFFFF1F2),
                 onClick = onLogout,
             ),
         ),
@@ -693,8 +712,7 @@ private fun CashierSidebarProfileSection(
                         icon = Icons.Outlined.Person,
                         label = "Profil Saya",
                         textColor = Color(0xFF334155),
-                        iconColor = Color(0xFF475569),
-                        iconBgColor = Color(0xFFF1F5F9),
+                        iconColor = Color(0xFF64748B),
                         onClick = {
                             expanded = false
                             onProfileClick()
@@ -704,8 +722,7 @@ private fun CashierSidebarProfileSection(
                         icon = Icons.Outlined.Settings,
                         label = "Pengaturan",
                         textColor = Color(0xFF334155),
-                        iconColor = Color(0xFF475569),
-                        iconBgColor = Color(0xFFF1F5F9),
+                        iconColor = Color(0xFF64748B),
                         onClick = {
                             expanded = false
                             onSettingsClick()
@@ -719,9 +736,9 @@ private fun CashierSidebarProfileSection(
                     RoleHeaderDropdownItem(
                         icon = Icons.Outlined.Lock,
                         label = "Kunci Layar (PIN)",
-                        textColor = Color(0xFFD97706),
-                        iconColor = Color(0xFFD97706),
-                        iconBgColor = Color(0xFFFEF3C7),
+                        textColor = Color(0xFF334155),
+                        iconColor = Color(0xFF64748B),
+                        trailingBadge = "Shift",
                         onClick = {
                             expanded = false
                             onLockClick()
@@ -732,7 +749,6 @@ private fun CashierSidebarProfileSection(
                         label = "Keluar",
                         textColor = Color(0xFFE11D48),
                         iconColor = Color(0xFFE11D48),
-                        iconBgColor = Color(0xFFFFF1F2),
                         onClick = {
                             expanded = false
                             onLogout()

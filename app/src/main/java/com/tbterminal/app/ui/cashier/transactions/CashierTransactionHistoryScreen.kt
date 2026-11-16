@@ -11,6 +11,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Description
+import androidx.compose.material.icons.outlined.RequestQuote
 import androidx.compose.material.icons.outlined.Search
 import androidx.compose.material.icons.outlined.Tune
 import androidx.compose.material3.Icon
@@ -61,6 +62,7 @@ fun CashierTransactionHistoryScreen(
     onProfileClick: () -> Unit = {},
     onSettingsClick: () -> Unit = {},
     onReceiptClick: (String) -> Unit,
+    onQuotationsClick: () -> Unit = {},
     onLogout: () -> Unit,
     viewModel: CashierTransactionHistoryViewModel = viewModel(
         factory = CashierTransactionHistoryViewModel.factory(
@@ -187,6 +189,25 @@ fun CashierTransactionHistoryScreen(
                         imageVector = Icons.Outlined.Description,
                         contentDescription = "Tampilkan rekap transaksi",
                         tint = if (showSummaryPopup) Color(0xFF004528) else Color(0xFF475569),
+                        modifier = Modifier.size(16.dp)
+                    )
+                }
+            }
+
+            // Button 4: Daftar Penawaran Harga / RAB [ 📋 ]
+            Surface(
+                onClick = onQuotationsClick,
+                shape = CircleShape,
+                color = Color.Transparent,
+                modifier = Modifier
+                    .size(32.dp)
+                    .testTag("cashier-history-quotations")
+            ) {
+                Box(contentAlignment = Alignment.Center) {
+                    Icon(
+                        imageVector = Icons.Outlined.RequestQuote,
+                        contentDescription = "Daftar Penawaran Harga (RAB)",
+                        tint = Color(0xFF475569),
                         modifier = Modifier.size(16.dp)
                     )
                 }

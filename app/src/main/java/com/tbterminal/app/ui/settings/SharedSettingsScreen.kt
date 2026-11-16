@@ -35,6 +35,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.layout.wrapContentSize
@@ -45,6 +46,8 @@ import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.outlined.ArrowBack
 import androidx.compose.material.icons.automirrored.outlined.KeyboardArrowRight
 import androidx.compose.material.icons.automirrored.outlined.ReceiptLong
 import androidx.compose.material.icons.outlined.Check
@@ -68,6 +71,7 @@ import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Surface
@@ -160,6 +164,14 @@ fun SharedSettingsScreen(
     onPhoneChanged: (String) -> Unit,
     onReceiptHeaderChanged: (String) -> Unit,
     onReceiptFooterChanged: (String) -> Unit,
+    onTaxEnabledChanged: (Boolean) -> Unit = {},
+    onTaxRateChanged: (String) -> Unit = {},
+    onTaxModeChanged: (String) -> Unit = {},
+    onTaxLabelChanged: (String) -> Unit = {},
+    onStoreNpwpChanged: (String) -> Unit = {},
+    onCashierDiscountLimitChanged: (String) -> Unit = {},
+    onCashRoundingUnitChanged: (Int) -> Unit = {},
+    onCashRoundingRuleChanged: (String) -> Unit = {},
     onPrinterSizeChanged: (String) -> Unit,
     onCashToleranceChanged: (String) -> Unit,
     onAutoLockMinutesChanged: (String) -> Unit,
@@ -175,20 +187,42 @@ fun SharedSettingsScreen(
     onTestPrint: () -> Unit = {},
     onTestCashDrawer: () -> Unit = {},
     onDismissMessage: () -> Unit = {},
+    showHeader: Boolean = false,
+    headerTitle: String = "Pengaturan",
+    onBack: (() -> Unit)? = null,
     modifier: Modifier = Modifier,
 ) {
     val pages = visibleSettingsPages(role)
     val currentPage = selectedPage?.takeIf { it in pages }
-    BackHandler(enabled = currentPage != null && pages.size > 1, onBack = onPageBack)
+    val handleBack: () -> Unit = {
+        if (currentPage != null && pages.size > 1) {
+            onPageBack()
+        } else {
+            onBack?.invoke() ?: onPageBack()
+        }
+    }
+    BackHandler(enabled = (currentPage != null && pages.size > 1) || onBack != null, onBack = handleBack)
 
-    BoxWithConstraints(
+    Column(
         modifier = modifier
             .fillMaxSize()
             .background(BackgroundColor)
             .testTag("settings-screen"),
     ) {
-        val wide = maxWidth >= 840.dp
-        val pagePadding = if (wide) 28.dp else 20.dp
+        if (showHeader) {
+            SettingsScreenHeader(
+                title = headerTitle,
+                onBack = if (onBack != null || (currentPage != null && pages.size > 1)) handleBack else null,
+            )
+        }
+
+        BoxWithConstraints(
+            modifier = Modifier
+                .fillMaxWidth()
+                .weight(1f),
+        ) {
+            val wide = maxWidth >= 840.dp
+            val pagePadding = if (wide) 28.dp else 20.dp
 
         Column(
             modifier = Modifier
@@ -229,8 +263,20 @@ fun SharedSettingsScreen(
                     ) {
                         when (currentPage) {
                             SettingsPage.STORE -> StoreIdentityPanel(
-                                uiState, wide, onStoreNameChanged, onAddressChanged, onPhoneChanged,
-                                onSaveStoreSettings,
+                                uiState = uiState,
+                                wide = wide,
+                                onStoreNameChanged = onStoreNameChanged,
+                                onAddressChanged = onAddressChanged,
+                                onPhoneChanged = onPhoneChanged,
+                                onTaxEnabledChanged = onTaxEnabledChanged,
+                                onTaxRateChanged = onTaxRateChanged,
+                                onTaxModeChanged = onTaxModeChanged,
+                                onTaxLabelChanged = onTaxLabelChanged,
+                                onStoreNpwpChanged = onStoreNpwpChanged,
+                                onCashierDiscountLimitChanged = onCashierDiscountLimitChanged,
+                                onCashRoundingUnitChanged = onCashRoundingUnitChanged,
+                                onCashRoundingRuleChanged = onCashRoundingRuleChanged,
+                                onSave = onSaveStoreSettings,
                             )
                             SettingsPage.RECEIPT, SettingsPage.DEVICE -> DeviceAndReceiptPanel(
                                 role = role,
@@ -273,6 +319,51 @@ fun SharedSettingsScreen(
                 .padding(top = 16.dp, start = 20.dp, end = 20.dp)
                 .zIndex(99f),
         )
+    }
+    }
+}
+
+@Composable
+private fun SettingsScreenHeader(
+    title: String = "Pengaturan",
+    onBack: (() -> Unit)? = null,
+) {
+    Surface(
+        color = Color.White.copy(alpha = 0.95f),
+        modifier = Modifier.fillMaxWidth(),
+    ) {
+        Column(modifier = Modifier.fillMaxWidth()) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .statusBarsPadding()
+                    .padding(horizontal = 16.dp, vertical = 12.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                if (onBack != null) {
+                    IconButton(
+                        onClick = onBack,
+                        modifier = Modifier.size(34.dp),
+                    ) {
+                        Icon(
+                            imageVector = Icons.AutoMirrored.Outlined.ArrowBack,
+                            contentDescription = "Kembali",
+                            tint = Color(0xFF334155),
+                            modifier = Modifier.size(20.dp),
+                        )
+                    }
+                }
+                Text(
+                    text = title,
+                    fontSize = 17.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = Color(0xFF0F172A),
+                    letterSpacing = (-0.3).sp,
+                )
+            }
+            HorizontalDivider(color = Color(0xFFE2E8F0).copy(alpha = 0.8f))
+        }
     }
 }
 
@@ -400,6 +491,14 @@ private fun StoreIdentityPanel(
     onStoreNameChanged: (String) -> Unit,
     onAddressChanged: (String) -> Unit,
     onPhoneChanged: (String) -> Unit,
+    onTaxEnabledChanged: (Boolean) -> Unit,
+    onTaxRateChanged: (String) -> Unit,
+    onTaxModeChanged: (String) -> Unit,
+    onTaxLabelChanged: (String) -> Unit,
+    onStoreNpwpChanged: (String) -> Unit,
+    onCashierDiscountLimitChanged: (String) -> Unit,
+    onCashRoundingUnitChanged: (Int) -> Unit,
+    onCashRoundingRuleChanged: (String) -> Unit,
     onSave: () -> Unit,
 ) {
     Column(
@@ -589,6 +688,232 @@ private fun StoreIdentityPanel(
                     leadingIcon = Icons.Outlined.Place,
                     minLines = 2,
                 )
+
+                HorizontalDivider(color = Slate200)
+
+                // Pengaturan Pajak / PPN (On/Off + Mode)
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Column(
+                        modifier = Modifier.weight(1f).padding(end = 12.dp),
+                        verticalArrangement = Arrangement.spacedBy(2.dp),
+                    ) {
+                        Text(
+                            text = "Pajak Penjualan (PPN)",
+                            fontSize = 14.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = Slate900,
+                        )
+                        Text(
+                            text = if (uiState.taxEnabled) {
+                                "Aktif (${uiState.taxLabel.ifBlank { "PPN" }} ${uiState.taxRateInput.ifBlank { "0" }}% • ${if (uiState.taxMode == "INCLUDE") "Sudah termasuk harga" else "Ditambahkan di akhir"})"
+                            } else {
+                                "Nonaktif (cocok untuk toko non-PKP)"
+                            },
+                            fontSize = 12.sp,
+                            color = Slate500,
+                        )
+                    }
+                    Switch(
+                        checked = uiState.taxEnabled,
+                        onCheckedChange = onTaxEnabledChanged,
+                        colors = SwitchDefaults.colors(
+                            checkedThumbColor = Color.White,
+                            checkedTrackColor = Brand500,
+                        ),
+                    )
+                }
+
+                if (uiState.taxEnabled) {
+                    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                        Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                            Text(
+                                text = "Mode Perhitungan Pajak",
+                                fontSize = 12.sp,
+                                fontWeight = FontWeight.SemiBold,
+                                color = Slate700,
+                            )
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                            ) {
+                                listOf(
+                                    "EXCLUDE" to "Exclude (+ di akhir)",
+                                    "INCLUDE" to "Include (Termasuk harga)"
+                                ).forEach { (modeKey, modeLabel) ->
+                                    val selected = uiState.taxMode == modeKey
+                                    Surface(
+                                        onClick = { onTaxModeChanged(modeKey) },
+                                        shape = RoundedCornerShape(10.dp),
+                                        color = if (selected) Brand50 else Color(0xFFF8FAFC),
+                                        border = BorderStroke(
+                                            if (selected) 1.5.dp else 1.dp,
+                                            if (selected) Brand500 else Slate200
+                                        ),
+                                        modifier = Modifier.weight(1f),
+                                    ) {
+                                        Text(
+                                            text = modeLabel,
+                                            fontSize = 12.sp,
+                                            fontWeight = if (selected) FontWeight.Bold else FontWeight.Medium,
+                                            color = if (selected) Brand500 else Slate600,
+                                            textAlign = TextAlign.Center,
+                                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 10.dp),
+                                        )
+                                    }
+                                }
+                            }
+                        }
+
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(12.dp),
+                        ) {
+                            StoreInputField(
+                                label = "Tarif (%)",
+                                value = uiState.taxRateInput,
+                                onValueChange = onTaxRateChanged,
+                                placeholder = "11",
+                                leadingIcon = Icons.AutoMirrored.Outlined.ReceiptLong,
+                                modifier = Modifier.weight(1f),
+                            )
+                            StoreInputField(
+                                label = "Label Pajak",
+                                value = uiState.taxLabel,
+                                onValueChange = onTaxLabelChanged,
+                                placeholder = "PPN",
+                                leadingIcon = Icons.Outlined.Storefront,
+                                modifier = Modifier.weight(1f),
+                            )
+                        }
+
+                        StoreInputField(
+                            label = "NPWP Toko (Opsional)",
+                            value = uiState.storeNpwp,
+                            onValueChange = onStoreNpwpChanged,
+                            placeholder = "00.000.000.0-000.000",
+                            leadingIcon = Icons.Outlined.PointOfSale,
+                        )
+                    }
+                }
+
+                HorizontalDivider(color = Slate200)
+
+                // Pembulatan Tunai Kasir
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                        Text(
+                            text = "Pembulatan Nominal Tunai",
+                            fontSize = 14.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = Slate900,
+                        )
+                        Text(
+                            text = "Berlaku saat transaksi memakai pembayaran Tunai agar kas laci rapi.",
+                            fontSize = 12.sp,
+                            color = Slate500,
+                        )
+                    }
+
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    ) {
+                        listOf(
+                            0 to "Nonaktif",
+                            100 to "Rp 100",
+                            500 to "Rp 500",
+                            1000 to "Rp 1.000"
+                        ).forEach { (unit, label) ->
+                            val selected = uiState.cashRoundingUnit == unit
+                            Surface(
+                                onClick = { onCashRoundingUnitChanged(unit) },
+                                shape = RoundedCornerShape(10.dp),
+                                color = if (selected) Brand50 else Color(0xFFF8FAFC),
+                                border = BorderStroke(
+                                    if (selected) 1.5.dp else 1.dp,
+                                    if (selected) Brand500 else Slate200
+                                ),
+                                modifier = Modifier.weight(1f),
+                            ) {
+                                Text(
+                                    text = label,
+                                    fontSize = 11.5.sp,
+                                    fontWeight = if (selected) FontWeight.Bold else FontWeight.Medium,
+                                    color = if (selected) Brand500 else Slate600,
+                                    textAlign = TextAlign.Center,
+                                    modifier = Modifier.padding(horizontal = 6.dp, vertical = 9.dp),
+                                )
+                            }
+                        }
+                    }
+
+                    if (uiState.cashRoundingUnit > 0) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        ) {
+                            listOf(
+                                "NEAREST" to "Terdekat",
+                                "DOWN" to "Ke Bawah",
+                                "UP" to "Ke Atas"
+                            ).forEach { (ruleKey, ruleLabel) ->
+                                val selected = uiState.cashRoundingRule == ruleKey
+                                Surface(
+                                    onClick = { onCashRoundingRuleChanged(ruleKey) },
+                                    shape = RoundedCornerShape(10.dp),
+                                    color = if (selected) Brand50 else Color(0xFFF8FAFC),
+                                    border = BorderStroke(
+                                        if (selected) 1.5.dp else 1.dp,
+                                        if (selected) Brand500 else Slate200
+                                    ),
+                                    modifier = Modifier.weight(1f),
+                                ) {
+                                    Text(
+                                        text = ruleLabel,
+                                        fontSize = 11.5.sp,
+                                        fontWeight = if (selected) FontWeight.Bold else FontWeight.Medium,
+                                        color = if (selected) Brand500 else Slate600,
+                                        textAlign = TextAlign.Center,
+                                        modifier = Modifier.padding(horizontal = 6.dp, vertical = 8.dp),
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
+
+                HorizontalDivider(color = Slate200)
+
+                // Batas Diskon Kasir tanpa Approval
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                        Text(
+                            text = "Kontrol Diskon Kasir",
+                            fontSize = 14.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = Slate900,
+                        )
+                        Text(
+                            text = "Diskon melebihi persentase ini otomatis meminta persetujuan (PIN/login) Admin atau Owner di kasir.",
+                            fontSize = 12.sp,
+                            color = Slate500,
+                        )
+                    }
+                    val isDiscountLimitError = uiState.error?.contains("Batas diskon kasir", ignoreCase = true) == true
+                    StoreInputField(
+                        label = "Batas Diskon Kasir Tanpa Approval (%)",
+                        value = uiState.cashierDiscountLimitInput,
+                        onValueChange = onCashierDiscountLimitChanged,
+                        placeholder = "10",
+                        leadingIcon = Icons.AutoMirrored.Outlined.ReceiptLong,
+                        isError = isDiscountLimitError,
+                        supportingText = if (isDiscountLimitError) uiState.error else "Nilai 0 - 100 (default 10%). Isi 0 jika semua diskon wajib approval.",
+                    )
+                }
 
                 // Submit Action CTA
                 Button(
@@ -1241,6 +1566,14 @@ private fun DeviceAndReceiptPanel(
     wide: Boolean,
     onReceiptHeaderChanged: (String) -> Unit,
     onReceiptFooterChanged: (String) -> Unit,
+    onTaxEnabledChanged: (Boolean) -> Unit = {},
+    onTaxRateChanged: (String) -> Unit = {},
+    onTaxModeChanged: (String) -> Unit = {},
+    onTaxLabelChanged: (String) -> Unit = {},
+    onStoreNpwpChanged: (String) -> Unit = {},
+    onCashierDiscountLimitChanged: (String) -> Unit = {},
+    onCashRoundingUnitChanged: (Int) -> Unit = {},
+    onCashRoundingRuleChanged: (String) -> Unit = {},
     onPrinterSizeChanged: (String) -> Unit,
     onCashToleranceChanged: (String) -> Unit,
     onAutoLockMinutesChanged: (String) -> Unit,

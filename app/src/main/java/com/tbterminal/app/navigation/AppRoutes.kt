@@ -45,6 +45,10 @@ sealed interface AppRoute {
         override val route = "admin/sales-transactions"
     }
 
+    data object Quotations : AppRoute {
+        override val route = "sales/quotations"
+    }
+
     data object Reports : AppRoute {
         override val route = "admin/reports"
     }

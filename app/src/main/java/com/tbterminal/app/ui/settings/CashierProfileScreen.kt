@@ -4,8 +4,6 @@ import androidx.compose.runtime.Composable
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.tbterminal.app.data.repository.AuthRepository
-import com.tbterminal.app.ui.dashboard.cashier.CashierDashboardShell
-import com.tbterminal.app.ui.dashboard.cashier.CashierDestination
 
 @Composable
 fun CashierProfileScreen(
@@ -21,47 +19,43 @@ fun CashierProfileScreen(
     onSettingsClick: () -> Unit = {},
     onEditProfile: (() -> Unit)? = null,
     editMode: Boolean = false,
-    onBack: () -> Unit = {},
+    onBack: (() -> Unit)? = null,
     onProfileSaved: () -> Unit = {},
     onLogout: () -> Unit,
     profileViewModel: ProfileViewModel = viewModel(factory = ProfileViewModel.factory(authRepository))
 ) {
     val uiState = profileViewModel.uiState.collectAsStateWithLifecycle().value
-    CashierDashboardShell(
-        userName = userName,
-        role = role,
-        activeDestination = CashierDestination.Profile,
-        onDashboardClick = onDashboardClick,
-        onPosClick = onPosClick,
-        onCashSessionClick = onCashSessionClick,
-        onTransactionHistoryClick = onTransactionHistoryClick,
-        onStockCheckClick = onStockCheckClick,
-        onProfileClick = onProfileClick,
-        onSettingsClick = onSettingsClick,
-        onLogout = onLogout
-    ) { contentModifier ->
-        if (editMode) {
-            SharedEditProfileScreen(
-                uiState = uiState,
-                onSave = profileViewModel::updateProfile,
-                onBack = onBack,
-                onSaved = {
-                    profileViewModel.consumeProfileUpdated()
-                    onProfileSaved()
-                },
-                onClearMessage = profileViewModel::clearMessage,
-                modifier = contentModifier,
-            )
+    val handleBack: () -> Unit = {
+        if (onBack != null) {
+            onBack()
         } else {
-            SharedProfileScreen(
-                uiState = uiState,
-                onReload = profileViewModel::loadProfile,
-                onChangePassword = profileViewModel::changePassword,
-                onChangePin = profileViewModel::changePin,
-                onClearMessage = profileViewModel::clearMessage,
-                onEditProfile = onEditProfile,
-                modifier = contentModifier
-            )
+            onDashboardClick()
         }
+    }
+
+    if (editMode) {
+        SharedEditProfileScreen(
+            uiState = uiState,
+            onSave = profileViewModel::updateProfile,
+            onBack = handleBack,
+            onSaved = {
+                profileViewModel.consumeProfileUpdated()
+                onProfileSaved()
+            },
+            onClearMessage = profileViewModel::clearMessage,
+        )
+    } else {
+        SharedProfileScreen(
+            uiState = uiState,
+            onReload = profileViewModel::loadProfile,
+            onChangePassword = profileViewModel::changePassword,
+            onChangePin = profileViewModel::changePin,
+            onClearMessage = profileViewModel::clearMessage,
+            showHeader = true,
+            pageTitle = "Profil Kasir",
+            onBack = handleBack,
+            onLogout = onLogout,
+            onEditProfile = onEditProfile,
+        )
     }
 }

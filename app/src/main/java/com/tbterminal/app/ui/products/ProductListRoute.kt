@@ -29,6 +29,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.outlined.Description
+import androidx.compose.material.icons.outlined.QrCode2
 import androidx.compose.material.icons.outlined.Search
 import androidx.compose.material.icons.outlined.Tune
 import androidx.compose.ui.Alignment
@@ -75,6 +76,7 @@ fun AdminProductListScreen(
     onProfileClick: () -> Unit = {},
     onSettingsClick: () -> Unit = {},
     onLogout: () -> Unit,
+    thermalPrinterManager: com.tbterminal.app.data.printer.ThermalPrinterManager? = null,
     viewModel: ProductListViewModel = viewModel(
         factory = ProductListViewModel.factory(inventoryRepository)
     )
@@ -94,6 +96,11 @@ fun AdminProductListScreen(
     }
     var showFilterPopup by remember { mutableStateOf(false) }
     var showSummaryPopup by rememberSaveable { mutableStateOf(false) }
+    var showBatchPrintDialog by remember { mutableStateOf(false) }
+    val openBatchPrint: () -> Unit = {
+        viewModel.loadBatchPrintProducts()
+        showBatchPrintDialog = true
+    }
     val isFiltered = uiState.selectedCategory != ALL_PRODUCT_CATEGORIES
     val context = LocalContext.current
     val csvLauncher = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
@@ -153,7 +160,20 @@ fun AdminProductListScreen(
                 }
             }
 
-            // Button 3: Ringkasan [ 📑 ]
+            // Button 3: Cetak Label Barcode Massal [ 🏷️ ]
+            IconButton(
+                onClick = openBatchPrint,
+                modifier = Modifier.size(36.dp).testTag("product-batch-barcode")
+            ) {
+                Icon(
+                    imageVector = Icons.Outlined.QrCode2,
+                    contentDescription = "Cetak barcode massal",
+                    tint = Color(0xFF475569),
+                    modifier = Modifier.size(20.dp)
+                )
+            }
+
+            // Button 4: Ringkasan [ 📑 ]
             IconButton(
                 onClick = { showSummaryPopup = true },
                 modifier = Modifier.size(36.dp).testTag("product-summary")
@@ -213,9 +233,19 @@ fun AdminProductListScreen(
                 onToggleProductClick = { product -> productToToggle = product },
                 onPreviousPage = viewModel::previousPage,
                 onNextPage = viewModel::nextPage,
-                onDismissMessage = viewModel::clearActionMessage
+                onDismissMessage = viewModel::clearActionMessage,
+                onBatchPrintClick = openBatchPrint,
             )
         }
+    }
+
+    if (showBatchPrintDialog) {
+        val batchSource = uiState.batchPrintProducts.ifEmpty { uiState.products }
+        com.tbterminal.app.ui.products.components.BatchPriceTagDialog(
+            products = batchSource,
+            thermalPrinterManager = thermalPrinterManager,
+            onDismissRequest = { showBatchPrintDialog = false },
+        )
     }
 
     if (uiState.showImportDialog) {

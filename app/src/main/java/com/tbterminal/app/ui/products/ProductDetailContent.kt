@@ -51,6 +51,7 @@ internal fun ProductDetailContent(
     uiState: ProductDetailUiState,
     onRetry: () -> Unit,
     onEditProductClick: (String) -> Unit,
+    thermalPrinterManager: com.tbterminal.app.data.printer.ThermalPrinterManager? = null,
 ) {
     var showPriceTagDialog by remember { mutableStateOf(false) }
 
@@ -85,6 +86,7 @@ internal fun ProductDetailContent(
             barcode = prod.sku ?: "",
             price = stock?.priceRetail ?: BigDecimal.ZERO,
             unitName = stock?.unitName ?: "Pcs",
+            thermalPrinterManager = thermalPrinterManager,
             onDismissRequest = { showPriceTagDialog = false }
         )
     }

@@ -15,6 +15,7 @@ import com.tbterminal.app.data.model.Product
 import com.tbterminal.app.data.model.ProductCategory
 import com.tbterminal.app.data.model.ProductCategoryPage
 import com.tbterminal.app.data.model.ProductPage
+import com.tbterminal.app.data.model.ProductPriceTier
 import com.tbterminal.app.data.model.ProductDetail
 import com.tbterminal.app.data.model.ProductStock
 import com.tbterminal.app.data.model.ProductStockPage
@@ -35,6 +36,7 @@ import com.tbterminal.app.data.remote.PaginatedResponse
 import com.tbterminal.app.data.remote.ProductCreateRequestDto
 import com.tbterminal.app.data.remote.ProductResponseDto
 import com.tbterminal.app.data.remote.ProductUpdateRequestDto
+import com.tbterminal.app.data.remote.UpdateProductPriceTiersRequestDto
 import com.tbterminal.app.data.remote.StockAdjustmentResponseDto
 import com.tbterminal.app.data.remote.StockDetailResponseDto
 import com.tbterminal.app.data.remote.StockOpnameRequestDto
@@ -90,6 +92,14 @@ interface InventoryRepository {
     suspend fun deleteProduct(id: String): RepositoryResult<Unit>
 
     suspend fun activateProduct(id: String): RepositoryResult<Product>
+
+    suspend fun getProductPriceTiers(productId: String): RepositoryResult<List<ProductPriceTier>> =
+        RepositoryResult.Success(emptyList())
+
+    suspend fun updateProductPriceTiers(
+        productId: String,
+        tiers: List<ProductPriceTier>
+    ): RepositoryResult<List<ProductPriceTier>> = RepositoryResult.Success(tiers)
 
     suspend fun executeStockOpname(
         productId: String,
@@ -333,7 +343,8 @@ class RemoteInventoryRepository(
             minStock = command.minStock,
             photoFilename = command.photoFilename,
             secondaryUnitId = command.secondaryUnitId,
-            secondaryUnitFactor = command.secondaryUnitFactor?.stripTrailingZeros()?.toPlainString()
+            secondaryUnitFactor = command.secondaryUnitFactor?.stripTrailingZeros()?.toPlainString(),
+            priceTiers = command.priceTiers?.map(ProductPriceTier::toDto)
         )
 
         return safeApiCall { inventoryApi.createProduct(request) }
@@ -366,7 +377,8 @@ class RemoteInventoryRepository(
             minStock = command.minStock,
             photoFilename = command.photoFilename,
             secondaryUnitId = command.secondaryUnitId,
-            secondaryUnitFactor = command.secondaryUnitFactor?.stripTrailingZeros()?.toPlainString()
+            secondaryUnitFactor = command.secondaryUnitFactor?.stripTrailingZeros()?.toPlainString(),
+            priceTiers = command.priceTiers?.map(ProductPriceTier::toDto)
         )
 
         return safeApiCall { inventoryApi.updateProduct(id, request) }
@@ -410,6 +422,40 @@ class RemoteInventoryRepository(
                 } else {
                     cacheProduct(product)
                     RepositoryResult.Success(product.toProduct())
+                }
+            }
+    }
+
+    override suspend fun getProductPriceTiers(productId: String): RepositoryResult<List<ProductPriceTier>> {
+        return safeApiCall { inventoryApi.getProductPriceTiers(productId) }
+            .toRepositoryResult { response ->
+                val data = response.data
+                if (!response.success || data == null) {
+                    RepositoryResult.Error(
+                        code = response.code ?: "GET_PRICE_TIERS_FAILED",
+                        message = response.message ?: response.error ?: "Harga grosir gagal dimuat."
+                    )
+                } else {
+                    RepositoryResult.Success(data.map { it.toProductPriceTier() })
+                }
+            }
+    }
+
+    override suspend fun updateProductPriceTiers(
+        productId: String,
+        tiers: List<ProductPriceTier>
+    ): RepositoryResult<List<ProductPriceTier>> {
+        val request = UpdateProductPriceTiersRequestDto(tiers = tiers.map(ProductPriceTier::toDto))
+        return safeApiCall { inventoryApi.updateProductPriceTiers(productId, request) }
+            .toRepositoryResult { response ->
+                val data = response.data
+                if (!response.success || data == null) {
+                    RepositoryResult.Error(
+                        code = response.code ?: "UPDATE_PRICE_TIERS_FAILED",
+                        message = response.message ?: response.error ?: "Harga grosir gagal disimpan."
+                    )
+                } else {
+                    RepositoryResult.Success(data.map { it.toProductPriceTier() })
                 }
             }
     }

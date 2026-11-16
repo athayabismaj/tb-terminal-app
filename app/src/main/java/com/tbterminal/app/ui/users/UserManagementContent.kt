@@ -1,5 +1,7 @@
 package com.tbterminal.app.ui.users
 
+import com.tbterminal.app.ui.components.TbPagination
+
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.expandVertically
 import androidx.compose.animation.shrinkVertically
@@ -948,78 +950,14 @@ private fun UserPagination(
     onPreviousPage: () -> Unit,
     onNextPage: () -> Unit,
 ) {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(top = 10.dp, bottom = 4.dp)
-            .testTag("user-pagination"),
-        horizontalArrangement = Arrangement.SpaceBetween,
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        // Range Information Pill
-        Surface(
-            shape = CircleShape,
-            color = Color.White,
-            border = BorderStroke(1.dp, Slate200),
-            shadowElevation = 0.5.dp,
-        ) {
-            Text(
-                text = "$firstItem-$lastItem dari $totalCount data",
-                modifier = Modifier.padding(horizontal = 14.dp, vertical = 6.dp),
-                fontSize = 12.sp,
-                fontWeight = FontWeight.Medium,
-                color = Slate600,
-            )
-        }
-
-        // Pager Buttons Pill
-        Surface(
-            shape = CircleShape,
-            color = Color.White,
-            border = BorderStroke(1.dp, Slate200),
-            shadowElevation = 0.5.dp,
-        ) {
-            Row(
-                modifier = Modifier.padding(horizontal = 6.dp, vertical = 4.dp),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(4.dp),
-            ) {
-                IconButton(
-                    onClick = onPreviousPage,
-                    enabled = currentPage > 1,
-                    modifier = Modifier.size(28.dp),
-                ) {
-                    Icon(
-                        Icons.Filled.ChevronLeft,
-                        contentDescription = "Halaman sebelumnya",
-                        modifier = Modifier.size(18.dp),
-                        tint = if (currentPage > 1) Slate700 else Slate300,
-                    )
-                }
-
-                Text(
-                    text = "$currentPage / $totalPages",
-                    fontSize = 12.sp,
-                    fontWeight = FontWeight.SemiBold,
-                    color = Slate700,
-                    modifier = Modifier.padding(horizontal = 6.dp),
-                )
-
-                IconButton(
-                    onClick = onNextPage,
-                    enabled = currentPage < totalPages,
-                    modifier = Modifier.size(28.dp),
-                ) {
-                    Icon(
-                        Icons.Filled.ChevronRight,
-                        contentDescription = "Halaman berikutnya",
-                        modifier = Modifier.size(18.dp),
-                        tint = if (currentPage < totalPages) Slate700 else Slate300,
-                    )
-                }
-            }
-        }
-    }
+    TbPagination(
+        currentPage = currentPage,
+        totalPages = totalPages,
+        onPreviousPage = onPreviousPage,
+        onNextPage = onNextPage,
+        supportingText = "$totalCount staf",
+        testTag = "user-pagination",
+    )
 }
 
 // ═════════════════════════════════════════════════════════════════════════════

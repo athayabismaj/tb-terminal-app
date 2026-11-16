@@ -104,6 +104,17 @@ interface InventoryApi {
         @Path("id") id: String
     ): Response<ApiResponse<ProductResponseDto>>
 
+    @GET("/api/inventory/products/{id}/price-tiers")
+    suspend fun getProductPriceTiers(
+        @Path("id") id: String
+    ): Response<ApiResponse<List<ProductPriceTierDto>>>
+
+    @PUT("/api/inventory/products/{id}/price-tiers")
+    suspend fun updateProductPriceTiers(
+        @Path("id") id: String,
+        @Body request: UpdateProductPriceTiersRequestDto
+    ): Response<ApiResponse<List<ProductPriceTierDto>>>
+
     @GET("/api/inventory/stock")
     suspend fun getStockDetails(
         @Query("page") page: Int = 1,
@@ -178,6 +189,18 @@ data class UnitRequestDto(
 )
 
 @Serializable
+data class ProductPriceTierDto(
+    val id: String? = null,
+    @Serializable(with = BigDecimalStringSerializer::class) val minQty: BigDecimal,
+    @Serializable(with = BigDecimalStringSerializer::class) val unitPrice: BigDecimal,
+)
+
+@Serializable
+data class UpdateProductPriceTiersRequestDto(
+    val tiers: List<ProductPriceTierDto> = emptyList(),
+)
+
+@Serializable
 data class ProductResponseDto(
     val id: String,
     val categoryId: String,
@@ -192,7 +215,8 @@ data class ProductResponseDto(
     val photoFilename: String? = null,
     val isActive: Boolean,
     val secondaryUnitId: String? = null,
-    val secondaryUnitFactor: String? = null
+    val secondaryUnitFactor: String? = null,
+    val priceTiers: List<ProductPriceTierDto> = emptyList()
 )
 
 @Serializable
@@ -208,7 +232,8 @@ data class ProductCreateRequestDto(
     @Serializable(with = BigDecimalStringSerializer::class) val minStock: BigDecimal,
     val photoFilename: String? = null,
     val secondaryUnitId: String? = null,
-    val secondaryUnitFactor: String? = null
+    val secondaryUnitFactor: String? = null,
+    val priceTiers: List<ProductPriceTierDto>? = null
 )
 
 @Serializable
@@ -223,7 +248,8 @@ data class ProductUpdateRequestDto(
     @Serializable(with = BigDecimalStringSerializer::class) val minStock: BigDecimal,
     val photoFilename: String? = null,
     val secondaryUnitId: String? = null,
-    val secondaryUnitFactor: String? = null
+    val secondaryUnitFactor: String? = null,
+    val priceTiers: List<ProductPriceTierDto>? = null
 )
 
 @Serializable
@@ -242,7 +268,8 @@ data class StockDetailResponseDto(
     val isActive: Boolean,
     val secondaryUnitId: String? = null,
     val secondaryUnitName: String? = null,
-    val secondaryUnitFactor: String? = null
+    val secondaryUnitFactor: String? = null,
+    val priceTiers: List<ProductPriceTierDto> = emptyList()
 )
 
 @Serializable

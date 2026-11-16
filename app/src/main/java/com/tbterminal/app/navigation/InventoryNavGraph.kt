@@ -137,6 +137,7 @@ internal fun NavGraphBuilder.inventoryGraph(navController: NavHostController, se
                     name = sessionUser.name,
                     role = sessionUser.role,
                     inventoryRepository = appContainer.inventoryRepository,
+                    thermalPrinterManager = appContainer.thermalPrinterManager,
                     onDashboardClick = {
                         navController.navigate(AppRoute.Dashboard.route) {
                             launchSingleTop = true
@@ -537,6 +538,7 @@ internal fun NavGraphBuilder.inventoryGraph(navController: NavHostController, se
                     role = sessionUser.role,
                     inventoryRepository = appContainer.inventoryRepository,
                     productId = productId,
+                    thermalPrinterManager = appContainer.thermalPrinterManager,
                     onDashboardClick = {
                         navController.navigate(AppRoute.Dashboard.route) {
                             launchSingleTop = true

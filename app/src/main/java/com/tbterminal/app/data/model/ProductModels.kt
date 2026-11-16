@@ -31,6 +31,12 @@ data class ProductUnitPage(
     val totalPages: Int
 )
 
+data class ProductPriceTier(
+    val id: String? = null,
+    val minQty: BigDecimal,
+    val unitPrice: BigDecimal
+)
+
 data class Product(
     val id: String,
     val categoryId: String,
@@ -45,7 +51,8 @@ data class Product(
     val photoFilename: String?,
     val isActive: Boolean,
     val secondaryUnitId: String? = null,
-    val secondaryUnitFactor: BigDecimal? = null
+    val secondaryUnitFactor: BigDecimal? = null,
+    val priceTiers: List<ProductPriceTier> = emptyList()
 )
 
 
@@ -72,7 +79,8 @@ data class ProductStock(
     val isActive: Boolean,
     val secondaryUnitId: String? = null,
     val secondaryUnitName: String? = null,
-    val secondaryUnitFactor: BigDecimal? = null
+    val secondaryUnitFactor: BigDecimal? = null,
+    val priceTiers: List<ProductPriceTier> = emptyList()
 )
 
 data class ProductStockPage(
@@ -127,7 +135,8 @@ data class CreateProductCommand(
     val minStock: BigDecimal,
     val photoFilename: String? = null,
     val secondaryUnitId: String? = null,
-    val secondaryUnitFactor: BigDecimal? = null
+    val secondaryUnitFactor: BigDecimal? = null,
+    val priceTiers: List<ProductPriceTier>? = null
 )
 
 data class UpdateProductCommand(
@@ -141,7 +150,8 @@ data class UpdateProductCommand(
     val minStock: BigDecimal,
     val photoFilename: String? = null,
     val secondaryUnitId: String? = null,
-    val secondaryUnitFactor: BigDecimal? = null
+    val secondaryUnitFactor: BigDecimal? = null,
+    val priceTiers: List<ProductPriceTier>? = null
 )
 
 data class ProductCsvRowPreview(

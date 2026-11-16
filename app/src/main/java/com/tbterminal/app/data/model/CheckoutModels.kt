@@ -12,11 +12,18 @@ data class CheckoutDiscount(
     val value: BigDecimal,
 )
 
+data class CheckoutPaymentLine(
+    val method: String,
+    val amount: String,
+    val reference: String? = null,
+)
+
 data class CheckoutSubmitCommand(
     val idempotencyKey: String,
     val items: List<CheckoutSubmitItem>,
     val paymentMethod: String,
     val amountPaid: String,
+    val payments: List<CheckoutPaymentLine>? = null,
     val customerId: String? = null,
     val notes: String? = null,
     val dueDays: Int = 30,
@@ -29,11 +36,13 @@ data class CheckoutSubmitItem(
     val productId: String,
     val quantity: Int,
     val discountRequest: CheckoutDiscount? = null,
+    val note: String? = null,
 )
 
 data class CheckoutPreviewCommand(
     val items: List<CheckoutSubmitItem>,
     val transactionDiscount: CheckoutDiscount? = null,
+    val customerId: String? = null,
 )
 
 data class CheckoutPreviewItem(
@@ -60,6 +69,17 @@ data class CheckoutPreview(
     val cashierDiscountLimitPercent: BigDecimal,
     val approvalRequired: Boolean,
     val expiresAt: String,
+    val taxEnabled: Boolean = false,
+    val taxMode: String? = null,
+    val taxRate: BigDecimal = BigDecimal.ZERO,
+    val taxLabel: String? = null,
+    val taxableBase: BigDecimal = BigDecimal.ZERO,
+    val taxAmount: BigDecimal = BigDecimal.ZERO,
+    val totalWithTax: BigDecimal = netTotal,
+    val cashRoundingUnit: Int = 0,
+    val cashRoundingRule: String = "NEAREST",
+    val estimatedCashRoundingAmount: BigDecimal = BigDecimal.ZERO,
+    val estimatedTotalWithCashRounding: BigDecimal = totalWithTax,
 )
 
 data class CheckoutReceipt(

@@ -76,7 +76,8 @@ internal fun ProductListContent(
     onToggleProductClick: (ProductStock) -> Unit,
     onPreviousPage: () -> Unit,
     onNextPage: () -> Unit,
-    onDismissMessage: () -> Unit
+    onDismissMessage: () -> Unit,
+    onBatchPrintClick: () -> Unit = {}
 ) {
     BoxWithConstraints(modifier = modifier.fillMaxSize().background(ProductBackground)) {
         val compact = maxWidth < 720.dp
@@ -237,6 +238,7 @@ internal fun ProductListContent(
                     onCategorySelected = onCategorySelected,
                     onAddProductClick = onAddProductClick,
                     onImportProductClick = onImportProductClick,
+                    onBatchPrintClick = onBatchPrintClick,
                     compact = compact,
                 )
             }

@@ -14,4 +14,12 @@ object AppSettingKeys {
     const val AUTO_LOCK_MINUTES = "device_auto_lock_minutes"
     const val SCANNER_SOUND_FEEDBACK = "device_scanner_sound_feedback"
     const val SCANNER_VIBRATE_FEEDBACK = "device_scanner_vibrate_feedback"
+    const val CACHED_STORE_NAME = "store_cached_name"
+    const val CACHED_STORE_NPWP = "store_cached_npwp"
+    const val CACHED_TAX_ENABLED = "store_cached_tax_enabled"
+    const val CACHED_TAX_RATE = "store_cached_tax_rate"
+    const val CACHED_TAX_MODE = "store_cached_tax_mode"
+    const val CACHED_TAX_LABEL = "store_cached_tax_label"
+    const val CACHED_CASH_ROUNDING_UNIT = "store_cached_cash_rounding_unit"
+    const val CACHED_CASH_ROUNDING_RULE = "store_cached_cash_rounding_rule"
 }

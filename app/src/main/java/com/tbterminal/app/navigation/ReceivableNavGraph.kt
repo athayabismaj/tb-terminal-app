@@ -229,6 +229,7 @@ internal fun NavGraphBuilder.receivableGraph(navController: NavHostController, s
                     role = sessionUser.role,
                     customerId = customerId,
                     receivableRepository = appContainer.receivableRepository,
+                    customerRepository = appContainer.customerRepository,
                     onDashboardClick = { navController.navigate(AppRoute.Dashboard.route) { launchSingleTop = true } },
                     onProductsClick = { navController.navigate(AppRoute.Products.route) { launchSingleTop = true } },
                     onStockOpnameClick = { navController.navigate(AppRoute.StockOpname.route) { launchSingleTop = true } },

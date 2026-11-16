@@ -471,6 +471,13 @@ internal fun NavGraphBuilder.dashboardGraph(navController: NavHostController, se
                     userName = sessionUser.name,
                     role = sessionUser.role,
                     authRepository = appContainer.authRepository,
+                    onBack = {
+                        if (!navController.popBackStack()) {
+                            navController.navigate(AppRoute.Dashboard.route) {
+                                popUpTo(AppRoute.Dashboard.route) { inclusive = true }
+                            }
+                        }
+                    },
                     onDashboardClick = {
                         navController.navigate(AppRoute.Dashboard.route) {
                             popUpTo(AppRoute.Dashboard.route) { inclusive = true }
@@ -534,6 +541,13 @@ internal fun NavGraphBuilder.dashboardGraph(navController: NavHostController, se
                     userName = sessionUser.name,
                     role = sessionUser.role,
                     authRepository = appContainer.authRepository,
+                    onBack = {
+                        if (!navController.popBackStack()) {
+                            navController.navigate(AppRoute.Dashboard.route) {
+                                popUpTo(AppRoute.Dashboard.route) { inclusive = true }
+                            }
+                        }
+                    },
                     onDashboardClick = { navigate(AppRoute.Dashboard.route) },
                     onPosClick = { navigate(AppRoute.CashierPos.route) },
                     onCashSessionClick = { navigate(AppRoute.CashierCashSession.route) },
@@ -542,7 +556,6 @@ internal fun NavGraphBuilder.dashboardGraph(navController: NavHostController, se
                     onProfileClick = { navigate(AppRoute.CashierProfile.route) },
                     onSettingsClick = { navigate(AppRoute.CashierSettings.route) },
                     editMode = true,
-                    onBack = { navController.popBackStack() },
                     onProfileSaved = {
                         navController.navigate(AppRoute.CashierProfile.route) {
                             popUpTo(AppRoute.CashierProfile.route) { inclusive = true }
@@ -571,6 +584,13 @@ internal fun NavGraphBuilder.dashboardGraph(navController: NavHostController, se
                     role = sessionUser.role,
                     systemRepository = appContainer.systemRepository,
                     localAppSettingsDataSource = appContainer.localAppSettingsDataSource,
+                    onBack = {
+                        if (!navController.popBackStack()) {
+                            navController.navigate(AppRoute.Dashboard.route) {
+                                popUpTo(AppRoute.Dashboard.route) { inclusive = true }
+                            }
+                        }
+                    },
                     onDashboardClick = {
                         navController.navigate(AppRoute.Dashboard.route) {
                             popUpTo(AppRoute.Dashboard.route) { inclusive = true }

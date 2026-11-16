@@ -39,7 +39,9 @@ data class ProductListUiState(
     val importCsv: String? = null,
     val importPreview: ProductCsvPreview? = null,
     val isImporting: Boolean = false,
-    val showImportDialog: Boolean = false
+    val showImportDialog: Boolean = false,
+    val batchPrintProducts: List<ProductStock> = emptyList(),
+    val isBatchPrintLoading: Boolean = false
 ) {
     val visibleProducts: List<ProductStock>
         get() = if (selectedCategory == ALL_PRODUCT_CATEGORIES) {

@@ -177,6 +177,11 @@ internal fun NavGraphBuilder.salesGraph(navController: NavHostController, sessio
                             launchSingleTop = true
                         }
                     },
+                    onQuotationsClick = {
+                        navController.navigate(AppRoute.Quotations.route) {
+                            launchSingleTop = true
+                        }
+                    },
                     onProfileClick = {
                         navController.navigate(AppRoute.CashierProfile.route) {
                             launchSingleTop = true
@@ -265,7 +270,24 @@ internal fun NavGraphBuilder.salesGraph(navController: NavHostController, sessio
                             launchSingleTop = true
                         }
                     },
-                    onLogout = logout
+                    onLogout = logout,
+                    onReorderClick = { tx ->
+                        appContainer.posReorderBridge.enqueue(tx)
+                        val hasPosInBackStack = runCatching {
+                            navController.getBackStackEntry(AppRoute.CashierPos.route)
+                            true
+                        }.getOrDefault(false)
+                        if (hasPosInBackStack) {
+                            navController.popBackStack(AppRoute.CashierPos.route, inclusive = false)
+                        } else {
+                            navController.navigate(AppRoute.CashierPos.route) {
+                                launchSingleTop = true
+                            }
+                        }
+                        navController.navigate(AppRoute.CashierCart.route) {
+                            launchSingleTop = true
+                        }
+                    }
                 )
             }
         }
@@ -571,6 +593,11 @@ internal fun NavGraphBuilder.salesGraph(navController: NavHostController, sessio
                             popUpTo(0)
                             launchSingleTop = true
                         }
+                    },
+                    onQuotationsClick = {
+                        navController.navigate(AppRoute.Quotations.route) {
+                            launchSingleTop = true
+                        }
                     }
                 )
             }
@@ -692,6 +719,42 @@ internal fun NavGraphBuilder.salesGraph(navController: NavHostController, sessio
                         sessionManager.logout()
                         navController.navigate(AppRoute.Login.route) {
                             popUpTo(0)
+                            launchSingleTop = true
+                        }
+                    }
+                )
+            }
+        }
+
+        composable(AppRoute.Quotations.route) {
+            val sessionUser = sessionManager.readSessionUser()
+            if (sessionUser == null) {
+                LaunchedEffect(Unit) {
+                    sessionManager.logout()
+                    navController.navigate(AppRoute.Login.route) {
+                        popUpTo(0)
+                        launchSingleTop = true
+                    }
+                }
+            } else {
+                com.tbterminal.app.ui.quotations.QuotationsScreen(
+                    role = sessionUser.role,
+                    quotationRepository = appContainer.quotationRepository,
+                    onBackClick = { navController.popBackStack() },
+                    onConvertToTransaction = { detail ->
+                        appContainer.posReorderBridge.enqueueQuotation(detail)
+                        val hasPosInBackStack = runCatching {
+                            navController.getBackStackEntry(AppRoute.CashierPos.route)
+                            true
+                        }.getOrDefault(false)
+                        if (hasPosInBackStack) {
+                            navController.popBackStack(AppRoute.CashierPos.route, inclusive = false)
+                        } else {
+                            navController.navigate(AppRoute.CashierPos.route) {
+                                launchSingleTop = true
+                            }
+                        }
+                        navController.navigate(AppRoute.CashierCart.route) {
                             launchSingleTop = true
                         }
                     }

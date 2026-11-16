@@ -11,9 +11,9 @@ internal fun SupplierDebtFooter(
     compact: Boolean = false,
 ) {
     val desktopText = if (uiState.total == 0L) {
-        "Menampilkan 0 hutang"
+        "0 hutang"
     } else {
-        "Menampilkan ${uiState.currentStart}–${uiState.currentEnd} dari ${uiState.total} hutang"
+        "${uiState.total} hutang"
     }
     TbPagination(
         currentPage = uiState.page,

@@ -5,6 +5,7 @@ import com.tbterminal.app.data.local.database.TbTerminalDatabase
 import com.tbterminal.app.data.local.entity.LocalTransactionEntity
 import com.tbterminal.app.data.local.model.SyncEntityType
 import com.tbterminal.app.data.local.model.SyncStatus
+import com.tbterminal.app.data.remote.CheckoutPaymentLineRequestDto
 import com.tbterminal.app.data.remote.OfflineCheckoutSyncItemRequestDto
 import com.tbterminal.app.data.remote.OfflineCheckoutSyncRequestDto
 import com.tbterminal.app.data.remote.SalesApi
@@ -388,8 +389,27 @@ class OfflineCheckoutSyncService(
                 priceAtTransaction = item.priceAtTransaction.toMoney(),
                 cogsAtTransaction = item.cogsAtTransaction.toMoney(),
                 discount = item.discount.toMoney(),
-                subtotal = item.subtotal.toMoney()
+                subtotal = item.subtotal.toMoney(),
+                note = item.note
             )
+        }
+        val localPayments = database.paymentDao().getByTransaction(transaction.localId)
+        val useSplitLines = localPayments.size > 1 || localPayments.any { !it.reference.isNullOrBlank() }
+        val syncPayments = if (useSplitLines) {
+            localPayments.map { payment ->
+                CheckoutPaymentLineRequestDto(
+                    method = payment.method.trim().lowercase(),
+                    amount = payment.amount.toMoney().toPlainString(),
+                    reference = payment.reference
+                )
+            }
+        } else {
+            null
+        }
+        val syncMethod = if (useSplitLines) {
+            if (transaction.remainingAmount > 0.0) "dp" else ""
+        } else {
+            paymentMethodForSync(transaction)
         }
 
         return BuildSyncRequestResult.Success(
@@ -400,7 +420,7 @@ class OfflineCheckoutSyncService(
                 cashierUserId = cashierUserId,
                 cashSessionId = cashSessionId,
                 customerId = transaction.customerServerId,
-                paymentMethod = paymentMethodForSync(transaction),
+                paymentMethod = syncMethod,
                 subtotal = transaction.subtotal.toMoney(),
                 discount = transaction.discount.toMoney(),
                 total = transaction.total.toMoney(),
@@ -408,7 +428,15 @@ class OfflineCheckoutSyncService(
                 remainingAmount = transaction.remainingAmount.toMoney(),
                 occurredAt = transaction.occurredAt.toOffsetDateTimeString(),
                 note = null,
-                items = items
+                items = items,
+                payments = syncPayments,
+                taxEnabled = transaction.taxEnabled,
+                taxMode = transaction.taxMode,
+                taxRate = transaction.taxRate.toMoney(),
+                taxLabel = transaction.taxLabel,
+                taxableBase = transaction.taxableBase.toMoney(),
+                taxAmount = transaction.taxAmount.toMoney(),
+                roundingAmount = transaction.roundingAmount.toMoney()
             )
         )
     }

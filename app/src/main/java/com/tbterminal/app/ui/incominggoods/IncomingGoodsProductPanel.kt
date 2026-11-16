@@ -1175,7 +1175,7 @@ private fun ProductPagination(
     onPreviousPage: () -> Unit,
     onNextPage: () -> Unit
 ) {
-    val supportingText = "Menampilkan ${uiState.tableStartIndex}–${uiState.tableEndIndex} dari ${uiState.totalTableProducts} produk"
+    val supportingText = "${uiState.totalTableProducts} produk"
     TbPagination(
         currentPage = uiState.tablePage,
         totalPages = uiState.totalTablePages,

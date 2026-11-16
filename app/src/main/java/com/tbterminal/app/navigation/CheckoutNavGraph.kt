@@ -160,6 +160,30 @@ internal fun NavGraphBuilder.checkoutGraph(navController: NavHostController, ses
                     }
                 }
 
+                val checkoutViewModel = cashierCheckoutViewModel(
+                    navController = navController,
+                    backStackEntry = backStackEntry,
+                    appContainer = appContainer
+                )
+                LaunchedEffect(Unit) {
+                    appContainer.posReorderBridge.pendingReorder.collect { tx ->
+                        if (tx != null) {
+                            appContainer.posReorderBridge.consume()?.let { consumed ->
+                                checkoutViewModel.reorderFromTransaction(consumed)
+                            }
+                        }
+                    }
+                }
+                LaunchedEffect(Unit) {
+                    appContainer.posReorderBridge.pendingQuotation.collect { quote ->
+                        if (quote != null) {
+                            appContainer.posReorderBridge.consumeQuotation()?.let { consumed ->
+                                checkoutViewModel.reorderFromQuotation(consumed)
+                            }
+                        }
+                    }
+                }
+
                 CashierCartRoute(
                     name = sessionUser.name,
                     role = sessionUser.role,
@@ -168,16 +192,17 @@ internal fun NavGraphBuilder.checkoutGraph(navController: NavHostController, ses
                     customerRepository = appContainer.customerRepository,
                     cashReconciliationRepository = appContainer.cashReconciliationRepository,
                     managerApprovalRepository = appContainer.managerApprovalRepository,
-                    viewModel = cashierCheckoutViewModel(
-                        navController = navController,
-                        backStackEntry = backStackEntry,
-                        appContainer = appContainer
-                    ),
+                    viewModel = checkoutViewModel,
                     onBackToPos = {
                         navController.popBackStack()
                     },
                     onNavigateToPayment = {
                         navController.navigate(AppRoute.CashierPayment.route) {
+                            launchSingleTop = true
+                        }
+                    },
+                    onOpenQuotations = {
+                        navController.navigate(AppRoute.Quotations.route) {
                             launchSingleTop = true
                         }
                     },
@@ -339,7 +364,10 @@ private fun cashierCheckoutViewModel(
             localCheckoutLookupService = appContainer.localCheckoutLookupService,
             localCheckoutService = appContainer.localCheckoutService,
             offlineStatusRepository = appContainer.offlineStatusRepository,
-            offlineSyncScheduler = appContainer.offlineSyncScheduler
+            offlineSyncScheduler = appContainer.offlineSyncScheduler,
+            localAppSettingsDataSource = appContainer.localAppSettingsDataSource,
+            systemRepository = appContainer.systemRepository,
+            quotationRepository = appContainer.quotationRepository,
         )
     )
 }

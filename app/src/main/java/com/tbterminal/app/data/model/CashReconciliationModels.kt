@@ -63,6 +63,15 @@ data class CashTransaction(
     val voidReason: String? = null
 )
 
+data class TransactionPaymentDetail(
+    val id: String,
+    val method: String,
+    val amount: BigDecimal,
+    val reference: String? = null,
+    val paymentSource: String = "CHECKOUT",
+    val paidAt: String
+)
+
 data class CashTransactionDetail(
     val id: String,
     val receiptId: String,
@@ -72,8 +81,20 @@ data class CashTransactionDetail(
     val userId: String = "",
     val cashierName: String? = null,
     val paymentMethods: List<String> = emptyList(),
+    val payments: List<TransactionPaymentDetail> = emptyList(),
     val type: String,
     val status: String,
+    val grossSubtotal: BigDecimal = BigDecimal.ZERO,
+    val itemDiscountTotal: BigDecimal = BigDecimal.ZERO,
+    val transactionDiscountAmount: BigDecimal = BigDecimal.ZERO,
+    val totalDiscountAmount: BigDecimal = BigDecimal.ZERO,
+    val taxEnabled: Boolean = false,
+    val taxMode: String? = null,
+    val taxRate: BigDecimal = BigDecimal.ZERO,
+    val taxLabel: String? = null,
+    val taxableBase: BigDecimal = BigDecimal.ZERO,
+    val taxAmount: BigDecimal = BigDecimal.ZERO,
+    val roundingAmount: BigDecimal = BigDecimal.ZERO,
     val total: BigDecimal,
     val paidAmount: BigDecimal,
     val amountTendered: BigDecimal,
@@ -130,7 +151,8 @@ data class CashTransactionItem(
     val unitName: String? = null,
     val quantity: BigDecimal,
     val priceAtTransaction: BigDecimal,
-    val subtotal: BigDecimal
+    val subtotal: BigDecimal,
+    val note: String? = null
 )
 
 data class CashTransactionPage(

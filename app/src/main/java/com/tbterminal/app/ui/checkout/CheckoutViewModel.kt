@@ -6,11 +6,14 @@ import androidx.lifecycle.viewModelScope
 import com.tbterminal.app.data.local.checkout.LocalCheckoutCommand
 import com.tbterminal.app.data.local.checkout.LocalCheckoutItemCommand
 import com.tbterminal.app.data.local.checkout.LocalCheckoutLookupService
+import com.tbterminal.app.data.local.checkout.LocalCheckoutPaymentLineCommand
 import com.tbterminal.app.data.local.checkout.LocalCheckoutResult
 import com.tbterminal.app.data.local.checkout.LocalCheckoutService
 import com.tbterminal.app.data.local.database.CashSessionLocalDataSource
+import com.tbterminal.app.data.local.database.LocalAppSettingsDataSource
 import com.tbterminal.app.data.local.entity.LocalCashSessionEntity
 import com.tbterminal.app.data.local.model.AppDataMode
+import com.tbterminal.app.data.model.CheckoutPaymentLine
 import com.tbterminal.app.data.model.CheckoutSubmitCommand
 import com.tbterminal.app.data.model.CheckoutSubmitItem
 import com.tbterminal.app.data.model.CheckoutDiscount
@@ -18,11 +21,13 @@ import com.tbterminal.app.data.model.CheckoutPreview
 import com.tbterminal.app.data.model.CheckoutPreviewCommand
 import com.tbterminal.app.data.model.CashSession
 import com.tbterminal.app.data.model.Customer
+import com.tbterminal.app.data.remote.NetworkResult
 import com.tbterminal.app.data.repository.CheckoutRepository
 import com.tbterminal.app.data.repository.CashReconciliationRepository
 import com.tbterminal.app.data.repository.CustomerRepository
 import com.tbterminal.app.data.repository.InventoryRepository
 import com.tbterminal.app.data.repository.RepositoryResult
+import com.tbterminal.app.data.repository.SystemRepository
 import com.tbterminal.app.data.sync.BackendStatus
 import com.tbterminal.app.data.sync.InternetStatus
 import com.tbterminal.app.data.sync.OfflineSyncScheduler
@@ -63,7 +68,10 @@ class CheckoutViewModel(
     private val localCheckoutLookupService: LocalCheckoutLookupService? = null,
     private val localCheckoutService: LocalCheckoutService? = null,
     private val offlineStatusRepository: OfflineStatusRepository? = null,
-    private val offlineSyncScheduler: OfflineSyncScheduler? = null
+    private val offlineSyncScheduler: OfflineSyncScheduler? = null,
+    private val localAppSettingsDataSource: LocalAppSettingsDataSource? = null,
+    private val systemRepository: SystemRepository? = null,
+    private val quotationRepository: com.tbterminal.app.data.repository.QuotationRepository? = null,
 ) : ViewModel() {
     private val _uiState = MutableStateFlow(CheckoutUiState())
     val uiState: StateFlow<CheckoutUiState> = _uiState.asStateFlow()
@@ -81,12 +89,57 @@ class CheckoutViewModel(
     private var latestOfflineStatus: OfflineStatus = OfflineStatus()
     private var pendingOnlineCheckout: PendingOnlineCheckout? = null
     private var ambiguousOnlineCheckout: CheckoutSubmitCommand? = null
+    private var reorderedProductsCache: Map<String, ReorderResolvedProduct> = emptyMap()
 
     init {
         observeOfflineStatus()
+        loadStoreConfig()
         loadCashSession()
         loadProducts()
         loadCustomers()
+    }
+
+    fun loadStoreConfig() {
+        viewModelScope.launch {
+            localAppSettingsDataSource?.let { ds ->
+                runCatching { ds.getCachedStoreConfig() }.getOrNull()?.let { cached ->
+                    _uiState.update { state ->
+                        state.copy(
+                            storeName = cached.storeName,
+                            storeNpwp = cached.storeNpwp,
+                            taxEnabled = cached.taxEnabled,
+                            taxMode = cached.taxMode,
+                            taxRate = cached.taxRate,
+                            taxLabel = cached.taxLabel,
+                            cashRoundingUnit = cached.cashRoundingUnit,
+                            cashRoundingRule = cached.cashRoundingRule,
+                        ).recalculateCheckoutState(state.cartItems, state.transactionDiscount)
+                    }
+                }
+            }
+            val sysRepo = systemRepository ?: return@launch
+            when (val result = sysRepo.getStoreSettings()) {
+                is NetworkResult.Success -> {
+                    val settings = result.data.data
+                    if (result.data.success && settings != null) {
+                        runCatching { localAppSettingsDataSource?.setCachedStoreConfig(settings) }
+                        _uiState.update { state ->
+                            state.copy(
+                                storeName = settings.storeName.ifBlank { "TB TERMINAL" },
+                                storeNpwp = settings.storeNpwp,
+                                taxEnabled = settings.taxEnabled,
+                                taxMode = settings.taxMode,
+                                taxRate = settings.taxRate,
+                                taxLabel = settings.taxLabel,
+                                cashRoundingUnit = settings.cashRoundingUnit,
+                                cashRoundingRule = settings.cashRoundingRule,
+                            ).recalculateCheckoutState(state.cartItems, state.transactionDiscount)
+                        }
+                    }
+                }
+                else -> Unit
+            }
+        }
     }
 
     private fun observeOfflineStatus() {
@@ -240,21 +293,7 @@ class CheckoutViewModel(
                     val productPage = result.data
                     val newItems = productPage.data
                         .filter { it.isActive }
-                        .map { product ->
-                            Product(
-                                productId = product.productId,
-                                name = product.productName,
-                                unitPrice = product.priceRetail,
-                                sku = product.sku,
-                                barcode = product.sku,
-                                unitName = product.unitName,
-                                categoryName = product.categoryName,
-                                stockQty = product.quantity,
-                                secondaryUnitId = product.secondaryUnitId,
-                                secondaryUnitName = product.secondaryUnitName,
-                                secondaryUnitFactor = product.secondaryUnitFactor
-                            )
-                        }
+                        .map { it.toCheckoutProduct() }
                     _uiState.update { current ->
                         val existingIds = current.products.map { it.productId }.toSet()
                         val combined = current.products + newItems.filter { it.productId !in existingIds }
@@ -299,21 +338,7 @@ class CheckoutViewModel(
                         state.copy(
                             products = productPage.data
                                 .filter { product -> product.isActive }
-                                .map { product ->
-                                    Product(
-                                        productId = product.productId,
-                                        name = product.productName,
-                                        unitPrice = product.priceRetail,
-                                        sku = product.sku,
-                                        barcode = product.sku,
-                                        unitName = product.unitName,
-                                        categoryName = product.categoryName,
-                                        stockQty = product.quantity,
-                                        secondaryUnitId = product.secondaryUnitId,
-                                        secondaryUnitName = product.secondaryUnitName,
-                                        secondaryUnitFactor = product.secondaryUnitFactor
-                                    )
-                                },
+                                .map { it.toCheckoutProduct() },
                             productPage = productPage.page.coerceAtLeast(1),
                             productLimit = productPage.limit,
                             productTotal = productPage.total,
@@ -450,7 +475,7 @@ class CheckoutViewModel(
                 customerError = null,
                 deliveryRecipientPhone = updatedRecipientPhone,
                 deliveryAddress = updatedAddress
-            )
+            ).recalculateCheckoutState(state.cartItems, state.transactionDiscount)
         }
     }
 
@@ -459,7 +484,7 @@ class CheckoutViewModel(
             state.copy(
                 selectedCustomer = null,
                 customerSearchQuery = ""
-            )
+            ).recalculateCheckoutState(state.cartItems, state.transactionDiscount)
         }
         loadCustomers()
     }
@@ -532,7 +557,7 @@ class CheckoutViewModel(
                             deliveryRecipientPhone = updatedRecipientPhone,
                             deliveryAddress = updatedAddress,
                             quickFeedbackMessage = "Pelanggan \"${created.name}\" berhasil didaftarkan!"
-                        )
+                        ).recalculateCheckoutState(it.cartItems, it.transactionDiscount)
                     }
                 }
                 is RepositoryResult.Error -> {
@@ -559,6 +584,334 @@ class CheckoutViewModel(
         if (!allowCheckoutIntentMutation()) return
         _uiState.update { state ->
             state.withCart(items)
+        }
+    }
+
+    fun reorderFromTransaction(transaction: com.tbterminal.app.data.model.CashTransactionDetail) {
+        if (transaction.items.isEmpty()) {
+            setError(UiText.DynamicString("Transaksi ini tidak memiliki item untuk disalin."))
+            return
+        }
+        val receiptNum = transaction.receiptId.ifBlank { transaction.id }
+        loadItemsForCartReorder(
+            sourceItems = transaction.items,
+            customerId = transaction.customerId,
+            documentLabel = receiptNum,
+            transactionDiscount = null,
+            quotationId = null,
+            quotationNumber = null,
+        )
+    }
+
+    fun reorderFromQuotation(quotation: com.tbterminal.app.data.model.QuotationDetail) {
+        if (quotation.items.isEmpty()) {
+            setError(UiText.DynamicString("Penawaran ini tidak memiliki item untuk dikonversi."))
+            return
+        }
+        val mappedItems = quotation.items.map { item ->
+            com.tbterminal.app.data.model.CashTransactionItem(
+                productId = item.productId,
+                productName = item.productName,
+                unitId = item.unitId,
+                unitName = item.unitName,
+                quantity = item.quantity,
+                priceAtTransaction = item.unitPrice,
+                subtotal = item.subtotal,
+                note = item.note,
+            )
+        }
+        val txDiscount = quotation.transactionDiscountType?.let { type ->
+            if (quotation.transactionDiscountValue > BigDecimal.ZERO) {
+                CheckoutDiscount(type = type, value = quotation.transactionDiscountValue)
+            } else null
+        }
+        loadItemsForCartReorder(
+            sourceItems = mappedItems,
+            customerId = quotation.customerId,
+            documentLabel = quotation.quotationNumber,
+            transactionDiscount = txDiscount,
+            quotationId = quotation.id,
+            quotationNumber = quotation.quotationNumber,
+        )
+    }
+
+    private fun loadItemsForCartReorder(
+        sourceItems: List<com.tbterminal.app.data.model.CashTransactionItem>,
+        customerId: String?,
+        documentLabel: String,
+        transactionDiscount: CheckoutDiscount?,
+        quotationId: String?,
+        quotationNumber: String?,
+    ) {
+        if (!allowCheckoutIntentMutation()) return
+        viewModelScope.launch {
+            _uiState.update { it.copy(isReordering = true) }
+
+            val distinctProductIds = sourceItems.map { it.productId }.distinct()
+            val resolvedMap = mutableMapOf<String, ReorderResolvedProduct>()
+
+            for (productId in distinctProductIds) {
+                val cachedFromUi = _uiState.value.products.firstOrNull { it.productId == productId }
+                val localLookup = localCheckoutLookupService?.findProductByServerId(productId)
+                when (val detailResult = inventoryRepository.getProductDetail(productId)) {
+                    is RepositoryResult.Success -> {
+                        val detail = detailResult.data
+                        val domainProduct = detail.product
+                        val stock = detail.stock
+                        val resolvedStockQty = stock?.quantity
+                            ?: cachedFromUi?.stockQty
+                            ?: localLookup?.let { BigDecimal.valueOf(it.stock) }
+                            ?: BigDecimal.ZERO
+                        val uiProduct = Product(
+                            productId = domainProduct.id,
+                            name = domainProduct.name,
+                            unitPrice = domainProduct.priceRetail,
+                            sku = domainProduct.sku,
+                            barcode = domainProduct.sku,
+                            unitName = stock?.unitName ?: cachedFromUi?.unitName.orEmpty(),
+                            categoryName = stock?.categoryName ?: cachedFromUi?.categoryName.orEmpty(),
+                            stockQty = resolvedStockQty,
+                            secondaryUnitId = domainProduct.secondaryUnitId,
+                            secondaryUnitName = stock?.secondaryUnitName ?: cachedFromUi?.secondaryUnitName,
+                            secondaryUnitFactor = domainProduct.secondaryUnitFactor,
+                            contractorPrice = domainProduct.priceContractor,
+                            priceTiers = domainProduct.priceTiers,
+                            masterDiscount = domainProduct.discount,
+                        )
+                        resolvedMap[productId] = ReorderResolvedProduct(
+                            product = uiProduct,
+                            isActive = domainProduct.isActive,
+                        )
+                    }
+                    else -> {
+                        if (cachedFromUi != null) {
+                            resolvedMap[productId] = ReorderResolvedProduct(
+                                product = cachedFromUi,
+                                isActive = true,
+                            )
+                        }
+                    }
+                }
+            }
+
+            val resolvedCustomer = customerId
+                ?.takeIf { it.isNotBlank() }
+                ?.let { cid ->
+                    when (val custResult = customerRepository.getCustomerById(cid)) {
+                        is RepositoryResult.Success -> custResult.data.takeIf { it.isActive }
+                        else -> _uiState.value.customers.firstOrNull { it.id == cid && it.isActive }
+                    }
+                }
+
+            val plan = buildCheckoutReorderPlan(
+                transactionItems = sourceItems,
+                resolvedProducts = resolvedMap,
+            )
+
+            if (plan.items.isEmpty()) {
+                _uiState.update { it.copy(isReordering = false) }
+                setError(UiText.DynamicString(plan.buildFeedbackMessage()))
+                return@launch
+            }
+
+            reorderedProductsCache = reorderedProductsCache + resolvedMap
+
+            if (_uiState.value.cartItems.isEmpty()) {
+                applyReorderReplace(
+                    plan = plan,
+                    customer = resolvedCustomer,
+                    feedback = plan.buildFeedbackMessage(),
+                    transactionDiscount = transactionDiscount,
+                    quotationId = quotationId,
+                    quotationNumber = quotationNumber,
+                )
+            } else {
+                _uiState.update { state ->
+                    state.copy(
+                        isReordering = false,
+                        pendingReorderConflict = PendingReorderConflict(
+                            receiptNumber = documentLabel,
+                            plan = plan,
+                            customer = resolvedCustomer,
+                            resolvedProducts = resolvedMap,
+                            quotationId = quotationId,
+                            quotationNumber = quotationNumber,
+                            transactionDiscount = transactionDiscount,
+                        ),
+                    )
+                }
+            }
+        }
+    }
+
+    fun resolveReorderConflict(replaceExisting: Boolean) {
+        val conflict = _uiState.value.pendingReorderConflict ?: return
+        if (!allowCheckoutIntentMutation()) return
+        if (replaceExisting) {
+            applyReorderReplace(
+                plan = conflict.plan,
+                customer = conflict.customer,
+                feedback = conflict.plan.buildFeedbackMessage(),
+                transactionDiscount = conflict.transactionDiscount,
+                quotationId = conflict.quotationId,
+                quotationNumber = conflict.quotationNumber,
+            )
+        } else {
+            val mergeResult = mergeReorderItemsIntoCart(
+                existingItems = _uiState.value.cartItems,
+                incomingItems = conflict.plan.items,
+                resolvedProducts = conflict.resolvedProducts,
+            )
+            val feedback = buildString {
+                append("${conflict.plan.items.size} item dari #${conflict.receiptNumber} ditambahkan ke keranjang")
+                if (mergeResult.cappedItems.isNotEmpty()) {
+                    append(" (${mergeResult.cappedItems.size} dibatasi stok tersedia)")
+                }
+                append(".")
+            }
+            _uiState.update { state ->
+                val resolvedCust = state.selectedCustomer ?: conflict.customer
+                state.copy(
+                    isReordering = false,
+                    pendingReorderConflict = null,
+                    selectedCustomer = resolvedCust,
+                    customerSearchQuery = resolvedCust?.name ?: state.customerSearchQuery,
+                    activeQuotationId = conflict.quotationId ?: state.activeQuotationId,
+                    activeQuotationNumber = conflict.quotationNumber ?: state.activeQuotationNumber,
+                    quickFeedbackMessage = feedback,
+                ).recalculateCheckoutState(
+                    items = mergeResult.items,
+                    discount = state.transactionDiscount ?: conflict.transactionDiscount,
+                )
+            }
+        }
+    }
+
+    fun dismissReorderConflict() {
+        _uiState.update { it.copy(pendingReorderConflict = null, isReordering = false) }
+    }
+
+    fun openSaveQuotationDialog() {
+        if (_uiState.value.cartItems.isEmpty()) {
+            setError(UiText.DynamicString("Keranjang belanja masih kosong."))
+            return
+        }
+        _uiState.update {
+            it.copy(
+                isSaveQuotationDialogOpen = true,
+                quotationValidDaysInput = it.quotationValidDaysInput.ifBlank { "14" },
+            )
+        }
+    }
+
+    fun dismissSaveQuotationDialog() {
+        if (_uiState.value.isSavingQuotation) return
+        _uiState.update { it.copy(isSaveQuotationDialogOpen = false) }
+    }
+
+    fun onQuotationValidDaysChanged(value: String) {
+        val clean = value.filter(Char::isDigit).take(3)
+        _uiState.update { it.copy(quotationValidDaysInput = clean) }
+    }
+
+    fun onQuotationNotesChanged(value: String) {
+        _uiState.update { it.copy(quotationNotesInput = value.take(300)) }
+    }
+
+    fun submitQuotation() {
+        val repo = quotationRepository ?: run {
+            setError(UiText.DynamicString("Fitur penawaran belum siap."))
+            return
+        }
+        val state = _uiState.value
+        if (state.isSavingQuotation) return
+        if (state.cartItems.isEmpty()) {
+            setError(UiText.DynamicString("Keranjang belanja kosong."))
+            return
+        }
+        val validDays = state.quotationValidDaysInput.toIntOrNull()?.coerceIn(1, 365) ?: 14
+
+        viewModelScope.launch {
+            _uiState.update { it.copy(isSavingQuotation = true) }
+            val command = com.tbterminal.app.data.model.CreateQuotationCommand(
+                customerId = state.selectedCustomer?.id,
+                customerName = if (state.selectedCustomer == null) {
+                    state.customerSearchQuery.trim().takeIf { it.isNotEmpty() }
+                } else null,
+                items = state.cartItems.map { item ->
+                    com.tbterminal.app.data.model.CreateQuotationItemCommand(
+                        productId = item.productId,
+                        qty = item.equivalentBaseQuantityBigDecimal,
+                        discountRequest = item.discountRequest,
+                        note = item.note,
+                    )
+                },
+                transactionDiscount = state.transactionDiscount,
+                validDays = validDays,
+                notes = state.quotationNotesInput.trim().takeIf { it.isNotEmpty() },
+            )
+            when (val result = repo.createQuotation(command)) {
+                is RepositoryResult.Success -> {
+                    _uiState.update {
+                        it.copy(
+                            isSavingQuotation = false,
+                            isSaveQuotationDialogOpen = false,
+                            quotationNotesInput = "",
+                            quickFeedbackMessage = "Penawaran ${result.data.quotationNumber} berhasil disimpan.",
+                        )
+                    }
+                }
+                is RepositoryResult.Error -> {
+                    _uiState.update { it.copy(isSavingQuotation = false) }
+                    setError(UiText.DynamicString(result.message))
+                }
+                is RepositoryResult.Exception -> {
+                    _uiState.update { it.copy(isSavingQuotation = false) }
+                    setError(UiText.DynamicString("Simpan penawaran memerlukan koneksi ke server."))
+                }
+            }
+        }
+    }
+
+    private fun applyReorderReplace(
+        plan: CheckoutReorderPlan,
+        customer: Customer?,
+        feedback: String,
+        transactionDiscount: CheckoutDiscount? = null,
+        quotationId: String? = null,
+        quotationNumber: String? = null,
+    ) {
+        _uiState.update { state ->
+            val customerAddress = customer?.address?.takeIf { it.isNotBlank() }.orEmpty()
+            val customerPhone = customer?.phone?.takeIf { it.isNotBlank() }.orEmpty()
+            state.copy(
+                isReordering = false,
+                pendingReorderConflict = null,
+                activeQuotationId = quotationId,
+                activeQuotationNumber = quotationNumber,
+                selectedCustomer = customer,
+                customerSearchQuery = customer?.name.orEmpty(),
+                customerError = null,
+                isDeliveryEnabled = false,
+                deliveryFee = BigDecimal.ZERO,
+                deliveryFeeInput = "",
+                deliveryAddress = customerAddress,
+                deliveryCourier = "",
+                deliveryFleet = "",
+                deliveryRecipientPhone = customerPhone,
+                deliveryVehiclePlate = "",
+                deliverySpecialInstructions = "",
+                isSplitPaymentEnabled = false,
+                isSplitDpMode = false,
+                splitPaymentLines = emptyList(),
+                amountPaidInput = "",
+                selectedPaymentMethod = PaymentMethod.TUNAI,
+                quickFeedbackMessage = feedback,
+            ).recalculateCheckoutState(
+                items = plan.items,
+                discount = transactionDiscount,
+                deliveryFeeAmount = BigDecimal.ZERO,
+            )
         }
     }
 
@@ -617,7 +970,11 @@ class CheckoutViewModel(
                     secondaryUnitId = product.secondaryUnitId,
                     secondaryUnitName = product.secondaryUnitName,
                     secondaryUnitFactor = product.secondaryUnitFactor,
-                    isSecondaryUnit = isSecondary
+                    isSecondaryUnit = isSecondary,
+                    retailBaseUnitPrice = product.unitPrice,
+                    contractorBaseUnitPrice = product.contractorPrice,
+                    priceTiers = product.priceTiers,
+                    masterUnitDiscount = product.masterDiscount,
                 )
             } else {
                 state.cartItems.map { item ->
@@ -673,19 +1030,7 @@ class CheckoutViewModel(
                             setError(UiText.DynamicString("Stok ${found.productName} kosong."))
                             return@launch
                         }
-                        val uiProduct = Product(
-                            productId = found.productId,
-                            name = found.productName,
-                            unitPrice = found.priceRetail,
-                            sku = found.sku,
-                            barcode = found.sku,
-                            unitName = found.unitName,
-                            categoryName = found.categoryName,
-                            stockQty = found.quantity,
-                            secondaryUnitId = found.secondaryUnitId,
-                            secondaryUnitName = found.secondaryUnitName,
-                            secondaryUnitFactor = found.secondaryUnitFactor
-                        )
+                        val uiProduct = found.toCheckoutProduct()
                         addProduct(uiProduct)
                         com.tbterminal.app.ui.barcode.BarcodeFeedbackHelper.playSuccessBeep()
                         context?.let { ctx ->
@@ -716,6 +1061,7 @@ class CheckoutViewModel(
         val currentItem = _uiState.value.cartItems.firstOrNull { it.cartItemId == cartItemId }
             ?: return
         val product = _uiState.value.products.firstOrNull { it.productId == currentItem.productId }
+            ?: reorderedProductsCache[currentItem.productId]?.product
 
         if (quantity > currentItem.quantity && product != null) {
             val otherItemsConsumedBaseQty = _uiState.value.cartItems
@@ -768,6 +1114,7 @@ class CheckoutViewModel(
         if (toSecondary && (factor == null || factor <= BigDecimal.ONE)) return
 
         val product = _uiState.value.products.firstOrNull { it.productId == currentItem.productId }
+            ?: reorderedProductsCache[currentItem.productId]?.product
         val newFactor = if (toSecondary) (factor ?: BigDecimal.ONE) else BigDecimal.ONE
         val otherItemsConsumedBaseQty = _uiState.value.cartItems
             .filter { it.productId == currentItem.productId && it.cartItemId != cartItemId }
@@ -819,7 +1166,9 @@ class CheckoutViewModel(
                             unitPrice = newUnitPrice,
                             unitName = newUnitName,
                             isSecondaryUnit = toSecondary,
-                            discountRequest = null
+                            discountRequest = null,
+                            hasManualDiscountOverride = false,
+                            isMasterDiscountApplied = false,
                         )
                     } else {
                         item
@@ -844,7 +1193,11 @@ class CheckoutViewModel(
             state.withCart(
                 state.cartItems.map { cartItem ->
                     if (cartItem.cartItemId == cartItemId) {
-                        cartItem.copy(discountRequest = discount)
+                        cartItem.copy(
+                            discountRequest = discount,
+                            hasManualDiscountOverride = true,
+                            isMasterDiscountApplied = false,
+                        )
                     } else {
                         cartItem
                     }
@@ -1194,14 +1547,18 @@ class CheckoutViewModel(
 
     fun selectPaymentMethod(paymentMethod: PaymentMethod) {
         _uiState.update { state ->
-            state.copy(
+            val updated = state.copy(
                 selectedPaymentMethod = paymentMethod,
+                isSplitPaymentEnabled = false,
+                isSplitDpMode = false,
+            ).recalculateCheckoutState(state.cartItems, state.transactionDiscount)
+            updated.copy(
                 amountPaidInput = when (paymentMethod) {
                     PaymentMethod.HUTANG -> "0"
                     PaymentMethod.DP -> {
                         if (state.selectedPaymentMethod == PaymentMethod.DP) state.amountPaidInput else ""
                     }
-                    else -> state.finalTotal.toPlainString()
+                    else -> updated.finalTotal.toPlainString()
                 }
             )
         }
@@ -1210,6 +1567,125 @@ class CheckoutViewModel(
     fun onAmountPaidChanged(value: String) {
         _uiState.update { state ->
             state.copy(amountPaidInput = value.moneyInput(), errorEvent = null)
+        }
+    }
+
+    fun setItemNote(cartItemId: String, note: String?) {
+        if (!allowCheckoutIntentMutation()) return
+        val cleaned = note?.trim()?.takeIf { it.isNotEmpty() }?.take(300)
+        _uiState.update { state ->
+            val updatedItems = state.cartItems.map { item ->
+                if (item.cartItemId == cartItemId) item.copy(note = cleaned) else item
+            }
+            state.withCart(updatedItems)
+        }
+    }
+
+    fun toggleSplitPayment(enabled: Boolean) {
+        if (!allowCheckoutIntentMutation()) return
+        _uiState.update { state ->
+            if (!enabled) {
+                state.copy(
+                    isSplitPaymentEnabled = false,
+                    isSplitDpMode = false,
+                    errorEvent = null
+                ).recalculateCheckoutState(state.cartItems, state.transactionDiscount)
+            } else {
+                val existingLines = state.splitPaymentLines
+                val starterLines = if (existingLines.isNotEmpty()) {
+                    existingLines
+                } else {
+                    val primaryMethod = if (state.selectedPaymentMethod in setOf(PaymentMethod.TUNAI, PaymentMethod.TRANSFER, PaymentMethod.QRIS)) {
+                        state.selectedPaymentMethod
+                    } else {
+                        PaymentMethod.TUNAI
+                    }
+                    val secondaryMethod = if (primaryMethod == PaymentMethod.TUNAI) PaymentMethod.QRIS else PaymentMethod.TUNAI
+                    listOf(
+                        SplitPaymentLineUi(
+                            method = primaryMethod,
+                            amountInput = state.finalTotal.stripTrailingZeros().toPlainString()
+                        ),
+                        SplitPaymentLineUi(
+                            method = secondaryMethod,
+                            amountInput = "0"
+                        )
+                    )
+                }
+                state.copy(
+                    isSplitPaymentEnabled = true,
+                    splitPaymentLines = starterLines,
+                    errorEvent = null
+                ).recalculateCheckoutState(state.cartItems, state.transactionDiscount)
+            }
+        }
+    }
+
+    fun setSplitDpMode(enabled: Boolean) {
+        _uiState.update { it.copy(isSplitDpMode = enabled, errorEvent = null) }
+    }
+
+    fun addSplitPaymentLine(method: PaymentMethod = PaymentMethod.TRANSFER) {
+        _uiState.update { state ->
+            if (state.splitPaymentLines.size >= 5) return@update state
+            val preferredMethod = if (method == PaymentMethod.TUNAI && state.splitPaymentLines.any { it.method == PaymentMethod.TUNAI }) {
+                PaymentMethod.TRANSFER
+            } else {
+                method
+            }
+            val currentPaid = state.splitPaymentLines.fold(BigDecimal.ZERO) { acc, line ->
+                acc.add(line.amountInput.trim().replace(',', '.').toBigDecimalOrNull() ?: BigDecimal.ZERO)
+            }
+            val remaining = state.finalTotal.subtract(currentPaid).coerceAtLeast(BigDecimal.ZERO)
+            val newLines = state.splitPaymentLines + SplitPaymentLineUi(
+                method = preferredMethod,
+                amountInput = if (remaining > BigDecimal.ZERO) remaining.stripTrailingZeros().toPlainString() else "0"
+            )
+            state.copy(splitPaymentLines = newLines, errorEvent = null)
+                .recalculateCheckoutState(state.cartItems, state.transactionDiscount)
+        }
+    }
+
+    fun removeSplitPaymentLine(lineId: String) {
+        _uiState.update { state ->
+            if (state.splitPaymentLines.size <= 1) return@update state
+            val newLines = state.splitPaymentLines.filterNot { it.id == lineId }
+            state.copy(splitPaymentLines = newLines, errorEvent = null)
+                .recalculateCheckoutState(state.cartItems, state.transactionDiscount)
+        }
+    }
+
+    fun updateSplitPaymentLineMethod(lineId: String, method: PaymentMethod) {
+        if (method !in setOf(PaymentMethod.TUNAI, PaymentMethod.TRANSFER, PaymentMethod.QRIS)) return
+        _uiState.update { state ->
+            if (method == PaymentMethod.TUNAI && state.splitPaymentLines.any { it.id != lineId && it.method == PaymentMethod.TUNAI }) {
+                return@update state.copy(errorEvent = UiText.DynamicString("Maksimal 1 baris pembayaran Tunai dalam split payment."))
+            }
+            val newLines = state.splitPaymentLines.map { line ->
+                if (line.id == lineId) line.copy(method = method) else line
+            }
+            state.copy(splitPaymentLines = newLines, errorEvent = null)
+                .recalculateCheckoutState(state.cartItems, state.transactionDiscount)
+        }
+    }
+
+    fun updateSplitPaymentLineAmount(lineId: String, value: String) {
+        _uiState.update { state ->
+            val sanitized = value.moneyInput()
+            val newLines = state.splitPaymentLines.map { line ->
+                if (line.id == lineId) line.copy(amountInput = sanitized) else line
+            }
+            state.copy(splitPaymentLines = newLines, errorEvent = null)
+                .recalculateCheckoutState(state.cartItems, state.transactionDiscount)
+        }
+    }
+
+    fun updateSplitPaymentLineReference(lineId: String, reference: String) {
+        _uiState.update { state ->
+            val newLines = state.splitPaymentLines.map { line ->
+                if (line.id == lineId) line.copy(reference = reference.take(100)) else line
+            }
+            state.copy(splitPaymentLines = newLines)
         }
     }
 
@@ -1267,9 +1743,11 @@ class CheckoutViewModel(
                         productId = item.productId,
                         quantity = effectiveQty,
                         discountRequest = item.discountRequest,
+                        note = item.note,
                     )
                 },
                 transactionDiscount = _uiState.value.transactionDiscount,
+                customerId = _uiState.value.selectedCustomer?.id,
             )
             when (val result = checkoutRepository.previewCheckout(previewCommand)) {
                 is RepositoryResult.Success -> {
@@ -1363,7 +1841,27 @@ class CheckoutViewModel(
         }
         val customerId = resolveCustomerIdBeforeCheckout()
         val typedCustomerName = _uiState.value.customerSearchQuery.trim()
-        if (customerId == null && paymentMethod.requiresRegisteredCustomer()) {
+        val isSplit = state.isSplitPaymentEnabled
+        val splitResult = if (isSplit) {
+            validateSplitCheckoutPayment(
+                lines = state.splitPaymentLines,
+                total = state.finalTotal,
+                isDpMode = state.isSplitDpMode,
+                customerSelected = customerId != null
+            )
+        } else null
+
+        if (splitResult?.error != null) {
+            _uiState.update {
+                it.copy(
+                    isLoading = false,
+                    errorEvent = UiText.DynamicString(splitResult.error)
+                )
+            }
+            return
+        }
+
+        if (!isSplit && customerId == null && paymentMethod.requiresRegisteredCustomer()) {
             _uiState.update {
                 it.copy(
                     isLoading = false,
@@ -1374,9 +1872,28 @@ class CheckoutViewModel(
             }
             return
         }
-        val effectiveAmountPaid = resolveAmountPaid(paymentMethod, fallbackAmount) ?: run {
-            _uiState.update { it.copy(isLoading = false) }
-            return
+        val effectiveAmountPaid = if (isSplit) {
+            splitResult!!.totalTendered
+        } else {
+            resolveAmountPaid(paymentMethod, fallbackAmount) ?: run {
+                _uiState.update { it.copy(isLoading = false) }
+                return
+            }
+        }
+        val paymentLinesForSubmit = if (isSplit) {
+            state.splitPaymentLines.mapNotNull { line ->
+                val amt = line.amountInput.trim().replace(',', '.').toBigDecimalOrNull() ?: return@mapNotNull null
+                CheckoutPaymentLine(
+                    method = line.method.apiValue(),
+                    amount = amt.toPlainString(),
+                    reference = line.reference.trim().takeIf { it.isNotEmpty() }
+                )
+            }
+        } else null
+        val paymentMethodForSubmit = if (isSplit) {
+            if (state.isSplitDpMode) "dp" else ""
+        } else {
+            paymentMethod.apiValue()
         }
         val cartSnapshot = _uiState.value.cartItems
         val notes = checkoutCustomerNote(typedCustomerName)
@@ -1386,6 +1903,8 @@ class CheckoutViewModel(
                 items = cartSnapshot,
                 paymentMethod = paymentMethod,
                 amountPaid = effectiveAmountPaid,
+                paymentLines = paymentLinesForSubmit,
+                isSplitDpMode = state.isSplitDpMode,
                 customerId = customerId,
                 notes = notes,
                 transactionDiscount = state.transactionDiscount,
@@ -1402,10 +1921,12 @@ class CheckoutViewModel(
                     productId = item.productId,
                     quantity = effectiveQty,
                     discountRequest = item.discountRequest,
+                    note = item.note,
                 )
             },
-            paymentMethod = paymentMethod.apiValue(),
+            paymentMethod = paymentMethodForSubmit,
             amountPaid = effectiveAmountPaid.toPlainString(),
+            payments = paymentLinesForSubmit,
             customerId = customerId,
             notes = notes,
             transactionDiscount = state.transactionDiscount,
@@ -1422,6 +1943,18 @@ class CheckoutViewModel(
             is RepositoryResult.Success -> {
                 pendingOnlineCheckout = null
                 ambiguousOnlineCheckout = null
+                val convertedQuotationId = _uiState.value.activeQuotationId
+                if (!convertedQuotationId.isNullOrBlank()) {
+                    viewModelScope.launch {
+                        runCatching {
+                            quotationRepository?.updateQuotationStatus(
+                                id = convertedQuotationId,
+                                status = com.tbterminal.app.data.model.QuotationStatus.CONVERTED,
+                                convertedTransactionId = result.data.transactionId,
+                            )
+                        }
+                    }
+                }
                 _checkoutEvents.tryEmit(CheckoutEvent.NavigateToReceipt(result.data.transactionId))
                 _uiState.update { current -> current.resetAfterSuccessfulCheckout() }
             }
@@ -1485,15 +2018,7 @@ class CheckoutViewModel(
                     is LocalCheckoutResult.Success -> {
                         offlineSyncScheduler?.scheduleIfEnabled()
                         _uiState.update { state ->
-                            CheckoutUiState(
-                                products = state.products,
-                                productPage = state.productPage,
-                                productLimit = state.productLimit,
-                                productTotal = state.productTotal,
-                                productTotalPages = state.productTotalPages,
-                                customers = state.customers,
-                                activeCashSession = state.activeCashSession,
-                                hasActiveCashSession = state.hasActiveCashSession,
+                            state.resetAfterSuccessfulCheckout().copy(
                                 errorEvent = UiText.DynamicString(
                                     "Transaksi disimpan lokal. Data akan disinkronkan saat server tersedia."
                                 )
@@ -1600,6 +2125,8 @@ class CheckoutViewModel(
         items: List<CartItem>,
         paymentMethod: PaymentMethod,
         amountPaid: BigDecimal,
+        paymentLines: List<CheckoutPaymentLine>?,
+        isSplitDpMode: Boolean,
         customerId: String?,
         notes: String?,
         transactionDiscount: CheckoutDiscount?,
@@ -1608,13 +2135,19 @@ class CheckoutViewModel(
     ): String {
         val fingerprint = buildString {
             append(paymentMethod.apiValue()).append('|').append(amountPaid.toPlainString()).append('|')
+            append(isSplitDpMode).append('|')
+            paymentLines.orEmpty().forEach { line ->
+                append(line.method).append(':').append(line.amount).append(':').append(line.reference.orEmpty()).append(',')
+            }
+            append('|')
             append(customerId.orEmpty()).append('|').append(notes.orEmpty()).append('|')
             append(checkoutAttemptId.orEmpty()).append('|').append(managerApprovalId.orEmpty()).append('|')
             append(transactionDiscount.fingerprintPart()).append('|')
             items.sortedBy(CartItem::cartItemId).forEach { item ->
                 append(item.cartItemId).append(':').append(item.quantity).append(':')
                     .append(item.discountRequest.fingerprintPart()).append(':')
-                    .append(item.isSecondaryUnit).append(';')
+                    .append(item.isSecondaryUnit).append(':')
+                    .append(item.note.orEmpty()).append(';')
             }
         }
         val existing = pendingOnlineCheckout
@@ -1662,6 +2195,14 @@ class CheckoutViewModel(
         activeCashSession = activeCashSession,
         hasActiveCashSession = hasActiveCashSession,
         heldCarts = heldCarts,
+        storeName = storeName,
+        storeNpwp = storeNpwp,
+        taxEnabled = taxEnabled,
+        taxMode = taxMode,
+        taxRate = taxRate,
+        taxLabel = taxLabel,
+        cashRoundingUnit = cashRoundingUnit,
+        cashRoundingRule = cashRoundingRule,
     )
 
     private fun RepositoryResult.Error.toUiText(): UiText {
@@ -1776,8 +2317,24 @@ class CheckoutViewModel(
         val subtotal = state.subtotal.toSafeDouble()
         val discount = state.totalDiscount.toSafeDouble()
         val total = state.finalTotal.toSafeDouble()
-        val paidAmount = resolveLocalCheckoutPaidAmount(state)
-            ?: return LocalCheckoutCommandBuildResult.Failed("Nominal bayar belum valid.")
+        val selectedCustomer = state.selectedCustomer
+        val splitValidation = if (state.isSplitPaymentEnabled) {
+            validateSplitCheckoutPayment(
+                lines = state.splitPaymentLines,
+                total = state.finalTotal,
+                isDpMode = state.isSplitDpMode,
+                customerSelected = selectedCustomer != null
+            )
+        } else null
+        if (splitValidation?.error != null) {
+            return LocalCheckoutCommandBuildResult.Failed(splitValidation.error)
+        }
+        val paidAmount = if (state.isSplitPaymentEnabled) {
+            if (state.isSplitDpMode) splitValidation!!.totalTendered.toSafeDouble() else state.finalTotal.toSafeDouble()
+        } else {
+            resolveLocalCheckoutPaidAmount(state)
+                ?: return LocalCheckoutCommandBuildResult.Failed("Nominal bayar belum valid.")
+        }
 
         if (subtotal < 0.0 || discount < 0.0 || total < 0.0) {
             return LocalCheckoutCommandBuildResult.Failed("Nilai transaksi lokal belum valid.")
@@ -1789,8 +2346,7 @@ class CheckoutViewModel(
             return LocalCheckoutCommandBuildResult.Failed("Nominal bayar melebihi total transaksi.")
         }
 
-        val selectedCustomer = state.selectedCustomer
-        if (state.selectedPaymentMethod.requiresRegisteredCustomer() && selectedCustomer == null) {
+        if (!state.isSplitPaymentEnabled && state.selectedPaymentMethod.requiresRegisteredCustomer() && selectedCustomer == null) {
             return LocalCheckoutCommandBuildResult.Failed("Hutang/DP wajib memakai pelanggan terdaftar.")
         }
 
@@ -1839,11 +2395,28 @@ class CheckoutViewModel(
                 priceAtTransaction = cartItem.unitPrice.toSafeDouble(),
                 cogsAtTransaction = productLookup.cogsAtTransaction * factor,
                 discount = 0.0,
-                subtotal = lineSubtotal.toSafeDouble()
+                subtotal = lineSubtotal.toSafeDouble(),
+                note = cartItem.note
             )
         }
 
         val remainingAmount = (total - paidAmount).coerceAtLeast(0.0)
+        val localSplitLines = if (state.isSplitPaymentEnabled) {
+            val remainingCashApplied = if (!state.isSplitDpMode) {
+                state.finalTotal.subtract(splitValidation!!.nonCashPaid).coerceAtLeast(BigDecimal.ZERO)
+            } else null
+            state.splitPaymentLines.mapNotNull { line ->
+                val rawAmt = line.amountInput.trim().replace(',', '.').toBigDecimalOrNull() ?: return@mapNotNull null
+                val appliedAmt = if (line.method == PaymentMethod.TUNAI && remainingCashApplied != null) {
+                    remainingCashApplied
+                } else rawAmt
+                LocalCheckoutPaymentLineCommand(
+                    method = line.method.apiValue(),
+                    amount = appliedAmt.toSafeDouble(),
+                    reference = line.reference.trim().takeIf { it.isNotEmpty() }
+                )
+            }
+        } else null
         return LocalCheckoutCommandBuildResult.Success(
             LocalCheckoutCommand(
                 cashierUserId = activeSession.cashierUserId,
@@ -1852,9 +2425,19 @@ class CheckoutViewModel(
                 customerLocalId = customerLookup?.localId,
                 customerServerId = selectedCustomer?.id,
                 customerName = selectedCustomer?.name ?: typedCustomerName.takeIf(String::isNotBlank),
-                paymentMethod = state.selectedPaymentMethod.apiValue(),
+                paymentMethod = if (state.isSplitPaymentEnabled) {
+                    if (state.isSplitDpMode) "dp" else "tunai"
+                } else state.selectedPaymentMethod.apiValue(),
+                payments = localSplitLines,
                 subtotal = subtotal,
                 discount = discount,
+                taxEnabled = state.taxEnabled,
+                taxMode = if (state.taxEnabled) state.taxMode else null,
+                taxRate = if (state.taxEnabled) state.taxRate.toSafeDouble() else 0.0,
+                taxLabel = if (state.taxEnabled) state.taxLabel else null,
+                taxableBase = if (state.taxEnabled) state.taxableBase.toSafeDouble() else 0.0,
+                taxAmount = if (state.taxEnabled) state.taxAmount.toSafeDouble() else 0.0,
+                roundingAmount = state.roundingAmount.toSafeDouble(),
                 total = total,
                 paidAmount = paidAmount,
                 remainingAmount = remainingAmount,
@@ -1886,7 +2469,10 @@ class CheckoutViewModel(
             localCheckoutLookupService: LocalCheckoutLookupService? = null,
             localCheckoutService: LocalCheckoutService? = null,
             offlineStatusRepository: OfflineStatusRepository? = null,
-            offlineSyncScheduler: OfflineSyncScheduler? = null
+            offlineSyncScheduler: OfflineSyncScheduler? = null,
+            localAppSettingsDataSource: LocalAppSettingsDataSource? = null,
+            systemRepository: SystemRepository? = null,
+            quotationRepository: com.tbterminal.app.data.repository.QuotationRepository? = null,
         ): ViewModelProvider.Factory {
             return viewModelFactory {
                 CheckoutViewModel(
@@ -1899,7 +2485,10 @@ class CheckoutViewModel(
                     localCheckoutLookupService = localCheckoutLookupService,
                     localCheckoutService = localCheckoutService,
                     offlineStatusRepository = offlineStatusRepository,
-                    offlineSyncScheduler = offlineSyncScheduler
+                    offlineSyncScheduler = offlineSyncScheduler,
+                    localAppSettingsDataSource = localAppSettingsDataSource,
+                    systemRepository = systemRepository,
+                    quotationRepository = quotationRepository,
                 )
             }
         }
@@ -1957,15 +2546,44 @@ internal fun CheckoutUiState.recalculateCheckoutState(
     discount: CheckoutDiscount?,
     deliveryFeeAmount: BigDecimal = if (isDeliveryEnabled) deliveryFee else BigDecimal.ZERO,
 ): CheckoutUiState {
-    val totals = estimateCheckoutTotals(items, discount)
-    val calculatedFinalTotal = totals.netTotal.add(deliveryFeeAmount).coerceAtLeast(BigDecimal.ZERO)
+    val repricedItems = repriceCartItemsForCheckout(
+        items = items,
+        isContractorCustomer = selectedCustomer?.isContractor == true,
+    )
+    val totals = estimateCheckoutTotals(repricedItems, discount)
+    val taxCalc = estimateTaxCalculation(
+        netGoodsTotal = totals.netTotal,
+        taxEnabled = taxEnabled,
+        taxRate = taxRate,
+        taxMode = taxMode,
+        taxLabel = taxLabel,
+    )
+    val totalBeforeRounding = taxCalc.totalWithTax.add(deliveryFeeAmount).coerceAtLeast(BigDecimal.ZERO)
+    val hasCashPayment = if (isSplitPaymentEnabled) {
+        splitPaymentLines.any {
+            it.method == PaymentMethod.TUNAI &&
+                (it.amountInput.trim().replace(',', '.').toBigDecimalOrNull() ?: BigDecimal.ZERO) > BigDecimal.ZERO
+        }
+    } else {
+        selectedPaymentMethod == PaymentMethod.TUNAI
+    }
+    val roundingCalc = estimateCashRoundingCalculation(
+        totalBeforeRounding = totalBeforeRounding,
+        hasCashPayment = hasCashPayment,
+        roundingUnit = cashRoundingUnit,
+        roundingRule = cashRoundingRule,
+    )
+    val calculatedFinalTotal = roundingCalc.finalTotal
     return copy(
-        cartItems = items,
+        cartItems = repricedItems,
         subtotal = totals.grossSubtotal,
         itemDiscountTotal = totals.itemDiscountTotal,
         transactionDiscount = discount,
         transactionDiscountAmount = totals.transactionDiscountAmount,
         totalDiscount = totals.totalDiscountAmount,
+        taxableBase = taxCalc.taxableBase,
+        taxAmount = taxCalc.taxAmount,
+        roundingAmount = roundingCalc.roundingAmount,
         finalTotal = calculatedFinalTotal,
         checkoutPreview = null,
         approvedManagerApprovalId = null,
@@ -2010,3 +2628,20 @@ private fun Long.toOffsetDateTimeString(): String {
 }
 
 private fun BigDecimal.toSafeDouble(): Double = runCatching { toDouble() }.getOrDefault(0.0)
+
+private fun com.tbterminal.app.data.model.ProductStock.toCheckoutProduct(): Product = Product(
+    productId = productId,
+    name = productName,
+    unitPrice = priceRetail,
+    sku = sku,
+    barcode = sku,
+    unitName = unitName,
+    categoryName = categoryName,
+    stockQty = quantity,
+    secondaryUnitId = secondaryUnitId,
+    secondaryUnitName = secondaryUnitName,
+    secondaryUnitFactor = secondaryUnitFactor,
+    contractorPrice = priceContractor,
+    priceTiers = priceTiers,
+    masterDiscount = discount,
+)

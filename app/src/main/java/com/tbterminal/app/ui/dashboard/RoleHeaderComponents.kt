@@ -1,5 +1,7 @@
 package com.tbterminal.app.ui.dashboard
 
+import android.content.Context
+import android.view.WindowManager
 import androidx.compose.animation.core.CubicBezierEasing
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.MutableTransitionState
@@ -53,6 +55,7 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -68,7 +71,9 @@ import androidx.compose.ui.graphics.TransformOrigin
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.IntOffset
@@ -97,8 +102,9 @@ data class RoleHeaderMenuItem(
     val label: String,
     val textColor: Color,
     val iconColor: Color,
-    val iconBgColor: Color,
+    val iconBgColor: Color = Color.Transparent,
     val showDividerBefore: Boolean = false,
+    val trailingBadge: String? = null,
     val onClick: () -> Unit,
 )
 
@@ -119,8 +125,9 @@ fun BrandedRoleTopBar(
     defaultInitial: String = "T",
     onBackClick: (() -> Unit)? = null,
     onBrandClick: (() -> Unit)? = null,
-    pillAvatarBgColor: Color = TopBarSlate200,
-    pillAvatarTextColor: Color = TopBarSlate700,
+    pillAvatarBgColor: Color = Color(0xFFDCFCE7),
+    pillAvatarTextColor: Color = Color(0xFF166534),
+    showProfileMenu: Boolean = true,
     actions: (@Composable RowScope.() -> Unit)? = null,
 ) {
     var expanded by rememberSaveable { mutableStateOf(false) }
@@ -169,8 +176,18 @@ fun BrandedRoleTopBar(
         displayName.trim().firstOrNull()?.uppercase() ?: defaultInitial
     }
 
+    val cleanRoleSubtitle = remember(roleSubtitle) {
+        val upper = roleSubtitle.uppercase()
+        when {
+            upper.contains("KASIR") -> "Kasir"
+            upper.contains("PEMILIK") -> "Pemilik Toko"
+            upper.contains("ADMIN") -> "Admin"
+            else -> roleSubtitle.split("·", "-").firstOrNull()?.trim() ?: roleSubtitle
+        }
+    }
+
     val density = LocalDensity.current
-    val popupYOffset = remember(density) { with(density) { 46.dp.roundToPx() } }
+    val popupYOffset = remember(density) { with(density) { 42.dp.roundToPx() } }
 
     Column(
         modifier = modifier
@@ -189,7 +206,7 @@ fun BrandedRoleTopBar(
             Row(
                 modifier = Modifier.weight(1f, fill = false),
                 verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(10.dp),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
             ) {
                 if (onBackClick != null) {
                     Surface(
@@ -243,11 +260,11 @@ fun BrandedRoleTopBar(
                     Text(
                         text = title,
                         color = TopBarSlate900,
-                        fontSize = 15.sp,
+                        fontSize = 14.5.sp,
                         fontWeight = FontWeight.Bold,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
-                        letterSpacing = (-0.3).sp,
+                        letterSpacing = (-0.35).sp,
                         lineHeight = 18.sp,
                     )
                     Text(
@@ -264,19 +281,21 @@ fun BrandedRoleTopBar(
             }
 
             // Sisi Kanan: Optional Actions + User Profile Pill + Popover Menu
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(6.dp),
-            ) {
-                if (actions != null) {
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(4.dp),
-                        content = actions,
-                    )
-                }
+            if (actions != null || showProfileMenu) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(4.dp),
+                ) {
+                    if (actions != null) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(2.dp),
+                            content = actions,
+                        )
+                    }
 
-                Box {
+                    if (showProfileMenu) {
+                        Box {
                     Surface(
                         onClick = {
                             val now = System.currentTimeMillis()
@@ -284,24 +303,22 @@ fun BrandedRoleTopBar(
                                 expanded = !expanded
                             }
                         },
-                        shape = RoundedCornerShape(100.dp),
-                        color = Color.Transparent,
-                        border = BorderStroke(
-                            1.dp,
-                            if (expanded) TopBarBrandGreen else TopBarSlate200,
-                        ),
+                        shape = CircleShape,
+                        color = Color.White,
+                        border = BorderStroke(1.dp, TopBarSlate200),
+                        shadowElevation = 0.5.dp,
                         modifier = Modifier
-                            .height(32.dp)
+                            .height(34.dp)
                             .testTag("topbar-profile-pill"),
                     ) {
                         Row(
-                            modifier = Modifier.padding(start = 4.dp, end = 7.dp),
+                            modifier = Modifier.padding(start = 3.dp, end = 9.dp),
                             verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(5.dp),
+                            horizontalArrangement = Arrangement.spacedBy(7.dp),
                         ) {
                             Box(
                                 modifier = Modifier
-                                    .size(22.dp)
+                                    .size(26.dp)
                                     .clip(CircleShape)
                                     .background(pillAvatarBgColor),
                                 contentAlignment = Alignment.Center,
@@ -309,16 +326,16 @@ fun BrandedRoleTopBar(
                                 Text(
                                     text = userInitial,
                                     color = pillAvatarTextColor,
-                                    fontSize = 11.5.sp,
+                                    fontSize = 12.sp,
                                     fontWeight = FontWeight.Bold,
                                 )
                             }
                             Icon(
                                 imageVector = Icons.Outlined.ExpandMore,
                                 contentDescription = "Menu akun pengguna",
-                                tint = if (expanded) TopBarBrandGreen else TopBarSlate500,
+                                tint = TopBarSlate500,
                                 modifier = Modifier
-                                    .size(14.dp)
+                                    .size(16.dp)
                                     .graphicsLayer { rotationZ = chevronRotation },
                             )
                         }
@@ -334,6 +351,21 @@ fun BrandedRoleTopBar(
                             },
                             properties = PopupProperties(focusable = true),
                         ) {
+                            val view = LocalView.current
+                            DisposableEffect(view) {
+                                try {
+                                    val windowManager = view.context.getSystemService(Context.WINDOW_SERVICE) as? WindowManager
+                                    val rootView = view.rootView
+                                    val params = rootView.layoutParams as? WindowManager.LayoutParams
+                                    if (windowManager != null && params != null) {
+                                        params.flags = params.flags or WindowManager.LayoutParams.FLAG_DIM_BEHIND
+                                        params.dimAmount = 0.25f
+                                        windowManager.updateViewLayout(rootView, params)
+                                    }
+                                } catch (_: Throwable) {}
+                                onDispose { }
+                            }
+
                             androidx.compose.animation.AnimatedVisibility(
                                 visibleState = menuTransitionState,
                                 enter = fadeIn(
@@ -341,14 +373,8 @@ fun BrandedRoleTopBar(
                                         durationMillis = 200,
                                         easing = CubicBezierEasing(0.16f, 1f, 0.3f, 1f),
                                     ),
-                                ) + slideInVertically(
-                                    initialOffsetY = { with(density) { (-8).dp.roundToPx() } },
-                                    animationSpec = tween(
-                                        durationMillis = 200,
-                                        easing = CubicBezierEasing(0.16f, 1f, 0.3f, 1f),
-                                    ),
                                 ) + scaleIn(
-                                    initialScale = 0.98f,
+                                    initialScale = 0.95f,
                                     transformOrigin = TransformOrigin(1f, 0f),
                                     animationSpec = tween(
                                         durationMillis = 200,
@@ -357,52 +383,40 @@ fun BrandedRoleTopBar(
                                 ),
                                 exit = fadeOut(
                                     animationSpec = tween(
-                                        durationMillis = 200,
-                                        easing = CubicBezierEasing(0.16f, 1f, 0.3f, 1f),
-                                    ),
-                                ) + slideOutVertically(
-                                    targetOffsetY = { with(density) { (-8).dp.roundToPx() } },
-                                    animationSpec = tween(
-                                        durationMillis = 200,
+                                        durationMillis = 180,
                                         easing = CubicBezierEasing(0.16f, 1f, 0.3f, 1f),
                                     ),
                                 ) + scaleOut(
-                                    targetScale = 0.98f,
+                                    targetScale = 0.95f,
                                     transformOrigin = TransformOrigin(1f, 0f),
                                     animationSpec = tween(
-                                        durationMillis = 200,
+                                        durationMillis = 180,
                                         easing = CubicBezierEasing(0.16f, 1f, 0.3f, 1f),
                                     ),
                                 ),
                             ) {
                                 Surface(
                                     modifier = Modifier
-                                        .width(264.dp)
+                                        .width(288.dp)
                                         .shadow(
-                                            elevation = 16.dp,
+                                            elevation = 20.dp,
                                             shape = RoundedCornerShape(16.dp),
-                                            ambientColor = Color(0x1A0F172A),
-                                            spotColor = Color(0x260F172A),
+                                            ambientColor = Color(0x1F0F172A),
+                                            spotColor = Color(0x2B0F172A),
                                         ),
                                     shape = RoundedCornerShape(16.dp),
                                     color = Color.White,
-                                    border = BorderStroke(1.dp, TopBarSlate100),
+                                    border = BorderStroke(1.dp, TopBarSlate200.copy(alpha = 0.8f)),
                                 ) {
                                     Column(
                                         modifier = Modifier
                                             .fillMaxWidth()
-                                            .padding(8.dp),
-                                        verticalArrangement = Arrangement.spacedBy(4.dp),
+                                            .padding(12.dp),
                                     ) {
                                         // Identity Card
                                         Box(
                                             modifier = Modifier
                                                 .fillMaxWidth()
-                                                .graphicsLayer {
-                                                    scaleX = cardScale
-                                                    scaleY = cardScale
-                                                    alpha = cardAlpha
-                                                }
                                                 .clip(RoundedCornerShape(12.dp))
                                                 .background(TopBarSlate50)
                                                 .border(1.dp, TopBarSlate100, RoundedCornerShape(12.dp))
@@ -410,19 +424,24 @@ fun BrandedRoleTopBar(
                                         ) {
                                             Row(
                                                 verticalAlignment = Alignment.CenterVertically,
-                                                horizontalArrangement = Arrangement.spacedBy(10.dp),
+                                                horizontalArrangement = Arrangement.spacedBy(12.dp),
                                             ) {
                                                 Box(
                                                     modifier = Modifier
-                                                        .size(36.dp)
+                                                        .size(44.dp)
                                                         .clip(CircleShape)
-                                                        .background(Color(0xFFE8F3EC)),
+                                                        .background(Color(0xFFECFDF5))
+                                                        .border(
+                                                            1.dp,
+                                                            Color(0xFFA7F3D0).copy(alpha = 0.5f),
+                                                            CircleShape,
+                                                        ),
                                                     contentAlignment = Alignment.Center,
                                                 ) {
                                                     Text(
                                                         text = userInitial,
-                                                        color = TopBarSheetGreen,
-                                                        fontSize = 14.sp,
+                                                        color = Color(0xFF047857),
+                                                        fontSize = 16.sp,
                                                         fontWeight = FontWeight.Bold,
                                                     )
                                                 }
@@ -430,63 +449,50 @@ fun BrandedRoleTopBar(
                                                     Text(
                                                         text = displayName,
                                                         color = TopBarSlate900,
-                                                        fontSize = 12.sp,
+                                                        fontSize = 14.sp,
                                                         fontWeight = FontWeight.Bold,
                                                         maxLines = 1,
                                                         overflow = TextOverflow.Ellipsis,
                                                     )
                                                     Text(
-                                                        text = roleSubtitle,
+                                                        text = cleanRoleSubtitle,
                                                         color = TopBarSlate500,
-                                                        fontSize = 10.sp,
-                                                        fontWeight = FontWeight.Medium,
-                                                        letterSpacing = 0.4.sp,
+                                                        fontSize = 12.sp,
+                                                        fontWeight = FontWeight.Normal,
                                                         maxLines = 1,
                                                         overflow = TextOverflow.Ellipsis,
                                                     )
                                                     Spacer(modifier = Modifier.height(4.dp))
-                                                    Box(
-                                                        modifier = Modifier
-                                                            .clip(RoundedCornerShape(999.dp))
-                                                            .background(Color(0xFFECFDF5))
-                                                            .border(
-                                                                1.dp,
-                                                                Color(0xFFA7F3D0).copy(alpha = 0.6f),
-                                                                RoundedCornerShape(999.dp),
-                                                            )
-                                                            .padding(horizontal = 8.dp, vertical = 2.dp),
+                                                    Row(
+                                                        verticalAlignment = Alignment.CenterVertically,
+                                                        horizontalArrangement = Arrangement.spacedBy(6.dp),
                                                     ) {
-                                                        Row(
-                                                            verticalAlignment = Alignment.CenterVertically,
-                                                            horizontalArrangement = Arrangement.spacedBy(4.dp),
-                                                        ) {
-                                                            Box(
-                                                                modifier = Modifier
-                                                                    .size(6.dp)
-                                                                    .clip(CircleShape)
-                                                                    .background(Color(0xFF10B981).copy(alpha = dotAlpha)),
-                                                            )
-                                                            Text(
-                                                                text = statusBadgeText,
-                                                                fontSize = 11.sp,
-                                                                fontWeight = FontWeight.Medium,
-                                                                color = Color(0xFF047857),
-                                                                maxLines = 1,
-                                                            )
-                                                        }
+                                                        Box(
+                                                            modifier = Modifier
+                                                                .size(8.dp)
+                                                                .clip(CircleShape)
+                                                                .background(Color(0xFF10B981).copy(alpha = dotAlpha)),
+                                                        )
+                                                        Text(
+                                                            text = statusBadgeText,
+                                                            fontSize = 11.sp,
+                                                            fontWeight = FontWeight.Medium,
+                                                            color = Color(0xFF047857),
+                                                            maxLines = 1,
+                                                        )
                                                     }
                                                 }
                                             }
                                         }
 
-                                        Spacer(modifier = Modifier.height(4.dp))
+                                        Spacer(modifier = Modifier.height(8.dp))
 
                                         menuItems.forEach { item ->
                                             if (item.showDividerBefore) {
                                                 HorizontalDivider(
                                                     color = TopBarSlate100,
                                                     thickness = 1.dp,
-                                                    modifier = Modifier.padding(vertical = 4.dp),
+                                                    modifier = Modifier.padding(horizontal = 4.dp, vertical = 4.dp),
                                                 )
                                             }
                                             RoleHeaderDropdownItem(
@@ -495,6 +501,7 @@ fun BrandedRoleTopBar(
                                                 textColor = item.textColor,
                                                 iconColor = item.iconColor,
                                                 iconBgColor = item.iconBgColor,
+                                                trailingBadge = item.trailingBadge,
                                                 onClick = {
                                                     expanded = false
                                                     item.onClick()
@@ -508,6 +515,8 @@ fun BrandedRoleTopBar(
                     }
                 }
             }
+                }
+            }
         }
         HorizontalDivider(color = TopBarSlate100, thickness = 1.dp)
     }
@@ -519,41 +528,64 @@ fun RoleHeaderDropdownItem(
     label: String,
     textColor: Color,
     iconColor: Color,
-    iconBgColor: Color,
+    iconBgColor: Color = Color.Transparent,
+    trailingBadge: String? = null,
     onClick: () -> Unit,
 ) {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .height(38.dp)
-            .clip(RoundedCornerShape(8.dp))
-            .clickable(onClick = onClick)
-            .padding(horizontal = 8.dp),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(10.dp),
+    Surface(
+        onClick = onClick,
+        shape = RoundedCornerShape(12.dp),
+        color = Color.Transparent,
+        modifier = Modifier.fillMaxWidth(),
     ) {
-        Box(
+        Row(
             modifier = Modifier
-                .size(26.dp)
-                .clip(RoundedCornerShape(6.dp))
-                .background(iconBgColor),
-            contentAlignment = Alignment.Center,
+                .fillMaxWidth()
+                .padding(horizontal = 12.dp, vertical = 9.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.SpaceBetween,
         ) {
-            Icon(
-                imageVector = icon,
-                contentDescription = label,
-                tint = iconColor,
-                modifier = Modifier.size(14.dp),
-            )
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
+            ) {
+                Icon(
+                    imageVector = icon,
+                    contentDescription = label,
+                    tint = iconColor,
+                    modifier = Modifier.size(16.dp),
+                )
+                Text(
+                    text = label,
+                    fontSize = 12.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    color = textColor,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+            }
+            if (trailingBadge != null) {
+                Box(
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(4.dp))
+                        .background(TopBarSlate100)
+                        .border(
+                            1.dp,
+                            TopBarSlate200.copy(alpha = 0.8f),
+                            RoundedCornerShape(4.dp),
+                        )
+                        .padding(horizontal = 6.dp, vertical = 2.dp),
+                ) {
+                    Text(
+                        text = trailingBadge,
+                        fontSize = 10.sp,
+                        fontFamily = FontFamily.Monospace,
+                        fontWeight = FontWeight.Medium,
+                        color = TopBarSlate500,
+                    )
+                }
+            }
         }
-        Text(
-            text = label,
-            fontSize = 12.sp,
-            fontWeight = FontWeight.SemiBold,
-            color = textColor,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
-        )
     }
 }
 

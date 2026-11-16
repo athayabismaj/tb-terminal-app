@@ -47,6 +47,13 @@ class LocalCheckoutService(
                         status = transactionStatus(remainingAmount),
                         subtotal = command.subtotal,
                         discount = command.discount,
+                        taxEnabled = command.taxEnabled,
+                        taxMode = command.taxMode,
+                        taxRate = command.taxRate,
+                        taxLabel = command.taxLabel,
+                        taxableBase = command.taxableBase,
+                        taxAmount = command.taxAmount,
+                        roundingAmount = command.roundingAmount,
                         total = command.total,
                         paidAmount = command.paidAmount,
                         remainingAmount = remainingAmount,
@@ -69,7 +76,28 @@ class LocalCheckoutService(
                     }
                 }
 
-                val paymentLocalId = if (command.paidAmount > 0.0) {
+                val paymentLines = command.payments?.filter { it.amount > 0.0 }.orEmpty()
+                val paymentLocalId = if (paymentLines.isNotEmpty()) {
+                    var firstId: Long? = null
+                    paymentLines.forEach { line ->
+                        val id = database.paymentDao().upsert(
+                            LocalPaymentEntity(
+                                clientGeneratedId = LocalIdGenerator.clientGeneratedId("PAY"),
+                                deviceId = deviceId,
+                                transactionLocalId = transactionLocalId,
+                                method = line.method,
+                                amount = line.amount,
+                                reference = line.reference,
+                                paidAt = command.occurredAt,
+                                syncStatus = SyncStatus.PENDING,
+                                createdAt = now,
+                                updatedAt = now
+                            )
+                        )
+                        if (firstId == null) firstId = id
+                    }
+                    firstId
+                } else if (command.paidAmount > 0.0) {
                     database.paymentDao().upsert(command.toPaymentEntity(transactionLocalId, now))
                 } else {
                     null
@@ -166,6 +194,7 @@ class LocalCheckoutService(
             cogsAtTransaction = cogsAtTransaction,
             discount = discount,
             subtotal = subtotal,
+            note = note,
             syncStatus = SyncStatus.PENDING,
             createdAt = now,
             updatedAt = now

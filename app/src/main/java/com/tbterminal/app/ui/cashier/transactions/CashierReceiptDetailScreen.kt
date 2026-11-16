@@ -11,6 +11,18 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.statusBarsPadding
+import androidx.compose.foundation.layout.Row
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.outlined.ArrowBack
+import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.Surface
+import androidx.compose.material3.Text
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.sp
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.runtime.Composable
@@ -62,6 +74,7 @@ fun CashierReceiptDetailScreen(
     onProfileClick: () -> Unit = {},
     onSettingsClick: () -> Unit = {},
     onLogout: () -> Unit,
+    onReorderClick: (com.tbterminal.app.data.model.CashTransactionDetail) -> Unit = {},
     viewModel: CashierTransactionHistoryViewModel = viewModel(
         factory = CashierTransactionHistoryViewModel.factory(
             repository = cashReconciliationRepository,
@@ -102,6 +115,7 @@ fun CashierReceiptDetailScreen(
                 onPayDebt = viewModel::payDebt,
                 onShowVoid = viewModel::showVoidDialog,
                 onShowRefund = viewModel::showRefundDialog,
+                onReorderClick = onReorderClick,
                 modifier = Modifier.fillMaxSize()
             )
             TopFloatingCapsule(
@@ -131,11 +145,41 @@ fun CashierReceiptDetailScreen(
 private fun ReceiptDetailTopBar(
     onBackClick: () -> Unit
 ) {
-    TBTopAppBar(
-        title = "Detail Struk",
-        onBackClick = onBackClick,
-        windowInsets = WindowInsets(0, 0, 0, 0)
-    )
+    Surface(
+        color = Color.White.copy(alpha = 0.95f),
+        modifier = Modifier.fillMaxWidth()
+    ) {
+        Column(modifier = Modifier.fillMaxWidth()) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .statusBarsPadding()
+                    .padding(horizontal = 16.dp, vertical = 12.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                IconButton(
+                    onClick = onBackClick,
+                    modifier = Modifier.size(34.dp)
+                ) {
+                    Icon(
+                        imageVector = Icons.AutoMirrored.Outlined.ArrowBack,
+                        contentDescription = "Kembali",
+                        tint = Color(0xFF334155),
+                        modifier = Modifier.size(20.dp)
+                    )
+                }
+                Text(
+                    text = "Detail Struk",
+                    fontSize = 17.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = Color(0xFF0F172A),
+                    letterSpacing = (-0.3).sp
+                )
+            }
+            HorizontalDivider(color = Color(0xFFE2E8F0).copy(alpha = 0.8f))
+        }
+    }
 }
 
 @Composable
@@ -151,6 +195,7 @@ private fun ReceiptDetailContent(
     onPayDebt: () -> Unit,
     onShowVoid: () -> Unit,
     onShowRefund: () -> Unit,
+    onReorderClick: (com.tbterminal.app.data.model.CashTransactionDetail) -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     val context = LocalContext.current
@@ -198,7 +243,8 @@ private fun ReceiptDetailContent(
                             onDeliveryOrderClick = { showDeliveryOrderDialog = true },
                             onShowPayDebt = onShowPayDebt,
                             onShowVoid = onShowVoid,
-                            onShowRefund = onShowRefund
+                            onShowRefund = onShowRefund,
+                            onReorderClick = { onReorderClick(state.selectedTransaction) },
                         )
                     }
                 }

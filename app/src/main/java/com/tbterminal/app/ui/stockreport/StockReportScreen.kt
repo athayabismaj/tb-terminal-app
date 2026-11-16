@@ -1605,13 +1605,7 @@ private fun StockPagination(
 ) {
     val safePage = uiState.page.coerceAtLeast(1)
     val safeTotalPages = uiState.totalPages.coerceAtLeast(1)
-    val first = if (uiState.totalProducts == 0L) 0L else (safePage - 1L) * uiState.pageSize + 1L
-    val last = minOf(safePage.toLong() * uiState.pageSize, uiState.totalProducts)
-    val text = if (compact) {
-        "${uiState.totalProducts} produk"
-    } else {
-        "Menampilkan $first–$last dari ${uiState.totalProducts} produk"
-    }
+    val text = "${uiState.totalProducts} produk"
 
     TbPagination(
         currentPage = safePage,

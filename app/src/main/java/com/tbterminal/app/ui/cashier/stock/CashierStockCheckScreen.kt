@@ -616,8 +616,7 @@ private fun StockPagination(
         totalPages = uiState.totalPages,
         onPreviousPage = onPreviousPage,
         onNextPage = onNextPage,
-        supportingText = if (compact) "${uiState.total} produk"
-        else "Menampilkan ${uiState.currentStart}-${uiState.currentEnd} dari ${uiState.total} produk",
+        supportingText = "${uiState.total} produk",
         isLoading = uiState.isLoading,
         testTag = "cashier-stock-pagination",
     )

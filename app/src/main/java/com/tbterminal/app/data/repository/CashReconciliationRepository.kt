@@ -499,8 +499,29 @@ private fun TransactionDetailDto.toCashTransactionDetail(): CashTransactionDetai
         userId = userId,
         cashierName = cashierName,
         paymentMethods = paymentMethods,
+        payments = payments.map {
+            com.tbterminal.app.data.model.TransactionPaymentDetail(
+                id = it.id,
+                method = it.method,
+                amount = it.amount,
+                reference = it.reference,
+                paymentSource = it.paymentSource,
+                paidAt = it.paidAt
+            )
+        },
         type = type,
         status = status,
+        grossSubtotal = grossSubtotal,
+        itemDiscountTotal = itemDiscountTotal,
+        transactionDiscountAmount = transactionDiscountAmount,
+        totalDiscountAmount = totalDiscountAmount,
+        taxEnabled = taxEnabled,
+        taxMode = taxMode,
+        taxRate = taxRate,
+        taxLabel = taxLabel,
+        taxableBase = taxableBase,
+        taxAmount = taxAmount,
+        roundingAmount = roundingAmount,
         total = total,
         paidAmount = paidAmount,
         amountTendered = amountTendered,
@@ -509,6 +530,7 @@ private fun TransactionDetailDto.toCashTransactionDetail(): CashTransactionDetai
         voidedAt = voidedAt,
         voidedByName = voidedByName,
         voidReason = voidReason,
+        notes = notes,
         items = items.map { it.toCashTransactionItem() }
     )
 }
@@ -525,7 +547,8 @@ private fun TransactionItemDto.toCashTransactionItem(): CashTransactionItem {
         unitId = unitId,
         quantity = quantity,
         priceAtTransaction = priceAtTransaction,
-        subtotal = subtotal
+        subtotal = subtotal,
+        note = note
     )
 }
 

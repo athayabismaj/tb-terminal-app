@@ -83,6 +83,9 @@ object WhatsAppReceiptHelper {
             }
             sb.appendLine("• ${item.productName.ifBlank { "Barang" }}")
             sb.appendLine("  $qtyText x ${item.priceAtTransaction.toRupiahText()} = ${item.subtotal.toRupiahText()}")
+            item.note?.trim()?.takeIf { it.isNotBlank() }?.let { note ->
+                sb.appendLine("  Catatan: $note")
+            }
         }
         sb.appendLine("--------------------------------")
         val grossSubtotal = transaction.items.fold(BigDecimal.ZERO) { acc, item ->
@@ -99,10 +102,22 @@ object WhatsAppReceiptHelper {
             ?.replace(",", ".")
             ?.trim()
             ?.toBigDecimalOrNull() ?: BigDecimal.ZERO
-        val baseForNoteDiscount = totalItemSubtotal.add(deliveryFee)
-        val diskonNota = baseForNoteDiscount.subtract(transaction.total).coerceAtLeast(BigDecimal.ZERO)
+        val excludedTax = if (transaction.taxEnabled && transaction.taxMode.equals("EXCLUDE", ignoreCase = true)) {
+            transaction.taxAmount
+        } else {
+            BigDecimal.ZERO
+        }
+        val diskonNota = if (transaction.transactionDiscountAmount > BigDecimal.ZERO) {
+            transaction.transactionDiscountAmount
+        } else {
+            val baseForNoteDiscount = totalItemSubtotal.add(deliveryFee).add(excludedTax).add(transaction.roundingAmount)
+            baseForNoteDiscount.subtract(transaction.total).coerceAtLeast(BigDecimal.ZERO)
+        }
+        val hasTaxInfo = transaction.taxEnabled &&
+            (transaction.taxAmount > BigDecimal.ZERO || transaction.taxableBase > BigDecimal.ZERO)
+        val hasRounding = transaction.roundingAmount.compareTo(BigDecimal.ZERO) != 0
 
-        if (itemDiscount > BigDecimal.ZERO || diskonNota > BigDecimal.ZERO || deliveryFee > BigDecimal.ZERO) {
+        if (itemDiscount > BigDecimal.ZERO || diskonNota > BigDecimal.ZERO || deliveryFee > BigDecimal.ZERO || hasTaxInfo || hasRounding) {
             sb.appendLine("Subtotal      : ${grossSubtotal.toRupiahText()}")
             if (itemDiscount > BigDecimal.ZERO) {
                 sb.appendLine("Diskon Item   : -${itemDiscount.toRupiahText()}")
@@ -113,22 +128,54 @@ object WhatsAppReceiptHelper {
             if (deliveryFee > BigDecimal.ZERO) {
                 sb.appendLine("Ongkos Kirim  : +${deliveryFee.toRupiahText()}")
             }
+            if (hasTaxInfo) {
+                val taxName = transaction.taxLabel?.takeIf { it.isNotBlank() } ?: "PPN"
+                val rateLabel = "$taxName ${transaction.taxRate.stripTrailingZeros().toPlainString()}%"
+                if (transaction.taxableBase > BigDecimal.ZERO) {
+                    sb.appendLine("DPP           : ${transaction.taxableBase.toRupiahText()}")
+                }
+                if (transaction.taxMode.equals("INCLUDE", ignoreCase = true)) {
+                    sb.appendLine("$rateLabel (Incl.): ${transaction.taxAmount.toRupiahText()}")
+                } else {
+                    sb.appendLine("$rateLabel       : +${transaction.taxAmount.toRupiahText()}")
+                }
+            }
+            if (hasRounding) {
+                val sign = if (transaction.roundingAmount > BigDecimal.ZERO) "+" else "-"
+                sb.appendLine("Pembulatan    : $sign${transaction.roundingAmount.abs().toRupiahText()}")
+            }
         }
         sb.appendLine("*TOTAL BELANJA : ${transaction.total.toRupiahText()}*")
 
-        val methods = transaction.paymentMethods.joinToString(" + ") { m ->
-            when (m.lowercase()) {
-                "tunai", "cash" -> "Tunai"
-                "qris" -> "QRIS"
-                "transfer", "bank_transfer" -> "Transfer"
-                "hutang", "credit" -> "Hutang"
-                "dp", "down_payment" -> "DP"
-                else -> m.replaceFirstChar { it.uppercase() }
-            }
-        }.ifBlank { "Tunai" }
+        val checkoutPayments = transaction.payments.filter {
+            it.amount > BigDecimal.ZERO &&
+                !it.paymentSource.equals("VOID_REVERSAL", ignoreCase = true) &&
+                !it.paymentSource.equals("REFUND_REVERSAL", ignoreCase = true)
+        }
+        fun formatWaMethod(m: String): String = when (m.lowercase()) {
+            "tunai", "cash" -> "Tunai"
+            "qris" -> "QRIS"
+            "transfer", "bank_transfer" -> "Transfer"
+            "hutang", "credit" -> "Hutang"
+            "dp", "down_payment" -> "DP"
+            else -> m.replaceFirstChar { it.uppercase() }
+        }
+        val methods = if (checkoutPayments.isNotEmpty()) {
+            checkoutPayments.map { formatWaMethod(it.method) }.distinct().joinToString(" + ")
+        } else {
+            transaction.paymentMethods.joinToString(" + ") { formatWaMethod(it) }.ifBlank { "Tunai" }
+        }
 
         sb.appendLine("Metode Bayar  : $methods")
-        val isCash = transaction.paymentMethods.any { it.lowercase() in setOf("tunai", "cash") } || transaction.paymentMethods.isEmpty()
+        if (checkoutPayments.size > 1 || checkoutPayments.any { !it.reference.isNullOrBlank() }) {
+            checkoutPayments.forEach { p ->
+                val refSuffix = p.reference?.trim()?.takeIf { it.isNotBlank() }?.let { " (Ref: $it)" } ?: ""
+                sb.appendLine("  • ${formatWaMethod(p.method)}: ${p.amount.toRupiahText()}$refSuffix")
+            }
+        }
+        val isCash = checkoutPayments.any { it.method.lowercase() in setOf("tunai", "cash") } ||
+            transaction.paymentMethods.any { it.lowercase() in setOf("tunai", "cash") } ||
+            (checkoutPayments.isEmpty() && transaction.paymentMethods.isEmpty())
         val tenderedAmount = if (transaction.amountTendered > BigDecimal.ZERO) transaction.amountTendered else transaction.paidAmount
         if (isCash || transaction.amountTendered > BigDecimal.ZERO) {
             sb.appendLine("Uang Diterima : ${tenderedAmount.toRupiahText()}")

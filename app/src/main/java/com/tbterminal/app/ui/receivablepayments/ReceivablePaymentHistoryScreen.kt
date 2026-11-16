@@ -433,7 +433,7 @@ private fun PaymentPagination(
         totalPages = uiState.totalPages,
         onPreviousPage = onPreviousPage,
         onNextPage = onNextPage,
-        supportingText = if (compact) "${uiState.totalPayments} pembayaran" else "Menampilkan $range",
+        supportingText = "${uiState.totalPayments} pembayaran",
         isLoading = uiState.isLoading,
         testTag = "receivable-payment-pagination",
     )

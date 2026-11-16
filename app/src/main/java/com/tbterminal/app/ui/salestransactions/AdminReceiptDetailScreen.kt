@@ -234,6 +234,39 @@ internal fun shareReceiptText(context: Context, transaction: CashTransactionDeta
     context.startActivity(shareIntent)
 }
 
+private fun formatReceiptPaymentMethod(method: String): String = when (method.lowercase()) {
+    "tunai", "cash" -> "Tunai"
+    "qris" -> "QRIS"
+    "transfer", "bank_transfer" -> "Transfer Bank"
+    "hutang", "credit" -> "Hutang"
+    "dp", "down_payment" -> "DP"
+    else -> method.replaceFirstChar { it.uppercase() }
+}
+
+private fun CashTransactionDetail.activeCheckoutPayments() = payments.filter {
+    it.amount > BigDecimal.ZERO &&
+        !it.paymentSource.equals("VOID_REVERSAL", ignoreCase = true) &&
+        !it.paymentSource.equals("REFUND_REVERSAL", ignoreCase = true)
+}
+
+private fun CashTransactionDetail.computeNoteDiscount(
+    totalItemSubtotal: BigDecimal,
+    deliveryFee: BigDecimal
+): BigDecimal {
+    if (transactionDiscountAmount > BigDecimal.ZERO) return transactionDiscountAmount
+    val excludedTax = if (taxEnabled && taxMode.equals("EXCLUDE", ignoreCase = true)) taxAmount else BigDecimal.ZERO
+    val base = totalItemSubtotal.add(deliveryFee).add(excludedTax).add(roundingAmount)
+    return base.subtract(total).coerceAtLeast(BigDecimal.ZERO)
+}
+
+private fun CashTransactionDetail.hasVisibleTax(): Boolean =
+    taxEnabled && (taxAmount > BigDecimal.ZERO || taxableBase > BigDecimal.ZERO)
+
+private fun CashTransactionDetail.taxRateLabel(): String {
+    val label = taxLabel?.takeIf { it.isNotBlank() } ?: "PPN"
+    return "$label ${taxRate.stripTrailingZeros().toPlainString()}%"
+}
+
 internal fun buildReceiptShareText(transaction: CashTransactionDetail, storeName: String = "TB TERMINAL"): String {
     val isVoided = transaction.status.equals("voided", true)
     val remaining = transaction.remainingAmount()
@@ -265,6 +298,9 @@ internal fun buildReceiptShareText(transaction: CashTransactionDetail, storeName
         }
         sb.appendLine("• ${item.productName.ifBlank { "Barang" }}")
         sb.appendLine("  $qtyText x ${item.priceAtTransaction.formatReceiptMoney()} = ${item.subtotal.formatReceiptMoney()}")
+        item.note?.trim()?.takeIf { it.isNotBlank() }?.let { note ->
+            sb.appendLine("  Catatan: $note")
+        }
     }
     sb.appendLine("--------------------------------")
     val grossSubtotal = transaction.items.fold(BigDecimal.ZERO) { acc, item ->
@@ -281,10 +317,11 @@ internal fun buildReceiptShareText(transaction: CashTransactionDetail, storeName
         ?.replace(",", ".")
         ?.trim()
         ?.toBigDecimalOrNull() ?: BigDecimal.ZERO
-    val baseForNoteDiscount = totalItemSubtotal.add(deliveryFee)
-    val diskonNota = baseForNoteDiscount.subtract(transaction.total).coerceAtLeast(BigDecimal.ZERO)
+    val diskonNota = transaction.computeNoteDiscount(totalItemSubtotal, deliveryFee)
+    val hasTax = transaction.hasVisibleTax()
+    val hasRounding = transaction.roundingAmount.compareTo(BigDecimal.ZERO) != 0
 
-    if (itemDiscount > BigDecimal.ZERO || diskonNota > BigDecimal.ZERO || deliveryFee > BigDecimal.ZERO) {
+    if (itemDiscount > BigDecimal.ZERO || diskonNota > BigDecimal.ZERO || deliveryFee > BigDecimal.ZERO || hasTax || hasRounding) {
         sb.appendLine("Subtotal  : ${grossSubtotal.formatReceiptMoney()}")
         if (itemDiscount > BigDecimal.ZERO) {
             sb.appendLine("Diskon Item: -${itemDiscount.formatReceiptMoney()}")
@@ -295,21 +332,39 @@ internal fun buildReceiptShareText(transaction: CashTransactionDetail, storeName
         if (deliveryFee > BigDecimal.ZERO) {
             sb.appendLine("Ongkos Kirim: +${deliveryFee.formatReceiptMoney()}")
         }
+        if (hasTax) {
+            if (transaction.taxableBase > BigDecimal.ZERO) {
+                sb.appendLine("DPP       : ${transaction.taxableBase.formatReceiptMoney()}")
+            }
+            if (transaction.taxMode.equals("INCLUDE", ignoreCase = true)) {
+                sb.appendLine("${transaction.taxRateLabel()} (Incl.): ${transaction.taxAmount.formatReceiptMoney()}")
+            } else {
+                sb.appendLine("${transaction.taxRateLabel()} : +${transaction.taxAmount.formatReceiptMoney()}")
+            }
+        }
+        if (hasRounding) {
+            val sign = if (transaction.roundingAmount > BigDecimal.ZERO) "+" else "-"
+            sb.appendLine("Pembulatan: $sign${transaction.roundingAmount.abs().formatReceiptMoney()}")
+        }
     }
     sb.appendLine("TOTAL     : ${transaction.total.formatReceiptMoney()}")
-    val methods = transaction.paymentMethods.joinToString(" + ") { m ->
-        when (m.lowercase()) {
-            "tunai", "cash" -> "Tunai"
-            "qris" -> "QRIS"
-            "transfer", "bank_transfer" -> "Transfer Bank"
-            "hutang", "credit" -> "Hutang"
-            "dp", "down_payment" -> "DP"
-            else -> m.replaceFirstChar { it.uppercase() }
-        }
-    }.ifBlank { "Tunai" }
+    val checkoutPayments = transaction.activeCheckoutPayments()
+    val methods = if (checkoutPayments.isNotEmpty()) {
+        checkoutPayments.map { formatReceiptPaymentMethod(it.method) }.distinct().joinToString(" + ")
+    } else {
+        transaction.paymentMethods.joinToString(" + ") { formatReceiptPaymentMethod(it) }.ifBlank { "Tunai" }
+    }
     sb.appendLine("Metode    : $methods")
+    if (checkoutPayments.size > 1 || checkoutPayments.any { !it.reference.isNullOrBlank() }) {
+        checkoutPayments.forEach { p ->
+            val refSuffix = p.reference?.trim()?.takeIf { it.isNotBlank() }?.let { " (Ref: $it)" } ?: ""
+            sb.appendLine("  • ${formatReceiptPaymentMethod(p.method)}: ${p.amount.formatReceiptMoney()}$refSuffix")
+        }
+    }
     val tenderedAmount = if (transaction.amountTendered > BigDecimal.ZERO) transaction.amountTendered else transaction.paidAmount
-    val isCash = transaction.paymentMethods.any { it.lowercase() in setOf("tunai", "cash") } || transaction.paymentMethods.isEmpty()
+    val isCash = checkoutPayments.any { it.method.lowercase() in setOf("tunai", "cash") } ||
+        transaction.paymentMethods.any { it.lowercase() in setOf("tunai", "cash") } ||
+        (checkoutPayments.isEmpty() && transaction.paymentMethods.isEmpty())
     if (isCash || transaction.amountTendered > BigDecimal.ZERO) {
         sb.appendLine("Uang Diterima : ${tenderedAmount.formatReceiptMoney()}")
         if (transaction.changeAmount > BigDecimal.ZERO || isCash) {
@@ -603,8 +658,9 @@ internal fun ReceiptSummaryCard(
         ?.replace(",", ".")
         ?.trim()
         ?.toBigDecimalOrNull() ?: BigDecimal.ZERO
-    val baseForNoteDiscount = totalItemSubtotal.add(deliveryFee)
-    val diskonNota = baseForNoteDiscount.subtract(transaction.total).coerceAtLeast(BigDecimal.ZERO)
+    val diskonNota = transaction.computeNoteDiscount(totalItemSubtotal, deliveryFee)
+    val hasTax = transaction.hasVisibleTax()
+    val hasRounding = transaction.roundingAmount.compareTo(BigDecimal.ZERO) != 0
 
     Card(
         modifier = Modifier.fillMaxWidth(),
@@ -932,6 +988,14 @@ internal fun ReceiptSummaryCard(
                                     color = if (lineDiscount > BigDecimal.ZERO) Color(0xFF006C4A) else Color(0xFF64748B),
                                     modifier = Modifier.padding(top = 2.dp)
                                 )
+                                item.note?.trim()?.takeIf { it.isNotBlank() }?.let { note ->
+                                    Text(
+                                        text = "Catatan: $note",
+                                        fontSize = 11.5.sp,
+                                        color = Color(0xFF475569),
+                                        modifier = Modifier.padding(top = 2.dp)
+                                    )
+                                }
                             }
                             Text(
                                 text = item.subtotal.formatReceiptMoney(),
@@ -1053,6 +1117,62 @@ internal fun ReceiptSummaryCard(
                             )
                         }
                     }
+
+                    if (hasTax) {
+                        if (transaction.taxableBase > BigDecimal.ZERO) {
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Text("DPP", color = Color(0xFF404944), fontSize = 13.sp)
+                                Text(
+                                    transaction.taxableBase.formatReceiptMoney(),
+                                    color = Color(0xFF131B2E),
+                                    fontSize = 13.5.sp,
+                                    fontFamily = FontFamily.Monospace,
+                                    fontWeight = FontWeight.Medium
+                                )
+                            }
+                        }
+                        val isIncludeTax = transaction.taxMode.equals("INCLUDE", ignoreCase = true)
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text(
+                                text = if (isIncludeTax) "${transaction.taxRateLabel()} (Sudah Termasuk)" else transaction.taxRateLabel(),
+                                color = Color(0xFF404944),
+                                fontSize = 13.sp
+                            )
+                            Text(
+                                text = if (isIncludeTax) transaction.taxAmount.formatReceiptMoney() else "+${transaction.taxAmount.formatReceiptMoney()}",
+                                color = Color(0xFF131B2E),
+                                fontSize = 13.5.sp,
+                                fontFamily = FontFamily.Monospace,
+                                fontWeight = FontWeight.Medium
+                            )
+                        }
+                    }
+
+                    if (hasRounding) {
+                        val sign = if (transaction.roundingAmount > BigDecimal.ZERO) "+" else "-"
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text("Pembulatan Tunai", color = Color(0xFF404944), fontSize = 13.sp)
+                            Text(
+                                "$sign${transaction.roundingAmount.abs().formatReceiptMoney()}",
+                                color = Color(0xFF131B2E),
+                                fontSize = 13.5.sp,
+                                fontFamily = FontFamily.Monospace,
+                                fontWeight = FontWeight.Medium
+                            )
+                        }
+                    }
                 }
 
                 DashedDivider(color = Color(0xFFBFC9C2).copy(alpha = 0.4f))
@@ -1083,22 +1203,16 @@ internal fun ReceiptSummaryCard(
                 // Payment Method & Tenders
                 Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
                     val isSettled = transaction.remainingAmount() <= BigDecimal.ZERO
-                    val effectiveMethods = if (isSettled) {
+                    val checkoutPayments = transaction.activeCheckoutPayments()
+                    val effectiveMethods = if (checkoutPayments.isNotEmpty()) {
+                        checkoutPayments.map { it.method }.distinct()
+                    } else if (isSettled) {
                         transaction.paymentMethods.filterNot { it.lowercase() in setOf("hutang", "credit", "dp", "down_payment") }
                             .ifEmpty { listOf("tunai") }
                     } else {
                         transaction.paymentMethods.ifEmpty { listOf("tunai") }
                     }
-                    val method = effectiveMethods.joinToString(" + ") { m ->
-                        when (m.lowercase()) {
-                            "tunai", "cash" -> "Tunai"
-                            "transfer", "bank_transfer" -> "Transfer Bank"
-                            "qris" -> "QRIS"
-                            "hutang", "credit" -> "Hutang"
-                            "dp", "down_payment" -> "DP"
-                            else -> m.replaceFirstChar { it.uppercase() }
-                        }
-                    }
+                    val method = effectiveMethods.joinToString(" + ") { formatReceiptPaymentMethod(it) }
                     val isCash = effectiveMethods.any { it.equals("tunai", ignoreCase = true) || it.equals("cash", ignoreCase = true) }
 
                     Row(
@@ -1123,6 +1237,30 @@ internal fun ReceiptSummaryCard(
                                 fontSize = 13.sp,
                                 fontWeight = FontWeight.SemiBold
                             )
+                        }
+                    }
+
+                    if (checkoutPayments.size > 1 || checkoutPayments.any { !it.reference.isNullOrBlank() }) {
+                        checkoutPayments.forEach { p ->
+                            Row(
+                                modifier = Modifier.fillMaxWidth().padding(start = 12.dp),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                val refText = p.reference?.trim()?.takeIf { it.isNotBlank() }?.let { " ($it)" } ?: ""
+                                Text(
+                                    text = "• ${formatReceiptPaymentMethod(p.method)}$refText",
+                                    color = Color(0xFF64748B),
+                                    fontSize = 12.sp
+                                )
+                                Text(
+                                    text = p.amount.formatReceiptMoney(),
+                                    color = Color(0xFF131B2E),
+                                    fontSize = 12.5.sp,
+                                    fontFamily = FontFamily.Monospace,
+                                    fontWeight = FontWeight.Medium
+                                )
+                            }
                         }
                     }
 
@@ -1325,10 +1463,14 @@ internal fun ReceiptActions(
     onDeliveryOrderClick: () -> Unit = {},
     onShowPayDebt: () -> Unit,
     onShowVoid: () -> Unit,
-    onShowRefund: () -> Unit
+    onShowRefund: () -> Unit,
+    onReorderClick: (() -> Unit)? = null,
 ) {
     val remaining = transaction.remainingAmount()
     val canAcceptPayment = role.equals("KASIR", ignoreCase = true) || role.equals("OWNER", ignoreCase = true)
+    val canReorder = onReorderClick != null &&
+        com.tbterminal.app.navigation.AppAccessPolicy.can(role, com.tbterminal.app.navigation.AppCapability.POS) &&
+        transaction.items.isNotEmpty()
 
     Column(
         modifier = Modifier.fillMaxWidth(),
@@ -1357,6 +1499,32 @@ internal fun ReceiptActions(
                 fontSize = 15.sp,
                 fontWeight = FontWeight.SemiBold
             )
+        }
+
+        if (canReorder) {
+            OutlinedButton(
+                onClick = { onReorderClick?.invoke() },
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(46.dp),
+                shape = RoundedCornerShape(12.dp),
+                border = BorderStroke(1.dp, Color(0xFF006C4A).copy(alpha = 0.45f)),
+                colors = ButtonDefaults.outlinedButtonColors(containerColor = Color(0xFFF0FDF4))
+            ) {
+                Icon(
+                    imageVector = Icons.Outlined.ContentCopy,
+                    contentDescription = null,
+                    tint = Color(0xFF10533C),
+                    modifier = Modifier.size(18.dp)
+                )
+                Spacer(modifier = Modifier.width(8.dp))
+                Text(
+                    text = "Salin ke Keranjang",
+                    color = Color(0xFF10533C),
+                    fontSize = 14.sp,
+                    fontWeight = FontWeight.SemiBold
+                )
+            }
         }
 
         // Contextual: Pay Debt Button if remaining amount exists
@@ -1809,6 +1977,9 @@ fun CetakStrukPreviewDialog(
                                 Text("  $qtyText x ${item.priceAtTransaction.formatReceiptMoney()}", fontSize = 11.sp, color = Color(0xFF475569))
                                 Text(item.subtotal.formatReceiptMoney(), fontSize = 12.sp, fontWeight = FontWeight.Medium, color = Color.Black)
                             }
+                            item.note?.trim()?.takeIf { it.isNotBlank() }?.let { note ->
+                                Text("  Cat: $note", fontSize = 10.sp, color = Color(0xFF64748B))
+                            }
                             Spacer(modifier = Modifier.height(4.dp))
                         }
 
@@ -1831,10 +2002,11 @@ fun CetakStrukPreviewDialog(
                             ?.replace(",", ".")
                             ?.trim()
                             ?.toBigDecimalOrNull() ?: BigDecimal.ZERO
-                        val previewBaseForNoteDiscount = previewTotalItemSubtotal.add(previewDeliveryFee)
-                        val previewDiskonNota = previewBaseForNoteDiscount.subtract(transaction.total).coerceAtLeast(BigDecimal.ZERO)
+                        val previewDiskonNota = transaction.computeNoteDiscount(previewTotalItemSubtotal, previewDeliveryFee)
+                        val previewHasTax = transaction.hasVisibleTax()
+                        val previewHasRounding = transaction.roundingAmount.compareTo(BigDecimal.ZERO) != 0
 
-                        if (previewItemDiscount > BigDecimal.ZERO || previewDiskonNota > BigDecimal.ZERO || previewDeliveryFee > BigDecimal.ZERO) {
+                        if (previewItemDiscount > BigDecimal.ZERO || previewDiskonNota > BigDecimal.ZERO || previewDeliveryFee > BigDecimal.ZERO || previewHasTax || previewHasRounding) {
                             Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
                                 Text("Subtotal", fontSize = 11.sp, color = Color(0xFF475569))
                                 Text(previewGrossSubtotal.formatReceiptMoney(), fontSize = 11.sp, color = Color.Black)
@@ -1857,25 +2029,50 @@ fun CetakStrukPreviewDialog(
                                     Text("+${previewDeliveryFee.formatReceiptMoney()}", fontSize = 11.sp, color = Color.Black)
                                 }
                             }
+                            if (previewHasTax) {
+                                if (transaction.taxableBase > BigDecimal.ZERO) {
+                                    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                                        Text("DPP", fontSize = 11.sp, color = Color(0xFF475569))
+                                        Text(transaction.taxableBase.formatReceiptMoney(), fontSize = 11.sp, color = Color.Black)
+                                    }
+                                }
+                                val isIncludeTax = transaction.taxMode.equals("INCLUDE", ignoreCase = true)
+                                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                                    Text(if (isIncludeTax) "Incl. ${transaction.taxRateLabel()}" else transaction.taxRateLabel(), fontSize = 11.sp, color = Color(0xFF475569))
+                                    Text(if (isIncludeTax) transaction.taxAmount.formatReceiptMoney() else "+${transaction.taxAmount.formatReceiptMoney()}", fontSize = 11.sp, color = Color.Black)
+                                }
+                            }
+                            if (previewHasRounding) {
+                                val sign = if (transaction.roundingAmount > BigDecimal.ZERO) "+" else "-"
+                                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                                    Text("Pembulatan", fontSize = 11.sp, color = Color(0xFF475569))
+                                    Text("$sign${transaction.roundingAmount.abs().formatReceiptMoney()}", fontSize = 11.sp, color = Color.Black)
+                                }
+                            }
                         }
 
                         Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
                             Text("TOTAL", fontSize = 13.sp, fontWeight = FontWeight.Bold, color = Color.Black)
                             Text(transaction.total.formatReceiptMoney(), fontSize = 14.sp, fontWeight = FontWeight.Black, color = Color.Black)
                         }
-                        val methods = transaction.paymentMethods.joinToString(" + ") { m ->
-                            when (m.lowercase()) {
-                                "tunai", "cash" -> "Tunai"
-                                "transfer", "bank_transfer" -> "Transfer"
-                                "qris" -> "QRIS"
-                                "hutang", "credit" -> "Hutang"
-                                "dp", "down_payment" -> "DP"
-                                else -> m.replaceFirstChar { it.uppercase() }
-                            }
-                        }.ifBlank { "Tunai" }
+                        val previewPayments = transaction.activeCheckoutPayments()
+                        val methods = if (previewPayments.isNotEmpty()) {
+                            previewPayments.map { formatReceiptPaymentMethod(it.method) }.distinct().joinToString(" + ")
+                        } else {
+                            transaction.paymentMethods.joinToString(" + ") { formatReceiptPaymentMethod(it) }.ifBlank { "Tunai" }
+                        }
                         Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
                             Text("Metode Bayar", fontSize = 11.sp, color = Color(0xFF475569))
                             Text(methods, fontSize = 11.sp, color = Color.Black)
+                        }
+                        if (previewPayments.size > 1 || previewPayments.any { !it.reference.isNullOrBlank() }) {
+                            previewPayments.forEach { p ->
+                                val refSuffix = p.reference?.trim()?.takeIf { it.isNotBlank() }?.let { " ($it)" } ?: ""
+                                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                                    Text("  • ${formatReceiptPaymentMethod(p.method)}$refSuffix", fontSize = 10.sp, color = Color(0xFF64748B))
+                                    Text(p.amount.formatReceiptMoney(), fontSize = 10.sp, color = Color.Black)
+                                }
+                            }
                         }
                         Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
                             Text("Dibayar", fontSize = 11.sp, color = Color(0xFF475569))
@@ -2299,20 +2496,29 @@ private class TransactionReceiptPrintAdapter(
         y += 18f
 
         // Baris Item
-        val rowHeight = 16f
+        val itemNotePaint = Paint(tableCellPaint).apply {
+            textSize = 6.5f
+            color = colorMuted
+            textAlign = Paint.Align.LEFT
+        }
         transaction.items.forEachIndexed { index, item ->
+            val cleanNote = item.note?.trim()?.takeIf { it.isNotBlank() }
+            val currentRowHeight = if (cleanNote != null) 24f else 16f
             if (y < pageHeight - 145f) {
                 if (index % 2 == 1) {
                     fillPaint.color = colorAltRow
-                    canvas.drawRect(left, y, right, y + rowHeight, fillPaint)
+                    canvas.drawRect(left, y, right, y + currentRowHeight, fillPaint)
                 }
-                canvas.drawLine(left, y + rowHeight, right, y + rowHeight, linePaint)
+                canvas.drawLine(left, y + currentRowHeight, right, y + currentRowHeight, linePaint)
 
                 // Kolom No
                 canvas.drawText("${index + 1}", xNo + (colNoW / 2f), y + 11.5f, tableCellPaint.apply { textAlign = Paint.Align.CENTER })
 
                 // Kolom Nama Barang
                 canvas.drawText(item.productName.take(36), xName + 4f, y + 11.5f, tableCellBoldPaint.apply { textAlign = Paint.Align.LEFT })
+                if (cleanNote != null) {
+                    canvas.drawText("Cat: ${cleanNote.take(40)}", xName + 4f, y + 20.5f, itemNotePaint)
+                }
 
                 // Kolom Qty
                 val qtyStr = if (item.quantity.stripTrailingZeros().scale() <= 0) {
@@ -2332,7 +2538,7 @@ private class TransactionReceiptPrintAdapter(
                 // Kolom Total
                 canvas.drawText(item.subtotal.formatReceiptMoney(), right - 4f, y + 11.5f, tableCellBoldPaint.apply { textAlign = Paint.Align.RIGHT })
 
-                y += rowHeight
+                y += currentRowHeight
             }
         }
 
@@ -2405,8 +2611,9 @@ private class TransactionReceiptPrintAdapter(
             ?.replace(",", ".")
             ?.trim()
             ?.toBigDecimalOrNull() ?: BigDecimal.ZERO
-        val pdfBaseForNoteDiscount = pdfTotalItemSubtotal.add(pdfDeliveryFee)
-        val pdfDiskonNota = pdfBaseForNoteDiscount.subtract(transaction.total).coerceAtLeast(BigDecimal.ZERO)
+        val pdfDiskonNota = transaction.computeNoteDiscount(pdfTotalItemSubtotal, pdfDeliveryFee)
+        val pdfHasTax = transaction.hasVisibleTax()
+        val pdfHasRounding = transaction.roundingAmount.compareTo(BigDecimal.ZERO) != 0
 
         // Subtotal
         canvas.drawText("Subtotal", summarySplitX + 12f, yRight + 8f, totalLabelPaint)
@@ -2433,6 +2640,27 @@ private class TransactionReceiptPrintAdapter(
             yRight += 12f
         }
 
+        if (pdfHasTax) {
+            if (transaction.taxableBase > BigDecimal.ZERO) {
+                canvas.drawText("DPP", summarySplitX + 12f, yRight + 4f, totalLabelPaint)
+                canvas.drawText(transaction.taxableBase.formatReceiptMoney(), right - 4f, yRight + 4f, totalValPaint)
+                yRight += 12f
+            }
+            val isIncludeTax = transaction.taxMode.equals("INCLUDE", ignoreCase = true)
+            val taxLabelPdf = if (isIncludeTax) "Incl. ${transaction.taxRateLabel()}" else transaction.taxRateLabel()
+            val taxValPdf = if (isIncludeTax) transaction.taxAmount.formatReceiptMoney() else "+${transaction.taxAmount.formatReceiptMoney()}"
+            canvas.drawText(taxLabelPdf, summarySplitX + 12f, yRight + 4f, totalLabelPaint)
+            canvas.drawText(taxValPdf, right - 4f, yRight + 4f, totalValPaint)
+            yRight += 12f
+        }
+
+        if (pdfHasRounding) {
+            val sign = if (transaction.roundingAmount > BigDecimal.ZERO) "+" else "-"
+            canvas.drawText("Pembulatan Tunai", summarySplitX + 12f, yRight + 4f, totalLabelPaint)
+            canvas.drawText("$sign${transaction.roundingAmount.abs().formatReceiptMoney()}", right - 4f, yRight + 4f, totalValPaint)
+            yRight += 12f
+        }
+
         // Total Akhir (Boxed Shaded Highlight)
         val totalBoxRect = android.graphics.RectF(summarySplitX + 8f, yRight, right, yRight + 16f)
         fillPaint.color = android.graphics.Color.rgb(241, 245, 249)
@@ -2456,9 +2684,21 @@ private class TransactionReceiptPrintAdapter(
         canvas.drawText(transaction.total.formatReceiptMoney(), right - 4f, yRight + 11.5f, grandValPaint)
         yRight += 21f
 
+        val pdfCheckoutPayments = transaction.activeCheckoutPayments()
+        if (pdfCheckoutPayments.size > 1 || pdfCheckoutPayments.any { !it.reference.isNullOrBlank() }) {
+            pdfCheckoutPayments.forEach { p ->
+                val refText = p.reference?.trim()?.takeIf { it.isNotBlank() }?.let { " ($it)" } ?: ""
+                canvas.drawText("Bayar ${formatReceiptPaymentMethod(p.method)}$refText", summarySplitX + 12f, yRight + 4f, totalLabelPaint)
+                canvas.drawText(p.amount.formatReceiptMoney(), right - 4f, yRight + 4f, totalValPaint)
+                yRight += 11f
+            }
+        }
+
         // Dibayar / Uang Diterima & Kembalian
         val pdfTenderedAmount = if (transaction.amountTendered > BigDecimal.ZERO) transaction.amountTendered else transaction.paidAmount
-        val pdfIsCash = transaction.paymentMethods.any { it.lowercase() in setOf("tunai", "cash") } || transaction.paymentMethods.isEmpty()
+        val pdfIsCash = pdfCheckoutPayments.any { it.method.lowercase() in setOf("tunai", "cash") } ||
+            transaction.paymentMethods.any { it.lowercase() in setOf("tunai", "cash") } ||
+            (pdfCheckoutPayments.isEmpty() && transaction.paymentMethods.isEmpty())
         if (pdfIsCash || transaction.amountTendered > BigDecimal.ZERO) {
             canvas.drawText("Uang Diterima", summarySplitX + 12f, yRight + 4f, totalLabelPaint)
             canvas.drawText(pdfTenderedAmount.formatReceiptMoney(), right - 4f, yRight + 4f, totalValPaint)

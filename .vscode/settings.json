@@ -1,0 +1,14 @@
+{
+  "files.watcherExclude": {
+    "**/build/**": true,
+    "**/.gradle/**": true,
+    "**/.idea/**": true,
+    "**/kspCaches/**": true,
+    "C:/tbterminal_build/**": true
+  },
+  "search.exclude": {
+    "**/build": true,
+    "**/.gradle": true,
+    "**/kspCaches": true
+  }
+}

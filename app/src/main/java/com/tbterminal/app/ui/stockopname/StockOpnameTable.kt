@@ -599,13 +599,7 @@ private fun StockTableFooter(
 ) {
     val safePage = uiState.tablePage.coerceAtLeast(1)
     val safeTotalPages = uiState.totalTablePages.coerceAtLeast(1)
-    val first = if (uiState.totalTableProducts == 0) 0 else (safePage - 1) * STOCK_OPNAME_TABLE_PAGE_SIZE + 1
-    val last = minOf(safePage * STOCK_OPNAME_TABLE_PAGE_SIZE, uiState.totalTableProducts)
-    val text = if (compact) {
-        "${uiState.totalTableProducts} produk"
-    } else {
-        "Menampilkan $first–$last dari ${uiState.totalTableProducts} produk"
-    }
+    val text = "${uiState.totalTableProducts} produk"
 
     TbPagination(
         currentPage = safePage,

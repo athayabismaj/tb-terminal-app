@@ -36,6 +36,7 @@ fun AdminProductDetailScreen(
     onProfileClick: () -> Unit = {},
     onSettingsClick: () -> Unit = {},
     onLogout: () -> Unit,
+    thermalPrinterManager: com.tbterminal.app.data.printer.ThermalPrinterManager? = null,
     viewModel: ProductDetailViewModel = viewModel(
         factory = ProductDetailViewModel.factory(
             inventoryRepository = inventoryRepository,
@@ -76,7 +77,8 @@ fun AdminProductDetailScreen(
             modifier = contentModifier,
             uiState = uiState,
             onRetry = viewModel::loadDetail,
-            onEditProductClick = onEditProductClick
+            onEditProductClick = onEditProductClick,
+            thermalPrinterManager = thermalPrinterManager,
         )
     }
 }

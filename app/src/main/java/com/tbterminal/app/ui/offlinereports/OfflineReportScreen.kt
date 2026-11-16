@@ -776,7 +776,7 @@ private fun OfflineReportPagination(
         totalPages = totalPages,
         onPreviousPage = onPreviousPage,
         onNextPage = onNextPage,
-        supportingText = if (totalItems == 0) "0 data" else if (compact) "$totalItems data" else "Menampilkan $firstItem–$lastItem dari $totalItems data",
+        supportingText = if (totalItems == 0) "0 data" else "$totalItems data",
         testTag = "offline-report-pagination",
     )
 }

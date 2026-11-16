@@ -110,6 +110,9 @@ object ReceiptEscPosFormatter {
             val qtyStr = "${formatQty(item.quantity)} x ${formatMoney(item.priceAtTransaction)}"
             val subtotalStr = formatMoney(item.subtotal)
             builder.twoColumn(" $qtyStr", subtotalStr)
+            item.note?.trim()?.takeIf { it.isNotBlank() }?.let { note ->
+                builder.textLine("  Cat: $note")
+            }
         }
 
         builder.lineSeparator('-')
@@ -129,10 +132,22 @@ object ReceiptEscPosFormatter {
             ?.replace(",", ".")
             ?.trim()
             ?.toBigDecimalOrNull() ?: BigDecimal.ZERO
-        val baseForNoteDiscount = totalItemSubtotal.add(deliveryFee)
-        val diskonNota = baseForNoteDiscount.subtract(transaction.total).coerceAtLeast(BigDecimal.ZERO)
+        val excludedTax = if (transaction.taxEnabled && transaction.taxMode.equals("EXCLUDE", ignoreCase = true)) {
+            transaction.taxAmount
+        } else {
+            BigDecimal.ZERO
+        }
+        val diskonNota = if (transaction.transactionDiscountAmount > BigDecimal.ZERO) {
+            transaction.transactionDiscountAmount
+        } else {
+            val baseForNoteDiscount = totalItemSubtotal.add(deliveryFee).add(excludedTax).add(transaction.roundingAmount)
+            baseForNoteDiscount.subtract(transaction.total).coerceAtLeast(BigDecimal.ZERO)
+        }
+        val hasTaxInfo = transaction.taxEnabled &&
+            (transaction.taxAmount > BigDecimal.ZERO || transaction.taxableBase > BigDecimal.ZERO)
+        val hasRounding = transaction.roundingAmount.compareTo(BigDecimal.ZERO) != 0
 
-        if (itemDiscount > BigDecimal.ZERO || diskonNota > BigDecimal.ZERO || deliveryFee > BigDecimal.ZERO) {
+        if (itemDiscount > BigDecimal.ZERO || diskonNota > BigDecimal.ZERO || deliveryFee > BigDecimal.ZERO || hasTaxInfo || hasRounding) {
             builder.twoColumn("Subtotal", formatMoney(grossSubtotal))
             if (itemDiscount > BigDecimal.ZERO) {
                 builder.twoColumn("Diskon Item", "-${formatMoney(itemDiscount)}")
@@ -143,27 +158,63 @@ object ReceiptEscPosFormatter {
             if (deliveryFee > BigDecimal.ZERO) {
                 builder.twoColumn("Ongkos Kirim", "+${formatMoney(deliveryFee)}")
             }
+            if (hasTaxInfo) {
+                val taxName = transaction.taxLabel?.takeIf { it.isNotBlank() } ?: "PPN"
+                val rateLabel = "$taxName ${transaction.taxRate.stripTrailingZeros().toPlainString()}%"
+                if (transaction.taxableBase > BigDecimal.ZERO) {
+                    builder.twoColumn("DPP", formatMoney(transaction.taxableBase))
+                }
+                if (transaction.taxMode.equals("INCLUDE", ignoreCase = true)) {
+                    builder.twoColumn("Incl. $rateLabel", formatMoney(transaction.taxAmount))
+                } else {
+                    builder.twoColumn(rateLabel, "+${formatMoney(transaction.taxAmount)}")
+                }
+            }
+            if (hasRounding) {
+                val sign = if (transaction.roundingAmount > BigDecimal.ZERO) "+" else "-"
+                builder.twoColumn("Pembulatan", "$sign${formatMoney(transaction.roundingAmount.abs())}")
+            }
         }
 
         builder.bold(true)
             .twoColumn("TOTAL", formatMoney(transaction.total))
             .bold(false)
 
-        val paymentMethodDisplay = if (transaction.paymentMethods.isNotEmpty()) {
-            transaction.paymentMethods.joinToString(", ") { method ->
-                when (method.lowercase()) {
-                    "cash", "tunai" -> "Tunai"
-                    "qris" -> "QRIS"
-                    "transfer" -> "Transfer"
-                    "hutang", "credit" -> "Hutang"
-                    "dp" -> "Uang Muka (DP)"
-                    else -> method.uppercase()
-                }
-            }
-        } else "Tunai"
+        val checkoutPayments = transaction.payments.filter {
+            it.amount > BigDecimal.ZERO &&
+                !it.paymentSource.equals("VOID_REVERSAL", ignoreCase = true) &&
+                !it.paymentSource.equals("REFUND_REVERSAL", ignoreCase = true)
+        }
+        fun formatMethodName(method: String): String = when (method.lowercase()) {
+            "cash", "tunai" -> "Tunai"
+            "qris" -> "QRIS"
+            "transfer", "bank_transfer" -> "Transfer"
+            "hutang", "credit" -> "Hutang"
+            "dp", "down_payment" -> "Uang Muka (DP)"
+            else -> method.uppercase()
+        }
+
+        val paymentMethodDisplay = if (checkoutPayments.isNotEmpty()) {
+            checkoutPayments.map { formatMethodName(it.method) }.distinct().joinToString(" + ")
+        } else if (transaction.paymentMethods.isNotEmpty()) {
+            transaction.paymentMethods.joinToString(", ") { formatMethodName(it) }
+        } else {
+            "Tunai"
+        }
         builder.twoColumn("Metode Bayar", paymentMethodDisplay)
 
-        val isCash = transaction.paymentMethods.any { it.lowercase() in setOf("tunai", "cash") } || transaction.paymentMethods.isEmpty()
+        if (checkoutPayments.size > 1 || checkoutPayments.any { !it.reference.isNullOrBlank() }) {
+            checkoutPayments.forEach { p ->
+                builder.twoColumn("  - ${formatMethodName(p.method)}", formatMoney(p.amount))
+                p.reference?.trim()?.takeIf { it.isNotBlank() }?.let { ref ->
+                    builder.textLine("    Ref: $ref")
+                }
+            }
+        }
+
+        val isCash = checkoutPayments.any { it.method.lowercase() in setOf("tunai", "cash") } ||
+            transaction.paymentMethods.any { it.lowercase() in setOf("tunai", "cash") } ||
+            (checkoutPayments.isEmpty() && transaction.paymentMethods.isEmpty())
         val tenderedAmount = if (transaction.amountTendered > BigDecimal.ZERO) transaction.amountTendered else transaction.paidAmount
 
         if (!isVoided) {

@@ -250,6 +250,9 @@ object DeliveryOrderFormatter {
             val unitStr = item.unitName?.takeIf { it.isNotBlank() } ?: "pcs"
             val itemLine = "[ ]  ${qtyStr.padStart(3)} $unitStr  ${item.productName}"
             builder.textLine(itemLine)
+            item.note?.trim()?.takeIf { it.isNotBlank() }?.let { note ->
+                builder.textLine("     Cat: $note")
+            }
         }
 
         builder.lineSeparator('-')
@@ -327,6 +330,9 @@ object DeliveryOrderFormatter {
             val qty = formatQty(item.quantity)
             val unit = item.unitName?.takeIf { it.isNotBlank() } ?: "pcs"
             sb.appendLine("${index + 1}. [ ] $qty $unit - ${item.productName}")
+            item.note?.trim()?.takeIf { it.isNotBlank() }?.let { note ->
+                sb.appendLine("   Catatan: $note")
+            }
         }
 
         sb.appendLine("--------------------------------")
@@ -611,19 +617,20 @@ class DeliveryOrderPrintAdapter(
         y += 18f
 
         // Baris Item Barang
-        val rowHeight = 16f
         transaction.items.forEachIndexed { index, item ->
+            val cleanNote = item.note?.trim()?.takeIf { it.isNotBlank() }
+            val currentRowHeight = if (cleanNote != null) 25f else 16f
             if (y < pageHeight - 150f) {
                 if (index % 2 == 1) {
                     fillPaint.color = colorAltRow
-                    canvas.drawRect(left, y, right, y + rowHeight, fillPaint)
+                    canvas.drawRect(left, y, right, y + currentRowHeight, fillPaint)
                 }
-                canvas.drawLine(left, y + rowHeight, right, y + rowHeight, linePaint)
+                canvas.drawLine(left, y + currentRowHeight, right, y + currentRowHeight, linePaint)
 
                 // Kotak Centang Checkbox [ ]
                 val boxSize = 8f
                 val cbLeft = xCheck + (colCheckW - boxSize) / 2f
-                val cbTop = y + (rowHeight - boxSize) / 2f
+                val cbTop = y + (16f - boxSize) / 2f
                 canvas.drawRect(cbLeft, cbTop, cbLeft + boxSize, cbTop + boxSize, linePaint)
 
                 // Kolom No
@@ -631,6 +638,9 @@ class DeliveryOrderPrintAdapter(
 
                 // Kolom Nama Barang
                 canvas.drawText(item.productName.take(38), xName + 4f, y + 11.5f, tableCellBoldPaint.apply { textAlign = Paint.Align.LEFT })
+                if (cleanNote != null) {
+                    canvas.drawText("Cat: ${cleanNote.take(46)}", xName + 4f, y + 21f, metaLabelPaint.apply { textAlign = Paint.Align.LEFT })
+                }
 
                 // Kolom Qty
                 val qtyStr = if (item.quantity.stripTrailingZeros().scale() <= 0) {
@@ -647,7 +657,7 @@ class DeliveryOrderPrintAdapter(
                 // Kolom Kondisi
                 canvas.drawText("Baik & Utuh", xCond + (colCondW / 2f), y + 11.5f, tableCellPaint.apply { textAlign = Paint.Align.CENTER; textSize = 7.5f })
 
-                y += rowHeight
+                y += currentRowHeight
             }
         }
 

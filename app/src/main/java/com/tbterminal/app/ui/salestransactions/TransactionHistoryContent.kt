@@ -1882,123 +1882,21 @@ private fun SalesHistoryPagination(
     onPreviousPage: () -> Unit,
     onNextPage: () -> Unit,
 ) {
-    if (compact) {
-        val canPrev = state.page > 1 && !state.isLoading
-        val canNext = state.page < state.totalPages && !state.isLoading
-
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(vertical = 12.dp)
-                .testTag("sales-history-pagination"),
-            horizontalArrangement = Arrangement.Center,
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            // Pill 1: Total transactions
-            Surface(
-                shape = RoundedCornerShape(12.dp),
-                color = Color.White,
-                border = BorderStroke(1.dp, Color(0xFF10533C).copy(alpha = 0.3f)),
-                shadowElevation = 0.5.dp,
-            ) {
-                Text(
-                    text = "${state.total} transaksi",
-                    fontSize = 12.sp,
-                    fontWeight = FontWeight.SemiBold,
-                    color = Color(0xFF10533C),
-                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp)
-                )
-            }
-
-            Spacer(Modifier.width(12.dp))
-
-            // Pill 2: Page controller
-            Surface(
-                shape = RoundedCornerShape(12.dp),
-                color = Color.White,
-                border = BorderStroke(1.dp, Color(0xFF10533C).copy(alpha = 0.3f)),
-                shadowElevation = 0.5.dp,
-            ) {
-                Row(
-                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(12.dp)
-                ) {
-                    Box(
-                        modifier = Modifier
-                            .size(18.dp)
-                            .clip(CircleShape)
-                            .clickable(enabled = canPrev, onClick = onPreviousPage),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Icon(
-                            imageVector = Icons.Filled.ChevronLeft,
-                            contentDescription = "Halaman sebelumnya",
-                            tint = if (canPrev) Color(0xFF10533C) else Color(0xFF94A3B8).copy(alpha = 0.4f),
-                            modifier = Modifier.size(16.dp)
-                        )
-                    }
-
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(3.dp)
-                    ) {
-                        Text(
-                            text = "${state.page}",
-                            fontSize = 12.sp,
-                            fontWeight = FontWeight.SemiBold,
-                            color = Color(0xFF1E293B)
-                        )
-                        Text(
-                            text = "/",
-                            fontSize = 12.sp,
-                            fontWeight = FontWeight.Normal,
-                            color = Color(0xFF94A3B8)
-                        )
-                        Text(
-                            text = "${state.totalPages.coerceAtLeast(1)}",
-                            fontSize = 12.sp,
-                            fontWeight = FontWeight.SemiBold,
-                            color = Color(0xFF1E293B)
-                        )
-                    }
-
-                    Box(
-                        modifier = Modifier
-                            .size(18.dp)
-                            .clip(CircleShape)
-                            .clickable(enabled = canNext, onClick = onNextPage),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Icon(
-                            imageVector = Icons.Filled.ChevronRight,
-                            contentDescription = "Halaman selanjutnya",
-                            tint = if (canNext) Color(0xFF10533C) else Color(0xFF94A3B8).copy(alpha = 0.4f),
-                            modifier = Modifier.size(16.dp)
-                        )
-                    }
-                }
-            }
-        }
+    val countText = if (state.total == 0L) {
+        "0 transaksi"
     } else {
-        val countText = if (state.total == 0L) {
-            "0 transaksi"
-        } else if (state.transactions.size.toLong() >= state.total) {
-            "${state.total} transaksi"
-        } else {
-            "${state.transactions.size} dari ${state.total} transaksi"
-        }
-        TbPagination(
-            currentPage = state.page,
-            totalPages = state.totalPages,
-            onPreviousPage = onPreviousPage,
-            onNextPage = onNextPage,
-            supportingText = countText,
-            isLoading = state.isLoading,
-            compact = compact,
-            testTag = "sales-history-pagination",
-        )
+        "${state.total} transaksi"
     }
+    TbPagination(
+        currentPage = state.page,
+        totalPages = state.totalPages,
+        onPreviousPage = onPreviousPage,
+        onNextPage = onNextPage,
+        supportingText = countText,
+        isLoading = state.isLoading,
+        compact = compact,
+        testTag = "sales-history-pagination",
+    )
 }
 
 private fun buildSalesMeta(transaction: CashTransaction): String = buildList {

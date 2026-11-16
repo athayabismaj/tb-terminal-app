@@ -3,6 +3,7 @@ package com.tbterminal.app.ui.checkout
 import com.tbterminal.app.data.model.Customer
 import com.tbterminal.app.data.model.CheckoutDiscount
 import com.tbterminal.app.data.model.CheckoutPreview
+import com.tbterminal.app.data.model.ProductPriceTier
 import com.tbterminal.app.ui.common.UiText
 import java.math.BigDecimal
 
@@ -22,6 +23,17 @@ data class CheckoutUiState(
     val transactionDiscount: CheckoutDiscount? = null,
     val transactionDiscountAmount: BigDecimal = BigDecimal.ZERO,
     val totalDiscount: BigDecimal = BigDecimal.ZERO,
+    val storeName: String = "TB TERMINAL",
+    val storeNpwp: String? = null,
+    val taxEnabled: Boolean = false,
+    val taxMode: String = "EXCLUDE",
+    val taxRate: BigDecimal = BigDecimal("11.00"),
+    val taxLabel: String = "PPN",
+    val taxableBase: BigDecimal = BigDecimal.ZERO,
+    val taxAmount: BigDecimal = BigDecimal.ZERO,
+    val cashRoundingUnit: Int = 0,
+    val cashRoundingRule: String = "NEAREST",
+    val roundingAmount: BigDecimal = BigDecimal.ZERO,
     val finalTotal: BigDecimal = BigDecimal.ZERO,
     val checkoutPreview: CheckoutPreview? = null,
     val approvedManagerApprovalId: String? = null,
@@ -29,6 +41,9 @@ data class CheckoutUiState(
     val isPreviewLoading: Boolean = false,
     val selectedPaymentMethod: PaymentMethod = PaymentMethod.TUNAI,
     val amountPaidInput: String = "",
+    val isSplitPaymentEnabled: Boolean = false,
+    val isSplitDpMode: Boolean = false,
+    val splitPaymentLines: List<SplitPaymentLineUi> = emptyList(),
     val activeCashSession: ActiveCashSessionUi? = null,
     val hasActiveCashSession: Boolean = false,
     val isCashSessionLoading: Boolean = false,
@@ -70,6 +85,31 @@ data class CheckoutUiState(
     val pettyCashDescriptionInput: String = "",
     val isPettyCashSubmitting: Boolean = false,
     val pettyCashError: String? = null,
+    val isReordering: Boolean = false,
+    val pendingReorderConflict: PendingReorderConflict? = null,
+    val activeQuotationId: String? = null,
+    val activeQuotationNumber: String? = null,
+    val isSaveQuotationDialogOpen: Boolean = false,
+    val isSavingQuotation: Boolean = false,
+    val quotationValidDaysInput: String = "14",
+    val quotationNotesInput: String = "",
+)
+
+data class PendingReorderConflict(
+    val receiptNumber: String,
+    val plan: CheckoutReorderPlan,
+    val customer: Customer? = null,
+    val resolvedProducts: Map<String, ReorderResolvedProduct> = emptyMap(),
+    val quotationId: String? = null,
+    val quotationNumber: String? = null,
+    val transactionDiscount: CheckoutDiscount? = null,
+)
+
+data class SplitPaymentLineUi(
+    val id: String = java.util.UUID.randomUUID().toString(),
+    val method: PaymentMethod = PaymentMethod.TUNAI,
+    val amountInput: String = "",
+    val reference: String = ""
 )
 
 data class HeldCart(
@@ -111,7 +151,10 @@ data class Product(
     val stockQty: BigDecimal = BigDecimal.ZERO,
     val secondaryUnitId: String? = null,
     val secondaryUnitName: String? = null,
-    val secondaryUnitFactor: BigDecimal? = null
+    val secondaryUnitFactor: BigDecimal? = null,
+    val contractorPrice: BigDecimal = BigDecimal.ZERO,
+    val priceTiers: List<ProductPriceTier> = emptyList(),
+    val masterDiscount: BigDecimal = BigDecimal.ZERO
 )
 
 data class CartItem(
@@ -122,13 +165,22 @@ data class CartItem(
     val sku: String = "",
     val unitName: String = "",
     val discountRequest: CheckoutDiscount? = null,
+    val note: String? = null,
     val cartItemId: String = productId,
     val baseUnitPrice: BigDecimal = unitPrice,
     val baseUnitName: String = unitName,
     val secondaryUnitId: String? = null,
     val secondaryUnitName: String? = null,
     val secondaryUnitFactor: BigDecimal? = null,
-    val isSecondaryUnit: Boolean = false
+    val isSecondaryUnit: Boolean = false,
+    val retailBaseUnitPrice: BigDecimal = baseUnitPrice,
+    val contractorBaseUnitPrice: BigDecimal = BigDecimal.ZERO,
+    val priceTiers: List<ProductPriceTier> = emptyList(),
+    val appliedPriceTierMinQty: BigDecimal? = null,
+    val isContractorPriceApplied: Boolean = false,
+    val masterUnitDiscount: BigDecimal = BigDecimal.ZERO,
+    val hasManualDiscountOverride: Boolean = false,
+    val isMasterDiscountApplied: Boolean = false
 ) {
     val hasSecondaryUnit: Boolean
         get() = secondaryUnitFactor != null && secondaryUnitFactor > BigDecimal.ONE

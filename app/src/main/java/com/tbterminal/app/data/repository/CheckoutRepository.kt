@@ -8,6 +8,7 @@ import com.tbterminal.app.data.model.CheckoutSubmitCommand
 import com.tbterminal.app.data.model.CheckoutDiscount
 import com.tbterminal.app.data.model.DiscountType
 import com.tbterminal.app.data.remote.CheckoutApi
+import com.tbterminal.app.data.remote.CheckoutPaymentLineRequestDto
 import com.tbterminal.app.data.remote.CheckoutPreviewRequest
 import com.tbterminal.app.data.remote.CheckoutLineItemRequest
 import com.tbterminal.app.data.remote.CheckoutRequest
@@ -31,9 +32,11 @@ class RemoteCheckoutRepository(
                     productId = item.productId,
                     qty = item.quantity.toString(),
                     discountRequest = item.discountRequest.toDto(),
+                    note = item.note,
                 )
             },
             transactionDiscount = command.transactionDiscount.toDto(),
+            customerId = command.customerId,
         )
         return safeApiCall { checkoutApi.previewCheckout(request) }
             .toRepositoryResult { response ->
@@ -69,6 +72,17 @@ class RemoteCheckoutRepository(
                             cashierDiscountLimitPercent = preview.cashierDiscountLimitPercent.toBigDecimal(),
                             approvalRequired = preview.approvalRequired,
                             expiresAt = preview.expiresAt,
+                            taxEnabled = preview.taxEnabled,
+                            taxMode = preview.taxMode,
+                            taxRate = preview.taxRate.toBigDecimal(),
+                            taxLabel = preview.taxLabel,
+                            taxableBase = preview.taxableBase.toBigDecimal(),
+                            taxAmount = preview.taxAmount.toBigDecimal(),
+                            totalWithTax = preview.totalWithTax.toBigDecimal(),
+                            cashRoundingUnit = preview.cashRoundingUnit,
+                            cashRoundingRule = preview.cashRoundingRule,
+                            estimatedCashRoundingAmount = preview.estimatedCashRoundingAmount.toBigDecimal(),
+                            estimatedTotalWithCashRounding = preview.estimatedTotalWithCashRounding.toBigDecimal(),
                         )
                     }.fold(
                         onSuccess = { RepositoryResult.Success(it) },
@@ -94,10 +108,18 @@ class RemoteCheckoutRepository(
                     productId = item.productId,
                     qty = item.quantity.toString(),
                     discountRequest = item.discountRequest.toDto(),
+                    note = item.note,
                 )
             },
             paymentMethod = command.paymentMethod,
             amountPaid = command.amountPaid,
+            payments = command.payments?.map { line ->
+                CheckoutPaymentLineRequestDto(
+                    method = line.method,
+                    amount = line.amount,
+                    reference = line.reference,
+                )
+            },
             notes = command.notes,
             dueDays = command.dueDays,
             transactionDiscount = command.transactionDiscount.toDto(),

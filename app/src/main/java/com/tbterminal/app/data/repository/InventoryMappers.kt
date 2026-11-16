@@ -4,6 +4,7 @@ import com.tbterminal.app.data.model.Product
 import com.tbterminal.app.data.model.ProductCategory
 import com.tbterminal.app.data.model.ProductCategoryPage
 import com.tbterminal.app.data.model.ProductPage
+import com.tbterminal.app.data.model.ProductPriceTier
 import com.tbterminal.app.data.model.ProductStock
 import com.tbterminal.app.data.model.ProductStockPage
 import com.tbterminal.app.data.model.ProductUnit
@@ -12,6 +13,7 @@ import com.tbterminal.app.data.model.StockAdjustment
 import com.tbterminal.app.data.model.StockAdjustmentPage
 import com.tbterminal.app.data.remote.CategoryResponseDto
 import com.tbterminal.app.data.remote.PaginatedResponse
+import com.tbterminal.app.data.remote.ProductPriceTierDto
 import com.tbterminal.app.data.remote.ProductResponseDto
 import com.tbterminal.app.data.remote.StockAdjustmentResponseDto
 import com.tbterminal.app.data.remote.StockDetailResponseDto
@@ -48,7 +50,8 @@ internal fun ProductResponseDto.toProduct(): Product {
         photoFilename = photoFilename,
         isActive = isActive,
         secondaryUnitId = secondaryUnitId,
-        secondaryUnitFactor = secondaryUnitFactor?.toBigDecimalOrNull()
+        secondaryUnitFactor = secondaryUnitFactor?.toBigDecimalOrNull(),
+        priceTiers = priceTiers.map(ProductPriceTierDto::toProductPriceTier)
     )
 }
 
@@ -68,7 +71,8 @@ internal fun StockDetailResponseDto.toProductStock(): ProductStock {
         isActive = isActive,
         secondaryUnitId = secondaryUnitId,
         secondaryUnitName = secondaryUnitName,
-        secondaryUnitFactor = secondaryUnitFactor?.toBigDecimalOrNull()
+        secondaryUnitFactor = secondaryUnitFactor?.toBigDecimalOrNull(),
+        priceTiers = priceTiers.map(ProductPriceTierDto::toProductPriceTier)
     )
 }
 
@@ -111,3 +115,15 @@ internal fun PaginatedResponse<ProductResponseDto>.toProductPage(): ProductPage 
         totalPages = totalPages
     )
 }
+
+internal fun ProductPriceTierDto.toProductPriceTier(): ProductPriceTier = ProductPriceTier(
+    id = id,
+    minQty = minQty,
+    unitPrice = unitPrice,
+)
+
+internal fun ProductPriceTier.toDto(): ProductPriceTierDto = ProductPriceTierDto(
+    id = id,
+    minQty = minQty,
+    unitPrice = unitPrice,
+)

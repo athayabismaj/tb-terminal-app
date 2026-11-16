@@ -31,9 +31,11 @@ import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.Add
 import androidx.compose.material.icons.outlined.Category
 import androidx.compose.material.icons.outlined.Check
 import androidx.compose.material.icons.outlined.Close
+import androidx.compose.material.icons.outlined.DeleteOutline
 import androidx.compose.material.icons.outlined.Description
 import androidx.compose.material.icons.outlined.Search
 import androidx.compose.material.icons.outlined.Tune
@@ -51,6 +53,7 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -950,12 +953,18 @@ internal fun PriceSummaryBottomSheet(
     }
 }
 
+private data class PriceTierDraft(
+    val id: String? = null,
+    val minQty: String = "",
+    val unitPrice: String = "",
+)
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 internal fun PriceUpdateDialog(
     state: PriceManagementUiState,
     onDismiss: () -> Unit,
-    onSave: (BigDecimal, BigDecimal, BigDecimal, BigDecimal) -> Unit
+    onSave: (BigDecimal, BigDecimal, BigDecimal, BigDecimal, List<com.tbterminal.app.data.model.ProductPriceTier>) -> Unit
 ) {
     val stock = state.selectedProductStock ?: return
     var priceBuyStr by remember(stock.productId, state.selectedProductDetail) {
@@ -970,8 +979,57 @@ internal fun PriceUpdateDialog(
     var discountStr by remember(stock.productId, state.selectedProductDetail) {
         mutableStateOf(state.selectedProductDetail?.discount?.toPlainString() ?: stock.discount.toPlainString())
     }
+    var tierDrafts by remember(stock.productId, state.selectedProductDetail) {
+        mutableStateOf(
+            (state.selectedProductDetail?.priceTiers ?: stock.priceTiers)
+                .sortedBy { it.minQty }
+                .map {
+                    PriceTierDraft(
+                        id = it.id,
+                        minQty = it.minQty.stripTrailingZeros().toPlainString(),
+                        unitPrice = it.unitPrice.stripTrailingZeros().toPlainString(),
+                    )
+                }
+        )
+    }
+
+    val tierValidation = remember(tierDrafts) {
+        val parsed = mutableListOf<com.tbterminal.app.data.model.ProductPriceTier>()
+        var errorMsg: String? = null
+        val seenQty = mutableListOf<BigDecimal>()
+        for ((idx, draft) in tierDrafts.withIndex()) {
+            val qty = draft.minQty.trim().replace(',', '.').toBigDecimalOrNull()
+            val price = draft.unitPrice.trim().replace(',', '.').toBigDecimalOrNull()
+            when {
+                qty == null || qty <= BigDecimal.ZERO -> {
+                    errorMsg = "Baris ${idx + 1}: Minimal qty harus > 0."
+                    break
+                }
+                price == null || price < BigDecimal.ZERO -> {
+                    errorMsg = "Baris ${idx + 1}: Harga satuan tidak valid."
+                    break
+                }
+                seenQty.any { it.compareTo(qty) == 0 } -> {
+                    errorMsg = "Minimal qty ${qty.stripTrailingZeros().toPlainString()} duplikat."
+                    break
+                }
+                else -> {
+                    seenQty += qty
+                    parsed += com.tbterminal.app.data.model.ProductPriceTier(
+                        id = draft.id,
+                        minQty = qty,
+                        unitPrice = price,
+                    )
+                }
+            }
+        }
+        parsed.sortedBy { it.minQty } to errorMsg
+    }
+    val parsedTiers = tierValidation.first
+    val tierError = tierValidation.second
+
     val validInput = listOf(priceBuyStr, priceRetailStr, priceContractorStr, discountStr)
-        .all { it.toBigDecimalOrNull() != null }
+        .all { it.toBigDecimalOrNull() != null } && tierError == null
 
     ModalBottomSheet(
         onDismissRequest = { if (!state.isSaving) onDismiss() },
@@ -1025,6 +1083,126 @@ internal fun PriceUpdateDialog(
                     )
                     PriceEditField("Harga kontraktor", priceContractorStr, { priceContractorStr = it }, "price-edit-contractor", !state.isSaving)
                     PriceEditField("Diskon", discountStr, { discountStr = it }, "price-edit-discount", !state.isSaving)
+
+                    Surface(
+                        color = Color(0xFFF8FAFC),
+                        shape = RoundedCornerShape(14.dp),
+                        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
+                    ) {
+                        Column(
+                            modifier = Modifier.fillMaxWidth().padding(12.dp),
+                            verticalArrangement = Arrangement.spacedBy(8.dp),
+                        ) {
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                            ) {
+                                Column(modifier = Modifier.weight(1f)) {
+                                    Text(
+                                        "Harga Grosir Bertingkat (Qty)",
+                                        fontWeight = FontWeight.SemiBold,
+                                        color = ProductText,
+                                        style = MaterialTheme.typography.titleSmall,
+                                    )
+                                    Text(
+                                        "Otomatis aktif saat qty >= Minimal Qty (${stock.unitName})",
+                                        color = DashboardTextSecondary,
+                                        style = MaterialTheme.typography.bodySmall,
+                                    )
+                                }
+                                TextButton(
+                                    onClick = {
+                                        if (tierDrafts.size < 10) {
+                                            tierDrafts = tierDrafts + PriceTierDraft()
+                                        }
+                                    },
+                                    enabled = !state.isSaving && tierDrafts.size < 10,
+                                ) {
+                                    Icon(Icons.Outlined.Add, contentDescription = null, modifier = Modifier.size(16.dp))
+                                    Spacer(Modifier.width(4.dp))
+                                    Text("Tambah")
+                                }
+                            }
+                            if (tierDrafts.isEmpty()) {
+                                Text(
+                                    "Belum ada harga grosir bertingkat.",
+                                    color = DashboardTextSecondary,
+                                    style = MaterialTheme.typography.bodySmall,
+                                )
+                            } else {
+                                tierDrafts.forEachIndexed { index, draft ->
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                    ) {
+                                        OutlinedTextField(
+                                            value = draft.minQty,
+                                            onValueChange = { next ->
+                                                tierDrafts = tierDrafts.toMutableList().apply {
+                                                    this[index] = draft.copy(minQty = next)
+                                                }
+                                            },
+                                            label = { Text("Min Qty") },
+                                            singleLine = true,
+                                            enabled = !state.isSaving,
+                                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                                            modifier = Modifier.weight(0.95f),
+                                            shape = RoundedCornerShape(10.dp),
+                                            colors = OutlinedTextFieldDefaults.colors(
+                                                focusedBorderColor = ProductPrimaryDark,
+                                                unfocusedBorderColor = MaterialTheme.colorScheme.outlineVariant,
+                                                focusedContainerColor = Color.White,
+                                                unfocusedContainerColor = Color.White,
+                                            ),
+                                        )
+                                        OutlinedTextField(
+                                            value = draft.unitPrice,
+                                            onValueChange = { next ->
+                                                tierDrafts = tierDrafts.toMutableList().apply {
+                                                    this[index] = draft.copy(unitPrice = next)
+                                                }
+                                            },
+                                            label = { Text("Harga / ${stock.unitName}") },
+                                            prefix = { Text("Rp") },
+                                            singleLine = true,
+                                            enabled = !state.isSaving,
+                                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                                            modifier = Modifier.weight(1.45f),
+                                            shape = RoundedCornerShape(10.dp),
+                                            colors = OutlinedTextFieldDefaults.colors(
+                                                focusedBorderColor = ProductPrimaryDark,
+                                                unfocusedBorderColor = MaterialTheme.colorScheme.outlineVariant,
+                                                focusedContainerColor = Color.White,
+                                                unfocusedContainerColor = Color.White,
+                                            ),
+                                        )
+                                        IconButton(
+                                            onClick = {
+                                                tierDrafts = tierDrafts.toMutableList().apply { removeAt(index) }
+                                            },
+                                            enabled = !state.isSaving,
+                                            modifier = Modifier.size(40.dp),
+                                        ) {
+                                            Icon(
+                                                Icons.Outlined.DeleteOutline,
+                                                contentDescription = "Hapus tingkat grosir",
+                                                tint = MaterialTheme.colorScheme.error,
+                                            )
+                                        }
+                                    }
+                                }
+                                tierError?.let { msg ->
+                                    Text(
+                                        text = msg,
+                                        color = MaterialTheme.colorScheme.error,
+                                        style = MaterialTheme.typography.bodySmall,
+                                    )
+                                }
+                            }
+                        }
+                    }
                 }
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                     OutlinedButton(
@@ -1040,7 +1218,8 @@ internal fun PriceUpdateDialog(
                             val retail = priceRetailStr.toBigDecimalOrNull() ?: return@Button
                             val contractor = priceContractorStr.toBigDecimalOrNull() ?: return@Button
                             val discount = discountStr.toBigDecimalOrNull() ?: return@Button
-                            onSave(buy, retail, contractor, discount)
+                            if (tierError != null) return@Button
+                            onSave(buy, retail, contractor, discount, parsedTiers)
                         },
                         enabled = !state.isSaving && validInput,
                         modifier = Modifier.weight(1f).height(50.dp).testTag("price-edit-save"),

@@ -153,6 +153,8 @@ fun BackofficeAdaptiveShell(
     onSyncCenterClick: () -> Unit = {},
     onReportsClick: () -> Unit = {},
     showPageHeader: Boolean = true,
+    showProfileMenu: Boolean = true,
+    showBottomBar: Boolean = true,
     topBarActions: @Composable androidx.compose.foundation.layout.RowScope.() -> Unit = {},
     modifier: Modifier = Modifier,
     content: @Composable (Modifier) -> Unit
@@ -163,6 +165,7 @@ fun BackofficeAdaptiveShell(
     val effectiveTitle = pageTitle ?: pageNavigation.title ?: activeSection.defaultRootTitle(ownerNavigation)
     val effectiveSubtitle = pageSubtitle ?: activeSection.defaultRootSubtitle()
     val effectiveBack = onBack ?: pageNavigation.onBack
+    val effectiveShowProfileMenu = showProfileMenu && effectiveBack == null
     val navigationDividerColor = MaterialTheme.colorScheme.outlineVariant
     var showSystemInfoSheet by rememberSaveable { mutableStateOf(false) }
 
@@ -184,6 +187,7 @@ fun BackofficeAdaptiveShell(
                             pageTitle = effectiveTitle,
                             pageSubtitle = effectiveSubtitle,
                             onBack = effectiveBack,
+                            showProfileMenu = effectiveShowProfileMenu,
                             onSystemInfoClick = { showSystemInfoSheet = true },
                             onProfileClick = onProfileClick,
                             onSettingsClick = onSettingsClick,
@@ -195,52 +199,54 @@ fun BackofficeAdaptiveShell(
                     }
                 },
                 bottomBar = {
-                    NavigationBar(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .drawBehind {
-                                val stroke = 1.dp.toPx()
-                                drawLine(
-                                    color = Color(0xFFE2E8F0), 
-                                    start = Offset(0f, 0f), 
-                                    end = Offset(size.width, 0f), 
-                                    strokeWidth = stroke
-                                )
-                            },
-                        containerColor = Color.White,
-                        tonalElevation = 0.dp
-                    ) {
-                        navigationItems.forEach { item ->
-                            val selected = item.section == activeSection
-                            NavigationBarItem(
-                                modifier = Modifier.testTag("nav-${item.section.name}"),
-                                icon = { 
-                                    Icon(
-                                        item.icon, 
-                                        contentDescription = null, 
-                                        modifier = Modifier.size(24.dp)
-                                    ) 
-                                },
-                                label = {
-                                    Text(
-                                        text = stringResource(item.section.labelRes),
-                                        fontSize = 11.sp,
-                                        fontWeight = if (selected) FontWeight.Bold else FontWeight.Medium,
-                                        maxLines = 1,
-                                        overflow = TextOverflow.Ellipsis,
-                                        letterSpacing = androidx.compose.ui.unit.TextUnit.Unspecified
+                    if (showBottomBar) {
+                        NavigationBar(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .drawBehind {
+                                    val stroke = 1.dp.toPx()
+                                    drawLine(
+                                        color = Color(0xFFE2E8F0), 
+                                        start = Offset(0f, 0f), 
+                                        end = Offset(size.width, 0f), 
+                                        strokeWidth = stroke
                                     )
                                 },
-                                selected = selected,
-                                onClick = { onSectionSelected(item.section) },
-                                colors = androidx.compose.material3.NavigationBarItemDefaults.colors(
-                                    selectedIconColor = Color(0xFF1B5E3C),
-                                    selectedTextColor = Color(0xFF1B5E3C),
-                                    indicatorColor = Color(0xFFEEF7F2),
-                                    unselectedIconColor = Color(0xFF94A3B8),
-                                    unselectedTextColor = Color(0xFF64748B)
+                            containerColor = Color.White,
+                            tonalElevation = 0.dp
+                        ) {
+                            navigationItems.forEach { item ->
+                                val selected = item.section == activeSection
+                                NavigationBarItem(
+                                    modifier = Modifier.testTag("nav-${item.section.name}"),
+                                    icon = { 
+                                        Icon(
+                                            item.icon, 
+                                            contentDescription = null, 
+                                            modifier = Modifier.size(24.dp)
+                                        ) 
+                                    },
+                                    label = {
+                                        Text(
+                                            text = stringResource(item.section.labelRes),
+                                            fontSize = 11.sp,
+                                            fontWeight = if (selected) FontWeight.Bold else FontWeight.Medium,
+                                            maxLines = 1,
+                                            overflow = TextOverflow.Ellipsis,
+                                            letterSpacing = androidx.compose.ui.unit.TextUnit.Unspecified
+                                        )
+                                    },
+                                    selected = selected,
+                                    onClick = { onSectionSelected(item.section) },
+                                    colors = androidx.compose.material3.NavigationBarItemDefaults.colors(
+                                        selectedIconColor = Color(0xFF1B5E3C),
+                                        selectedTextColor = Color(0xFF1B5E3C),
+                                        indicatorColor = Color(0xFFEEF7F2),
+                                        unselectedIconColor = Color(0xFF94A3B8),
+                                        unselectedTextColor = Color(0xFF64748B)
+                                    )
                                 )
-                            )
+                            }
                         }
                     }
                 }
@@ -317,6 +323,7 @@ fun BackofficeAdaptiveShell(
                             pageTitle = effectiveTitle,
                             pageSubtitle = effectiveSubtitle,
                             onBack = effectiveBack,
+                            showProfileMenu = effectiveShowProfileMenu,
                             onSystemInfoClick = { showSystemInfoSheet = true },
                             onProfileClick = onProfileClick,
                             onSettingsClick = onSettingsClick,
@@ -362,6 +369,7 @@ private fun BackofficeTopBar(
     pageTitle: String,
     pageSubtitle: String,
     onBack: (() -> Unit)?,
+    showProfileMenu: Boolean = true,
     onSystemInfoClick: () -> Unit,
     onProfileClick: () -> Unit,
     onSettingsClick: () -> Unit,
@@ -407,9 +415,8 @@ private fun BackofficeTopBar(
                 RoleHeaderMenuItem(
                     icon = Icons.Outlined.Assessment,
                     label = "Laporan Bisnis",
-                    textColor = Color(0xFF10533C),
-                    iconColor = Color(0xFF10533C),
-                    iconBgColor = Color(0xFFE8F3EC),
+                    textColor = Color(0xFF334155),
+                    iconColor = Color(0xFF64748B),
                     onClick = onReportsClick,
                 )
             )
@@ -418,9 +425,8 @@ private fun BackofficeTopBar(
                 RoleHeaderMenuItem(
                     icon = Icons.Outlined.Sync,
                     label = "Pusat Sinkronisasi",
-                    textColor = Color(0xFF10533C),
-                    iconColor = Color(0xFF10533C),
-                    iconBgColor = Color(0xFFE8F3EC),
+                    textColor = Color(0xFF334155),
+                    iconColor = Color(0xFF64748B),
                     onClick = onSyncCenterClick,
                 )
             )
@@ -430,8 +436,7 @@ private fun BackofficeTopBar(
                 icon = Icons.Outlined.Storefront,
                 label = if (isOwner) "Info Sistem & Toko" else "Info Operasional & Toko",
                 textColor = Color(0xFF334155),
-                iconColor = Color(0xFF475569),
-                iconBgColor = Color(0xFFF1F5F9),
+                iconColor = Color(0xFF64748B),
                 onClick = onSystemInfoClick,
             )
         )
@@ -441,7 +446,6 @@ private fun BackofficeTopBar(
                 label = "Keluar",
                 textColor = Color(0xFFE11D48),
                 iconColor = Color(0xFFE11D48),
-                iconBgColor = Color(0xFFFFF1F2),
                 showDividerBefore = true,
                 onClick = onLogout,
             )
@@ -457,8 +461,9 @@ private fun BackofficeTopBar(
         subtitle = pageSubtitle,
         onBackClick = onBack,
         onBrandClick = onSystemInfoClick,
-        pillAvatarBgColor = if (isOwner) Color(0xFFE8F3EC) else Color(0xFFE2E8F0),
-        pillAvatarTextColor = if (isOwner) Color(0xFF10533C) else Color(0xFF334155),
+        pillAvatarBgColor = Color(0xFFDCFCE7),
+        pillAvatarTextColor = Color(0xFF166534),
+        showProfileMenu = showProfileMenu,
         actions = { actions() },
         menuItems = menuItems,
     )

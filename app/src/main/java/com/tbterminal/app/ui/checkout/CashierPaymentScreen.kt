@@ -24,6 +24,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
@@ -127,6 +128,13 @@ fun CashierPaymentScreen(
     onUseCustomerName: () -> Unit,
     onSelectPayment: (PaymentMethod) -> Unit,
     onAmountPaidChanged: (String) -> Unit,
+    onToggleSplitPayment: (Boolean) -> Unit = {},
+    onSplitDpModeChanged: (Boolean) -> Unit = {},
+    onAddSplitLine: (PaymentMethod) -> Unit = {},
+    onRemoveSplitLine: (String) -> Unit = {},
+    onSplitLineMethodChanged: (String, PaymentMethod) -> Unit = { _, _ -> },
+    onSplitLineAmountChanged: (String, String) -> Unit = { _, _ -> },
+    onSplitLineReferenceChanged: (String, String) -> Unit = { _, _ -> },
     onTransactionDiscountChanged: (CheckoutDiscount?) -> Unit,
     onCheckout: () -> Unit,
     onBackToCart: () -> Unit,
@@ -155,12 +163,28 @@ fun CashierPaymentScreen(
     onLockScreen: (() -> Unit)? = null
 ) {
     val totalItems = state.cartItems.sumOf { it.quantity }
-    val paymentIsValid = validateCheckoutPaymentInput(
-        paymentMethod = state.selectedPaymentMethod,
-        amountPaidInput = state.amountPaidInput,
-        total = state.finalTotal
-    ).error == null
-    val isCustomerRequired = state.selectedPaymentMethod in setOf(PaymentMethod.HUTANG, PaymentMethod.DP)
+    val splitValidation = if (state.isSplitPaymentEnabled) {
+        validateSplitCheckoutPayment(
+            lines = state.splitPaymentLines,
+            total = state.finalTotal,
+            isDpMode = state.isSplitDpMode,
+            customerSelected = state.selectedCustomer != null
+        )
+    } else null
+    val paymentIsValid = if (state.isSplitPaymentEnabled) {
+        splitValidation?.error == null
+    } else {
+        validateCheckoutPaymentInput(
+            paymentMethod = state.selectedPaymentMethod,
+            amountPaidInput = state.amountPaidInput,
+            total = state.finalTotal
+        ).error == null
+    }
+    val isCustomerRequired = if (state.isSplitPaymentEnabled) {
+        state.isSplitDpMode
+    } else {
+        state.selectedPaymentMethod in setOf(PaymentMethod.HUTANG, PaymentMethod.DP)
+    }
     val creditCustomerIsValid = !isCustomerRequired || state.selectedCustomer != null
 
     var showCustomerPickerDialog by remember { mutableStateOf(false) }
@@ -183,7 +207,8 @@ fun CashierPaymentScreen(
         onSettingsClick = onSettingsClick,
         onLogout = onLogout,
         onLockScreen = onLockScreen,
-        showHeader = false
+        showHeader = false,
+        showBottomBar = false
     ) { contentModifier ->
         Scaffold(
             snackbarHost = { SnackbarHost(snackbarHostState) },
@@ -290,6 +315,51 @@ fun CashierPaymentScreen(
                                     }
                                 }
                             }
+
+                            if (state.taxEnabled || state.roundingAmount.compareTo(BigDecimal.ZERO) != 0) {
+                                HorizontalDivider(color = PaymentOutline.copy(alpha = 0.6f))
+                                Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                                    if (state.taxEnabled) {
+                                        val rateStr = state.taxRate.stripTrailingZeros().toPlainString()
+                                        val isInclude = state.taxMode.equals("INCLUDE", ignoreCase = true)
+                                        Row(
+                                            modifier = Modifier.fillMaxWidth(),
+                                            horizontalArrangement = Arrangement.SpaceBetween
+                                        ) {
+                                            Text(
+                                                text = "${state.taxLabel} ($rateStr%${if (isInclude) " • Termasuk" else ""})",
+                                                fontSize = 11.5.sp,
+                                                color = Color(0xFF64748B)
+                                            )
+                                            Text(
+                                                text = if (isInclude) "(${formatRupiah(state.taxAmount)})" else "+ ${formatRupiah(state.taxAmount)}",
+                                                fontSize = 11.5.sp,
+                                                fontWeight = FontWeight.SemiBold,
+                                                color = Color(0xFF334155)
+                                            )
+                                        }
+                                    }
+                                    if (state.roundingAmount.compareTo(BigDecimal.ZERO) != 0) {
+                                        val sign = if (state.roundingAmount > BigDecimal.ZERO) "+" else "-"
+                                        Row(
+                                            modifier = Modifier.fillMaxWidth(),
+                                            horizontalArrangement = Arrangement.SpaceBetween
+                                        ) {
+                                            Text(
+                                                text = "Pembulatan Tunai",
+                                                fontSize = 11.5.sp,
+                                                color = Color(0xFF64748B)
+                                            )
+                                            Text(
+                                                text = "$sign ${formatRupiah(state.roundingAmount.abs())}",
+                                                fontSize = 11.5.sp,
+                                                fontWeight = FontWeight.SemiBold,
+                                                color = if (state.roundingAmount > BigDecimal.ZERO) Color(0xFF334155) else Color(0xFF047857)
+                                            )
+                                        }
+                                    }
+                                }
+                            }
                         }
                     }
 
@@ -334,12 +404,16 @@ fun CashierPaymentScreen(
                                                 .background(Color(0xFF10B981), CircleShape)
                                         )
                                         Text(
-                                            text = when (state.selectedPaymentMethod) {
-                                                PaymentMethod.TUNAI -> "Tunai"
-                                                PaymentMethod.QRIS -> "QRIS"
-                                                PaymentMethod.TRANSFER -> "Transfer Bank"
-                                                PaymentMethod.HUTANG -> "Hutang / Tempo"
-                                                PaymentMethod.DP -> "DP / Bertahap"
+                                            text = if (state.isSplitPaymentEnabled) {
+                                                "Bayar Campur (${state.splitPaymentLines.size})"
+                                            } else {
+                                                when (state.selectedPaymentMethod) {
+                                                    PaymentMethod.TUNAI -> "Tunai"
+                                                    PaymentMethod.QRIS -> "QRIS"
+                                                    PaymentMethod.TRANSFER -> "Transfer Bank"
+                                                    PaymentMethod.HUTANG -> "Hutang / Tempo"
+                                                    PaymentMethod.DP -> "DP / Bertahap"
+                                                }
                                             },
                                             fontSize = 11.sp,
                                             fontWeight = FontWeight.Medium,
@@ -358,7 +432,7 @@ fun CashierPaymentScreen(
                                     title = "Tunai",
                                     subtitle = "Cash on Hand",
                                     icon = Icons.Outlined.Payments,
-                                    isSelected = state.selectedPaymentMethod == PaymentMethod.TUNAI,
+                                    isSelected = !state.isSplitPaymentEnabled && state.selectedPaymentMethod == PaymentMethod.TUNAI,
                                     onClick = { onSelectPayment(PaymentMethod.TUNAI) },
                                     modifier = Modifier.weight(1f)
                                 )
@@ -367,7 +441,7 @@ fun CashierPaymentScreen(
                                     title = "QRIS",
                                     subtitle = "Scan Statis/Dinamis",
                                     icon = Icons.Outlined.QrCode2,
-                                    isSelected = state.selectedPaymentMethod == PaymentMethod.QRIS,
+                                    isSelected = !state.isSplitPaymentEnabled && state.selectedPaymentMethod == PaymentMethod.QRIS,
                                     onClick = { onSelectPayment(PaymentMethod.QRIS) },
                                     modifier = Modifier.weight(1f)
                                 )
@@ -382,7 +456,7 @@ fun CashierPaymentScreen(
                                     title = "Transfer Bank",
                                     subtitle = "BCA, Mandiri, BRI",
                                     icon = Icons.Outlined.AccountBalance,
-                                    isSelected = state.selectedPaymentMethod == PaymentMethod.TRANSFER,
+                                    isSelected = !state.isSplitPaymentEnabled && state.selectedPaymentMethod == PaymentMethod.TRANSFER,
                                     onClick = { onSelectPayment(PaymentMethod.TRANSFER) },
                                     modifier = Modifier.weight(1f)
                                 )
@@ -391,13 +465,13 @@ fun CashierPaymentScreen(
                                     title = "Hutang / Tempo",
                                     subtitle = "Jatuh tempo nota",
                                     icon = Icons.AutoMirrored.Outlined.ReceiptLong,
-                                    isSelected = state.selectedPaymentMethod == PaymentMethod.HUTANG,
+                                    isSelected = !state.isSplitPaymentEnabled && state.selectedPaymentMethod == PaymentMethod.HUTANG,
                                     onClick = { onSelectPayment(PaymentMethod.HUTANG) },
                                     modifier = Modifier.weight(1f)
                                 )
                             }
 
-                            // Grid 2-Kolom: Baris 3 (DP / Bertahap)
+                            // Grid 2-Kolom: Baris 3 (DP / Bertahap + Toggle Split Payment)
                             Row(
                                 horizontalArrangement = Arrangement.spacedBy(10.dp),
                                 modifier = Modifier.fillMaxWidth()
@@ -406,14 +480,35 @@ fun CashierPaymentScreen(
                                     title = "DP / Bertahap",
                                     subtitle = "Uang muka termin",
                                     icon = Icons.Outlined.AccountBalanceWallet,
-                                    isSelected = state.selectedPaymentMethod == PaymentMethod.DP,
+                                    isSelected = !state.isSplitPaymentEnabled && state.selectedPaymentMethod == PaymentMethod.DP,
                                     onClick = { onSelectPayment(PaymentMethod.DP) },
-                                    modifier = Modifier.fillMaxWidth(0.485f)
+                                    modifier = Modifier.weight(1f)
+                                )
+
+                                PaymentMethodGridCard(
+                                    title = "Bayar Campur",
+                                    subtitle = "Split 2+ metode",
+                                    icon = Icons.Outlined.Payments,
+                                    isSelected = state.isSplitPaymentEnabled,
+                                    onClick = { onToggleSplitPayment(!state.isSplitPaymentEnabled) },
+                                    modifier = Modifier.weight(1f)
                                 )
                             }
                         }
                     }
 
+                    if (state.isSplitPaymentEnabled) {
+                        SplitPaymentBuilderCard(
+                            state = state,
+                            splitValidation = splitValidation,
+                            onAddSplitLine = onAddSplitLine,
+                            onRemoveSplitLine = onRemoveSplitLine,
+                            onSplitLineMethodChanged = onSplitLineMethodChanged,
+                            onSplitLineAmountChanged = onSplitLineAmountChanged,
+                            onSplitLineReferenceChanged = onSplitLineReferenceChanged,
+                            onSplitDpModeChanged = onSplitDpModeChanged,
+                        )
+                    } else {
                     // C. CashPaymentInputSection (Bila Tunai Terpilih)
                     if (state.selectedPaymentMethod == PaymentMethod.TUNAI) {
                         Surface(
@@ -844,6 +939,7 @@ fun CashierPaymentScreen(
                         }
 
                         else -> Unit
+                    }
                     }
 
                     // E. Data Pelanggan (Card Selector Persis Mockup HTML)
@@ -1424,7 +1520,7 @@ fun CashierPaymentScreen(
                         // Big Thumb-Friendly Checkout Button
                         Button(
                             onClick = {
-                                if (state.selectedPaymentMethod == PaymentMethod.QRIS) {
+                                if (!state.isSplitPaymentEnabled && state.selectedPaymentMethod == PaymentMethod.QRIS) {
                                     onOpenQrisDialog()
                                 } else {
                                     onCheckout()
@@ -1477,6 +1573,8 @@ fun CashierPaymentScreen(
                                             text = when {
                                                 state.hasAmbiguousCheckout -> "Periksa Transaksi"
                                                 state.checkoutPreview?.approvalRequired == true -> "Persetujuan Diskon"
+                                                state.isSplitPaymentEnabled && state.isSplitDpMode -> "Simpan DP Bayar Campur"
+                                                state.isSplitPaymentEnabled -> "Selesaikan Bayar Campur"
                                                 state.selectedPaymentMethod == PaymentMethod.QRIS -> "Tampilkan Kode QRIS"
                                                 state.selectedPaymentMethod == PaymentMethod.HUTANG -> "Catat Piutang"
                                                 state.selectedPaymentMethod == PaymentMethod.DP -> "Simpan Transaksi DP"
@@ -2060,19 +2158,18 @@ private fun PaymentTopBar(
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
+                    .statusBarsPadding()
                     .padding(horizontal = 16.dp, vertical = 12.dp),
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(10.dp)
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
                     IconButton(
                         onClick = onBackToCart,
-                        modifier = Modifier
-                            .size(36.dp)
-                            .clip(RoundedCornerShape(12.dp))
+                        modifier = Modifier.size(34.dp)
                     ) {
                         Icon(
                             imageVector = Icons.AutoMirrored.Outlined.ArrowBack,
@@ -2088,7 +2185,7 @@ private fun PaymentTopBar(
                     ) {
                         Text(
                             text = "Pembayaran",
-                            fontSize = 18.sp,
+                            fontSize = 17.sp,
                             fontWeight = FontWeight.Bold,
                             color = PaymentTextPrimary,
                             letterSpacing = (-0.3).sp
@@ -2097,7 +2194,7 @@ private fun PaymentTopBar(
                         Text(
                             text = "($totalItems item)",
                             color = Color(0xFF64748B),
-                            fontSize = 14.sp,
+                            fontSize = 13.sp,
                             fontWeight = FontWeight.Normal
                         )
                     }
@@ -2128,7 +2225,7 @@ private fun PaymentTopBar(
                     }
                 }
             }
-            HorizontalDivider(color = Color(0xFFF1F5F9))
+            HorizontalDivider(color = Color(0xFFE2E8F0).copy(alpha = 0.8f))
         }
     }
 }
@@ -2221,6 +2318,293 @@ private fun PaymentMethodGridCard(
                         tint = Color.White,
                         modifier = Modifier.size(10.dp)
                     )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun SplitPaymentBuilderCard(
+    state: CheckoutUiState,
+    splitValidation: SplitPaymentValidationResult?,
+    onAddSplitLine: (PaymentMethod) -> Unit,
+    onRemoveSplitLine: (String) -> Unit,
+    onSplitLineMethodChanged: (String, PaymentMethod) -> Unit,
+    onSplitLineAmountChanged: (String, String) -> Unit,
+    onSplitLineReferenceChanged: (String, String) -> Unit,
+    onSplitDpModeChanged: (Boolean) -> Unit,
+) {
+    Surface(
+        shape = RoundedCornerShape(16.dp),
+        color = Color.White,
+        border = BorderStroke(1.dp, PaymentOutline.copy(alpha = 0.8f)),
+        shadowElevation = 0.5.dp,
+        modifier = Modifier.fillMaxWidth()
+    ) {
+        Column(
+            modifier = Modifier.padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Column {
+                    Text(
+                        text = "RINCIAN SPLIT PAYMENT",
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = Color(0xFF94A3B8),
+                        letterSpacing = 1.sp
+                    )
+                    Text(
+                        text = "Bagi nominal ke 2+ metode bayar",
+                        fontSize = 11.5.sp,
+                        color = Color(0xFF64748B)
+                    )
+                }
+
+                if (state.splitPaymentLines.size < 5) {
+                    TextButton(
+                        onClick = { onAddSplitLine(PaymentMethod.TRANSFER) },
+                        contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp)
+                    ) {
+                        Text(
+                            text = "+ Tambah",
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = PaymentBrand
+                        )
+                    }
+                }
+            }
+
+            state.splitPaymentLines.forEachIndexed { index, line ->
+                Surface(
+                    shape = RoundedCornerShape(12.dp),
+                    color = Color(0xFFF8FAFC),
+                    border = BorderStroke(1.dp, PaymentOutline),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Column(
+                        modifier = Modifier.padding(12.dp),
+                        verticalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text(
+                                text = "Pembayaran #${index + 1}",
+                                fontSize = 11.5.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = Color(0xFF334155)
+                            )
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                            ) {
+                                val otherPaid = state.splitPaymentLines
+                                    .filter { it.id != line.id }
+                                    .fold(BigDecimal.ZERO) { acc, other ->
+                                        acc.add(other.amountInput.trim().replace(',', '.').toBigDecimalOrNull() ?: BigDecimal.ZERO)
+                                    }
+                                val lineRemaining = state.finalTotal.subtract(otherPaid).coerceAtLeast(BigDecimal.ZERO)
+                                val currentLineAmt = line.amountInput.trim().replace(',', '.').toBigDecimalOrNull() ?: BigDecimal.ZERO
+                                if (lineRemaining > BigDecimal.ZERO && lineRemaining.compareTo(currentLineAmt) != 0) {
+                                    Text(
+                                        text = "Isi Sisa",
+                                        fontSize = 11.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        color = PaymentBrand,
+                                        modifier = Modifier
+                                            .clip(RoundedCornerShape(6.dp))
+                                            .background(Color(0xFFDCFCE7))
+                                            .clickable {
+                                                onSplitLineAmountChanged(
+                                                    line.id,
+                                                    lineRemaining.stripTrailingZeros().toPlainString()
+                                                )
+                                            }
+                                            .padding(horizontal = 8.dp, vertical = 3.dp)
+                                    )
+                                }
+                                if (state.splitPaymentLines.size > 1) {
+                                    IconButton(
+                                        onClick = { onRemoveSplitLine(line.id) },
+                                        modifier = Modifier.size(24.dp)
+                                    ) {
+                                        Icon(
+                                            imageVector = Icons.Outlined.Close,
+                                            contentDescription = "Hapus metode",
+                                            tint = Color(0xFF94A3B8),
+                                            modifier = Modifier.size(16.dp)
+                                        )
+                                    }
+                                }
+                            }
+                        }
+
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(6.dp)
+                        ) {
+                            listOf(PaymentMethod.TUNAI, PaymentMethod.TRANSFER, PaymentMethod.QRIS).forEach { m ->
+                                val isSelected = line.method == m
+                                Surface(
+                                    onClick = { onSplitLineMethodChanged(line.id, m) },
+                                    shape = RoundedCornerShape(8.dp),
+                                    color = if (isSelected) Color(0xFFDCFCE7) else Color.White,
+                                    border = BorderStroke(
+                                        1.dp,
+                                        if (isSelected) Color(0xFF10B981) else PaymentOutline
+                                    ),
+                                    modifier = Modifier.weight(1f)
+                                ) {
+                                    Text(
+                                        text = m.displayName(),
+                                        fontSize = 11.5.sp,
+                                        fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
+                                        color = if (isSelected) Color(0xFF065F46) else Color(0xFF475569),
+                                        modifier = Modifier.padding(vertical = 7.dp),
+                                        textAlign = androidx.compose.ui.text.style.TextAlign.Center
+                                    )
+                                }
+                            }
+                        }
+
+                        OutlinedTextField(
+                            value = line.amountInput,
+                            onValueChange = { onSplitLineAmountChanged(line.id, it) },
+                            leadingIcon = {
+                                Text(
+                                    "Rp",
+                                    fontSize = 13.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = Color(0xFF94A3B8),
+                                    modifier = Modifier.padding(start = 10.dp)
+                                )
+                            },
+                            placeholder = { Text("0", color = Color(0xFF94A3B8)) },
+                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                            singleLine = true,
+                            shape = RoundedCornerShape(10.dp),
+                            modifier = Modifier.fillMaxWidth(),
+                            colors = OutlinedTextFieldDefaults.colors(
+                                focusedContainerColor = Color.White,
+                                unfocusedContainerColor = Color.White,
+                                focusedBorderColor = PaymentBrand,
+                                unfocusedBorderColor = PaymentOutline
+                            )
+                        )
+
+                        if (line.method != PaymentMethod.TUNAI) {
+                            OutlinedTextField(
+                                value = line.reference,
+                                onValueChange = { onSplitLineReferenceChanged(line.id, it) },
+                                placeholder = { Text("No. Referensi / Bukti (opsional)", fontSize = 12.sp, color = Color(0xFF94A3B8)) },
+                                singleLine = true,
+                                shape = RoundedCornerShape(10.dp),
+                                textStyle = TextStyle(fontSize = 12.sp, color = PaymentTextPrimary),
+                                modifier = Modifier.fillMaxWidth(),
+                                colors = OutlinedTextFieldDefaults.colors(
+                                    focusedContainerColor = Color.White,
+                                    unfocusedContainerColor = Color.White,
+                                    focusedBorderColor = PaymentBrand,
+                                    unfocusedBorderColor = PaymentOutline
+                                )
+                            )
+                        }
+                    }
+                }
+            }
+
+            // Opsi DP Split jika masih kurang bayar
+            Surface(
+                onClick = { onSplitDpModeChanged(!state.isSplitDpMode) },
+                shape = RoundedCornerShape(10.dp),
+                color = if (state.isSplitDpMode) Color(0xFFFFFBEB) else Color(0xFFF8FAFC),
+                border = BorderStroke(1.dp, if (state.isSplitDpMode) Color(0xFFFCD34D) else PaymentOutline),
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Row(
+                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            text = "Catat sisa sebagai DP / Piutang",
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.SemiBold,
+                            color = if (state.isSplitDpMode) Color(0xFF92400E) else Color(0xFF334155)
+                        )
+                        Text(
+                            text = "Wajib pilih pelanggan terdaftar jika diaktifkan",
+                            fontSize = 10.5.sp,
+                            color = Color(0xFF64748B)
+                        )
+                    }
+                    androidx.compose.material3.Switch(
+                        checked = state.isSplitDpMode,
+                        onCheckedChange = onSplitDpModeChanged
+                    )
+                }
+            }
+
+            // Live Split Payment Summary
+            val summary = splitValidation ?: SplitPaymentValidationResult()
+            val hasError = summary.error != null
+            Surface(
+                shape = RoundedCornerShape(12.dp),
+                color = if (hasError) Color(0xFFFEF2F2) else Color(0xFFF0FDF4),
+                border = BorderStroke(1.dp, if (hasError) Color(0xFFFECACA) else Color(0xFFBBF7D0)),
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Column(
+                    modifier = Modifier.padding(12.dp),
+                    verticalArrangement = Arrangement.spacedBy(4.dp)
+                ) {
+                    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                        Text("Total Masuk", fontSize = 12.sp, color = Color(0xFF475569))
+                        Text(
+                            formatRupiah(summary.totalTendered),
+                            fontSize = 13.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = PaymentTextPrimary
+                        )
+                    }
+                    if (summary.error != null) {
+                        Text(
+                            text = summary.error,
+                            fontSize = 11.5.sp,
+                            fontWeight = FontWeight.SemiBold,
+                            color = Color(0xFFDC2626)
+                        )
+                    } else if (state.isSplitDpMode) {
+                        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                            Text("Sisa Piutang / Tempo", fontSize = 12.sp, color = Color(0xFFB45309))
+                            Text(
+                                formatRupiah(summary.remainingReceivable),
+                                fontSize = 13.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = Color(0xFFB45309)
+                            )
+                        }
+                    } else {
+                        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                            Text("Kembalian", fontSize = 12.sp, color = Color(0xFF047857))
+                            Text(
+                                formatRupiah(summary.changeAmount),
+                                fontSize = 13.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = Color(0xFF047857)
+                            )
+                        }
+                    }
                 }
             }
         }

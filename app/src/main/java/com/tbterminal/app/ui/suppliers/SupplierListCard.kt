@@ -406,7 +406,7 @@ private fun SupplierPagination(
     val start = if (totalCount == 0L) 0 else (uiState.page - 1L) * uiState.pageSize + 1
     val end = minOf(uiState.page.toLong() * uiState.pageSize, if (uiState.statusFilter == SupplierStatusFilter.ALL) uiState.totalSuppliers else totalCount)
     val totalDisplay = if (uiState.statusFilter == SupplierStatusFilter.ALL) uiState.totalSuppliers else totalCount
-    val supportingText = "$start–$end dari $totalDisplay supplier"
+    val supportingText = "$totalDisplay supplier"
 
     TbPagination(
         currentPage = uiState.page,

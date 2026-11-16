@@ -326,13 +326,7 @@ private fun ReportsTransactionPagination(
     onPreviousPage: () -> Unit,
     onNextPage: () -> Unit,
 ) {
-    val firstItem = if (totalItems == 0L) 0 else ((page - 1) * REPORTS_PAGE_SIZE) + 1
-    val lastItem = minOf(page * REPORTS_PAGE_SIZE, totalItems.toInt())
-    val text = if (compact) {
-        if (totalItems == 0L) "0 data" else "$totalItems data"
-    } else {
-        if (totalItems == 0L) "0 data" else "Menampilkan $firstItem–$lastItem dari $totalItems data"
-    }
+    val text = if (totalItems == 0L) "0 data" else "$totalItems data"
     TbPagination(
         currentPage = page,
         totalPages = totalPages,

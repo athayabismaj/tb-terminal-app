@@ -1,24 +1,21 @@
 package com.tbterminal.app.ui.products.components
 
-import android.graphics.Bitmap
-import android.graphics.Color as AndroidColor
 import android.widget.Toast
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Add
 import androidx.compose.material.icons.outlined.Close
+import androidx.compose.material.icons.outlined.PictureAsPdf
 import androidx.compose.material.icons.outlined.Print
 import androidx.compose.material.icons.outlined.Remove
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.platform.LocalContext
@@ -28,11 +25,10 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
-import com.google.zxing.BarcodeFormat
-import com.google.zxing.MultiFormatWriter
-import com.tbterminal.app.data.printer.BluetoothPrinterDriver
-import com.tbterminal.app.data.printer.PriceTagLabelFormatter
+import com.tbterminal.app.data.printer.PriceTagItem
+import com.tbterminal.app.data.printer.PriceTagPrintHelper
 import com.tbterminal.app.data.printer.PrinterResult
+import com.tbterminal.app.data.printer.ThermalPrinterManager
 import com.tbterminal.app.ui.common.toRupiahText
 import java.math.BigDecimal
 import kotlinx.coroutines.launch
@@ -43,7 +39,7 @@ private val TagYellowBorder = Color(0xFFFDE047)
 
 /**
  * Dialog pratinjau dan pencetak stiker label harga rak toko (Shelf Price Tag)
- * dengan grafik barcode 1D / QR code dan format ESC/POS printer thermal.
+ * dengan grafik barcode 1D dan format ESC/POS (`GS k`) maupun PDF stiker A4.
  */
 @Composable
 fun PriceTagDialog(
@@ -53,6 +49,7 @@ fun PriceTagDialog(
     price: BigDecimal,
     unitName: String = "Pcs",
     storeName: String = "TB TERMINAL",
+    thermalPrinterManager: ThermalPrinterManager? = null,
     onDismissRequest: () -> Unit
 ) {
     val context = LocalContext.current
@@ -62,9 +59,9 @@ fun PriceTagDialog(
 
     val resolvedCode = sku.ifBlank { barcode.orEmpty() }.ifBlank { "000000" }
 
-    // Generate Barcode 1D (Code 128) Bitmap
+    // Generate Barcode 1D (Code 128) Bitmap via shared helper
     val barcodeBitmap = remember(resolvedCode) {
-        generateCode128Bitmap(resolvedCode)
+        PriceTagPrintHelper.generateCode128Bitmap(resolvedCode)
     }
 
     Dialog(onDismissRequest = onDismissRequest) {
@@ -244,28 +241,26 @@ fun PriceTagDialog(
                 // Tombol Cetak ke Printer Thermal
                 Button(
                     onClick = {
-                        val pairedPrinters = BluetoothPrinterDriver.getPairedDevices(context)
-                        if (pairedPrinters.isEmpty()) {
-                            Toast.makeText(context, "Tidak ada printer Bluetooth yang terhubung. Silakan pasangkan printer di Pengaturan.", Toast.LENGTH_LONG).show()
-                            return@Button
-                        }
-
-                        val printer = pairedPrinters.first()
                         isPrinting = true
                         coroutineScope.launch {
-                            val bytes = PriceTagLabelFormatter.buildPriceTagBytes(
+                            val item = PriceTagItem(
                                 productName = productName,
                                 sku = sku,
                                 barcode = barcode,
                                 price = price,
                                 unitName = unitName,
-                                storeName = storeName,
-                                copies = copies
+                                copies = copies,
                             )
-
-                            when (val result = BluetoothPrinterDriver.print(context, printer.address, bytes)) {
+                            when (
+                                val result = PriceTagPrintHelper.printThermalLabels(
+                                    context = context,
+                                    items = listOf(item),
+                                    storeName = storeName,
+                                    thermalPrinterManager = thermalPrinterManager,
+                                )
+                            ) {
                                 is PrinterResult.Success -> {
-                                    Toast.makeText(context, "Label rak ($copies lembar) berhasil dicetak ke ${printer.name}.", Toast.LENGTH_SHORT).show()
+                                    Toast.makeText(context, "Label rak ($copies lembar) berhasil dikirim ke printer thermal.", Toast.LENGTH_SHORT).show()
                                     onDismissRequest()
                                 }
                                 is PrinterResult.Error -> {
@@ -297,7 +292,7 @@ fun PriceTagDialog(
                         )
                         Spacer(Modifier.width(8.dp))
                         Text(
-                            text = "Cetak $copies Label Rak",
+                            text = "Cetak Thermal ($copies Label)",
                             fontWeight = FontWeight.Bold,
                             fontSize = 14.sp
                         )
@@ -305,6 +300,47 @@ fun PriceTagDialog(
                 }
 
                 Spacer(modifier = Modifier.height(8.dp))
+
+                OutlinedButton(
+                    onClick = {
+                        PriceTagPrintHelper.printPriceTagSheetPdf(
+                            context = context,
+                            items = listOf(
+                                PriceTagItem(
+                                    productName = productName,
+                                    sku = sku,
+                                    barcode = barcode,
+                                    price = price,
+                                    unitName = unitName,
+                                    copies = copies,
+                                )
+                            ),
+                            storeName = storeName,
+                        )
+                    },
+                    enabled = !isPrinting,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(44.dp),
+                    shape = RoundedCornerShape(12.dp),
+                    border = BorderStroke(1.dp, BrandGreen.copy(alpha = 0.45f)),
+                ) {
+                    Icon(
+                        imageVector = Icons.Outlined.PictureAsPdf,
+                        contentDescription = null,
+                        tint = BrandGreen,
+                        modifier = Modifier.size(18.dp)
+                    )
+                    Spacer(Modifier.width(8.dp))
+                    Text(
+                        text = "Cetak Stiker PDF (A4)",
+                        color = BrandGreen,
+                        fontWeight = FontWeight.SemiBold,
+                        fontSize = 13.5.sp
+                    )
+                }
+
+                Spacer(modifier = Modifier.height(6.dp))
 
                 TextButton(
                     onClick = onDismissRequest,
@@ -315,23 +351,4 @@ fun PriceTagDialog(
             }
         }
     }
-}
-
-private fun generateCode128Bitmap(content: String, widthPx: Int = 400, heightPx: Int = 100): Bitmap? {
-    return runCatching {
-        val clean = content.filter { it.code in 32..126 }.ifBlank { "000000" }
-        val bitMatrix = MultiFormatWriter().encode(clean, BarcodeFormat.CODE_128, widthPx, heightPx)
-        val width = bitMatrix.width
-        val height = bitMatrix.height
-        val pixels = IntArray(width * height)
-        for (y in 0 until height) {
-            val offset = y * width
-            for (x in 0 until width) {
-                pixels[offset + x] = if (bitMatrix.get(x, y)) AndroidColor.BLACK else AndroidColor.WHITE
-            }
-        }
-        Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888).apply {
-            setPixels(pixels, 0, width, 0, 0, width, height)
-        }
-    }.getOrNull()
 }

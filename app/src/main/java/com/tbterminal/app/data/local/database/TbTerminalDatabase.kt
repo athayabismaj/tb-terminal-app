@@ -55,7 +55,7 @@ import com.tbterminal.app.data.local.entity.SyncQueueEntity
         SyncQueueEntity::class,
         AppSettingEntity::class
     ],
-    version = 3,
+    version = 4,
     exportSchema = false
 )
 @TypeConverters(LocalConverters::class)
@@ -92,7 +92,7 @@ abstract class TbTerminalDatabase : RoomDatabase() {
                     TbTerminalDatabase::class.java,
                     DATABASE_NAME
                 )
-                    .addMigrations(MIGRATION_1_2, MIGRATION_2_3)
+                    .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4)
                     .build()
                     .also { instance = it }
             }
@@ -121,6 +121,20 @@ abstract class TbTerminalDatabase : RoomDatabase() {
             override fun migrate(db: SupportSQLiteDatabase) {
                 createTransactionTables(db)
                 createTransactionIndexes(db)
+            }
+        }
+
+        private val MIGRATION_3_4 = object : Migration(3, 4) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE local_transactions ADD COLUMN taxEnabled INTEGER NOT NULL DEFAULT 0")
+                db.execSQL("ALTER TABLE local_transactions ADD COLUMN taxMode TEXT")
+                db.execSQL("ALTER TABLE local_transactions ADD COLUMN taxRate REAL NOT NULL DEFAULT 0.0")
+                db.execSQL("ALTER TABLE local_transactions ADD COLUMN taxLabel TEXT")
+                db.execSQL("ALTER TABLE local_transactions ADD COLUMN taxableBase REAL NOT NULL DEFAULT 0.0")
+                db.execSQL("ALTER TABLE local_transactions ADD COLUMN taxAmount REAL NOT NULL DEFAULT 0.0")
+                db.execSQL("ALTER TABLE local_transactions ADD COLUMN roundingAmount REAL NOT NULL DEFAULT 0.0")
+                db.execSQL("ALTER TABLE local_transaction_items ADD COLUMN note TEXT")
+                db.execSQL("ALTER TABLE local_payments ADD COLUMN reference TEXT")
             }
         }
 

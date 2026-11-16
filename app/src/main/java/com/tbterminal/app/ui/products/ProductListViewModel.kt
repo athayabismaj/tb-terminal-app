@@ -181,6 +181,36 @@ class ProductListViewModel(
         _uiState.update { it.copy(showImportDialog = false, importCsv = null, importPreview = null) }
     }
 
+    fun loadBatchPrintProducts() {
+        if (_uiState.value.isBatchPrintLoading) return
+        viewModelScope.launch {
+            _uiState.update { state ->
+                state.copy(
+                    isBatchPrintLoading = true,
+                    batchPrintProducts = state.batchPrintProducts.ifEmpty { state.products },
+                )
+            }
+            when (val result = inventoryRepository.getProductStocks(page = 1, limit = 100, search = null)) {
+                is RepositoryResult.Success -> {
+                    _uiState.update { state ->
+                        state.copy(
+                            isBatchPrintLoading = false,
+                            batchPrintProducts = result.data.data,
+                        )
+                    }
+                }
+                else -> {
+                    _uiState.update { state ->
+                        state.copy(
+                            isBatchPrintLoading = false,
+                            batchPrintProducts = state.batchPrintProducts.ifEmpty { state.products },
+                        )
+                    }
+                }
+            }
+        }
+    }
+
     private fun setLoadError(message: String) {
         _uiState.update { state ->
             state.copy(isLoading = false, errorMessage = message)

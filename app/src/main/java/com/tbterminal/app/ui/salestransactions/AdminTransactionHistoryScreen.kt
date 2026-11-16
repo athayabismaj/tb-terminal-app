@@ -13,6 +13,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Search
 import androidx.compose.material.icons.outlined.Tune
 import androidx.compose.material.icons.outlined.Description
+import androidx.compose.material.icons.outlined.RequestQuote
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.foundation.shape.CircleShape
@@ -80,6 +81,7 @@ fun AdminTransactionHistoryScreen(
     onLogout: () -> Unit,
     onBack: (() -> Unit)? = null,
     onNewTransactionClick: () -> Unit = {},
+    onQuotationsClick: () -> Unit = {},
     viewModel: AdminTransactionHistoryViewModel = viewModel(
         factory = AdminTransactionHistoryViewModel.factory(
             repository = cashReconciliationRepository,
@@ -159,6 +161,19 @@ fun AdminTransactionHistoryScreen(
                 Icon(
                     imageVector = Icons.Outlined.Description,
                     contentDescription = "Tampilkan rekap transaksi",
+                    tint = Color(0xFF64748B),
+                    modifier = Modifier.size(20.dp)
+                )
+            }
+
+            // Button 4: Daftar Penawaran Harga / RAB [ 📋 ]
+            IconButton(
+                onClick = onQuotationsClick,
+                modifier = Modifier.size(36.dp).testTag("sales-history-quotations")
+            ) {
+                Icon(
+                    imageVector = Icons.Outlined.RequestQuote,
+                    contentDescription = "Daftar Penawaran Harga (RAB)",
                     tint = Color(0xFF64748B),
                     modifier = Modifier.size(20.dp)
                 )

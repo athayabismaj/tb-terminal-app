@@ -7,8 +7,6 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.tbterminal.app.data.repository.SystemRepository
 import com.tbterminal.app.data.local.database.LocalAppSettingsDataSource
-import com.tbterminal.app.ui.dashboard.cashier.CashierDashboardShell
-import com.tbterminal.app.ui.dashboard.cashier.CashierDestination
 
 @Composable
 fun CashierSettingsScreen(
@@ -23,7 +21,8 @@ fun CashierSettingsScreen(
     onStockCheckClick: () -> Unit = {},
     onProfileClick: () -> Unit = {},
     onSettingsClick: () -> Unit = {},
-    onLogout: () -> Unit,
+    onBack: (() -> Unit)? = null,
+    onLogout: () -> Unit = {},
     viewModel: SettingsViewModel = viewModel(
         factory = SettingsViewModel.factory(
             systemRepository,
@@ -34,56 +33,51 @@ fun CashierSettingsScreen(
 ) {
     val context = LocalContext.current
     val uiState = viewModel.uiState.collectAsStateWithLifecycle().value
-
-    CashierDashboardShell(
-        userName = userName,
-        role = role,
-        activeDestination = CashierDestination.Settings,
-        onDashboardClick = onDashboardClick,
-        onPosClick = onPosClick,
-        onCashSessionClick = onCashSessionClick,
-        onTransactionHistoryClick = onTransactionHistoryClick,
-        onStockCheckClick = onStockCheckClick,
-        onProfileClick = onProfileClick,
-        onSettingsClick = onSettingsClick,
-        onLogout = onLogout
-    ) { contentModifier ->
-        SharedSettingsScreen(
-            role = role,
-            selectedPage = SettingsPage.DEVICE,
-            onPageSelected = {},
-            onPageBack = {},
-            uiState = uiState,
-            onReload = viewModel::reload,
-            onSaveStoreSettings = viewModel::saveStoreSettings,
-            onSaveLocalPreferences = viewModel::saveLocalPreferences,
-            onStoreNameChanged = viewModel::onStoreNameChanged,
-            onAddressChanged = viewModel::onAddressChanged,
-            onPhoneChanged = viewModel::onPhoneChanged,
-            onReceiptHeaderChanged = viewModel::onReceiptHeaderChanged,
-            onReceiptFooterChanged = viewModel::onReceiptFooterChanged,
-            onPrinterSizeChanged = viewModel::onPrinterSizeChanged,
-            onCashToleranceChanged = viewModel::onCashToleranceChanged,
-            onAutoLockMinutesChanged = viewModel::onAutoLockMinutesChanged,
-            onAutoPrintReceiptChanged = viewModel::onAutoPrintReceiptChanged,
-            onSelectPrinter = {
-                if (launchAndroidPrintDialog(context, uiState.printerSize)) {
-                    viewModel.onPrinterFrameworkOpened()
-                } else {
-                    viewModel.onPrinterFrameworkFailed()
-                }
-            },
-            onPrinterConnectionTypeChanged = viewModel::onPrinterConnectionTypeChanged,
-            onPrinterDeviceSelected = viewModel::onPrinterDeviceSelected,
-            onAutoCutPaperChanged = viewModel::onAutoCutPaperChanged,
-            onOpenCashDrawerChanged = viewModel::onOpenCashDrawerChanged,
-            onScannerSoundFeedbackChanged = viewModel::onScannerSoundFeedbackChanged,
-            onScannerVibrateFeedbackChanged = viewModel::onScannerVibrateFeedbackChanged,
-            onScanPrinters = { viewModel.scanPrinters(context) },
-            onTestPrint = { viewModel.testPrint(context) },
-            onTestCashDrawer = { viewModel.testCashDrawer(context) },
-            onDismissMessage = viewModel::clearMessage,
-            modifier = contentModifier
-        )
+    val handleBack: () -> Unit = {
+        if (onBack != null) {
+            onBack()
+        } else {
+            onDashboardClick()
+        }
     }
+
+    SharedSettingsScreen(
+        role = role,
+        selectedPage = SettingsPage.DEVICE,
+        onPageSelected = {},
+        onPageBack = handleBack,
+        uiState = uiState,
+        showHeader = true,
+        headerTitle = "Pengaturan",
+        onBack = handleBack,
+        onReload = viewModel::reload,
+        onSaveStoreSettings = viewModel::saveStoreSettings,
+        onSaveLocalPreferences = viewModel::saveLocalPreferences,
+        onStoreNameChanged = viewModel::onStoreNameChanged,
+        onAddressChanged = viewModel::onAddressChanged,
+        onPhoneChanged = viewModel::onPhoneChanged,
+        onReceiptHeaderChanged = viewModel::onReceiptHeaderChanged,
+        onReceiptFooterChanged = viewModel::onReceiptFooterChanged,
+        onPrinterSizeChanged = viewModel::onPrinterSizeChanged,
+        onCashToleranceChanged = viewModel::onCashToleranceChanged,
+        onAutoLockMinutesChanged = viewModel::onAutoLockMinutesChanged,
+        onAutoPrintReceiptChanged = viewModel::onAutoPrintReceiptChanged,
+        onSelectPrinter = {
+            if (launchAndroidPrintDialog(context, uiState.printerSize)) {
+                viewModel.onPrinterFrameworkOpened()
+            } else {
+                viewModel.onPrinterFrameworkFailed()
+            }
+        },
+        onPrinterConnectionTypeChanged = viewModel::onPrinterConnectionTypeChanged,
+        onPrinterDeviceSelected = viewModel::onPrinterDeviceSelected,
+        onAutoCutPaperChanged = viewModel::onAutoCutPaperChanged,
+        onOpenCashDrawerChanged = viewModel::onOpenCashDrawerChanged,
+        onScannerSoundFeedbackChanged = viewModel::onScannerSoundFeedbackChanged,
+        onScannerVibrateFeedbackChanged = viewModel::onScannerVibrateFeedbackChanged,
+        onScanPrinters = { viewModel.scanPrinters(context) },
+        onTestPrint = { viewModel.testPrint(context) },
+        onTestCashDrawer = { viewModel.testCashDrawer(context) },
+        onDismissMessage = viewModel::clearMessage,
+    )
 }

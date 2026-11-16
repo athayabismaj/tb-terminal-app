@@ -26,6 +26,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.window.Dialog
 import com.tbterminal.app.data.model.Customer
 import com.tbterminal.app.data.model.CheckoutDiscount
 import com.tbterminal.app.ui.barcode.CameraBarcodeScannerDialog
@@ -80,6 +81,7 @@ fun CashierCartScreen(
     onAmountPaidChanged: (String) -> Unit,
     onClearCart: () -> Unit,
     onItemDiscountChanged: (String, CheckoutDiscount?) -> Unit,
+    onItemNoteChanged: (String, String?) -> Unit = { _, _ -> },
     onTransactionDiscountChanged: (CheckoutDiscount?) -> Unit,
     onToggleUnit: (String, Boolean) -> Unit = { _, _ -> },
     onCheckout: () -> Unit,
@@ -105,9 +107,12 @@ fun CashierCartScreen(
     onOpenQuickAddCustomer: () -> Unit = {},
     onDismissQuickAddCustomer: () -> Unit = {},
     onQuickCreateCustomer: (String, String, String, Boolean) -> Unit = { _, _, _, _ -> },
-    onLockScreen: (() -> Unit)? = null
+    onLockScreen: (() -> Unit)? = null,
+    onOpenSaveQuotation: () -> Unit = {},
+    onOpenQuotations: () -> Unit = {},
 ) {
     var discountItemId by remember { mutableStateOf<String?>(null) }
+    var noteItemId by remember { mutableStateOf<String?>(null) }
     var showTransactionDiscount by remember { mutableStateOf(false) }
     var showCameraScanner by remember { mutableStateOf(false) }
     var showClearCartDialog by remember { mutableStateOf(false) }
@@ -126,7 +131,8 @@ fun CashierCartScreen(
         onSettingsClick = onSettingsClick,
         onLogout = onLogout,
         onLockScreen = onLockScreen,
-        showHeader = false
+        showHeader = false,
+        showBottomBar = false
     ) { contentModifier ->
         Scaffold(
             snackbarHost = { SnackbarHost(snackbarHostState) },
@@ -156,6 +162,7 @@ fun CashierCartScreen(
                     onClearCart = { showClearCartDialog = true },
                     onEditItemDiscount = { discountItemId = it },
                     onRemoveItemDiscount = { cartItemId -> onItemDiscountChanged(cartItemId, null) },
+                    onEditItemNote = { noteItemId = it },
                     onEditTransactionDiscount = { showTransactionDiscount = true },
                     onToggleUnit = onToggleUnit,
                     onCheckout = onCheckout,
@@ -177,6 +184,8 @@ fun CashierCartScreen(
                     onOpenCameraScanner = { showCameraScanner = true },
                     onOpenQrisDialog = onOpenQrisDialog,
                     onOpenQuickAddCustomer = onOpenQuickAddCustomer,
+                    onOpenSaveQuotation = onOpenSaveQuotation,
+                    onOpenQuotations = onOpenQuotations,
                     modifier = Modifier
                         .fillMaxSize()
                         .padding(contentPadding)
@@ -218,6 +227,229 @@ fun CashierCartScreen(
                     discountItemId = null
                 },
             )
+        }
+    }
+    noteItemId?.let { cartItemId ->
+        val item = state.cartItems.firstOrNull { it.cartItemId == cartItemId }
+        if (item != null) {
+            var noteDraft by remember(cartItemId, item.note) { mutableStateOf(item.note.orEmpty()) }
+            ModalBottomSheet(
+                onDismissRequest = { noteItemId = null },
+                sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
+                containerColor = Color.White,
+                shape = RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp),
+                scrimColor = Color(0xFF0F172A).copy(alpha = 0.5f),
+                dragHandle = {
+                    Box(
+                        modifier = Modifier
+                            .padding(vertical = 10.dp)
+                            .size(width = 36.dp, height = 4.dp)
+                            .background(Color(0xFFCBD5E1), RoundedCornerShape(2.dp))
+                    )
+                }
+            ) {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 24.dp)
+                        .padding(bottom = 32.dp),
+                    verticalArrangement = Arrangement.spacedBy(16.dp)
+                ) {
+                    // Header Bar
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Column {
+                            Text(
+                                text = "Catatan Item",
+                                fontSize = 18.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = CartOnSurface
+                            )
+                            Text(
+                                text = "Tambahkan instruksi atau keterangan khusus produk",
+                                fontSize = 12.sp,
+                                color = CartOnSurfaceVariant
+                            )
+                        }
+
+                        IconButton(onClick = { noteItemId = null }) {
+                            Icon(
+                                Icons.Outlined.Close,
+                                contentDescription = "Tutup",
+                                tint = CartOnSurfaceVariant
+                            )
+                        }
+                    }
+
+                    HorizontalDivider(color = CartOutlineVariant, thickness = 1.dp)
+
+                    // Info Produk Box
+                    Surface(
+                        shape = RoundedCornerShape(12.dp),
+                        color = Color(0xFFF8FAFC),
+                        border = BorderStroke(1.dp, CartOutlineVariant),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(12.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(12.dp)
+                        ) {
+                            Surface(
+                                modifier = Modifier.size(38.dp),
+                                shape = RoundedCornerShape(10.dp),
+                                color = Color(0xFFE8F3EC),
+                                border = BorderStroke(1.dp, Color(0xFFA7F3D0))
+                            ) {
+                                Box(contentAlignment = Alignment.Center) {
+                                    Icon(
+                                        imageVector = Icons.Outlined.EditNote,
+                                        contentDescription = null,
+                                        tint = CartPrimary,
+                                        modifier = Modifier.size(20.dp)
+                                    )
+                                }
+                            }
+                            Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                                Text(
+                                    text = item.productName,
+                                    fontSize = 13.5.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = CartOnSurface,
+                                    maxLines = 2,
+                                    overflow = TextOverflow.Ellipsis
+                                )
+                                val qtyText = item.quantity.toString()
+                                val uName = item.unitName.ifBlank { "pcs" }
+                                Text(
+                                    text = "$qtyText $uName • ${formatRupiah(item.unitPrice)}",
+                                    fontSize = 12.sp,
+                                    color = CartOnSurfaceVariant
+                                )
+                            }
+                        }
+                    }
+
+                    // Input Catatan Field
+                    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                        Text(
+                            text = "Instruksi / Catatan Khusus",
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.SemiBold,
+                            color = CartOnSurface
+                        )
+                        OutlinedTextField(
+                            value = noteDraft,
+                            onValueChange = { noteDraft = it.take(300) },
+                            placeholder = {
+                                Text(
+                                    text = "Contoh: Potong 3 meter, warna putih tulang, titip gudang...",
+                                    color = Color(0xFF94A3B8),
+                                    fontSize = 13.sp
+                                )
+                            },
+                            leadingIcon = {
+                                Icon(
+                                    imageVector = Icons.Outlined.EditNote,
+                                    contentDescription = null,
+                                    tint = CartOnSurfaceVariant,
+                                    modifier = Modifier.size(20.dp)
+                                )
+                            },
+                            modifier = Modifier.fillMaxWidth(),
+                            shape = RoundedCornerShape(12.dp),
+                            maxLines = 3,
+                            colors = OutlinedTextFieldDefaults.colors(
+                                focusedBorderColor = CartPrimary,
+                                unfocusedBorderColor = CartOutlineVariant,
+                                focusedContainerColor = Color.White,
+                                unfocusedContainerColor = Color(0xFFF8FAFC),
+                                cursorColor = CartPrimary,
+                                focusedTextColor = CartOnSurface,
+                                unfocusedTextColor = CartOnSurface,
+                            )
+                        )
+                    }
+
+                    Spacer(modifier = Modifier.height(4.dp))
+
+                    // Action Buttons
+                    Button(
+                        onClick = {
+                            onItemNoteChanged(cartItemId, noteDraft.trim().takeIf { it.isNotEmpty() })
+                            noteItemId = null
+                        },
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(48.dp),
+                        shape = RoundedCornerShape(12.dp),
+                        colors = ButtonDefaults.buttonColors(containerColor = CartPrimary)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Outlined.Check,
+                            contentDescription = null,
+                            modifier = Modifier.size(18.dp)
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text(
+                            text = "SIMPAN CATATAN",
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.Bold,
+                            letterSpacing = 0.5.sp
+                        )
+                    }
+
+                    if (!item.note.isNullOrBlank()) {
+                        OutlinedButton(
+                            onClick = {
+                                onItemNoteChanged(cartItemId, null)
+                                noteItemId = null
+                            },
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(40.dp),
+                            shape = RoundedCornerShape(12.dp),
+                            border = BorderStroke(1.dp, Color(0xFFFECACA)),
+                            colors = ButtonDefaults.outlinedButtonColors(
+                                containerColor = Color(0xFFFEF2F2),
+                                contentColor = CartError
+                            )
+                        ) {
+                            Icon(
+                                imageVector = Icons.Outlined.DeleteOutline,
+                                contentDescription = null,
+                                modifier = Modifier.size(16.dp),
+                                tint = CartError
+                            )
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Text(
+                                text = "Hapus Catatan",
+                                fontSize = 12.5.sp,
+                                fontWeight = FontWeight.SemiBold,
+                                color = CartError
+                            )
+                        }
+                    }
+
+                    TextButton(
+                        onClick = { noteItemId = null },
+                        shape = RoundedCornerShape(12.dp),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(38.dp)
+                    ) {
+                        Text(
+                            text = "Batal",
+                            fontSize = 13.5.sp,
+                            fontWeight = FontWeight.Medium,
+                            color = CartOnSurfaceVariant
+                        )
+                    }
+                }
+            }
         }
     }
     if (showTransactionDiscount) {
@@ -391,6 +623,7 @@ private fun CartContent(
     onClearCart: () -> Unit,
     onEditItemDiscount: (String) -> Unit,
     onRemoveItemDiscount: (String) -> Unit,
+    onEditItemNote: (String) -> Unit = {},
     onEditTransactionDiscount: () -> Unit,
     onToggleUnit: (String, Boolean) -> Unit,
     onCheckout: () -> Unit,
@@ -406,6 +639,8 @@ private fun CartContent(
     onOpenCameraScanner: () -> Unit,
     onOpenQrisDialog: () -> Unit,
     onOpenQuickAddCustomer: () -> Unit,
+    onOpenSaveQuotation: () -> Unit = {},
+    onOpenQuotations: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     val totalItems = state.cartItems.sumOf { it.quantity }
@@ -428,14 +663,34 @@ private fun CartContent(
                     modifier = Modifier
                         .weight(1.3f)
                         .fillMaxHeight()
+                        .statusBarsPadding()
                         .padding(20.dp)
                 ) {
                     CartTopBar(
                         totalItems = totalItems,
                         onBackToPos = onBackToPos,
                         onOpenCameraScanner = onOpenCameraScanner,
-                        onClearCart = onClearCart
+                        onClearCart = onClearCart,
+                        onOpenSaveQuotation = onOpenSaveQuotation,
+                        onOpenQuotations = onOpenQuotations,
                     )
+                    state.activeQuotationNumber?.let { rabNumber ->
+                        Spacer(modifier = Modifier.height(8.dp))
+                        Surface(
+                            shape = RoundedCornerShape(10.dp),
+                            color = Color(0xFFFEF3C7),
+                            border = BorderStroke(1.dp, Color(0xFFFCD34D)),
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Text(
+                                text = "Konversi dari Penawaran #$rabNumber",
+                                fontSize = 12.sp,
+                                fontWeight = FontWeight.SemiBold,
+                                color = Color(0xFF92400E),
+                                modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp)
+                            )
+                        }
+                    }
 
                     Spacer(modifier = Modifier.height(14.dp))
 
@@ -454,6 +709,7 @@ private fun CartContent(
                                 onRemove = { onRemove(item.cartItemId) },
                                 onDiscountClick = { onEditItemDiscount(item.cartItemId) },
                                 onRemoveDiscount = { onRemoveItemDiscount(item.cartItemId) },
+                                onNoteClick = { onEditItemNote(item.cartItemId) },
                                 onToggleUnit = { toSecondary -> onToggleUnit(item.cartItemId, toSecondary) },
                             )
                         }
@@ -517,8 +773,30 @@ private fun CartContent(
                             onBackToPos = onBackToPos,
                             onOpenCameraScanner = onOpenCameraScanner,
                             onClearCart = onClearCart,
-                            modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp)
+                            onOpenSaveQuotation = onOpenSaveQuotation,
+                            onOpenQuotations = onOpenQuotations,
+                            modifier = Modifier
+                                .statusBarsPadding()
+                                .padding(horizontal = 16.dp, vertical = 12.dp)
                         )
+                        state.activeQuotationNumber?.let { rabNumber ->
+                            Surface(
+                                shape = RoundedCornerShape(8.dp),
+                                color = Color(0xFFFEF3C7),
+                                border = BorderStroke(1.dp, Color(0xFFFCD34D)),
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(horizontal = 16.dp, vertical = 4.dp)
+                            ) {
+                                Text(
+                                    text = "Konversi dari Penawaran #$rabNumber",
+                                    fontSize = 11.5.sp,
+                                    fontWeight = FontWeight.SemiBold,
+                                    color = Color(0xFF92400E),
+                                    modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp)
+                                )
+                            }
+                        }
                         HorizontalDivider(color = Color(0xFFE2E8F0).copy(alpha = 0.8f))
                     }
                 }
@@ -543,6 +821,7 @@ private fun CartContent(
                             onRemove = { onRemove(item.cartItemId) },
                             onDiscountClick = { onEditItemDiscount(item.cartItemId) },
                             onRemoveDiscount = { onRemoveItemDiscount(item.cartItemId) },
+                            onNoteClick = { onEditItemNote(item.cartItemId) },
                             onToggleUnit = { toSecondary -> onToggleUnit(item.cartItemId, toSecondary) },
                         )
                     }
@@ -551,8 +830,8 @@ private fun CartContent(
                     item {
                         Surface(
                             onClick = onBackToPos,
-                            shape = RoundedCornerShape(12.dp),
-                            color = Color.White.copy(alpha = 0.5f),
+                            shape = RoundedCornerShape(16.dp),
+                            color = Color.White,
                             border = BorderStroke(1.dp, Color(0xFFCBD5E1)),
                             modifier = Modifier
                                 .fillMaxWidth()
@@ -563,18 +842,25 @@ private fun CartContent(
                                 horizontalArrangement = Arrangement.Center,
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
-                                Icon(
-                                    imageVector = Icons.Outlined.AddCircleOutline,
-                                    contentDescription = null,
-                                    tint = Color(0xFF10533C),
-                                    modifier = Modifier.size(16.dp)
-                                )
+                                Box(
+                                    modifier = Modifier
+                                        .size(20.dp)
+                                        .background(Color(0xFFE7F2EC), CircleShape),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Outlined.Add,
+                                        contentDescription = null,
+                                        tint = Color(0xFF10533C),
+                                        modifier = Modifier.size(13.dp)
+                                    )
+                                }
                                 Spacer(modifier = Modifier.width(8.dp))
                                 Text(
-                                    text = "Tambah Biaya Lain / Custom Item",
+                                    text = "Tambah Item Manual / Biaya",
                                     fontSize = 12.sp,
-                                    fontWeight = FontWeight.SemiBold,
-                                    color = Color(0xFF64748B)
+                                    fontWeight = FontWeight.Medium,
+                                    color = Color(0xFF475569)
                                 )
                             }
                         }
@@ -711,6 +997,53 @@ private fun CartContent(
                                         fontSize = 12.sp,
                                         fontWeight = FontWeight.SemiBold,
                                         color = Color(0xFF1E293B)
+                                    )
+                                }
+                            }
+
+                            // Pajak PPN (jika aktif)
+                            if (state.taxEnabled) {
+                                val rateStr = state.taxRate.stripTrailingZeros().toPlainString()
+                                val isInclude = state.taxMode.equals("INCLUDE", ignoreCase = true)
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Text(
+                                        text = "${state.taxLabel} ($rateStr%${if (isInclude) " • Incl." else ""})",
+                                        fontSize = 12.sp,
+                                        fontWeight = FontWeight.Medium,
+                                        color = Color(0xFF475569)
+                                    )
+                                    Text(
+                                        text = if (isInclude) "(${formatRupiah(state.taxAmount)})" else "+ ${formatRupiah(state.taxAmount)}",
+                                        fontSize = 12.sp,
+                                        fontWeight = FontWeight.SemiBold,
+                                        color = Color(0xFF1E293B)
+                                    )
+                                }
+                            }
+
+                            // Pembulatan Tunai (jika aktif & != 0)
+                            if (state.roundingAmount.compareTo(BigDecimal.ZERO) != 0) {
+                                val sign = if (state.roundingAmount > BigDecimal.ZERO) "+" else "-"
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Text(
+                                        text = "Pembulatan Tunai",
+                                        fontSize = 12.sp,
+                                        fontWeight = FontWeight.Medium,
+                                        color = Color(0xFF475569)
+                                    )
+                                    Text(
+                                        text = "$sign ${formatRupiah(state.roundingAmount.abs())}",
+                                        fontSize = 12.sp,
+                                        fontWeight = FontWeight.SemiBold,
+                                        color = if (state.roundingAmount > BigDecimal.ZERO) Color(0xFF1E293B) else Color(0xFF047857)
                                     )
                                 }
                             }
@@ -864,6 +1197,8 @@ private fun CartTopBar(
     onBackToPos: () -> Unit,
     onOpenCameraScanner: () -> Unit,
     onClearCart: () -> Unit,
+    onOpenSaveQuotation: () -> Unit = {},
+    onOpenQuotations: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     Row(
@@ -871,22 +1206,20 @@ private fun CartTopBar(
         horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.CenterVertically
     ) {
-        // Sisi Kiri: Tombol Back Bulat + Judul "Keranjang" + (N item)
+        // Sisi Kiri: Tombol Back + Judul "Keranjang" + (N item)
         Row(
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(10.dp)
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
         ) {
             IconButton(
                 onClick = onBackToPos,
-                modifier = Modifier
-                    .size(36.dp)
-                    .clip(CircleShape)
+                modifier = Modifier.size(34.dp)
             ) {
                 Icon(
                     imageVector = Icons.AutoMirrored.Outlined.ArrowBack,
                     contentDescription = "Kembali ke POS",
                     tint = Color(0xFF334155),
-                    modifier = Modifier.size(22.dp)
+                    modifier = Modifier.size(20.dp)
                 )
             }
 
@@ -896,7 +1229,7 @@ private fun CartTopBar(
             ) {
                 Text(
                     text = "Keranjang",
-                    fontSize = 18.sp,
+                    fontSize = 17.sp,
                     fontWeight = FontWeight.Bold,
                     color = Color(0xFF0F172A),
                     letterSpacing = (-0.3).sp
@@ -911,37 +1244,77 @@ private fun CartTopBar(
             }
         }
 
-        // Sisi Kanan: Barcode Scanner & Kosongkan Keranjang (Trash)
+        // Sisi Kanan: 4 Kotak Action Icons (Simpan RAB, Daftar RAB, Scan Barcode, Kosongkan Keranjang)
         Row(
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(4.dp)
+            horizontalArrangement = Arrangement.spacedBy(6.dp)
         ) {
-            IconButton(
-                onClick = onOpenCameraScanner,
-                modifier = Modifier
-                    .size(36.dp)
-                    .clip(RoundedCornerShape(10.dp))
+            // 1. Simpan RAB (Floppy disk icon, Amber)
+            Surface(
+                onClick = onOpenSaveQuotation,
+                shape = RoundedCornerShape(10.dp),
+                color = Color.Transparent,
+                modifier = Modifier.size(34.dp)
             ) {
-                Icon(
-                    imageVector = Icons.Outlined.QrCodeScanner,
-                    contentDescription = "Scan Barcode",
-                    tint = Color(0xFF334155),
-                    modifier = Modifier.size(20.dp)
-                )
+                Box(contentAlignment = Alignment.Center) {
+                    Icon(
+                        imageVector = Icons.Outlined.Save,
+                        contentDescription = "Simpan RAB",
+                        tint = Color(0xFFD97706),
+                        modifier = Modifier.size(20.dp)
+                    )
+                }
             }
 
-            IconButton(
-                onClick = onClearCart,
-                modifier = Modifier
-                    .size(36.dp)
-                    .clip(RoundedCornerShape(10.dp))
+            // 2. Daftar RAB (Document icon, Slate)
+            Surface(
+                onClick = onOpenQuotations,
+                shape = RoundedCornerShape(10.dp),
+                color = Color.Transparent,
+                modifier = Modifier.size(34.dp)
             ) {
-                Icon(
-                    imageVector = Icons.Outlined.DeleteOutline,
-                    contentDescription = "Kosongkan Keranjang",
-                    tint = Color(0xFFE11D48),
-                    modifier = Modifier.size(20.dp)
-                )
+                Box(contentAlignment = Alignment.Center) {
+                    Icon(
+                        imageVector = Icons.Outlined.Description,
+                        contentDescription = "Daftar RAB",
+                        tint = Color(0xFF475569),
+                        modifier = Modifier.size(20.dp)
+                    )
+                }
+            }
+
+            // 3. Scan Barcode (QrCodeScanner icon, Slate)
+            Surface(
+                onClick = onOpenCameraScanner,
+                shape = RoundedCornerShape(10.dp),
+                color = Color.Transparent,
+                modifier = Modifier.size(34.dp)
+            ) {
+                Box(contentAlignment = Alignment.Center) {
+                    Icon(
+                        imageVector = Icons.Outlined.QrCodeScanner,
+                        contentDescription = "Scan Barcode",
+                        tint = Color(0xFF475569),
+                        modifier = Modifier.size(20.dp)
+                    )
+                }
+            }
+
+            // 4. Kosongkan Keranjang (Delete / Trash icon, Rose)
+            Surface(
+                onClick = onClearCart,
+                shape = RoundedCornerShape(10.dp),
+                color = Color.Transparent,
+                modifier = Modifier.size(34.dp)
+            ) {
+                Box(contentAlignment = Alignment.Center) {
+                    Icon(
+                        imageVector = Icons.Outlined.DeleteOutline,
+                        contentDescription = "Kosongkan Keranjang",
+                        tint = Color(0xFFE11D48),
+                        modifier = Modifier.size(20.dp)
+                    )
+                }
             }
         }
     }
@@ -1317,6 +1690,24 @@ private fun CartSummaryPanel(
                     CartCalculationRow(
                         "Ongkos Kirim Armada",
                         "+${formatRupiah(state.deliveryFee)}"
+                    )
+                }
+
+                if (state.taxEnabled) {
+                    val rateStr = state.taxRate.stripTrailingZeros().toPlainString()
+                    val isInclude = state.taxMode.equals("INCLUDE", ignoreCase = true)
+                    CartCalculationRow(
+                        label = "${state.taxLabel} ($rateStr%${if (isInclude) " • Incl." else ""})",
+                        value = if (isInclude) "(${formatRupiah(state.taxAmount)})" else "+${formatRupiah(state.taxAmount)}"
+                    )
+                }
+
+                if (state.roundingAmount.compareTo(BigDecimal.ZERO) != 0) {
+                    val sign = if (state.roundingAmount > BigDecimal.ZERO) "+" else "-"
+                    CartCalculationRow(
+                        label = "Pembulatan Tunai",
+                        value = "$sign${formatRupiah(state.roundingAmount.abs())}",
+                        isDiscount = state.roundingAmount < BigDecimal.ZERO
                     )
                 }
 

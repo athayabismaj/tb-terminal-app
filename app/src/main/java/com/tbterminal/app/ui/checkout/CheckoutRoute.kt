@@ -3,25 +3,14 @@ package com.tbterminal.app.ui.checkout
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.WindowInsets
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Calculate
 import androidx.compose.material.icons.outlined.Search
 import androidx.compose.material.icons.outlined.Tune
-import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.Icon
-import androidx.compose.material3.Scaffold
-import androidx.compose.material3.SnackbarHost
-import androidx.compose.material3.SnackbarHostState
-import androidx.compose.material3.Surface
+import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -35,6 +24,13 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import androidx.compose.ui.window.Dialog
+import androidx.compose.material.icons.outlined.Close
+import androidx.compose.material.icons.outlined.Description
+import androidx.compose.material.icons.outlined.EditNote
+import androidx.compose.material.icons.outlined.Schedule
+import com.tbterminal.app.ui.quotations.formatQuotationMoney
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.tbterminal.app.data.repository.CashReconciliationRepository
@@ -381,6 +377,7 @@ fun CashierCartRoute(
     onSettingsClick: () -> Unit = {},
     onLogout: () -> Unit = {},
     onNavigateToReceipt: (String) -> Unit = {},
+    onOpenQuotations: () -> Unit = {},
     viewModel: CheckoutViewModel = viewModel(
         factory = CheckoutViewModel.factory(
             checkoutRepository = checkoutRepository,
@@ -501,7 +498,9 @@ fun CashierCartRoute(
         onOpenQuickAddCustomer = viewModel::openQuickAddCustomer,
         onDismissQuickAddCustomer = viewModel::dismissQuickAddCustomer,
         onQuickCreateCustomer = viewModel::quickCreateCustomer,
-        onLockScreen = viewModel::lockScreen
+        onLockScreen = viewModel::lockScreen,
+        onOpenSaveQuotation = viewModel::openSaveQuotationDialog,
+        onOpenQuotations = onOpenQuotations,
     )
 }
     if (uiState.isHoldCartDialogOpen) {
@@ -511,6 +510,263 @@ fun CashierCartRoute(
             onDismiss = viewModel::dismissHoldCartDialog,
             onConfirm = viewModel::holdCurrentCart
         )
+    }
+    if (uiState.isSaveQuotationDialogOpen) {
+        ModalBottomSheet(
+            onDismissRequest = viewModel::dismissSaveQuotationDialog,
+            sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
+            containerColor = Color.White,
+            shape = RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp),
+            scrimColor = Color(0xFF0F172A).copy(alpha = 0.5f),
+            dragHandle = {
+                Box(
+                    modifier = Modifier
+                        .padding(vertical = 10.dp)
+                        .size(width = 36.dp, height = 4.dp)
+                        .background(Color(0xFFCBD5E1), RoundedCornerShape(2.dp))
+                )
+            }
+        ) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 24.dp)
+                    .padding(bottom = 32.dp),
+                verticalArrangement = Arrangement.spacedBy(16.dp)
+            ) {
+                // Header Bar
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Column {
+                        Text(
+                            text = "Simpan Penawaran Harga (RAB)",
+                            fontSize = 18.sp,
+                            fontWeight = androidx.compose.ui.text.font.FontWeight.Bold,
+                            color = Color(0xFF0F172A)
+                        )
+                        Text(
+                            text = "Simpan keranjang menjadi dokumen RAB tanpa memotong stok",
+                            fontSize = 12.sp,
+                            color = Color(0xFF64748B)
+                        )
+                    }
+
+                    IconButton(onClick = viewModel::dismissSaveQuotationDialog) {
+                        Icon(
+                            Icons.Outlined.Close,
+                            contentDescription = "Tutup",
+                            tint = Color(0xFF64748B)
+                        )
+                    }
+                }
+
+                HorizontalDivider(
+                    color = Color(0xFFE2E8F0),
+                    thickness = 1.dp
+                )
+
+                // Info Box Keranjang
+                Surface(
+                    shape = RoundedCornerShape(12.dp),
+                    color = Color(0xFFF8FAFC),
+                    border = BorderStroke(1.dp, Color(0xFFE2E8F0)),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Row(
+                        modifier = Modifier.padding(12.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(12.dp)
+                    ) {
+                        Surface(
+                            modifier = Modifier.size(38.dp),
+                            shape = RoundedCornerShape(10.dp),
+                            color = Color(0xFFFEF3C7),
+                            border = BorderStroke(1.dp, Color(0xFFFDE68A))
+                        ) {
+                            Box(contentAlignment = Alignment.Center) {
+                                Icon(
+                                    imageVector = Icons.Outlined.Description,
+                                    contentDescription = null,
+                                    tint = Color(0xFFB45309),
+                                    modifier = Modifier.size(20.dp)
+                                )
+                            }
+                        }
+                        Column(
+                            verticalArrangement = Arrangement.spacedBy(2.dp)
+                        ) {
+                            val custName = uiState.selectedCustomer?.name
+                                ?: uiState.customerSearchQuery.trim().takeIf { it.isNotEmpty() }
+                                ?: "Pelanggan Umum"
+                            Text(
+                                text = "Pelanggan: $custName",
+                                fontSize = 13.sp,
+                                fontWeight = androidx.compose.ui.text.font.FontWeight.Bold,
+                                color = Color(0xFF0F172A)
+                            )
+                            Text(
+                                text = "${uiState.cartItems.size} barang • Total: ${formatQuotationMoney(uiState.finalTotal)}",
+                                fontSize = 12.sp,
+                                fontWeight = androidx.compose.ui.text.font.FontWeight.Medium,
+                                color = Color(0xFF10533C)
+                            )
+                        }
+                    }
+                }
+
+                // Field 1: Masa Berlaku (Hari)
+                Column(
+                    verticalArrangement = Arrangement.spacedBy(6.dp)
+                ) {
+                    Text(
+                        text = "Masa Berlaku (Hari) *",
+                        fontSize = 12.sp,
+                        fontWeight = androidx.compose.ui.text.font.FontWeight.SemiBold,
+                        color = Color(0xFF0F172A)
+                    )
+                    OutlinedTextField(
+                        value = uiState.quotationValidDaysInput,
+                        onValueChange = viewModel::onQuotationValidDaysChanged,
+                        placeholder = {
+                            Text("14", color = Color(0xFF94A3B8), fontSize = 13.sp)
+                        },
+                        leadingIcon = {
+                            Icon(
+                                Icons.Outlined.Schedule,
+                                contentDescription = null,
+                                tint = Color(0xFF64748B),
+                                modifier = Modifier.size(20.dp)
+                            )
+                        },
+                        trailingIcon = {
+                            Text(
+                                text = "hari",
+                                color = Color(0xFF64748B),
+                                fontSize = 12.sp,
+                                modifier = Modifier.padding(end = 12.dp)
+                            )
+                        },
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(12.dp),
+                        singleLine = true,
+                        colors = OutlinedTextFieldDefaults.colors(
+                            focusedBorderColor = Color(0xFF10533C),
+                            unfocusedBorderColor = Color(0xFFE2E8F0),
+                            focusedContainerColor = Color.White,
+                            unfocusedContainerColor = Color(0xFFF8FAFC),
+                            cursorColor = Color(0xFF10533C),
+                            focusedTextColor = Color(0xFF0F172A),
+                            unfocusedTextColor = Color(0xFF0F172A),
+                        )
+                    )
+                }
+
+                // Field 2: Catatan Penawaran
+                Column(
+                    verticalArrangement = Arrangement.spacedBy(6.dp)
+                ) {
+                    Text(
+                        text = "Catatan Penawaran (Opsional)",
+                        fontSize = 12.sp,
+                        fontWeight = androidx.compose.ui.text.font.FontWeight.SemiBold,
+                        color = Color(0xFF0F172A)
+                    )
+                    OutlinedTextField(
+                        value = uiState.quotationNotesInput,
+                        onValueChange = viewModel::onQuotationNotesChanged,
+                        placeholder = {
+                            Text(
+                                "Contoh: Penawaran renovasi ruko, ongkir ditanggung pembeli...",
+                                color = Color(0xFF94A3B8),
+                                fontSize = 13.sp
+                            )
+                        },
+                        leadingIcon = {
+                            Icon(
+                                Icons.Outlined.EditNote,
+                                contentDescription = null,
+                                tint = Color(0xFF64748B),
+                                modifier = Modifier.size(20.dp)
+                            )
+                        },
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(12.dp),
+                        maxLines = 3,
+                        colors = OutlinedTextFieldDefaults.colors(
+                            focusedBorderColor = Color(0xFF10533C),
+                            unfocusedBorderColor = Color(0xFFE2E8F0),
+                            focusedContainerColor = Color.White,
+                            unfocusedContainerColor = Color(0xFFF8FAFC),
+                            cursorColor = Color(0xFF10533C),
+                            focusedTextColor = Color(0xFF0F172A),
+                            unfocusedTextColor = Color(0xFF0F172A),
+                        )
+                    )
+                }
+
+                Spacer(modifier = Modifier.height(4.dp))
+
+                // Action Button: Simpan RAB
+                Button(
+                    onClick = viewModel::submitQuotation,
+                    enabled = !uiState.isSavingQuotation,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(48.dp),
+                    shape = RoundedCornerShape(12.dp),
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = Color(0xFF10533C)
+                    )
+                ) {
+                    if (uiState.isSavingQuotation) {
+                        CircularProgressIndicator(
+                            modifier = Modifier.size(18.dp),
+                            color = Color.White,
+                            strokeWidth = 2.dp
+                        )
+                        Spacer(modifier = Modifier.width(10.dp))
+                        Text(
+                            text = "MENYIMPAN DOKUMEN RAB...",
+                            fontSize = 12.sp,
+                            fontWeight = androidx.compose.ui.text.font.FontWeight.Bold
+                        )
+                    } else {
+                        Icon(
+                            Icons.Outlined.Description,
+                            contentDescription = null,
+                            modifier = Modifier.size(18.dp)
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text(
+                            text = "SIMPAN DOKUMEN RAB",
+                            fontSize = 12.sp,
+                            fontWeight = androidx.compose.ui.text.font.FontWeight.Bold,
+                            letterSpacing = 0.5.sp
+                        )
+                    }
+                }
+
+                // Action Button: Batal
+                TextButton(
+                    onClick = viewModel::dismissSaveQuotationDialog,
+                    enabled = !uiState.isSavingQuotation,
+                    shape = RoundedCornerShape(12.dp),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(38.dp)
+                ) {
+                    Text(
+                        text = "Batal",
+                        fontSize = 13.5.sp,
+                        fontWeight = androidx.compose.ui.text.font.FontWeight.Medium,
+                        color = Color(0xFF64748B)
+                    )
+                }
+            }
+        }
     }
     if (uiState.isHeldCartsSheetOpen) {
         HeldCartsSheet(
@@ -553,6 +809,51 @@ fun CashierCartRoute(
             onConfirm = viewModel::submitPettyCash
         )
     }
+    if (uiState.pendingReorderConflict != null) {
+        val conflict = uiState.pendingReorderConflict!!
+        androidx.compose.material3.AlertDialog(
+            onDismissRequest = viewModel::dismissReorderConflict,
+            title = {
+                androidx.compose.material3.Text("Keranjang Sudah Berisi Barang")
+            },
+            text = {
+                androidx.compose.foundation.layout.Column(
+                    verticalArrangement = Arrangement.spacedBy(6.dp)
+                ) {
+                    androidx.compose.material3.Text(
+                        text = "Anda menyalin ${conflict.plan.items.size} item dari nota #${conflict.receiptNumber}. Pilih cara memuat ke keranjang:"
+                    )
+                    if (conflict.plan.adjustedItems.isNotEmpty() || conflict.plan.skippedItems.isNotEmpty()) {
+                        androidx.compose.material3.Text(
+                            text = conflict.plan.buildFeedbackMessage(),
+                            color = Color(0xFFB45309)
+                        )
+                    }
+                }
+            },
+            confirmButton = {
+                androidx.compose.material3.Button(
+                    onClick = { viewModel.resolveReorderConflict(replaceExisting = true) }
+                ) {
+                    androidx.compose.material3.Text("Ganti Keranjang")
+                }
+            },
+            dismissButton = {
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    androidx.compose.material3.TextButton(
+                        onClick = viewModel::dismissReorderConflict
+                    ) {
+                        androidx.compose.material3.Text("Batal")
+                    }
+                    androidx.compose.material3.OutlinedButton(
+                        onClick = { viewModel.resolveReorderConflict(replaceExisting = false) }
+                    ) {
+                        androidx.compose.material3.Text("Tambahkan")
+                    }
+                }
+            }
+        )
+    }
     approvalAttemptId?.let { attemptId ->
         ManagerApprovalDialog(
             context = ManagerApprovalContext(
@@ -589,6 +890,7 @@ fun CashierPaymentRoute(
     onSettingsClick: () -> Unit = {},
     onLogout: () -> Unit = {},
     onNavigateToReceipt: (String) -> Unit = {},
+    onOpenQuotations: () -> Unit = {},
     viewModel: CheckoutViewModel = viewModel(
         factory = CheckoutViewModel.factory(
             checkoutRepository = checkoutRepository,
@@ -648,6 +950,13 @@ fun CashierPaymentRoute(
             onUseCustomerName = viewModel::useQuickCustomerName,
             onSelectPayment = viewModel::selectPaymentMethod,
             onAmountPaidChanged = viewModel::onAmountPaidChanged,
+            onToggleSplitPayment = viewModel::toggleSplitPayment,
+            onSplitDpModeChanged = viewModel::setSplitDpMode,
+            onAddSplitLine = viewModel::addSplitPaymentLine,
+            onRemoveSplitLine = viewModel::removeSplitPaymentLine,
+            onSplitLineMethodChanged = viewModel::updateSplitPaymentLineMethod,
+            onSplitLineAmountChanged = viewModel::updateSplitPaymentLineAmount,
+            onSplitLineReferenceChanged = viewModel::updateSplitPaymentLineReference,
             onTransactionDiscountChanged = viewModel::setTransactionDiscount,
             onCheckout = {
                 val preview = uiState.checkoutPreview

@@ -26,6 +26,7 @@ data class LocalPaymentEntity(
     val transactionServerId: String? = null,
     val method: String,
     val amount: Double = 0.0,
+    val reference: String? = null,
     val paidAt: Long = System.currentTimeMillis(),
     val syncStatus: SyncStatus = SyncStatus.PENDING,
     val createdAt: Long = System.currentTimeMillis(),

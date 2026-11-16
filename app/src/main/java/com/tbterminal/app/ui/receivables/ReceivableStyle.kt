@@ -20,6 +20,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.tbterminal.app.data.model.Receivable
 import com.tbterminal.app.ui.theme.TbAmber
 import com.tbterminal.app.ui.theme.TbBackground
 import com.tbterminal.app.ui.theme.TbError
@@ -126,6 +127,11 @@ internal fun ReceivablePageIconButton(icon: ImageVector, enabled: Boolean, onCli
 internal fun String.initial(): String = firstOrNull()?.uppercase() ?: "P"
 
 internal fun String.shortTransactionId(): String = take(10).uppercase()
+
+internal fun Receivable.mobileReference(): String =
+    legacyInvoiceNumber?.takeIf(String::isNotBlank)
+        ?: transactionId?.shortTransactionId()
+        ?: source
 
 internal fun String.statusLabel(): String {
     return when (lowercase()) {

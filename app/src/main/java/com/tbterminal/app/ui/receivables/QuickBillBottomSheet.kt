@@ -6,41 +6,42 @@ import android.net.Uri
 import android.widget.Toast
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.ReceiptLong
 import androidx.compose.material.icons.outlined.Check
 import androidx.compose.material.icons.outlined.Close
 import androidx.compose.material.icons.outlined.ContentCopy
-import androidx.compose.material.icons.outlined.Edit
-import androidx.compose.material.icons.outlined.Info
-import androidx.compose.material.icons.outlined.Person
-import androidx.compose.material.icons.outlined.Phone
 import androidx.compose.material.icons.outlined.Refresh
-import androidx.compose.material.icons.outlined.Share
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.ModalBottomSheet
-import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -48,16 +49,22 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.tbterminal.app.R
 import com.tbterminal.app.data.model.Receivable
 import java.math.BigDecimal
 import java.time.LocalDate
+import java.time.format.DateTimeFormatter
+import java.util.Locale
 
 internal enum class QuickBillFormatMode(val label: String) {
     Summary("Rangkuman Rapi"),
@@ -81,7 +88,6 @@ internal fun QuickBillBottomSheet(
     initialCustomerId: String? = null,
     onDismiss: () -> Unit
 ) {
-    val context = LocalContext.current
     val today = remember { LocalDate.now() }
 
     val customersWithDebt = remember(uiState.receivables, uiState.customers) {
@@ -92,7 +98,7 @@ internal fun QuickBillBottomSheet(
         unpaidGroup.map { (custId, list) ->
             val totalRemaining = list.sumOf { it.remainingAmount }
             val customerObj = uiState.customers.firstOrNull { it.id == custId }
-            val name = customerObj?.name ?: list.firstOrNull()?.customerName ?: "Pelanggan"
+            val name = (customerObj?.name ?: list.firstOrNull()?.customerName ?: "Pelanggan").toTitleCase()
             val phone = customerObj?.phone
             val nearestDue = list.mapNotNull {
                 runCatching { LocalDate.parse(it.dueDate.take(10)) }.getOrNull()
@@ -115,6 +121,66 @@ internal fun QuickBillBottomSheet(
         }.sortedByDescending { it.totalRemaining }
     }
 
+    QuickBillBottomSheetContent(
+        customersWithDebt = customersWithDebt,
+        initialCustomerId = initialCustomerId,
+        onDismiss = onDismiss
+    )
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+internal fun QuickBillCustomerBottomSheet(
+    customerId: String,
+    customerName: String,
+    customerPhone: String? = null,
+    receivables: List<Receivable>,
+    onDismiss: () -> Unit
+) {
+    val today = remember { LocalDate.now() }
+    val unpaidList = remember(receivables) {
+        receivables.filter { it.remainingAmount > BigDecimal.ZERO }
+    }
+    val nearestDue = remember(unpaidList) {
+        unpaidList.mapNotNull {
+            runCatching { LocalDate.parse(it.dueDate.take(10)) }.getOrNull()
+        }.minOrNull()?.toString()
+    }
+    val overdueCount = remember(unpaidList) {
+        unpaidList.count {
+            val d = runCatching { LocalDate.parse(it.dueDate.take(10)) }.getOrNull()
+            d != null && d.isBefore(today)
+        }
+    }
+    val customerItem = remember(customerId, customerName, customerPhone, unpaidList, nearestDue, overdueCount) {
+        QuickBillCustomerItem(
+            id = customerId,
+            name = customerName.toTitleCase(),
+            phone = customerPhone,
+            totalRemaining = unpaidList.sumOf { it.remainingAmount },
+            unpaidInvoices = unpaidList,
+            overdueCount = overdueCount,
+            nearestDue = nearestDue
+        )
+    }
+
+    QuickBillBottomSheetContent(
+        customersWithDebt = listOf(customerItem),
+        initialCustomerId = customerId,
+        onDismiss = onDismiss
+    )
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun QuickBillBottomSheetContent(
+    customersWithDebt: List<QuickBillCustomerItem>,
+    initialCustomerId: String? = null,
+    onDismiss: () -> Unit
+) {
+    val context = LocalContext.current
+    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+
     var selectedCustomerId by remember(initialCustomerId, customersWithDebt) {
         mutableStateOf(initialCustomerId ?: customersWithDebt.firstOrNull()?.id)
     }
@@ -122,7 +188,7 @@ internal fun QuickBillBottomSheet(
     val selectedCustomer = customersWithDebt.firstOrNull { it.id == selectedCustomerId }
         ?: customersWithDebt.firstOrNull()
 
-    // Mode format: jika pelanggan memiliki banyak nota (>3), default-kan ke Summary agar tidak menumpuk
+    // Default mode format
     var formatMode by remember(selectedCustomer?.id) {
         val defaultMode = if ((selectedCustomer?.unpaidInvoices?.size ?: 0) > 3) {
             QuickBillFormatMode.Summary
@@ -149,57 +215,64 @@ internal fun QuickBillBottomSheet(
 
     ModalBottomSheet(
         onDismissRequest = onDismiss,
+        sheetState = sheetState,
         containerColor = Color.White,
         dragHandle = {
-            Column(
+            Box(
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(top = 10.dp, bottom = 4.dp),
-                horizontalAlignment = Alignment.CenterHorizontally
+                contentAlignment = Alignment.Center
             ) {
                 Box(
                     modifier = Modifier
-                        .width(40.dp)
-                        .height(4.dp)
-                        .background(Color(0xFFE2E8F0), CircleShape)
+                        .width(44.dp)
+                        .height(5.dp)
+                        .background(Color(0xFFCBD5E1), CircleShape)
                 )
             }
         },
-        shape = RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp)
+        shape = RoundedCornerShape(topStart = 32.dp, topEnd = 32.dp)
     ) {
         Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 20.dp)
-                .padding(bottom = 28.dp)
-                .verticalScroll(rememberScrollState()),
-            verticalArrangement = Arrangement.spacedBy(14.dp)
+            modifier = Modifier.fillMaxWidth()
         ) {
             // Header
             Row(
-                modifier = Modifier.fillMaxWidth(),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 20.dp, vertical = 8.dp),
                 horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
+                verticalAlignment = Alignment.Top
             ) {
                 Column(modifier = Modifier.weight(1f)) {
                     Text(
-                        text = "Tagih Cepat via WhatsApp",
-                        fontSize = 17.sp,
+                        text = "Tagih via WhatsApp",
+                        fontSize = 16.sp,
                         fontWeight = FontWeight.Bold,
                         color = Color(0xFF0F172A)
                     )
+                    Spacer(modifier = Modifier.height(2.dp))
                     Text(
-                        text = "Teks dapat diedit sebelum dibagikan ke WhatsApp (tanpa API)",
+                        text = "Kirim rincian tagihan langsung ke nomor pelanggan",
                         fontSize = 12.sp,
                         color = Color(0xFF64748B)
                     )
                 }
-                IconButton(onClick = onDismiss, modifier = Modifier.size(32.dp)) {
+
+                Box(
+                    modifier = Modifier
+                        .size(32.dp)
+                        .clip(CircleShape)
+                        .background(Color(0xFFF1F5F9))
+                        .clickable { onDismiss() },
+                    contentAlignment = Alignment.Center
+                ) {
                     Icon(
-                        Icons.Outlined.Close,
+                        imageVector = Icons.Outlined.Close,
                         contentDescription = "Tutup",
-                        tint = Color(0xFF64748B),
-                        modifier = Modifier.size(18.dp)
+                        tint = Color(0xFF94A3B8),
+                        modifier = Modifier.size(16.dp)
                     )
                 }
             }
@@ -211,7 +284,9 @@ internal fun QuickBillBottomSheet(
                     color = Color(0xFFF8FAFC),
                     shape = RoundedCornerShape(12.dp),
                     border = BorderStroke(1.dp, Color(0xFFE2E8F0)),
-                    modifier = Modifier.fillMaxWidth()
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(20.dp)
                 ) {
                     Column(
                         modifier = Modifier.padding(24.dp),
@@ -245,16 +320,17 @@ internal fun QuickBillBottomSheet(
                         )
                     }
                 }
-            } else {
-                // Pemilih Pelanggan (jika lebih dari 1 pelanggan)
-                if (customersWithDebt.size > 1) {
-                    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                        Text(
-                            text = "Pilih Pelanggan:",
-                            fontSize = 12.sp,
-                            fontWeight = FontWeight.SemiBold,
-                            color = Color(0xFF475569)
-                        )
+            } else if (selectedCustomer != null) {
+                // Scrollable Content
+                Column(
+                    modifier = Modifier
+                        .weight(1f, fill = false)
+                        .verticalScroll(rememberScrollState())
+                        .padding(horizontal = 20.dp, vertical = 14.dp),
+                    verticalArrangement = Arrangement.spacedBy(16.dp)
+                ) {
+                    // Selection chip if > 1 customer
+                    if (customersWithDebt.size > 1) {
                         Row(
                             modifier = Modifier
                                 .fillMaxWidth()
@@ -266,14 +342,14 @@ internal fun QuickBillBottomSheet(
                                 Surface(
                                     onClick = { selectedCustomerId = item.id },
                                     shape = RoundedCornerShape(10.dp),
-                                    color = if (isSelected) Color(0xFF15803D) else Color(0xFFF8FAFC),
+                                    color = if (isSelected) Color(0xFF10533C) else Color(0xFFF8FAFC),
                                     border = BorderStroke(
                                         1.dp,
-                                        if (isSelected) Color(0xFF15803D) else Color(0xFFE2E8F0)
-                                    ),
+                                        if (isSelected) Color(0xFF10533C) else Color(0xFFE2E8F0)
+                                    )
                                 ) {
                                     Row(
-                                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
+                                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 7.dp),
                                         verticalAlignment = Alignment.CenterVertically,
                                         horizontalArrangement = Arrangement.spacedBy(6.dp)
                                     ) {
@@ -286,154 +362,143 @@ internal fun QuickBillBottomSheet(
                                         Text(
                                             text = item.totalRemaining.currencyText(),
                                             fontSize = 11.sp,
-                                            fontWeight = FontWeight.Normal,
-                                            color = if (isSelected) Color(0xFFDCFCE7) else Color(0xFF64748B)
+                                            color = if (isSelected) Color(0xFFD1FAE5) else Color(0xFF64748B)
                                         )
                                     }
                                 }
                             }
                         }
                     }
-                }
 
-                // Info Pelanggan Terpilih
-                if (selectedCustomer != null) {
-                    Surface(
-                        color = Color(0xFFF8FAFC),
-                        shape = RoundedCornerShape(14.dp),
-                        border = BorderStroke(1.dp, Color(0xFFE2E8F0)),
-                        modifier = Modifier.fillMaxWidth()
-                    ) {
-                        Column(
-                            modifier = Modifier.padding(14.dp),
-                            verticalArrangement = Arrangement.spacedBy(10.dp)
+                    // Section Customer Card
+                    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Text(
+                            text = "PILIH PELANGGAN",
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = Color(0xFF64748B),
+                            letterSpacing = 0.8.sp
+                        )
+
+                        Surface(
+                            color = Color.White,
+                            shape = RoundedCornerShape(12.dp),
+                            border = BorderStroke(1.dp, Color(0xFFE2E8F0)),
+                            shadowElevation = 0.5.dp,
+                            modifier = Modifier.fillMaxWidth()
                         ) {
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.SpaceBetween,
-                                verticalAlignment = Alignment.CenterVertically
+                            Column(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(14.dp)
                             ) {
+                                // Top Row: Avatar + Name + Phone and Total Piutang
                                 Row(
-                                    verticalAlignment = Alignment.CenterVertically,
-                                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                                    modifier = Modifier.weight(1f)
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                    verticalAlignment = Alignment.CenterVertically
                                 ) {
-                                    Box(
-                                        modifier = Modifier
-                                            .size(36.dp)
-                                            .background(Color(0xFFE2E8F0), CircleShape),
-                                        contentAlignment = Alignment.Center
+                                    Row(
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        horizontalArrangement = Arrangement.spacedBy(12.dp),
+                                        modifier = Modifier.weight(1f)
                                     ) {
-                                        Icon(
-                                            Icons.Outlined.Person,
-                                            contentDescription = null,
-                                            tint = Color(0xFF475569),
-                                            modifier = Modifier.size(18.dp)
-                                        )
-                                    }
-                                    Column {
-                                        Text(
-                                            text = selectedCustomer.name,
-                                            fontSize = 14.sp,
-                                            fontWeight = FontWeight.Bold,
-                                            color = Color(0xFF0F172A)
-                                        )
-                                        Row(
-                                            verticalAlignment = Alignment.CenterVertically,
-                                            horizontalArrangement = Arrangement.spacedBy(4.dp)
+                                        Box(
+                                            modifier = Modifier
+                                                .size(40.dp)
+                                                .background(Color(0xFF10533C).copy(alpha = 0.10f), CircleShape)
+                                                .border(
+                                                    BorderStroke(1.dp, Color(0xFF10533C).copy(alpha = 0.20f)),
+                                                    CircleShape
+                                                ),
+                                            contentAlignment = Alignment.Center
                                         ) {
-                                            Icon(
-                                                Icons.Outlined.Phone,
-                                                contentDescription = null,
-                                                tint = Color(0xFF94A3B8),
-                                                modifier = Modifier.size(12.dp)
+                                            Text(
+                                                text = getInitials(selectedCustomer.name),
+                                                fontSize = 12.sp,
+                                                fontWeight = FontWeight.Bold,
+                                                color = Color(0xFF10533C)
                                             )
+                                        }
+
+                                        Column {
+                                            Text(
+                                                text = selectedCustomer.name,
+                                                fontSize = 14.sp,
+                                                fontWeight = FontWeight.Bold,
+                                                color = Color(0xFF0F172A),
+                                                maxLines = 1
+                                            )
+                                            Spacer(modifier = Modifier.height(2.dp))
                                             Text(
                                                 text = selectedCustomer.phone ?: "No. WhatsApp belum diisi",
-                                                fontSize = 11.sp,
-                                                color = if (selectedCustomer.phone != null) Color(0xFF475569) else Color(0xFF94A3B8)
+                                                fontSize = 12.sp,
+                                                color = Color(0xFF64748B)
                                             )
                                         }
                                     }
+
+                                    Column(horizontalAlignment = Alignment.End) {
+                                        Text(
+                                            text = "Total Piutang",
+                                            fontSize = 11.sp,
+                                            fontWeight = FontWeight.Medium,
+                                            color = Color(0xFF64748B)
+                                        )
+                                        Spacer(modifier = Modifier.height(2.dp))
+                                        Text(
+                                            text = selectedCustomer.totalRemaining.currencyText(),
+                                            fontSize = 16.sp,
+                                            fontWeight = FontWeight.Bold,
+                                            color = Color(0xFF10533C)
+                                        )
+                                    }
                                 }
 
-                                Column(horizontalAlignment = Alignment.End) {
-                                    Text(
-                                        text = "Total Piutang",
-                                        fontSize = 10.sp,
-                                        color = Color(0xFF64748B)
-                                    )
-                                    Text(
-                                        text = selectedCustomer.totalRemaining.currencyText(),
-                                        fontSize = 14.sp,
-                                        fontWeight = FontWeight.Bold,
-                                        color = Color(0xFF0F172A)
-                                    )
-                                }
-                            }
+                                Spacer(modifier = Modifier.height(10.dp))
+                                HorizontalDivider(color = Color(0xFFF1F5F9))
+                                Spacer(modifier = Modifier.height(10.dp))
 
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.SpaceBetween,
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
+                                // Bottom Row: Unpaid Invoices count + Due Date
                                 Row(
-                                    verticalAlignment = Alignment.CenterVertically,
-                                    horizontalArrangement = Arrangement.spacedBy(4.dp)
-                                ) {
-                                    Icon(
-                                        Icons.AutoMirrored.Outlined.ReceiptLong,
-                                        contentDescription = null,
-                                        tint = Color(0xFF64748B),
-                                        modifier = Modifier.size(13.dp)
-                                    )
-                                    Text(
-                                        text = "${selectedCustomer.unpaidInvoices.size} Nota Belum Lunas",
-                                        fontSize = 11.sp,
-                                        color = Color(0xFF64748B)
-                                    )
-                                }
-
-                                if (selectedCustomer.overdueCount > 0) {
-                                    Text(
-                                        text = "${selectedCustomer.overdueCount} Jatuh Tempo",
-                                        fontSize = 11.sp,
-                                        fontWeight = FontWeight.SemiBold,
-                                        color = Color(0xFFE11D48)
-                                    )
-                                } else if (!selectedCustomer.nearestDue.isNullOrBlank()) {
-                                    Text(
-                                        text = "Tempo: ${selectedCustomer.nearestDue}",
-                                        fontSize = 11.sp,
-                                        fontWeight = FontWeight.Medium,
-                                        color = Color(0xFF64748B)
-                                    )
-                                }
-                            }
-
-                            // Banner info jika pelanggan memiliki nota banyak
-                            if (selectedCustomer.unpaidInvoices.size > 3) {
-                                Surface(
-                                    shape = RoundedCornerShape(8.dp),
-                                    color = Color(0xFFEFF6FF),
-                                    border = BorderStroke(1.dp, Color(0xFFBFDBFE))
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                    verticalAlignment = Alignment.CenterVertically
                                 ) {
                                     Row(
-                                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
                                         verticalAlignment = Alignment.CenterVertically,
                                         horizontalArrangement = Arrangement.spacedBy(6.dp)
                                     ) {
                                         Icon(
-                                            Icons.Outlined.Info,
+                                            imageVector = Icons.AutoMirrored.Outlined.ReceiptLong,
                                             contentDescription = null,
-                                            tint = Color(0xFF2563EB),
+                                            tint = Color(0xFF94A3B8),
                                             modifier = Modifier.size(14.dp)
                                         )
                                         Text(
-                                            text = "Pelanggan memiliki ${selectedCustomer.unpaidInvoices.size} nota. Format Rangkuman membuat pesan lebih rapi dan ringkas.",
+                                            text = "${selectedCustomer.unpaidInvoices.size} Nota Belum Lunas",
+                                            fontSize = 12.sp,
+                                            fontWeight = FontWeight.Medium,
+                                            color = Color(0xFF334155)
+                                        )
+                                    }
+
+                                    Row(
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        horizontalArrangement = Arrangement.spacedBy(4.dp)
+                                    ) {
+                                        Text(
+                                            text = "Jatuh Tempo:",
                                             fontSize = 11.sp,
-                                            color = Color(0xFF1E40AF),
-                                            lineHeight = 15.sp
+                                            color = Color(0xFF94A3B8)
+                                        )
+                                        val formattedDue = formatDateIndo(selectedCustomer.nearestDue)
+                                        val isOverdue = selectedCustomer.overdueCount > 0
+                                        Text(
+                                            text = formattedDue,
+                                            fontSize = 11.sp,
+                                            fontWeight = FontWeight.Medium,
+                                            color = if (isOverdue) Color(0xFFE11D48) else Color(0xFF334155)
                                         )
                                     }
                                 }
@@ -441,32 +506,56 @@ internal fun QuickBillBottomSheet(
                         }
                     }
 
-                    // Pilihan Format Pesan (Tab Ringkasan vs Rincian)
-                    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                    // Section Format Pesan
+                    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                         Text(
-                            text = "Format Pesan WhatsApp:",
-                            fontSize = 12.sp,
-                            fontWeight = FontWeight.SemiBold,
-                            color = Color(0xFF475569)
+                            text = "FORMAT PESAN",
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = Color(0xFF64748B),
+                            letterSpacing = 0.8.sp
                         )
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.spacedBy(8.dp)
-                        ) {
-                            QuickBillFormatMode.entries.forEach { mode ->
-                                val isSelected = formatMode == mode
-                                Surface(
-                                    onClick = { formatMode = mode },
-                                    shape = RoundedCornerShape(10.dp),
-                                    color = if (isSelected) Color(0xFF0F172A) else Color(0xFFF1F5F9),
-                                    modifier = Modifier.weight(1f).height(34.dp)
-                                ) {
-                                    Box(contentAlignment = Alignment.Center) {
+
+                        Box(modifier = Modifier.fillMaxWidth()) {
+                            HorizontalDivider(
+                                color = Color(0xFFE2E8F0),
+                                thickness = 1.dp,
+                                modifier = Modifier.align(Alignment.BottomCenter)
+                            )
+
+                            Row(modifier = Modifier.fillMaxWidth()) {
+                                QuickBillFormatMode.entries.forEach { mode ->
+                                    val isSelected = formatMode == mode
+                                    Column(
+                                        modifier = Modifier
+                                            .weight(1f)
+                                            .clickable {
+                                                if (formatMode != mode) {
+                                                    formatMode = mode
+                                                    editedMessageText = buildWhatsAppReminderText(
+                                                        customerName = selectedCustomer.name,
+                                                        totalRemainingText = selectedCustomer.totalRemaining.currencyText(),
+                                                        unpaidInvoices = selectedCustomer.unpaidInvoices,
+                                                        overdueCount = selectedCustomer.overdueCount,
+                                                        nearestDueDate = selectedCustomer.nearestDue,
+                                                        mode = mode
+                                                    )
+                                                }
+                                            },
+                                        horizontalAlignment = Alignment.CenterHorizontally
+                                    ) {
                                         Text(
                                             text = mode.label,
-                                            fontSize = 11.sp,
-                                            fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
-                                            color = if (isSelected) Color.White else Color(0xFF475569)
+                                            fontSize = 13.sp,
+                                            fontWeight = if (isSelected) FontWeight.SemiBold else FontWeight.Medium,
+                                            color = if (isSelected) Color(0xFF10533C) else Color(0xFF64748B),
+                                            modifier = Modifier.padding(bottom = 10.dp)
+                                        )
+                                        Box(
+                                            modifier = Modifier
+                                                .fillMaxWidth()
+                                                .height(2.dp)
+                                                .background(if (isSelected) Color(0xFF10533C) else Color.Transparent)
                                         )
                                     }
                                 }
@@ -474,162 +563,143 @@ internal fun QuickBillBottomSheet(
                         }
                     }
 
-                    // Editable Message Text Field
-                    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                    // Section Pratinjau Pesan
+                    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                         Row(
                             modifier = Modifier.fillMaxWidth(),
                             horizontalArrangement = Arrangement.SpaceBetween,
                             verticalAlignment = Alignment.CenterVertically
                         ) {
-                            Row(
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.spacedBy(4.dp)
-                            ) {
-                                Icon(
-                                    Icons.Outlined.Edit,
-                                    contentDescription = null,
-                                    tint = Color(0xFF475569),
-                                    modifier = Modifier.size(13.dp)
-                                )
-                                Text(
-                                    text = "Edit Teks Pesan:",
-                                    fontSize = 12.sp,
-                                    fontWeight = FontWeight.SemiBold,
-                                    color = Color(0xFF475569)
-                                )
-                            }
+                            Text(
+                                text = "Pratinjau Pesan",
+                                fontSize = 12.sp,
+                                fontWeight = FontWeight.SemiBold,
+                                color = Color(0xFF334155)
+                            )
 
-                            Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                                // Tombol Reset ke Default Template
-                                Surface(
-                                    onClick = {
-                                        editedMessageText = buildWhatsAppReminderText(
-                                            customerName = selectedCustomer.name,
-                                            totalRemainingText = selectedCustomer.totalRemaining.currencyText(),
-                                            unpaidInvoices = selectedCustomer.unpaidInvoices,
-                                            overdueCount = selectedCustomer.overdueCount,
-                                            nearestDueDate = selectedCustomer.nearestDue,
-                                            mode = formatMode
-                                        )
-                                        Toast.makeText(context, "Teks di-reset ke template awal", Toast.LENGTH_SHORT).show()
-                                    },
-                                    shape = RoundedCornerShape(6.dp),
-                                    color = Color.Transparent
+                            Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                                // Tombol Reset
+                                Box(
+                                    modifier = Modifier
+                                        .size(32.dp)
+                                        .clip(RoundedCornerShape(8.dp))
+                                        .clickable {
+                                            editedMessageText = buildWhatsAppReminderText(
+                                                customerName = selectedCustomer.name,
+                                                totalRemainingText = selectedCustomer.totalRemaining.currencyText(),
+                                                unpaidInvoices = selectedCustomer.unpaidInvoices,
+                                                overdueCount = selectedCustomer.overdueCount,
+                                                nearestDueDate = selectedCustomer.nearestDue,
+                                                mode = formatMode
+                                            )
+                                            Toast.makeText(context, "Format pesan dipulihkan", Toast.LENGTH_SHORT).show()
+                                        },
+                                    contentAlignment = Alignment.Center
                                 ) {
-                                    Row(
-                                        modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
-                                        verticalAlignment = Alignment.CenterVertically,
-                                        horizontalArrangement = Arrangement.spacedBy(3.dp)
-                                    ) {
-                                        Icon(
-                                            Icons.Outlined.Refresh,
-                                            contentDescription = null,
-                                            tint = Color(0xFF64748B),
-                                            modifier = Modifier.size(13.dp)
-                                        )
-                                        Text(
-                                            text = "Reset",
-                                            fontSize = 11.sp,
-                                            fontWeight = FontWeight.Medium,
-                                            color = Color(0xFF64748B)
-                                        )
-                                    }
+                                    Icon(
+                                        imageVector = Icons.Outlined.Refresh,
+                                        contentDescription = "Pulihkan format awal",
+                                        tint = Color(0xFF64748B),
+                                        modifier = Modifier.size(16.dp)
+                                    )
                                 }
 
-                                // Tombol Salin Teks
-                                Surface(
-                                    onClick = {
-                                        copyTextToClipboard(context, "Pesan Tagihan", editedMessageText)
-                                        Toast.makeText(context, "Teks pesan berhasil disalin!", Toast.LENGTH_SHORT).show()
-                                    },
-                                    shape = RoundedCornerShape(6.dp),
-                                    color = Color.Transparent
+                                // Tombol Copy
+                                Box(
+                                    modifier = Modifier
+                                        .size(32.dp)
+                                        .clip(RoundedCornerShape(8.dp))
+                                        .clickable {
+                                            copyTextToClipboard(context, "Pesan Tagihan", editedMessageText)
+                                            Toast.makeText(context, "Teks pesan berhasil disalin!", Toast.LENGTH_SHORT).show()
+                                        },
+                                    contentAlignment = Alignment.Center
                                 ) {
-                                    Row(
-                                        modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
-                                        verticalAlignment = Alignment.CenterVertically,
-                                        horizontalArrangement = Arrangement.spacedBy(3.dp)
-                                    ) {
-                                        Icon(
-                                            Icons.Outlined.ContentCopy,
-                                            contentDescription = null,
-                                            tint = Color(0xFF15803D),
-                                            modifier = Modifier.size(13.dp)
-                                        )
-                                        Text(
-                                            text = "Salin",
-                                            fontSize = 11.sp,
-                                            fontWeight = FontWeight.Medium,
-                                            color = Color(0xFF15803D)
-                                        )
-                                    }
+                                    Icon(
+                                        imageVector = Icons.Outlined.ContentCopy,
+                                        contentDescription = "Salin teks",
+                                        tint = Color(0xFF64748B),
+                                        modifier = Modifier.size(16.dp)
+                                    )
                                 }
                             }
                         }
 
-                        OutlinedTextField(
-                            value = editedMessageText,
-                            onValueChange = { editedMessageText = it },
-                            modifier = Modifier.fillMaxWidth(),
-                            textStyle = TextStyle(
-                                fontSize = 11.sp,
-                                color = Color(0xFF14532D),
-                                lineHeight = 16.sp,
-                                fontFamily = FontFamily.Default
-                            ),
+                        // Message Text Box
+                        Surface(
+                            color = Color.White,
                             shape = RoundedCornerShape(12.dp),
-                            minLines = 7,
-                            maxLines = 14,
-                            colors = OutlinedTextFieldDefaults.colors(
-                                focusedContainerColor = Color(0xFFF0FDF4),
-                                unfocusedContainerColor = Color(0xFFF0FDF4),
-                                focusedBorderColor = Color(0xFF15803D),
-                                unfocusedBorderColor = Color(0xFFDCFCE7),
-                                cursorColor = Color(0xFF15803D)
+                            border = BorderStroke(1.dp, Color(0xFFCBD5E1)),
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            BasicTextField(
+                                value = editedMessageText,
+                                onValueChange = { editedMessageText = it },
+                                textStyle = TextStyle(
+                                    fontSize = 12.sp,
+                                    color = Color(0xFF1E293B),
+                                    lineHeight = 18.sp,
+                                    fontFamily = FontFamily.Default
+                                ),
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(14.dp)
+                                    .heightIn(min = 160.dp, max = 280.dp),
+                                cursorBrush = SolidColor(Color(0xFF10533C))
                             )
-                        )
-                        Text(
-                            text = "💡 Tip: Anda dapat menambahkan nomor rekening bank, catatan khusus, atau salam sebelum mengirim.",
-                            fontSize = 11.sp,
-                            color = Color(0xFF64748B),
-                            lineHeight = 14.sp
-                        )
+                        }
                     }
+                }
 
-                    // Tombol Aksi Utama (Bagikan ke WhatsApp)
-                    Surface(
-                        onClick = {
-                            shareReminderViaWhatsApp(
-                                context = context,
-                                message = editedMessageText,
-                                phoneNumber = selectedCustomer.phone
-                            )
-                        },
-                        shape = RoundedCornerShape(12.dp),
-                        color = Color(0xFF15803D),
-                        contentColor = Color.White,
+                // Sticky Bottom CTA (Footer)
+                Surface(
+                    color = Color.White,
+                    border = BorderStroke(1.dp, Color(0xFFF1F5F9)),
+                    shadowElevation = 8.dp,
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Column(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .height(44.dp)
+                            .navigationBarsPadding()
+                            .padding(horizontal = 20.dp, vertical = 14.dp)
                     ) {
-                        Row(
-                            modifier = Modifier.padding(horizontal = 14.dp),
-                            horizontalArrangement = Arrangement.Center,
-                            verticalAlignment = Alignment.CenterVertically
+                        Button(
+                            onClick = {
+                                shareReminderViaWhatsApp(
+                                    context = context,
+                                    message = editedMessageText,
+                                    phoneNumber = selectedCustomer.phone
+                                )
+                            },
+                            shape = RoundedCornerShape(12.dp),
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = Color(0xFF10533C),
+                                contentColor = Color.White
+                            ),
+                            contentPadding = PaddingValues(vertical = 12.dp),
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(48.dp)
                         ) {
-                            Icon(
-                                Icons.Outlined.Share,
-                                contentDescription = null,
-                                tint = Color.White,
-                                modifier = Modifier.size(17.dp)
-                            )
-                            Spacer(Modifier.width(8.dp))
-                            Text(
-                                text = "Bagikan ke WhatsApp",
-                                fontSize = 13.sp,
-                                fontWeight = FontWeight.Bold,
-                                color = Color.White
-                            )
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.Center
+                            ) {
+                                Icon(
+                                    painter = painterResource(id = R.drawable.ic_whatsapp),
+                                    contentDescription = null,
+                                    tint = Color.White,
+                                    modifier = Modifier.size(18.dp)
+                                )
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Text(
+                                    text = "Kirim ke WhatsApp",
+                                    fontSize = 14.sp,
+                                    fontWeight = FontWeight.SemiBold,
+                                    color = Color.White
+                                )
+                            }
                         }
                     }
                 }
@@ -639,10 +709,9 @@ internal fun QuickBillBottomSheet(
 }
 
 /**
- * Format pesan WhatsApp yang rapi, profesional, dan nyaman dibaca.
- * Menangani pelanggan dengan banyak nota secara cerdas:
- * - Mode Summary: Rangkuman total + status nota (sangat cocok untuk banyak nota).
- * - Mode Detailed: Rincian nota prioritas (top 4-5 nota tertua/jatuh tempo) + ringkasan sisa nota.
+ * Format teks pengingat WhatsApp sesuai format mockup resmi:
+ * - Summary: Rangkuman ringkas dan ramah.
+ * - Detailed: Rincian nota terstruktur dengan nomor nota, tanggal, jatuh tempo, dan nominal.
  */
 private fun buildWhatsAppReminderText(
     customerName: String,
@@ -653,62 +722,116 @@ private fun buildWhatsAppReminderText(
     mode: QuickBillFormatMode,
     storeName: String = "Terminal Barokah Jaya"
 ): String {
-    val sb = StringBuilder()
-    sb.appendLine("*PENGINGAT TAGIHAN PIUTANG*")
-    sb.appendLine("*$storeName*")
-    sb.appendLine("━━━━━━━━━━━━━━━━━━━━")
-    sb.appendLine("Yth. Bapak/Ibu *$customerName*,")
-    sb.appendLine()
-    sb.appendLine("Semoga Bapak/Ibu senantiasa dalam keadaan sehat.")
-    sb.appendLine("Kami menginformasikan rekap tagihan piutang Anda di *$storeName*:")
-    sb.appendLine()
-    sb.appendLine("💰 *Total Sisa Tagihan:* *$totalRemainingText*")
-    
-    val totalNota = unpaidInvoices.size
-    val notaStatusDesc = when {
-        overdueCount > 0 -> "$totalNota Nota ($overdueCount Jatuh Tempo)"
-        else -> "$totalNota Nota"
-    }
-    sb.appendLine("📑 *Jumlah Tagihan:* $notaStatusDesc")
+    val formattedNearestDue = formatDateIndo(nearestDueDate)
 
-    if (!nearestDueDate.isNullOrBlank()) {
-        sb.appendLine("⏰ *Jatuh Tempo Terdekat:* $nearestDueDate")
-    }
-
-    if (mode == QuickBillFormatMode.Detailed && unpaidInvoices.isNotEmpty()) {
-        sb.appendLine()
-        sb.appendLine("📋 *Rincian Nota:*")
-
-        // Urutkan nota: yang jatuh tempo duluan / tanggal terlama di atas
-        val sortedList = unpaidInvoices.sortedBy { it.dueDate }
-        val maxShow = 5
-        val displayItems = sortedList.take(maxShow)
-        val remainingCount = sortedList.size - displayItems.size
-
-        displayItems.forEachIndexed { idx, item ->
-            val ref = item.legacyInvoiceNumber?.takeIf(String::isNotBlank)
-                ?: item.transactionId?.takeIf(String::isNotBlank)
-                ?: item.id.take(8).uppercase()
-            val due = item.dueDate.take(10)
-            val isOverdue = runCatching { LocalDate.parse(due).isBefore(LocalDate.now()) }.getOrDefault(false)
-            val dueStatus = if (isOverdue) " _(Jatuh tempo)_" else " _(Tempo: $due)_"
-            sb.appendLine("${idx + 1}. Nota #$ref • ${item.remainingAmount.currencyText()}$dueStatus")
+    return when (mode) {
+        QuickBillFormatMode.Summary -> {
+            buildString {
+                appendLine("Halo Bapak/Ibu $customerName,")
+                appendLine()
+                appendLine("Kami menginformasikan rekap tagihan piutang Anda di $storeName:")
+                appendLine()
+                appendLine("• Total Sisa Tagihan: $totalRemainingText")
+                appendLine("• Jumlah Nota: ${unpaidInvoices.size} Nota Belum Lunas")
+                appendLine("• Jatuh Tempo Terdekat: $formattedNearestDue")
+                appendLine()
+                appendLine("Pembayaran dapat dilakukan langsung di kasir toko atau transfer rekening.")
+                appendLine()
+                appendLine("Terima kasih atas kerja sama dan kepercayaannya.")
+                append(storeName)
+            }
         }
+        QuickBillFormatMode.Detailed -> {
+            val sortedInvoices = unpaidInvoices.sortedBy { it.dueDate }
+            buildString {
+                appendLine("*PENGINGAT TAGIHAN PIUTANG*")
+                appendLine("*$storeName*")
+                appendLine("───────────────────────────────")
+                appendLine()
+                appendLine("Yth. *Bapak/Ibu $customerName*,")
+                appendLine()
+                appendLine("Semoga Bapak/Ibu senantiasa dalam keadaan sehat dan lancar rezeki.")
+                appendLine()
+                appendLine("Kami menginformasikan rincian nota piutang yang tercatat di toko kami:")
+                appendLine()
+                appendLine("📋 *RINCIAN NOTA:*")
+                if (sortedInvoices.size <= 1) {
+                    val inv = sortedInvoices.firstOrNull()
+                    val ref = inv?.legacyInvoiceNumber?.takeIf(String::isNotBlank)
+                        ?: inv?.transactionId?.takeIf(String::isNotBlank)?.let {
+                            if (it.length > 12) "INV-${it.take(8).uppercase()}" else it
+                        }
+                        ?: "INV-${inv?.id?.take(8)?.uppercase() ?: "0000"}"
+                    val invNo = if (ref.startsWith("#")) ref else "#$ref"
+                    val date = formatDateIndo(inv?.debtDate?.ifBlank { inv.createdAt })
+                    val due = formatDateIndo(inv?.dueDate)
+                    val amount = inv?.remainingAmount?.currencyText() ?: totalRemainingText
 
-        if (remainingCount > 0) {
-            val remainingSum = sortedList.drop(maxShow).sumOf { it.remainingAmount }
-            sb.appendLine("_(...dan $remainingCount nota lainnya senilai ${remainingSum.currencyText()})_")
+                    appendLine("• No. Nota : *$invNo*")
+                    appendLine("• Tanggal  : $date")
+                    appendLine("• Jth. Tempo: *$due*")
+                    appendLine("• Nominal  : *$amount*")
+                } else {
+                    sortedInvoices.forEachIndexed { idx, inv ->
+                        val ref = inv.legacyInvoiceNumber?.takeIf(String::isNotBlank)
+                            ?: inv.transactionId?.takeIf(String::isNotBlank)?.let {
+                                if (it.length > 12) "INV-${it.take(8).uppercase()}" else it
+                            }
+                            ?: "INV-${inv.id.take(8).uppercase()}"
+                        val invNo = if (ref.startsWith("#")) ref else "#$ref"
+                        val date = formatDateIndo(inv.debtDate.ifBlank { inv.createdAt })
+                        val due = formatDateIndo(inv.dueDate)
+                        val amount = inv.remainingAmount.currencyText()
+
+                        appendLine("${idx + 1}. No. Nota : *$invNo*")
+                        appendLine("   • Tanggal  : $date")
+                        appendLine("   • Jth. Tempo: *$due*")
+                        appendLine("   • Nominal  : *$amount*")
+                        if (idx < sortedInvoices.lastIndex) appendLine()
+                    }
+                }
+                appendLine()
+                appendLine("💰 *TOTAL TAGIHAN : $totalRemainingText*")
+                appendLine()
+                appendLine("💳 *Metode Pembayaran:*")
+                appendLine("1. Langsung di kasir toko *$storeName*")
+                appendLine("2. Transfer via Bank/QRIS (hubungi kami untuk rekening tujuan)")
+                appendLine()
+                appendLine("_Apabila telah melakukan pembayaran, mohon konfirmasi bukti transfer atau abaikan pesan ini._")
+                appendLine()
+                appendLine("Terima kasih atas kepercayaan dan kerja samanya.")
+                appendLine()
+                appendLine("Salam hangat,")
+                append("*Kasir $storeName*")
+            }
         }
     }
+}
 
-    sb.appendLine()
-    sb.appendLine("Pembayaran dapat diselesaikan langsung di kasir toko atau transfer rekening.")
-    sb.appendLine("Apabila ada pertanyaan mengenai rincian nota atau sudah melakukan pembayaran, silakan hubungi kami.")
-    sb.appendLine()
-    sb.appendLine("Terima kasih atas kerja sama dan kepercayaannya. 🙏")
-    sb.appendLine()
-    sb.appendLine("*$storeName*")
-    return sb.toString().trimEnd()
+private fun String.toTitleCase(): String {
+    return split(" ").joinToString(" ") { word ->
+        word.replaceFirstChar { if (it.isLowerCase()) it.titlecase(Locale.getDefault()) else it.toString() }
+    }
+}
+
+private fun getInitials(name: String): String {
+    val trimmed = name.trim()
+    if (trimmed.isEmpty()) return "PL"
+    val parts = trimmed.split("\\s+".toRegex()).filter { it.isNotEmpty() }
+    return when {
+        parts.size >= 2 -> "${parts[0].first().uppercaseChar()}${parts[1].first().uppercaseChar()}"
+        parts.isNotEmpty() -> parts[0].take(2).uppercase()
+        else -> "PL"
+    }
+}
+
+private fun formatDateIndo(dateStr: String?): String {
+    if (dateStr.isNullOrBlank()) return "-"
+    return runCatching {
+        val parsed = LocalDate.parse(dateStr.take(10))
+        val formatter = DateTimeFormatter.ofPattern("dd MMM yyyy", Locale.forLanguageTag("id-ID"))
+        parsed.format(formatter)
+    }.getOrDefault(dateStr.take(10))
 }
 
 internal fun shareReminderViaWhatsApp(

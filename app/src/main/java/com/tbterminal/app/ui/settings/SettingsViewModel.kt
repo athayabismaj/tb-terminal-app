@@ -32,6 +32,14 @@ data class SettingsUiState(
     val phone: String = "",
     val receiptHeader: String = "TB Terminal",
     val receiptFooter: String = "Terima kasih telah berbelanja.",
+    val taxEnabled: Boolean = false,
+    val taxRateInput: String = "11",
+    val taxMode: String = "EXCLUDE",
+    val taxLabel: String = "PPN",
+    val storeNpwp: String = "",
+    val cashierDiscountLimitInput: String = "10",
+    val cashRoundingUnit: Int = 0,
+    val cashRoundingRule: String = "NEAREST",
     val printerSize: String = "58mm",
     val cashTolerance: String = "0",
     val autoLockMinutes: String = "15",
@@ -107,6 +115,26 @@ class SettingsViewModel(
             _uiState.update { it.copy(error = "Nama toko tidak boleh kosong.", message = null) }
             return
         }
+        val parsedTaxRate = state.taxRateInput.trim().replace(',', '.').toBigDecimalOrNull()
+        if (parsedTaxRate == null || parsedTaxRate < BigDecimal.ZERO || parsedTaxRate > BigDecimal("100") || parsedTaxRate.scale() > 2) {
+            _uiState.update { it.copy(error = "Tarif pajak harus antara 0 - 100 dan maksimal 2 desimal.", message = null) }
+            return
+        }
+        val cleanedTaxLabel = state.taxLabel.trim().ifBlank { "PPN" }
+        if (cleanedTaxLabel.length > 50) {
+            _uiState.update { it.copy(error = "Label pajak maksimal 50 karakter.", message = null) }
+            return
+        }
+        val cleanedNpwp = state.storeNpwp.trim()
+        if (cleanedNpwp.length > 50) {
+            _uiState.update { it.copy(error = "NPWP toko maksimal 50 karakter.", message = null) }
+            return
+        }
+        val parsedDiscountLimit = state.cashierDiscountLimitInput.trim().replace(',', '.').toBigDecimalOrNull()
+        if (parsedDiscountLimit == null || parsedDiscountLimit < BigDecimal.ZERO || parsedDiscountLimit > BigDecimal("100") || parsedDiscountLimit.scale() > 2) {
+            _uiState.update { it.copy(error = "Batas diskon kasir harus antara 0 - 100 dan maksimal 2 desimal.", message = null) }
+            return
+        }
 
         viewModelScope.launch {
             _uiState.update { it.copy(isSaving = true, error = null, message = null) }
@@ -116,7 +144,15 @@ class SettingsViewModel(
                 phone = state.phone.trim().takeIf(String::isNotBlank),
                 receiptHeader = state.receiptHeader.trim().takeIf(String::isNotBlank),
                 receiptFooter = state.receiptFooter.trim().takeIf(String::isNotBlank),
-                printerSize = state.printerSize
+                printerSize = state.printerSize,
+                cashierDiscountLimitPercent = parsedDiscountLimit.setScale(2, java.math.RoundingMode.HALF_UP),
+                taxEnabled = state.taxEnabled,
+                taxRate = parsedTaxRate.setScale(2, java.math.RoundingMode.HALF_UP),
+                taxMode = state.taxMode,
+                taxLabel = cleanedTaxLabel,
+                storeNpwp = cleanedNpwp,
+                cashRoundingUnit = state.cashRoundingUnit,
+                cashRoundingRule = state.cashRoundingRule
             )
 
             when (val result = systemRepository.updateStoreSettings(command)) {
@@ -242,6 +278,16 @@ class SettingsViewModel(
     fun onPhoneChanged(value: String) = _uiState.update { it.copy(phone = value, error = null) }
     fun onReceiptHeaderChanged(value: String) = _uiState.update { it.copy(receiptHeader = value, error = null) }
     fun onReceiptFooterChanged(value: String) = _uiState.update { it.copy(receiptFooter = value, error = null) }
+    fun onTaxEnabledChanged(value: Boolean) = _uiState.update { it.copy(taxEnabled = value, error = null) }
+    fun onTaxRateChanged(value: String) = _uiState.update { it.copy(taxRateInput = value.filter { c -> c.isDigit() || c == '.' || c == ',' }.take(6), error = null) }
+    fun onTaxModeChanged(value: String) = _uiState.update { it.copy(taxMode = value, error = null) }
+    fun onTaxLabelChanged(value: String) = _uiState.update { it.copy(taxLabel = value.take(50), error = null) }
+    fun onStoreNpwpChanged(value: String) = _uiState.update { it.copy(storeNpwp = value.take(50), error = null) }
+    fun onCashierDiscountLimitChanged(value: String) = _uiState.update {
+        it.copy(cashierDiscountLimitInput = value.filter { c -> c.isDigit() || c == '.' || c == ',' }.take(6), error = null)
+    }
+    fun onCashRoundingUnitChanged(value: Int) = _uiState.update { it.copy(cashRoundingUnit = value, error = null) }
+    fun onCashRoundingRuleChanged(value: String) = _uiState.update { it.copy(cashRoundingRule = value, error = null) }
     fun onPrinterSizeChanged(value: String) = _uiState.update { it.copy(printerSize = value, error = null) }
     fun onCashToleranceChanged(value: String) = _uiState.update {
         it.copy(cashTolerance = sanitizeMoneyInput(value), error = null)
@@ -360,7 +406,8 @@ class SettingsViewModel(
         it.copy(error = "Layanan cetak Android tidak tersedia pada perangkat ini.", message = null)
     }
 
-    private fun applyStoreSettings(settings: StoreSettings, message: String? = null) {
+    private suspend fun applyStoreSettings(settings: StoreSettings, message: String? = null) {
+        runCatching { localAppSettingsDataSource.setCachedStoreConfig(settings) }
         _uiState.update {
             it.copy(
                 isLoading = false,
@@ -372,6 +419,14 @@ class SettingsViewModel(
                 phone = settings.phone.orEmpty(),
                 receiptHeader = settings.receiptHeader.orEmpty(),
                 receiptFooter = settings.receiptFooter.orEmpty(),
+                taxEnabled = settings.taxEnabled,
+                taxRateInput = settings.taxRate.stripTrailingZeros().toPlainString(),
+                taxMode = settings.taxMode,
+                taxLabel = settings.taxLabel,
+                storeNpwp = settings.storeNpwp.orEmpty(),
+                cashierDiscountLimitInput = settings.cashierDiscountLimitPercent.stripTrailingZeros().toPlainString(),
+                cashRoundingUnit = settings.cashRoundingUnit,
+                cashRoundingRule = settings.cashRoundingRule,
                 printerSize = it.printerSize
             )
         }

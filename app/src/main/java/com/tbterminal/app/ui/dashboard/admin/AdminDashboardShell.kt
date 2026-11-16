@@ -61,6 +61,7 @@ fun AdminDashboardShell(
     pageTitle: String? = null,
     onBack: (() -> Unit)? = null,
     showPageHeader: Boolean = true,
+    showBottomBar: Boolean = true,
     topBarActions: @Composable androidx.compose.foundation.layout.RowScope.() -> Unit = {},
     onLogout: () -> Unit,
     content: @Composable (Modifier) -> Unit
@@ -98,6 +99,7 @@ fun AdminDashboardShell(
             onProfileClick = navigateOrFallback(AdminDestination.Profile, onProfileClick),
             onSettingsClick = navigateOrFallback(AdminDestination.Settings, onSettingsClick),
             onLogout = onLogout,
+            showProfileMenu = activeDestination.isCashierPrimaryDestination(),
             topBarActions = {
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
@@ -106,6 +108,7 @@ fun AdminDashboardShell(
                     topBarActions()
                 }
             },
+            showBottomBar = showBottomBar,
             content = content,
         )
         return
@@ -127,6 +130,8 @@ fun AdminDashboardShell(
         onBack = onBack,
         topBarActions = topBarActions,
         showPageHeader = showPageHeader,
+        showProfileMenu = activeDestination.isBackofficeRootDestination(),
+        showBottomBar = showBottomBar,
     ) { contentModifier ->
         content(contentModifier)
     }
@@ -159,6 +164,15 @@ internal fun AdminDestination.isBackofficeRootDestination(): Boolean = when (thi
     AdminDestination.FinanceHub,
     AdminDestination.StockHub,
     AdminDestination.MoreHub -> true
+    else -> false
+}
+
+internal fun AdminDestination.isCashierPrimaryDestination(): Boolean = when (this) {
+    AdminDestination.Dashboard,
+    AdminDestination.NewTransaction,
+    AdminDestination.CashierCashSession,
+    AdminDestination.CashierTransactionHistory,
+    AdminDestination.Receivables -> true
     else -> false
 }
 

@@ -221,7 +221,7 @@ private fun CashPagination(
         totalPages = uiState.totalPages,
         onPreviousPage = onPreviousPage,
         onNextPage = onNextPage,
-        supportingText = "Menampilkan ${uiState.currentStart}-${uiState.currentEnd} dari ${uiState.total} transaksi",
+        supportingText = if (uiState.total == 0L) "0 transaksi" else "${uiState.total} transaksi",
         isLoading = uiState.isLoading,
         testTag = "cash-reconciliation-pagination",
     )

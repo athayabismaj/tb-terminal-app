@@ -49,3 +49,103 @@ internal fun checkoutChange(amountPaidInput: String, total: BigDecimal): BigDeci
     val amount = amountPaidInput.toBigDecimalOrNull() ?: return BigDecimal.ZERO
     return amount.subtract(total).coerceAtLeast(BigDecimal.ZERO)
 }
+
+internal data class SplitPaymentValidationResult(
+    val totalTendered: BigDecimal = BigDecimal.ZERO,
+    val cashTendered: BigDecimal = BigDecimal.ZERO,
+    val nonCashPaid: BigDecimal = BigDecimal.ZERO,
+    val changeAmount: BigDecimal = BigDecimal.ZERO,
+    val remainingReceivable: BigDecimal = BigDecimal.ZERO,
+    val error: String? = null
+)
+
+internal fun validateSplitCheckoutPayment(
+    lines: List<SplitPaymentLineUi>,
+    total: BigDecimal,
+    isDpMode: Boolean,
+    customerSelected: Boolean,
+): SplitPaymentValidationResult {
+    if (total < BigDecimal.ZERO) return SplitPaymentValidationResult(error = "Total transaksi tidak boleh negatif.")
+    if (lines.isEmpty()) return SplitPaymentValidationResult(error = "Tambahkan minimal 1 metode pembayaran.")
+    if (lines.size > 5) return SplitPaymentValidationResult(error = "Maksimal 5 metode pembayaran.")
+    if (lines.count { it.method == PaymentMethod.TUNAI } > 1) {
+        return SplitPaymentValidationResult(error = "Maksimal 1 baris pembayaran Tunai.")
+    }
+    if (lines.any { it.method == PaymentMethod.HUTANG || it.method == PaymentMethod.DP }) {
+        return SplitPaymentValidationResult(error = "Split payment hanya mendukung Tunai, Transfer, atau QRIS.")
+    }
+
+    var nonCash = BigDecimal.ZERO
+    var cash = BigDecimal.ZERO
+    for (line in lines) {
+        val amt = line.amountInput.trim().replace(',', '.').toBigDecimalOrNull()
+            ?: return SplitPaymentValidationResult(error = "Nominal split payment belum valid.")
+        if (amt <= BigDecimal.ZERO && total > BigDecimal.ZERO) {
+            return SplitPaymentValidationResult(error = "Setiap nominal pembayaran harus lebih dari nol.")
+        }
+        if (amt < BigDecimal.ZERO || amt.scale() > 2) {
+            return SplitPaymentValidationResult(error = "Nominal maksimal 2 desimal dan tidak boleh negatif.")
+        }
+        if (line.method == PaymentMethod.TUNAI) {
+            cash = cash.add(amt)
+        } else {
+            nonCash = nonCash.add(amt)
+        }
+    }
+
+    val tendered = nonCash.add(cash)
+    if (nonCash > total) {
+        return SplitPaymentValidationResult(
+            totalTendered = tendered,
+            cashTendered = cash,
+            nonCashPaid = nonCash,
+            error = "Total pembayaran non-tunai melebihi total tagihan."
+        )
+    }
+
+    return if (isDpMode) {
+        when {
+            !customerSelected -> SplitPaymentValidationResult(
+                totalTendered = tendered,
+                cashTendered = cash,
+                nonCashPaid = nonCash,
+                error = "DP split wajib memilih pelanggan terdaftar."
+            )
+            tendered <= BigDecimal.ZERO || tendered >= total -> SplitPaymentValidationResult(
+                totalTendered = tendered,
+                cashTendered = cash,
+                nonCashPaid = nonCash,
+                error = "Total DP harus lebih dari nol dan kurang dari total tagihan."
+            )
+            else -> SplitPaymentValidationResult(
+                totalTendered = tendered,
+                cashTendered = cash,
+                nonCashPaid = nonCash,
+                remainingReceivable = total.subtract(tendered).coerceAtLeast(BigDecimal.ZERO)
+            )
+        }
+    } else {
+        if (tendered < total) {
+            SplitPaymentValidationResult(
+                totalTendered = tendered,
+                cashTendered = cash,
+                nonCashPaid = nonCash,
+                error = "Total pembayaran split kurang dari tagihan."
+            )
+        } else if (cash > BigDecimal.ZERO && nonCash.compareTo(total) == 0) {
+            SplitPaymentValidationResult(
+                totalTendered = tendered,
+                cashTendered = cash,
+                nonCashPaid = nonCash,
+                error = "Non-tunai sudah lunas; hapus baris tunai."
+            )
+        } else {
+            SplitPaymentValidationResult(
+                totalTendered = tendered,
+                cashTendered = cash,
+                nonCashPaid = nonCash,
+                changeAmount = tendered.subtract(total).coerceAtLeast(BigDecimal.ZERO)
+            )
+        }
+    }
+}

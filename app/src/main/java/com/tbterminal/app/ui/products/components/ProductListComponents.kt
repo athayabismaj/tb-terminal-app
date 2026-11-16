@@ -35,6 +35,7 @@ import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.outlined.Check
 import androidx.compose.material.icons.outlined.Close
 import androidx.compose.material.icons.outlined.ExpandMore
+import androidx.compose.material.icons.outlined.QrCode2
 import androidx.compose.material.icons.outlined.Search
 import androidx.compose.material.icons.outlined.Tune
 import androidx.compose.material.icons.outlined.UploadFile
@@ -211,6 +212,7 @@ internal fun ProductListToolbar(
     onCategorySelected: (String) -> Unit,
     onAddProductClick: (() -> Unit)? = null,
     onImportProductClick: (() -> Unit)? = null,
+    onBatchPrintClick: (() -> Unit)? = null,
     compact: Boolean = false
 ) {
     var categoriesExpanded by remember { mutableStateOf(false) }
@@ -362,6 +364,26 @@ internal fun ProductListToolbar(
                     fontWeight = FontWeight.SemiBold,
                 )
                 filter(Modifier.fillMaxWidth())
+                onBatchPrintClick?.let { onBatchPrint ->
+                    OutlinedButton(
+                        onClick = {
+                            showMobileFilters = false
+                            onBatchPrint()
+                        },
+                        modifier = Modifier.fillMaxWidth().height(50.dp).testTag("product-mobile-batch-print"),
+                        shape = RoundedCornerShape(14.dp),
+                        border = BorderStroke(1.dp, ProductLine.copy(alpha = 0.7f)),
+                        contentPadding = PaddingValues(horizontal = 14.dp),
+                    ) {
+                        Icon(
+                            Icons.Outlined.QrCode2,
+                            contentDescription = null,
+                            modifier = Modifier.size(19.dp)
+                        )
+                        Spacer(Modifier.width(7.dp))
+                        Text("Cetak Label Massal", maxLines = 1)
+                    }
+                }
                 onImportProductClick?.let { onImport ->
                     OutlinedButton(
                         onClick = {
@@ -391,6 +413,23 @@ internal fun ProductListToolbar(
     ) {
         search(Modifier.weight(1f))
         filter(Modifier.width(220.dp))
+        onBatchPrintClick?.let { onBatchPrint ->
+            OutlinedButton(
+                onClick = onBatchPrint,
+                modifier = Modifier.height(52.dp).testTag("product-batch-print"),
+                shape = RoundedCornerShape(14.dp),
+                border = BorderStroke(1.dp, ProductLine.copy(alpha = 0.7f)),
+                contentPadding = PaddingValues(horizontal = 16.dp),
+            ) {
+                Icon(
+                    Icons.Outlined.QrCode2,
+                    contentDescription = null,
+                    modifier = Modifier.size(19.dp)
+                )
+                Spacer(Modifier.width(7.dp))
+                Text("Label Massal", maxLines = 1)
+            }
+        }
         onImportProductClick?.let { onImport ->
             OutlinedButton(
                 onClick = onImport,

@@ -1634,7 +1634,7 @@ private fun CustomerPagination(uiState: CustomerListUiState, compact: Boolean, o
         onPreviousPage = onPreviousPage,
         onNextPage = onNextPage,
         modifier = Modifier.padding(horizontal = 4.dp, vertical = 8.dp),
-        supportingText = "${uiState.currentStart}-${uiState.currentEnd} dari ${uiState.totalCustomers} pelanggan",
+        supportingText = "${uiState.totalCustomers} pelanggan",
         isLoading = uiState.isLoading,
         testTag = "customer-pagination",
     )

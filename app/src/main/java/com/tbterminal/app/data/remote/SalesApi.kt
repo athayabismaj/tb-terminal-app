@@ -5,6 +5,7 @@ import kotlinx.serialization.Serializable
 import retrofit2.Response
 import retrofit2.http.Body
 import retrofit2.http.GET
+import retrofit2.http.PATCH
 import retrofit2.http.POST
 import retrofit2.http.Path
 import retrofit2.http.Query
@@ -119,6 +120,30 @@ interface SalesApi {
     suspend fun syncCashExpense(
         @Body request: OfflineCashExpenseSyncRequestDto
     ): Response<ApiResponse<OfflineCashExpenseSyncResponseDto>>
+
+    @GET("/api/sales/quotations")
+    suspend fun getQuotations(
+        @Query("page") page: Int = 1,
+        @Query("limit") limit: Int = 20,
+        @Query("status") status: String? = null,
+        @Query("search") search: String? = null,
+    ): Response<ApiResponse<PaginatedResponse<QuotationSummaryDto>>>
+
+    @POST("/api/sales/quotations")
+    suspend fun createQuotation(
+        @Body request: CreateQuotationRequestDto
+    ): Response<ApiResponse<QuotationDetailDto>>
+
+    @GET("/api/sales/quotations/{id}")
+    suspend fun getQuotationById(
+        @Path("id") id: String
+    ): Response<ApiResponse<QuotationDetailDto>>
+
+    @PATCH("/api/sales/quotations/{id}/status")
+    suspend fun updateQuotationStatus(
+        @Path("id") id: String,
+        @Body request: UpdateQuotationStatusRequestDto
+    ): Response<ApiResponse<QuotationDetailDto>>
 }
 
 @Serializable
@@ -208,6 +233,16 @@ data class SalesTransactionSummaryDto(
 )
 
 @Serializable
+data class TransactionPaymentDto(
+    val id: String,
+    val method: String,
+    @Serializable(with = BigDecimalStringSerializer::class) val amount: BigDecimal,
+    val reference: String? = null,
+    val paymentSource: String = "CHECKOUT",
+    val paidAt: String
+)
+
+@Serializable
 data class TransactionDetailDto(
     val id: String,
     val receiptId: String? = null,
@@ -217,12 +252,25 @@ data class TransactionDetailDto(
     val userId: String = "",
     val cashierName: String? = null,
     val paymentMethods: List<String> = emptyList(),
+    val payments: List<TransactionPaymentDto> = emptyList(),
     val type: String,
     val status: String,
+    @Serializable(with = BigDecimalStringSerializer::class) val grossSubtotal: BigDecimal = BigDecimal.ZERO,
+    @Serializable(with = BigDecimalStringSerializer::class) val itemDiscountTotal: BigDecimal = BigDecimal.ZERO,
+    @Serializable(with = BigDecimalStringSerializer::class) val transactionDiscountAmount: BigDecimal = BigDecimal.ZERO,
+    @Serializable(with = BigDecimalStringSerializer::class) val totalDiscountAmount: BigDecimal = BigDecimal.ZERO,
+    val taxEnabled: Boolean = false,
+    val taxMode: String? = null,
+    @Serializable(with = BigDecimalStringSerializer::class) val taxRate: BigDecimal = BigDecimal.ZERO,
+    val taxLabel: String? = null,
+    @Serializable(with = BigDecimalStringSerializer::class) val taxableBase: BigDecimal = BigDecimal.ZERO,
+    @Serializable(with = BigDecimalStringSerializer::class) val taxAmount: BigDecimal = BigDecimal.ZERO,
+    @Serializable(with = BigDecimalStringSerializer::class) val roundingAmount: BigDecimal = BigDecimal.ZERO,
     @Serializable(with = BigDecimalStringSerializer::class) val total: BigDecimal,
     @Serializable(with = BigDecimalStringSerializer::class) val paidAmount: BigDecimal,
     @Serializable(with = BigDecimalStringSerializer::class) val amountTendered: BigDecimal = BigDecimal.ZERO,
     @Serializable(with = BigDecimalStringSerializer::class) val changeAmount: BigDecimal = BigDecimal.ZERO,
+    val notes: String? = null,
     val createdAt: String,
     val voidedAt: String? = null,
     val voidedBy: String? = null,
@@ -283,7 +331,8 @@ data class TransactionItemDto(
     val unitId: String,
     @Serializable(with = BigDecimalStringSerializer::class) val quantity: BigDecimal,
     @Serializable(with = BigDecimalStringSerializer::class) val priceAtTransaction: BigDecimal,
-    @Serializable(with = BigDecimalStringSerializer::class) val subtotal: BigDecimal
+    @Serializable(with = BigDecimalStringSerializer::class) val subtotal: BigDecimal,
+    val note: String? = null
 )
 
 @Serializable
@@ -336,7 +385,8 @@ data class OfflineCheckoutSyncItemRequestDto(
     @Serializable(with = BigDecimalStringSerializer::class) val priceAtTransaction: BigDecimal,
     @Serializable(with = BigDecimalStringSerializer::class) val cogsAtTransaction: BigDecimal,
     @Serializable(with = BigDecimalStringSerializer::class) val discount: BigDecimal = BigDecimal.ZERO,
-    @Serializable(with = BigDecimalStringSerializer::class) val subtotal: BigDecimal
+    @Serializable(with = BigDecimalStringSerializer::class) val subtotal: BigDecimal,
+    val note: String? = null
 )
 
 @Serializable
@@ -356,7 +406,15 @@ data class OfflineCheckoutSyncRequestDto(
     val occurredAt: String,
     val note: String? = null,
     val dueDays: Int = 30,
-    val items: List<OfflineCheckoutSyncItemRequestDto>
+    val items: List<OfflineCheckoutSyncItemRequestDto>,
+    val payments: List<CheckoutPaymentLineRequestDto>? = null,
+    val taxEnabled: Boolean = false,
+    val taxMode: String? = null,
+    @Serializable(with = BigDecimalStringSerializer::class) val taxRate: BigDecimal = BigDecimal.ZERO,
+    val taxLabel: String? = null,
+    @Serializable(with = BigDecimalStringSerializer::class) val taxableBase: BigDecimal = BigDecimal.ZERO,
+    @Serializable(with = BigDecimalStringSerializer::class) val taxAmount: BigDecimal = BigDecimal.ZERO,
+    @Serializable(with = BigDecimalStringSerializer::class) val roundingAmount: BigDecimal = BigDecimal.ZERO
 )
 
 @Serializable
@@ -367,4 +425,92 @@ data class OfflineCheckoutSyncResponseDto(
     val serverPaymentIds: List<String> = emptyList(),
     val serverReceivableId: String? = null,
     val syncedAt: String
+)
+
+@Serializable
+data class CreateQuotationItemRequestDto(
+    val productId: String,
+    @Serializable(with = BigDecimalStringSerializer::class) val qty: BigDecimal,
+    val discountRequest: DiscountRequestDto? = null,
+    val note: String? = null,
+)
+
+@Serializable
+data class CreateQuotationRequestDto(
+    val customerId: String? = null,
+    val customerName: String? = null,
+    val items: List<CreateQuotationItemRequestDto>,
+    val transactionDiscount: DiscountRequestDto? = null,
+    val validDays: Int = 14,
+    val notes: String? = null,
+)
+
+@Serializable
+data class UpdateQuotationStatusRequestDto(
+    val status: String,
+    val convertedTransactionId: String? = null,
+)
+
+@Serializable
+data class QuotationItemDto(
+    val id: String,
+    val productId: String,
+    val productName: String,
+    val unitId: String,
+    val unitName: String? = null,
+    @Serializable(with = BigDecimalStringSerializer::class) val quantity: BigDecimal,
+    @Serializable(with = BigDecimalStringSerializer::class) val unitPrice: BigDecimal,
+    val discountType: String? = null,
+    @Serializable(with = BigDecimalStringSerializer::class) val discountValue: BigDecimal = BigDecimal.ZERO,
+    @Serializable(with = BigDecimalStringSerializer::class) val discountAmount: BigDecimal = BigDecimal.ZERO,
+    @Serializable(with = BigDecimalStringSerializer::class) val subtotal: BigDecimal,
+    val note: String? = null,
+)
+
+@Serializable
+data class QuotationSummaryDto(
+    val id: String,
+    val quotationNumber: String,
+    val userId: String,
+    val cashierName: String? = null,
+    val customerId: String? = null,
+    val customerName: String? = null,
+    val status: String,
+    val validUntil: String? = null,
+    @Serializable(with = BigDecimalStringSerializer::class) val total: BigDecimal,
+    val itemCount: Int,
+    val notes: String? = null,
+    val convertedTransactionId: String? = null,
+    val createdAt: String,
+)
+
+@Serializable
+data class QuotationDetailDto(
+    val id: String,
+    val quotationNumber: String,
+    val userId: String,
+    val cashierName: String? = null,
+    val customerId: String? = null,
+    val customerName: String? = null,
+    val status: String,
+    val validUntil: String? = null,
+    val notes: String? = null,
+    @Serializable(with = BigDecimalStringSerializer::class) val grossSubtotal: BigDecimal,
+    @Serializable(with = BigDecimalStringSerializer::class) val itemDiscountTotal: BigDecimal,
+    val transactionDiscountType: String? = null,
+    @Serializable(with = BigDecimalStringSerializer::class) val transactionDiscountValue: BigDecimal = BigDecimal.ZERO,
+    @Serializable(with = BigDecimalStringSerializer::class) val transactionDiscountAmount: BigDecimal = BigDecimal.ZERO,
+    @Serializable(with = BigDecimalStringSerializer::class) val totalDiscountAmount: BigDecimal,
+    val taxEnabled: Boolean = false,
+    val taxMode: String? = null,
+    @Serializable(with = BigDecimalStringSerializer::class) val taxRate: BigDecimal = BigDecimal.ZERO,
+    val taxLabel: String? = null,
+    @Serializable(with = BigDecimalStringSerializer::class) val taxableBase: BigDecimal = BigDecimal.ZERO,
+    @Serializable(with = BigDecimalStringSerializer::class) val taxAmount: BigDecimal = BigDecimal.ZERO,
+    @Serializable(with = BigDecimalStringSerializer::class) val total: BigDecimal,
+    val convertedTransactionId: String? = null,
+    val convertedAt: String? = null,
+    val createdAt: String,
+    val updatedAt: String,
+    val items: List<QuotationItemDto>,
 )

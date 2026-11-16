@@ -921,9 +921,7 @@ private fun SecurityPagination(
     onPrevious: () -> Unit,
     onNext: () -> Unit,
 ) {
-    val start = if (uiState.totalLogs == 0L) 0 else (uiState.page - 1L) * uiState.limit + 1
-    val end = minOf(uiState.page.toLong() * uiState.limit, uiState.totalLogs)
-    val supportingText = "$start–$end dari ${uiState.totalLogs} data"
+    val supportingText = "${uiState.totalLogs} log"
 
     TbPagination(
         currentPage = uiState.page,

@@ -1,5 +1,11 @@
 package com.tbterminal.app.data.local.checkout
 
+data class LocalCheckoutPaymentLineCommand(
+    val method: String,
+    val amount: Double,
+    val reference: String? = null
+)
+
 data class LocalCheckoutCommand(
     val cashierUserId: String,
     val cashSessionLocalId: Long? = null,
@@ -8,8 +14,16 @@ data class LocalCheckoutCommand(
     val customerServerId: String? = null,
     val customerName: String? = null,
     val paymentMethod: String,
+    val payments: List<LocalCheckoutPaymentLineCommand>? = null,
     val subtotal: Double,
     val discount: Double = 0.0,
+    val taxEnabled: Boolean = false,
+    val taxMode: String? = null,
+    val taxRate: Double = 0.0,
+    val taxLabel: String? = null,
+    val taxableBase: Double = 0.0,
+    val taxAmount: Double = 0.0,
+    val roundingAmount: Double = 0.0,
     val total: Double,
     val paidAmount: Double,
     val remainingAmount: Double? = null,
@@ -30,5 +44,6 @@ data class LocalCheckoutItemCommand(
     val priceAtTransaction: Double,
     val cogsAtTransaction: Double = 0.0,
     val discount: Double = 0.0,
-    val subtotal: Double
+    val subtotal: Double,
+    val note: String? = null
 )

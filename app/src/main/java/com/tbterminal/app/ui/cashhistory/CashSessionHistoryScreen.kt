@@ -1238,12 +1238,8 @@ private fun SessionPagination(
         visibleCount.toLong()
     }
 
-    val supportingText = if (compact) {
-        val totalSessions = if (uiState.totalSessions > 0) uiState.totalSessions else uiState.sessions.size
-        "${uiState.sessions.size} dari $totalSessions sesi"
-    } else {
-        "Menampilkan $currentStart–$currentEnd dari $effectiveTotal"
-    }
+    val totalSessions = if (uiState.totalSessions > 0) uiState.totalSessions else uiState.sessions.size.toLong()
+    val supportingText = "$totalSessions sesi"
 
     TbPagination(
         currentPage = uiState.page,

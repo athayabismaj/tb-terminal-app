@@ -190,7 +190,8 @@ class PriceManagementViewModel(
         priceBuy: BigDecimal,
         priceRetail: BigDecimal,
         priceContractor: BigDecimal,
-        discount: BigDecimal
+        discount: BigDecimal,
+        priceTiers: List<com.tbterminal.app.data.model.ProductPriceTier> = emptyList()
     ) {
         val detail = _uiState.value.selectedProductDetail ?: return
         
@@ -206,7 +207,10 @@ class PriceManagementViewModel(
                 priceContractor = priceContractor,
                 discount = discount,
                 minStock = detail.minStock,
-                photoFilename = detail.photoFilename
+                photoFilename = detail.photoFilename,
+                secondaryUnitId = detail.secondaryUnitId,
+                secondaryUnitFactor = detail.secondaryUnitFactor,
+                priceTiers = priceTiers
             )
             
             when (val result = inventoryRepository.updateProduct(detail.id, command)) {

@@ -42,13 +42,7 @@ internal fun MasterDataPagination(
 ) {
     val safePage = page.coerceAtLeast(1)
     val safeTotalPages = totalPages.coerceAtLeast(1)
-    val first = if (total == 0L) 0 else (safePage - 1L) * pageSize + 1
-    val last = minOf(safePage.toLong() * pageSize, total)
-    val text = if (compact) {
-        "$total $itemLabel"
-    } else {
-        "Menampilkan $first–$last dari $total $itemLabel"
-    }
+    val text = "$total $itemLabel"
 
     TbPagination(
         currentPage = safePage,

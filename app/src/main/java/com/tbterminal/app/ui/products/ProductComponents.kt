@@ -287,16 +287,13 @@ internal fun ProductPagination(
     compact: Boolean = false,
 ) {
     val safePage = page.coerceAtLeast(1)
-    val startItem = if (total == 0L) 0L else ((safePage - 1) * pageSize + 1L)
-    val endItem = if (total == 0L) 0L else (startItem + visibleCount - 1L).coerceAtMost(total)
     TbPagination(
         currentPage = safePage,
         totalPages = totalPages,
         onPreviousPage = onPreviousPage,
         onNextPage = onNextPage,
         modifier = Modifier.padding(horizontal = if (compact) 0.dp else 20.dp, vertical = 8.dp),
-        supportingText = if (compact) "$startItem-$endItem dari $total produk"
-        else "Menampilkan $startItem-$endItem dari $total produk",
+        supportingText = "$total produk",
         testTag = "product-pagination",
     )
 }

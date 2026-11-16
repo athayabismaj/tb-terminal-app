@@ -365,15 +365,14 @@ private fun ExpensePagination(
     val totalText = if (uiState.searchQuery.isBlank()) {
         "${uiState.totalExpenses} pengeluaran"
     } else {
-        "$visibleCount hasil pada halaman ini"
+        "$visibleCount hasil"
     }
     TbPagination(
         currentPage = uiState.page,
         totalPages = uiState.totalPages,
         onPreviousPage = onPreviousPage,
         onNextPage = onNextPage,
-        supportingText = if (compact) "$visibleCount pengeluaran pada halaman ini"
-        else "Menampilkan $start-$end dari $totalText",
+        supportingText = totalText,
         isLoading = uiState.isLoading,
         testTag = "cash-expense-pagination",
     )

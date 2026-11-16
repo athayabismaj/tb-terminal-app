@@ -130,13 +130,35 @@ private fun PriceMobileRow(product: ProductStock, onEdit: () -> Unit) {
             PriceMobileValue("Harga jual", product.priceRetail.moneyText(), Modifier.weight(1f), Alignment.CenterHorizontally, true)
             PriceMobileValue("Kontraktor", product.priceContractor.moneyText(), Modifier.weight(1f), Alignment.End)
         }
-        if (product.discount > BigDecimal.ZERO) {
-            Text(
-                "Diskon ${product.discount.moneyText()}",
-                color = androidx.compose.material3.MaterialTheme.colorScheme.error,
-                fontSize = 11.sp,
-                fontWeight = FontWeight.SemiBold,
-            )
+        if (product.discount > BigDecimal.ZERO || product.priceTiers.isNotEmpty()) {
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                if (product.discount > BigDecimal.ZERO) {
+                    Text(
+                        "Diskon ${product.discount.moneyText()}",
+                        color = androidx.compose.material3.MaterialTheme.colorScheme.error,
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.SemiBold,
+                    )
+                }
+                if (product.priceTiers.isNotEmpty()) {
+                    Surface(
+                        shape = RoundedCornerShape(6.dp),
+                        color = Color(0xFFECFDF5),
+                        border = BorderStroke(1.dp, Color(0xFFA7F3D0)),
+                    ) {
+                        Text(
+                            "${product.priceTiers.size} tingkat grosir",
+                            color = Color(0xFF047857),
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.SemiBold,
+                            modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
+                        )
+                    }
+                }
+            }
         }
     }
 }
@@ -211,6 +233,19 @@ private fun PriceTableRow(
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
             )
+            if (product.priceTiers.isNotEmpty()) {
+                val sortedTiers = product.priceTiers.sortedBy { it.minQty }
+                val firstTier = sortedTiers.first()
+                Text(
+                    "Grosir: ${sortedTiers.size} tingkat (mulai >= ${firstTier.minQty.stripTrailingZeros().toPlainString()} ${product.unitName} @ ${firstTier.unitPrice.moneyText()})",
+                    color = Color(0xFF047857),
+                    fontSize = 11.sp,
+                    fontWeight = FontWeight.Medium,
+                    modifier = Modifier.padding(top = 2.dp),
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+            }
         }
         PriceValue(product.priceBuy.moneyText(), Modifier.weight(1.35f))
         PriceValue(product.priceRetail.moneyText(), Modifier.weight(1.35f), FontWeight.SemiBold)
@@ -297,7 +332,7 @@ internal fun PriceManagementPagination(
         totalPages = safeTotalPages,
         onPreviousPage = onPreviousPage,
         onNextPage = onNextPage,
-        supportingText = if (compact) "${state.totalProducts} produk" else rangeText,
+        supportingText = "${state.totalProducts} produk",
         isLoading = state.isLoading,
         testTag = "price-management-pagination",
     )

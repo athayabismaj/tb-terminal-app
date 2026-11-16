@@ -165,6 +165,7 @@ internal object AppRouteAccessPolicy {
 
             value == AppRoute.SalesTransactions.route || value.matchesRoute(AppRoute.AdminReceiptDetail.route) ->
                 AppCapability.ALL_TRANSACTIONS
+            value == AppRoute.Quotations.route -> AppCapability.DASHBOARD
             value == AppRoute.CashSessionHistory.route || value == AppRoute.CashReconciliation.route ||
                 value.matchesRoute(AppRoute.CashReconciliationDetail.route) ||
                 value == AppRoute.CashExpenses.route -> AppCapability.CASH_SESSIONS

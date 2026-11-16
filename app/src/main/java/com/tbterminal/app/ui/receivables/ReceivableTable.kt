@@ -197,105 +197,22 @@ internal fun ReceivableTableCard(
                             }
                         }
 
-                        // Compact Mobile Pagination (matching SalesHistoryPagination)
-                        val canPrevUser = safeUserPage > 1 && !uiState.isLoading
-                        val canNextUser = safeUserPage < totalUserPages && !uiState.isLoading
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(vertical = 12.dp)
-                                .testTag("receivable-user-pagination"),
-                            horizontalArrangement = Arrangement.Center,
-                            verticalAlignment = Alignment.CenterVertically,
-                        ) {
-                            Surface(
-                                shape = RoundedCornerShape(12.dp),
-                                color = Color.White,
-                                border = BorderStroke(1.dp, Color(0xFF10533C).copy(alpha = 0.3f)),
-                                shadowElevation = 0.5.dp,
-                            ) {
-                                Text(
-                                    text = "$totalUsers pelanggan",
-                                    fontSize = 12.sp,
-                                    fontWeight = FontWeight.SemiBold,
-                                    color = Color(0xFF10533C),
-                                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp)
-                                )
-                            }
-
-                            Spacer(Modifier.width(12.dp))
-
-                            Surface(
-                                shape = RoundedCornerShape(12.dp),
-                                color = Color.White,
-                                border = BorderStroke(1.dp, Color(0xFF10533C).copy(alpha = 0.3f)),
-                                shadowElevation = 0.5.dp,
-                            ) {
-                                Row(
-                                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
-                                    verticalAlignment = Alignment.CenterVertically,
-                                    horizontalArrangement = Arrangement.spacedBy(12.dp)
-                                ) {
-                                    Box(
-                                        modifier = Modifier
-                                            .size(18.dp)
-                                            .clip(CircleShape)
-                                            .clickable(enabled = canPrevUser) {
-                                                userPage = (safeUserPage - 1).coerceAtLeast(1)
-                                            },
-                                        contentAlignment = Alignment.Center
-                                    ) {
-                                        Icon(
-                                            imageVector = Icons.Filled.ChevronLeft,
-                                            contentDescription = "Halaman sebelumnya",
-                                            tint = if (canPrevUser) Color(0xFF10533C) else Color(0xFF94A3B8).copy(alpha = 0.4f),
-                                            modifier = Modifier.size(16.dp)
-                                        )
-                                    }
-
-                                    Row(
-                                        verticalAlignment = Alignment.CenterVertically,
-                                        horizontalArrangement = Arrangement.spacedBy(3.dp)
-                                    ) {
-                                        Text(
-                                            text = "$safeUserPage",
-                                            fontSize = 12.sp,
-                                            fontWeight = FontWeight.SemiBold,
-                                            color = Color(0xFF1E293B)
-                                        )
-                                        Text(
-                                            text = "/",
-                                            fontSize = 12.sp,
-                                            fontWeight = FontWeight.Normal,
-                                            color = Color(0xFF94A3B8)
-                                        )
-                                        Text(
-                                            text = "$totalUserPages",
-                                            fontSize = 12.sp,
-                                            fontWeight = FontWeight.SemiBold,
-                                            color = Color(0xFF1E293B)
-                                        )
-                                    }
-
-                                    Box(
-                                        modifier = Modifier
-                                            .size(18.dp)
-                                            .clip(CircleShape)
-                                            .clickable(enabled = canNextUser) {
-                                                userPage = (safeUserPage + 1).coerceAtMost(totalUserPages)
-                                            },
-                                        contentAlignment = Alignment.Center
-                                    ) {
-                                        Icon(
-                                            imageVector = Icons.Filled.ChevronRight,
-                                            contentDescription = "Halaman selanjutnya",
-                                            tint = if (canNextUser) Color(0xFF10533C) else Color(0xFF94A3B8).copy(alpha = 0.4f),
-                                            modifier = Modifier.size(16.dp)
-                                        )
-                                    }
-                                }
-                            }
-                        }
+                        // Mobile Pagination (matching QuotationsScreen style)
+                        TbPagination(
+                            currentPage = safeUserPage,
+                            totalPages = totalUserPages,
+                            onPreviousPage = {
+                                userPage = (safeUserPage - 1).coerceAtLeast(1)
+                            },
+                            onNextPage = {
+                                userPage = (safeUserPage + 1).coerceAtMost(totalUserPages)
+                            },
+                            supportingText = "$totalUsers pelanggan",
+                            isLoading = uiState.isLoading,
+                            compact = true,
+                            testTag = "receivable-user-pagination",
+                            modifier = Modifier.padding(top = 4.dp, bottom = 4.dp)
+                        )
                     }
                 }
             }
@@ -329,9 +246,9 @@ internal fun ReceivableTableCard(
 
                         // Desktop Pagination
                         val desktopText = if (uiState.total == 0L) {
-                            "Menampilkan 0 piutang"
+                            "0 piutang"
                         } else {
-                            "Menampilkan ${uiState.currentStart}–${uiState.currentEnd} dari ${uiState.total} piutang"
+                            "${uiState.total} piutang"
                         }
                         TbPagination(
                             currentPage = uiState.page,
@@ -845,8 +762,7 @@ private fun ReceivableFooter(
         onPreviousPage = onPreviousPage,
         onNextPage = onNextPage,
         supportingText = if (uiState.searchQuery.isNotBlank()) "${uiState.filteredReceivables.size} hasil"
-        else if (compact) "${uiState.total} data"
-        else "Menampilkan ${uiState.currentStart}-${uiState.currentEnd} dari ${uiState.total} piutang",
+        else "${uiState.total} piutang",
         isLoading = uiState.isLoading,
         testTag = "receivable-pagination",
     )
@@ -1017,11 +933,6 @@ private fun ReceivableError() {
         }
     }
 }
-
-private fun Receivable.mobileReference(): String =
-    legacyInvoiceNumber?.takeIf(String::isNotBlank)
-        ?: transactionId?.shortTransactionId()
-        ?: source
 
 private fun Receivable.isPaid(): Boolean = status.equals(ReceivableStatusFilter.Paid.apiValue, ignoreCase = true)
 

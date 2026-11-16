@@ -1,5 +1,6 @@
 package com.tbterminal.app.ui.receivables
 
+import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -23,6 +24,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.padding
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.blur
 import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -79,6 +81,17 @@ fun AdminReceivableScreen(
     var isSearchExpanded by rememberSaveable { mutableStateOf(false) }
     var showFilterPopup by remember { mutableStateOf(false) }
     var showSummaryPopup by rememberSaveable { mutableStateOf(false) }
+
+    val isAnyPopupOpen = uiState.selectedReceivable != null ||
+        uiState.isOpeningBalanceOpen ||
+        uiState.isAdjustmentOpen ||
+        uiState.lastPaymentReceipt != null ||
+        showFilterPopup ||
+        showSummaryPopup
+    val popupBlurRadius by animateDpAsState(
+        targetValue = if (isAnyPopupOpen) 16.dp else 0.dp,
+        label = "receivable_route_blur"
+    )
 
     val isFiltered = uiState.statusFilter != ReceivableStatusFilter.All ||
         uiState.sortOrder != ReceivableSortOrder.NearestDueDate ||
@@ -194,7 +207,7 @@ fun AdminReceivableScreen(
             modifier = contentModifier,
         ) {
             ReceivableScreen(
-                modifier = Modifier,
+                modifier = Modifier.then(if (popupBlurRadius > 0.dp) Modifier.blur(popupBlurRadius) else Modifier),
                 uiState = uiState,
                 isSearchExpanded = isSearchExpanded,
                 onToggleSearch = { isSearchExpanded = !isSearchExpanded },

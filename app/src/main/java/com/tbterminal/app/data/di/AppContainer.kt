@@ -81,6 +81,7 @@ interface AppContainer {
     val offlineSyncScheduler: OfflineSyncScheduler
     val authRepository: AuthRepository
     val cashReconciliationRepository: CashReconciliationRepository
+    val quotationRepository: com.tbterminal.app.data.repository.QuotationRepository
     val checkoutRepository: CheckoutRepository
     val userRepository: UserRepository
     val securityLogRepository: SecurityLogRepository
@@ -93,6 +94,7 @@ interface AppContainer {
     val managerApprovalRepository: ManagerApprovalRepository
     val systemRepository: com.tbterminal.app.data.repository.SystemRepository
     val thermalPrinterManager: com.tbterminal.app.data.printer.ThermalPrinterManager
+    val posReorderBridge: com.tbterminal.app.ui.checkout.PosReorderBridge
 }
 
 class DefaultAppContainer(
@@ -294,6 +296,12 @@ class DefaultAppContainer(
         )
     }
 
+    override val quotationRepository: com.tbterminal.app.data.repository.QuotationRepository by lazy {
+        com.tbterminal.app.data.repository.RemoteQuotationRepository(
+            salesApi = networkModule.salesApi
+        )
+    }
+
     override val userRepository: UserRepository by lazy {
         RemoteUserRepository(networkModule.userApi)
     }
@@ -336,5 +344,9 @@ class DefaultAppContainer(
 
     override val systemRepository: com.tbterminal.app.data.repository.SystemRepository by lazy {
         com.tbterminal.app.data.repository.SystemRepository(networkModule.systemApi)
+    }
+
+    override val posReorderBridge: com.tbterminal.app.ui.checkout.PosReorderBridge by lazy {
+        com.tbterminal.app.ui.checkout.PosReorderBridge()
     }
 }
