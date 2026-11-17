@@ -282,11 +282,8 @@ internal fun ProductMinimalCard(
             .clickable(enabled = !isOutOfStock, onClick = onCardClick),
         color = Color.White,
         shape = RoundedCornerShape(16.dp),
-        border = BorderStroke(
-            1.dp,
-            if (isInCart) BrandForest.copy(alpha = 0.5f) else Slate200.copy(alpha = 0.8f)
-        ),
-        shadowElevation = if (isInCart) 1.5.dp else 0.5.dp
+        border = if (isInCart) BorderStroke(1.5.dp, BrandForest) else null,
+        shadowElevation = if (isInCart) 2.dp else 0.75.dp
     ) {
         Column(
             modifier = Modifier.fillMaxWidth()
@@ -345,22 +342,23 @@ internal fun ProductMinimalCard(
 
                 Spacer(modifier = Modifier.height(2.dp))
 
-                // Product Title (font-semibold text-slate-900 text-sm leading-snug line-clamp-1)
+                // Product Title (tajam, bold, kontras)
                 Text(
                     text = product.name,
                     color = Slate900,
                     fontSize = 13.5.sp,
-                    fontWeight = FontWeight.SemiBold,
+                    fontWeight = FontWeight.Bold,
                     lineHeight = 18.sp,
-                    maxLines = 1,
+                    maxLines = 2,
                     overflow = TextOverflow.Ellipsis
                 )
 
                 // Secondary Unit Conversion (if configured)
-                if (product.secondaryUnitFactor != null && product.secondaryUnitFactor > BigDecimal.ONE) {
+                val secFactor = product.secondaryUnitFactor
+                if (secFactor != null && secFactor > BigDecimal.ONE) {
                     Spacer(modifier = Modifier.height(2.dp))
                     Text(
-                        text = "1 ${product.secondaryUnitName ?: "Satuan 2"} = ${product.secondaryUnitFactor.stripTrailingZeros().toPlainString()} ${product.unitName}",
+                        text = "1 ${product.secondaryUnitName ?: "Satuan 2"} = ${secFactor.stripTrailingZeros().toPlainString()} ${product.unitName}",
                         color = BrandForest,
                         fontSize = 9.sp,
                         fontWeight = FontWeight.Bold,
@@ -371,16 +369,16 @@ internal fun ProductMinimalCard(
 
                 Spacer(modifier = Modifier.height(8.dp))
 
-                // Price and Unit
+                // Price and Unit: Emerald contrast (5.8:1)
                 Row(
                     verticalAlignment = Alignment.Bottom,
                     horizontalArrangement = Arrangement.spacedBy(2.dp)
                 ) {
                     Text(
                         text = product.unitPrice.moneyText(),
-                        color = Slate900,
-                        fontSize = 14.sp,
-                        fontWeight = FontWeight.Bold,
+                        color = Color(0xFF047857),
+                        fontSize = 15.sp,
+                        fontWeight = FontWeight.ExtraBold,
                         lineHeight = 18.sp
                     )
                     if (product.unitName.isNotBlank()) {

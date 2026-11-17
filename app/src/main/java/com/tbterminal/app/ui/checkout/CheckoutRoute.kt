@@ -121,6 +121,7 @@ fun CashierPosRoute(
         userName = name,
         role = role,
         activeDestination = CashierDestination.Pos,
+        showHeader = false,
         topBarActions = {
             // Button 1: Search [ 🔍 ] (Rounded-full 32x32 dp matching HTML mockup)
             Surface(
@@ -279,6 +280,7 @@ fun CashierPosRoute(
                 onDismissFilterDialog = { showFilterDialog = false },
                 showMaterialEstimator = showMaterialEstimator,
                 onDismissMaterialEstimator = { showMaterialEstimator = false },
+                onOpenMaterialEstimator = { showMaterialEstimator = true },
                 onApplyMaterialSearch = { query ->
                     isSearchExpanded = true
                     viewModel.onSearchChanged(query)

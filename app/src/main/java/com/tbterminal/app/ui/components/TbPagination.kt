@@ -141,5 +141,11 @@ fun tbPaginationSupportingText(
     endIndex: Int? = null,
 ): String {
     if (totalCount <= 0L) return "0 $unit"
+    if (startIndex != null && endIndex != null) {
+        return "$startIndex–$endIndex dari $totalCount $unit"
+    }
+    if (visibleCount > 0 && visibleCount.toLong() < totalCount) {
+        return "$visibleCount dari $totalCount $unit"
+    }
     return "$totalCount $unit"
 }
