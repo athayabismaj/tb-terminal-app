@@ -15,6 +15,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -22,14 +23,17 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import com.tbterminal.app.ui.cash.CashReconciliationUiState
-import com.tbterminal.app.ui.cashier.session.components.CloseShiftCard
+import com.tbterminal.app.ui.cashier.session.components.CashierBukaShiftView
 import com.tbterminal.app.ui.cashier.session.components.LocalCashSessionBadges
-import com.tbterminal.app.ui.cashier.session.components.OpenShiftForm
-import com.tbterminal.app.ui.cashier.session.components.SessionSummarySection
-import com.tbterminal.app.ui.cashier.session.components.SessionTransactionsCard
 import com.tbterminal.app.ui.cashier.session.components.ShiftClosureBottomSheetModal
+import com.tbterminal.app.ui.cashier.session.components.ShiftPaymentBreakdownBottomSheet
+import com.tbterminal.app.ui.cashier.session.components.ShiftRecentTransactionsSection
+import com.tbterminal.app.ui.cashier.session.components.ShiftReprintChooserDialog
+import com.tbterminal.app.ui.cashier.session.components.ShiftSingleLineSummaryCard
+import com.tbterminal.app.ui.cashier.session.components.ShiftUtilityRow
 import com.tbterminal.app.ui.components.SkeletonList
 import com.tbterminal.app.ui.components.TopFloatingCapsule
+import java.math.BigDecimal
 
 private val CanvasBg = Color(0xFFF8FAF9)
 
@@ -44,13 +48,29 @@ fun CashierCashSessionScreen(
     onCloseSession: () -> Unit,
     onShowExpenseDialog: () -> Unit,
     onTransactionHistoryClick: () -> Unit,
-    onClearMessage: () -> Unit = {}
+    onClearMessage: () -> Unit = {},
+    onPrintShiftSummary: () -> Unit = {}
 ) {
     val isClosingError = uiState.hasActiveSession && !uiState.isExpenseDialogOpen && uiState.errorMessage != null
     val closingErrorText = if (isClosingError) uiState.errorMessage else null
 
     var isPrivacyHidden by rememberSaveable { mutableStateOf(false) }
     var showCloseShiftModal by rememberSaveable { mutableStateOf(false) }
+    var showPaymentBreakdownSheet by rememberSaveable { mutableStateOf(false) }
+    var showReprintChooserDialog by rememberSaveable { mutableStateOf(false) }
+
+    // Hitung metrik ringkasan shift
+    val omzet = remember(uiState.transactions, uiState.cashSales) {
+        if (uiState.transactions.isNotEmpty()) {
+            uiState.transactions.sumOf { it.total }
+        } else {
+            uiState.cashSales
+        }
+    }
+    val totalTransactions = remember(uiState.total, uiState.transactions) {
+        if (uiState.total > 0) uiState.total else uiState.transactions.size.toLong()
+    }
+    val expectedCash = uiState.systemCash
 
     Box(
         modifier = modifier
@@ -90,41 +110,60 @@ fun CashierCashSessionScreen(
                         itemCount = 3
                     )
                 } else if (!uiState.hasActiveSession) {
-                    // FORM BUKA SESI SHIFT BARU
-                    OpenShiftForm(
-                        modifier = Modifier.fillMaxWidth(),
-                        uiState = uiState,
+                    // FORM BUKA SESI SHIFT BARU (Keputusan 2)
+                    CashierBukaShiftView(
+                        cashierName = "Kasir",
+                        terminalName = "Terminal Barokah Jaya",
+                        openingCashInput = uiState.openingCashInput,
                         onOpeningCashChanged = onOpeningCashChanged,
-                        onOpenSession = onOpenSession
+                        onOpenSession = onOpenSession,
+                        isSubmitting = uiState.isSubmitting,
+                        errorMessage = if (!uiState.hasActiveSession) uiState.errorMessage else null,
+                        modifier = Modifier.fillMaxWidth()
                     )
                 } else {
-                    // SHIFT AKTIF:
-                    // 1. CardRingkasanKasLaci
-                    SessionSummarySection(
-                        modifier = Modifier.fillMaxWidth(),
-                        uiState = uiState,
+                    // ── SHIFT AKTIF (FASE 4) ──
+
+                    // 1. Ringkasan Shift Satu Baris (Keputusan 7: Omzet | Transaksi | Kas Seharusnya)
+                    ShiftSingleLineSummaryCard(
+                        omzet = omzet,
+                        transactionCount = totalTransactions,
+                        expectedCash = expectedCash,
                         isPrivacyHidden = isPrivacyHidden,
                         onTogglePrivacy = { isPrivacyHidden = !isPrivacyHidden },
-                        onShowExpenseDialog = onShowExpenseDialog
+                        onClickDetail = { showPaymentBreakdownSheet = true },
+                        modifier = Modifier.fillMaxWidth()
                     )
 
-                    // 2. CardTutupShiftKasir (Compact action card yang membuka modal pop-up bottom sheet)
-                    CloseShiftCard(
-                        modifier = Modifier.fillMaxWidth(),
-                        onOpenModal = { showCloseShiftModal = true }
+                    // 2. Utility Row: Kas In/Out, Cetak Ulang, Tutup Shift (Touch target >= 48dp)
+                    ShiftUtilityRow(
+                        onKasMasukKeluarClick = onShowExpenseDialog,
+                        onCetakUlangClick = { showReprintChooserDialog = true },
+                        onTutupShiftClick = { showCloseShiftModal = true },
+                        modifier = Modifier.fillMaxWidth()
                     )
 
-                    // 3. SectionTransaksiSesiIni
-                    SessionTransactionsCard(
-                        modifier = Modifier.fillMaxWidth(),
-                        uiState = uiState,
-                        onTransactionHistoryClick = onTransactionHistoryClick
+                    // 3. Aktivitas Transaksi Shift Ini (Tanpa kartu bertumpuk)
+                    ShiftRecentTransactionsSection(
+                        transactions = uiState.transactions,
+                        totalTransactions = totalTransactions,
+                        onTransactionHistoryClick = onTransactionHistoryClick,
+                        onReprintTransaction = { showReprintChooserDialog = true },
+                        modifier = Modifier.fillMaxWidth()
                     )
                 }
             }
         }
 
-        // ── 4. POP-UP BOTTOM SHEET MODAL (Tutup Shift Kasir) ──
+        // ── BOTTOM SHEET 1: Rincian Metode Pembayaran & Arus Kas Laci ──
+        if (showPaymentBreakdownSheet && uiState.hasActiveSession) {
+            ShiftPaymentBreakdownBottomSheet(
+                uiState = uiState,
+                onDismiss = { showPaymentBreakdownSheet = false }
+            )
+        }
+
+        // ── BOTTOM SHEET 2: Rekonsiliasi & Tutup Shift ──
         if (showCloseShiftModal && uiState.hasActiveSession) {
             ShiftClosureBottomSheetModal(
                 onDismiss = { showCloseShiftModal = false },
@@ -133,12 +172,21 @@ fun CashierCashSessionScreen(
                 notes = uiState.closingNotesInput,
                 onCashChange = onClosingCashChanged,
                 onNotesChange = onClosingNotesChanged,
-                onSubmit = {
-                    onCloseSession()
-                },
+                onSubmit = onCloseSession,
                 isSubmitting = uiState.isSubmitting,
                 isError = isClosingError,
                 supportingText = closingErrorText
+            )
+        }
+
+        // ── DIALOG 3: Cetak Ulang Dokumen (Slip Shift / Riwayat Struk) ──
+        if (showReprintChooserDialog) {
+            ShiftReprintChooserDialog(
+                hasActiveShift = uiState.hasActiveSession,
+                latestTransaction = uiState.transactions.firstOrNull(),
+                onPrintShiftSlip = onPrintShiftSummary,
+                onOpenTransactionHistory = onTransactionHistoryClick,
+                onDismiss = { showReprintChooserDialog = false }
             )
         }
     }

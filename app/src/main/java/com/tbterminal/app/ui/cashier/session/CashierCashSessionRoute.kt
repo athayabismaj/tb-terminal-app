@@ -20,7 +20,6 @@ import com.tbterminal.app.data.printer.PrinterResult
 import com.tbterminal.app.data.printer.ThermalPrinterManager
 import com.tbterminal.app.data.repository.CashReconciliationRepository
 import com.tbterminal.app.data.sync.OfflineStatusRepository
-import com.tbterminal.app.ui.cash.CashExpenseDialog
 import com.tbterminal.app.ui.cash.CashReconciliationViewModel
 import com.tbterminal.app.ui.cashier.session.components.SuccessModalOverlay
 import com.tbterminal.app.ui.dashboard.cashier.CashierDashboardShell
@@ -94,7 +93,38 @@ fun CashierCashSessionRoute(
             onCloseSession = viewModel::closeSession,
             onShowExpenseDialog = viewModel::showExpenseDialog,
             onTransactionHistoryClick = onTransactionHistoryClick,
-            onClearMessage = viewModel::clearMessage
+            onClearMessage = viewModel::clearMessage,
+            onPrintShiftSummary = {
+                val targetSession = uiState.activeSession ?: uiState.lastClosedSession
+                if (targetSession != null && thermalPrinterManager != null) {
+                    scope.launch {
+                        isPrinting = true
+                        try {
+                            val paperSize = thermalPrinterManager.getPaperSize()
+                            val bytes = CashSessionSummaryFormatter.buildShiftSettlementBytes(
+                                session = targetSession,
+                                paperSize = paperSize
+                            )
+                            when (val result = thermalPrinterManager.printCustomBytes(context, bytes)) {
+                                is PrinterResult.Success -> {
+                                    Toast.makeText(context, "Slip rekap shift berhasil dicetak", Toast.LENGTH_SHORT).show()
+                                }
+                                is PrinterResult.Error -> {
+                                    Toast.makeText(context, "Gagal mencetak: ${result.message}", Toast.LENGTH_LONG).show()
+                                }
+                            }
+                        } catch (e: Exception) {
+                            Toast.makeText(context, "Error cetak: ${e.message}", Toast.LENGTH_SHORT).show()
+                        } finally {
+                            isPrinting = false
+                        }
+                    }
+                } else if (thermalPrinterManager == null) {
+                    Toast.makeText(context, "Printer belum dikonfigurasi.", Toast.LENGTH_SHORT).show()
+                } else {
+                    Toast.makeText(context, "Tidak ada shift aktif.", Toast.LENGTH_SHORT).show()
+                }
+            }
         )
     }
 
