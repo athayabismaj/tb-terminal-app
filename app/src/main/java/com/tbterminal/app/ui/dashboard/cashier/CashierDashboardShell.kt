@@ -15,6 +15,7 @@ import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -49,6 +50,8 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -58,11 +61,16 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.tbterminal.app.TbTerminalApplication
+import com.tbterminal.app.data.local.database.DevicePreferences
+import com.tbterminal.app.data.sync.BackendStatus
+import com.tbterminal.app.data.sync.OfflineStatus
 import com.tbterminal.app.ui.dashboard.BrandedRoleTopBar
 import com.tbterminal.app.ui.dashboard.LocalBackofficePageNavigation
 import com.tbterminal.app.ui.dashboard.RoleHeaderDropdownItem
@@ -129,12 +137,28 @@ fun CashierDashboardShell(
     onLockScreen: (() -> Unit)? = null,
     showHeader: Boolean = true,
     showBottomBar: Boolean = true,
-    showProfileMenu: Boolean = activeDestination.isCashierRootDestination(),
+    showProfileMenu: Boolean = false,
     pageTitle: String? = null,
     topBarActions: (@Composable () -> Unit)? = null,
     content: @Composable (Modifier) -> Unit
 ) {
-    val effectiveShowProfileMenu = showProfileMenu && LocalBackofficePageNavigation.current.onBack == null
+    val context = LocalContext.current
+    val app = context.applicationContext as? TbTerminalApplication
+    val appContainer = app?.appContainer
+    val offlineStatusFlow = remember(appContainer) { appContainer?.offlineStatusRepository?.status }
+    val offlineStatus by (offlineStatusFlow?.collectAsState(initial = OfflineStatus()) ?: remember { mutableStateOf(OfflineStatus()) })
+    var devicePreferences by remember { mutableStateOf(DevicePreferences()) }
+    LaunchedEffect(appContainer) {
+        devicePreferences = appContainer?.localAppSettingsDataSource?.getDevicePreferences() ?: DevicePreferences()
+    }
+    var hasActiveShift by remember { mutableStateOf(false) }
+    LaunchedEffect(activeDestination) {
+        val session = appContainer?.cashSessionLocalDataSource?.getLatestOpenSession()
+        hasActiveShift = (session != null)
+    }
+
+    var showAccountBottomSheet by rememberSaveable { mutableStateOf(false) }
+    val effectiveShowProfileMenu = false
     val adminNavigator = LocalAdminDestinationNavigator.current
     val openReceivables: () -> Unit = onReceivablesClick ?: {
         adminNavigator?.invoke(AdminDestination.Receivables)
@@ -202,35 +226,41 @@ fun CashierDashboardShell(
         } else {
             Column(modifier = Modifier.fillMaxSize()) {
                 if (showHeader) {
-                    CashierCompactTopBar(
-                        userName = userName,
-                        role = role,
-                        title = pageTitle ?: when (activeDestination) {
-                            CashierDestination.CashSession -> "Kas Harian & Shift"
-                            CashierDestination.TransactionHistory -> "Riwayat Transaksi"
-                            CashierDestination.Pos -> "Transaksi Kasir (POS)"
-                            CashierDestination.Receivables -> "Piutang Pelanggan"
-                            CashierDestination.ReceivablePayments -> "Riwayat Pembayaran Piutang"
-                            CashierDestination.Customers -> "Pelanggan"
-                            else -> "Dashboard"
-                        },
-                        subtitle = when (activeDestination) {
-                            CashierDestination.CashSession, CashierDestination.TransactionHistory, CashierDestination.Receivables, CashierDestination.ReceivablePayments, CashierDestination.Customers -> "Terminal Barokah Jaya"
-                            else -> "Terminal Barokah Jaya"
-                        },
-                        topBarActions = topBarActions,
-                        showProfileMenu = effectiveShowProfileMenu,
-                        onTerminalInfoClick = { showTerminalModal = true },
-                        onProfileClick = onProfileClick,
-                        onSettingsClick = onSettingsClick,
-                        onLogout = onLogout,
-                        onLockClick = handleLock
-                    )
+                    if (activeDestination == CashierDestination.CashSession) {
+                        CashierKasTopBar(
+                            userName = userName,
+                            role = role,
+                            title = pageTitle ?: "Kas Harian & Shift",
+                            subtitle = "Terminal Barokah Jaya",
+                            offlineStatus = offlineStatus,
+                            devicePreferences = devicePreferences,
+                            onAccountClick = { showAccountBottomSheet = true },
+                            onLockClick = handleLock
+                        )
+                    } else {
+                        CashierCompactTopBar(
+                            userName = userName,
+                            role = role,
+                            title = pageTitle ?: when (activeDestination) {
+                                CashierDestination.TransactionHistory -> "Riwayat Transaksi"
+                                CashierDestination.Pos -> "Transaksi Kasir (POS)"
+                                CashierDestination.Receivables -> "Piutang Pelanggan"
+                                CashierDestination.ReceivablePayments -> "Riwayat Pembayaran Piutang"
+                                CashierDestination.Customers -> "Pelanggan"
+                                else -> "POS"
+                            },
+                            subtitle = "Terminal Barokah Jaya",
+                            topBarActions = topBarActions,
+                            showProfileMenu = false,
+                            onTerminalInfoClick = { showTerminalModal = true },
+                            onProfileClick = onProfileClick,
+                            onSettingsClick = onSettingsClick,
+                            onLogout = onLogout,
+                            onLockClick = handleLock
+                        )
+                    }
                 }
                 content(Modifier.weight(1f))
-                OfflineStatusIndicatorHost(
-                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp)
-                )
                 if (showBottomBar) {
                     CashierBottomNavigation(
                         activeDestination = activeDestination,
@@ -242,6 +272,23 @@ fun CashierDashboardShell(
                     )
                 }
             }
+        }
+
+        if (showAccountBottomSheet) {
+            CashierAccountBottomSheet(
+                userName = userName,
+                role = role,
+                terminalId = "TRM-01",
+                offlineStatus = offlineStatus,
+                devicePreferences = devicePreferences,
+                hasActiveShift = hasActiveShift,
+                onDismiss = { showAccountBottomSheet = false },
+                onLockScreen = handleLock,
+                onSwitchCashier = handleLock,
+                onChangePin = onProfileClick,
+                onSettingsClick = onSettingsClick,
+                onLogout = onLogout
+            )
         }
 
         if (showTerminalModal) {
@@ -269,6 +316,238 @@ fun CashierDashboardShell(
                         internalPinError = null
                     }
                 }
+            )
+        }
+    }
+}
+
+@Composable
+internal fun CashierKasTopBar(
+    userName: String,
+    role: String,
+    title: String,
+    subtitle: String,
+    offlineStatus: OfflineStatus,
+    devicePreferences: DevicePreferences,
+    onAccountClick: () -> Unit,
+    onLockClick: () -> Unit
+) {
+    val displayName = remember(userName) {
+        val trimmed = userName.trim()
+        when {
+            trimmed.isEmpty() || trimmed.equals("kasir", ignoreCase = true) -> "Kasir"
+            trimmed.equals("Budi", ignoreCase = true) -> "Budi Santoso"
+            else -> trimmed
+        }
+    }
+    val userInitial = remember(displayName) {
+        displayName.firstOrNull()?.uppercase() ?: "K"
+    }
+
+    Surface(
+        color = Color.White,
+        border = BorderStroke(1.dp, Color(0xFFF1F5F9)),
+        shadowElevation = 0.5.dp,
+        modifier = Modifier.fillMaxWidth()
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .statusBarsPadding()
+        ) {
+            // Baris 1: Judul Halaman + Chip Identitas Kasir + Tombol Gembok Kunci PIN
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(56.dp)
+                    .padding(horizontal = 14.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                Column(modifier = Modifier.weight(1f, fill = false)) {
+                    Text(
+                        text = title,
+                        fontSize = 17.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = Color(0xFF0F172A),
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                    Text(
+                        text = subtitle,
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.Medium,
+                        color = Color(0xFF64748B),
+                        maxLines = 1
+                    )
+                }
+
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    // Chip Identitas Kasir (Membuka Bottom Sheet Akun)
+                    Surface(
+                        onClick = onAccountClick,
+                        shape = RoundedCornerShape(20.dp),
+                        color = Color(0xFFF1F5F9),
+                        border = BorderStroke(1.dp, Color(0xFFE2E8F0)),
+                        modifier = Modifier.heightIn(min = 36.dp)
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(6.dp)
+                        ) {
+                            Box(
+                                modifier = Modifier
+                                    .size(22.dp)
+                                    .clip(CircleShape)
+                                    .background(Color(0xFFE8F3EC)),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Text(
+                                    text = userInitial,
+                                    fontSize = 10.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = Color(0xFF1B5E3C)
+                                )
+                            }
+                            Text(
+                                text = displayName,
+                                fontSize = 12.sp,
+                                fontWeight = FontWeight.SemiBold,
+                                color = Color(0xFF0F172A),
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis
+                            )
+                        }
+                    }
+
+                    // Ikon Gembok Kecil (Akses Cepat 1 Ketukan Kunci PIN)
+                    IconButton(
+                        onClick = onLockClick,
+                        modifier = Modifier.size(44.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Outlined.Lock,
+                            contentDescription = "Kunci Layar (PIN)",
+                            tint = Color(0xFF334155),
+                            modifier = Modifier.size(20.dp)
+                        )
+                    }
+                }
+            }
+
+            // Baris 2: Chip Status Permanen (Jaringan/Sync + Printer)
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(start = 14.dp, end = 14.dp, bottom = 10.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                CashierNetworkStatusChip(status = offlineStatus, onClick = onAccountClick)
+                CashierPrinterStatusChip(preferences = devicePreferences, onClick = onAccountClick)
+            }
+        }
+    }
+}
+
+@Composable
+fun CashierNetworkStatusChip(
+    status: OfflineStatus,
+    onClick: (() -> Unit)? = null,
+    modifier: Modifier = Modifier
+) {
+    val isOnline = status.isInternetOnline && status.backendStatus == BackendStatus.CONNECTED
+    val hasPending = status.pendingSyncCount > 0
+    val dotColor = when {
+        !status.isInternetOnline || status.backendStatus == BackendStatus.UNREACHABLE -> Color(0xFFD97706)
+        hasPending -> Color(0xFF2563EB)
+        else -> Color(0xFF10B981)
+    }
+    val chipBg = when {
+        !isOnline -> Color(0xFFFEF3C7)
+        hasPending -> Color(0xFFEFF6FF)
+        else -> Color(0xFFECFDF5)
+    }
+    val chipBorder = when {
+        !isOnline -> Color(0xFFFDE68A)
+        hasPending -> Color(0xFFBFDBFE)
+        else -> Color(0xFFA7F3D0)
+    }
+    val textColor = when {
+        !isOnline -> Color(0xFFB45309)
+        hasPending -> Color(0xFF1D4ED8)
+        else -> Color(0xFF047857)
+    }
+    val label = when {
+        !status.isInternetOnline -> "Offline"
+        status.backendStatus == BackendStatus.UNREACHABLE -> "Server Terputus"
+        hasPending -> "Sync (${status.pendingSyncCount})"
+        else -> "Online"
+    }
+
+    Surface(
+        onClick = { onClick?.invoke() },
+        enabled = onClick != null,
+        shape = RoundedCornerShape(20.dp),
+        color = chipBg,
+        border = BorderStroke(1.dp, chipBorder),
+        modifier = modifier.heightIn(min = 30.dp)
+    ) {
+        Row(
+            modifier = Modifier.padding(horizontal = 9.dp, vertical = 5.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(6.dp)
+        ) {
+            Box(
+                modifier = Modifier
+                    .size(7.dp)
+                    .clip(CircleShape)
+                    .background(dotColor)
+            )
+            Text(
+                text = label,
+                fontSize = 11.sp,
+                fontWeight = FontWeight.Bold,
+                color = textColor
+            )
+        }
+    }
+}
+
+@Composable
+fun CashierPrinterStatusChip(
+    preferences: DevicePreferences,
+    onClick: (() -> Unit)? = null,
+    modifier: Modifier = Modifier
+) {
+    val isConfigured = preferences.printerBluetoothAddress.isNotBlank()
+    val chipBg = if (isConfigured) Color(0xFFF8FAFC) else Color(0xFFFFF7ED)
+    val chipBorder = if (isConfigured) Color(0xFFE2E8F0) else Color(0xFFFFEDD5)
+    val textColor = if (isConfigured) Color(0xFF334155) else Color(0xFFC2410C)
+    val label = if (isConfigured) "🖨️ ${preferences.paperSize} Siap" else "🖨️ Printer Belum Diatur"
+
+    Surface(
+        onClick = { onClick?.invoke() },
+        enabled = onClick != null,
+        shape = RoundedCornerShape(20.dp),
+        color = chipBg,
+        border = BorderStroke(1.dp, chipBorder),
+        modifier = modifier.heightIn(min = 30.dp)
+    ) {
+        Row(
+            modifier = Modifier.padding(horizontal = 9.dp, vertical = 5.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(4.dp)
+        ) {
+            Text(
+                text = label,
+                fontSize = 11.sp,
+                fontWeight = FontWeight.SemiBold,
+                color = textColor
             )
         }
     }
@@ -349,7 +628,7 @@ private fun CashierCompactTopBar(
 }
 
 @Composable
-private fun CashierBottomNavigation(
+internal fun CashierBottomNavigation(
     activeDestination: CashierDestination,
     onDashboardClick: () -> Unit,
     onPosClick: () -> Unit,
@@ -359,28 +638,22 @@ private fun CashierBottomNavigation(
 ) {
     val items = listOf(
         CashierBottomNavItem(
-            destination = CashierDestination.Dashboard,
-            label = "Dashboard",
-            icon = Icons.Outlined.Home,
-            onClick = onDashboardClick
-        ),
-        CashierBottomNavItem(
             destination = CashierDestination.Pos,
             label = "POS",
             icon = Icons.Outlined.PointOfSale,
             onClick = onPosClick
         ),
         CashierBottomNavItem(
-            destination = CashierDestination.CashSession,
-            label = "Kas",
-            icon = Icons.Outlined.Payments,
-            onClick = onCashSessionClick
-        ),
-        CashierBottomNavItem(
             destination = CashierDestination.TransactionHistory,
             label = "Riwayat",
             icon = Icons.Outlined.History,
             onClick = onTransactionHistoryClick
+        ),
+        CashierBottomNavItem(
+            destination = CashierDestination.CashSession,
+            label = "Kas",
+            icon = Icons.Outlined.Payments,
+            onClick = onCashSessionClick
         ),
         CashierBottomNavItem(
             destination = CashierDestination.Receivables,
@@ -415,9 +688,10 @@ private fun CashierBottomNavigation(
                     modifier = Modifier
                         .clip(RoundedCornerShape(12.dp))
                         .clickable(onClick = item.onClick)
-                        .padding(horizontal = 8.dp, vertical = 2.dp),
+                        .padding(horizontal = 12.dp, vertical = 4.dp)
+                        .heightIn(min = 48.dp),
                     horizontalAlignment = Alignment.CenterHorizontally,
-                    verticalArrangement = Arrangement.spacedBy(2.dp)
+                    verticalArrangement = Arrangement.Center
                 ) {
                     if (selected) {
                         Box(
@@ -513,40 +787,34 @@ private fun CashierShellSidebar(
                 .padding(horizontal = 12.dp)
         ) {
             CashierShellSidebarItem(
-                icon = Icons.Outlined.Home,
-                text = "Dashboard",
-                isActive = activeDestination == CashierDestination.Dashboard,
-                onClick = onDashboardClick
-            )
-            CashierShellSidebarItem(
                 icon = Icons.Outlined.PointOfSale,
                 text = "POS",
                 isActive = activeDestination == CashierDestination.Pos,
                 onClick = onPosClick
             )
             CashierShellSidebarItem(
-                icon = Icons.Outlined.Payments,
-                text = "Kas Harian",
-                isActive = activeDestination == CashierDestination.CashSession,
-                onClick = onCashSessionClick
-            )
-            CashierShellSidebarItem(
                 icon = Icons.Outlined.History,
-                text = "Transaksi Saya",
+                text = "Riwayat Transaksi",
                 isActive = activeDestination == CashierDestination.TransactionHistory,
                 onClick = onTransactionHistoryClick
             )
             CashierShellSidebarItem(
-                icon = Icons.Outlined.Person,
-                text = "Pelanggan",
-                isActive = activeDestination == CashierDestination.Customers,
-                onClick = onCustomersClick
+                icon = Icons.Outlined.Payments,
+                text = "Kas Harian & Shift",
+                isActive = activeDestination == CashierDestination.CashSession,
+                onClick = onCashSessionClick
             )
             CashierShellSidebarItem(
                 icon = Icons.Outlined.AccountBalanceWallet,
                 text = "Piutang Pelanggan",
                 isActive = activeDestination == CashierDestination.Receivables,
                 onClick = onReceivablesClick
+            )
+            CashierShellSidebarItem(
+                icon = Icons.Outlined.Person,
+                text = "Pelanggan",
+                isActive = activeDestination == CashierDestination.Customers,
+                onClick = onCustomersClick
             )
             CashierShellSidebarItem(
                 icon = Icons.Outlined.Payments,

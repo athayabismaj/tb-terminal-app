@@ -52,6 +52,7 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
@@ -67,6 +68,8 @@ import com.tbterminal.app.data.local.cashexpense.LocalCashExpenseService
 import com.tbterminal.app.data.local.database.CashSessionLocalDataSource
 import com.tbterminal.app.data.model.CashTransaction
 import com.tbterminal.app.data.repository.CashReconciliationRepository
+import com.tbterminal.app.ui.cash.CashReconciliationViewModel
+import com.tbterminal.app.ui.cashier.session.components.CashierBukaShiftView
 import com.tbterminal.app.ui.checkout.components.MaterialEstimatorDialog
 import com.tbterminal.app.ui.common.toDisplayTime
 import com.tbterminal.app.ui.common.toRupiahText
@@ -132,10 +135,27 @@ fun CashierDashboardScreen(
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
 
+    val cashViewModel: CashReconciliationViewModel = viewModel(
+        factory = CashReconciliationViewModel.factory(
+            repository = cashReconciliationRepository,
+            cashSessionLocalDataSource = cashSessionLocalDataSource,
+            localCashExpenseService = localCashExpenseService,
+            cashierNameFallback = name
+        )
+    )
+    val cashUiState by cashViewModel.uiState.collectAsStateWithLifecycle()
+
+    // Keputusan Desain 2: Saat shift aktif, kasir langsung mendarat di POS.
+    LaunchedEffect(uiState.isLoading, uiState.activeSession, cashUiState.hasActiveSession) {
+        if ((!uiState.isLoading && uiState.activeSession != null) || cashUiState.hasActiveSession) {
+            onPosClick()
+        }
+    }
+
     CashierDashboardShell(
         userName = name,
         role = role,
-        activeDestination = CashierDestination.Dashboard,
+        activeDestination = CashierDestination.Pos,
         onDashboardClick = onDashboardClick,
         onPosClick = onPosClick,
         onCashSessionClick = onCashSessionClick,
@@ -144,30 +164,52 @@ fun CashierDashboardScreen(
         onReceivablesClick = onReceivablesClick,
         onProfileClick = onProfileClick,
         onSettingsClick = onSettingsClick,
-        onLogout = onLogout
+        onLogout = onLogout,
+        pageTitle = "Buka Shift Kasir"
     ) { contentModifier ->
-        Box(modifier = contentModifier.fillMaxSize()) {
+        Box(
+            modifier = contentModifier
+                .fillMaxSize()
+                .background(SurfaceBg),
+            contentAlignment = Alignment.Center
+        ) {
             TopFloatingCapsule(
-                message = uiState.errorMessage,
+                message = cashUiState.errorMessage ?: uiState.errorMessage,
                 isError = true,
-                onDismiss = viewModel::clearErrorMessage
+                onDismiss = {
+                    cashViewModel.clearMessage()
+                    viewModel.clearErrorMessage()
+                }
             )
 
-            RefreshableContent(
-                isRefreshing = uiState.isLoading && (uiState.activeSession != null || uiState.recentTransactions.isNotEmpty()),
-                onRefresh = viewModel::loadDashboardData,
-                modifier = Modifier.fillMaxSize(),
-            ) {
-                CashierDashboardContent(
-                    cashierName = name,
-                    uiState = uiState,
-                    onPosClick = onPosClick,
-                    onCashSessionClick = onCashSessionClick,
-                    onTransactionHistoryClick = onTransactionHistoryClick,
-                    onStockCheckClick = onStockCheckClick,
-                    onRefresh = viewModel::loadDashboardData,
-                    modifier = Modifier.fillMaxSize()
-                )
+            if (uiState.isLoading && uiState.activeSession == null && !cashUiState.hasActiveSession) {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .widthIn(max = 480.dp)
+                        .padding(16.dp),
+                    verticalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    SkeletonCard()
+                }
+            } else if (uiState.activeSession == null && !cashUiState.hasActiveSession) {
+                // Layar Buka Shift sederhana: input modal awal kas dan satu tombol utama
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .widthIn(max = 480.dp)
+                        .padding(16.dp)
+                ) {
+                    CashierBukaShiftView(
+                        cashierName = name,
+                        terminalName = "Terminal Barokah Jaya",
+                        openingCashInput = cashUiState.openingCashInput,
+                        onOpeningCashChanged = cashViewModel::onOpeningCashChanged,
+                        onOpenSession = cashViewModel::openSession,
+                        isSubmitting = cashUiState.isSubmitting,
+                        errorMessage = cashUiState.errorMessage
+                    )
+                }
             }
         }
     }
@@ -1226,10 +1268,11 @@ private fun CashierRecentTransactionsCard(
             } else {
                 "#TRX-${trx.id.takeLast(6).uppercase()}"
             }
-            val customer = if (!trx.customerName.isNullOrBlank()) trx.customerName else "Pelanggan Umum"
+            val customer = trx.customerName?.takeIf { it.isNotBlank() } ?: "Pelanggan Umum"
             val method = trx.paymentMethods.firstOrNull()?.uppercase() ?: "TUNAI"
             val timeStr = trx.createdAt.toDisplayTime()
-            val hasRemaining = trx.remainingAmount != null && trx.remainingAmount > java.math.BigDecimal.ZERO
+            val remaining = trx.remainingAmount
+            val hasRemaining = remaining != null && remaining > java.math.BigDecimal.ZERO
             val isLunas = !hasRemaining && (
                 trx.status.equals("COMPLETED", ignoreCase = true) ||
                 trx.status.equals("PAID", ignoreCase = true) ||
