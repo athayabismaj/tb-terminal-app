@@ -32,4 +32,5 @@ local.properties
 /patch_*.py
 /scratch/
 *.xml
+run.bat
 

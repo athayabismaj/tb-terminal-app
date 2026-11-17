@@ -127,6 +127,8 @@ interface SalesApi {
         @Query("limit") limit: Int = 20,
         @Query("status") status: String? = null,
         @Query("search") search: String? = null,
+        @Query("startDate") startDate: String? = null,
+        @Query("endDate") endDate: String? = null,
     ): Response<ApiResponse<PaginatedResponse<QuotationSummaryDto>>>
 
     @POST("/api/sales/quotations")

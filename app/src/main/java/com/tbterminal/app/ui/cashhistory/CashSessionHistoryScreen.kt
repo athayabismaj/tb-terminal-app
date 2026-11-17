@@ -42,6 +42,9 @@ import androidx.compose.material.icons.outlined.FactCheck
 import androidx.compose.material.icons.outlined.Payments
 import androidx.compose.material.icons.outlined.Schedule
 import androidx.compose.material.icons.outlined.Search
+import androidx.compose.material.icons.outlined.Refresh
+import androidx.compose.material.icons.outlined.ErrorOutline
+import androidx.compose.material.icons.outlined.SearchOff
 import androidx.compose.material.icons.outlined.Tune
 import androidx.compose.material.icons.outlined.Visibility
 import androidx.compose.ui.draw.clip
@@ -1415,42 +1418,69 @@ private fun SessionFeedback(
     actionLabel: String? = null,
     onAction: (() -> Unit)? = null,
 ) {
-    Surface(
-        modifier = Modifier.fillMaxWidth(),
-        color = Color.White,
-        shape = RoundedCornerShape(16.dp),
-        border = BorderStroke(1.dp, Slate200),
-        shadowElevation = 1.dp,
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(vertical = 40.dp, horizontal = 24.dp),
+        contentAlignment = Alignment.Center,
     ) {
         Column(
-            modifier = Modifier.padding(horizontal = 24.dp, vertical = 38.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.spacedBy(8.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp),
         ) {
-            Surface(
-                modifier = Modifier.size(48.dp),
-                shape = CircleShape,
-                color = Slate100,
+            Box(
+                modifier = Modifier
+                    .size(64.dp)
+                    .clip(CircleShape)
+                    .background(if (actionLabel != null) Color(0xFFFEF2F2) else Color(0xFFF1F5F9)),
+                contentAlignment = Alignment.Center,
             ) {
-                Box(contentAlignment = Alignment.Center) {
-                    Icon(
-                        Icons.Outlined.Payments,
-                        contentDescription = null,
-                        tint = Slate500,
-                        modifier = Modifier.size(24.dp),
-                    )
-                }
+                Icon(
+                    imageVector = when {
+                        actionLabel != null -> Icons.Outlined.ErrorOutline
+                        title.contains("tidak ditemukan", ignoreCase = true) -> Icons.Outlined.SearchOff
+                        else -> Icons.Outlined.Payments
+                    },
+                    contentDescription = null,
+                    tint = if (actionLabel != null) Color(0xFFDC2626) else Color(0xFF94A3B8),
+                    modifier = Modifier.size(32.dp),
+                )
             }
-            Text(title, style = MaterialTheme.typography.titleMedium, color = Slate900, fontWeight = FontWeight.Bold)
-            Text(message, style = MaterialTheme.typography.bodySmall, color = Slate500, textAlign = TextAlign.Center)
+            Text(
+                text = title,
+                fontSize = 15.sp,
+                fontWeight = FontWeight.SemiBold,
+                color = Slate900,
+                textAlign = TextAlign.Center,
+            )
+            Text(
+                text = message,
+                fontSize = 13.sp,
+                color = Slate500,
+                textAlign = TextAlign.Center,
+                modifier = Modifier.widthIn(max = 340.dp),
+            )
             if (actionLabel != null && onAction != null) {
-                Spacer(Modifier.height(4.dp))
                 OutlinedButton(
                     onClick = onAction,
-                    modifier = Modifier.height(44.dp),
                     shape = RoundedCornerShape(12.dp),
+                    colors = ButtonDefaults.outlinedButtonColors(
+                        contentColor = Color(0xFF256B57),
+                    ),
+                    border = BorderStroke(1.dp, Color(0xFF256B57).copy(alpha = 0.5f)),
+                    modifier = Modifier.padding(top = 4.dp),
                 ) {
-                    Text(actionLabel, color = Brand600, fontWeight = FontWeight.SemiBold)
+                    Icon(
+                        imageVector = Icons.Outlined.Refresh,
+                        contentDescription = null,
+                        modifier = Modifier.size(16.dp),
+                    )
+                    Spacer(Modifier.width(6.dp))
+                    Text(
+                        text = actionLabel,
+                        fontSize = 13.sp,
+                        fontWeight = FontWeight.SemiBold,
+                    )
                 }
             }
         }

@@ -11,6 +11,10 @@ import androidx.compose.material.icons.outlined.Check
 import androidx.compose.material.icons.outlined.Schedule
 import androidx.compose.material.icons.automirrored.outlined.Sort
 import androidx.compose.material.icons.outlined.Search
+import androidx.compose.material.icons.outlined.SearchOff
+import androidx.compose.material.icons.outlined.Refresh
+import androidx.compose.material.icons.outlined.ErrorOutline
+import androidx.compose.ui.draw.clip
 import androidx.compose.material.icons.outlined.Add
 import androidx.compose.material.icons.outlined.CalendarMonth
 import androidx.compose.material.icons.outlined.ReceiptLong
@@ -69,6 +73,10 @@ import androidx.compose.material.icons.outlined.FactCheck
 import androidx.compose.material.icons.outlined.Inventory2
 import androidx.compose.material.icons.outlined.MonetizationOn
 import androidx.compose.material.icons.outlined.Search
+import androidx.compose.material.icons.outlined.SearchOff
+import androidx.compose.material.icons.outlined.Refresh
+import androidx.compose.material.icons.outlined.ErrorOutline
+import androidx.compose.ui.draw.clip
 import androidx.compose.material.icons.outlined.DateRange
 import androidx.compose.material.icons.outlined.EditCalendar
 import androidx.compose.material.icons.filled.ArrowDropDown
@@ -187,7 +195,7 @@ internal fun PurchaseHistoryScreen(
                 },
                 onResetAllFilters = onResetAllFilters
             )
-            PurchaseTable(uiState, compact, onRefresh, onShowDetail, onPreviousPage, onNextPage)
+            PurchaseTable(uiState, compact, onRefresh, onShowDetail, onPreviousPage, onNextPage, onResetAllFilters)
         }
     }
     
@@ -256,22 +264,37 @@ private fun PurchaseTable(
     onRefresh: () -> Unit,
     onShowDetail: (String) -> Unit,
     onPreviousPage: () -> Unit,
-    onNextPage: () -> Unit
+    onNextPage: () -> Unit,
+    onResetAllFilters: () -> Unit = {}
 ) {
     Column(Modifier.fillMaxWidth()) {
         if (compact) {
-            androidx.compose.material3.Surface(
-                modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(16.dp),
-                color = Color.White,
-                border = BorderStroke(1.dp, Color(0xFFE2E8F0)),
-                shadowElevation = 1.dp
-            ) {
-                when {
-                    uiState.isLoading && uiState.purchases.isEmpty() -> PurchaseMobileSkeleton()
-                    uiState.errorMessage != null -> PurchaseError(uiState.errorMessage, onRefresh)
-                    uiState.visiblePurchases.isEmpty() -> EmptyBox(uiState.searchQuery)
-                    else -> {
+            when {
+                uiState.isLoading && uiState.purchases.isEmpty() -> {
+                    androidx.compose.material3.Surface(
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(16.dp),
+                        color = Color.White,
+                        border = BorderStroke(1.dp, Color(0xFFE2E8F0)),
+                        shadowElevation = 1.dp
+                    ) {
+                        PurchaseMobileSkeleton()
+                    }
+                }
+                uiState.errorMessage != null -> PurchaseError(uiState.errorMessage, onRefresh)
+                uiState.visiblePurchases.isEmpty() -> EmptyBox(
+                    searchQuery = uiState.searchQuery,
+                    hasFilter = uiState.isFiltered,
+                    onResetFilter = onResetAllFilters,
+                )
+                else -> {
+                    androidx.compose.material3.Surface(
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(16.dp),
+                        color = Color.White,
+                        border = BorderStroke(1.dp, Color(0xFFE2E8F0)),
+                        shadowElevation = 1.dp
+                    ) {
                         Column {
                             uiState.visiblePurchases.forEachIndexed { index, purchase ->
                                 PurchaseMobileRow(purchase, onShowDetail)
@@ -288,14 +311,11 @@ private fun PurchaseTable(
             when {
                 uiState.isLoading && uiState.purchases.isEmpty() -> PurchaseTableSkeleton()
                 uiState.errorMessage != null -> PurchaseError(uiState.errorMessage, onRefresh)
-                uiState.visiblePurchases.isEmpty() -> androidx.compose.material3.Surface(
-                    modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(16.dp),
-                    color = Color.White,
-                    border = BorderStroke(1.dp, Color(0xFFE2E8F0)),
-                ) {
-                    EmptyBox(uiState.searchQuery)
-                }
+                uiState.visiblePurchases.isEmpty() -> EmptyBox(
+                    searchQuery = uiState.searchQuery,
+                    hasFilter = uiState.isFiltered,
+                    onResetFilter = onResetAllFilters,
+                )
                 else -> {
                     Column {
                         uiState.visiblePurchases.forEachIndexed { index, purchase ->
@@ -2119,52 +2139,143 @@ private fun PurchaseDetailSkeletonContent(onDismiss: () -> Unit) {
 }
 
 @Composable
-private fun EmptyBox(searchQuery: String) {
-    Column(
+private fun EmptyBox(
+    searchQuery: String,
+    hasFilter: Boolean = false,
+    onResetFilter: (() -> Unit)? = null,
+) {
+    val isFiltered = searchQuery.isNotBlank() || hasFilter
+    Box(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(vertical = 36.dp, horizontal = 20.dp),
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.spacedBy(8.dp)
+            .padding(vertical = 40.dp, horizontal = 24.dp),
+        contentAlignment = Alignment.Center,
     ) {
-        Box(
-            modifier = Modifier
-                .size(48.dp)
-                .background(Color(0xFFF1F5F9), CircleShape),
-            contentAlignment = Alignment.Center
+        Column(
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(10.dp),
         ) {
-            Icon(
-                imageVector = if (searchQuery.isNotBlank()) Icons.Outlined.Search else Icons.Outlined.ReceiptLong,
-                contentDescription = null,
-                tint = Color(0xFF94A3B8),
-                modifier = Modifier.size(24.dp)
+            Box(
+                modifier = Modifier
+                    .size(64.dp)
+                    .clip(CircleShape)
+                    .background(Color(0xFFF1F5F9)),
+                contentAlignment = Alignment.Center,
+            ) {
+                Icon(
+                    imageVector = if (isFiltered) Icons.Outlined.SearchOff else Icons.Outlined.ReceiptLong,
+                    contentDescription = null,
+                    tint = Color(0xFF94A3B8),
+                    modifier = Modifier.size(32.dp),
+                )
+            }
+            Text(
+                text = if (isFiltered) "Nota Tidak Ditemukan" else "Belum Ada Nota Pembelian",
+                fontSize = 15.sp,
+                fontWeight = FontWeight.SemiBold,
+                color = Color(0xFF0F172A),
+                textAlign = TextAlign.Center,
             )
+            Text(
+                text = if (isFiltered) {
+                    if (searchQuery.isNotBlank()) "Tidak ada nota pembelian yang cocok dengan \"$searchQuery\"."
+                    else "Tidak ada nota pembelian yang sesuai dengan filter yang dipilih."
+                } else {
+                    "Semua transaksi nota pembelian barang dari supplier akan otomatis tercatat di sini."
+                },
+                fontSize = 13.sp,
+                color = Color(0xFF64748B),
+                textAlign = TextAlign.Center,
+                modifier = Modifier.widthIn(max = 340.dp),
+            )
+            if (isFiltered && onResetFilter != null) {
+                androidx.compose.material3.OutlinedButton(
+                    onClick = onResetFilter,
+                    shape = RoundedCornerShape(12.dp),
+                    colors = androidx.compose.material3.ButtonDefaults.outlinedButtonColors(
+                        contentColor = Color(0xFF256B57),
+                    ),
+                    border = BorderStroke(1.dp, Color(0xFF256B57).copy(alpha = 0.5f)),
+                    modifier = Modifier.padding(top = 4.dp),
+                ) {
+                    Icon(
+                        imageVector = Icons.Outlined.Refresh,
+                        contentDescription = null,
+                        modifier = Modifier.size(16.dp),
+                    )
+                    Spacer(Modifier.width(6.dp))
+                    Text(
+                        text = "Reset Filter",
+                        fontSize = 13.sp,
+                        fontWeight = FontWeight.SemiBold,
+                    )
+                }
+            }
         }
-        Text(
-            text = if (searchQuery.isNotBlank()) "Nota tidak ditemukan" else "Belum ada nota pembelian",
-            fontSize = 15.sp,
-            fontWeight = FontWeight.SemiBold,
-            color = Color(0xFF334155),
-            textAlign = TextAlign.Center
-        )
-        Text(
-            text = if (searchQuery.isNotBlank()) 
-                "Coba cari nomor nota atau nama supplier yang berbeda." 
-            else 
-                "Gunakan tombol Catat di atas untuk mencatat nota pembelian baru.",
-            fontSize = 13.sp,
-            color = Color(0xFF94A3B8),
-            textAlign = TextAlign.Center
-        )
     }
 }
 
 @Composable
 private fun PurchaseError(message: String, onRefresh: () -> Unit) {
-    Column(Modifier.fillMaxWidth().height(180.dp), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.Center) {
-        Text(message, color = Color(0xFFDC2626))
-        Spacer(Modifier.height(8.dp))
-        OutlinedButton(onClick = onRefresh) { Text("Coba Lagi") }
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(vertical = 40.dp, horizontal = 24.dp),
+        contentAlignment = Alignment.Center,
+    ) {
+        Column(
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(10.dp),
+        ) {
+            Box(
+                modifier = Modifier
+                    .size(64.dp)
+                    .clip(CircleShape)
+                    .background(Color(0xFFFEF2F2)),
+                contentAlignment = Alignment.Center,
+            ) {
+                Icon(
+                    imageVector = Icons.Outlined.ErrorOutline,
+                    contentDescription = null,
+                    tint = Color(0xFFDC2626),
+                    modifier = Modifier.size(32.dp),
+                )
+            }
+            Text(
+                text = "Riwayat Pembelian Gagal Dimuat",
+                fontSize = 15.sp,
+                fontWeight = FontWeight.SemiBold,
+                color = Color(0xFF0F172A),
+            )
+            Text(
+                text = message,
+                fontSize = 13.sp,
+                color = Color(0xFF64748B),
+                textAlign = TextAlign.Center,
+                modifier = Modifier.widthIn(max = 340.dp),
+            )
+            androidx.compose.material3.OutlinedButton(
+                onClick = onRefresh,
+                shape = RoundedCornerShape(12.dp),
+                colors = androidx.compose.material3.ButtonDefaults.outlinedButtonColors(
+                    contentColor = Color(0xFF256B57),
+                ),
+                border = BorderStroke(1.dp, Color(0xFF256B57).copy(alpha = 0.5f)),
+                modifier = Modifier.padding(top = 4.dp),
+            ) {
+                Icon(
+                    imageVector = Icons.Outlined.Refresh,
+                    contentDescription = null,
+                    modifier = Modifier.size(16.dp),
+                )
+                Spacer(Modifier.width(6.dp))
+                Text(
+                    text = "Coba Lagi",
+                    fontSize = 13.sp,
+                    fontWeight = FontWeight.SemiBold,
+                )
+            }
+        }
     }
 }
 

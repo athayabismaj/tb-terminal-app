@@ -14,6 +14,8 @@ import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.ui.draw.clip
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.ArrowBack
 import androidx.compose.material3.HorizontalDivider
@@ -156,11 +158,13 @@ private fun ReceiptDetailTopBar(
                     .statusBarsPadding()
                     .padding(horizontal = 16.dp, vertical = 12.dp),
                 verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                horizontalArrangement = Arrangement.spacedBy(10.dp)
             ) {
                 IconButton(
                     onClick = onBackClick,
-                    modifier = Modifier.size(34.dp)
+                    modifier = Modifier
+                        .size(36.dp)
+                        .clip(CircleShape)
                 ) {
                     Icon(
                         imageVector = Icons.AutoMirrored.Outlined.ArrowBack,
@@ -171,13 +175,13 @@ private fun ReceiptDetailTopBar(
                 }
                 Text(
                     text = "Detail Struk",
-                    fontSize = 17.sp,
+                    fontSize = 16.sp,
                     fontWeight = FontWeight.Bold,
                     color = Color(0xFF0F172A),
-                    letterSpacing = (-0.3).sp
+                    letterSpacing = (-0.2).sp
                 )
             }
-            HorizontalDivider(color = Color(0xFFE2E8F0).copy(alpha = 0.8f))
+            HorizontalDivider(color = Color(0xFFF1F5F9), thickness = 1.dp)
         }
     }
 }

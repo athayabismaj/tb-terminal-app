@@ -180,7 +180,12 @@ internal fun SupplierDebtTableCard(
                 // Cards Area
                 when {
                     uiState.errorMessage != null && uiState.payables.isEmpty() -> SupplierDebtError(Modifier)
-                    uiState.filteredPayables.isEmpty() -> SupplierDebtEmpty(Modifier)
+                    uiState.filteredPayables.isEmpty() -> SupplierDebtEmpty(
+                        modifier = Modifier,
+                        searchQuery = uiState.searchQuery,
+                        hasFilter = uiState.searchQuery.isNotBlank() || uiState.statusFilter != SupplierDebtStatusFilter.All || uiState.dueFilter != SupplierDebtDueFilter.All,
+                        onResetFilter = onResetAllFilters,
+                    )
                 else -> {
                     val groupedBySupplier = remember(uiState.filteredPayables) {
                         uiState.filteredPayables.groupBy { it.supplierId.ifBlank { it.supplierName } }.toList()
@@ -297,7 +302,12 @@ internal fun SupplierDebtTableCard(
                             )
                         }
                         if (uiState.filteredPayables.isEmpty()) {
-                            SupplierDebtEmpty(Modifier)
+                            SupplierDebtEmpty(
+                                modifier = Modifier,
+                                searchQuery = uiState.searchQuery,
+                                hasFilter = uiState.searchQuery.isNotBlank() || uiState.statusFilter != SupplierDebtStatusFilter.All || uiState.dueFilter != SupplierDebtDueFilter.All,
+                                onResetFilter = onResetAllFilters,
+                            )
                         } else {
                             Surface(
                                 modifier = Modifier.fillMaxWidth(),

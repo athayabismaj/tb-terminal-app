@@ -110,6 +110,8 @@ internal class ReceivableCustomerDetailViewModel(
         _uiState.update {
             it.copy(
                 selectedReceivableForPayment = receivable,
+                isPayAllOpen = true,
+                selectedPayAllInvoiceIds = setOf(receivable.id),
                 paymentAmountInput = receivable.remainingAmount.stripTrailingZeros().toPlainString(),
                 paymentMethod = ReceivablePaymentMethod.Cash,
                 referenceInput = "",

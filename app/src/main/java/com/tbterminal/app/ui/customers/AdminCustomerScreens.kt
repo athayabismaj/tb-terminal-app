@@ -44,6 +44,11 @@ import androidx.compose.material.icons.outlined.Person
 import androidx.compose.material.icons.outlined.Phone
 import androidx.compose.material.icons.outlined.Place
 import androidx.compose.material.icons.outlined.Search
+import androidx.compose.material.icons.outlined.SearchOff
+import androidx.compose.material.icons.outlined.People
+import androidx.compose.material.icons.outlined.Refresh
+import androidx.compose.material3.OutlinedButton
+import androidx.compose.ui.draw.clip
 import androidx.compose.material.icons.outlined.Tune
 import androidx.compose.material.icons.outlined.Description
 import androidx.compose.material.icons.outlined.Close
@@ -873,8 +878,15 @@ private fun CustomerTableCard(
         Spacer(modifier = Modifier.height(if (compact) 8.dp else 12.dp))
         when {
             uiState.isLoading && uiState.customers.isEmpty() -> CustomerListLoading(compact = compact)
-            uiState.errorMessage != null && uiState.customers.isEmpty() -> CustomerEmpty("Pelanggan gagal dimuat.")
-            uiState.visibleCustomers.isEmpty() -> CustomerEmpty()
+            uiState.errorMessage != null && uiState.customers.isEmpty() -> CustomerEmpty(
+                message = "Pelanggan gagal dimuat. Silakan periksa koneksi atau coba lagi.",
+                isSearch = false
+            )
+            uiState.visibleCustomers.isEmpty() -> CustomerEmpty(
+                message = if (uiState.searchQuery.isNotBlank()) "Tidak ada pelanggan yang cocok dengan \"${uiState.searchQuery}\"." else null,
+                isSearch = uiState.searchQuery.isNotBlank(),
+                onResetQuery = { onSearchChanged("") }
+            )
             compact -> Surface(
                 modifier = Modifier.fillMaxWidth().testTag("customer-card-list"),
                 shape = RoundedCornerShape(16.dp),
@@ -2049,8 +2061,78 @@ private fun CustomerCenteredError(message: String, onRetry: () -> Unit) {
 }
 
 @Composable
-private fun CustomerEmpty(message: String = "Belum ada pelanggan yang cocok.") {
-    AppEmptyState(message = message, modifier = Modifier.height(220.dp))
+private fun CustomerEmpty(
+    message: String? = null,
+    isSearch: Boolean = false,
+    onResetQuery: (() -> Unit)? = null,
+) {
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(vertical = 40.dp, horizontal = 24.dp),
+        contentAlignment = Alignment.Center,
+    ) {
+        Column(
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(10.dp),
+        ) {
+            Box(
+                modifier = Modifier
+                    .size(64.dp)
+                    .clip(CircleShape)
+                    .background(Color(0xFFF1F5F9)),
+                contentAlignment = Alignment.Center,
+            ) {
+                Icon(
+                    imageVector = if (isSearch) Icons.Outlined.SearchOff else Icons.Outlined.People,
+                    contentDescription = null,
+                    tint = Color(0xFF94A3B8),
+                    modifier = Modifier.size(32.dp),
+                )
+            }
+            Text(
+                text = if (isSearch) "Pelanggan Tidak Ditemukan" else "Belum Ada Pelanggan",
+                fontSize = 15.sp,
+                fontWeight = FontWeight.SemiBold,
+                color = CustomerText,
+                textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+            )
+            Text(
+                text = message ?: if (isSearch) {
+                    "Tidak ada data pelanggan yang cocok dengan pencarian."
+                } else {
+                    "Tambahkan pelanggan baru untuk mencatat transaksi dan piutang."
+                },
+                fontSize = 13.sp,
+                color = CustomerMuted,
+                textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+                modifier = Modifier.widthIn(max = 340.dp),
+            )
+            if (isSearch && onResetQuery != null) {
+                OutlinedButton(
+                    onClick = onResetQuery,
+                    shape = RoundedCornerShape(12.dp),
+                    colors = ButtonDefaults.outlinedButtonColors(
+                        contentColor = Color(0xFF256B57),
+                    ),
+                    border = BorderStroke(1.dp, Color(0xFF256B57).copy(alpha = 0.5f)),
+                    modifier = Modifier.padding(top = 4.dp),
+                ) {
+                    Icon(
+                        imageVector = Icons.Outlined.Refresh,
+                        contentDescription = null,
+                        modifier = Modifier.size(16.dp),
+                    )
+                    Spacer(Modifier.width(6.dp))
+                    Text(
+                        text = "Reset Pencarian",
+                        fontSize = 13.sp,
+                        fontWeight = FontWeight.SemiBold,
+                    )
+                }
+            }
+        }
+    }
 }
 
 @Composable

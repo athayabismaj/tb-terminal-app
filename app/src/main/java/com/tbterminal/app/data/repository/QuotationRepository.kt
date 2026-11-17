@@ -21,6 +21,8 @@ interface QuotationRepository {
         limit: Int = 20,
         status: String? = null,
         search: String? = null,
+        startDate: String? = null,
+        endDate: String? = null,
     ): RepositoryResult<QuotationPage>
 
     suspend fun createQuotation(command: CreateQuotationCommand): RepositoryResult<QuotationDetail>
@@ -43,6 +45,8 @@ class RemoteQuotationRepository(
         limit: Int,
         status: String?,
         search: String?,
+        startDate: String?,
+        endDate: String?,
     ): RepositoryResult<QuotationPage> {
         return safeApiCall {
             salesApi.getQuotations(
@@ -50,6 +54,8 @@ class RemoteQuotationRepository(
                 limit = limit,
                 status = status?.takeIf(String::isNotBlank),
                 search = search?.takeIf(String::isNotBlank),
+                startDate = startDate?.takeIf(String::isNotBlank),
+                endDate = endDate?.takeIf(String::isNotBlank),
             )
         }.toRepositoryResult { response ->
             val paged = response.data

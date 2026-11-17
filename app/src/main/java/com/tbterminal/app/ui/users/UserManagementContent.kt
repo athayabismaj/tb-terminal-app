@@ -54,6 +54,9 @@ import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.rounded.Add
 import androidx.compose.material.icons.outlined.ExpandMore
 import androidx.compose.material.icons.outlined.Search
+import androidx.compose.material.icons.outlined.SearchOff
+import androidx.compose.material.icons.outlined.Refresh
+import androidx.compose.material.icons.outlined.ErrorOutline
 import androidx.compose.material.icons.outlined.Tune
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -392,23 +395,31 @@ fun UserManagementContent(
             )
 
             // ── 3. USER LIST / UNIFIED CARD ──
+            val errorMessage = uiState.errorMessage
             when {
                 uiState.isLoading -> {
                     UserListSkeleton(compact = compact)
                 }
-                uiState.errorMessage != null -> {
+                errorMessage != null -> {
                     UserFeedback(
-                        message = uiState.errorMessage,
+                        message = errorMessage,
                         actionLabel = "Muat ulang",
                         onAction = onRetry,
+                        isError = true,
                     )
                 }
                 visibleStaff.isEmpty() -> {
                     UserFeedback(
                         message = if (searchQuery.isNotBlank() || hasActiveFilter) {
-                            "Tidak ada pengguna yang cocok."
+                            "Tidak ada pengguna yang cocok dengan pencarian atau filter yang dipilih."
                         } else {
-                            "Belum ada pengguna."
+                            "Belum ada staf atau pengguna yang terdaftar."
+                        },
+                        actionLabel = if (searchQuery.isNotBlank() || hasActiveFilter) "Reset Filter" else null,
+                        onAction = {
+                            onSearchQueryChanged("")
+                            onStatusFilterChanged(UserStatusFilter.All)
+                            onRoleFilterChanged(UserRoleFilter.All)
                         },
                     )
                 }
@@ -1477,24 +1488,76 @@ private fun UserSummaryRow(
 // USER FEEDBACK (ERROR & EMPTY STATE)
 // ═════════════════════════════════════════════════════════════════════════════
 @Composable
-private fun UserFeedback(message: String, actionLabel: String? = null, onAction: () -> Unit = {}) {
-    Surface(
-        modifier = Modifier.fillMaxWidth().heightIn(min = 160.dp),
-        color = Color.White,
-        shape = RoundedCornerShape(16.dp),
-        border = BorderStroke(1.dp, Slate200),
-        shadowElevation = 0.5.dp,
+private fun UserFeedback(
+    message: String,
+    actionLabel: String? = null,
+    onAction: () -> Unit = {},
+    isError: Boolean = false,
+) {
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(vertical = 40.dp, horizontal = 24.dp),
+        contentAlignment = Alignment.Center,
     ) {
         Column(
-            modifier = Modifier.fillMaxWidth().padding(24.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.Center,
+            verticalArrangement = Arrangement.spacedBy(10.dp),
         ) {
-            Icon(Icons.Outlined.Group, contentDescription = null, tint = Slate400, modifier = Modifier.size(28.dp))
-            Spacer(Modifier.height(10.dp))
-            Text(message, style = MaterialTheme.typography.bodyMedium, color = Slate500)
+            Box(
+                modifier = Modifier
+                    .size(64.dp)
+                    .clip(CircleShape)
+                    .background(if (isError) Color(0xFFFEF2F2) else Color(0xFFF1F5F9)),
+                contentAlignment = Alignment.Center,
+            ) {
+                Icon(
+                    imageVector = when {
+                        isError -> Icons.Outlined.ErrorOutline
+                        message.contains("tidak ada", ignoreCase = true) || message.contains("tidak cocok", ignoreCase = true) -> Icons.Outlined.SearchOff
+                        else -> Icons.Outlined.Group
+                    },
+                    contentDescription = null,
+                    tint = if (isError) Color(0xFFDC2626) else Color(0xFF94A3B8),
+                    modifier = Modifier.size(32.dp),
+                )
+            }
+            Text(
+                text = if (isError) "Gagal Memuat Pengguna" else if (message.contains("tidak ada", ignoreCase = true) || message.contains("tidak cocok", ignoreCase = true)) "Pengguna Tidak Ditemukan" else "Belum Ada Pengguna",
+                fontSize = 15.sp,
+                fontWeight = FontWeight.SemiBold,
+                color = Slate900,
+                textAlign = TextAlign.Center,
+            )
+            Text(
+                text = message,
+                fontSize = 13.sp,
+                color = Slate500,
+                textAlign = TextAlign.Center,
+                modifier = Modifier.widthIn(max = 340.dp),
+            )
             if (actionLabel != null) {
-                TextButton(onClick = onAction) { Text(actionLabel, color = BrandSage) }
+                OutlinedButton(
+                    onClick = onAction,
+                    shape = RoundedCornerShape(12.dp),
+                    colors = ButtonDefaults.outlinedButtonColors(
+                        contentColor = Color(0xFF256B57),
+                    ),
+                    border = BorderStroke(1.dp, Color(0xFF256B57).copy(alpha = 0.5f)),
+                    modifier = Modifier.padding(top = 4.dp),
+                ) {
+                    Icon(
+                        imageVector = Icons.Outlined.Refresh,
+                        contentDescription = null,
+                        modifier = Modifier.size(16.dp),
+                    )
+                    Spacer(Modifier.width(6.dp))
+                    Text(
+                        text = actionLabel,
+                        fontSize = 13.sp,
+                        fontWeight = FontWeight.SemiBold,
+                    )
+                }
             }
         }
     }

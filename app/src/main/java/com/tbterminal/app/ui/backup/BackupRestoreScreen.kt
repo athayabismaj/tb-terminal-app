@@ -756,50 +756,43 @@ private fun ServerHistoryHeader(jobCount: Int) {
 
 @Composable
 private fun EmptyServerBackupState() {
-    Surface(
-        modifier = Modifier.fillMaxWidth(),
-        color = Color.White,
-        shape = RoundedCornerShape(16.dp),
-        border = BorderStroke(1.dp, SurfaceBorder.copy(alpha = 0.8f)),
-        shadowElevation = 0.5.dp
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(vertical = 40.dp, horizontal = 24.dp),
+        contentAlignment = Alignment.Center,
     ) {
         Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(vertical = 32.dp, horizontal = 20.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.Center
+            verticalArrangement = Arrangement.spacedBy(10.dp),
         ) {
             Box(
                 modifier = Modifier
-                    .size(48.dp)
+                    .size(64.dp)
                     .clip(CircleShape)
-                    .background(BrandSageLight),
-                contentAlignment = Alignment.Center
+                    .background(Color(0xFFF1F5F9)),
+                contentAlignment = Alignment.Center,
             ) {
                 Icon(
                     imageVector = Icons.Outlined.Cloud,
                     contentDescription = null,
-                    tint = BrandSage,
-                    modifier = Modifier.size(24.dp)
+                    tint = Color(0xFF94A3B8),
+                    modifier = Modifier.size(32.dp),
                 )
             }
-
-            Spacer(Modifier.height(12.dp))
-
             Text(
-                text = "Belum ada riwayat cadangan server",
-                fontSize = 14.sp,
-                fontWeight = FontWeight.Bold,
-                color = Slate800
+                text = "Belum Ada Riwayat Cadangan",
+                fontSize = 15.sp,
+                fontWeight = FontWeight.SemiBold,
+                color = Slate800,
+                textAlign = androidx.compose.ui.text.style.TextAlign.Center,
             )
-
-            Spacer(Modifier.height(4.dp))
-
             Text(
-                text = "Cadangan baru akan tampil di bagian ini.",
-                fontSize = 12.sp,
-                color = Slate400
+                text = "Riwayat cadangan server yang dibuat akan otomatis tersimpan dan tampil di sini.",
+                fontSize = 13.sp,
+                color = Slate400,
+                textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+                modifier = Modifier.widthIn(max = 340.dp),
             )
         }
     }

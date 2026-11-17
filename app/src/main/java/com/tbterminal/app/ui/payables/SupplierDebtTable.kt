@@ -14,6 +14,12 @@ import androidx.compose.material.icons.filled.ExpandLess
 import androidx.compose.material.icons.filled.ExpandMore
 import androidx.compose.material.icons.outlined.Receipt
 import androidx.compose.material.icons.outlined.Search
+import androidx.compose.material.icons.outlined.SearchOff
+import androidx.compose.material.icons.outlined.ErrorOutline
+import androidx.compose.material.icons.outlined.Refresh
+import androidx.compose.material3.OutlinedButton
+import androidx.compose.ui.draw.clip
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.material.icons.automirrored.outlined.ReceiptLong
 import androidx.compose.material.icons.Icons
 import androidx.compose.ui.text.withStyle
@@ -87,7 +93,11 @@ internal fun SupplierDebtRows(
     when {
         uiState.isLoading && uiState.payables.isEmpty() -> SupplierDebtLoading(modifier, compact)
         uiState.errorMessage != null && uiState.payables.isEmpty() -> SupplierDebtError(modifier)
-        uiState.filteredPayables.isEmpty() -> SupplierDebtEmpty(modifier)
+        uiState.filteredPayables.isEmpty() -> SupplierDebtEmpty(
+            modifier = modifier,
+            searchQuery = uiState.searchQuery,
+            hasFilter = uiState.searchQuery.isNotBlank() || uiState.statusFilter != SupplierDebtStatusFilter.All || uiState.dueFilter != SupplierDebtDueFilter.All,
+        )
         compact -> {
             val groupedBySupplier = uiState.filteredPayables.groupBy { it.supplierId.ifBlank { it.supplierName } }
             Column(
@@ -419,53 +429,85 @@ private fun SupplierDebtTableDesktopSkeleton() {
 }
 
 @Composable
-internal fun SupplierDebtEmpty(modifier: Modifier = Modifier, searchQuery: String = "") {
-    Surface(
-        modifier = modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(16.dp),
-        color = Color.White,
-        border = BorderStroke(1.dp, Color(0xFFE2E8F0)),
-        shadowElevation = 1.dp
+internal fun SupplierDebtEmpty(
+    modifier: Modifier = Modifier,
+    searchQuery: String = "",
+    hasFilter: Boolean = false,
+    onResetFilter: (() -> Unit)? = null,
+) {
+    val isFiltered = searchQuery.isNotBlank() || hasFilter
+    Box(
+        modifier = modifier
+            .fillMaxWidth()
+            .padding(vertical = 40.dp, horizontal = 24.dp),
+        contentAlignment = Alignment.Center,
     ) {
         Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(vertical = 36.dp, horizontal = 20.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.spacedBy(8.dp)
+            verticalArrangement = Arrangement.spacedBy(10.dp),
         ) {
             Box(
                 modifier = Modifier
-                    .size(48.dp)
-                    .background(Color(0xFFF1F5F9), CircleShape),
-                contentAlignment = Alignment.Center
+                    .size(64.dp)
+                    .clip(CircleShape)
+                    .background(Color(0xFFF1F5F9)),
+                contentAlignment = Alignment.Center,
             ) {
                 Icon(
-                    imageVector = if (searchQuery.isNotBlank()) Icons.Outlined.Search else Icons.AutoMirrored.Outlined.ReceiptLong,
+                    imageVector = if (isFiltered) Icons.Outlined.SearchOff else Icons.AutoMirrored.Outlined.ReceiptLong,
                     contentDescription = null,
                     tint = Color(0xFF94A3B8),
-                    modifier = Modifier.size(24.dp)
+                    modifier = Modifier.size(32.dp),
                 )
             }
             Text(
-                text = if (searchQuery.isNotBlank()) "Hutang tidak ditemukan" else "Belum ada data hutang",
-                fontSize = 14.sp,
+                text = if (isFiltered) "Hutang Tidak Ditemukan" else "Belum Ada Data Hutang",
+                fontSize = 15.sp,
                 fontWeight = FontWeight.SemiBold,
-                color = Color(0xFF0F172A)
+                color = Color(0xFF0F172A),
             )
             Text(
-                text = if (searchQuery.isNotBlank()) "Tidak ada hutang supplier yang cocok dengan \"$searchQuery\"" else "Data kewajiban hutang supplier akan muncul di sini setelah transaksi pembelian tempo dicatat.",
-                fontSize = 12.sp,
+                text = if (isFiltered) {
+                    if (searchQuery.isNotBlank()) "Tidak ada hutang supplier yang cocok dengan \"$searchQuery\"."
+                    else "Tidak ada data hutang yang cocok dengan filter yang dipilih."
+                } else {
+                    "Data kewajiban hutang supplier akan otomatis muncul di sini setelah transaksi pembelian tempo dicatat."
+                },
+                fontSize = 13.sp,
                 color = Color(0xFF64748B),
-                textAlign = TextAlign.Center
+                textAlign = TextAlign.Center,
+                modifier = Modifier.widthIn(max = 340.dp),
             )
+            if (isFiltered && onResetFilter != null) {
+                OutlinedButton(
+                    onClick = onResetFilter,
+                    shape = RoundedCornerShape(12.dp),
+                    colors = ButtonDefaults.outlinedButtonColors(
+                        contentColor = Color(0xFF10533C),
+                    ),
+                    border = BorderStroke(1.dp, Color(0xFF10533C).copy(alpha = 0.5f)),
+                    modifier = Modifier.padding(top = 4.dp),
+                ) {
+                    Icon(
+                        imageVector = Icons.Outlined.Refresh,
+                        contentDescription = null,
+                        modifier = Modifier.size(16.dp),
+                    )
+                    Spacer(Modifier.width(6.dp))
+                    Text(
+                        text = "Reset Filter",
+                        fontSize = 13.sp,
+                        fontWeight = FontWeight.SemiBold,
+                    )
+                }
+            }
         }
     }
 }
 
 @Composable
 internal fun SupplierDebtError(modifier: Modifier) {
-    SupplierDebtFeedback(modifier, "Hutang supplier gagal dimuat", "Tarik layar ke bawah untuk mencoba lagi.", DebtDanger)
+    SupplierDebtFeedback(modifier, "Hutang Supplier Gagal Dimuat", "Tarik layar ke bawah untuk mencoba memuat ulang data.", DebtDanger)
 }
 
 @Composable
@@ -475,19 +517,43 @@ private fun SupplierDebtFeedback(
     message: String,
     titleColor: androidx.compose.ui.graphics.Color,
 ) {
-    Surface(
-        modifier = modifier.fillMaxWidth(),
-        color = DebtSurface,
-        shape = RoundedCornerShape(18.dp),
-        border = BorderStroke(1.dp, DebtLine),
+    Box(
+        modifier = modifier
+            .fillMaxWidth()
+            .padding(vertical = 40.dp, horizontal = 24.dp),
+        contentAlignment = Alignment.Center,
     ) {
         Column(
-            modifier = Modifier.fillMaxWidth().padding(horizontal = 24.dp, vertical = 46.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.spacedBy(6.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp),
         ) {
-            Text(title, style = MaterialTheme.typography.titleSmall, color = titleColor, fontWeight = FontWeight.SemiBold)
-            Text(message, style = MaterialTheme.typography.bodySmall, color = DebtMuted, textAlign = TextAlign.Center)
+            Box(
+                modifier = Modifier
+                    .size(64.dp)
+                    .clip(CircleShape)
+                    .background(Color(0xFFFEF2F2)),
+                contentAlignment = Alignment.Center,
+            ) {
+                Icon(
+                    imageVector = Icons.Outlined.ErrorOutline,
+                    contentDescription = null,
+                    tint = titleColor,
+                    modifier = Modifier.size(32.dp),
+                )
+            }
+            Text(
+                text = title,
+                fontSize = 15.sp,
+                fontWeight = FontWeight.SemiBold,
+                color = Color(0xFF0F172A),
+            )
+            Text(
+                text = message,
+                fontSize = 13.sp,
+                color = Color(0xFF64748B),
+                textAlign = TextAlign.Center,
+                modifier = Modifier.widthIn(max = 340.dp),
+            )
         }
     }
 }

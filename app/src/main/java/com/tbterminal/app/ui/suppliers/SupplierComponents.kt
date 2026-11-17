@@ -27,6 +27,9 @@ import androidx.compose.material.icons.outlined.Description
 import androidx.compose.material.icons.outlined.ExpandMore
 import androidx.compose.material.icons.outlined.Inventory2
 import androidx.compose.material.icons.outlined.SearchOff
+import androidx.compose.material.icons.outlined.Refresh
+import androidx.compose.foundation.layout.widthIn
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.DropdownMenu
@@ -148,49 +151,76 @@ internal fun SupplierLoadingState() {
 }
 
 @Composable
-internal fun SupplierEmptyState(query: String = "") {
-    Surface(
-        modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(16.dp),
-        color = Color.White,
-        border = BorderStroke(1.dp, SupplierSlate200),
+internal fun SupplierEmptyState(
+    query: String = "",
+    onResetQuery: (() -> Unit)? = null,
+    modifier: Modifier = Modifier,
+) {
+    Box(
+        modifier = modifier
+            .fillMaxWidth()
+            .padding(vertical = 40.dp, horizontal = 24.dp),
+        contentAlignment = Alignment.Center,
     ) {
         Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 24.dp, vertical = 36.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.spacedBy(10.dp),
         ) {
             Box(
                 modifier = Modifier
-                    .size(52.dp)
-                    .background(SupplierEmerald50, CircleShape),
+                    .size(64.dp)
+                    .clip(CircleShape)
+                    .background(Color(0xFFF1F5F9)),
                 contentAlignment = Alignment.Center,
             ) {
                 Icon(
                     imageVector = if (query.isNotBlank()) Icons.Outlined.SearchOff else Icons.Outlined.Inventory2,
                     contentDescription = null,
-                    tint = SupplierEmerald600,
-                    modifier = Modifier.size(24.dp),
+                    tint = Color(0xFF94A3B8),
+                    modifier = Modifier.size(32.dp),
                 )
             }
             Text(
-                text = if (query.isNotBlank()) "Supplier tidak ditemukan" else "Belum ada supplier",
+                text = if (query.isNotBlank()) "Supplier Tidak Ditemukan" else "Belum Ada Supplier",
                 fontSize = 15.sp,
                 fontWeight = FontWeight.SemiBold,
                 color = SupplierSlate900,
+                textAlign = TextAlign.Center,
             )
             Text(
                 text = if (query.isNotBlank()) {
-                    "Tidak ada supplier dengan kata kunci \"$query\""
+                    "Tidak ada data supplier yang cocok dengan kata kunci \"$query\"."
                 } else {
-                    "Tambahkan data supplier untuk pencatatan restok barang."
+                    "Tambahkan data supplier untuk pencatatan transaksi pembelian dan restok barang."
                 },
                 fontSize = 13.sp,
                 color = SupplierSlate500,
-                fontWeight = FontWeight.Normal,
+                textAlign = TextAlign.Center,
+                modifier = Modifier.widthIn(max = 340.dp),
             )
+            if (query.isNotBlank() && onResetQuery != null) {
+                OutlinedButton(
+                    onClick = onResetQuery,
+                    shape = RoundedCornerShape(12.dp),
+                    colors = ButtonDefaults.outlinedButtonColors(
+                        contentColor = Color(0xFF256B57),
+                    ),
+                    border = BorderStroke(1.dp, Color(0xFF256B57).copy(alpha = 0.5f)),
+                    modifier = Modifier.padding(top = 4.dp),
+                ) {
+                    Icon(
+                        imageVector = Icons.Outlined.Refresh,
+                        contentDescription = null,
+                        modifier = Modifier.size(16.dp),
+                    )
+                    Spacer(Modifier.width(6.dp))
+                    Text(
+                        text = "Reset Pencarian",
+                        fontSize = 13.sp,
+                        fontWeight = FontWeight.SemiBold,
+                    )
+                }
+            }
         }
     }
 }

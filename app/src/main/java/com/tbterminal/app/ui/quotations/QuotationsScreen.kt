@@ -37,6 +37,7 @@ import androidx.compose.material.icons.automirrored.outlined.Chat
 import androidx.compose.material.icons.automirrored.outlined.KeyboardArrowLeft
 import androidx.compose.material.icons.automirrored.outlined.KeyboardArrowRight
 import androidx.compose.material.icons.automirrored.outlined.Send
+import androidx.compose.material.icons.outlined.CalendarMonth
 import androidx.compose.material.icons.outlined.Cancel
 import androidx.compose.material.icons.outlined.Check
 import androidx.compose.material.icons.outlined.CheckCircle
@@ -90,12 +91,16 @@ import com.tbterminal.app.data.model.QuotationSummary
 import com.tbterminal.app.data.repository.QuotationRepository
 import com.tbterminal.app.navigation.AppAccessPolicy
 import com.tbterminal.app.navigation.AppCapability
+import com.tbterminal.app.ui.components.HistoryDatePickerDialog
 import com.tbterminal.app.ui.components.TopFloatingCapsule
 import java.math.BigDecimal
+import java.time.DayOfWeek
 import java.time.Instant
 import java.time.LocalDate
 import java.time.OffsetDateTime
 import java.time.ZoneId
+import java.time.format.DateTimeFormatter
+import java.util.Locale
 
 // ═════════════════════════════════════════════════════════════════════════════
 // INDUSTRIAL POS MODERN MINIMAL DESIGN TOKENS
@@ -113,6 +118,39 @@ private val TextMuted = Color(0xFF94A3B8)
 private val BorderLight = Color(0xFFE2E8F0)
 
 private val WIB_ZONE = ZoneId.of("Asia/Jakarta")
+
+private fun formatQuotationPeriodDisplayDate(
+    startDate: LocalDate?,
+    endDate: LocalDate?,
+    preset: String,
+): String {
+    if (preset == "Semua") return "Semua Periode"
+    val idLocale = Locale.forLanguageTag("id-ID")
+    val dayMonth = DateTimeFormatter.ofPattern("d MMM", idLocale)
+    val dayMonthYear = DateTimeFormatter.ofPattern("d MMM yyyy", idLocale)
+    val today = LocalDate.now(WIB_ZONE)
+
+    return when (preset) {
+        "Hari ini", "Hari" -> {
+            if (startDate == today) "Hari Ini (${startDate.format(dayMonth)})"
+            else startDate?.format(dayMonthYear) ?: "Hari Ini"
+        }
+        "Minggu ini", "Minggu" -> {
+            if (startDate != null && endDate != null) "Minggu Ini (${startDate.format(dayMonth)} - ${endDate.format(dayMonth)})"
+            else "Minggu Ini"
+        }
+        "Bulan ini", "Bulan" -> {
+            val monthYear = DateTimeFormatter.ofPattern("MMMM yyyy", idLocale)
+            startDate?.format(monthYear)?.replaceFirstChar { it.uppercase() } ?: "Bulan Ini"
+        }
+        else -> {
+            if (startDate != null && endDate != null) {
+                if (startDate == endDate) startDate.format(dayMonthYear)
+                else "${startDate.format(dayMonth)} - ${endDate.format(dayMonthYear)}"
+            } else preset
+        }
+    }
+}
 
 private fun isQuotationExpired(validUntilIso: String?): Boolean {
     if (validUntilIso.isNullOrBlank()) return false
@@ -149,7 +187,9 @@ fun QuotationsScreen(
     var showFilterPopup by remember { mutableStateOf(false) }
 
     val isSearchActive = isSearchExpanded || uiState.searchQuery.isNotEmpty()
-    val isFiltered = uiState.selectedStatus != ALL_QUOTATION_STATUSES
+    val isDateFiltered = uiState.selectedPeriodPreset != "Semua" || uiState.startDate != null || uiState.endDate != null
+    val isStatusFiltered = uiState.selectedStatus != ALL_QUOTATION_STATUSES
+    val isFiltered = isDateFiltered || isStatusFiltered
 
     Scaffold(
         containerColor = ScreenBg,
@@ -360,7 +400,7 @@ fun QuotationsScreen(
                     .padding(horizontal = 16.dp, vertical = 12.dp),
                 verticalArrangement = Arrangement.spacedBy(12.dp)
             ) {
-                // ── Quick Filter Bar (Tampil saat filter status aktif) ───────
+                // ── Quick Filter Bar (Tampil saat filter status / periode aktif) ────
                 if (isFiltered) {
                     Row(
                         modifier = Modifier
@@ -380,48 +420,103 @@ fun QuotationsScreen(
                                 fontWeight = FontWeight.Medium,
                                 color = Color(0xFF64748B)
                             )
-                            val statusLabel = when (uiState.selectedStatus) {
-                                QuotationStatus.DRAFT.name -> "Draft"
-                                QuotationStatus.SENT.name -> "Terkirim"
-                                QuotationStatus.CONVERTED.name -> "Jadi Transaksi"
-                                QuotationStatus.CANCELLED.name -> "Dibatalkan"
-                                else -> uiState.selectedStatus
-                            }
-                            Surface(
-                                shape = RoundedCornerShape(100.dp),
-                                color = Color.White,
-                                border = BorderStroke(1.dp, Color(0xFFE2E8F0))
-                            ) {
-                                Row(
-                                    modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp),
-                                    verticalAlignment = Alignment.CenterVertically,
-                                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+
+                            // Chip Periode Waktu
+                            if (isDateFiltered) {
+                                val periodLabel = formatQuotationPeriodDisplayDate(
+                                    uiState.startDate,
+                                    uiState.endDate,
+                                    uiState.selectedPeriodPreset
+                                )
+                                Surface(
+                                    shape = RoundedCornerShape(100.dp),
+                                    color = Color.White,
+                                    border = BorderStroke(1.dp, Color(0xFFE2E8F0))
                                 ) {
-                                    Icon(
-                                        Icons.Outlined.CheckCircle,
-                                        null,
-                                        tint = BrandGreen,
-                                        modifier = Modifier.size(14.dp)
-                                    )
-                                    Text(
-                                        text = statusLabel,
-                                        fontSize = 12.sp,
-                                        fontWeight = FontWeight.Medium,
-                                        color = Color(0xFF334155),
-                                    )
-                                    Box(
-                                        modifier = Modifier
-                                            .size(16.dp)
-                                            .clip(CircleShape)
-                                            .clickable { viewModel.onStatusSelected(ALL_QUOTATION_STATUSES) },
-                                        contentAlignment = Alignment.Center
+                                    Row(
+                                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp),
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        horizontalArrangement = Arrangement.spacedBy(6.dp)
                                     ) {
                                         Icon(
-                                            Icons.Outlined.Close,
+                                            Icons.Outlined.CalendarMonth,
                                             null,
-                                            tint = Color(0xFF94A3B8),
-                                            modifier = Modifier.size(12.dp)
+                                            tint = BrandGreen,
+                                            modifier = Modifier.size(14.dp)
                                         )
+                                        Text(
+                                            text = periodLabel,
+                                            fontSize = 12.sp,
+                                            fontWeight = FontWeight.Medium,
+                                            color = Color(0xFF334155),
+                                            maxLines = 1,
+                                            overflow = TextOverflow.Ellipsis
+                                        )
+                                        Box(
+                                            modifier = Modifier
+                                                .size(16.dp)
+                                                .clip(CircleShape)
+                                                .clickable { viewModel.clearDateFilter() },
+                                            contentAlignment = Alignment.Center
+                                        ) {
+                                            Icon(
+                                                Icons.Outlined.Close,
+                                                null,
+                                                tint = Color(0xFF94A3B8),
+                                                modifier = Modifier.size(12.dp)
+                                            )
+                                        }
+                                    }
+                                }
+                            }
+
+                            // Chip Status Dokumen
+                            if (isStatusFiltered) {
+                                val statusLabel = when (uiState.selectedStatus) {
+                                    QuotationStatus.DRAFT.name -> "Draft"
+                                    QuotationStatus.SENT.name -> "Terkirim"
+                                    QuotationStatus.CONVERTED.name -> "Jadi Transaksi"
+                                    QuotationStatus.CANCELLED.name -> "Dibatalkan"
+                                    else -> uiState.selectedStatus
+                                }
+                                Surface(
+                                    shape = RoundedCornerShape(100.dp),
+                                    color = Color.White,
+                                    border = BorderStroke(1.dp, Color(0xFFE2E8F0))
+                                ) {
+                                    Row(
+                                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp),
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                                    ) {
+                                        Icon(
+                                            Icons.Outlined.CheckCircle,
+                                            null,
+                                            tint = BrandGreen,
+                                            modifier = Modifier.size(14.dp)
+                                        )
+                                        Text(
+                                            text = statusLabel,
+                                            fontSize = 12.sp,
+                                            fontWeight = FontWeight.Medium,
+                                            color = Color(0xFF334155),
+                                            maxLines = 1,
+                                            overflow = TextOverflow.Ellipsis
+                                        )
+                                        Box(
+                                            modifier = Modifier
+                                                .size(16.dp)
+                                                .clip(CircleShape)
+                                                .clickable { viewModel.clearStatusFilter() },
+                                            contentAlignment = Alignment.Center
+                                        ) {
+                                            Icon(
+                                                Icons.Outlined.Close,
+                                                null,
+                                                tint = Color(0xFF94A3B8),
+                                                modifier = Modifier.size(12.dp)
+                                            )
+                                        }
                                     }
                                 }
                             }
@@ -434,7 +529,7 @@ fun QuotationsScreen(
                             color = Color(0xFFF43F5E),
                             modifier = Modifier
                                 .clip(RoundedCornerShape(6.dp))
-                                .clickable { viewModel.onStatusSelected(ALL_QUOTATION_STATUSES) }
+                                .clickable { viewModel.resetFilters() }
                                 .padding(horizontal = 6.dp, vertical = 4.dp)
                         )
                     }
@@ -546,13 +641,22 @@ fun QuotationsScreen(
         }
     }
 
-    // ── Filter Bottom Sheet (Persis Gaya Penjualan) ─────────────────────────
+    // ── Filter Bottom Sheet (Persis Gaya Filter Penjualan) ──────────────────
     if (showFilterPopup) {
         QuotationFilterBottomSheet(
             selectedStatus = uiState.selectedStatus,
+            selectedPreset = uiState.selectedPeriodPreset,
+            startDate = uiState.startDate,
+            endDate = uiState.endDate,
             onDismiss = { showFilterPopup = false },
-            onApplyStatus = viewModel::onStatusSelected,
-            onResetFilters = { viewModel.onStatusSelected(ALL_QUOTATION_STATUSES) }
+            onApplyFilters = { status, preset, start, end ->
+                viewModel.applyFilters(status, preset, start, end)
+                showFilterPopup = false
+            },
+            onResetFilters = {
+                viewModel.resetFilters()
+                showFilterPopup = false
+            }
         )
     }
 
@@ -817,11 +921,22 @@ private fun QuotationPaginationCapsule(
 @Composable
 private fun QuotationFilterBottomSheet(
     selectedStatus: String,
+    selectedPreset: String,
+    startDate: LocalDate?,
+    endDate: LocalDate?,
     onDismiss: () -> Unit,
-    onApplyStatus: (String) -> Unit,
-    onResetFilters: () -> Unit,
+    onApplyFilters: (status: String, preset: String, start: LocalDate?, end: LocalDate?) -> Unit,
+    onResetFilters: () -> Unit = {},
 ) {
+    val zone = remember { ZoneId.of("Asia/Jakarta") }
+    val today: LocalDate = remember { LocalDate.now(zone) }
+    var tempSelectedPreset by remember { mutableStateOf(selectedPreset) }
+    val initialStart = remember(startDate) { startDate ?: today }
+    val initialEnd = remember(endDate) { endDate ?: today }
+    var tempStartDate by remember { mutableStateOf<LocalDate?>(if (selectedPreset == "Semua") null else initialStart) }
+    var tempEndDate by remember { mutableStateOf<LocalDate?>(if (selectedPreset == "Semua") null else initialEnd) }
     var tempSelectedStatus by remember { mutableStateOf(selectedStatus) }
+    var showDatePicker by remember { mutableStateOf(false) }
 
     ModalBottomSheet(
         onDismissRequest = onDismiss,
@@ -860,7 +975,7 @@ private fun QuotationFilterBottomSheet(
                     )
                     Spacer(Modifier.height(2.dp))
                     Text(
-                        text = "Atur status dokumen penawaran harga",
+                        text = "Atur periode waktu dan status dokumen penawaran",
                         fontSize = 13.sp,
                         color = Color(0xFF64748B),
                         lineHeight = 17.sp,
@@ -885,55 +1000,169 @@ private fun QuotationFilterBottomSheet(
 
             HorizontalDivider(color = Color(0xFFF1F5F9), thickness = 1.dp)
 
-            // Content: Status Options (Persis SalesFilterBottomSheet)
+            // Scrollable Filter Content (Persis SalesFilterBottomSheet)
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
+                    .weight(1f, fill = false)
+                    .verticalScroll(rememberScrollState())
                     .padding(horizontal = 24.dp, vertical = 18.dp),
-                verticalArrangement = Arrangement.spacedBy(16.dp)
+                verticalArrangement = Arrangement.spacedBy(22.dp)
             ) {
-                Text(
-                    text = "STATUS DOKUMEN",
-                    fontSize = 12.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = Color(0xFF64748B),
-                    letterSpacing = 0.8.sp,
-                )
-
-                val statusRows = listOf(
-                    listOf(ALL_QUOTATION_STATUSES to "Semua Status", QuotationStatus.DRAFT.name to "Draft"),
-                    listOf(QuotationStatus.SENT.name to "Terkirim", QuotationStatus.CONVERTED.name to "Jadi Transaksi")
-                )
-
+                // BEGIN: FilterSection - Periode Waktu (Persis SalesFilterBottomSheet)
                 Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                    statusRows.forEach { rowPairs ->
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.spacedBy(10.dp)
-                        ) {
-                            rowPairs.forEach { (key, label) ->
-                                val isSelected = tempSelectedStatus == key
-                                QuotationFilterOptionCard(
-                                    label = label,
-                                    isSelected = isSelected,
-                                    onClick = { tempSelectedStatus = key },
-                                    modifier = Modifier.weight(1f),
-                                    testTag = "quotation-filter-option-$key"
-                                )
+                    Text(
+                        text = "PERIODE WAKTU",
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = Color(0xFF64748B),
+                        letterSpacing = 0.8.sp,
+                    )
+
+                    val periodOptions = listOf(
+                        listOf("Semua" to "Semua", "Hari ini" to "Hari Ini"),
+                        listOf("Minggu ini" to "Minggu Ini", "Bulan ini" to "Bulan Ini")
+                    )
+
+                    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                        periodOptions.forEach { rowPairs ->
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.spacedBy(10.dp)
+                            ) {
+                                rowPairs.forEach { (key, label) ->
+                                    val isSelected = tempSelectedPreset == key
+                                    QuotationFilterOptionCard(
+                                        label = label,
+                                        isSelected = isSelected,
+                                        onClick = {
+                                            tempSelectedPreset = key
+                                            when (key) {
+                                                "Semua" -> {
+                                                    tempStartDate = null
+                                                    tempEndDate = null
+                                                }
+                                                "Hari ini" -> {
+                                                    tempStartDate = today
+                                                    tempEndDate = today
+                                                }
+                                                "Minggu ini" -> {
+                                                    tempStartDate = today.with(DayOfWeek.MONDAY)
+                                                    tempEndDate = today.with(DayOfWeek.SUNDAY)
+                                                }
+                                                "Bulan ini" -> {
+                                                    tempStartDate = today.withDayOfMonth(1)
+                                                    tempEndDate = today.withDayOfMonth(today.lengthOfMonth())
+                                                }
+                                            }
+                                        },
+                                        modifier = Modifier.weight(1f),
+                                        testTag = "quotation-filter-period-$key"
+                                    )
+                                }
                             }
                         }
                     }
 
-                    // Full width status: Dibatalkan
-                    val isCancelled = tempSelectedStatus == QuotationStatus.CANCELLED.name
-                    QuotationFilterOptionCard(
-                        label = "Dibatalkan",
-                        isSelected = isCancelled,
-                        onClick = { tempSelectedStatus = QuotationStatus.CANCELLED.name },
-                        modifier = Modifier.fillMaxWidth(),
-                        isCentered = true,
-                        testTag = "quotation-filter-option-${QuotationStatus.CANCELLED.name}"
+                    // Custom Date Range Button (Persis SalesFilterBottomSheet)
+                    Surface(
+                        onClick = { showDatePicker = true },
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(44.dp)
+                            .testTag("quotation-filter-custom-date-btn"),
+                        shape = RoundedCornerShape(12.dp),
+                        color = Color(0xFFF8FAFC),
+                        border = BorderStroke(1.dp, Color(0xFFCBD5E1))
+                    ) {
+                        Row(
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .padding(horizontal = 14.dp),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Outlined.CalendarMonth,
+                                    contentDescription = null,
+                                    tint = if (tempSelectedPreset == "Kustom") BrandGreen else Color(0xFF64748B),
+                                    modifier = Modifier.size(16.dp)
+                                )
+                                val customText = if (tempSelectedPreset == "Kustom" && tempStartDate != null && tempEndDate != null) {
+                                    if (tempStartDate == tempEndDate) {
+                                        tempStartDate!!.format(DateTimeFormatter.ofPattern("dd/MM/yyyy"))
+                                    } else {
+                                        "${tempStartDate!!.format(DateTimeFormatter.ofPattern("dd/MM"))} - ${tempEndDate!!.format(DateTimeFormatter.ofPattern("dd/MM"))}"
+                                    }
+                                } else {
+                                    "Pilih Tanggal Kustom"
+                                }
+                                Text(
+                                    text = customText,
+                                    fontSize = 13.sp,
+                                    fontWeight = if (tempSelectedPreset == "Kustom") FontWeight.SemiBold else FontWeight.Medium,
+                                    color = if (tempSelectedPreset == "Kustom") BrandGreen else Color(0xFF475569)
+                                )
+                            }
+                            Text(
+                                text = "Atur >",
+                                fontSize = 12.sp,
+                                fontWeight = FontWeight.SemiBold,
+                                color = BrandGreen
+                            )
+                        }
+                    }
+                }
+
+                // BEGIN: FilterSection - Status Dokumen (Persis SalesFilterBottomSheet)
+                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                    Text(
+                        text = "STATUS DOKUMEN",
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = Color(0xFF64748B),
+                        letterSpacing = 0.8.sp,
                     )
+
+                    val statusRows = listOf(
+                        listOf(ALL_QUOTATION_STATUSES to "Semua Status", QuotationStatus.DRAFT.name to "Draft"),
+                        listOf(QuotationStatus.SENT.name to "Terkirim", QuotationStatus.CONVERTED.name to "Jadi Transaksi")
+                    )
+
+                    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                        statusRows.forEach { rowPairs ->
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.spacedBy(10.dp)
+                            ) {
+                                rowPairs.forEach { (key, label) ->
+                                    val isSelected = tempSelectedStatus == key
+                                    QuotationFilterOptionCard(
+                                        label = label,
+                                        isSelected = isSelected,
+                                        onClick = { tempSelectedStatus = key },
+                                        modifier = Modifier.weight(1f),
+                                        testTag = "quotation-filter-option-$key"
+                                    )
+                                }
+                            }
+                        }
+
+                        // Full width status: Dibatalkan
+                        val isCancelled = tempSelectedStatus == QuotationStatus.CANCELLED.name
+                        QuotationFilterOptionCard(
+                            label = "Dibatalkan",
+                            isSelected = isCancelled,
+                            onClick = { tempSelectedStatus = QuotationStatus.CANCELLED.name },
+                            modifier = Modifier.fillMaxWidth(),
+                            isCentered = true,
+                            testTag = "quotation-filter-option-${QuotationStatus.CANCELLED.name}"
+                        )
+                    }
                 }
             }
 
@@ -949,8 +1178,7 @@ private fun QuotationFilterBottomSheet(
             ) {
                 Button(
                     onClick = {
-                        onApplyStatus(tempSelectedStatus)
-                        onDismiss()
+                        onApplyFilters(tempSelectedStatus, tempSelectedPreset, tempStartDate, tempEndDate)
                     },
                     modifier = Modifier
                         .fillMaxWidth()
@@ -987,6 +1215,31 @@ private fun QuotationFilterBottomSheet(
                 }
             }
         }
+    }
+
+    if (showDatePicker) {
+        HistoryDatePickerDialog(
+            currentDate = (tempStartDate ?: today).toString(),
+            initialMode = when (tempSelectedPreset) {
+                "Bulan ini", "Bulan" -> "Bulan"
+                "Minggu ini", "Minggu" -> "Minggu"
+                else -> "Hari"
+            },
+            onDismiss = { showDatePicker = false },
+            onConfirmRange = { newStartStr, newEndStr, _ ->
+                tempStartDate = runCatching { LocalDate.parse(newStartStr) }.getOrNull()
+                tempEndDate = runCatching { LocalDate.parse(newEndStr) }.getOrNull()
+                tempSelectedPreset = "Kustom"
+                showDatePicker = false
+            },
+            onConfirm = { singleDateStr ->
+                val date = runCatching { LocalDate.parse(singleDateStr) }.getOrNull()
+                tempStartDate = date
+                tempEndDate = date
+                tempSelectedPreset = "Kustom"
+                showDatePicker = false
+            }
+        )
     }
 }
 

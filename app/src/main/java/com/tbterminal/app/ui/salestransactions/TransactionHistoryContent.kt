@@ -49,6 +49,10 @@ import androidx.compose.material.icons.outlined.Description
 import androidx.compose.material.icons.outlined.ExpandMore
 import androidx.compose.material.icons.outlined.History
 import androidx.compose.material.icons.outlined.Search
+import androidx.compose.material.icons.outlined.SearchOff
+import androidx.compose.material.icons.outlined.ReceiptLong
+import androidx.compose.material.icons.outlined.Refresh
+import androidx.compose.material.icons.outlined.ErrorOutline
 import androidx.compose.material.icons.outlined.Tune
 import androidx.compose.material.icons.outlined.Check
 import androidx.compose.material.icons.outlined.Schedule
@@ -482,10 +486,21 @@ internal fun TransactionHistoryContent(
                 isLoading = state.isLoading && state.transactions.isEmpty(),
             )
 
+            val isFiltered = state.query.isNotBlank() ||
+                (state.statusFilter != "Semua" && state.statusFilter.isNotBlank()) ||
+                (state.paymentMethodFilter != "Semua" && state.paymentMethodFilter.isNotBlank()) ||
+                (state.selectedPreset != "Semua" && state.selectedPreset != null)
+
             when {
                 state.isLoading && state.transactions.isEmpty() -> SalesHistoryLoading(compact)
                 state.error != null && state.transactions.isEmpty() -> SalesHistoryError(state.error, onRetry)
-                state.transactions.isEmpty() -> SalesHistoryEmpty()
+                state.transactions.isEmpty() -> SalesHistoryEmpty(
+                    hasFilterOrSearch = isFiltered,
+                    onResetFilter = {
+                        onSearchChanged("")
+                        onResetAllFilters()
+                    }
+                )
                 else -> {
                     if (compact) {
                         Surface(
@@ -1816,61 +1831,138 @@ private fun SalesHistoryLoading(compact: Boolean) {
 }
 
 @Composable
-private fun SalesHistoryEmpty() {
-    SalesHistoryStateCard(
-        icon = Icons.Outlined.History,
-        title = "Belum ada penjualan",
-        message = "Tidak ada transaksi yang cocok dengan filter saat ini.",
-    )
-}
-
-@Composable
-private fun SalesHistoryError(message: String, onRetry: () -> Unit) {
-    SalesHistoryStateCard(
-        icon = Icons.Outlined.History,
-        title = "Riwayat gagal dimuat",
-        message = message,
-        action = { Button(onClick = onRetry) { Text("Coba lagi") } },
-    )
-}
-
-@Composable
-private fun SalesHistoryInlineError(message: String, onRetry: () -> Unit) {
-    Surface(
-        modifier = Modifier.fillMaxWidth(),
-        color = MaterialTheme.colorScheme.errorContainer,
-        contentColor = MaterialTheme.colorScheme.onErrorContainer,
-        shape = RoundedCornerShape(14.dp),
+private fun SalesHistoryEmpty(
+    hasFilterOrSearch: Boolean = false,
+    onResetFilter: (() -> Unit)? = null,
+) {
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(vertical = 40.dp, horizontal = 24.dp),
+        contentAlignment = Alignment.Center,
     ) {
-        Row(modifier = Modifier.padding(14.dp), verticalAlignment = Alignment.CenterVertically) {
-            Text(message, modifier = Modifier.weight(1f), style = MaterialTheme.typography.bodySmall)
-            OutlinedButton(onClick = onRetry) { Text("Coba lagi") }
+        Column(
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(10.dp),
+        ) {
+            Box(
+                modifier = Modifier
+                    .size(64.dp)
+                    .clip(CircleShape)
+                    .background(Color(0xFFF1F5F9)),
+                contentAlignment = Alignment.Center,
+            ) {
+                Icon(
+                    imageVector = if (hasFilterOrSearch) Icons.Outlined.SearchOff else Icons.Outlined.ReceiptLong,
+                    contentDescription = null,
+                    tint = Color(0xFF94A3B8),
+                    modifier = Modifier.size(32.dp),
+                )
+            }
+            Text(
+                text = if (hasFilterOrSearch) "Transaksi Tidak Ditemukan" else "Belum Ada Transaksi",
+                fontSize = 15.sp,
+                fontWeight = FontWeight.SemiBold,
+                color = TbText,
+            )
+            Text(
+                text = if (hasFilterOrSearch) {
+                    "Tidak ada riwayat transaksi yang cocok dengan filter atau kata kunci pencarian saat ini."
+                } else {
+                    "Semua transaksi penjualan kasir akan otomatis tercatat dan tersimpan di sini."
+                },
+                fontSize = 13.sp,
+                color = TbTextMuted,
+                textAlign = TextAlign.Center,
+                modifier = Modifier.widthIn(max = 340.dp),
+            )
+            if (hasFilterOrSearch && onResetFilter != null) {
+                OutlinedButton(
+                    onClick = onResetFilter,
+                    shape = RoundedCornerShape(12.dp),
+                    colors = ButtonDefaults.outlinedButtonColors(
+                        contentColor = Color(0xFF10533C),
+                    ),
+                    border = BorderStroke(1.dp, Color(0xFF10533C).copy(alpha = 0.5f)),
+                    modifier = Modifier.padding(top = 4.dp),
+                ) {
+                    Icon(
+                        imageVector = Icons.Outlined.Refresh,
+                        contentDescription = null,
+                        modifier = Modifier.size(16.dp),
+                    )
+                    Spacer(Modifier.width(6.dp))
+                    Text(
+                        text = "Reset Filter",
+                        fontSize = 13.sp,
+                        fontWeight = FontWeight.SemiBold,
+                    )
+                }
+            }
         }
     }
 }
 
 @Composable
-private fun SalesHistoryStateCard(
-    icon: androidx.compose.ui.graphics.vector.ImageVector,
-    title: String,
-    message: String,
-    action: (@Composable () -> Unit)? = null,
-) {
-    Surface(
-        modifier = Modifier.fillMaxWidth(),
-        color = TbSurface,
-        shape = RoundedCornerShape(18.dp),
-        border = BorderStroke(1.dp, TbOutline),
+private fun SalesHistoryError(message: String, onRetry: () -> Unit) {
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(vertical = 40.dp, horizontal = 24.dp),
+        contentAlignment = Alignment.Center,
     ) {
         Column(
-            modifier = Modifier.fillMaxWidth().padding(horizontal = 24.dp, vertical = 36.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.spacedBy(10.dp),
         ) {
-            Icon(icon, null, tint = TbTextMuted, modifier = Modifier.size(32.dp))
-            Text(title, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold, color = TbText)
-            Text(message, style = MaterialTheme.typography.bodyMedium, color = TbTextMuted, textAlign = TextAlign.Center)
-            action?.invoke()
+            Box(
+                modifier = Modifier
+                    .size(64.dp)
+                    .clip(CircleShape)
+                    .background(Color(0xFFFEF2F2)),
+                contentAlignment = Alignment.Center,
+            ) {
+                Icon(
+                    imageVector = Icons.Outlined.ErrorOutline,
+                    contentDescription = null,
+                    tint = TbError,
+                    modifier = Modifier.size(32.dp),
+                )
+            }
+            Text(
+                text = "Riwayat Gagal Dimuat",
+                fontSize = 15.sp,
+                fontWeight = FontWeight.SemiBold,
+                color = TbText,
+            )
+            Text(
+                text = message,
+                fontSize = 13.sp,
+                color = TbTextMuted,
+                textAlign = TextAlign.Center,
+                modifier = Modifier.widthIn(max = 340.dp),
+            )
+            OutlinedButton(
+                onClick = onRetry,
+                shape = RoundedCornerShape(12.dp),
+                colors = ButtonDefaults.outlinedButtonColors(
+                    contentColor = Color(0xFF10533C),
+                ),
+                border = BorderStroke(1.dp, Color(0xFF10533C).copy(alpha = 0.5f)),
+                modifier = Modifier.padding(top = 4.dp),
+            ) {
+                Icon(
+                    imageVector = Icons.Outlined.Refresh,
+                    contentDescription = null,
+                    modifier = Modifier.size(16.dp),
+                )
+                Spacer(Modifier.width(6.dp))
+                Text(
+                    text = "Coba Lagi",
+                    fontSize = 13.sp,
+                    fontWeight = FontWeight.SemiBold,
+                )
+            }
         }
     }
 }

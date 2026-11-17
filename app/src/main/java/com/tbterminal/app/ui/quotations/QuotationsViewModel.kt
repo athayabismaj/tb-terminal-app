@@ -9,6 +9,7 @@ import com.tbterminal.app.data.model.QuotationSummary
 import com.tbterminal.app.data.repository.QuotationRepository
 import com.tbterminal.app.data.repository.RepositoryResult
 import com.tbterminal.app.ui.common.viewModelFactory
+import java.time.LocalDate
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -20,6 +21,9 @@ import kotlinx.coroutines.launch
 data class QuotationsUiState(
     val quotations: List<QuotationSummary> = emptyList(),
     val selectedStatus: String = ALL_QUOTATION_STATUSES,
+    val selectedPeriodPreset: String = "Semua",
+    val startDate: LocalDate? = null,
+    val endDate: LocalDate? = null,
     val searchQuery: String = "",
     val page: Int = 1,
     val totalPages: Int = 1,
@@ -47,9 +51,12 @@ class QuotationsViewModel(
 
     fun loadQuotations(page: Int = _uiState.value.page) {
         viewModelScope.launch {
-            val statusParam = _uiState.value.selectedStatus
+            val state = _uiState.value
+            val statusParam = state.selectedStatus
                 .takeIf { it != ALL_QUOTATION_STATUSES }
-            val searchParam = _uiState.value.searchQuery.trim().takeIf { it.isNotBlank() }
+            val searchParam = state.searchQuery.trim().takeIf { it.isNotBlank() }
+            val startParam = state.startDate?.toString()
+            val endParam = state.endDate?.toString()
             _uiState.update { it.copy(isLoading = true, errorMessage = null, page = page) }
 
             when (
@@ -58,15 +65,34 @@ class QuotationsViewModel(
                     limit = 20,
                     status = statusParam,
                     search = searchParam,
+                    startDate = startParam,
+                    endDate = endParam,
                 )
             ) {
                 is RepositoryResult.Success -> {
+                    val rawData = result.data.data
+                    val filteredData = if (state.startDate != null || state.endDate != null) {
+                        rawData.filter { q ->
+                            val date = runCatching { LocalDate.parse(q.createdAt.take(10)) }.getOrNull()
+                            if (date == null) true
+                            else {
+                                val afterStart = state.startDate == null || !date.isBefore(state.startDate)
+                                val beforeEnd = state.endDate == null || !date.isAfter(state.endDate)
+                                afterStart && beforeEnd
+                            }
+                        }
+                    } else {
+                        rawData
+                    }
+                    val isClientFiltered = (state.startDate != null || state.endDate != null) && filteredData.size < rawData.size
+                    val finalTotal = if (isClientFiltered) filteredData.size.toLong() else result.data.total
+
                     _uiState.update {
                         it.copy(
-                            quotations = result.data.data,
+                            quotations = filteredData,
                             page = result.data.page,
                             totalPages = result.data.totalPages.coerceAtLeast(1),
-                            total = result.data.total,
+                            total = finalTotal,
                             isLoading = false,
                             errorMessage = null,
                         )
@@ -82,8 +108,53 @@ class QuotationsViewModel(
         }
     }
 
+    fun applyFilters(
+        status: String,
+        preset: String,
+        start: LocalDate?,
+        end: LocalDate?,
+    ) {
+        _uiState.update {
+            it.copy(
+                selectedStatus = status,
+                selectedPeriodPreset = preset,
+                startDate = start,
+                endDate = end,
+            )
+        }
+        loadQuotations(page = 1)
+    }
+
     fun onStatusSelected(status: String) {
         _uiState.update { it.copy(selectedStatus = status) }
+        loadQuotations(page = 1)
+    }
+
+    fun clearStatusFilter() {
+        _uiState.update { it.copy(selectedStatus = ALL_QUOTATION_STATUSES) }
+        loadQuotations(page = 1)
+    }
+
+    fun clearDateFilter() {
+        _uiState.update {
+            it.copy(
+                selectedPeriodPreset = "Semua",
+                startDate = null,
+                endDate = null,
+            )
+        }
+        loadQuotations(page = 1)
+    }
+
+    fun resetFilters() {
+        _uiState.update {
+            it.copy(
+                selectedStatus = ALL_QUOTATION_STATUSES,
+                selectedPeriodPreset = "Semua",
+                startDate = null,
+                endDate = null,
+            )
+        }
         loadQuotations(page = 1)
     }
 

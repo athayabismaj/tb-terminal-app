@@ -22,6 +22,13 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.ReceiptLong
 import androidx.compose.material.icons.outlined.Payments
 import androidx.compose.material.icons.outlined.Search
+import androidx.compose.material.icons.outlined.SearchOff
+import androidx.compose.material.icons.outlined.ErrorOutline
+import androidx.compose.material.icons.outlined.Refresh
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.ui.draw.clip
+import androidx.compose.foundation.layout.widthIn
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.material.icons.outlined.Visibility
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
@@ -266,11 +273,16 @@ private fun ExpenseTable(
         )
         Spacer(Modifier.height(if (compact) 12.dp else 28.dp))
         if (!compact) ExpenseHeader()
+        val errorMessage = uiState.errorMessage
         when {
             uiState.isLoading -> LoadingBox()
-            uiState.errorMessage != null -> ErrorBox(uiState.errorMessage, onRefresh)
+            errorMessage != null -> ErrorBox(errorMessage, onRefresh)
             uiState.expenses.isEmpty() -> EmptyBox()
-            visibleExpenses.isEmpty() -> EmptyBox("Tidak ada pengeluaran yang cocok.")
+            visibleExpenses.isEmpty() -> EmptyBox(
+                message = "Tidak ada pengeluaran kas yang cocok dengan \"${uiState.searchQuery}\".",
+                isSearch = true,
+                onResetQuery = { onSearchChanged("") },
+            )
             else -> visibleExpenses.forEach { if (compact) ExpenseMobileRow(it, onShowSessionDetail) else ExpenseRow(it, onShowSessionDetail) }
         }
         ExpensePagination(uiState, visibleExpenses.size, compact, onPreviousPage, onNextPage)
@@ -385,14 +397,138 @@ private fun LoadingBox() = com.tbterminal.app.ui.components.SkeletonList(
 )
 
 @Composable
-private fun EmptyBox(message: String = "Belum ada pengeluaran kas.") = Box(Modifier.fillMaxWidth().height(180.dp), contentAlignment = Alignment.Center) { Text(message, color = ExpenseMuted) }
+private fun EmptyBox(
+    message: String = "Belum ada pengeluaran kas.",
+    isSearch: Boolean = false,
+    onResetQuery: (() -> Unit)? = null,
+) {
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(vertical = 40.dp, horizontal = 24.dp),
+        contentAlignment = Alignment.Center,
+    ) {
+        Column(
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(10.dp),
+        ) {
+            Box(
+                modifier = Modifier
+                    .size(64.dp)
+                    .clip(CircleShape)
+                    .background(Color(0xFFF1F5F9)),
+                contentAlignment = Alignment.Center,
+            ) {
+                Icon(
+                    imageVector = if (isSearch) Icons.Outlined.SearchOff else Icons.Outlined.Payments,
+                    contentDescription = null,
+                    tint = Color(0xFF94A3B8),
+                    modifier = Modifier.size(32.dp),
+                )
+            }
+            Text(
+                text = if (isSearch) "Pengeluaran Tidak Ditemukan" else "Belum Ada Pengeluaran Kas",
+                fontSize = 15.sp,
+                fontWeight = FontWeight.SemiBold,
+                color = ExpenseText,
+                textAlign = TextAlign.Center,
+            )
+            Text(
+                text = if (isSearch) message else "Catatan biaya operasional kasir atau toko akan otomatis tercatat di sini.",
+                fontSize = 13.sp,
+                color = ExpenseMuted,
+                textAlign = TextAlign.Center,
+                modifier = Modifier.widthIn(max = 340.dp),
+            )
+            if (isSearch && onResetQuery != null) {
+                OutlinedButton(
+                    onClick = onResetQuery,
+                    shape = RoundedCornerShape(12.dp),
+                    colors = ButtonDefaults.outlinedButtonColors(
+                        contentColor = Color(0xFF256B57),
+                    ),
+                    border = BorderStroke(1.dp, Color(0xFF256B57).copy(alpha = 0.5f)),
+                    modifier = Modifier.padding(top = 4.dp),
+                ) {
+                    Icon(
+                        imageVector = Icons.Outlined.Refresh,
+                        contentDescription = null,
+                        modifier = Modifier.size(16.dp),
+                    )
+                    Spacer(Modifier.width(6.dp))
+                    Text(
+                        text = "Reset Pencarian",
+                        fontSize = 13.sp,
+                        fontWeight = FontWeight.SemiBold,
+                    )
+                }
+            }
+        }
+    }
+}
 
 @Composable
 private fun ErrorBox(message: String, onRetry: () -> Unit) {
-    Column(Modifier.fillMaxWidth().height(180.dp), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.Center) {
-        Text(message, color = ExpenseDanger)
-        Spacer(Modifier.height(8.dp))
-        OutlinedButton(onClick = onRetry) { Text("Coba Lagi") }
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(vertical = 40.dp, horizontal = 24.dp),
+        contentAlignment = Alignment.Center,
+    ) {
+        Column(
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(10.dp),
+        ) {
+            Box(
+                modifier = Modifier
+                    .size(64.dp)
+                    .clip(CircleShape)
+                    .background(Color(0xFFFEF2F2)),
+                contentAlignment = Alignment.Center,
+            ) {
+                Icon(
+                    imageVector = Icons.Outlined.ErrorOutline,
+                    contentDescription = null,
+                    tint = ExpenseDanger,
+                    modifier = Modifier.size(32.dp),
+                )
+            }
+            Text(
+                text = "Pengeluaran Gagal Dimuat",
+                fontSize = 15.sp,
+                fontWeight = FontWeight.SemiBold,
+                color = ExpenseText,
+                textAlign = TextAlign.Center,
+            )
+            Text(
+                text = message,
+                fontSize = 13.sp,
+                color = ExpenseMuted,
+                textAlign = TextAlign.Center,
+                modifier = Modifier.widthIn(max = 340.dp),
+            )
+            OutlinedButton(
+                onClick = onRetry,
+                shape = RoundedCornerShape(12.dp),
+                colors = ButtonDefaults.outlinedButtonColors(
+                    contentColor = Color(0xFF256B57),
+                ),
+                border = BorderStroke(1.dp, Color(0xFF256B57).copy(alpha = 0.5f)),
+                modifier = Modifier.padding(top = 4.dp),
+            ) {
+                Icon(
+                    imageVector = Icons.Outlined.Refresh,
+                    contentDescription = null,
+                    modifier = Modifier.size(16.dp),
+                )
+                Spacer(Modifier.width(6.dp))
+                Text(
+                    text = "Coba Lagi",
+                    fontSize = 13.sp,
+                    fontWeight = FontWeight.SemiBold,
+                )
+            }
+        }
     }
 }
 

@@ -73,6 +73,10 @@ import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material.icons.outlined.Close
 import androidx.compose.material.icons.outlined.ExpandMore
 import androidx.compose.material.icons.outlined.Search
+import androidx.compose.material.icons.outlined.SearchOff
+import androidx.compose.material.icons.outlined.Refresh
+import androidx.compose.material.icons.outlined.ErrorOutline
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.DropdownMenu
@@ -157,9 +161,17 @@ internal fun ReceivableTableCard(
             if (uiState.isLoading && uiState.receivables.isEmpty()) {
                 ReceivableLoading(compact = true)
             } else {
+                val isFilterActive = uiState.searchQuery.isNotBlank() ||
+                    uiState.statusFilter != ReceivableStatusFilter.All ||
+                    uiState.dueFilter != ReceivableDueFilter.All
+
                 when {
                     uiState.errorMessage != null && uiState.receivables.isEmpty() -> ReceivableError()
-                    uiState.filteredReceivables.isEmpty() -> ReceivableEmpty(uiState.searchQuery)
+                    uiState.filteredReceivables.isEmpty() -> ReceivableEmpty(
+                        searchQuery = uiState.searchQuery,
+                        hasFilter = isFilterActive,
+                        onResetFilter = onResetAllFilters
+                    )
                     else -> {
                         val groupedByCustomer = remember(uiState.filteredReceivables) {
                             uiState.filteredReceivables.groupBy { it.customerId }.toList()
@@ -238,9 +250,17 @@ internal fun ReceivableTableCard(
             if (uiState.isLoading && uiState.receivables.isEmpty()) {
                 ReceivableLoading(compact = false)
             } else {
+                val isFilterActive = uiState.searchQuery.isNotBlank() ||
+                    uiState.statusFilter != ReceivableStatusFilter.All ||
+                    uiState.dueFilter != ReceivableDueFilter.All
+
                 when {
                     uiState.errorMessage != null && uiState.receivables.isEmpty() -> ReceivableError()
-                    uiState.filteredReceivables.isEmpty() -> ReceivableEmpty(uiState.searchQuery)
+                    uiState.filteredReceivables.isEmpty() -> ReceivableEmpty(
+                        searchQuery = uiState.searchQuery,
+                        hasFilter = isFilterActive,
+                        onResetFilter = onResetAllFilters
+                    )
                     else -> {
                         ReceivableTable(uiState.filteredReceivables, onPayClick)
 
@@ -871,65 +891,120 @@ private fun ReceivableTableDesktopSkeleton() {
 }
 
 @Composable
-private fun ReceivableEmpty(searchQuery: String = "") {
-    Surface(
-        modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(16.dp),
-        color = Color.White,
-        border = BorderStroke(1.dp, Color(0xFFE2E8F0)),
-        shadowElevation = 1.dp
+private fun ReceivableEmpty(
+    searchQuery: String = "",
+    hasFilter: Boolean = false,
+    onResetFilter: (() -> Unit)? = null,
+) {
+    val isFiltered = searchQuery.isNotBlank() || hasFilter
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(vertical = 40.dp, horizontal = 24.dp),
+        contentAlignment = Alignment.Center,
     ) {
         Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(vertical = 36.dp, horizontal = 20.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.spacedBy(8.dp)
+            verticalArrangement = Arrangement.spacedBy(10.dp),
         ) {
             Box(
                 modifier = Modifier
-                    .size(48.dp)
-                    .background(Color(0xFFF1F5F9), CircleShape),
-                contentAlignment = Alignment.Center
+                    .size(64.dp)
+                    .clip(CircleShape)
+                    .background(Color(0xFFF1F5F9)),
+                contentAlignment = Alignment.Center,
             ) {
                 Icon(
-                    imageVector = if (searchQuery.isNotBlank()) Icons.Outlined.Search else Icons.Outlined.Receipt,
+                    imageVector = if (isFiltered) Icons.Outlined.SearchOff else Icons.AutoMirrored.Outlined.ReceiptLong,
                     contentDescription = null,
                     tint = Color(0xFF94A3B8),
-                    modifier = Modifier.size(24.dp)
+                    modifier = Modifier.size(32.dp),
                 )
             }
             Text(
-                text = if (searchQuery.isNotBlank()) "Piutang tidak ditemukan" else "Belum ada data piutang",
-                fontSize = 14.sp,
+                text = if (isFiltered) "Piutang Tidak Ditemukan" else "Belum Ada Data Piutang",
+                fontSize = 15.sp,
                 fontWeight = FontWeight.SemiBold,
-                color = Color(0xFF0F172A)
+                color = Color(0xFF0F172A),
             )
             Text(
-                text = if (searchQuery.isNotBlank()) "Tidak ada data piutang yang cocok dengan \"$searchQuery\"" else "Data piutang pelanggan akan tercatat di sini saat transaksi tempo atau saldo awal dibuat.",
-                fontSize = 12.sp,
+                text = if (isFiltered) {
+                    if (searchQuery.isNotBlank()) "Tidak ada data piutang yang cocok dengan \"$searchQuery\"."
+                    else "Tidak ada data piutang yang cocok dengan filter yang dipilih."
+                } else {
+                    "Data piutang pelanggan akan otomatis tercatat saat transaksi tempo atau saldo awal dibuat."
+                },
+                fontSize = 13.sp,
                 color = Color(0xFF64748B),
-                textAlign = TextAlign.Center
+                textAlign = TextAlign.Center,
+                modifier = Modifier.widthIn(max = 340.dp),
             )
+            if (isFiltered && onResetFilter != null) {
+                OutlinedButton(
+                    onClick = onResetFilter,
+                    shape = RoundedCornerShape(12.dp),
+                    colors = ButtonDefaults.outlinedButtonColors(
+                        contentColor = Color(0xFF10533C),
+                    ),
+                    border = BorderStroke(1.dp, Color(0xFF10533C).copy(alpha = 0.5f)),
+                    modifier = Modifier.padding(top = 4.dp),
+                ) {
+                    Icon(
+                        imageVector = Icons.Outlined.Refresh,
+                        contentDescription = null,
+                        modifier = Modifier.size(16.dp),
+                    )
+                    Spacer(Modifier.width(6.dp))
+                    Text(
+                        text = "Reset Filter",
+                        fontSize = 13.sp,
+                        fontWeight = FontWeight.SemiBold,
+                    )
+                }
+            }
         }
     }
 }
 
 @Composable
 private fun ReceivableError() {
-    Surface(
-        modifier = Modifier.fillMaxWidth(),
-        color = ReceivableSurface,
-        shape = RoundedCornerShape(18.dp),
-        border = BorderStroke(1.dp, ReceivableLine),
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(vertical = 40.dp, horizontal = 24.dp),
+        contentAlignment = Alignment.Center,
     ) {
         Column(
-            modifier = Modifier.fillMaxWidth().padding(32.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.spacedBy(6.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp),
         ) {
-            Text("Piutang pelanggan gagal dimuat", style = MaterialTheme.typography.titleSmall, color = ReceivableDanger, fontWeight = FontWeight.SemiBold)
-            Text("Tarik layar ke bawah untuk mencoba lagi.", style = MaterialTheme.typography.bodySmall, color = ReceivableMuted)
+            Box(
+                modifier = Modifier
+                    .size(64.dp)
+                    .clip(CircleShape)
+                    .background(Color(0xFFFEF2F2)),
+                contentAlignment = Alignment.Center,
+            ) {
+                Icon(
+                    imageVector = Icons.Outlined.ErrorOutline,
+                    contentDescription = null,
+                    tint = ReceivableDanger,
+                    modifier = Modifier.size(32.dp),
+                )
+            }
+            Text(
+                text = "Piutang Pelanggan Gagal Dimuat",
+                fontSize = 15.sp,
+                fontWeight = FontWeight.SemiBold,
+                color = Color(0xFF0F172A),
+            )
+            Text(
+                text = "Tarik layar ke bawah untuk mencoba memuat ulang data.",
+                fontSize = 13.sp,
+                color = Color(0xFF64748B),
+                textAlign = TextAlign.Center,
+                modifier = Modifier.widthIn(max = 340.dp),
+            )
         }
     }
 }

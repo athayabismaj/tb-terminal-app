@@ -220,7 +220,10 @@ internal fun SupplierListCard(
 
         when {
             uiState.isLoading && uiState.suppliers.isEmpty() -> SupplierLoadingState()
-            uiState.visibleSuppliers.isEmpty() -> SupplierEmptyState(query = uiState.searchQuery)
+            uiState.visibleSuppliers.isEmpty() -> SupplierEmptyState(
+                query = uiState.searchQuery,
+                onResetQuery = { onSearchChanged("") }
+            )
             compact -> SupplierMobileList(uiState.visibleSuppliers, onEdit, onDelete)
             else -> SupplierTable(uiState.visibleSuppliers, onEdit, onDelete)
         }

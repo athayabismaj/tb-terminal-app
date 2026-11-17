@@ -109,10 +109,31 @@ internal fun AdminReceivableCustomerDetailScreen(
     var showPaymentHistory by remember { mutableStateOf(false) }
     var showQuickBillSheet by remember { mutableStateOf(false) }
 
-    val isAnyPopupOpen = uiState.selectedReceivableForPayment != null ||
-        uiState.isPayAllOpen ||
-        showQuickBillSheet ||
-        showPaymentHistory
+    if (uiState.isPayAllOpen) {
+        val unpaidReceivables = uiState.receivables.filter { it.remainingAmount > BigDecimal.ZERO }
+        ReceivableDedicatedPaymentScreen(
+            customerName = uiState.customerName,
+            unpaidReceivables = unpaidReceivables,
+            selectedInvoiceIds = uiState.selectedPayAllInvoiceIds,
+            paymentAmountInput = uiState.paymentAmountInput,
+            paymentMethod = uiState.paymentMethod,
+            referenceInput = uiState.referenceInput,
+            notesInput = uiState.notesInput,
+            isSubmittingPayment = uiState.isSubmittingPayment,
+            errorMessage = uiState.paymentErrorMessage,
+            onToggleInvoice = viewModel::togglePayAllInvoice,
+            onSelectAllInvoices = viewModel::selectAllPayAllInvoices,
+            onAmountChanged = viewModel::onPaymentAmountChanged,
+            onMethodChanged = viewModel::onPaymentMethodChanged,
+            onReferenceChanged = viewModel::onReferenceChanged,
+            onNotesChanged = viewModel::onNotesChanged,
+            onBack = viewModel::closePayment,
+            onSubmit = viewModel::submitPayment
+        )
+        return
+    }
+
+    val isAnyPopupOpen = showQuickBillSheet || showPaymentHistory
     val popupBlurRadius by animateDpAsState(
         targetValue = if (isAnyPopupOpen) 16.dp else 0.dp,
         label = "customer_detail_blur"
@@ -144,25 +165,27 @@ internal fun AdminReceivableCustomerDetailScreen(
                         // Left: Back Button & Screen Title
                         Row(
                             verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                            horizontalArrangement = Arrangement.spacedBy(10.dp)
                         ) {
                             IconButton(
                                 onClick = onBack,
-                                modifier = Modifier.size(34.dp)
+                                modifier = Modifier
+                                    .size(36.dp)
+                                    .clip(CircleShape)
                             ) {
                                 Icon(
                                     imageVector = Icons.AutoMirrored.Outlined.ArrowBack,
                                     contentDescription = "Kembali",
-                                    tint = Slate800,
+                                    tint = Slate700,
                                     modifier = Modifier.size(20.dp)
                                 )
                             }
                             Text(
                                 text = "Detail Piutang",
-                                fontSize = 17.sp,
+                                fontSize = 16.sp,
                                 fontWeight = FontWeight.Bold,
                                 color = Slate900,
-                                letterSpacing = (-0.3).sp
+                                letterSpacing = (-0.2).sp
                             )
                         }
 
@@ -203,7 +226,7 @@ internal fun AdminReceivableCustomerDetailScreen(
                             }
                         }
                     }
-                    HorizontalDivider(color = Color(0xFFE2E8F0).copy(alpha = 0.8f))
+                    HorizontalDivider(color = Slate100, thickness = 1.dp)
                 }
             }
         }
@@ -262,49 +285,6 @@ internal fun AdminReceivableCustomerDetailScreen(
                     )
 
                     Spacer(modifier = Modifier.height(16.dp))
-                }
-
-                // Modal: Payment Dialog (Single)
-                uiState.selectedReceivableForPayment?.let { receivable ->
-                    ReceivablePaymentDialog(
-                        receivable = receivable,
-                        paymentAmountInput = uiState.paymentAmountInput,
-                        paymentMethod = uiState.paymentMethod,
-                        referenceInput = uiState.referenceInput,
-                        notesInput = uiState.notesInput,
-                        isSubmittingPayment = uiState.isSubmittingPayment,
-                        errorMessage = uiState.paymentErrorMessage,
-                        onAmountChanged = viewModel::onPaymentAmountChanged,
-                        onMethodChanged = viewModel::onPaymentMethodChanged,
-                        onReferenceChanged = viewModel::onReferenceChanged,
-                        onNotesChanged = viewModel::onNotesChanged,
-                        onDismiss = viewModel::closePayment,
-                        onSubmit = viewModel::submitPayment
-                    )
-                }
-
-                // Modal: Payment Dialog (Bayar Semua)
-                if (uiState.isPayAllOpen) {
-                    val unpaidReceivables = uiState.receivables.filter { it.remainingAmount > BigDecimal.ZERO }
-                    ReceivablePayAllDialog(
-                        customerName = uiState.customerName,
-                        unpaidReceivables = unpaidReceivables,
-                        selectedInvoiceIds = uiState.selectedPayAllInvoiceIds,
-                        paymentAmountInput = uiState.paymentAmountInput,
-                        paymentMethod = uiState.paymentMethod,
-                        referenceInput = uiState.referenceInput,
-                        notesInput = uiState.notesInput,
-                        isSubmittingPayment = uiState.isSubmittingPayment,
-                        errorMessage = uiState.paymentErrorMessage,
-                        onToggleInvoice = viewModel::togglePayAllInvoice,
-                        onSelectAllInvoices = viewModel::selectAllPayAllInvoices,
-                        onAmountChanged = viewModel::onPaymentAmountChanged,
-                        onMethodChanged = viewModel::onPaymentMethodChanged,
-                        onReferenceChanged = viewModel::onReferenceChanged,
-                        onNotesChanged = viewModel::onNotesChanged,
-                        onDismiss = viewModel::closePayment,
-                        onSubmit = viewModel::submitPayment
-                    )
                 }
 
                 // Modal: Quick Bill WhatsApp Bottom Sheet
