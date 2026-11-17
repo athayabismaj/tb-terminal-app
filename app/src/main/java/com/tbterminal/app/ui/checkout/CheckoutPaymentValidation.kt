@@ -2,12 +2,12 @@ package com.tbterminal.app.ui.checkout
 
 import java.math.BigDecimal
 
-internal data class CheckoutPaymentInputResult(
+data class CheckoutPaymentInputResult(
     val amountPaid: BigDecimal? = null,
     val error: String? = null
 )
 
-internal fun validateCheckoutPaymentInput(
+fun validateCheckoutPaymentInput(
     paymentMethod: PaymentMethod,
     amountPaidInput: String,
     total: BigDecimal
@@ -45,12 +45,12 @@ internal fun validateCheckoutPaymentInput(
     }
 }
 
-internal fun checkoutChange(amountPaidInput: String, total: BigDecimal): BigDecimal {
+fun checkoutChange(amountPaidInput: String, total: BigDecimal): BigDecimal {
     val amount = amountPaidInput.toBigDecimalOrNull() ?: return BigDecimal.ZERO
     return amount.subtract(total).coerceAtLeast(BigDecimal.ZERO)
 }
 
-internal data class SplitPaymentValidationResult(
+data class SplitPaymentValidationResult(
     val totalTendered: BigDecimal = BigDecimal.ZERO,
     val cashTendered: BigDecimal = BigDecimal.ZERO,
     val nonCashPaid: BigDecimal = BigDecimal.ZERO,
@@ -59,7 +59,7 @@ internal data class SplitPaymentValidationResult(
     val error: String? = null
 )
 
-internal fun validateSplitCheckoutPayment(
+fun validateSplitCheckoutPayment(
     lines: List<SplitPaymentLineUi>,
     total: BigDecimal,
     isDpMode: Boolean,

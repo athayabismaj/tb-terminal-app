@@ -23,6 +23,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -756,7 +757,30 @@ private fun CartContent(
                 }
             }
         } else {
-            // ── TAMPILAN SMARTPHONE: PERSIS SESUAI SPESIFIKASI HTML MOCKUP ──
+            // ── TAMPILAN SMARTPHONE: SATU LEMBAR STRUK TERPADU (FASE 3) ──
+            var showCustomerPickerSheet by remember { mutableStateOf(false) }
+
+            if (showCustomerPickerSheet) {
+                CustomerModalBottomSheet(
+                    customerRepository = null,
+                    initialCustomers = state.customers,
+                    currentSelectedCustomer = state.selectedCustomer,
+                    onCustomerSelected = { customer ->
+                        if (customer != null) {
+                            onSelectCustomer(customer)
+                        } else {
+                            onClearCustomer()
+                        }
+                        showCustomerPickerSheet = false
+                    },
+                    onAddNewCustomerClick = {
+                        showCustomerPickerSheet = false
+                        onOpenQuickAddCustomer()
+                    },
+                    onDismiss = { showCustomerPickerSheet = false }
+                )
+            }
+
             Column(
                 modifier = Modifier
                     .fillMaxSize()
@@ -801,263 +825,354 @@ private fun CartContent(
                     }
                 }
 
-                // Scrollable Cart Items List
+                // ── COMPACT PILLS ROW: Pelanggan & Diskon ──
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp, vertical = 10.dp),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    val activeCustomer = state.selectedCustomer
+                    Surface(
+                        onClick = { showCustomerPickerSheet = true },
+                        shape = RoundedCornerShape(12.dp),
+                        color = if (activeCustomer != null) Color(0xFFF0FDF4) else Color.White,
+                        border = BorderStroke(1.dp, if (activeCustomer != null) Color(0xFFBBF7D0) else Color(0xFFE2E8F0)),
+                        modifier = Modifier
+                            .weight(1f)
+                            .height(44.dp)
+                    ) {
+                        Row(
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .padding(horizontal = 10.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.SpaceBetween
+                        ) {
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(6.dp),
+                                modifier = Modifier.weight(1f, fill = false)
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Outlined.Person,
+                                    contentDescription = null,
+                                    tint = if (activeCustomer != null) Color(0xFF10533C) else Color(0xFF64748B),
+                                    modifier = Modifier.size(16.dp)
+                                )
+                                Text(
+                                    text = activeCustomer?.name ?: "Pelanggan Umum",
+                                    fontSize = 12.sp,
+                                    fontWeight = if (activeCustomer != null) FontWeight.Bold else FontWeight.Medium,
+                                    color = if (activeCustomer != null) Color(0xFF0F172A) else Color(0xFF475569),
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis
+                                )
+                            }
+                            if (activeCustomer != null) {
+                                Icon(
+                                    imageVector = Icons.Outlined.Close,
+                                    contentDescription = "Hapus pelanggan",
+                                    tint = Color(0xFF94A3B8),
+                                    modifier = Modifier
+                                        .size(16.dp)
+                                        .clickable { onClearCustomer() }
+                                )
+                            }
+                        }
+                    }
+
+                    val hasTrxDiscount = state.transactionDiscountAmount > BigDecimal.ZERO
+                    Surface(
+                        onClick = onEditTransactionDiscount,
+                        shape = RoundedCornerShape(12.dp),
+                        color = if (hasTrxDiscount) Color(0xFFFEF3C7) else Color.White,
+                        border = BorderStroke(1.dp, if (hasTrxDiscount) Color(0xFFFCD34D) else Color(0xFFE2E8F0)),
+                        modifier = Modifier
+                            .weight(1f)
+                            .height(44.dp)
+                    ) {
+                        Row(
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .padding(horizontal = 10.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(6.dp)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Outlined.LocalOffer,
+                                contentDescription = null,
+                                tint = if (hasTrxDiscount) Color(0xFFB45309) else Color(0xFF64748B),
+                                modifier = Modifier.size(16.dp)
+                            )
+                            Text(
+                                text = if (hasTrxDiscount) "- ${formatRupiah(state.transactionDiscountAmount)}" else "+ Diskon Nota",
+                                fontSize = 12.sp,
+                                fontWeight = if (hasTrxDiscount) FontWeight.Bold else FontWeight.Medium,
+                                color = if (hasTrxDiscount) Color(0xFF92400E) else Color(0xFF475569),
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis
+                            )
+                        }
+                    }
+                }
+
+                // ── SATU LEMBAR STRUK TERPADU (Unified Receipt Sheet) ──
                 LazyColumn(
                     modifier = Modifier
                         .weight(1f)
                         .fillMaxWidth()
                         .padding(horizontal = 16.dp),
-                    contentPadding = PaddingValues(top = 12.dp, bottom = 16.dp),
+                    contentPadding = PaddingValues(top = 2.dp, bottom = 16.dp),
                     verticalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
-                    items(state.cartItems, key = { it.cartItemId }) { item ->
-                        val product = state.products.firstOrNull { it.productId == item.productId }
-                        CartItemCard(
-                            item = item,
-                            sku = item.sku.ifBlank { product?.sku ?: "" },
-                            unitName = item.unitName.ifBlank { product?.unitName ?: "" },
-                            onIncrease = { onIncrease(item.cartItemId) },
-                            onDecrease = { onDecrease(item.cartItemId) },
-                            onRemove = { onRemove(item.cartItemId) },
-                            onDiscountClick = { onEditItemDiscount(item.cartItemId) },
-                            onRemoveDiscount = { onRemoveItemDiscount(item.cartItemId) },
-                            onNoteClick = { onEditItemNote(item.cartItemId) },
-                            onToggleUnit = { toSecondary -> onToggleUnit(item.cartItemId, toSecondary) },
-                        )
-                    }
-
-                    // Quick Add SKU / Custom Manual Charge button
                     item {
                         Surface(
-                            onClick = onBackToPos,
                             shape = RoundedCornerShape(16.dp),
                             color = Color.White,
-                            border = BorderStroke(1.dp, Color(0xFFCBD5E1)),
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .height(44.dp)
+                            border = BorderStroke(1.dp, Color(0xFFE2E8F0)),
+                            shadowElevation = 1.dp,
+                            modifier = Modifier.fillMaxWidth()
                         ) {
-                            Row(
-                                modifier = Modifier.fillMaxSize(),
-                                horizontalArrangement = Arrangement.Center,
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                Box(
-                                    modifier = Modifier
-                                        .size(20.dp)
-                                        .background(Color(0xFFE7F2EC), CircleShape),
-                                    contentAlignment = Alignment.Center
-                                ) {
-                                    Icon(
-                                        imageVector = Icons.Outlined.Add,
-                                        contentDescription = null,
-                                        tint = Color(0xFF10533C),
-                                        modifier = Modifier.size(13.dp)
-                                    )
-                                }
-                                Spacer(modifier = Modifier.width(8.dp))
-                                Text(
-                                    text = "Tambah Item Manual / Biaya",
-                                    fontSize = 12.sp,
-                                    fontWeight = FontWeight.Medium,
-                                    color = Color(0xFF475569)
-                                )
-                            }
-                        }
-                    }
-                }
-
-                // CheckoutSummaryPanel (Bottom Sheet matching HTML specification)
-                Surface(
-                    shape = RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp),
-                    color = Color.White,
-                    shadowElevation = 12.dp,
-                    border = BorderStroke(1.dp, Color(0xFFE2E8F0).copy(alpha = 0.85f)),
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    Column(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(horizontal = 20.dp, vertical = 14.dp),
-                        verticalArrangement = Arrangement.spacedBy(10.dp)
-                    ) {
-                        // Drag handle pill
-                        Box(
-                            modifier = Modifier
-                                .align(Alignment.CenterHorizontally)
-                                .size(width = 40.dp, height = 4.dp)
-                                .background(Color(0xFFCBD5E1), RoundedCornerShape(2.dp))
-                        )
-
-                        // Breakdown lines (Subtotal, Diskon Item, Diskon Transaksi, Ongkir, Pajak)
-                        Column(
-                            modifier = Modifier.fillMaxWidth(),
-                            verticalArrangement = Arrangement.spacedBy(6.dp)
-                        ) {
-                            // Subtotal (N item)
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.SpaceBetween,
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                Text(
-                                    text = "Subtotal ($totalItems item)",
-                                    fontSize = 12.sp,
-                                    fontWeight = FontWeight.Medium,
-                                    color = Color(0xFF475569)
-                                )
-                                Text(
-                                    text = formatRupiah(state.subtotal),
-                                    fontSize = 12.sp,
-                                    fontWeight = FontWeight.SemiBold,
-                                    color = Color(0xFF1E293B)
-                                )
-                            }
-
-                            // Diskon Item (if any)
-                            if (state.itemDiscountTotal > BigDecimal.ZERO) {
+                            Column(modifier = Modifier.fillMaxWidth()) {
+                                // Header Struk
                                 Row(
-                                    modifier = Modifier.fillMaxWidth(),
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .background(Color(0xFFF8FAFC))
+                                        .padding(horizontal = 16.dp, vertical = 12.dp),
                                     horizontalArrangement = Arrangement.SpaceBetween,
                                     verticalAlignment = Alignment.CenterVertically
                                 ) {
                                     Row(
                                         verticalAlignment = Alignment.CenterVertically,
-                                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                                        horizontalArrangement = Arrangement.spacedBy(8.dp)
                                     ) {
                                         Icon(
-                                            imageVector = Icons.Outlined.LocalOffer,
+                                            imageVector = Icons.AutoMirrored.Outlined.ReceiptLong,
                                             contentDescription = null,
-                                            tint = Color(0xFFD97706),
-                                            modifier = Modifier.size(14.dp)
+                                            tint = Color(0xFF10533C),
+                                            modifier = Modifier.size(16.dp)
                                         )
                                         Text(
-                                            text = "Diskon Item",
+                                            text = "STRUK PESANAN",
                                             fontSize = 12.sp,
-                                            fontWeight = FontWeight.Medium,
-                                            color = Color(0xFFB45309)
+                                            fontWeight = FontWeight.Bold,
+                                            color = Color(0xFF1E293B),
+                                            letterSpacing = 0.5.sp
                                         )
                                     }
                                     Text(
-                                        text = "- ${formatRupiah(state.itemDiscountTotal)}",
-                                        fontSize = 12.sp,
+                                        text = "$totalItems Item",
+                                        fontSize = 11.5.sp,
                                         fontWeight = FontWeight.SemiBold,
-                                        color = Color(0xFFB45309)
+                                        color = Color(0xFF64748B)
                                     )
                                 }
-                            }
 
-                            // Diskon Transaksi (clickable)
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.SpaceBetween,
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                Row(
-                                    modifier = Modifier.clickable { onEditTransactionDiscount() },
-                                    verticalAlignment = Alignment.CenterVertically,
-                                    horizontalArrangement = Arrangement.spacedBy(4.dp)
-                                ) {
-                                    Icon(
-                                        imageVector = Icons.Outlined.Add,
-                                        contentDescription = null,
-                                        tint = Color(0xFF10533C),
-                                        modifier = Modifier.size(14.dp)
-                                    )
-                                    Text(
-                                        text = if (state.transactionDiscountAmount > BigDecimal.ZERO) "Diskon Nota" else "Tambah Diskon Nota",
-                                        fontSize = 12.sp,
-                                        fontWeight = FontWeight.SemiBold,
-                                        color = Color(0xFF10533C)
-                                    )
+                                HorizontalDivider(color = Color(0xFFE2E8F0))
+
+                                if (state.cartItems.isEmpty()) {
+                                    // Empty state inside the receipt sheet
+                                    Column(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .padding(32.dp),
+                                        horizontalAlignment = Alignment.CenterHorizontally,
+                                        verticalArrangement = Arrangement.spacedBy(10.dp)
+                                    ) {
+                                        Box(
+                                            modifier = Modifier
+                                                .size(48.dp)
+                                                .background(Color(0xFFF1F5F9), CircleShape),
+                                            contentAlignment = Alignment.Center
+                                        ) {
+                                            Icon(
+                                                imageVector = Icons.Outlined.ShoppingCart,
+                                                contentDescription = null,
+                                                tint = Color(0xFF94A3B8),
+                                                modifier = Modifier.size(24.dp)
+                                            )
+                                        }
+                                        Text(
+                                            text = "Keranjang Belanja Kosong",
+                                            fontSize = 14.sp,
+                                            fontWeight = FontWeight.Bold,
+                                            color = Color(0xFF0F172A)
+                                        )
+                                        Text(
+                                            text = "Pilih produk di POS untuk menambahkan ke struk belanja.",
+                                            fontSize = 12.sp,
+                                            color = Color(0xFF64748B),
+                                            textAlign = TextAlign.Center
+                                        )
+                                        OutlinedButton(
+                                            onClick = onBackToPos,
+                                            shape = RoundedCornerShape(10.dp),
+                                            border = BorderStroke(1.dp, Color(0xFF10533C)),
+                                            colors = ButtonDefaults.outlinedButtonColors(contentColor = Color(0xFF10533C)),
+                                            modifier = Modifier.padding(top = 4.dp)
+                                        ) {
+                                            Text("Pilih Produk di POS", fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
+                                        }
+                                    }
+                                } else {
+                                    // List of Items with hairline dividers
+                                    state.cartItems.forEachIndexed { index, item ->
+                                        if (index > 0) {
+                                            HorizontalDivider(color = Color(0xFFF1F5F9), thickness = 1.dp)
+                                        }
+                                        val product = state.products.firstOrNull { it.productId == item.productId }
+                                        CartItemCard(
+                                            item = item,
+                                            sku = item.sku.ifBlank { product?.sku ?: "" },
+                                            unitName = item.unitName.ifBlank { product?.unitName ?: "" },
+                                            onIncrease = { onIncrease(item.cartItemId) },
+                                            onDecrease = { onDecrease(item.cartItemId) },
+                                            onRemove = { onRemove(item.cartItemId) },
+                                            onDiscountClick = { onEditItemDiscount(item.cartItemId) },
+                                            onRemoveDiscount = { onRemoveItemDiscount(item.cartItemId) },
+                                            onNoteClick = { onEditItemNote(item.cartItemId) },
+                                            onToggleUnit = { toSecondary -> onToggleUnit(item.cartItemId, toSecondary) },
+                                            isReceiptMode = true
+                                        )
+                                    }
+
+                                    // Quick Add SKU / Custom Manual Charge row
+                                    Surface(
+                                        onClick = onBackToPos,
+                                        color = Color(0xFFFAFAFA),
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .height(42.dp)
+                                    ) {
+                                        Row(
+                                            modifier = Modifier.fillMaxSize(),
+                                            horizontalArrangement = Arrangement.Center,
+                                            verticalAlignment = Alignment.CenterVertically
+                                        ) {
+                                            Icon(
+                                                imageVector = Icons.Outlined.Add,
+                                                contentDescription = null,
+                                                tint = Color(0xFF10533C),
+                                                modifier = Modifier.size(14.dp)
+                                            )
+                                            Spacer(modifier = Modifier.width(6.dp))
+                                            Text(
+                                                text = "+ Tambah Item Lain / Biaya Manual",
+                                                fontSize = 12.sp,
+                                                fontWeight = FontWeight.Medium,
+                                                color = Color(0xFF475569)
+                                            )
+                                        }
+                                    }
+
+                                    // Hairline separator before breakdown
+                                    HorizontalDivider(color = Color(0xFFE2E8F0), thickness = 1.dp)
+
+                                    // Order Breakdown inside Receipt Sheet
+                                    Column(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .padding(16.dp),
+                                        verticalArrangement = Arrangement.spacedBy(8.dp)
+                                    ) {
+                                        // Subtotal
+                                        Row(
+                                            modifier = Modifier.fillMaxWidth(),
+                                            horizontalArrangement = Arrangement.SpaceBetween,
+                                            verticalAlignment = Alignment.CenterVertically
+                                        ) {
+                                            Text("Subtotal ($totalItems item)", fontSize = 12.5.sp, color = Color(0xFF475569))
+                                            Text(formatRupiah(state.subtotal), fontSize = 12.5.sp, fontWeight = FontWeight.SemiBold, color = Color(0xFF1E293B))
+                                        }
+
+                                        // Diskon Item (if any)
+                                        if (state.itemDiscountTotal > BigDecimal.ZERO) {
+                                            Row(
+                                                modifier = Modifier.fillMaxWidth(),
+                                                horizontalArrangement = Arrangement.SpaceBetween,
+                                                verticalAlignment = Alignment.CenterVertically
+                                            ) {
+                                                Text("Diskon Item", fontSize = 12.5.sp, color = Color(0xFFB45309))
+                                                Text("- ${formatRupiah(state.itemDiscountTotal)}", fontSize = 12.5.sp, fontWeight = FontWeight.SemiBold, color = Color(0xFFB45309))
+                                            }
+                                        }
+
+                                        // Diskon Transaksi (if any)
+                                        if (state.transactionDiscountAmount > BigDecimal.ZERO) {
+                                            Row(
+                                                modifier = Modifier.fillMaxWidth(),
+                                                horizontalArrangement = Arrangement.SpaceBetween,
+                                                verticalAlignment = Alignment.CenterVertically
+                                            ) {
+                                                Text("Diskon Transaksi", fontSize = 12.5.sp, color = Color(0xFFB45309))
+                                                Text("- ${formatRupiah(state.transactionDiscountAmount)}", fontSize = 12.5.sp, fontWeight = FontWeight.SemiBold, color = Color(0xFFB45309))
+                                            }
+                                        }
+
+                                        // Ongkos Kirim Armada (if delivery enabled)
+                                        if (state.isDeliveryEnabled) {
+                                            Row(
+                                                modifier = Modifier.fillMaxWidth(),
+                                                horizontalArrangement = Arrangement.SpaceBetween,
+                                                verticalAlignment = Alignment.CenterVertically
+                                            ) {
+                                                Text("Ongkos Kirim Armada", fontSize = 12.5.sp, color = Color(0xFF475569))
+                                                Text("+ ${formatRupiah(state.deliveryFee)}", fontSize = 12.5.sp, fontWeight = FontWeight.SemiBold, color = Color(0xFF1E293B))
+                                            }
+                                        }
+
+                                        // Pajak PPN (if tax applied)
+                                        if (state.taxEnabled) {
+                                            val rateStr = state.taxRate.stripTrailingZeros().toPlainString()
+                                            val isInclude = state.taxMode.equals("INCLUDE", ignoreCase = true)
+                                            Row(
+                                                modifier = Modifier.fillMaxWidth(),
+                                                horizontalArrangement = Arrangement.SpaceBetween,
+                                                verticalAlignment = Alignment.CenterVertically
+                                            ) {
+                                                Text("${state.taxLabel} ($rateStr%${if (isInclude) " • Incl." else ""})", fontSize = 12.5.sp, color = Color(0xFF475569))
+                                                Text(if (isInclude) "(${formatRupiah(state.taxAmount)})" else "+ ${formatRupiah(state.taxAmount)}", fontSize = 12.5.sp, fontWeight = FontWeight.SemiBold, color = Color(0xFF1E293B))
+                                            }
+                                        }
+
+                                        // Pembulatan Tunai (if rounding applied)
+                                        if (state.roundingAmount.compareTo(BigDecimal.ZERO) != 0) {
+                                            val sign = if (state.roundingAmount > BigDecimal.ZERO) "+" else "-"
+                                            Row(
+                                                modifier = Modifier.fillMaxWidth(),
+                                                horizontalArrangement = Arrangement.SpaceBetween,
+                                                verticalAlignment = Alignment.CenterVertically
+                                            ) {
+                                                Text("Pembulatan Tunai", fontSize = 12.5.sp, color = Color(0xFF475569))
+                                                Text("$sign ${formatRupiah(state.roundingAmount.abs())}", fontSize = 12.5.sp, fontWeight = FontWeight.SemiBold, color = if (state.roundingAmount > BigDecimal.ZERO) Color(0xFF1E293B) else Color(0xFF047857))
+                                            }
+                                        }
+                                    }
                                 }
-                                Text(
-                                    text = if (state.transactionDiscountAmount > BigDecimal.ZERO) "- ${formatRupiah(state.transactionDiscountAmount)}" else "- Rp 0",
-                                    fontSize = 12.sp,
-                                    fontWeight = if (state.transactionDiscountAmount > BigDecimal.ZERO) FontWeight.SemiBold else FontWeight.Normal,
-                                    color = if (state.transactionDiscountAmount > BigDecimal.ZERO) Color(0xFFB45309) else Color(0xFF94A3B8)
-                                )
                             }
-
-                            // Ongkir (if delivery enabled)
-                            if (state.isDeliveryEnabled) {
-                                Row(
-                                    modifier = Modifier.fillMaxWidth(),
-                                    horizontalArrangement = Arrangement.SpaceBetween,
-                                    verticalAlignment = Alignment.CenterVertically
-                                ) {
-                                    Text(
-                                        text = "Ongkos Kirim Armada",
-                                        fontSize = 12.sp,
-                                        fontWeight = FontWeight.Medium,
-                                        color = Color(0xFF475569)
-                                    )
-                                    Text(
-                                        text = "+ ${formatRupiah(state.deliveryFee)}",
-                                        fontSize = 12.sp,
-                                        fontWeight = FontWeight.SemiBold,
-                                        color = Color(0xFF1E293B)
-                                    )
-                                }
-                            }
-
-                            // Pajak PPN (jika aktif)
-                            if (state.taxEnabled) {
-                                val rateStr = state.taxRate.stripTrailingZeros().toPlainString()
-                                val isInclude = state.taxMode.equals("INCLUDE", ignoreCase = true)
-                                Row(
-                                    modifier = Modifier.fillMaxWidth(),
-                                    horizontalArrangement = Arrangement.SpaceBetween,
-                                    verticalAlignment = Alignment.CenterVertically
-                                ) {
-                                    Text(
-                                        text = "${state.taxLabel} ($rateStr%${if (isInclude) " • Incl." else ""})",
-                                        fontSize = 12.sp,
-                                        fontWeight = FontWeight.Medium,
-                                        color = Color(0xFF475569)
-                                    )
-                                    Text(
-                                        text = if (isInclude) "(${formatRupiah(state.taxAmount)})" else "+ ${formatRupiah(state.taxAmount)}",
-                                        fontSize = 12.sp,
-                                        fontWeight = FontWeight.SemiBold,
-                                        color = Color(0xFF1E293B)
-                                    )
-                                }
-                            }
-
-                            // Pembulatan Tunai (jika aktif & != 0)
-                            if (state.roundingAmount.compareTo(BigDecimal.ZERO) != 0) {
-                                val sign = if (state.roundingAmount > BigDecimal.ZERO) "+" else "-"
-                                Row(
-                                    modifier = Modifier.fillMaxWidth(),
-                                    horizontalArrangement = Arrangement.SpaceBetween,
-                                    verticalAlignment = Alignment.CenterVertically
-                                ) {
-                                    Text(
-                                        text = "Pembulatan Tunai",
-                                        fontSize = 12.sp,
-                                        fontWeight = FontWeight.Medium,
-                                        color = Color(0xFF475569)
-                                    )
-                                    Text(
-                                        text = "$sign ${formatRupiah(state.roundingAmount.abs())}",
-                                        fontSize = 12.sp,
-                                        fontWeight = FontWeight.SemiBold,
-                                        color = if (state.roundingAmount > BigDecimal.ZERO) Color(0xFF1E293B) else Color(0xFF047857)
-                                    )
-                                }
-                            }
-
-
                         }
+                    }
+                }
 
-                        // Dashed divider
-                        HorizontalDivider(
-                            color = Color(0xFFE2E8F0),
-                            thickness = 1.dp
-                        )
-
-                        // TOTAL TAGIHAN
+                // ── STICKY FOOTER: Total Tebal + Tombol Lanjut Bayar ──
+                Surface(
+                    shape = RoundedCornerShape(topStart = 20.dp, topEnd = 20.dp),
+                    color = Color.White,
+                    shadowElevation = 8.dp,
+                    border = BorderStroke(1.dp, Color(0xFFE2E8F0)),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .navigationBarsPadding()
+                            .padding(horizontal = 16.dp, vertical = 12.dp),
+                        verticalArrangement = Arrangement.spacedBy(10.dp)
+                    ) {
+                        // Total Row
                         Row(
                             modifier = Modifier.fillMaxWidth(),
                             horizontalArrangement = Arrangement.SpaceBetween,
@@ -1069,25 +1184,24 @@ private fun CartContent(
                                     fontSize = 11.sp,
                                     fontWeight = FontWeight.Bold,
                                     color = Color(0xFF94A3B8),
-                                    letterSpacing = 1.sp
+                                    letterSpacing = 0.8.sp
                                 )
                                 Text(
-                                    text = "Termasuk semua item & diskon",
+                                    text = "$totalItems item pesanan",
                                     fontSize = 11.5.sp,
-                                    fontWeight = FontWeight.Medium,
                                     color = Color(0xFF64748B)
                                 )
                             }
                             Text(
                                 text = formatRupiah(state.finalTotal),
-                                fontSize = 21.sp,
+                                fontSize = 22.sp,
                                 fontWeight = FontWeight.ExtraBold,
                                 color = Color(0xFF10533C),
                                 letterSpacing = (-0.5).sp
                             )
                         }
 
-                        // Buttons Row: Parkir & Lanjut Pembayaran
+                        // Buttons Row: Parkir + Lanjut Bayar
                         val showParkirButton = state.cartItems.isNotEmpty() || state.heldCarts.isNotEmpty()
                         Row(
                             modifier = Modifier.fillMaxWidth(),
@@ -1095,18 +1209,14 @@ private fun CartContent(
                             verticalAlignment = Alignment.CenterVertically
                         ) {
                             if (showParkirButton) {
-                                // Parkir Button (tampil saat produk sudah di-klik / ada di keranjang, atau ada antrean parkir)
                                 OutlinedButton(
                                     onClick = onOpenParkir,
                                     modifier = Modifier
-                                        .weight(0.42f)
+                                        .weight(0.38f)
                                         .height(48.dp),
                                     shape = RoundedCornerShape(12.dp),
-                                    border = BorderStroke(1.dp, Color(0xFFE2E8F0)),
-                                    colors = ButtonDefaults.outlinedButtonColors(
-                                        containerColor = Color.White,
-                                        contentColor = Color(0xFF1E293B)
-                                    ),
+                                    border = BorderStroke(1.dp, Color(0xFFCBD5E1)),
+                                    colors = ButtonDefaults.outlinedButtonColors(containerColor = Color.White),
                                     contentPadding = PaddingValues(horizontal = 8.dp)
                                 ) {
                                     Row(
@@ -1137,12 +1247,11 @@ private fun CartContent(
                                 }
                             }
 
-                            // Lanjut Pembayaran Button (penuh jika keranjang kosong/belum ada parkir, proporsional jika ada tombol parkir)
                             Button(
                                 onClick = onNavigateToPayment,
                                 enabled = state.cartItems.isNotEmpty(),
                                 modifier = Modifier
-                                    .then(if (showParkirButton) Modifier.weight(0.78f) else Modifier.fillMaxWidth())
+                                    .then(if (showParkirButton) Modifier.weight(0.82f) else Modifier.fillMaxWidth())
                                     .height(48.dp),
                                 shape = RoundedCornerShape(12.dp),
                                 colors = ButtonDefaults.buttonColors(
@@ -1150,17 +1259,17 @@ private fun CartContent(
                                     disabledContainerColor = Color(0xFFE2E8F0),
                                     disabledContentColor = Color(0xFF94A3B8)
                                 ),
-                                elevation = ButtonDefaults.buttonElevation(defaultElevation = 2.dp),
-                                contentPadding = PaddingValues(horizontal = 12.dp)
+                                elevation = ButtonDefaults.buttonElevation(defaultElevation = 1.dp),
+                                contentPadding = PaddingValues(horizontal = 14.dp)
                             ) {
                                 Row(
                                     verticalAlignment = Alignment.CenterVertically,
                                     horizontalArrangement = Arrangement.spacedBy(6.dp)
                                 ) {
                                     Text(
-                                        text = "Lanjut Pembayaran",
+                                        text = "Lanjut Bayar",
                                         fontWeight = FontWeight.Bold,
-                                        fontSize = 13.5.sp,
+                                        fontSize = 14.sp,
                                         color = Color.White
                                     )
                                     Icon(
@@ -1172,15 +1281,6 @@ private fun CartContent(
                                 }
                             }
                         }
-
-                        // Home Indicator Pill
-                        Box(
-                            modifier = Modifier
-                                .align(Alignment.CenterHorizontally)
-                                .padding(top = 2.dp)
-                                .size(width = 128.dp, height = 4.dp)
-                                .background(Color(0xFFCBD5E1), RoundedCornerShape(2.dp))
-                        )
                     }
                 }
             }

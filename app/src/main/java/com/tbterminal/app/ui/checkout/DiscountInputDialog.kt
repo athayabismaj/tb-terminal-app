@@ -67,7 +67,7 @@ private val ErrorRed = Color(0xFFEF4444)
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-internal fun DiscountInputDialog(
+fun DiscountInputDialog(
     title: String,
     baseAmount: BigDecimal,
     initialValue: CheckoutDiscount?,

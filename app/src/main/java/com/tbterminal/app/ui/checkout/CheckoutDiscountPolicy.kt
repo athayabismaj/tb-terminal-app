@@ -52,7 +52,7 @@ internal fun validateCheckoutDiscount(
     return null
 }
 
-internal fun estimateDiscountAmount(base: BigDecimal, discount: CheckoutDiscount?): BigDecimal {
+fun estimateDiscountAmount(base: BigDecimal, discount: CheckoutDiscount?): BigDecimal {
     discount ?: return BigDecimal.ZERO.setScale(MONEY_SCALE)
     return when (discount.type) {
         DiscountType.PERCENTAGE -> base.multiply(discount.value)

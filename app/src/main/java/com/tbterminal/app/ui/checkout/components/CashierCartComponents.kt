@@ -7,6 +7,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -55,7 +56,6 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.tbterminal.app.ui.checkout.CartItem
 import com.tbterminal.app.ui.checkout.PaymentMethod
-import com.tbterminal.app.ui.checkout.displayName
 import com.tbterminal.app.ui.checkout.estimateDiscountAmount
 import com.tbterminal.app.data.model.DiscountType
 import java.math.BigDecimal
@@ -86,6 +86,7 @@ fun CartItemCard(
     onToggleUnit: ((Boolean) -> Unit)? = null,
     onRemoveDiscount: (() -> Unit)? = null,
     onNoteClick: (() -> Unit)? = null,
+    isReceiptMode: Boolean = false,
 ) {
     val lineGross = item.unitPrice.multiply(item.quantity.toBigDecimal())
     val discountAmount = estimateDiscountAmount(lineGross, item.discountRequest)
@@ -94,16 +95,16 @@ fun CartItemCard(
 
     Surface(
         modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(16.dp),
-        color = Color.White,
-        border = BorderStroke(1.dp, Color(0xFFE2E8F0)),
-        shadowElevation = 0.5.dp
+        shape = if (isReceiptMode) androidx.compose.ui.graphics.RectangleShape else RoundedCornerShape(16.dp),
+        color = if (isReceiptMode) Color.Transparent else Color.White,
+        border = if (isReceiptMode) null else BorderStroke(1.dp, Color(0xFFE2E8F0)),
+        shadowElevation = if (isReceiptMode) 0.dp else 0.5.dp
     ) {
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(14.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp)
+                .padding(if (isReceiptMode) PaddingValues(horizontal = 16.dp, vertical = 12.dp) else PaddingValues(14.dp)),
+            verticalArrangement = Arrangement.spacedBy(10.dp)
         ) {
             // ── BARIS 1: Info Produk & Subtotal Harga ──
             Row(
@@ -186,23 +187,26 @@ fun CartItemCard(
                                     modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
                                 )
                             }
-                        } else if (item.appliedPriceTierMinQty != null) {
-                            Surface(
-                                shape = RoundedCornerShape(6.dp),
-                                color = Color(0xFFECFDF5),
-                                border = BorderStroke(1.dp, Color(0xFFA7F3D0)),
-                                modifier = Modifier.padding(top = 3.dp)
-                            ) {
-                                val minQtyText = item.appliedPriceTierMinQty.stripTrailingZeros().toPlainString()
-                                val tierUnitLabel = item.baseUnitName.ifBlank { unitName }.trim()
-                                val suffix = if (tierUnitLabel.isNotBlank()) " $tierUnitLabel" else ""
-                                Text(
-                                    text = "Grosir >= $minQtyText$suffix",
-                                    fontSize = 10.sp,
-                                    fontWeight = FontWeight.SemiBold,
-                                    color = Color(0xFF047857),
-                                    modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
-                                )
+                        } else {
+                            val minTierQty = item.appliedPriceTierMinQty
+                            if (minTierQty != null) {
+                                Surface(
+                                    shape = RoundedCornerShape(6.dp),
+                                    color = Color(0xFFECFDF5),
+                                    border = BorderStroke(1.dp, Color(0xFFA7F3D0)),
+                                    modifier = Modifier.padding(top = 3.dp)
+                                ) {
+                                    val minQtyText = minTierQty.stripTrailingZeros().toPlainString()
+                                    val tierUnitLabel = item.baseUnitName.ifBlank { unitName }.trim()
+                                    val suffix = if (tierUnitLabel.isNotBlank()) " $tierUnitLabel" else ""
+                                    Text(
+                                        text = "Grosir >= $minQtyText$suffix",
+                                        fontSize = 10.sp,
+                                        fontWeight = FontWeight.SemiBold,
+                                        color = Color(0xFF047857),
+                                        modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                                    )
+                                }
                             }
                         }
                         if (!item.note.isNullOrBlank()) {
@@ -403,12 +407,12 @@ fun CartItemCard(
                         horizontalArrangement = Arrangement.spacedBy(2.dp),
                         modifier = Modifier.padding(2.dp)
                     ) {
-                        // Tombol Kurang / Hapus
+                        // Tombol Kurang / Hapus (minimal 48dp)
                         Surface(
                             onClick = if (item.quantity <= 1) onRemove else onDecrease,
                             shape = RoundedCornerShape(8.dp),
                             color = Color.Transparent,
-                            modifier = Modifier.size(28.dp)
+                            modifier = Modifier.size(48.dp)
                         ) {
                             Box(contentAlignment = Alignment.Center) {
                                 if (item.quantity <= 1) {
@@ -416,14 +420,14 @@ fun CartItemCard(
                                         imageVector = Icons.Outlined.Delete,
                                         contentDescription = "Hapus Item",
                                         tint = Color(0xFFE11D48),
-                                        modifier = Modifier.size(14.dp)
+                                        modifier = Modifier.size(18.dp)
                                     )
                                 } else {
                                     Icon(
                                         imageVector = Icons.Outlined.Remove,
                                         contentDescription = "Kurang Qty",
                                         tint = Color(0xFF475569),
-                                        modifier = Modifier.size(14.dp)
+                                        modifier = Modifier.size(18.dp)
                                     )
                                 }
                             }
@@ -431,32 +435,32 @@ fun CartItemCard(
 
                         // Angka Kuantitas
                         Box(
-                            modifier = Modifier.width(26.dp),
+                            modifier = Modifier.widthIn(min = 32.dp),
                             contentAlignment = Alignment.Center
                         ) {
                             Text(
                                 text = item.quantity.toString(),
-                                fontSize = 12.sp,
-                                fontWeight = FontWeight.SemiBold,
+                                fontSize = 14.sp,
+                                fontWeight = FontWeight.Bold,
                                 color = Color(0xFF1E293B),
                                 textAlign = TextAlign.Center
                             )
                         }
 
-                        // Tombol Tambah (Hijau Kasira #10533C)
+                        // Tombol Tambah (Hijau Kasir #10533C, minimal 48dp)
                         Surface(
                             onClick = onIncrease,
                             shape = RoundedCornerShape(8.dp),
                             color = Color(0xFF10533C),
                             shadowElevation = 0.5.dp,
-                            modifier = Modifier.size(28.dp)
+                            modifier = Modifier.size(48.dp)
                         ) {
                             Box(contentAlignment = Alignment.Center) {
                                 Icon(
                                     imageVector = Icons.Outlined.Add,
                                     contentDescription = "Tambah Qty",
                                     tint = Color.White,
-                                    modifier = Modifier.size(14.dp)
+                                    modifier = Modifier.size(18.dp)
                                 )
                             }
                         }

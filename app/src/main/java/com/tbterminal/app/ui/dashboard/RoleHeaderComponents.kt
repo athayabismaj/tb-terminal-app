@@ -198,7 +198,7 @@ fun BrandedRoleTopBar(
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 16.dp, vertical = 9.dp),
+                .padding(horizontal = 16.dp, vertical = 12.dp),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.SpaceBetween,
         ) {
@@ -206,32 +206,28 @@ fun BrandedRoleTopBar(
             Row(
                 modifier = Modifier.weight(1f, fill = false),
                 verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                horizontalArrangement = Arrangement.spacedBy(10.dp),
             ) {
                 if (onBackClick != null) {
-                    Surface(
+                    IconButton(
                         onClick = onBackClick,
-                        shape = RoundedCornerShape(11.dp),
-                        color = TopBarSlate50,
-                        border = BorderStroke(1.dp, TopBarSlate200),
                         modifier = Modifier
-                            .size(38.dp)
+                            .size(36.dp)
+                            .clip(CircleShape)
                             .testTag("topbar-back-button"),
                     ) {
-                        Box(contentAlignment = Alignment.Center) {
-                            Icon(
-                                imageVector = Icons.AutoMirrored.Outlined.ArrowBack,
-                                contentDescription = "Kembali",
-                                tint = TopBarSlate900,
-                                modifier = Modifier.size(18.dp),
-                            )
-                        }
+                        Icon(
+                            imageVector = Icons.AutoMirrored.Outlined.ArrowBack,
+                            contentDescription = "Kembali",
+                            tint = TopBarSlate700,
+                            modifier = Modifier.size(20.dp),
+                        )
                     }
                 } else {
                     Box(
                         modifier = Modifier
-                            .size(38.dp)
-                            .clip(RoundedCornerShape(11.dp))
+                            .size(36.dp)
+                            .clip(RoundedCornerShape(10.dp))
                             .background(TopBarBrandGreen)
                             .then(
                                 if (onBrandClick != null) {
@@ -246,7 +242,7 @@ fun BrandedRoleTopBar(
                         Text(
                             text = "TB",
                             color = Color.White,
-                            fontSize = 14.sp,
+                            fontSize = 13.sp,
                             fontWeight = FontWeight.Bold,
                             letterSpacing = 0.5.sp,
                         )
@@ -260,12 +256,12 @@ fun BrandedRoleTopBar(
                     Text(
                         text = title,
                         color = TopBarSlate900,
-                        fontSize = 14.5.sp,
+                        fontSize = 16.sp,
                         fontWeight = FontWeight.Bold,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
-                        letterSpacing = (-0.35).sp,
-                        lineHeight = 18.sp,
+                        letterSpacing = (-0.2).sp,
+                        lineHeight = 20.sp,
                     )
                     Text(
                         text = subtitle,

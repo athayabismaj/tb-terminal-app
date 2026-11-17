@@ -205,7 +205,17 @@ enum class PaymentMethod {
     TRANSFER,
     QRIS,
     HUTANG,
-    DP
+    DP;
+
+    fun displayName(): String {
+        return when (this) {
+            TUNAI -> "Tunai"
+            TRANSFER -> "Transfer"
+            QRIS -> "QRIS"
+            HUTANG -> "Hutang"
+            DP -> "DP"
+        }
+    }
 }
 
 fun PaymentMethod.apiValue(): String {
@@ -218,12 +228,4 @@ fun PaymentMethod.apiValue(): String {
     }
 }
 
-fun PaymentMethod.displayName(): String {
-    return when (this) {
-        PaymentMethod.TUNAI -> "Tunai"
-        PaymentMethod.TRANSFER -> "Transfer"
-        PaymentMethod.QRIS -> "QRIS"
-        PaymentMethod.HUTANG -> "Hutang"
-        PaymentMethod.DP -> "DP"
-    }
-}
+fun PaymentMethod.displayName(): String = this.displayName()

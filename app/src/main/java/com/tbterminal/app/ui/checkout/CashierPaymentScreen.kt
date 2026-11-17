@@ -18,6 +18,7 @@ import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -40,7 +41,6 @@ import androidx.compose.material.icons.filled.Close
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import com.tbterminal.app.data.repository.CustomerRepository
-import com.tbterminal.app.ui.receivables.CustomerSelectionDialog
 import androidx.compose.material.icons.outlined.AccountBalance
 import androidx.compose.material.icons.outlined.AccountBalanceWallet
 import androidx.compose.material.icons.outlined.Add
@@ -423,76 +423,43 @@ fun CashierPaymentScreen(
                                 }
                             }
 
-                            // Grid 2-Kolom: Baris 1 (Tunai & QRIS)
-                            Row(
-                                horizontalArrangement = Arrangement.spacedBy(10.dp),
+                            // Segmented Control 4 Metode (Tunai, QRIS, Transfer, Tempo)
+                            PaymentMethodSegmentedControl(
+                                selectedMethod = state.selectedPaymentMethod,
+                                isSplitPayment = state.isSplitPaymentEnabled,
+                                onSelectMethod = { method ->
+                                    if (state.isSplitPaymentEnabled) {
+                                        onToggleSplitPayment(false)
+                                    }
+                                    onSelectPayment(method)
+                                },
                                 modifier = Modifier.fillMaxWidth()
-                            ) {
-                                PaymentMethodGridCard(
-                                    title = "Tunai",
-                                    subtitle = "Cash on Hand",
-                                    icon = Icons.Outlined.Payments,
-                                    isSelected = !state.isSplitPaymentEnabled && state.selectedPaymentMethod == PaymentMethod.TUNAI,
-                                    onClick = { onSelectPayment(PaymentMethod.TUNAI) },
-                                    modifier = Modifier.weight(1f)
-                                )
+                            )
 
-                                PaymentMethodGridCard(
-                                    title = "QRIS",
-                                    subtitle = "Scan Statis/Dinamis",
-                                    icon = Icons.Outlined.QrCode2,
-                                    isSelected = !state.isSplitPaymentEnabled && state.selectedPaymentMethod == PaymentMethod.QRIS,
-                                    onClick = { onSelectPayment(PaymentMethod.QRIS) },
-                                    modifier = Modifier.weight(1f)
-                                )
-                            }
-
-                            // Grid 2-Kolom: Baris 2 (Transfer Bank & Hutang / Tempo)
+                            // Opsi Tambahan: Bayar Campur / DP
                             Row(
-                                horizontalArrangement = Arrangement.spacedBy(10.dp),
-                                modifier = Modifier.fillMaxWidth()
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(top = 2.dp),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
                             ) {
-                                PaymentMethodGridCard(
-                                    title = "Transfer Bank",
-                                    subtitle = "BCA, Mandiri, BRI",
-                                    icon = Icons.Outlined.AccountBalance,
-                                    isSelected = !state.isSplitPaymentEnabled && state.selectedPaymentMethod == PaymentMethod.TRANSFER,
-                                    onClick = { onSelectPayment(PaymentMethod.TRANSFER) },
-                                    modifier = Modifier.weight(1f)
+                                Text(
+                                    text = if (state.isSplitPaymentEnabled) "Mode Pembayaran Campur Aktif" else "Metode lain: Termin DP / Split?",
+                                    fontSize = 11.5.sp,
+                                    color = Color(0xFF64748B)
                                 )
-
-                                PaymentMethodGridCard(
-                                    title = "Hutang / Tempo",
-                                    subtitle = "Jatuh tempo nota",
-                                    icon = Icons.AutoMirrored.Outlined.ReceiptLong,
-                                    isSelected = !state.isSplitPaymentEnabled && state.selectedPaymentMethod == PaymentMethod.HUTANG,
-                                    onClick = { onSelectPayment(PaymentMethod.HUTANG) },
-                                    modifier = Modifier.weight(1f)
-                                )
-                            }
-
-                            // Grid 2-Kolom: Baris 3 (DP / Bertahap + Toggle Split Payment)
-                            Row(
-                                horizontalArrangement = Arrangement.spacedBy(10.dp),
-                                modifier = Modifier.fillMaxWidth()
-                            ) {
-                                PaymentMethodGridCard(
-                                    title = "DP / Bertahap",
-                                    subtitle = "Uang muka termin",
-                                    icon = Icons.Outlined.AccountBalanceWallet,
-                                    isSelected = !state.isSplitPaymentEnabled && state.selectedPaymentMethod == PaymentMethod.DP,
-                                    onClick = { onSelectPayment(PaymentMethod.DP) },
-                                    modifier = Modifier.weight(1f)
-                                )
-
-                                PaymentMethodGridCard(
-                                    title = "Bayar Campur",
-                                    subtitle = "Split 2+ metode",
-                                    icon = Icons.Outlined.Payments,
-                                    isSelected = state.isSplitPaymentEnabled,
+                                TextButton(
                                     onClick = { onToggleSplitPayment(!state.isSplitPaymentEnabled) },
-                                    modifier = Modifier.weight(1f)
-                                )
+                                    contentPadding = PaddingValues(horizontal = 8.dp, vertical = 2.dp)
+                                ) {
+                                    Text(
+                                        text = if (state.isSplitPaymentEnabled) "Batal Bayar Campur" else "+ Bayar Campur / DP",
+                                        fontSize = 12.sp,
+                                        fontWeight = FontWeight.SemiBold,
+                                        color = if (state.isSplitPaymentEnabled) Color(0xFFDC2626) else Color(0xFF10533C)
+                                    )
+                                }
                             }
                         }
                     }
@@ -600,7 +567,7 @@ fun CashierPaymentScreen(
                                     }
                                 }
 
-                                // Quick Cash Preset Chips (Uang Pas, 50.000, 100.000, dsb)
+                                // Quick Cash Preset Chips (Uang Pas, Pecahan terdekat di atas total)
                                 if (state.finalTotal > BigDecimal.ZERO) {
                                     val presets = getCashQuickPresets(state.finalTotal)
                                     val parsedInput = state.amountPaidInput.trim().replace(',', '.').toBigDecimalOrNull()
@@ -610,57 +577,62 @@ fun CashierPaymentScreen(
                                         modifier = Modifier.fillMaxWidth(),
                                         horizontalArrangement = Arrangement.spacedBy(8.dp)
                                     ) {
-                                        // Chip Uang Pas
+                                        // Chip Uang Pas (Minimal 48dp touch target)
                                         Surface(
                                             onClick = {
                                                 onAmountPaidChanged(state.finalTotal.stripTrailingZeros().toPlainString())
                                             },
                                             shape = RoundedCornerShape(12.dp),
-                                            color = Color.White,
+                                            color = if (isUangPasSelected) Color(0xFFE7F2EC) else Color.White,
                                             border = BorderStroke(
                                                 if (isUangPasSelected) 2.dp else 1.dp,
-                                                if (isUangPasSelected) Color(0xFF10B981) else PaymentOutline
+                                                if (isUangPasSelected) Color(0xFF10533C) else PaymentOutline
                                             ),
                                             shadowElevation = 0.5.dp,
-                                            modifier = Modifier.weight(1f)
+                                            modifier = Modifier
+                                                .weight(1f)
+                                                .height(48.dp)
                                         ) {
                                             Box(
-                                                modifier = Modifier.padding(vertical = 10.dp),
+                                                modifier = Modifier.fillMaxSize(),
                                                 contentAlignment = Alignment.Center
                                             ) {
                                                 Text(
                                                     text = "Uang Pas",
-                                                    fontSize = 12.sp,
+                                                    fontSize = 12.5.sp,
                                                     fontWeight = if (isUangPasSelected) FontWeight.Bold else FontWeight.SemiBold,
-                                                    color = if (isUangPasSelected) Color(0xFF0F172A) else Color(0xFF334155)
+                                                    color = if (isUangPasSelected) Color(0xFF10533C) else Color(0xFF334155)
                                                 )
                                             }
                                         }
 
-                                        presets.take(2).forEach { preset ->
+                                        // Dynamic Nearest Denominations (Minimal 48dp)
+                                        presets.take(3).forEach { preset ->
                                             val isPresetSelected = parsedInput != null && parsedInput.compareTo(preset) == 0
                                             Surface(
                                                 onClick = {
                                                     onAmountPaidChanged(preset.stripTrailingZeros().toPlainString())
                                                 },
                                                 shape = RoundedCornerShape(12.dp),
-                                                color = Color.White,
+                                                color = if (isPresetSelected) Color(0xFFE7F2EC) else Color.White,
                                                 border = BorderStroke(
                                                     if (isPresetSelected) 2.dp else 1.dp,
-                                                    if (isPresetSelected) Color(0xFF10B981) else PaymentOutline
+                                                    if (isPresetSelected) Color(0xFF10533C) else PaymentOutline
                                                 ),
                                                 shadowElevation = 0.5.dp,
-                                                modifier = Modifier.weight(1f)
+                                                modifier = Modifier
+                                                    .weight(1f)
+                                                    .height(48.dp)
                                             ) {
                                                 Box(
-                                                    modifier = Modifier.padding(vertical = 10.dp),
+                                                    modifier = Modifier.fillMaxSize(),
                                                     contentAlignment = Alignment.Center
                                                 ) {
                                                     Text(
                                                         text = formatRupiah(preset).replace("Rp ", ""),
-                                                        fontSize = 12.sp,
+                                                        fontSize = 12.5.sp,
                                                         fontWeight = if (isPresetSelected) FontWeight.Bold else FontWeight.SemiBold,
-                                                        color = if (isPresetSelected) Color(0xFF0F172A) else Color(0xFF334155)
+                                                        color = if (isPresetSelected) Color(0xFF10533C) else Color(0xFF334155)
                                                     )
                                                 }
                                             }
@@ -668,58 +640,127 @@ fun CashierPaymentScreen(
                                     }
                                 }
 
-                                // Change/Kembalian Result Banner
+                                // Change / Shortage Result Banner (Kembalian Hijau Besar / Uang Kurang Merah)
                                 val parsedAmount = state.amountPaidInput.trim().replace(',', '.').toBigDecimalOrNull()
-                                val diff = if (parsedAmount != null) parsedAmount.subtract(state.finalTotal) else BigDecimal.ZERO
-                                val isOver = diff >= BigDecimal.ZERO
+                                val isPaidSufficient = parsedAmount != null && parsedAmount >= state.finalTotal
+                                val changeAmount = checkoutChange(state.amountPaidInput, state.finalTotal)
+                                val shortage = if (parsedAmount != null && parsedAmount < state.finalTotal) {
+                                    state.finalTotal.subtract(parsedAmount)
+                                } else if (parsedAmount == null) {
+                                    state.finalTotal
+                                } else {
+                                    BigDecimal.ZERO
+                                }
 
-                                Surface(
-                                    shape = RoundedCornerShape(12.dp),
-                                    color = if (state.amountPaidInput.isNotEmpty() && !isOver) Color(0xFFFEF2F2) else Color.White,
-                                    border = BorderStroke(1.dp, if (state.amountPaidInput.isNotEmpty() && !isOver) Color(0xFFFECACA) else PaymentOutline),
-                                    shadowElevation = 0.5.dp,
-                                    modifier = Modifier.fillMaxWidth()
-                                ) {
-                                    Row(
-                                        modifier = Modifier
-                                            .fillMaxWidth()
-                                            .padding(horizontal = 14.dp, vertical = 10.dp),
-                                        horizontalArrangement = Arrangement.SpaceBetween,
-                                        verticalAlignment = Alignment.CenterVertically
+                                if (isPaidSufficient) {
+                                    // Prominent Large Green Card
+                                    Surface(
+                                        shape = RoundedCornerShape(14.dp),
+                                        color = Color(0xFFF0FDF4),
+                                        border = BorderStroke(1.5.dp, Color(0xFF86EFAC)),
+                                        modifier = Modifier.fillMaxWidth()
                                     ) {
                                         Row(
-                                            verticalAlignment = Alignment.CenterVertically,
-                                            horizontalArrangement = Arrangement.spacedBy(10.dp)
+                                            modifier = Modifier
+                                                .fillMaxWidth()
+                                                .padding(horizontal = 16.dp, vertical = 14.dp),
+                                            horizontalArrangement = Arrangement.SpaceBetween,
+                                            verticalAlignment = Alignment.CenterVertically
                                         ) {
-                                            Surface(
-                                                shape = RoundedCornerShape(8.dp),
-                                                color = if (state.amountPaidInput.isNotEmpty() && !isOver) Color(0xFFFEE2E2) else Color(0xFFF1F5F9),
-                                                modifier = Modifier.size(26.dp)
+                                            Row(
+                                                verticalAlignment = Alignment.CenterVertically,
+                                                horizontalArrangement = Arrangement.spacedBy(10.dp)
                                             ) {
-                                                Box(contentAlignment = Alignment.Center) {
+                                                Box(
+                                                    modifier = Modifier
+                                                        .size(36.dp)
+                                                        .background(Color(0xFFDCFCE7), CircleShape),
+                                                    contentAlignment = Alignment.Center
+                                                ) {
                                                     Icon(
-                                                        imageVector = if (state.amountPaidInput.isNotEmpty() && !isOver) Icons.Outlined.WarningAmber else Icons.Outlined.Check,
+                                                        imageVector = Icons.Outlined.CheckCircle,
                                                         contentDescription = null,
-                                                        tint = if (state.amountPaidInput.isNotEmpty() && !isOver) Color(0xFFDC2626) else Color(0xFF64748B),
-                                                        modifier = Modifier.size(14.dp)
+                                                        tint = Color(0xFF047857),
+                                                        modifier = Modifier.size(20.dp)
+                                                    )
+                                                }
+                                                Column {
+                                                    Text(
+                                                        text = "KEMBALIAN",
+                                                        fontSize = 11.sp,
+                                                        fontWeight = FontWeight.Bold,
+                                                        color = Color(0xFF047857),
+                                                        letterSpacing = 0.5.sp
+                                                    )
+                                                    Text(
+                                                        text = "Uang diterima cukup",
+                                                        fontSize = 11.5.sp,
+                                                        color = Color(0xFF065F46)
                                                     )
                                                 }
                                             }
-
                                             Text(
-                                                text = if (state.amountPaidInput.isNotEmpty() && !isOver) "Kurang Bayar" else "Kembalian",
-                                                fontSize = 12.sp,
-                                                fontWeight = FontWeight.SemiBold,
-                                                color = if (state.amountPaidInput.isNotEmpty() && !isOver) Color(0xFFDC2626) else Color(0xFF334155)
+                                                text = formatRupiah(changeAmount),
+                                                fontSize = 24.sp,
+                                                fontWeight = FontWeight.Bold,
+                                                color = Color(0xFF047857)
                                             )
                                         }
-
-                                        Text(
-                                            text = formatRupiah(diff.abs()),
-                                            fontSize = 14.sp,
-                                            fontWeight = FontWeight.Bold,
-                                            color = if (state.amountPaidInput.isNotEmpty() && !isOver) Color(0xFFDC2626) else PaymentTextPrimary
-                                        )
+                                    }
+                                } else {
+                                    // Prominent Large Red Card
+                                    Surface(
+                                        shape = RoundedCornerShape(14.dp),
+                                        color = Color(0xFFFEF2F2),
+                                        border = BorderStroke(1.5.dp, Color(0xFFFCA5A5)),
+                                        modifier = Modifier.fillMaxWidth()
+                                    ) {
+                                        Row(
+                                            modifier = Modifier
+                                                .fillMaxWidth()
+                                                .padding(horizontal = 16.dp, vertical = 14.dp),
+                                            horizontalArrangement = Arrangement.SpaceBetween,
+                                            verticalAlignment = Alignment.CenterVertically
+                                        ) {
+                                            Row(
+                                                verticalAlignment = Alignment.CenterVertically,
+                                                horizontalArrangement = Arrangement.spacedBy(10.dp)
+                                            ) {
+                                                Box(
+                                                    modifier = Modifier
+                                                        .size(36.dp)
+                                                        .background(Color(0xFFFEE2E2), CircleShape),
+                                                    contentAlignment = Alignment.Center
+                                                ) {
+                                                    Icon(
+                                                        imageVector = Icons.Outlined.WarningAmber,
+                                                        contentDescription = null,
+                                                        tint = Color(0xFFDC2626),
+                                                        modifier = Modifier.size(20.dp)
+                                                    )
+                                                }
+                                                Column {
+                                                    Text(
+                                                        text = "UANG KURANG",
+                                                        fontSize = 11.sp,
+                                                        fontWeight = FontWeight.Bold,
+                                                        color = Color(0xFFDC2626),
+                                                        letterSpacing = 0.5.sp
+                                                    )
+                                                    Text(
+                                                        text = "Nominal belum mencukupi",
+                                                        fontSize = 11.5.sp,
+                                                        color = Color(0xFF991B1B)
+                                                    )
+                                                }
+                                            }
+                                            Text(
+                                                text = "Kurang ${formatRupiah(shortage)}",
+                                                fontSize = 18.sp,
+                                                fontWeight = FontWeight.Bold,
+                                                color = Color(0xFFDC2626)
+                                            )
+                                        }
                                     }
                                 }
                             }
@@ -1000,9 +1041,10 @@ fun CashierPaymentScreen(
                                         modifier = Modifier.size(40.dp)
                                     ) {
                                         Box(contentAlignment = Alignment.Center) {
-                                            if (state.selectedCustomer != null) {
+                                            val activeCust = state.selectedCustomer
+                                            if (activeCust != null) {
                                                 Text(
-                                                    text = state.selectedCustomer.name.take(2).uppercase(),
+                                                    text = activeCust.name.take(2).uppercase(),
                                                     fontWeight = FontWeight.Bold,
                                                     fontSize = 12.5.sp,
                                                     color = Color(0xFF334155),
@@ -1020,8 +1062,9 @@ fun CashierPaymentScreen(
                                     }
 
                                     Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                                        val activeCust = state.selectedCustomer
                                         Text(
-                                            text = state.selectedCustomer?.name ?: "Pilih Pelanggan",
+                                            text = activeCust?.name ?: "Pilih Pelanggan",
                                             fontSize = 14.sp,
                                             fontWeight = FontWeight.Bold,
                                             color = Color(0xFF1E293B),
@@ -1029,16 +1072,16 @@ fun CashierPaymentScreen(
                                             overflow = TextOverflow.Ellipsis
                                         )
                                         Text(
-                                            text = if (state.selectedCustomer != null) {
-                                                val cat = if (state.selectedCustomer.isContractor) "Kontraktor" else "Pelanggan Biasa"
-                                                val phone = state.selectedCustomer.phone?.ifBlank { "Tanpa nomor telepon" } ?: "Tanpa nomor telepon"
+                                            text = if (activeCust != null) {
+                                                val cat = if (activeCust.isContractor) "Kontraktor" else "Pelanggan Biasa"
+                                                val phone = activeCust.phone?.ifBlank { "Tanpa nomor telepon" } ?: "Tanpa nomor telepon"
                                                 "$cat • $phone"
                                             } else {
                                                 if (isCustomerRequired) "Wajib untuk ${state.selectedPaymentMethod.displayName()}"
                                                 else "Pelanggan Biasa • Transaksi tanpa member"
                                             },
                                             fontSize = 12.sp,
-                                            color = if (isCustomerRequired && state.selectedCustomer == null) Color(0xFFDC2626) else Color(0xFF94A3B8),
+                                            color = if (isCustomerRequired && activeCust == null) Color(0xFFDC2626) else Color(0xFF94A3B8),
                                             maxLines = 1,
                                             overflow = TextOverflow.Ellipsis
                                         )
@@ -1658,7 +1701,7 @@ fun CashierPaymentScreen(
 // SUB-KOMPONEN: MODAL BOTTOM SHEET PILIH PELANGGAN (PERSIS MOCKUP HTML)
 // ═════════════════════════════════════════════════════════════════════════════
 @Composable
-private fun CustomerModalBottomSheet(
+internal fun CustomerModalBottomSheet(
     customerRepository: CustomerRepository?,
     initialCustomers: List<Customer>,
     currentSelectedCustomer: Customer?,
@@ -2231,6 +2274,68 @@ private fun PaymentTopBar(
 }
 
 // ═════════════════════════════════════════════════════════════════════════════
+// SUB-KOMPONEN: SEGMENTED CONTROL 4 METODE (FASE 3 SPESIFIKASI INDUSTRI)
+// ═════════════════════════════════════════════════════════════════════════════
+@Composable
+fun PaymentMethodSegmentedControl(
+    selectedMethod: PaymentMethod,
+    isSplitPayment: Boolean,
+    onSelectMethod: (PaymentMethod) -> Unit,
+    modifier: Modifier = Modifier
+) {
+    val methods = listOf(
+        PaymentMethod.TUNAI to "Tunai",
+        PaymentMethod.QRIS to "QRIS",
+        PaymentMethod.TRANSFER to "Transfer",
+        PaymentMethod.HUTANG to "Tempo",
+    )
+
+    Surface(
+        shape = RoundedCornerShape(14.dp),
+        color = Color(0xFFF1F5F9),
+        border = BorderStroke(1.dp, Color(0xFFE2E8F0)),
+        modifier = modifier
+            .fillMaxWidth()
+            .height(48.dp)
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(4.dp),
+            horizontalArrangement = Arrangement.spacedBy(4.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            methods.forEach { (method, label) ->
+                val isSelected = !isSplitPayment && selectedMethod == method
+                Surface(
+                    onClick = { onSelectMethod(method) },
+                    shape = RoundedCornerShape(10.dp),
+                    color = if (isSelected) Color.White else Color.Transparent,
+                    shadowElevation = if (isSelected) 1.dp else 0.dp,
+                    border = if (isSelected) BorderStroke(1.dp, Color(0xFFCBD5E1)) else null,
+                    modifier = Modifier
+                        .weight(1f)
+                        .fillMaxHeight()
+                ) {
+                    Box(
+                        modifier = Modifier.fillMaxSize(),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text(
+                            text = label,
+                            fontSize = 13.sp,
+                            fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
+                            color = if (isSelected) Color(0xFF10533C) else Color(0xFF64748B),
+                            maxLines = 1
+                        )
+                    }
+                }
+            }
+        }
+    }
+}
+
+// ═════════════════════════════════════════════════════════════════════════════
 // SUB-KOMPONEN: KARTU METODE PEMBAYARAN GRID (2 KOLOM PERSIS MOCKUP HTML)
 // ═════════════════════════════════════════════════════════════════════════════
 @Composable
@@ -2577,9 +2682,10 @@ private fun SplitPaymentBuilderCard(
                             color = PaymentTextPrimary
                         )
                     }
-                    if (summary.error != null) {
+                    val summaryError = summary.error
+                    if (summaryError != null) {
                         Text(
-                            text = summary.error,
+                            text = summaryError,
                             fontSize = 11.5.sp,
                             fontWeight = FontWeight.SemiBold,
                             color = Color(0xFFDC2626)
