@@ -15,7 +15,8 @@
     <uses-feature android:name="android.hardware.usb.host" android:required="false" />
     <uses-feature android:name="android.hardware.camera" android:required="false" />
 
-    <application android:name=".TbTerminalApplication"
+    <application
+        android:name=".TbTerminalApplication"
         android:usesCleartextTraffic="false"
         android:allowBackup="false"
         android:dataExtractionRules="@xml/data_extraction_rules"
@@ -36,7 +37,16 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
+
+        <provider
+            android:name="androidx.core.content.FileProvider"
+            android:authorities="${applicationId}.fileprovider"
+            android:exported="false"
+            android:grantUriPermissions="true">
+            <meta-data
+                android:name="android.support.FILE_PROVIDER_PATHS"
+                android:resource="@xml/file_paths" />
+        </provider>
     </application>
 
 </manifest>
-

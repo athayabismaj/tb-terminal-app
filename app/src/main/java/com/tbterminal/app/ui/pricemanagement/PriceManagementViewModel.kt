@@ -207,7 +207,6 @@ class PriceManagementViewModel(
                 priceContractor = priceContractor,
                 discount = discount,
                 minStock = detail.minStock,
-                photoFilename = detail.photoFilename,
                 secondaryUnitId = detail.secondaryUnitId,
                 secondaryUnitFactor = detail.secondaryUnitFactor,
                 priceTiers = priceTiers

@@ -47,7 +47,7 @@ internal fun ProductResponseDto.toProduct(): Product {
         priceContractor = priceContractor,
         discount = discount,
         minStock = minStock,
-        photoFilename = photoFilename,
+        photoUrl = photoUrl,
         isActive = isActive,
         secondaryUnitId = secondaryUnitId,
         secondaryUnitFactor = secondaryUnitFactor?.toBigDecimalOrNull(),
@@ -72,7 +72,8 @@ internal fun StockDetailResponseDto.toProductStock(): ProductStock {
         secondaryUnitId = secondaryUnitId,
         secondaryUnitName = secondaryUnitName,
         secondaryUnitFactor = secondaryUnitFactor?.toBigDecimalOrNull(),
-        priceTiers = priceTiers.map(ProductPriceTierDto::toProductPriceTier)
+        priceTiers = priceTiers.map(ProductPriceTierDto::toProductPriceTier),
+        photoUrl = photoUrl
     )
 }
 

@@ -1,8 +1,10 @@
 package com.tbterminal.app
 
 import android.app.Application
+import coil.Coil
 import com.tbterminal.app.data.di.AppContainer
 import com.tbterminal.app.data.di.DefaultAppContainer
+import com.tbterminal.app.data.media.CoilImageLoaderFactory
 import com.tbterminal.app.data.repository.LocalBackupRepository
 import com.tbterminal.app.data.worker.StockAlertScheduler
 import kotlinx.coroutines.launch
@@ -13,6 +15,7 @@ class TbTerminalApplication : Application() {
 
     override fun onCreate() {
         super.onCreate()
+        Coil.setImageLoader(CoilImageLoaderFactory.create(this))
         LocalBackupRepository.applyPendingRestoreIfAny(this)
         appContainer = DefaultAppContainer(this)
         StockAlertScheduler.schedulePeriodic(this)

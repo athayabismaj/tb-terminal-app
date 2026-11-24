@@ -8,13 +8,16 @@ import kotlinx.serialization.descriptors.PrimitiveSerialDescriptor
 import kotlinx.serialization.descriptors.SerialDescriptor
 import kotlinx.serialization.encoding.Decoder
 import kotlinx.serialization.encoding.Encoder
+import okhttp3.MultipartBody
 import retrofit2.Response
 import retrofit2.http.Body
 import retrofit2.http.DELETE
 import retrofit2.http.GET
+import retrofit2.http.Multipart
 import retrofit2.http.PATCH
 import retrofit2.http.POST
 import retrofit2.http.PUT
+import retrofit2.http.Part
 import retrofit2.http.Path
 import retrofit2.http.Query
 
@@ -115,6 +118,18 @@ interface InventoryApi {
         @Body request: UpdateProductPriceTiersRequestDto
     ): Response<ApiResponse<List<ProductPriceTierDto>>>
 
+    @Multipart
+    @POST("/api/inventory/products/{id}/photo")
+    suspend fun uploadProductPhoto(
+        @Path("id") id: String,
+        @Part photo: MultipartBody.Part
+    ): Response<ApiResponse<ProductPhotoResponseDto>>
+
+    @DELETE("/api/inventory/products/{id}/photo")
+    suspend fun deleteProductPhoto(
+        @Path("id") id: String
+    ): Response<Unit>
+
     @GET("/api/inventory/stock")
     suspend fun getStockDetails(
         @Query("page") page: Int = 1,
@@ -212,11 +227,17 @@ data class ProductResponseDto(
     @Serializable(with = BigDecimalStringSerializer::class) val priceContractor: BigDecimal,
     @Serializable(with = BigDecimalStringSerializer::class) val discount: BigDecimal = BigDecimal.ZERO,
     @Serializable(with = BigDecimalStringSerializer::class) val minStock: BigDecimal,
-    val photoFilename: String? = null,
+    val photoUrl: String? = null,
     val isActive: Boolean,
     val secondaryUnitId: String? = null,
     val secondaryUnitFactor: String? = null,
     val priceTiers: List<ProductPriceTierDto> = emptyList()
+)
+
+@Serializable
+data class ProductPhotoResponseDto(
+    val productId: String,
+    val photoUrl: String
 )
 
 @Serializable
@@ -230,7 +251,6 @@ data class ProductCreateRequestDto(
     @Serializable(with = BigDecimalStringSerializer::class) val priceContractor: BigDecimal,
     @Serializable(with = BigDecimalStringSerializer::class) val discount: BigDecimal = BigDecimal.ZERO,
     @Serializable(with = BigDecimalStringSerializer::class) val minStock: BigDecimal,
-    val photoFilename: String? = null,
     val secondaryUnitId: String? = null,
     val secondaryUnitFactor: String? = null,
     val priceTiers: List<ProductPriceTierDto>? = null
@@ -246,7 +266,6 @@ data class ProductUpdateRequestDto(
     @Serializable(with = BigDecimalStringSerializer::class) val priceContractor: BigDecimal,
     @Serializable(with = BigDecimalStringSerializer::class) val discount: BigDecimal = BigDecimal.ZERO,
     @Serializable(with = BigDecimalStringSerializer::class) val minStock: BigDecimal,
-    val photoFilename: String? = null,
     val secondaryUnitId: String? = null,
     val secondaryUnitFactor: String? = null,
     val priceTiers: List<ProductPriceTierDto>? = null
@@ -266,6 +285,7 @@ data class StockDetailResponseDto(
     @Serializable(with = BigDecimalStringSerializer::class) val priceContractor: BigDecimal,
     @Serializable(with = BigDecimalStringSerializer::class) val discount: BigDecimal = BigDecimal.ZERO,
     val isActive: Boolean,
+    val photoUrl: String? = null,
     val secondaryUnitId: String? = null,
     val secondaryUnitName: String? = null,
     val secondaryUnitFactor: String? = null,

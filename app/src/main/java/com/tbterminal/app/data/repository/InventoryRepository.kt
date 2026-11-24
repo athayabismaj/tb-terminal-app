@@ -45,6 +45,10 @@ import com.tbterminal.app.data.remote.UnitResponseDto
 import com.tbterminal.app.data.remote.ProductCsvImportRequestDto
 import com.tbterminal.app.data.remote.OpeningStockRequestDto
 import com.tbterminal.app.data.remote.safeApiCall
+import com.tbterminal.app.data.remote.safeUnitApiCall
+import okhttp3.MediaType.Companion.toMediaType
+import okhttp3.MultipartBody
+import okhttp3.RequestBody.Companion.toRequestBody
 import java.math.BigDecimal
 import kotlinx.coroutines.CancellationException
 
@@ -100,6 +104,14 @@ interface InventoryRepository {
         productId: String,
         tiers: List<ProductPriceTier>
     ): RepositoryResult<List<ProductPriceTier>> = RepositoryResult.Success(tiers)
+
+    suspend fun uploadProductPhoto(
+        productId: String,
+        bytes: ByteArray,
+        fileName: String = "product.jpg"
+    ): RepositoryResult<String> = RepositoryResult.Error("UNSUPPORTED", "Upload foto produk tidak didukung.")
+
+    suspend fun deleteProductPhoto(productId: String): RepositoryResult<Unit> = RepositoryResult.Success(Unit)
 
     suspend fun executeStockOpname(
         productId: String,
@@ -341,7 +353,6 @@ class RemoteInventoryRepository(
             priceContractor = command.priceContractor,
             discount = command.discount,
             minStock = command.minStock,
-            photoFilename = command.photoFilename,
             secondaryUnitId = command.secondaryUnitId,
             secondaryUnitFactor = command.secondaryUnitFactor?.stripTrailingZeros()?.toPlainString(),
             priceTiers = command.priceTiers?.map(ProductPriceTier::toDto)
@@ -375,7 +386,6 @@ class RemoteInventoryRepository(
             priceContractor = command.priceContractor,
             discount = command.discount,
             minStock = command.minStock,
-            photoFilename = command.photoFilename,
             secondaryUnitId = command.secondaryUnitId,
             secondaryUnitFactor = command.secondaryUnitFactor?.stripTrailingZeros()?.toPlainString(),
             priceTiers = command.priceTiers?.map(ProductPriceTier::toDto)
@@ -407,6 +417,36 @@ class RemoteInventoryRepository(
                 } else {
                     RepositoryResult.Success(Unit)
                 }
+            }
+    }
+
+    override suspend fun uploadProductPhoto(
+        productId: String,
+        bytes: ByteArray,
+        fileName: String
+    ): RepositoryResult<String> {
+        val body = bytes.toRequestBody("image/jpeg".toMediaType())
+        val part = MultipartBody.Part.createFormData("photo", fileName, body)
+        return safeApiCall { inventoryApi.uploadProductPhoto(productId, part) }
+            .toRepositoryResult { response ->
+                val uploaded = response.data
+                if (!response.success || uploaded == null) {
+                    RepositoryResult.Error(
+                        code = response.code ?: "UPLOAD_PRODUCT_PHOTO_FAILED",
+                        message = response.message ?: response.error ?: "Foto produk gagal diunggah."
+                    )
+                } else {
+                    cacheSafely { productLocalDataSource?.updateProductPhoto(productId, uploaded.photoUrl) }
+                    RepositoryResult.Success(uploaded.photoUrl)
+                }
+            }
+    }
+
+    override suspend fun deleteProductPhoto(productId: String): RepositoryResult<Unit> {
+        return safeUnitApiCall { inventoryApi.deleteProductPhoto(productId) }
+            .toRepositoryResult {
+                cacheSafely { productLocalDataSource?.updateProductPhoto(productId, null) }
+                RepositoryResult.Success(Unit)
             }
     }
 
@@ -970,7 +1010,8 @@ private fun LocalProductEntity.toCachedProductStock(): ProductStock {
         priceRetail = priceRetail.toBigDecimalSafe(),
         priceContractor = priceContractor.toBigDecimalSafe(),
         discount = discount.toBigDecimalSafe(),
-        isActive = isActive
+        isActive = isActive,
+        photoUrl = photoFilename
     )
 }
 

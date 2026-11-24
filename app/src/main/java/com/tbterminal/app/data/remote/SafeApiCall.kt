@@ -11,31 +11,55 @@ import retrofit2.Response
 
 suspend fun <T> safeApiCall(
     apiCall: suspend () -> Response<T>
+): NetworkResult<T> = executeSafeCall {
+    val response = apiCall()
+    if (!response.isSuccessful) {
+        val apiError = response.toApiErrorResponse()
+        return@executeSafeCall NetworkResult.Error(
+            code = apiError.code,
+            message = UserFacingErrorMapper.message(
+                httpStatus = response.code(),
+                code = apiError.code,
+                backendMessage = apiError.message,
+            )
+        )
+    }
+
+    val body = response.body()
+    if (body != null) {
+        NetworkResult.Success(body)
+    } else {
+        NetworkResult.Error(
+            code = "EMPTY_BODY",
+            message = UserFacingErrorMapper.message(code = "EMPTY_BODY")
+        )
+    }
+}
+
+suspend fun safeUnitApiCall(
+    apiCall: suspend () -> Response<Unit>
+): NetworkResult<Unit> = executeSafeCall {
+    val response = apiCall()
+    if (response.isSuccessful) {
+        NetworkResult.Success(Unit)
+    } else {
+        val apiError = response.toApiErrorResponse()
+        NetworkResult.Error(
+            code = apiError.code,
+            message = UserFacingErrorMapper.message(
+                httpStatus = response.code(),
+                code = apiError.code,
+                backendMessage = apiError.message,
+            )
+        )
+    }
+}
+
+private inline fun <T> executeSafeCall(
+    block: () -> NetworkResult<T>
 ): NetworkResult<T> {
     return try {
-        val response = apiCall()
-
-        if (!response.isSuccessful) {
-            val apiError = response.toApiErrorResponse()
-            return NetworkResult.Error(
-                code = apiError.code,
-                message = UserFacingErrorMapper.message(
-                    httpStatus = response.code(),
-                    code = apiError.code,
-                    backendMessage = apiError.message,
-                )
-            )
-        }
-
-        val body = response.body()
-        if (body != null) {
-            NetworkResult.Success(body)
-        } else {
-            NetworkResult.Error(
-                code = "EMPTY_BODY",
-                message = UserFacingErrorMapper.message(code = "EMPTY_BODY")
-            )
-        }
+        block()
     } catch (cancellation: CancellationException) {
         throw cancellation
     } catch (timeout: SocketTimeoutException) {

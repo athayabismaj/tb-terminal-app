@@ -2644,4 +2644,5 @@ private fun com.tbterminal.app.data.model.ProductStock.toCheckoutProduct(): Prod
     contractorPrice = priceContractor,
     priceTiers = priceTiers,
     masterDiscount = discount,
+    photoUrl = photoUrl
 )

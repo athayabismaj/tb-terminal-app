@@ -54,6 +54,7 @@ class ProductLocalDataSource(
                     discount = product.discount,
                     stock = product.stock,
                     minimumStock = product.minimumStock,
+                    photoFilename = product.photoFilename,
                     isActive = product.isActive,
                     syncStatus = product.syncStatus,
                     updatedAt = product.updatedAt,
@@ -67,5 +68,10 @@ class ProductLocalDataSource(
 
     suspend fun cacheProduct(product: LocalProductEntity) {
         productDao.upsert(product)
+    }
+
+    suspend fun updateProductPhoto(serverId: String, photoUrl: String?) {
+        val existing = productDao.getByServerId(serverId) ?: return
+        productDao.upsert(existing.copy(photoFilename = photoUrl, updatedAt = System.currentTimeMillis()))
     }
 }

@@ -154,7 +154,8 @@ data class Product(
     val secondaryUnitFactor: BigDecimal? = null,
     val contractorPrice: BigDecimal = BigDecimal.ZERO,
     val priceTiers: List<ProductPriceTier> = emptyList(),
-    val masterDiscount: BigDecimal = BigDecimal.ZERO
+    val masterDiscount: BigDecimal = BigDecimal.ZERO,
+    val photoUrl: String? = null
 )
 
 data class CartItem(

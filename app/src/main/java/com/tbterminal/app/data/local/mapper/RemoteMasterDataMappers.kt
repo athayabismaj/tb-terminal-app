@@ -30,7 +30,7 @@ fun ProductResponseDto.toLocalProductEntity(now: Long = System.currentTimeMillis
         priceContractor = priceContractor.toSafeDouble(),
         discount = discount.toSafeDouble(),
         minimumStock = minStock.toSafeDouble(),
-        photoFilename = photoFilename,
+        photoFilename = photoUrl,
         isActive = isActive,
         syncStatus = SyncStatus.SYNCED,
         updatedAt = now
@@ -50,6 +50,7 @@ fun StockDetailResponseDto.toLocalProductEntity(now: Long = System.currentTimeMi
         discount = discount.toSafeDouble(),
         stock = quantity.toSafeDouble(),
         minimumStock = minStock.toSafeDouble(),
+        photoFilename = photoUrl,
         isActive = isActive,
         syncStatus = SyncStatus.SYNCED,
         updatedAt = now,
@@ -111,7 +112,7 @@ fun LocalProductEntity.toProduct(): Product {
         priceContractor = priceContractor.toBigDecimal(),
         discount = discount.toBigDecimal(),
         minStock = minimumStock.toBigDecimal(),
-        photoFilename = photoFilename,
+        photoUrl = photoFilename,
         isActive = isActive
     )
 }

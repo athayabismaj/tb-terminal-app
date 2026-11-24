@@ -48,7 +48,7 @@ data class Product(
     val priceContractor: BigDecimal,
     val discount: BigDecimal,
     val minStock: BigDecimal,
-    val photoFilename: String?,
+    val photoUrl: String? = null,
     val isActive: Boolean,
     val secondaryUnitId: String? = null,
     val secondaryUnitFactor: BigDecimal? = null,
@@ -80,7 +80,8 @@ data class ProductStock(
     val secondaryUnitId: String? = null,
     val secondaryUnitName: String? = null,
     val secondaryUnitFactor: BigDecimal? = null,
-    val priceTiers: List<ProductPriceTier> = emptyList()
+    val priceTiers: List<ProductPriceTier> = emptyList(),
+    val photoUrl: String? = null
 )
 
 data class ProductStockPage(
@@ -133,7 +134,6 @@ data class CreateProductCommand(
     val priceContractor: BigDecimal,
     val discount: BigDecimal,
     val minStock: BigDecimal,
-    val photoFilename: String? = null,
     val secondaryUnitId: String? = null,
     val secondaryUnitFactor: BigDecimal? = null,
     val priceTiers: List<ProductPriceTier>? = null
@@ -148,7 +148,6 @@ data class UpdateProductCommand(
     val priceContractor: BigDecimal,
     val discount: BigDecimal,
     val minStock: BigDecimal,
-    val photoFilename: String? = null,
     val secondaryUnitId: String? = null,
     val secondaryUnitFactor: BigDecimal? = null,
     val priceTiers: List<ProductPriceTier>? = null
