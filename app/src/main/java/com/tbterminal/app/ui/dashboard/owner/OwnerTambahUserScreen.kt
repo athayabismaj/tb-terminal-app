@@ -63,6 +63,7 @@ import androidx.compose.ui.unit.em
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.zIndex
 import com.tbterminal.app.data.model.UserRole
+import com.tbterminal.app.data.validation.CredentialValidator
 import com.tbterminal.app.ui.auth.AlertType
 import com.tbterminal.app.ui.auth.AppAlert
 import com.tbterminal.app.ui.auth.RingsPattern
@@ -133,19 +134,21 @@ internal fun validateOwnerUserEmail(raw: String): String? {
 }
 
 internal fun validateOwnerUserPassword(raw: String): String? {
-    return when {
-        raw.isEmpty() -> "Password wajib diisi"
-        raw.length < 6 -> "Password minimal 6 karakter"
-        else -> null
-    }
+    return CredentialValidator.validatePassword(
+        password = raw,
+        requiredMessage = "Password wajib diisi",
+        minMessage = "Password minimal ${CredentialValidator.PASSWORD_MIN_LENGTH} karakter",
+        maxMessage = "Password maksimal ${CredentialValidator.PASSWORD_MAX_LENGTH} karakter"
+    )
 }
 
 internal fun validateOwnerUserPin(raw: String): String? {
-    return when {
-        raw.isEmpty() -> "PIN akses wajib diisi"
-        raw.length != 6 || !raw.all(Char::isDigit) -> "PIN harus 6 digit angka"
-        else -> null
-    }
+    return CredentialValidator.validatePin(
+        pin = raw,
+        requiredMessage = "PIN akses wajib diisi",
+        nonDigitMessage = "PIN harus ${CredentialValidator.PIN_MIN_LENGTH}–${CredentialValidator.PIN_MAX_LENGTH} digit angka",
+        lengthMessage = "PIN harus ${CredentialValidator.PIN_MIN_LENGTH}–${CredentialValidator.PIN_MAX_LENGTH} digit angka"
+    )
 }
 
 private fun List<UserRole>.toRoleRadioOptions(): List<RadioCardOption<String>> {
@@ -646,7 +649,7 @@ internal fun OwnerUserFormScreen(
         fullName.trim().length >= 2 &&
         username.trim().length >= 3 &&
         selectedRoleId != null &&
-        (isEditMode || (password.length >= 6 && pin.length == 6)) &&
+        (isEditMode || (CredentialValidator.isValidPasswordLength(password) && CredentialValidator.isValidPin(pin))) &&
         !isSaving &&
         (!isEditMode || hasChanges)
 
@@ -948,7 +951,7 @@ private fun UserFormFieldsColumn(
                             label = "Password",
                             value = password,
                             onValueChange = onPasswordChange,
-                            placeholder = "Minimal 6 karakter",
+                            placeholder = "8–72 karakter",
                             visible = showPassword,
                             onToggleVisibility = { showPassword = !showPassword },
                             errorText = passwordError,
@@ -963,10 +966,10 @@ private fun UserFormFieldsColumn(
                         )
 
                         PasswordFormField(
-                            label = "PIN akses (6 digit)",
+                            label = "PIN akses (4–6 digit)",
                             value = pin,
                             onValueChange = onPinChange,
-                            placeholder = "6 angka PIN",
+                            placeholder = "4–6 angka PIN",
                             visible = showPin,
                             onToggleVisibility = { showPin = !showPin },
                             errorText = pinError,
@@ -987,7 +990,7 @@ private fun UserFormFieldsColumn(
                         label = "Password",
                         value = password,
                         onValueChange = onPasswordChange,
-                        placeholder = "Minimal 6 karakter",
+                        placeholder = "8–72 karakter",
                         visible = showPassword,
                         onToggleVisibility = { showPassword = !showPassword },
                         errorText = passwordError,
@@ -1003,10 +1006,10 @@ private fun UserFormFieldsColumn(
                     Spacer(modifier = Modifier.height(16.dp))
 
                     PasswordFormField(
-                        label = "PIN akses (6 digit)",
+                        label = "PIN akses (4–6 digit)",
                         value = pin,
                         onValueChange = onPinChange,
-                        placeholder = "6 angka PIN",
+                        placeholder = "4–6 angka PIN",
                         visible = showPin,
                         onToggleVisibility = { showPin = !showPin },
                         errorText = pinError,
@@ -1300,8 +1303,8 @@ private fun TabletOwnerUserFormLayout(
     } else {
         listOf(
             "Pilih peran Admin atau Kasir",
-            "Password minimal 6 karakter",
-            "PIN 6 digit dipakai untuk buka layar kasir"
+            "Password 8–72 karakter",
+            "PIN 4–6 digit dipakai untuk buka layar kasir"
         )
     }
 

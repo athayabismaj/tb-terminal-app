@@ -179,7 +179,20 @@ class ManagerApprovalViewModelTest {
 
         assertEquals(0, repository.callCount)
         assertNull(viewModel.uiState.value.grant)
-        assertEquals("PIN manager harus terdiri dari 6 digit.", viewModel.uiState.value.errorMessage)
+        assertEquals("PIN manager harus terdiri dari 4 sampai 6 digit angka.", viewModel.uiState.value.errorMessage)
+    }
+
+    @Test
+    fun fourDigitManagerPinIsAccepted() = runTest(dispatcher) {
+        val repository = FakeManagerApprovalRepository(successResult(context))
+        val viewModel = configuredViewModel(repository, username = "owner01", pin = "2580")
+
+        assertTrue(viewModel.submit())
+        advanceUntilIdle()
+
+        assertEquals(1, repository.callCount)
+        assertEquals("2580", repository.lastCommand?.approverPin)
+        assertEquals(ManagerApprovalUiPhase.SUCCESS, viewModel.uiState.value.phase)
     }
 
     private suspend fun assertSuccessfulApproval(username: String) {

@@ -6,6 +6,7 @@ import androidx.lifecycle.viewModelScope
 import com.tbterminal.app.data.repository.AuthRepository
 import com.tbterminal.app.data.repository.PinUnlockResult
 import com.tbterminal.app.data.repository.RepositoryResult
+import com.tbterminal.app.data.validation.CredentialValidator
 import com.tbterminal.app.ui.common.viewModelFactory
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
@@ -105,6 +106,15 @@ class AuthViewModel(
             _authState.value = AuthState.Error(
                 message = "Kata sandi minimal 6 karakter",
                 passwordError = "Kata sandi minimal 6 karakter",
+                isPasswordHighlighted = true
+            )
+            return
+        }
+        if (password.length > CredentialValidator.PASSWORD_MAX_LENGTH) {
+            val maxMsg = "Kata sandi maksimal ${CredentialValidator.PASSWORD_MAX_LENGTH} karakter"
+            _authState.value = AuthState.Error(
+                message = maxMsg,
+                passwordError = maxMsg,
                 isPasswordHighlighted = true
             )
             return
@@ -215,8 +225,10 @@ class AuthViewModel(
         if (currentUnlock is UnlockState.LockedOut && currentUnlock.remainingSeconds > 0L) {
             return
         }
-        if (!pin.matches(Regex("\\d{4,6}"))) {
-            _unlockState.value = UnlockState.Error("PIN harus terdiri dari 4 sampai 6 digit")
+        if (!CredentialValidator.isValidPin(pin)) {
+            _unlockState.value = UnlockState.Error(
+                "PIN harus terdiri dari ${CredentialValidator.PIN_MIN_LENGTH} sampai ${CredentialValidator.PIN_MAX_LENGTH} digit angka"
+            )
             return
         }
 
@@ -329,8 +341,10 @@ class AuthViewModel(
             _resetPinState.value = ResetPinState.Error("Kata sandi saat ini wajib diisi")
             return
         }
-        if (!newPin.matches(Regex("\\d{4,6}"))) {
-            _resetPinState.value = ResetPinState.Error("PIN baru harus terdiri dari 4 sampai 6 digit")
+        if (!CredentialValidator.isValidPin(newPin)) {
+            _resetPinState.value = ResetPinState.Error(
+                "PIN baru harus terdiri dari ${CredentialValidator.PIN_MIN_LENGTH} sampai ${CredentialValidator.PIN_MAX_LENGTH} digit angka"
+            )
             return
         }
         if (newPin != confirmPin) {

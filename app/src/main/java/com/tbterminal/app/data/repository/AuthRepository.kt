@@ -17,6 +17,7 @@ import com.tbterminal.app.data.remote.UserUpdateRequest
 import com.tbterminal.app.data.remote.safeApiCall
 import com.tbterminal.app.data.session.SessionManager
 import com.tbterminal.app.data.session.SessionUser
+import com.tbterminal.app.data.validation.CredentialValidator
 import java.io.IOException
 import java.net.ConnectException
 import java.net.SocketTimeoutException
@@ -138,8 +139,11 @@ class RemoteAuthRepository private constructor(
     }
 
     override suspend fun unlock(pin: String): RepositoryResult<PinUnlockResult> {
-        if (!pin.matches(PIN_PATTERN)) {
-            return RepositoryResult.Error("VALIDATION_ERROR", "PIN harus terdiri dari 4 sampai 6 digit")
+        if (!CredentialValidator.isValidPin(pin)) {
+            return RepositoryResult.Error(
+                "VALIDATION_ERROR",
+                "PIN harus terdiri dari ${CredentialValidator.PIN_MIN_LENGTH} sampai ${CredentialValidator.PIN_MAX_LENGTH} digit angka"
+            )
         }
         return try {
             val response = authApi.unlock(UnlockRequest(pin = pin, deviceId = deviceIdProvider()))
@@ -264,8 +268,11 @@ class RemoteAuthRepository private constructor(
         if (currentPassword.isBlank()) {
             return RepositoryResult.Error("VALIDATION_ERROR", "Kata sandi wajib diisi")
         }
-        if (!newPin.matches(PIN_PATTERN)) {
-            return RepositoryResult.Error("VALIDATION_ERROR", "PIN baru harus terdiri dari 4 sampai 6 digit")
+        if (!CredentialValidator.isValidPin(newPin)) {
+            return RepositoryResult.Error(
+                "VALIDATION_ERROR",
+                "PIN baru harus terdiri dari ${CredentialValidator.PIN_MIN_LENGTH} sampai ${CredentialValidator.PIN_MAX_LENGTH} digit angka"
+            )
         }
         val result = safeApiCall {
             authApi.resetPinWithPassword(
@@ -467,8 +474,13 @@ class RemoteAuthRepository private constructor(
         if (oldPassword.isBlank()) {
             return RepositoryResult.Error("VALIDATION_ERROR", "Password lama wajib diisi")
         }
-        if (newPassword.length < 6) {
-            return RepositoryResult.Error("VALIDATION_ERROR", "Password baru minimal 6 karakter")
+        CredentialValidator.validatePassword(
+            password = newPassword,
+            requiredMessage = "Password baru wajib diisi",
+            minMessage = "Password baru minimal ${CredentialValidator.PASSWORD_MIN_LENGTH} karakter",
+            maxMessage = "Password baru maksimal ${CredentialValidator.PASSWORD_MAX_LENGTH} karakter"
+        )?.let { message ->
+            return RepositoryResult.Error("VALIDATION_ERROR", message)
         }
         if (oldPassword == newPassword) {
             return RepositoryResult.Error("VALIDATION_ERROR", "Password baru harus berbeda dari password lama")
@@ -479,11 +491,17 @@ class RemoteAuthRepository private constructor(
     }
 
     override suspend fun changeMyPin(oldPin: String, newPin: String): RepositoryResult<Unit> {
-        if (!oldPin.matches(PIN_PATTERN)) {
-            return RepositoryResult.Error("VALIDATION_ERROR", "PIN lama harus terdiri dari 4 sampai 6 digit")
+        if (!CredentialValidator.isValidPin(oldPin)) {
+            return RepositoryResult.Error(
+                "VALIDATION_ERROR",
+                "PIN lama harus terdiri dari ${CredentialValidator.PIN_MIN_LENGTH} sampai ${CredentialValidator.PIN_MAX_LENGTH} digit angka"
+            )
         }
-        if (!newPin.matches(PIN_PATTERN)) {
-            return RepositoryResult.Error("VALIDATION_ERROR", "PIN baru harus terdiri dari 4 sampai 6 digit")
+        if (!CredentialValidator.isValidPin(newPin)) {
+            return RepositoryResult.Error(
+                "VALIDATION_ERROR",
+                "PIN baru harus terdiri dari ${CredentialValidator.PIN_MIN_LENGTH} sampai ${CredentialValidator.PIN_MAX_LENGTH} digit angka"
+            )
         }
         if (oldPin == newPin) {
             return RepositoryResult.Error("VALIDATION_ERROR", "PIN baru harus berbeda dari PIN lama")
@@ -510,7 +528,6 @@ class RemoteAuthRepository private constructor(
     }
 
     private companion object {
-        val PIN_PATTERN = Regex("\\d{4,6}")
         val USERNAME_PATTERN = Regex("^[a-zA-Z0-9._-]{3,50}$")
         val EMAIL_PATTERN = Regex("^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$")
         val WRONG_PIN_ERROR_CODES = setOf("INVALID_PIN", "WRONG_PIN", "PIN_MISMATCH", "UNLOCK_FAILED")

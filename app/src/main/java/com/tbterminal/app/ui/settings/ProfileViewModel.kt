@@ -7,6 +7,7 @@ import com.tbterminal.app.data.model.UserProfile
 import com.tbterminal.app.data.repository.AuthRepository
 import com.tbterminal.app.data.repository.PinUnlockResult
 import com.tbterminal.app.data.repository.RepositoryResult
+import com.tbterminal.app.data.validation.CredentialValidator
 import com.tbterminal.app.ui.common.viewModelFactory
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -127,8 +128,13 @@ class ProfileViewModel(
             _uiState.update { it.copy(error = "Kata sandi saat ini wajib diisi", isNetworkError = false) }
             return
         }
-        if (!newPin.matches(Regex("\\d{6}"))) {
-            _uiState.update { it.copy(error = "PIN baru harus 6 digit angka.", isNetworkError = false) }
+        CredentialValidator.validatePin(
+            pin = newPin,
+            requiredMessage = "PIN baru harus ${CredentialValidator.PIN_MIN_LENGTH} sampai ${CredentialValidator.PIN_MAX_LENGTH} digit angka.",
+            nonDigitMessage = "PIN baru harus ${CredentialValidator.PIN_MIN_LENGTH} sampai ${CredentialValidator.PIN_MAX_LENGTH} digit angka.",
+            lengthMessage = "PIN baru harus ${CredentialValidator.PIN_MIN_LENGTH} sampai ${CredentialValidator.PIN_MAX_LENGTH} digit angka."
+        )?.let { pinError ->
+            _uiState.update { it.copy(error = pinError, isNetworkError = false) }
             return
         }
         if (newPin != confirmation) {
@@ -273,17 +279,21 @@ internal fun validatePasswordChange(
     confirmation: String
 ): String? = when {
     oldPassword.isBlank() -> "Password lama wajib diisi."
-    newPassword.length < 6 -> "Password baru minimal 6 karakter."
+    newPassword.length < CredentialValidator.PASSWORD_MIN_LENGTH ->
+        "Password baru minimal ${CredentialValidator.PASSWORD_MIN_LENGTH} karakter."
+    newPassword.length > CredentialValidator.PASSWORD_MAX_LENGTH ->
+        "Password baru maksimal ${CredentialValidator.PASSWORD_MAX_LENGTH} karakter."
     oldPassword == newPassword -> "Password baru harus berbeda dari password lama."
     newPassword != confirmation -> "Konfirmasi password tidak sama."
     else -> null
 }
 
 internal fun validatePinChange(oldPin: String, newPin: String, confirmation: String): String? {
-    val pinPattern = Regex("\\d{4,6}")
     return when {
-        !oldPin.matches(pinPattern) -> "PIN lama harus terdiri dari 4 sampai 6 digit."
-        !newPin.matches(pinPattern) -> "PIN baru harus terdiri dari 4 sampai 6 digit."
+        !CredentialValidator.isValidPin(oldPin) ->
+            "PIN lama harus terdiri dari ${CredentialValidator.PIN_MIN_LENGTH} sampai ${CredentialValidator.PIN_MAX_LENGTH} digit angka."
+        !CredentialValidator.isValidPin(newPin) ->
+            "PIN baru harus terdiri dari ${CredentialValidator.PIN_MIN_LENGTH} sampai ${CredentialValidator.PIN_MAX_LENGTH} digit angka."
         oldPin == newPin -> "PIN baru harus berbeda dari PIN lama."
         newPin != confirmation -> "Konfirmasi PIN tidak sama."
         else -> null

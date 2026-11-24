@@ -9,6 +9,7 @@ import com.tbterminal.app.data.model.ManagerApprovalGrant
 import com.tbterminal.app.data.model.ManagerApprovalStatus
 import com.tbterminal.app.data.remote.NetworkResult
 import com.tbterminal.app.data.repository.ManagerApprovalRepository
+import com.tbterminal.app.data.validation.CredentialValidator
 import com.tbterminal.app.ui.common.viewModelFactory
 import java.util.concurrent.atomic.AtomicBoolean
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -177,7 +178,8 @@ class ManagerApprovalViewModel internal constructor(
 
 internal fun validateManagerApprovalInput(username: String, pin: String): String? = when {
     username.isBlank() -> "Akun manager wajib diisi."
-    pin.length != 6 || !pin.all(Char::isDigit) -> "PIN manager harus terdiri dari 6 digit."
+    !CredentialValidator.isValidPin(pin) ->
+        "PIN manager harus terdiri dari ${CredentialValidator.PIN_MIN_LENGTH} sampai ${CredentialValidator.PIN_MAX_LENGTH} digit angka."
     else -> null
 }
 

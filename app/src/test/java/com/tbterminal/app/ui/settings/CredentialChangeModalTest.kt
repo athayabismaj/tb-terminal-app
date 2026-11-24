@@ -75,6 +75,12 @@ class CredentialChangeModalTest {
         composeRule.onNodeWithTag("credential-save").assertIsEnabled().performClick()
         assertEquals(Triple("kasirlama1", "barokah25", "barokah25"), submitted)
 
+        val over72 = "a1".repeat(37)
+        composeRule.onNodeWithTag("credential-new").performTextReplacement(over72)
+        composeRule.onNodeWithTag("credential-confirmation").performTextReplacement(over72)
+        composeRule.onNodeWithText("Password maksimal 72 karakter").assertIsDisplayed()
+        composeRule.onNodeWithTag("credential-save").assertIsNotEnabled()
+
         composeRule.onNodeWithTag("password-forgot-link").performClick()
         assertTrue(forgotClicked)
     }

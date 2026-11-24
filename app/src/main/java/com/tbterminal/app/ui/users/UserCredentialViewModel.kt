@@ -8,6 +8,7 @@ import com.tbterminal.app.data.model.UpdateUserCommand
 import com.tbterminal.app.data.model.UserPage
 import com.tbterminal.app.data.repository.RepositoryResult
 import com.tbterminal.app.data.repository.UserRepository
+import com.tbterminal.app.data.validation.CredentialValidator
 import com.tbterminal.app.ui.common.viewModelFactory
 import kotlinx.coroutines.channels.BufferOverflow
 import kotlinx.coroutines.flow.MutableSharedFlow
@@ -84,23 +85,31 @@ class UserCredentialViewModel(
 
     fun submit(mode: UserCredentialMode) {
         val state = _uiState.value
-        val user = state.targetUser
+        if (state.isSubmitting) return
+        val user = state.targetUser ?: run {
+            setFormError("User belum siap diperbarui.")
+            return
+        }
         val credential = state.credential
         val confirmation = state.confirmation
 
+        val validationError = when (mode) {
+            UserCredentialMode.Password -> CredentialValidator.validatePassword(
+                password = credential,
+                requiredMessage = mode.emptyMessage(),
+                minMessage = "Password baru minimal ${CredentialValidator.PASSWORD_MIN_LENGTH} karakter.",
+                maxMessage = "Password baru maksimal ${CredentialValidator.PASSWORD_MAX_LENGTH} karakter."
+            )
+            UserCredentialMode.Pin -> CredentialValidator.validatePin(
+                pin = credential,
+                requiredMessage = mode.emptyMessage(),
+                nonDigitMessage = "PIN hanya boleh berisi angka.",
+                lengthMessage = "PIN baru harus terdiri dari ${CredentialValidator.PIN_MIN_LENGTH} sampai ${CredentialValidator.PIN_MAX_LENGTH} digit angka."
+            )
+        }
+
         when {
-            state.isSubmitting -> return
-            user == null -> setFormError("User belum siap diperbarui.")
-            credential.isBlank() -> setFormError(mode.emptyMessage())
-            mode == UserCredentialMode.Password && credential.length < MIN_PASSWORD_LENGTH -> {
-                setFormError("Password baru minimal $MIN_PASSWORD_LENGTH karakter.")
-            }
-            mode == UserCredentialMode.Pin && !credential.all(Char::isDigit) -> {
-                setFormError("PIN hanya boleh berisi angka.")
-            }
-            mode == UserCredentialMode.Pin && credential.length != PIN_LENGTH -> {
-                setFormError("PIN baru harus terdiri dari $PIN_LENGTH digit.")
-            }
+            validationError != null -> setFormError(validationError)
             credential != confirmation -> setFormError(mode.mismatchMessage())
             else -> updateCredentialOnServer(user = user, mode = mode, credential = credential)
         }
@@ -209,8 +218,6 @@ class UserCredentialViewModel(
 
     companion object {
         private const val USER_PAGE_LIMIT = 200
-        private const val MIN_PASSWORD_LENGTH = 6
-        private const val PIN_LENGTH = 6
         private const val OWNER_ROLE_NAME = "OWNER"
 
         fun factory(userRepository: UserRepository): ViewModelProvider.Factory {
