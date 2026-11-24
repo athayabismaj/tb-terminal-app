@@ -79,8 +79,8 @@ class MainActivity : ComponentActivity() {
                                             launchSingleTop = true
                                         }
                                     }
-                                    SessionEvent.Unauthorized -> {
-                                        authViewModel.notifySessionExpired()
+                                    is SessionEvent.Unauthorized -> {
+                                        authViewModel.notifySessionExpired(event.reason)
                                         navController.navigate(AppRoute.Login.route) {
                                             popUpTo(0)
                                             launchSingleTop = true

@@ -1,5 +1,6 @@
 package com.tbterminal.app.data.session
 
+import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
@@ -10,6 +11,7 @@ import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
+@OptIn(ExperimentalCoroutinesApi::class)
 class SessionManagerTest {
     @Test
     fun `initialization checks session marker without decrypting token`() {
@@ -64,14 +66,23 @@ class SessionManagerTest {
     }
 
     @Test
-    fun handleUnauthorized_clearsSession() {
+    fun handleUnauthorized_clearsSession() = runTest {
         val store = FakeTokenStore().apply { saveTokens("access", "refresh") }
         val manager = SessionManager(store)
+        val emitted = mutableListOf<SessionEvent>()
+        val job = launch(UnconfinedTestDispatcher(testScheduler)) {
+            emitted.add(manager.events.first())
+        }
 
-        manager.handleUnauthorized()
+        manager.handleUnauthorized("Batas percobaan terlampaui. Silakan login kembali.")
+        job.join()
 
         assertFalse(manager.hasAccessToken())
         assertNull(store.readRefreshToken())
+        assertEquals(
+            listOf(SessionEvent.Unauthorized("Batas percobaan terlampaui. Silakan login kembali.")),
+            emitted
+        )
     }
 
     @Test

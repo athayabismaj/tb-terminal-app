@@ -277,10 +277,14 @@ class AuthViewModel(
                         return
                     }
                 }
-                _unlockState.value = UnlockState.WrongPin(
-                    message = result.message,
-                    attemptsLeft = result.attemptsLeft
-                )
+                _unlockState.value = if (result.isLocked) {
+                    UnlockState.Error(result.message)
+                } else {
+                    UnlockState.WrongPin(
+                        message = result.message,
+                        attemptsLeft = result.attemptsLeft
+                    )
+                }
             }
         }
     }
@@ -405,13 +409,15 @@ class AuthViewModel(
         _loginNotice.value = PASSWORD_CHANGED_LOGIN_MESSAGE
     }
 
-    fun notifySessionExpired() {
+    fun notifySessionExpired(reason: String? = null) {
         lockoutCountdownJob?.cancel()
         verifiedPasswordForPinReset = null
         _pendingForgotPinReset.value = false
         _loginNotice.value = null
         _unlockState.value = UnlockState.Idle
-        _authState.value = AuthState.Error("Sesi telah berakhir. Silakan login kembali.")
+        _authState.value = AuthState.Error(
+            reason?.takeIf(String::isNotBlank) ?: "Sesi telah berakhir. Silakan login kembali."
+        )
     }
 
     override fun onCleared() {

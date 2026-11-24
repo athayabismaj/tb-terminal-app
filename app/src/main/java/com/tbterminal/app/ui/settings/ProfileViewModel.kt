@@ -241,11 +241,20 @@ class ProfileViewModel(
     private fun isNetworkFailureCode(code: String): Boolean = code in NETWORK_FAILURE_CODES
 
     private fun mapPasswordChangeError(code: String, message: String): String {
+        val normalized = code.trim().uppercase()
         val lower = message.lowercase()
-        val isWrongCurrent = code == "HTTP_401" ||
-            code == "INVALID_CREDENTIALS" ||
-            code == "INVALID_PASSWORD" ||
-            code == "WRONG_PASSWORD" ||
+        val isLockoutOrRateLimit = normalized in LOCKOUT_OR_RATE_LIMIT_CODES ||
+            lower.contains("batas percobaan") ||
+            lower.contains("terlalu banyak") ||
+            lower.contains("terkunci") ||
+            lower.contains("login kembali")
+        if (isLockoutOrRateLimit) {
+            return message
+        }
+        val isWrongCurrent = normalized == "HTTP_401" ||
+            normalized == "INVALID_CREDENTIALS" ||
+            normalized == "INVALID_PASSWORD" ||
+            normalized == "WRONG_PASSWORD" ||
             ((lower.contains("lama") || lower.contains("saat ini")) && lower.contains("salah")) ||
             lower.contains("incorrect") ||
             lower.contains("invalid current password")
@@ -253,6 +262,15 @@ class ProfileViewModel(
     }
 
     companion object {
+        private val LOCKOUT_OR_RATE_LIMIT_CODES = setOf(
+            "TOO_MANY_ATTEMPTS",
+            "RATE_LIMITED",
+            "TOO_MANY_REQUESTS",
+            "HTTP_429",
+            "PIN_LOCKED",
+            "HTTP_423",
+            "PIN_MAX_ATTEMPTS_EXCEEDED"
+        )
         private val NETWORK_FAILURE_CODES = setOf(
             "NETWORK_TIMEOUT",
             "NETWORK_UNAVAILABLE",

@@ -26,4 +26,24 @@ class UserFacingErrorMapperTest {
             UserFacingErrorMapper.message(code = "NETWORK_TIMEOUT"),
         )
     }
+
+    @Test
+    fun maps429And423LockoutCodesWithRetryAfterDuration() {
+        assertEquals(
+            "Terlalu banyak percobaan gagal. Coba lagi dalam 45 detik.",
+            UserFacingErrorMapper.message(httpStatus = 429, code = "TOO_MANY_ATTEMPTS", retryAfterSeconds = 45L),
+        )
+        assertEquals(
+            "Terlalu banyak PIN manager salah. Persetujuan akun ini dikunci sementara. Coba lagi dalam 5 menit.",
+            UserFacingErrorMapper.message(httpStatus = 429, code = "MANAGER_APPROVER_LOCKED", retryAfterSeconds = 300L),
+        )
+        assertEquals(
+            "PIN terkunci sementara. Coba lagi dalam 1 menit 15 detik.",
+            UserFacingErrorMapper.message(httpStatus = 423, code = "PIN_LOCKED", retryAfterSeconds = 75L),
+        )
+        assertEquals(
+            "Terlalu banyak percobaan. Tunggu 2 menit lalu coba lagi.",
+            UserFacingErrorMapper.message(httpStatus = 429, code = "RATE_LIMITED", retryAfterSeconds = 120L),
+        )
+    }
 }

@@ -4,9 +4,14 @@ import java.io.IOException
 import java.net.ConnectException
 import java.net.SocketTimeoutException
 import java.net.UnknownHostException
+import java.time.ZonedDateTime
+import java.time.format.DateTimeFormatter
 import kotlinx.coroutines.CancellationException
 import kotlinx.serialization.SerializationException
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.contentOrNull
+import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.jsonPrimitive
 import retrofit2.Response
 
 suspend fun <T> safeApiCall(
@@ -15,13 +20,16 @@ suspend fun <T> safeApiCall(
     val response = apiCall()
     if (!response.isSuccessful) {
         val apiError = response.toApiErrorResponse()
+        val retryAfterSeconds = parseRetryAfterSeconds(response.headers()["Retry-After"])
         return@executeSafeCall NetworkResult.Error(
             code = apiError.code,
             message = UserFacingErrorMapper.message(
                 httpStatus = response.code(),
                 code = apiError.code,
                 backendMessage = apiError.message,
-            )
+                retryAfterSeconds = retryAfterSeconds,
+            ),
+            retryAfterSeconds = retryAfterSeconds,
         )
     }
 
@@ -44,13 +52,16 @@ suspend fun safeUnitApiCall(
         NetworkResult.Success(Unit)
     } else {
         val apiError = response.toApiErrorResponse()
+        val retryAfterSeconds = parseRetryAfterSeconds(response.headers()["Retry-After"])
         NetworkResult.Error(
             code = apiError.code,
             message = UserFacingErrorMapper.message(
                 httpStatus = response.code(),
                 code = apiError.code,
                 backendMessage = apiError.message,
-            )
+                retryAfterSeconds = retryAfterSeconds,
+            ),
+            retryAfterSeconds = retryAfterSeconds,
         )
     }
 }
@@ -93,11 +104,42 @@ private fun <T> Response<T>.toApiErrorResponse(): ApiErrorResponse {
     }
 
     return try {
-        errorJson.decodeFromString<ApiErrorResponse>(rawError)
-    } catch (_: Exception) {
+        val decoded = errorJson.decodeFromString<ApiErrorResponse>(rawError)
         ApiErrorResponse(
-            code = "HTTP_${code()}",
-            message = "Format error server tidak sesuai kontrak."
+            code = decoded.code.ifBlank { "HTTP_${code()}" },
+            message = decoded.message.ifBlank { decoded.error.orEmpty() },
+            error = decoded.error,
+            details = decoded.details,
         )
+    } catch (_: Exception) {
+        val jsonObj = runCatching { errorJson.parseToJsonElement(rawError).jsonObject }.getOrNull()
+        if (jsonObj != null) {
+            val code = jsonObj["code"]?.jsonPrimitive?.contentOrNull?.takeIf(String::isNotBlank)
+                ?: "HTTP_${code()}"
+            val message = jsonObj["message"]?.jsonPrimitive?.contentOrNull?.takeIf(String::isNotBlank)
+                ?: jsonObj["error"]?.jsonPrimitive?.contentOrNull?.takeIf(String::isNotBlank)
+                ?: "Server menolak request tanpa detail error."
+            ApiErrorResponse(code = code, message = message)
+        } else {
+            ApiErrorResponse(
+                code = "HTTP_${code()}",
+                message = "Format error server tidak sesuai kontrak."
+            )
+        }
     }
+}
+
+internal fun parseRetryAfterSeconds(
+    headerValue: String?,
+    clockMillis: () -> Long = { System.currentTimeMillis() },
+): Long? {
+    val trimmed = headerValue?.trim()?.takeIf(String::isNotBlank) ?: return null
+    trimmed.toLongOrNull()?.let { numericSeconds ->
+        return if (numericSeconds >= 0L) numericSeconds.coerceAtLeast(1L) else null
+    }
+    val parsedDate = runCatching {
+        ZonedDateTime.parse(trimmed, DateTimeFormatter.RFC_1123_DATE_TIME)
+    }.getOrNull() ?: return null
+    val diffMillis = parsedDate.toInstant().toEpochMilli() - clockMillis()
+    return ((diffMillis + 999L) / 1000L).coerceAtLeast(1L)
 }

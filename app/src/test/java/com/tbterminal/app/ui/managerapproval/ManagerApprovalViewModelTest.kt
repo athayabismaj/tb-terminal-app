@@ -100,6 +100,14 @@ class ManagerApprovalViewModelTest {
             "Persetujuan manager sudah kedaluwarsa. Silakan minta persetujuan baru.",
             managerApprovalErrorMessage("MANAGER_APPROVAL_EXPIRED", "expired"),
         )
+        assertEquals(
+            "Terlalu banyak PIN manager salah. Persetujuan akun ini dikunci sementara. Coba lagi dalam 5 menit.",
+            managerApprovalErrorMessage("MANAGER_APPROVER_LOCKED", "locked", retryAfterSeconds = 300L),
+        )
+        assertEquals(
+            "Terlalu banyak percobaan. Coba lagi dalam 45 detik.",
+            managerApprovalErrorMessage("TOO_MANY_ATTEMPTS", "locked", retryAfterSeconds = 45L),
+        )
     }
 
     @Test
