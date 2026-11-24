@@ -140,7 +140,7 @@ internal fun ProductListContent(
                                     value = uiState.searchQuery,
                                     onValueChange = onSearchChanged,
                                     singleLine = true,
-                                    textStyle = TextStyle(
+                                    textStyle = TextStyle(fontFamily = com.tbterminal.app.ui.theme.KawanSans, 
                                         color = Color(0xFF0F172A),
                                         fontSize = 13.sp,
                                         fontWeight = FontWeight.Medium

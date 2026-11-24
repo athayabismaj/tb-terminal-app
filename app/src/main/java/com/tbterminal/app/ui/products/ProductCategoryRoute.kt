@@ -3,7 +3,6 @@ package com.tbterminal.app.ui.products
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.layout.size
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.outlined.Search
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -19,9 +18,12 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.tbterminal.app.data.repository.InventoryRepository
+import com.tbterminal.app.ui.components.RefreshableContent
 import com.tbterminal.app.ui.dashboard.admin.AdminDashboardShell
 import com.tbterminal.app.ui.dashboard.admin.AdminDestination
-import com.tbterminal.app.ui.components.RefreshableContent
+import com.tbterminal.app.ui.dashboard.isOwnerPersona
+import com.tbterminal.app.ui.dashboard.owner.OwnerKategoriRoute
+import com.tbterminal.app.ui.dashboard.owner.OwnerTambahKategoriRoute
 
 @Composable
 fun AdminProductCategoriesScreen(
@@ -55,6 +57,45 @@ fun AdminProductCategoriesScreen(
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     var isSearchExpanded by rememberSaveable { mutableStateOf(false) }
+
+    if (isOwnerPersona(role)) {
+        if (uiState.isFormVisible) {
+            OwnerTambahKategoriRoute(
+                uiState = uiState,
+                onNameChanged = viewModel::onNameChanged,
+                onSave = viewModel::save,
+                onDelete = viewModel::delete,
+                onCancel = viewModel::cancelEdit,
+                onStockClick = onStockClick,
+                onDashboardClick = onDashboardClick,
+                onDismissMessage = viewModel::clearMessage
+            )
+        } else {
+            OwnerKategoriRoute(
+                uiState = uiState,
+                isSearchExpanded = isSearchExpanded,
+                onOpenSearch = { isSearchExpanded = true },
+                onCloseSearch = {
+                    isSearchExpanded = false
+                    if (uiState.searchQuery.isNotEmpty()) {
+                        viewModel.onSearchChanged("")
+                    }
+                },
+                onSearchChanged = viewModel::onSearchChanged,
+                onAddCategoryClick = viewModel::openAddForm,
+                onCategoryClick = viewModel::edit,
+                onRefresh = viewModel::refresh,
+                onLoadNextPage = viewModel::nextPage,
+                onRetryLoadMore = { viewModel.loadCategories(uiState.page) },
+                onBack = null,
+                onStockClick = onStockClick,
+                onDashboardClick = onDashboardClick,
+                onDismissMessage = viewModel::clearMessage
+            )
+        }
+        return
+    }
+
     BackHandler(enabled = uiState.isFormVisible) { viewModel.cancelEdit() }
 
     AdminDashboardShell(

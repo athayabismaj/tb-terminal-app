@@ -125,7 +125,7 @@ internal fun ProductUnitListCard(
                                 .weight(1f)
                                 .testTag("unit-search-input"),
                             singleLine = true,
-                            textStyle = TextStyle(
+                            textStyle = TextStyle(fontFamily = com.tbterminal.app.ui.theme.KawanSans, 
                                 color = Color(0xFF1E293B),
                                 fontSize = 13.sp
                             ),
@@ -336,7 +336,7 @@ private fun UnitSearchField(
                     value = value,
                     onValueChange = onValueChange,
                     singleLine = true,
-                    textStyle = TextStyle(
+                    textStyle = TextStyle(fontFamily = com.tbterminal.app.ui.theme.KawanSans, 
                         color = TextPrimary,
                         fontSize = 14.sp,
                     ),

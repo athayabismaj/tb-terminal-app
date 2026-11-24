@@ -171,13 +171,23 @@ class ProductCategoryViewModel(
         when (result) {
             is RepositoryResult.Success -> {
                 _uiState.update { state ->
-                    state.copy(isSaving = false, message = "Kategori berhasil dihapus.")
+                    state.copy(
+                        isSaving = false,
+                        editingCategory = null,
+                        nameInput = "",
+                        isFormVisible = false,
+                        message = "Kategori berhasil dihapus."
+                    )
                 }
                 loadCategories(page = _uiState.value.page)
             }
             is RepositoryResult.Error -> setMessage(result.message)
             is RepositoryResult.Exception -> setMessage("Kategori gagal dihapus karena koneksi bermasalah.")
         }
+    }
+
+    fun clearMessage() {
+        _uiState.update { state -> state.copy(message = null) }
     }
 
     private fun setMessage(

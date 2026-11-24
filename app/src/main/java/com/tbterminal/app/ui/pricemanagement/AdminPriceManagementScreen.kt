@@ -313,7 +313,7 @@ private fun PriceManagementContent(
                                     value = state.searchQuery,
                                     onValueChange = onSearchChanged,
                                     singleLine = true,
-                                    textStyle = TextStyle(
+                                    textStyle = TextStyle(fontFamily = com.tbterminal.app.ui.theme.KawanSans, 
                                         color = Color(0xFF0F172A),
                                         fontSize = 13.sp,
                                         fontWeight = FontWeight.Medium
@@ -619,7 +619,7 @@ internal fun PriceFilterBottomSheet(
                                 value = categoryQuery,
                                 onValueChange = { categoryQuery = it },
                                 singleLine = true,
-                                textStyle = TextStyle(
+                                textStyle = TextStyle(fontFamily = com.tbterminal.app.ui.theme.KawanSans, 
                                     fontSize = 13.sp,
                                     color = Color(0xFF0F172A),
                                     fontWeight = FontWeight.Medium

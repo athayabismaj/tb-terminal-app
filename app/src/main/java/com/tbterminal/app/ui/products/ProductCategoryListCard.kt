@@ -132,7 +132,7 @@ internal fun ProductCategoryListCard(
                                 value = uiState.searchQuery,
                                 onValueChange = onSearchChanged,
                                 singleLine = true,
-                                textStyle = TextStyle(
+                                textStyle = TextStyle(fontFamily = com.tbterminal.app.ui.theme.KawanSans, 
                                     color = Color(0xFF0F172A),
                                     fontSize = 13.sp,
                                     fontWeight = FontWeight.Medium
@@ -342,7 +342,7 @@ private fun CategorySearchField(
                     value = value,
                     onValueChange = onValueChange,
                     singleLine = true,
-                    textStyle = TextStyle(
+                    textStyle = TextStyle(fontFamily = com.tbterminal.app.ui.theme.KawanSans, 
                         color = TextPrimary,
                         fontSize = 14.sp,
                     ),

@@ -843,7 +843,7 @@ internal fun ProductFilterBottomSheet(
                                 value = categoryQuery,
                                 onValueChange = { categoryQuery = it },
                                 singleLine = true,
-                                textStyle = TextStyle(
+                                textStyle = TextStyle(fontFamily = com.tbterminal.app.ui.theme.KawanSans, 
                                     fontSize = 13.sp,
                                     color = Color(0xFF0F172A),
                                     fontWeight = FontWeight.Medium

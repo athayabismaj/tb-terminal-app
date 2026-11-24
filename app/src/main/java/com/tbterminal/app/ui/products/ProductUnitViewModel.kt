@@ -189,13 +189,24 @@ class ProductUnitViewModel(
         when (result) {
             is RepositoryResult.Success -> {
                 _uiState.update { state ->
-                    state.copy(isSaving = false, message = "Satuan berhasil dihapus.")
+                    state.copy(
+                        isSaving = false,
+                        editingUnit = null,
+                        nameInput = "",
+                        symbolInput = "",
+                        isFormVisible = false,
+                        message = "Satuan berhasil dihapus."
+                    )
                 }
                 loadUnits(page = _uiState.value.page)
             }
             is RepositoryResult.Error -> setMessage(result.message)
             is RepositoryResult.Exception -> setMessage("Satuan gagal dihapus karena koneksi bermasalah.")
         }
+    }
+
+    fun clearMessage() {
+        _uiState.update { state -> state.copy(message = null) }
     }
 
     private fun setMessage(
