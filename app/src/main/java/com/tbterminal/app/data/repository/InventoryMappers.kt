@@ -49,8 +49,8 @@ internal fun ProductResponseDto.toProduct(): Product {
         minStock = minStock,
         photoUrl = photoUrl,
         isActive = isActive,
-        secondaryUnitId = secondaryUnitId,
-        secondaryUnitFactor = secondaryUnitFactor?.toBigDecimalOrNull(),
+        secondaryUnitId = secondaryUnitId?.trim()?.takeIf(String::isNotBlank),
+        secondaryUnitFactor = secondaryUnitFactor?.trim()?.toBigDecimalOrNull(),
         priceTiers = priceTiers.map(ProductPriceTierDto::toProductPriceTier)
     )
 }
@@ -69,11 +69,12 @@ internal fun StockDetailResponseDto.toProductStock(): ProductStock {
         priceContractor = priceContractor,
         discount = discount,
         isActive = isActive,
-        secondaryUnitId = secondaryUnitId,
-        secondaryUnitName = secondaryUnitName,
-        secondaryUnitFactor = secondaryUnitFactor?.toBigDecimalOrNull(),
+        secondaryUnitId = secondaryUnitId?.trim()?.takeIf(String::isNotBlank),
+        secondaryUnitName = secondaryUnitName?.trim()?.takeIf(String::isNotBlank),
+        secondaryUnitFactor = secondaryUnitFactor?.trim()?.toBigDecimalOrNull(),
         priceTiers = priceTiers.map(ProductPriceTierDto::toProductPriceTier),
-        photoUrl = photoUrl
+        photoUrl = photoUrl,
+        baseUnitId = baseUnitId?.trim()?.takeIf(String::isNotBlank)
     )
 }
 

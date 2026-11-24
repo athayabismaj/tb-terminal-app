@@ -274,6 +274,7 @@ data class ProductUpdateRequestDto(
 @Serializable
 data class StockDetailResponseDto(
     val productId: String,
+    val baseUnitId: String? = null,
     val sku: String,
     val productName: String,
     val categoryName: String,

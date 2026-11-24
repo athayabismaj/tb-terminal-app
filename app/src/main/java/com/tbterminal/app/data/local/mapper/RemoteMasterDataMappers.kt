@@ -23,7 +23,9 @@ fun ProductResponseDto.toLocalProductEntity(now: Long = System.currentTimeMillis
         name = name,
         sku = sku,
         categoryServerId = categoryId,
-        unitServerId = baseUnitId,
+        unitServerId = baseUnitId.trim().takeIf(String::isNotBlank),
+        secondaryUnitServerId = secondaryUnitId?.trim()?.takeIf(String::isNotBlank),
+        secondaryUnitFactor = secondaryUnitFactor?.trim()?.toBigDecimalOrNull(),
         priceSell = priceRetail.toSafeDouble(),
         priceBuy = priceBuy.toSafeDouble(),
         priceRetail = priceRetail.toSafeDouble(),
@@ -43,6 +45,11 @@ fun StockDetailResponseDto.toLocalProductEntity(now: Long = System.currentTimeMi
         clientGeneratedId = "server-product-$productId",
         name = productName,
         sku = sku,
+        unitServerId = baseUnitId?.trim()?.takeIf(String::isNotBlank),
+        unitName = unitName.trim().takeIf(String::isNotBlank),
+        secondaryUnitServerId = secondaryUnitId?.trim()?.takeIf(String::isNotBlank),
+        secondaryUnitName = secondaryUnitName?.trim()?.takeIf(String::isNotBlank),
+        secondaryUnitFactor = secondaryUnitFactor?.trim()?.toBigDecimalOrNull(),
         priceSell = priceRetail.toSafeDouble(),
         priceBuy = priceBuy.toSafeDouble(),
         priceRetail = priceRetail.toSafeDouble(),
@@ -113,7 +120,9 @@ fun LocalProductEntity.toProduct(): Product {
         discount = discount.toBigDecimal(),
         minStock = minimumStock.toBigDecimal(),
         photoUrl = photoFilename,
-        isActive = isActive
+        isActive = isActive,
+        secondaryUnitId = secondaryUnitServerId,
+        secondaryUnitFactor = secondaryUnitFactor
     )
 }
 

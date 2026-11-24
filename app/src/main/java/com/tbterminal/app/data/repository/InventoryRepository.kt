@@ -44,6 +44,7 @@ import com.tbterminal.app.data.remote.UnitRequestDto
 import com.tbterminal.app.data.remote.UnitResponseDto
 import com.tbterminal.app.data.remote.ProductCsvImportRequestDto
 import com.tbterminal.app.data.remote.OpeningStockRequestDto
+import com.tbterminal.app.data.remote.NetworkResult
 import com.tbterminal.app.data.remote.safeApiCall
 import com.tbterminal.app.data.remote.safeUnitApiCall
 import okhttp3.MediaType.Companion.toMediaType
@@ -179,8 +180,9 @@ class RemoteInventoryRepository(
         limit: Int,
         search: String?
     ): RepositoryResult<ProductStockPage> {
+        val normalizedSearch = search?.takeIf(String::isNotBlank)
         val result = safeApiCall {
-            inventoryApi.getStockDetails(page = page, limit = limit, search = search?.takeIf(String::isNotBlank))
+            inventoryApi.getStockDetails(page = page, limit = limit, search = normalizedSearch)
         }.toRepositoryResult { response ->
             val stockPage = response.data
             if (!response.success || stockPage == null) {
@@ -190,7 +192,14 @@ class RemoteInventoryRepository(
                 )
             } else {
                 cacheProductStocks(stockPage.data)
-                RepositoryResult.Success(stockPage.toProductStockPage())
+                RepositoryResult.Success(
+                    enrichProductStockPage(
+                        stockPage = stockPage,
+                        page = page,
+                        limit = limit,
+                        search = normalizedSearch
+                    )
+                )
             }
         }
 
@@ -783,6 +792,156 @@ class RemoteInventoryRepository(
             }
     }
 
+    private suspend fun enrichProductStockPage(
+        stockPage: PaginatedResponse<StockDetailResponseDto>,
+        page: Int,
+        limit: Int,
+        search: String?
+    ): ProductStockPage {
+        val basePage = stockPage.toProductStockPage()
+        if (stockPage.data.isEmpty()) return basePage
+
+        // StockDetailResponse does not yet include baseUnitId or secondary unit metadata,
+        // so hydrate from authoritative /api/inventory/products and /api/inventory/units.
+        val needsProductMetadata = stockPage.data.any { dto ->
+            dto.baseUnitId.isNullOrBlank() ||
+                (!dto.secondaryUnitId.isNullOrBlank() && dto.secondaryUnitFactor.isNullOrBlank())
+        }
+        val productsById = if (needsProductMetadata) {
+            fetchAndCacheProductsSafely(page = page, limit = limit, search = search)
+        } else {
+            emptyMap()
+        }
+        val cachedById = loadCachedProductsByServerId(stockPage.data.map { it.productId })
+
+        val unitIdsNeeded = buildSet {
+            stockPage.data.forEach { dto ->
+                val remote = productsById[dto.productId]
+                val cached = cachedById[dto.productId]
+                val secUnitId = dto.secondaryUnitId?.trim()?.takeIf(String::isNotBlank)
+                    ?: if (remote != null) remote.secondaryUnitId?.trim()?.takeIf(String::isNotBlank)
+                    else cached?.secondaryUnitServerId?.trim()?.takeIf(String::isNotBlank)
+                if (secUnitId != null && dto.secondaryUnitName.isNullOrBlank()) {
+                    add(secUnitId)
+                }
+                val baseUnitId = dto.baseUnitId?.trim()?.takeIf(String::isNotBlank)
+                    ?: remote?.baseUnitId?.trim()?.takeIf(String::isNotBlank)
+                    ?: cached?.unitServerId?.trim()?.takeIf(String::isNotBlank)
+                if (baseUnitId != null && dto.unitName.isBlank()) {
+                    add(baseUnitId)
+                }
+            }
+        }
+        val unitNameById = resolveUnitNamesSafely(unitIdsNeeded)
+        if (unitNameById.isNotEmpty()) {
+            cacheSafely {
+                productLocalDataSource?.applyUnitNames(
+                    unitNameByServerId = unitNameById,
+                    productServerIds = stockPage.data.map { it.productId }
+                )
+            }
+        }
+
+        val enrichedItems = basePage.data.map { item ->
+            val remote = productsById[item.productId]
+            val cached = cachedById[item.productId]
+            val resolvedBaseUnitId = item.baseUnitId?.takeIf(String::isNotBlank)
+                ?: remote?.baseUnitId?.trim()?.takeIf(String::isNotBlank)
+                ?: cached?.unitServerId?.trim()?.takeIf(String::isNotBlank)
+            val resolvedSecondaryUnitId = item.secondaryUnitId?.takeIf(String::isNotBlank)
+                ?: if (remote != null) remote.secondaryUnitId?.trim()?.takeIf(String::isNotBlank)
+                else cached?.secondaryUnitServerId?.trim()?.takeIf(String::isNotBlank)
+            val resolvedSecondaryFactor = item.secondaryUnitFactor
+                ?: if (remote != null) remote.secondaryUnitFactor?.trim()?.toBigDecimalOrNull()
+                else cached?.secondaryUnitFactor
+            val resolvedSecondaryUnitName = item.secondaryUnitName?.takeIf(String::isNotBlank)
+                ?: resolvedSecondaryUnitId?.let { unitId ->
+                    unitNameById[unitId]
+                        ?: cached?.takeIf { it.secondaryUnitServerId == unitId }?.secondaryUnitName
+                }
+            item.copy(
+                baseUnitId = resolvedBaseUnitId,
+                secondaryUnitId = resolvedSecondaryUnitId,
+                secondaryUnitName = resolvedSecondaryUnitName,
+                secondaryUnitFactor = resolvedSecondaryFactor
+            )
+        }
+        return basePage.copy(data = enrichedItems)
+    }
+
+    private suspend fun fetchAndCacheProductsSafely(
+        page: Int,
+        limit: Int,
+        search: String?
+    ): Map<String, ProductResponseDto> {
+        var productsById = emptyMap<String, ProductResponseDto>()
+        cacheSafely {
+            val result = safeApiCall {
+                inventoryApi.getProducts(page = page, limit = limit, search = search)
+            }
+            if (result is NetworkResult.Success) {
+                val productPage = result.data.data
+                if (result.data.success && productPage != null) {
+                    cacheProducts(productPage.data)
+                    productsById = productPage.data.associateBy { it.id }
+                }
+            }
+        }
+        return productsById
+    }
+
+    private suspend fun loadCachedProductsByServerId(
+        productIds: List<String>
+    ): Map<String, LocalProductEntity> {
+        val source = productLocalDataSource ?: return emptyMap()
+        val result = mutableMapOf<String, LocalProductEntity>()
+        cacheSafely {
+            productIds.distinct().forEach { id ->
+                source.getCachedProductByServerId(id)?.let { result[id] = it }
+            }
+        }
+        return result
+    }
+
+    private suspend fun resolveUnitNamesSafely(unitIdsNeeded: Set<String>): Map<String, String> {
+        if (unitIdsNeeded.isEmpty()) return emptyMap()
+        val unitNames = loadCachedUnitNamesSafely().toMutableMap()
+        if (unitIdsNeeded.any { it !in unitNames }) {
+            cacheSafely {
+                val result = safeApiCall { inventoryApi.getUnits() }
+                if (result is NetworkResult.Success) {
+                    val units = result.data.data
+                    if (result.data.success && units != null) {
+                        cacheUnits(units)
+                        units.forEach { unit ->
+                            val label = unit.name.trim().takeIf(String::isNotBlank)
+                                ?: unit.symbol.trim().takeIf(String::isNotBlank)
+                            if (label != null) {
+                                unitNames[unit.id] = label
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        return unitNames
+    }
+
+    private suspend fun loadCachedUnitNamesSafely(): Map<String, String> {
+        val source = unitLocalDataSource ?: return emptyMap()
+        val map = mutableMapOf<String, String>()
+        cacheSafely {
+            source.getCachedUnits().forEach { unit ->
+                val serverId = unit.serverId?.trim()?.takeIf(String::isNotBlank) ?: return@forEach
+                val label = unit.name.trim().takeIf(String::isNotBlank)
+                    ?: unit.symbol.trim().takeIf(String::isNotBlank)
+                    ?: return@forEach
+                map[serverId] = label
+            }
+        }
+        return map
+    }
+
     private suspend fun cacheProduct(product: ProductResponseDto) {
         cacheSafely {
             productLocalDataSource?.cacheProduct(product.toLocalProductEntity())
@@ -881,9 +1040,10 @@ class RemoteInventoryRepository(
             val cached = productLocalDataSource?.getCachedProducts(page, limit, search)
                 ?: return@readCacheOrOriginal null
             if (cached.data.isEmpty()) return@readCacheOrOriginal null
+            val unitNameById = loadCachedUnitNamesSafely()
             RepositoryResult.Success(
                 ProductStockPage(
-                    data = cached.data.map { it.toCachedProductStock() },
+                    data = cached.data.map { it.toCachedProductStock(unitNameById) },
                     total = cached.total,
                     page = cached.page,
                     limit = cached.limit,
@@ -997,13 +1157,22 @@ private fun RepositoryResult<*>.shouldFallbackToCache(): Boolean {
     }
 }
 
-private fun LocalProductEntity.toCachedProductStock(): ProductStock {
+private fun LocalProductEntity.toCachedProductStock(
+    unitNameById: Map<String, String> = emptyMap()
+): ProductStock {
+    val resolvedBaseUnitId = unitServerId?.trim()?.takeIf(String::isNotBlank)
+    val resolvedUnitName = unitName?.trim()?.takeIf(String::isNotBlank)
+        ?: resolvedBaseUnitId?.let(unitNameById::get)
+        ?: ""
+    val resolvedSecondaryUnitId = secondaryUnitServerId?.trim()?.takeIf(String::isNotBlank)
+    val resolvedSecondaryUnitName = secondaryUnitName?.trim()?.takeIf(String::isNotBlank)
+        ?: resolvedSecondaryUnitId?.let(unitNameById::get)
     return ProductStock(
         productId = serverId.orEmpty(),
         sku = sku.orEmpty(),
         productName = name,
         categoryName = "",
-        unitName = "",
+        unitName = resolvedUnitName,
         quantity = stock.toBigDecimalSafe(),
         minStock = minimumStock.toBigDecimalSafe(),
         priceBuy = priceBuy.toBigDecimalSafe(),
@@ -1011,7 +1180,11 @@ private fun LocalProductEntity.toCachedProductStock(): ProductStock {
         priceContractor = priceContractor.toBigDecimalSafe(),
         discount = discount.toBigDecimalSafe(),
         isActive = isActive,
-        photoUrl = photoFilename
+        secondaryUnitId = resolvedSecondaryUnitId,
+        secondaryUnitName = resolvedSecondaryUnitName,
+        secondaryUnitFactor = secondaryUnitFactor,
+        photoUrl = photoFilename,
+        baseUnitId = resolvedBaseUnitId
     )
 }
 
