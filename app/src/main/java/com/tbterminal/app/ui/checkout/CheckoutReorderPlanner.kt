@@ -120,6 +120,7 @@ internal fun buildCheckoutReorderPlan(
                 contractorBaseUnitPrice = product.contractorPrice,
                 priceTiers = product.priceTiers,
                 masterUnitDiscount = product.masterDiscount,
+                baseUnitId = product.baseUnitId,
             )
         }
     }

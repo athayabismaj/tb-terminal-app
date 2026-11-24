@@ -10,6 +10,8 @@ import com.tbterminal.app.data.local.checkout.LocalCheckoutLookupService
 import com.tbterminal.app.data.local.checkout.LocalCheckoutPaymentLineCommand
 import com.tbterminal.app.data.local.checkout.LocalCheckoutResult
 import com.tbterminal.app.data.local.checkout.LocalCheckoutService
+import com.tbterminal.app.data.local.checkout.OfflineItemUnitResolution
+import com.tbterminal.app.data.local.checkout.resolveOfflineCheckoutItemUnit
 import com.tbterminal.app.data.local.database.CashSessionLocalDataSource
 import com.tbterminal.app.data.local.database.LocalAppSettingsDataSource
 import com.tbterminal.app.data.local.entity.LocalCashSessionEntity
@@ -695,6 +697,7 @@ class CheckoutViewModel(
                             contractorPrice = domainProduct.priceContractor,
                             priceTiers = domainProduct.priceTiers,
                             masterDiscount = domainProduct.discount,
+                            baseUnitId = domainProduct.baseUnitId,
                         )
                         resolvedMap[productId] = ReorderResolvedProduct(
                             product = uiProduct,
@@ -993,6 +996,7 @@ class CheckoutViewModel(
                     contractorBaseUnitPrice = product.contractorPrice,
                     priceTiers = product.priceTiers,
                     masterUnitDiscount = product.masterDiscount,
+                    baseUnitId = product.baseUnitId,
                 )
             } else {
                 state.cartItems.map { item ->
@@ -2545,16 +2549,32 @@ class CheckoutViewModel(
                     "Data lokal produk ${cartItem.productName} belum tersedia."
                 )
             val quantity = cartItem.quantity.toDouble()
-            val baseQuantity = cartItem.equivalentBaseQuantity
-            val factor = if (cartItem.isSecondaryUnit && cartItem.secondaryUnitFactor != null) {
-                cartItem.secondaryUnitFactor.toDouble()
-            } else {
-                1.0
+            val unitResolution = resolveOfflineCheckoutItemUnit(
+                productName = cartItem.productName,
+                quantity = cartItem.quantity,
+                isSecondaryUnit = cartItem.isSecondaryUnit,
+                cartBaseUnitId = cartItem.baseUnitId,
+                cartSecondaryUnitId = cartItem.secondaryUnitId,
+                cartSecondaryUnitFactor = cartItem.secondaryUnitFactor,
+                cachedBaseUnitId = productLookup.baseUnitServerId,
+                cachedSecondaryUnitId = productLookup.secondaryUnitServerId,
+                cachedSecondaryUnitFactor = productLookup.secondaryUnitFactor
+            )
+            if (unitResolution is OfflineItemUnitResolution.Error) {
+                return LocalCheckoutCommandBuildResult.Failed(unitResolution.reason)
             }
+            unitResolution as OfflineItemUnitResolution.Success
             val totalProductBaseQty = state.cartItems
                 .filter { it.productId == cartItem.productId }
-                .sumOf { it.equivalentBaseQuantity }
-            if (productLookup.stock < totalProductBaseQty) {
+                .fold(BigDecimal.ZERO) { acc, item ->
+                    val itemFactor = if (item.isSecondaryUnit) {
+                        item.secondaryUnitFactor ?: productLookup.secondaryUnitFactor ?: BigDecimal.ONE
+                    } else {
+                        BigDecimal.ONE
+                    }
+                    acc.add(item.quantity.toBigDecimal().multiply(itemFactor))
+                }
+            if (BigDecimal.valueOf(productLookup.stock) < totalProductBaseQty) {
                 return LocalCheckoutCommandBuildResult.Failed(
                     "Stok lokal ${cartItem.productName} tidak cukup."
                 )
@@ -2569,13 +2589,16 @@ class CheckoutViewModel(
                 skuSnapshot = cartItem.sku.takeIf(String::isNotBlank),
                 unitNameSnapshot = cartItem.unitName.takeIf(String::isNotBlank),
                 quantity = quantity,
-                baseQuantity = baseQuantity,
-                conversionFactor = factor,
+                baseQuantity = unitResolution.baseQuantity.toDouble(),
+                conversionFactor = unitResolution.conversionFactor.toDouble(),
                 priceAtTransaction = cartItem.unitPrice.toSafeDouble(),
-                cogsAtTransaction = productLookup.cogsAtTransaction * factor,
+                cogsAtTransaction = productLookup.cogsAtTransaction * unitResolution.conversionFactor.toDouble(),
                 discount = 0.0,
                 subtotal = lineSubtotal.toSafeDouble(),
-                note = cartItem.note
+                note = cartItem.note,
+                unitServerId = unitResolution.unitServerId,
+                baseQuantityExact = unitResolution.baseQuantity,
+                conversionFactorExact = unitResolution.conversionFactor
             )
         }
 
@@ -2827,5 +2850,6 @@ private fun com.tbterminal.app.data.model.ProductStock.toCheckoutProduct(): Prod
     contractorPrice = priceContractor,
     priceTiers = priceTiers,
     masterDiscount = discount,
-    photoUrl = photoUrl
+    photoUrl = photoUrl,
+    baseUnitId = baseUnitId
 )

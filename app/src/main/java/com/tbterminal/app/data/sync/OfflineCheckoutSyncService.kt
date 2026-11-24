@@ -1,6 +1,7 @@
 package com.tbterminal.app.data.sync
 
 import androidx.room.withTransaction
+import com.tbterminal.app.data.local.checkout.normalizeExactDecimal
 import com.tbterminal.app.data.local.database.TbTerminalDatabase
 import com.tbterminal.app.data.local.entity.LocalTransactionEntity
 import com.tbterminal.app.data.local.model.SyncEntityType
@@ -396,6 +397,13 @@ class OfflineCheckoutSyncService(
         }
         val items = localItems.map { item ->
             val productServerId = item.productServerId.orEmpty()
+            val resolvedUnitId = item.unitServerId?.trim()?.takeIf(String::isNotBlank)
+            val resolvedBaseQuantity = item.baseQuantity
+                ?.takeIf { it > BigDecimal.ZERO }
+                ?.let(::normalizeExactDecimal)
+            // Always send unitId and baseQuantity together; legacy rows without both are sent
+            // without either field so the server handles conversion safely.
+            val sendUnitPair = resolvedUnitId != null && resolvedBaseQuantity != null
             OfflineCheckoutSyncItemRequestDto(
                 productId = productServerId,
                 productNameSnapshot = item.productNameSnapshot,
@@ -404,7 +412,9 @@ class OfflineCheckoutSyncService(
                 cogsAtTransaction = item.cogsAtTransaction.toMoney(),
                 discount = item.discount.toMoney(),
                 subtotal = item.subtotal.toMoney(),
-                note = item.note
+                note = item.note,
+                unitId = if (sendUnitPair) resolvedUnitId else null,
+                baseQuantity = if (sendUnitPair) resolvedBaseQuantity else null
             )
         }
         val localPayments = database.paymentDao().getByTransaction(transaction.localId)
