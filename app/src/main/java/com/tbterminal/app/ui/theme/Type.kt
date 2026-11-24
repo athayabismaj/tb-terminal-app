@@ -2,13 +2,26 @@ package com.tbterminal.app.ui.theme
 
 import androidx.compose.material3.Typography
 import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.font.Font
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.sp
+import com.tbterminal.app.R
 
-private val AppFont = FontFamily.SansSerif
+val KawanSans = FontFamily(
+    Font(R.font.kawansans_light, FontWeight.Light),
+    Font(R.font.kawansans_regular, FontWeight.Normal),
+    Font(R.font.kawansans_medium, FontWeight.Medium),
+    Font(R.font.kawansans_semibold, FontWeight.SemiBold),
+    Font(R.font.kawansans_bold, FontWeight.Bold),
+)
+
+private val AppFont = KawanSans
+private val DefaultM3Typography = Typography()
 
 val Typography = Typography(
+    displayLarge = DefaultM3Typography.displayLarge.copy(fontFamily = AppFont),
+    displayMedium = DefaultM3Typography.displayMedium.copy(fontFamily = AppFont),
     displaySmall = TextStyle(fontFamily = AppFont, fontWeight = FontWeight.Bold, fontSize = 36.sp, lineHeight = 44.sp, letterSpacing = (-0.5).sp),
     headlineLarge = TextStyle(fontFamily = AppFont, fontWeight = FontWeight.Bold, fontSize = 30.sp, lineHeight = 38.sp, letterSpacing = (-0.3).sp),
     headlineMedium = TextStyle(fontFamily = AppFont, fontWeight = FontWeight.Bold, fontSize = 26.sp, lineHeight = 34.sp, letterSpacing = (-0.2).sp),

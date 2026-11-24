@@ -32,33 +32,35 @@ private val DarkColorScheme = darkColorScheme(
 )
 
 private val LightColorScheme = lightColorScheme(
-    primary = TbGreen,
-    onPrimary = Color.White,
-    primaryContainer = TbGreenLight,
+    primary = Brand,
+    onPrimary = OnBrand,
+    primaryContainer = BrandSoftText,
     onPrimaryContainer = TbGreenDark,
     secondary = Color(0xFF53645B),
-    onSecondary = Color.White,
+    onSecondary = OnBrand,
     secondaryContainer = Color(0xFFDDE7E1),
     onSecondaryContainer = Color(0xFF0A3527),
     tertiary = TbAmber,
-    onTertiary = Color.White,
+    onTertiary = OnBrand,
     tertiaryContainer = TbAmberLight,
     onTertiaryContainer = Color(0xFF3B2600),
     background = TbBackground,
-    onBackground = TbText,
-    surface = TbSurface,
-    onSurface = TbText,
+    onBackground = Ink,
+    surface = SurfaceWhite,
+    onSurface = Ink,
     surfaceVariant = TbSurfaceMuted,
-    onSurfaceVariant = TbTextMuted,
-    outline = Color(0xFF77827C),
+    onSurfaceVariant = Muted,
+    outline = FieldBorder,
     outlineVariant = TbOutline,
-    error = TbError
+    error = FieldErrorColor
 )
+
+val RadiusControl = 16.dp
 
 private val AppShapes = Shapes(
     extraSmall = RoundedCornerShape(8.dp),
     small = RoundedCornerShape(12.dp),
-    medium = RoundedCornerShape(16.dp),
+    medium = RoundedCornerShape(RadiusControl),
     large = RoundedCornerShape(22.dp),
     extraLarge = RoundedCornerShape(28.dp)
 )

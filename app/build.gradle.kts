@@ -1,4 +1,7 @@
+import java.net.Inet4Address
+import java.net.NetworkInterface
 import java.net.URI
+import java.util.Collections
 
 plugins {
     alias(libs.plugins.android.application)
@@ -7,8 +10,55 @@ plugins {
     id("org.jetbrains.kotlin.plugin.serialization") version "2.0.21"
 }
 
-val developmentBaseUrl = providers.gradleProperty("DEV_BASE_URL")
-    .orElse("http://10.0.2.2:8080/")
+fun detectHostLanIp(): String? {
+    return try {
+        val interfacesEnumeration = NetworkInterface.getNetworkInterfaces() ?: return null
+        val interfaces = Collections.list(interfacesEnumeration)
+        val candidateIps = mutableListOf<String>()
+
+        for (iface in interfaces) {
+            if (iface.isLoopback || !iface.isUp) continue
+            val addresses = Collections.list(iface.inetAddresses)
+            for (addr in addresses) {
+                if (addr is Inet4Address && !addr.isLoopbackAddress) {
+                    val ip = addr.hostAddress
+                    if (!ip.isNullOrBlank()) {
+                        candidateIps.add(ip)
+                    }
+                }
+            }
+        }
+
+        candidateIps.firstOrNull { it.startsWith("192.168.") }
+            ?: candidateIps.firstOrNull { it.startsWith("10.") }
+            ?: candidateIps.firstOrNull { it.matches(Regex("^172\\.(1[6-9]|2[0-9]|3[0-1])\\..*")) }
+            ?: candidateIps.firstOrNull()
+    } catch (_: Throwable) {
+        null
+    }
+}
+
+fun resolveDevelopmentBaseUrl(configured: String?): String {
+    val trimmed = configured?.trim().orEmpty()
+    val isExplicitCustom = trimmed.isNotEmpty() &&
+        !trimmed.equals("auto", ignoreCase = true) &&
+        trimmed != "http://10.0.2.2:8080/"
+
+    if (isExplicitCustom) {
+        return if (trimmed.endsWith("/")) trimmed else "$trimmed/"
+    }
+
+    val lanIp = detectHostLanIp()
+    return if (lanIp != null) {
+        "http://$lanIp:8080/"
+    } else {
+        "http://10.0.2.2:8080/"
+    }
+}
+
+val rawDevBaseUrl = providers.gradleProperty("DEV_BASE_URL").orNull
+val resolvedDevelopmentBaseUrl = resolveDevelopmentBaseUrl(rawDevBaseUrl)
+
 val productionBaseUrl = providers.gradleProperty("PROD_BASE_URL")
     .orElse(providers.environmentVariable("PROD_BASE_URL"))
 val releaseRequested = gradle.startParameter.taskNames.any { it.contains("release", ignoreCase = true) }
@@ -63,7 +113,7 @@ android {
 
     buildTypes {
         debug {
-            buildConfigField("String", "BASE_URL", "\"${developmentBaseUrl.get()}\"")
+            buildConfigField("String", "BASE_URL", "\"${resolvedDevelopmentBaseUrl}\"")
         }
         release {
             val releaseUrl = productionBaseUrl.orNull ?: "https://production-url-required.invalid/"
@@ -86,6 +136,11 @@ android {
         compose = true
         buildConfig = true
     }
+    testOptions {
+        unitTests {
+            isIncludeAndroidResources = true
+        }
+    }
 }
 
 kotlin {
@@ -107,6 +162,12 @@ dependencies {
     testImplementation(libs.junit)
     testImplementation(libs.kotlinx.coroutines.test)
     testImplementation("com.squareup.okhttp3:mockwebserver:4.12.0")
+    testImplementation("org.robolectric:robolectric:4.14.1")
+    testImplementation("io.github.takahirom.roborazzi:roborazzi:1.39.0")
+    testImplementation("io.github.takahirom.roborazzi:roborazzi-compose:1.39.0")
+    testImplementation("io.github.takahirom.roborazzi:roborazzi-junit-rule:1.39.0")
+    testImplementation(platform(libs.androidx.compose.bom))
+    testImplementation(libs.androidx.compose.ui.test.junit4)
     androidTestImplementation(libs.androidx.junit)
     androidTestImplementation(libs.androidx.espresso.core)
     androidTestImplementation(platform(libs.androidx.compose.bom))

@@ -4,17 +4,19 @@ import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.withFrameNanos
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
@@ -27,7 +29,9 @@ import com.tbterminal.app.navigation.AppRoute
 import com.tbterminal.app.navigation.AppRouteAccessPolicy
 import com.tbterminal.app.navigation.resolveStartDestination
 import com.tbterminal.app.ui.auth.AuthViewModel
+import com.tbterminal.app.ui.auth.SplashScreen
 import com.tbterminal.app.ui.theme.TbterminalappTheme
+import kotlinx.coroutines.delay
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -41,18 +45,20 @@ class MainActivity : ComponentActivity() {
                     color = MaterialTheme.colorScheme.background
                 ) {
                     val navigationReady = remember { mutableStateOf(false) }
+                    val showSplash = rememberSaveable { mutableStateOf(true) }
                     LaunchedEffect(Unit) {
-                        // Render a lightweight first frame before loading the full navigation graph.
+                        // Render a lightweight splash frame before loading the full navigation graph.
                         // This keeps cold startup responsive on devices experiencing high disk I/O.
                         withFrameNanos { }
                         navigationReady.value = true
+                        if (showSplash.value) {
+                            delay(850L)
+                            showSplash.value = false
+                        }
                     }
 
-                    if (!navigationReady.value) {
-                        Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                            CircularProgressIndicator()
-                        }
-                    } else {
+                    Box(modifier = Modifier.fillMaxSize()) {
+                        if (navigationReady.value) {
                     val navController = rememberNavController()
                     val authViewModel: AuthViewModel = viewModel(
                         factory = AuthViewModel.factory(appContainer.authRepository)
@@ -132,6 +138,14 @@ class MainActivity : ComponentActivity() {
                         sessionManager = sessionManager,
                         appContainer = appContainer
                     )
+                        }
+
+                        AnimatedVisibility(
+                            visible = !navigationReady.value || showSplash.value,
+                            exit = fadeOut(animationSpec = tween(durationMillis = 280))
+                        ) {
+                            SplashScreen()
+                        }
                     }
                 }
             }

@@ -33,4 +33,6 @@ local.properties
 /scratch/
 *.xml
 run.bat
+run.sh
+run.bat.windows_bak
 
