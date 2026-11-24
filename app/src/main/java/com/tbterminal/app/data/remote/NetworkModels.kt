@@ -1,5 +1,6 @@
 package com.tbterminal.app.data.remote
 
+import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import java.math.BigDecimal
 
@@ -18,7 +19,16 @@ data class LoginRequest(
 
 @Serializable
 data class UnlockRequest(
-    val pin: String
+    val pin: String,
+    val deviceId: String? = null
+)
+
+@Serializable
+data class PinUnlockResponse(
+    val valid: Boolean,
+    @SerialName("attempts_left") val attemptsLeft: Int,
+    @SerialName("locked_until") val lockedUntil: String? = null,
+    @SerialName("force_logout") val forceLogout: Boolean = false
 )
 
 @Serializable
@@ -65,6 +75,13 @@ data class ChangePasswordRequestDto(
 data class ChangePinRequestDto(
     val oldPin: String,
     val newPin: String
+)
+
+@Serializable
+data class ResetPinRequestDto(
+    val currentPassword: String,
+    val newPin: String,
+    val deviceId: String? = null
 )
 
 @Serializable

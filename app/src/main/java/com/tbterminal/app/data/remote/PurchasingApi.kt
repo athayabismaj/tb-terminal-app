@@ -6,6 +6,7 @@ import retrofit2.Response
 import retrofit2.http.Body
 import retrofit2.http.DELETE
 import retrofit2.http.GET
+import retrofit2.http.PATCH
 import retrofit2.http.Path
 import retrofit2.http.POST
 import retrofit2.http.PUT
@@ -16,8 +17,20 @@ interface PurchasingApi {
     suspend fun getSuppliers(
         @Query("page") page: Int = 1,
         @Query("limit") limit: Int = 20,
-        @Query("search") search: String? = null
+        @Query("search") search: String? = null,
+        @Query("status") status: String? = null
     ): Response<ApiResponse<PaginatedResponse<SupplierResponseDto>>>
+
+    @GET("/api/purchasing/suppliers/{id}")
+    suspend fun getSupplierById(
+        @Path("id") id: String,
+        @Query("includeInactive") includeInactive: Boolean? = null
+    ): Response<ApiResponse<SupplierResponseDto>>
+
+    @PATCH("/api/purchasing/suppliers/{id}/activate")
+    suspend fun activateSupplier(
+        @Path("id") id: String
+    ): Response<ApiResponse<SupplierResponseDto>>
 
     @POST("/api/purchasing/suppliers")
     suspend fun createSupplier(

@@ -12,7 +12,10 @@ interface AuthApi {
     suspend fun login(@Body request: LoginRequest): Response<ApiResponse<LoginResponse>>
 
     @POST("/api/auth/unlock")
-    suspend fun unlock(@Body request: UnlockRequest): Response<ApiResponse<Unit>>
+    suspend fun unlock(@Body request: UnlockRequest): Response<ApiResponse<PinUnlockResponse>>
+
+    @POST("/api/auth/reset-pin")
+    suspend fun resetPinWithPassword(@Body request: ResetPinRequestDto): Response<ApiResponse<Unit>>
 
     @GET("/api/auth/me")
     suspend fun getMe(): Response<ApiResponse<CurrentUserDto>>

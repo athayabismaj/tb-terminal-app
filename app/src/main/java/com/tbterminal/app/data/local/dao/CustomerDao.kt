@@ -17,6 +17,12 @@ interface CustomerDao {
         """
         SELECT * FROM local_customers
         WHERE deletedAt IS NULL
+            AND (
+                :status IS NULL
+                OR :status = 'all'
+                OR (:status = 'active' AND isActive = 1)
+                OR (:status = 'inactive' AND isActive = 0)
+            )
             AND (:query IS NULL OR name LIKE '%' || :query || '%' OR phone LIKE '%' || :query || '%')
         ORDER BY name ASC
         LIMIT :limit OFFSET :offset
@@ -24,6 +30,7 @@ interface CustomerDao {
     )
     suspend fun getCachedCustomers(
         query: String?,
+        status: String? = null,
         limit: Int,
         offset: Int
     ): List<LocalCustomerEntity>
@@ -32,10 +39,19 @@ interface CustomerDao {
         """
         SELECT COUNT(*) FROM local_customers
         WHERE deletedAt IS NULL
+            AND (
+                :status IS NULL
+                OR :status = 'all'
+                OR (:status = 'active' AND isActive = 1)
+                OR (:status = 'inactive' AND isActive = 0)
+            )
             AND (:query IS NULL OR name LIKE '%' || :query || '%' OR phone LIKE '%' || :query || '%')
         """
     )
-    suspend fun countCachedCustomers(query: String?): Long
+    suspend fun countCachedCustomers(
+        query: String?,
+        status: String? = null
+    ): Long
 
     @Query("SELECT * FROM local_customers WHERE localId = :localId LIMIT 1")
     suspend fun getByLocalId(localId: Long): LocalCustomerEntity?

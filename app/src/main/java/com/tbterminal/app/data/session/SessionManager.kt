@@ -241,6 +241,10 @@ class SessionManager(
         return tokenStore.readSessionUser()
     }
 
+    fun updateSessionUser(user: SessionUser) {
+        tokenStore.saveSessionUser(user)
+    }
+
     fun hasAccessToken(): Boolean {
         return tokenStore.hasStoredAccessToken()
     }

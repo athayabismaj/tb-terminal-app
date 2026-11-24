@@ -37,6 +37,44 @@ class UnauthorizedInterceptorTest {
             server.shutdown()
         }
     }
+
+    @Test
+    fun unlock422And423KeepSessionIntact() {
+        val server = MockWebServer()
+        server.enqueue(
+            MockResponse()
+                .setResponseCode(422)
+                .setBody("""{"success":false,"code":"INVALID_PIN","data":{"valid":false,"attempts_left":4,"locked_until":null,"force_logout":false}}""")
+        )
+        server.enqueue(
+            MockResponse()
+                .setResponseCode(423)
+                .setBody("""{"success":false,"code":"PIN_LOCKED","data":{"valid":false,"attempts_left":0,"locked_until":"2026-11-19T10:00:30Z","force_logout":false}}""")
+        )
+        server.start()
+        try {
+            val tokenStore = InMemoryTokenStore().apply {
+                saveTokens("access-token", "refresh-token")
+                saveSessionUser(SessionUser("Kasir", "kasir", true, "2026-09-01", null))
+            }
+            val sessionManager = SessionManager(tokenStore)
+            val client = OkHttpClient.Builder()
+                .addInterceptor(UnauthorizedInterceptor(sessionManager))
+                .build()
+
+            repeat(2) {
+                val request = Request.Builder()
+                    .url(server.url("/api/auth/unlock"))
+                    .header("Authorization", "Bearer access-token")
+                    .build()
+                client.newCall(request).execute().close()
+            }
+
+            org.junit.Assert.assertTrue(sessionManager.hasAccessToken())
+        } finally {
+            server.shutdown()
+        }
+    }
 }
 
 private class InMemoryTokenStore : TokenStore {

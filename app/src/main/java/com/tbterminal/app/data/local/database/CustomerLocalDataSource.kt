@@ -9,14 +9,17 @@ class CustomerLocalDataSource(
     suspend fun getCachedCustomers(
         page: Int,
         limit: Int,
-        search: String?
+        search: String?,
+        status: String? = null
     ): CachedPage<LocalCustomerEntity> {
         val safePage = page.coerceAtLeast(1)
         val safeLimit = limit.coerceAtLeast(1)
         val query = search?.trim()?.takeIf(String::isNotBlank)
-        val total = customerDao.countCachedCustomers(query)
+        val normalizedStatus = status?.trim()?.lowercase()?.takeIf(String::isNotBlank)
+        val total = customerDao.countCachedCustomers(query, normalizedStatus)
         val data = customerDao.getCachedCustomers(
             query = query,
+            status = normalizedStatus,
             limit = safeLimit,
             offset = (safePage - 1) * safeLimit
         )

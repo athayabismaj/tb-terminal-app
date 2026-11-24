@@ -36,12 +36,21 @@ class UnauthorizedInterceptor(
 
         if (
             response.code == HttpURLConnection.HTTP_UNAUTHORIZED &&
-            response.request.header("Authorization") != null
+            response.request.header("Authorization") != null &&
+            !isUnlockPinAttemptError(response)
         ) {
             sessionManager.handleUnauthorized()
         }
 
         return response
+    }
+
+    private fun isUnlockPinAttemptError(response: Response): Boolean {
+        if (!response.request.url.encodedPath.endsWith("/api/auth/unlock")) {
+            return false
+        }
+        val bodySnippet = runCatching { response.peekBody(4096).string() }.getOrDefault("")
+        return bodySnippet.contains("\"INVALID_PIN\"") || bodySnippet.contains("\"PIN_LOCKED\"")
     }
 }
 

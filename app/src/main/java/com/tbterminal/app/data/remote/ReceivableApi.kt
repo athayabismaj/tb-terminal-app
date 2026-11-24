@@ -6,6 +6,7 @@ import retrofit2.Response
 import retrofit2.http.Body
 import retrofit2.http.DELETE
 import retrofit2.http.GET
+import retrofit2.http.PATCH
 import retrofit2.http.POST
 import retrofit2.http.PUT
 import retrofit2.http.Path
@@ -16,12 +17,14 @@ interface ReceivableApi {
     suspend fun getCustomers(
         @Query("page") page: Int = 1,
         @Query("limit") limit: Int = 20,
-        @Query("search") search: String? = null
+        @Query("search") search: String? = null,
+        @Query("status") status: String? = null
     ): Response<ApiResponse<PaginatedResponse<CustomerResponseDto>>>
 
     @GET("/api/receivable/customers/{id}")
     suspend fun getCustomerById(
-        @Path("id") id: String
+        @Path("id") id: String,
+        @Query("includeInactive") includeInactive: Boolean? = null
     ): Response<ApiResponse<CustomerResponseDto>>
 
     @POST("/api/receivable/customers")
@@ -39,6 +42,11 @@ interface ReceivableApi {
     suspend fun deactivateCustomer(
         @Path("id") id: String
     ): Response<ApiResponse<Unit>>
+
+    @PATCH("/api/receivable/customers/{id}/activate")
+    suspend fun activateCustomer(
+        @Path("id") id: String
+    ): Response<ApiResponse<CustomerResponseDto>>
 
     @GET("/api/receivable/receivables")
     suspend fun getReceivables(

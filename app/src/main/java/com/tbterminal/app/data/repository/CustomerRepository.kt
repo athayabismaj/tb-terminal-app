@@ -17,7 +17,8 @@ interface CustomerRepository {
     suspend fun getCustomers(
         page: Int = 1,
         limit: Int = 10,
-        search: String? = null
+        search: String? = null,
+        status: String? = null
     ): RepositoryResult<CustomerPage>
 
     suspend fun getCustomerById(id: String): RepositoryResult<Customer>
@@ -30,6 +31,8 @@ interface CustomerRepository {
     ): RepositoryResult<Customer>
 
     suspend fun deactivateCustomer(id: String): RepositoryResult<Unit>
+
+    suspend fun activateCustomer(id: String): RepositoryResult<Customer>
 }
 
 class RemoteCustomerRepository(
@@ -39,10 +42,17 @@ class RemoteCustomerRepository(
     override suspend fun getCustomers(
         page: Int,
         limit: Int,
-        search: String?
+        search: String?,
+        status: String?
     ): RepositoryResult<CustomerPage> {
+        val normalizedStatus = status?.trim()?.takeIf(String::isNotBlank)
         val result = safeApiCall {
-            receivableApi.getCustomers(page = page, limit = limit, search = search?.takeIf(String::isNotBlank))
+            receivableApi.getCustomers(
+                page = page,
+                limit = limit,
+                search = search?.takeIf(String::isNotBlank),
+                status = normalizedStatus
+            )
         }.toRepositoryResult { response ->
             val pageData = response.data
             if (!response.success || pageData == null) {
@@ -59,12 +69,12 @@ class RemoteCustomerRepository(
         return when (result) {
             is RepositoryResult.Success -> result
             is RepositoryResult.Error,
-            is RepositoryResult.Exception -> fallbackCustomerPage(page, limit, search, result)
+            is RepositoryResult.Exception -> fallbackCustomerPage(page, limit, search, normalizedStatus, result)
         }
     }
 
     override suspend fun getCustomerById(id: String): RepositoryResult<Customer> {
-        val result = safeApiCall { receivableApi.getCustomerById(id) }
+        val result = safeApiCall { receivableApi.getCustomerById(id, includeInactive = true) }
             .toRepositoryResult { response ->
                 val customer = response.data
                 if (!response.success || customer == null) {
@@ -129,9 +139,67 @@ class RemoteCustomerRepository(
                         message = response.message ?: response.error ?: "Pelanggan gagal dinonaktifkan."
                     )
                 } else {
+                    cacheSafely {
+                        customerLocalDataSource?.getCachedCustomerByServerId(id)?.let { existing ->
+                            customerLocalDataSource.cacheCustomer(existing.copy(isActive = false))
+                        }
+                    }
                     RepositoryResult.Success(Unit)
                 }
             }
+    }
+
+    override suspend fun activateCustomer(id: String): RepositoryResult<Customer> {
+        var httpStatus: Int? = null
+        val result = safeApiCall {
+            receivableApi.activateCustomer(id).also { httpStatus = it.code() }
+        }
+            .toRepositoryResult { response ->
+                val customer = response.data
+                if (!response.success || customer == null) {
+                    RepositoryResult.Error(
+                        code = response.code ?: "ACTIVATE_CUSTOMER_FAILED",
+                        message = response.message ?: response.error ?: "Pelanggan gagal diaktifkan."
+                    )
+                } else {
+                    cacheCustomer(customer)
+                    RepositoryResult.Success(customer.toCustomer())
+                }
+            }
+
+        if (result is RepositoryResult.Error) {
+            if (httpStatus == 409 || isAlreadyActiveConflict(result)) {
+                return when (val refreshed = getCustomerById(id)) {
+                    is RepositoryResult.Success -> {
+                        val activeCustomer = refreshed.data.copy(isActive = true)
+                        cacheSafely {
+                            customerLocalDataSource?.getCachedCustomerByServerId(id)?.let { existing ->
+                                customerLocalDataSource.cacheCustomer(existing.copy(isActive = true))
+                            }
+                        }
+                        RepositoryResult.Success(activeCustomer)
+                    }
+                    is RepositoryResult.Error,
+                    is RepositoryResult.Exception -> result
+                }
+            }
+            if (httpStatus == 404 || result.code == "HTTP_404" || result.code.equals("NOT_FOUND", ignoreCase = true)) {
+                return RepositoryResult.Error(
+                    code = "HTTP_404",
+                    message = "Pelanggan sudah dihapus atau tidak ditemukan."
+                )
+            }
+        }
+        return result
+    }
+
+    private fun isAlreadyActiveConflict(error: RepositoryResult.Error): Boolean {
+        val code = error.code.uppercase()
+        val message = error.message.lowercase()
+        return code == "HTTP_409" ||
+            code.contains("ALREADY_ACTIVE") ||
+            "sudah aktif" in message ||
+            "already active" in message
     }
 
     private suspend fun cacheCustomer(customer: CustomerResponseDto) {
@@ -171,11 +239,12 @@ class RemoteCustomerRepository(
         page: Int,
         limit: Int,
         search: String?,
+        status: String?,
         original: RepositoryResult<CustomerPage>
     ): RepositoryResult<CustomerPage> {
         if (!original.shouldFallbackToCustomerCache()) return original
         return readCacheOrOriginal(original) {
-            val cached = customerLocalDataSource?.getCachedCustomers(page, limit, search)
+            val cached = customerLocalDataSource?.getCachedCustomers(page, limit, search, status)
                 ?: return@readCacheOrOriginal null
             if (cached.data.isEmpty()) return@readCacheOrOriginal null
             RepositoryResult.Success(

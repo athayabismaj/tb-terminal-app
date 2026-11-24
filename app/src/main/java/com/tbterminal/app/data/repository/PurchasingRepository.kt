@@ -32,8 +32,16 @@ interface PurchasingRepository {
     suspend fun getSuppliers(
         page: Int = 1,
         limit: Int = 20,
-        search: String? = null
+        search: String? = null,
+        status: String? = null
     ): RepositoryResult<SupplierPage>
+
+    suspend fun getSupplierById(
+        id: String,
+        includeInactive: Boolean = true
+    ): RepositoryResult<Supplier>
+
+    suspend fun activateSupplier(id: String): RepositoryResult<Supplier>
 
     suspend fun createSupplier(
         name: String,
@@ -92,10 +100,16 @@ class RemotePurchasingRepository(
     override suspend fun getSuppliers(
         page: Int,
         limit: Int,
-        search: String?
+        search: String?,
+        status: String?
     ): RepositoryResult<SupplierPage> {
         return safeApiCall {
-            purchasingApi.getSuppliers(page = page, limit = limit, search = search?.takeIf(String::isNotBlank))
+            purchasingApi.getSuppliers(
+                page = page,
+                limit = limit,
+                search = search?.takeIf(String::isNotBlank),
+                status = status?.takeIf(String::isNotBlank)
+            )
         }.toRepositoryResult { response ->
             val supplierPage = response.data
             if (!response.success || supplierPage == null) {
@@ -107,6 +121,43 @@ class RemotePurchasingRepository(
                 RepositoryResult.Success(supplierPage.toSupplierPage())
             }
         }
+    }
+
+    override suspend fun getSupplierById(
+        id: String,
+        includeInactive: Boolean
+    ): RepositoryResult<Supplier> {
+        return safeApiCall {
+            purchasingApi.getSupplierById(
+                id = id,
+                includeInactive = if (includeInactive) true else null
+            )
+        }.toRepositoryResult { response ->
+            val supplier = response.data
+            if (!response.success || supplier == null) {
+                RepositoryResult.Error(
+                    code = response.code ?: "SUPPLIER_DETAIL_FAILED",
+                    message = response.message ?: response.error ?: "Detail supplier gagal dimuat."
+                )
+            } else {
+                RepositoryResult.Success(supplier.toSupplier())
+            }
+        }
+    }
+
+    override suspend fun activateSupplier(id: String): RepositoryResult<Supplier> {
+        return safeApiCall { purchasingApi.activateSupplier(id) }
+            .toRepositoryResult { response ->
+                val supplier = response.data
+                if (!response.success || supplier == null) {
+                    RepositoryResult.Error(
+                        code = response.code ?: "ACTIVATE_SUPPLIER_FAILED",
+                        message = response.message ?: response.error ?: "Supplier gagal diaktifkan kembali."
+                    )
+                } else {
+                    RepositoryResult.Success(supplier.toSupplier())
+                }
+            }
     }
 
     override suspend fun createSupplier(

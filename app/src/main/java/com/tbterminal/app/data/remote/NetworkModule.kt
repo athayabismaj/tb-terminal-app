@@ -30,8 +30,67 @@ class NetworkModule(
 
     private val normalizedBaseUrl = baseUrl.asRetrofitBaseUrl()
 
+    private val devAutoHostInterceptor: okhttp3.Interceptor by lazy {
+        object : okhttp3.Interceptor {
+            @Volatile
+            private var activeHost: String? = null
+
+            override fun intercept(chain: okhttp3.Interceptor.Chain): okhttp3.Response {
+                val originalRequest = chain.request()
+                if (!BuildConfig.DEBUG) {
+                    return chain.proceed(originalRequest)
+                }
+
+                val currentUrl = originalRequest.url
+                val primaryHost = currentUrl.host
+                val port = currentUrl.port
+
+                val candidates = linkedSetOf<String>().apply {
+                    activeHost?.let { add(it) }
+                    add(primaryHost)
+                    add("127.0.0.1")
+                    add("10.0.2.2")
+                }.toList()
+
+                var lastException: java.io.IOException? = null
+                for (host in candidates) {
+                    val candidateUrl = currentUrl.newBuilder()
+                        .host(host)
+                        .port(port)
+                        .build()
+                    val candidateRequest = originalRequest.newBuilder()
+                        .url(candidateUrl)
+                        .build()
+
+                    try {
+                        val response = chain.proceed(candidateRequest)
+                        if (activeHost != host) {
+                            activeHost = host
+                        }
+                        return response
+                    } catch (e: java.io.IOException) {
+                        val isConnectionError = e is java.net.ConnectException ||
+                            e is java.net.NoRouteToHostException ||
+                            e is java.net.PortUnreachableException ||
+                            (e.message?.contains("Failed to connect", ignoreCase = true) == true)
+
+                        if (!isConnectionError) {
+                            throw e
+                        }
+                        lastException = e
+                    }
+                }
+
+                throw lastException ?: java.io.IOException("Gagal terhubung ke host backend: $candidates")
+            }
+        }
+    }
+
     private val refreshOkHttpClient: OkHttpClient by lazy {
-        OkHttpClient.Builder().applyStandardTimeouts().build()
+        OkHttpClient.Builder()
+            .applyStandardTimeouts()
+            .addInterceptor(devAutoHostInterceptor)
+            .build()
     }
 
     private val refreshApi: TokenRefreshApi by lazy {
@@ -46,6 +105,7 @@ class NetworkModule(
     val okHttpClient: OkHttpClient by lazy {
         OkHttpClient.Builder()
             .applyStandardTimeouts()
+            .addInterceptor(devAutoHostInterceptor)
             .addInterceptor(AuthInterceptor(tokenStore))
             .authenticator(RefreshTokenAuthenticator(tokenStore, sessionManager, refreshApi))
             .addInterceptor(UnauthorizedInterceptor(sessionManager))
@@ -57,6 +117,7 @@ class NetworkModule(
             .connectTimeout(HEALTH_TIMEOUT_SECONDS, TimeUnit.SECONDS)
             .readTimeout(HEALTH_TIMEOUT_SECONDS, TimeUnit.SECONDS)
             .callTimeout(HEALTH_TIMEOUT_SECONDS, TimeUnit.SECONDS)
+            .addInterceptor(devAutoHostInterceptor)
             .build()
     }
 
