@@ -15,19 +15,35 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
+internal object CreatedSupplierBridge {
+    private var pendingCreatedSupplier: Supplier? = null
+
+    fun setPendingCreated(supplier: Supplier) {
+        pendingCreatedSupplier = supplier
+    }
+
+    fun consumePendingCreated(): Supplier? {
+        val value = pendingCreatedSupplier
+        pendingCreatedSupplier = null
+        return value
+    }
+}
+
 class SupplierViewModel(
     private val purchasingRepository: PurchasingRepository
 ) : ViewModel() {
     private val _uiState = MutableStateFlow(SupplierUiState())
     val uiState: StateFlow<SupplierUiState> = _uiState.asStateFlow()
     private var searchJob: Job? = null
+    private var loadJob: Job? = null
 
     init {
         loadSuppliers()
     }
 
     fun loadSuppliers(page: Int = _uiState.value.page) {
-        viewModelScope.launch {
+        loadJob?.cancel()
+        loadJob = viewModelScope.launch {
             val state = _uiState.value
             val safePage = page.coerceAtLeast(1)
             _uiState.update { it.copy(isLoading = true, page = safePage, message = null) }
@@ -35,7 +51,8 @@ class SupplierViewModel(
                 val result = purchasingRepository.getSuppliers(
                     page = safePage,
                     limit = state.pageSize,
-                    search = state.searchQuery.trim().takeIf(String::isNotBlank)
+                    search = state.searchQuery.trim().takeIf(String::isNotBlank),
+                    status = state.statusFilter.apiValue
                 )
             ) {
                 is RepositoryResult.Success -> {
@@ -56,7 +73,7 @@ class SupplierViewModel(
         }
     }
 
-    fun refresh() = loadSuppliers(_uiState.value.page)
+    fun refresh() = loadSuppliers(page = 1)
 
     fun onSearchChanged(query: String) {
         _uiState.update { it.copy(searchQuery = query, page = 1, message = null) }
@@ -68,7 +85,10 @@ class SupplierViewModel(
     }
 
     fun onStatusFilterChanged(filter: SupplierStatusFilter) {
-        _uiState.update { it.copy(statusFilter = filter) }
+        if (_uiState.value.statusFilter == filter) return
+        searchJob?.cancel()
+        _uiState.update { it.copy(statusFilter = filter, page = 1, message = null) }
+        loadSuppliers(page = 1)
     }
 
     fun onNameChanged(value: String) = updateInput { it.copy(nameInput = value) }
@@ -110,7 +130,7 @@ class SupplierViewModel(
             when (val result = purchasingRepository.deleteSupplier(supplier.id)) {
                 is RepositoryResult.Success -> {
                     _uiState.update { it.copy(isSaving = false, message = "Supplier berhasil dinonaktifkan.") }
-                    loadSuppliers()
+                    loadSuppliers(page = 1)
                 }
                 is RepositoryResult.Error -> setMessage(result.message)
                 is RepositoryResult.Exception -> setMessage("Supplier gagal dinonaktifkan karena koneksi bermasalah.")
@@ -135,9 +155,13 @@ class SupplierViewModel(
             _uiState.update { it.copy(isSaving = true, message = null) }
             val phone = state.phoneInput.trim().takeIf(String::isNotBlank)
             val address = state.addressInput.trim().takeIf(String::isNotBlank)
+            val isCreating = state.editingSupplier == null
             val result = state.editingSupplier?.let {
                 purchasingRepository.updateSupplier(it.id, name, phone, address, paymentTerm)
             } ?: purchasingRepository.createSupplier(name, phone, address, paymentTerm)
+            if (isCreating && result is RepositoryResult.Success) {
+                CreatedSupplierBridge.setPendingCreated(result.data)
+            }
             handleSavedResult(result)
         }
     }
@@ -177,6 +201,164 @@ class SupplierViewModel(
     companion object {
         fun factory(purchasingRepository: PurchasingRepository): ViewModelProvider.Factory {
             return viewModelFactory { SupplierViewModel(purchasingRepository) }
+        }
+    }
+}
+
+class SupplierDetailViewModel(
+    private val purchasingRepository: PurchasingRepository,
+    private val supplierId: String
+) : ViewModel() {
+    private val _uiState = MutableStateFlow(SupplierDetailUiState())
+    val uiState: StateFlow<SupplierDetailUiState> = _uiState.asStateFlow()
+
+    init {
+        loadDetail()
+    }
+
+    fun loadDetail() {
+        if (supplierId.isBlank()) {
+            _uiState.update {
+                it.copy(
+                    isLoading = false,
+                    errorMessage = "ID supplier tidak valid."
+                )
+            }
+            return
+        }
+        viewModelScope.launch {
+            _uiState.update { it.copy(isLoading = true, errorMessage = null) }
+            when (val result = purchasingRepository.getSupplierById(supplierId, includeInactive = true)) {
+                is RepositoryResult.Success -> {
+                    _uiState.update { it.copy(supplier = result.data, isLoading = false) }
+                }
+                is RepositoryResult.Error -> setLoadError(result.message)
+                is RepositoryResult.Exception -> setLoadError("Koneksi bermasalah. Detail supplier gagal dimuat.")
+            }
+        }
+    }
+
+    fun deactivate() = performDeactivate(stayOnDetail = false)
+
+    fun undoActivate() = performDeactivate(stayOnDetail = true)
+
+    fun activate() {
+        if (_uiState.value.isMutating || supplierId.isBlank()) return
+        _uiState.update {
+            it.copy(
+                isMutating = true,
+                isReactivated = false,
+                actionErrorMessage = null,
+                isNotFoundError = false
+            )
+        }
+        viewModelScope.launch {
+            when (val result = purchasingRepository.activateSupplier(supplierId)) {
+                is RepositoryResult.Success -> {
+                    _uiState.update {
+                        it.copy(
+                            supplier = result.data,
+                            isMutating = false,
+                            isReactivated = true,
+                            actionErrorMessage = null,
+                            isNotFoundError = false
+                        )
+                    }
+                }
+                is RepositoryResult.Error -> {
+                    _uiState.update {
+                        it.copy(
+                            isMutating = false,
+                            actionErrorMessage = result.message,
+                            isNotFoundError = result.code == "HTTP_404"
+                        )
+                    }
+                }
+                is RepositoryResult.Exception -> {
+                    _uiState.update {
+                        it.copy(
+                            isMutating = false,
+                            actionErrorMessage = "Supplier gagal diaktifkan karena koneksi bermasalah.",
+                            isNotFoundError = false
+                        )
+                    }
+                }
+            }
+        }
+    }
+
+    private fun performDeactivate(stayOnDetail: Boolean) {
+        if (_uiState.value.isMutating || supplierId.isBlank()) return
+        _uiState.update {
+            it.copy(
+                isMutating = true,
+                isReactivated = false,
+                actionErrorMessage = null,
+                isNotFoundError = false
+            )
+        }
+        viewModelScope.launch {
+            when (val result = purchasingRepository.deleteSupplier(supplierId)) {
+                is RepositoryResult.Success -> {
+                    _uiState.update { current ->
+                        current.copy(
+                            supplier = current.supplier?.copy(isActive = false),
+                            isMutating = false,
+                            isDeactivated = !stayOnDetail,
+                            actionErrorMessage = null,
+                            isNotFoundError = false
+                        )
+                    }
+                }
+                is RepositoryResult.Error -> {
+                    _uiState.update {
+                        it.copy(
+                            isMutating = false,
+                            actionErrorMessage = result.message,
+                            isNotFoundError = result.code == "HTTP_404"
+                        )
+                    }
+                }
+                is RepositoryResult.Exception -> {
+                    val msg = if (stayOnDetail) {
+                        "Supplier gagal dinonaktifkan kembali karena koneksi bermasalah."
+                    } else {
+                        "Supplier gagal dinonaktifkan karena koneksi bermasalah."
+                    }
+                    _uiState.update {
+                        it.copy(
+                            isMutating = false,
+                            actionErrorMessage = msg,
+                            isNotFoundError = false
+                        )
+                    }
+                }
+            }
+        }
+    }
+
+    fun clearActionError() {
+        _uiState.update { it.copy(actionErrorMessage = null, isNotFoundError = false) }
+    }
+
+    fun resetDeactivatedState() {
+        _uiState.update { it.copy(isDeactivated = false) }
+    }
+
+    fun resetReactivatedState() {
+        _uiState.update { it.copy(isReactivated = false) }
+    }
+
+    private fun setLoadError(message: String) {
+        _uiState.update { it.copy(isLoading = false, errorMessage = message) }
+    }
+
+    companion object {
+        fun factory(
+            purchasingRepository: PurchasingRepository,
+            supplierId: String
+        ): ViewModelProvider.Factory {
+            return viewModelFactory { SupplierDetailViewModel(purchasingRepository, supplierId) }
         }
     }
 }

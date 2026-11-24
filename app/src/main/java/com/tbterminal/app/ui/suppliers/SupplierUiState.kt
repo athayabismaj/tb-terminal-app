@@ -2,10 +2,20 @@ package com.tbterminal.app.ui.suppliers
 
 import com.tbterminal.app.data.model.Supplier
 
-enum class SupplierStatusFilter(val label: String) {
-    ALL("Semua status"),
-    ACTIVE("Aktif"),
-    INACTIVE("Nonaktif"),
+enum class SupplierStatusFilter(
+    val label: String,
+    val chipLabel: String,
+    val apiValue: String
+) {
+    ALL(label = "Semua status", chipLabel = "Semua", apiValue = "all"),
+    ACTIVE(label = "Aktif", chipLabel = "Aktif", apiValue = "active"),
+    INACTIVE(label = "Nonaktif", chipLabel = "Nonaktif", apiValue = "inactive"),
+}
+
+internal enum class SupplierSortOrder(val label: String) {
+    NAME_ASC("Nama A\u2013Z"),
+    NAME_DESC("Nama Z\u2013A"),
+    TERM_DESC("Termin terlama"),
 }
 
 data class SupplierUiState(
@@ -33,3 +43,14 @@ data class SupplierUiState(
             SupplierStatusFilter.INACTIVE -> suppliers.filter { !it.isActive }
         }
 }
+
+data class SupplierDetailUiState(
+    val supplier: Supplier? = null,
+    val isLoading: Boolean = true,
+    val isMutating: Boolean = false,
+    val errorMessage: String? = null,
+    val actionErrorMessage: String? = null,
+    val isDeactivated: Boolean = false,
+    val isReactivated: Boolean = false,
+    val isNotFoundError: Boolean = false
+)

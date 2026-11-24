@@ -281,7 +281,307 @@ class UserManagementViewModel(
     }
 }
 
-private fun ManagedUser.toStaffMember(): StaffMember {
+data class UserDetailUiState(
+    val staff: StaffMember? = null,
+    val isLoading: Boolean = true,
+    val isMutating: Boolean = false,
+    val errorMessage: String? = null,
+    val actionErrorMessage: String? = null,
+    val credentialErrorMessage: String? = null,
+    val credentialSuccessMessage: String? = null,
+    val isDeactivated: Boolean = false,
+    val isReactivated: Boolean = false,
+    val isNotFoundError: Boolean = false
+)
+
+class UserDetailViewModel(
+    private val userRepository: UserRepository,
+    private val userId: String
+) : ViewModel() {
+    private val _uiState = MutableStateFlow(UserDetailUiState())
+    val uiState: StateFlow<UserDetailUiState> = _uiState.asStateFlow()
+
+    init {
+        loadDetail()
+    }
+
+    fun loadDetail() {
+        if (userId.isBlank()) {
+            _uiState.update { it.copy(isLoading = false, errorMessage = "ID pengguna tidak valid.") }
+            return
+        }
+        viewModelScope.launch {
+            _uiState.update { it.copy(isLoading = true, errorMessage = null) }
+            when (val result = userRepository.getUsers(limit = USER_DETAIL_PAGE_LIMIT)) {
+                is RepositoryResult.Success -> {
+                    val user = result.data.data.firstOrNull { candidate ->
+                        candidate.id == userId &&
+                            !candidate.roleName.equals(OWNER_ROLE_NAME, ignoreCase = true)
+                    }
+                    if (user != null) {
+                        _uiState.update {
+                            it.copy(
+                                staff = user.toStaffMember(),
+                                isLoading = false,
+                                errorMessage = null
+                            )
+                        }
+                    } else {
+                        _uiState.update {
+                            it.copy(
+                                isLoading = false,
+                                errorMessage = "Pengguna tidak ditemukan."
+                            )
+                        }
+                    }
+                }
+                is RepositoryResult.Error -> {
+                    _uiState.update { it.copy(isLoading = false, errorMessage = result.message) }
+                }
+                is RepositoryResult.Exception -> {
+                    _uiState.update {
+                        it.copy(
+                            isLoading = false,
+                            errorMessage = "Koneksi bermasalah. Detail pengguna gagal dimuat."
+                        )
+                    }
+                }
+            }
+        }
+    }
+
+    fun deactivate() = performDeactivate(stayOnDetail = false)
+
+    fun undoActivate() = performDeactivate(stayOnDetail = true)
+
+    fun activate() {
+        val current = _uiState.value.staff ?: return
+        if (_uiState.value.isMutating || userId.isBlank()) return
+        _uiState.update {
+            it.copy(
+                isMutating = true,
+                isReactivated = false,
+                actionErrorMessage = null,
+                isNotFoundError = false
+            )
+        }
+        viewModelScope.launch {
+            val command = UpdateUserCommand(
+                name = current.name,
+                username = current.username,
+                isActive = true,
+                roleId = current.roleId,
+                email = current.rawEmail
+            )
+            when (val result = userRepository.updateUser(userId, command)) {
+                is RepositoryResult.Success -> {
+                    _uiState.update {
+                        it.copy(
+                            staff = result.data.toStaffMember(),
+                            isMutating = false,
+                            isReactivated = true,
+                            actionErrorMessage = null,
+                            isNotFoundError = false
+                        )
+                    }
+                }
+                is RepositoryResult.Error -> {
+                    _uiState.update {
+                        it.copy(
+                            isMutating = false,
+                            actionErrorMessage = result.message,
+                            isNotFoundError = result.code == "HTTP_404"
+                        )
+                    }
+                }
+                is RepositoryResult.Exception -> {
+                    _uiState.update {
+                        it.copy(
+                            isMutating = false,
+                            actionErrorMessage = "Pengguna gagal diaktifkan karena koneksi bermasalah.",
+                            isNotFoundError = false
+                        )
+                    }
+                }
+            }
+        }
+    }
+
+    private fun performDeactivate(stayOnDetail: Boolean) {
+        if (_uiState.value.isMutating || userId.isBlank()) return
+        _uiState.update {
+            it.copy(
+                isMutating = true,
+                isReactivated = false,
+                actionErrorMessage = null,
+                isNotFoundError = false
+            )
+        }
+        viewModelScope.launch {
+            when (val result = userRepository.deactivateUser(userId)) {
+                is RepositoryResult.Success -> {
+                    _uiState.update { current ->
+                        current.copy(
+                            staff = current.staff?.copy(status = StaffStatus.Inactive),
+                            isMutating = false,
+                            isDeactivated = !stayOnDetail,
+                            actionErrorMessage = null,
+                            isNotFoundError = false
+                        )
+                    }
+                }
+                is RepositoryResult.Error -> {
+                    _uiState.update {
+                        it.copy(
+                            isMutating = false,
+                            actionErrorMessage = result.message,
+                            isNotFoundError = result.code == "HTTP_404"
+                        )
+                    }
+                }
+                is RepositoryResult.Exception -> {
+                    val msg = if (stayOnDetail) {
+                        "Pengguna gagal dinonaktifkan kembali karena koneksi bermasalah."
+                    } else {
+                        "Pengguna gagal dinonaktifkan karena koneksi bermasalah."
+                    }
+                    _uiState.update {
+                        it.copy(
+                            isMutating = false,
+                            actionErrorMessage = msg,
+                            isNotFoundError = false
+                        )
+                    }
+                }
+            }
+        }
+    }
+
+    fun clearActionError() {
+        _uiState.update { it.copy(actionErrorMessage = null, isNotFoundError = false) }
+    }
+
+    fun resetDeactivatedState() {
+        _uiState.update { it.copy(isDeactivated = false) }
+    }
+
+    fun resetReactivatedState() {
+        _uiState.update { it.copy(isReactivated = false) }
+    }
+
+    fun clearCredentialMessages() {
+        _uiState.update { it.copy(credentialErrorMessage = null, credentialSuccessMessage = null) }
+    }
+
+    fun changePassword(newPassword: String, confirmPassword: String) {
+        val current = _uiState.value.staff ?: return
+        if (_uiState.value.isMutating || userId.isBlank()) return
+        if (newPassword.length < MIN_PASSWORD_LENGTH) {
+            _uiState.update { it.copy(credentialErrorMessage = "Kata sandi baru minimal $MIN_PASSWORD_LENGTH karakter.") }
+            return
+        }
+        if (newPassword != confirmPassword) {
+            _uiState.update { it.copy(credentialErrorMessage = "Kata sandi tidak sama.") }
+            return
+        }
+        submitCredentialUpdate(
+            current = current,
+            newPassword = newPassword,
+            newPin = null,
+            successMessage = "Kata sandi berhasil diperbarui",
+            connectionErrorMessage = "Kata sandi gagal diperbarui karena koneksi bermasalah."
+        )
+    }
+
+    fun changePin(newPin: String, confirmPin: String) {
+        val current = _uiState.value.staff ?: return
+        if (_uiState.value.isMutating || userId.isBlank()) return
+        if (newPin.length != PIN_LENGTH || !newPin.all(Char::isDigit)) {
+            _uiState.update { it.copy(credentialErrorMessage = "PIN baru harus terdiri dari $PIN_LENGTH digit.") }
+            return
+        }
+        if (newPin != confirmPin) {
+            _uiState.update { it.copy(credentialErrorMessage = "PIN tidak sama.") }
+            return
+        }
+        submitCredentialUpdate(
+            current = current,
+            newPassword = null,
+            newPin = newPin,
+            successMessage = "PIN transaksi berhasil diperbarui",
+            connectionErrorMessage = "PIN gagal diperbarui karena koneksi bermasalah."
+        )
+    }
+
+    private fun submitCredentialUpdate(
+        current: StaffMember,
+        newPassword: String?,
+        newPin: String?,
+        successMessage: String,
+        connectionErrorMessage: String
+    ) {
+        _uiState.update {
+            it.copy(
+                isMutating = true,
+                credentialErrorMessage = null,
+                credentialSuccessMessage = null
+            )
+        }
+        viewModelScope.launch {
+            val command = UpdateUserCommand(
+                name = current.name,
+                username = current.username,
+                isActive = current.status == StaffStatus.Active,
+                roleId = current.roleId,
+                email = current.rawEmail,
+                newPassword = newPassword,
+                newPin = newPin
+            )
+            when (val result = userRepository.updateUser(userId, command)) {
+                is RepositoryResult.Success -> {
+                    _uiState.update {
+                        it.copy(
+                            staff = result.data.toStaffMember(),
+                            isMutating = false,
+                            credentialErrorMessage = null,
+                            credentialSuccessMessage = successMessage
+                        )
+                    }
+                }
+                is RepositoryResult.Error -> {
+                    _uiState.update {
+                        it.copy(
+                            isMutating = false,
+                            credentialErrorMessage = result.message,
+                            isNotFoundError = result.code == "HTTP_404"
+                        )
+                    }
+                }
+                is RepositoryResult.Exception -> {
+                    _uiState.update {
+                        it.copy(
+                            isMutating = false,
+                            credentialErrorMessage = connectionErrorMessage
+                        )
+                    }
+                }
+            }
+        }
+    }
+
+    companion object {
+        private const val USER_DETAIL_PAGE_LIMIT = 200
+
+        fun factory(
+            userRepository: UserRepository,
+            userId: String
+        ): ViewModelProvider.Factory {
+            return viewModelFactory { UserDetailViewModel(userRepository, userId) }
+        }
+    }
+}
+
+internal fun ManagedUser.toStaffMember(): StaffMember {
     val lastLoginInstant = lastLogin?.toServerInstantOrNull()
 
     return StaffMember(

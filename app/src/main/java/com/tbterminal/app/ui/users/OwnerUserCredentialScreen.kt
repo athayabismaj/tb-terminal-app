@@ -8,6 +8,7 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import com.tbterminal.app.data.repository.UserRepository
 import com.tbterminal.app.ui.dashboard.admin.AdminDashboardShell
 import com.tbterminal.app.ui.dashboard.admin.AdminDestination
+import com.tbterminal.app.ui.dashboard.owner.OwnerUserToastBridge
 
 @Composable
 fun OwnerUserCredentialScreen(
@@ -42,7 +43,12 @@ fun OwnerUserCredentialScreen(
     LaunchedEffect(viewModel.events, userId) {
         viewModel.events.collect { event ->
             when (event) {
-                is UserCredentialEvent.CredentialUpdated -> onUserManagementClick()
+                is UserCredentialEvent.CredentialUpdated -> {
+                    OwnerUserToastBridge.setPendingSuccess(
+                        if (mode == UserCredentialMode.Password) "Password diperbarui" else "PIN diperbarui"
+                    )
+                    onUserManagementClick()
+                }
             }
         }
     }

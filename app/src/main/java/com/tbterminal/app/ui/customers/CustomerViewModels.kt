@@ -23,21 +23,25 @@ class CustomerListViewModel(
     private val _uiState = MutableStateFlow(CustomerListUiState())
     val uiState: StateFlow<CustomerListUiState> = _uiState.asStateFlow()
     private var searchJob: Job? = null
+    private var loadJob: Job? = null
 
     init {
         loadCustomers()
     }
 
     fun loadCustomers(page: Int = _uiState.value.page) {
-        viewModelScope.launch {
+        loadJob?.cancel()
+        loadJob = viewModelScope.launch {
             val search = _uiState.value.searchQuery.trim().takeIf(String::isNotBlank)
+            val status = _uiState.value.statusFilter.apiValue
             _uiState.update { it.copy(isLoading = true, errorMessage = null, page = page) }
 
             when (
                 val result = customerRepository.getCustomers(
                     page = page,
                     limit = CUSTOMER_PAGE_SIZE,
-                    search = search
+                    search = search,
+                    status = status
                 )
             ) {
                 is RepositoryResult.Success -> {
@@ -58,7 +62,7 @@ class CustomerListViewModel(
         }
     }
 
-    fun refresh() = loadCustomers(_uiState.value.page)
+    fun refresh() = loadCustomers(page = 1)
 
     fun onSearchChanged(query: String) {
         _uiState.update { it.copy(searchQuery = query) }
@@ -74,11 +78,17 @@ class CustomerListViewModel(
     }
 
     fun onStatusFilterChanged(status: CustomerStatusFilter) {
+        if (_uiState.value.statusFilter == status) return
         _uiState.update { it.copy(statusFilter = status) }
+        loadCustomers(page = 1)
     }
 
     fun onFilterApplied(category: CustomerCategoryFilter, status: CustomerStatusFilter) {
+        val statusChanged = _uiState.value.statusFilter != status
         _uiState.update { it.copy(categoryFilter = category, statusFilter = status) }
+        if (statusChanged) {
+            loadCustomers(page = 1)
+        }
     }
 
     fun previousPage() {
@@ -240,6 +250,117 @@ class CustomerDetailViewModel(
                 is RepositoryResult.Exception -> setLoadError("Koneksi bermasalah. Detail pelanggan gagal dimuat.")
             }
         }
+    }
+
+    fun deactivate() = performDeactivate(stayOnDetail = false)
+
+    fun undoActivate() = performDeactivate(stayOnDetail = true)
+
+    fun activate() {
+        if (_uiState.value.isMutating) return
+        _uiState.update {
+            it.copy(
+                isMutating = true,
+                isReactivated = false,
+                actionErrorMessage = null,
+                isNotFoundError = false
+            )
+        }
+        viewModelScope.launch {
+            when (val result = customerRepository.activateCustomer(customerId)) {
+                is RepositoryResult.Success -> {
+                    _uiState.update {
+                        it.copy(
+                            customer = result.data,
+                            isMutating = false,
+                            isReactivated = true,
+                            actionErrorMessage = null,
+                            isNotFoundError = false
+                        )
+                    }
+                }
+                is RepositoryResult.Error -> {
+                    _uiState.update {
+                        it.copy(
+                            isMutating = false,
+                            actionErrorMessage = result.message,
+                            isNotFoundError = result.code == "HTTP_404"
+                        )
+                    }
+                }
+                is RepositoryResult.Exception -> {
+                    _uiState.update {
+                        it.copy(
+                            isMutating = false,
+                            actionErrorMessage = "Pelanggan gagal diaktifkan karena koneksi bermasalah.",
+                            isNotFoundError = false
+                        )
+                    }
+                }
+            }
+        }
+    }
+
+    private fun performDeactivate(stayOnDetail: Boolean) {
+        if (_uiState.value.isMutating) return
+        _uiState.update {
+            it.copy(
+                isMutating = true,
+                isReactivated = false,
+                actionErrorMessage = null,
+                isNotFoundError = false
+            )
+        }
+        viewModelScope.launch {
+            when (val result = customerRepository.deactivateCustomer(customerId)) {
+                is RepositoryResult.Success -> {
+                    _uiState.update { current ->
+                        current.copy(
+                            customer = current.customer?.copy(isActive = false),
+                            isMutating = false,
+                            isDeactivated = !stayOnDetail,
+                            actionErrorMessage = null,
+                            isNotFoundError = false
+                        )
+                    }
+                }
+                is RepositoryResult.Error -> {
+                    _uiState.update {
+                        it.copy(
+                            isMutating = false,
+                            actionErrorMessage = result.message,
+                            isNotFoundError = result.code == "HTTP_404"
+                        )
+                    }
+                }
+                is RepositoryResult.Exception -> {
+                    val msg = if (stayOnDetail) {
+                        "Pelanggan gagal dinonaktifkan kembali karena koneksi bermasalah."
+                    } else {
+                        "Pelanggan gagal dinonaktifkan karena koneksi bermasalah."
+                    }
+                    _uiState.update {
+                        it.copy(
+                            isMutating = false,
+                            actionErrorMessage = msg,
+                            isNotFoundError = false
+                        )
+                    }
+                }
+            }
+        }
+    }
+
+    fun clearActionError() {
+        _uiState.update { it.copy(actionErrorMessage = null, isNotFoundError = false) }
+    }
+
+    fun resetDeactivatedState() {
+        _uiState.update { it.copy(isDeactivated = false) }
+    }
+
+    fun resetReactivatedState() {
+        _uiState.update { it.copy(isReactivated = false) }
     }
 
     private fun setLoadError(message: String) {

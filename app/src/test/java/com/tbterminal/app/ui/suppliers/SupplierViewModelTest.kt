@@ -56,9 +56,11 @@ class SupplierViewModelTest {
         advanceUntilIdle()
 
         viewModel.onStatusFilterChanged(SupplierStatusFilter.ACTIVE)
+        advanceUntilIdle()
 
         val state = viewModel.uiState.value
         assertEquals(SupplierStatusFilter.ACTIVE, state.statusFilter)
+        assertEquals("active", fakeRepo.lastRequestedStatus)
         assertEquals(1, state.visibleSuppliers.size)
         assertEquals("Supplier Aktif", state.visibleSuppliers.first().name)
     }
@@ -69,14 +71,19 @@ class SupplierViewModelTest {
         advanceUntilIdle()
 
         viewModel.onStatusFilterChanged(SupplierStatusFilter.INACTIVE)
+        advanceUntilIdle()
 
         val state = viewModel.uiState.value
         assertEquals(SupplierStatusFilter.INACTIVE, state.statusFilter)
+        assertEquals("inactive", fakeRepo.lastRequestedStatus)
         assertEquals(1, state.visibleSuppliers.size)
         assertEquals("Supplier Nonaktif", state.visibleSuppliers.first().name)
     }
 
     private class FakePurchasingRepository : PurchasingRepository {
+        var lastRequestedStatus: String? = null
+            private set
+
         private val list = listOf(
             Supplier(
                 id = "1",
@@ -100,16 +107,42 @@ class SupplierViewModelTest {
             ),
         )
 
-        override suspend fun getSuppliers(page: Int, limit: Int, search: String?): RepositoryResult<SupplierPage> {
+        override suspend fun getSuppliers(
+            page: Int,
+            limit: Int,
+            search: String?,
+            status: String?
+        ): RepositoryResult<SupplierPage> {
+            lastRequestedStatus = status
+            val filtered = when (status) {
+                "active" -> list.filter { it.isActive }
+                "inactive" -> list.filter { !it.isActive }
+                else -> list
+            }
             return RepositoryResult.Success(
                 SupplierPage(
-                    data = list,
-                    total = list.size.toLong(),
+                    data = filtered,
+                    total = filtered.size.toLong(),
                     page = 1,
                     limit = 10,
                     totalPages = 1
                 )
             )
+        }
+
+        override suspend fun getSupplierById(id: String, includeInactive: Boolean): RepositoryResult<Supplier> {
+            val found = list.firstOrNull { it.id == id && (includeInactive || it.isActive) }
+            return if (found != null) {
+                RepositoryResult.Success(found)
+            } else {
+                RepositoryResult.Error(code = "HTTP_404", message = "Supplier tidak ditemukan.")
+            }
+        }
+
+        override suspend fun activateSupplier(id: String): RepositoryResult<Supplier> {
+            val found = list.firstOrNull { it.id == id }
+                ?: return RepositoryResult.Error(code = "HTTP_404", message = "Supplier tidak ditemukan.")
+            return RepositoryResult.Success(found.copy(isActive = true))
         }
 
         override suspend fun createSupplier(name: String, phone: String?, address: String?, paymentTermDays: Int): RepositoryResult<Supplier> {

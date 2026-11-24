@@ -6,8 +6,8 @@ import androidx.compose.runtime.getValue
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.tbterminal.app.data.repository.UserRepository
-import com.tbterminal.app.ui.dashboard.admin.AdminDashboardShell
-import com.tbterminal.app.ui.dashboard.admin.AdminDestination
+import com.tbterminal.app.ui.dashboard.owner.OwnerTambahUserRoute
+import com.tbterminal.app.ui.dashboard.owner.OwnerUserToastBridge
 
 @Composable
 fun OwnerAddUserScreen(
@@ -35,45 +35,25 @@ fun OwnerAddUserScreen(
     LaunchedEffect(viewModel.events, onUserManagementClick) {
         viewModel.events.collect { event ->
             when (event) {
-                is AddUserEvent.UserCreated -> onUserManagementClick()
+                is AddUserEvent.UserCreated -> {
+                    OwnerUserToastBridge.setPendingSuccess("Pengguna ditambahkan")
+                    onUserManagementClick()
+                }
             }
         }
     }
 
-    AdminDashboardShell(
-        onProductsClick = {},
-
-        userName = name,
-        role = role,
-        activeDestination = AdminDestination.UserManagement,
-        onDashboardClick = onDashboardClick,
-        onReportsClick = onReportsClick,
-        onSyncCenterClick = onSyncCenterClick,
-        onStockReportClick = onStockReportClick,
-        onReceivablesClick = onReceivablesClick,
-        onSupplierDebtsClick = onSupplierDebtsClick,
-        onCashReconciliationClick = onCashReconciliationClick,
-        onOperationalAuditClick = onOperationalAuditClick,
-        onUserManagementClick = onUserManagementClick,
-        onSecurityLogClick = onSecurityLogClick,
-        onSettingsClick = onSettingsClick,
-        pageTitle = "Tambah pengguna",
+    OwnerTambahUserRoute(
+        uiState = uiState,
+        onFullNameChanged = viewModel::updateFullName,
+        onUsernameChanged = viewModel::updateUsername,
+        onEmailChanged = viewModel::updateEmail,
+        onPasswordChanged = viewModel::updatePassword,
+        onPinChanged = viewModel::updatePin,
+        onRoleSelected = viewModel::selectRole,
+        onSave = viewModel::submit,
+        onRetryRoles = viewModel::loadRoles,
         onBack = onUserManagementClick,
-        showPageHeader = true,
-        onLogout = onLogout
-    ) { contentModifier ->
-        AddUserContent(
-            modifier = contentModifier,
-            uiState = uiState,
-            onFullNameChange = viewModel::updateFullName,
-            onEmailChange = viewModel::updateEmail,
-            onUsernameChange = viewModel::updateUsername,
-            onPasswordChange = viewModel::updatePassword,
-            onPinChange = viewModel::updatePin,
-            onRoleChange = viewModel::selectRole,
-            onRetryRoles = viewModel::loadRoles,
-            onCancel = onUserManagementClick,
-            onSubmit = viewModel::submit
-        )
-    }
+        onDashboardClick = onDashboardClick
+    )
 }

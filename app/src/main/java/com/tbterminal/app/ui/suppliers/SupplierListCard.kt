@@ -113,7 +113,7 @@ internal fun SupplierListCard(
                                 .weight(1f)
                                 .testTag("supplier-search-input"),
                             singleLine = true,
-                            textStyle = TextStyle(
+                            textStyle = TextStyle(fontFamily = com.tbterminal.app.ui.theme.KawanSans, 
                                 color = Color(0xFF1E293B),
                                 fontSize = 13.sp
                             ),
@@ -281,7 +281,7 @@ private fun SupplierToolbar(
                     onValueChange = onSearchChanged,
                     modifier = Modifier.weight(1f),
                     singleLine = true,
-                    textStyle = TextStyle(
+                    textStyle = TextStyle(fontFamily = com.tbterminal.app.ui.theme.KawanSans, 
                         fontSize = 13.sp,
                         color = SupplierSlate900,
                         fontWeight = FontWeight.Normal,

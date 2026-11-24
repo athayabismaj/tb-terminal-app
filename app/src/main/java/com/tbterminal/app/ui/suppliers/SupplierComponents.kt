@@ -12,7 +12,10 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
@@ -20,7 +23,6 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.rounded.Add
-import androidx.compose.material.icons.outlined.Check
 import androidx.compose.material.icons.outlined.CheckCircle
 import androidx.compose.material.icons.outlined.Close
 import androidx.compose.material.icons.outlined.Description
@@ -59,6 +61,12 @@ import com.tbterminal.app.data.model.Supplier
 import com.tbterminal.app.ui.components.AppConfirmDialog
 import com.tbterminal.app.ui.components.AppConfirmationSpec
 import com.tbterminal.app.ui.components.SkeletonBox
+import com.tbterminal.app.ui.customers.CustomerFilterOptionCard
+import com.tbterminal.app.ui.dashboard.owner.ownerTextStyle
+import com.tbterminal.app.ui.theme.Brand
+import com.tbterminal.app.ui.theme.Ink
+import com.tbterminal.app.ui.theme.Muted
+import com.tbterminal.app.ui.theme.OnBrand
 
 @Composable
 internal fun SupplierMessage(message: String, onDismiss: () -> Unit) {
@@ -273,9 +281,12 @@ internal fun SupplierFilterSheet(
     statusFilter: SupplierStatusFilter,
     onApplyFilter: (SupplierStatusFilter) -> Unit,
     onDismiss: () -> Unit,
+    sortOrder: SupplierSortOrder? = null,
+    onSortApply: ((SupplierSortOrder) -> Unit)? = null,
 ) {
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     var tempStatus by remember(statusFilter) { mutableStateOf(statusFilter) }
+    var tempSort by remember(sortOrder) { mutableStateOf(sortOrder ?: SupplierSortOrder.NAME_ASC) }
 
     ModalBottomSheet(
         onDismissRequest = onDismiss,
@@ -286,24 +297,25 @@ internal fun SupplierFilterSheet(
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(top = 10.dp, bottom = 6.dp),
+                    .padding(top = 12.dp, bottom = 4.dp),
                 contentAlignment = Alignment.Center
             ) {
                 Box(
                     modifier = Modifier
                         .size(width = 40.dp, height = 4.dp)
-                        .background(Color(0xFFCBD5E1), RoundedCornerShape(999.dp))
+                        .background(Color(0xFFCBD5E1), RoundedCornerShape(2.dp))
                 )
             }
-        },
-        tonalElevation = 0.dp
+        }
     ) {
         Column(
             modifier = Modifier
                 .fillMaxWidth()
+                .verticalScroll(rememberScrollState())
+                .navigationBarsPadding()
                 .padding(horizontal = 24.dp)
                 .padding(bottom = 24.dp),
-            verticalArrangement = Arrangement.spacedBy(20.dp)
+            verticalArrangement = Arrangement.spacedBy(18.dp)
         ) {
             // Header
             Row(
@@ -311,17 +323,28 @@ internal fun SupplierFilterSheet(
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                Column {
                     Text(
                         text = "Filter Supplier",
-                        fontSize = 18.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = Color(0xFF0F172A)
+                        style = ownerTextStyle(
+                            fontSize = 18.sp,
+                            lineHeight = 24.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = Ink
+                        )
                     )
                     Text(
-                        text = "Sesuaikan kriteria daftar supplier",
-                        fontSize = 12.sp,
-                        color = Color(0xFF64748B)
+                        text = if (sortOrder != null && onSortApply != null) {
+                            "Atur status dan urutan supplier"
+                        } else {
+                            "Atur status supplier yang ditampilkan"
+                        },
+                        style = ownerTextStyle(
+                            fontSize = 14.sp,
+                            lineHeight = 20.sp,
+                            fontWeight = FontWeight.Normal,
+                            color = Muted
+                        )
                     )
                 }
                 Box(
@@ -334,64 +357,109 @@ internal fun SupplierFilterSheet(
                 ) {
                     Icon(
                         imageVector = Icons.Outlined.Close,
-                        contentDescription = "Tutup",
+                        contentDescription = "Tutup filter",
                         tint = Color(0xFF64748B),
                         modifier = Modifier.size(16.dp)
                     )
                 }
             }
 
-            // Status Section
-            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                Text(
-                    text = "STATUS SUPPLIER",
-                    fontSize = 11.sp,
-                    fontWeight = FontWeight.Bold,
-                    letterSpacing = 0.5.sp,
-                    color = Color(0xFF64748B)
+            // Section 1: STATUS SUPPLIER
+            Text(
+                text = "Status supplier",
+                style = ownerTextStyle(
+                    fontSize = 14.sp,
+                    lineHeight = 20.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    color = Ink
                 )
-                SupplierFilterOptionCard(
-                    title = "Semua Status",
-                    selected = tempStatus == SupplierStatusFilter.ALL,
-                    onClick = { tempStatus = SupplierStatusFilter.ALL },
-                    testTag = "supplier-status-option-ALL"
-                )
-                SupplierFilterOptionCard(
-                    title = "Aktif",
-                    selected = tempStatus == SupplierStatusFilter.ACTIVE,
-                    onClick = { tempStatus = SupplierStatusFilter.ACTIVE },
-                    testTag = "supplier-status-option-ACTIVE"
-                )
-                SupplierFilterOptionCard(
-                    title = "Nonaktif",
-                    selected = tempStatus == SupplierStatusFilter.INACTIVE,
-                    onClick = { tempStatus = SupplierStatusFilter.INACTIVE },
-                    testTag = "supplier-status-option-INACTIVE"
-                )
+            )
+
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                SupplierStatusFilter.entries.forEach { filter ->
+                    CustomerFilterOptionCard(
+                        label = filter.chipLabel,
+                        isSelected = tempStatus == filter,
+                        onClick = { tempStatus = filter },
+                        modifier = Modifier
+                            .weight(1f)
+                            .testTag("supplier-status-option-${filter.name}")
+                    )
+                }
             }
 
-            // Sticky footer buttons
+            if (sortOrder != null && onSortApply != null) {
+                Text(
+                    text = "Urutan",
+                    style = ownerTextStyle(
+                        fontSize = 14.sp,
+                        lineHeight = 20.sp,
+                        fontWeight = FontWeight.SemiBold,
+                        color = Ink
+                    )
+                )
+
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    SupplierSortOrder.entries.forEach { order ->
+                        CustomerFilterOptionCard(
+                            label = order.label,
+                            isSelected = tempSort == order,
+                            onClick = { tempSort = order },
+                            modifier = Modifier
+                                .weight(1f)
+                                .testTag("supplier-sort-option-${order.name}")
+                        )
+                    }
+                }
+            }
+
+            Spacer(Modifier.height(8.dp))
+
+            // Footer Buttons
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.spacedBy(12.dp)
             ) {
-                OutlinedButton(
+                Button(
                     onClick = {
                         tempStatus = SupplierStatusFilter.ALL
+                        tempSort = SupplierSortOrder.NAME_ASC
                         onApplyFilter(SupplierStatusFilter.ALL)
+                        onSortApply?.invoke(SupplierSortOrder.NAME_ASC)
                         onDismiss()
                     },
                     modifier = Modifier
                         .weight(1f)
-                        .height(48.dp),
+                        .height(48.dp)
+                        .testTag("supplier-filter-reset"),
                     shape = RoundedCornerShape(12.dp),
-                    border = BorderStroke(1.dp, Color(0xFFE2E8F0))
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = Color.White,
+                        contentColor = Brand
+                    ),
+                    border = BorderStroke(1.dp, Brand)
                 ) {
-                    Text("Reset", color = Color(0xFF64748B), fontWeight = FontWeight.SemiBold)
+                    Text(
+                        text = "Reset",
+                        style = ownerTextStyle(
+                            fontSize = 14.sp,
+                            lineHeight = 20.sp,
+                            fontWeight = FontWeight.SemiBold,
+                            color = Brand
+                        )
+                    )
                 }
+
                 Button(
                     onClick = {
                         onApplyFilter(tempStatus)
+                        onSortApply?.invoke(tempSort)
                         onDismiss()
                     },
                     modifier = Modifier
@@ -400,54 +468,21 @@ internal fun SupplierFilterSheet(
                         .testTag("supplier-filter-done"),
                     shape = RoundedCornerShape(12.dp),
                     colors = ButtonDefaults.buttonColors(
-                        containerColor = Color(0xFF256B57),
+                        containerColor = Brand,
                         contentColor = Color.White
-                    )
+                    ),
+                    elevation = ButtonDefaults.buttonElevation(defaultElevation = 2.dp)
                 ) {
-                    Text("Terapkan", fontWeight = FontWeight.Bold)
+                    Text(
+                        text = "Terapkan",
+                        style = ownerTextStyle(
+                            fontSize = 14.sp,
+                            lineHeight = 20.sp,
+                            fontWeight = FontWeight.SemiBold,
+                            color = OnBrand
+                        )
+                    )
                 }
-            }
-        }
-    }
-}
-
-@Composable
-private fun SupplierFilterOptionCard(
-    title: String,
-    selected: Boolean,
-    onClick: () -> Unit,
-    testTag: String = ""
-) {
-    Surface(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clip(RoundedCornerShape(12.dp))
-            .clickable(onClick = onClick)
-            .then(if (testTag.isNotEmpty()) Modifier.testTag(testTag) else Modifier),
-        shape = RoundedCornerShape(12.dp),
-        color = if (selected) Color(0xFFEAF3EF) else Color(0xFFF8FAFC),
-        border = BorderStroke(1.dp, if (selected) Color(0xFF256B57) else Color(0xFFE2E8F0))
-    ) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 16.dp, vertical = 14.dp),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Text(
-                text = title,
-                fontSize = 14.sp,
-                fontWeight = if (selected) FontWeight.Bold else FontWeight.Medium,
-                color = if (selected) Color(0xFF256B57) else Color(0xFF334155)
-            )
-            if (selected) {
-                Icon(
-                    imageVector = Icons.Outlined.Check,
-                    contentDescription = null,
-                    tint = Color(0xFF256B57),
-                    modifier = Modifier.size(18.dp)
-                )
             }
         }
     }

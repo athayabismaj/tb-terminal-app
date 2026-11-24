@@ -24,6 +24,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -102,6 +103,12 @@ import com.tbterminal.app.ui.components.SkeletonBox
 import com.tbterminal.app.ui.components.TbMobileControlSheet
 import com.tbterminal.app.ui.components.TbMobileSheetDoneButton
 import com.tbterminal.app.ui.components.TopFloatingCapsule
+import com.tbterminal.app.ui.customers.CustomerFilterOptionCard
+import com.tbterminal.app.ui.dashboard.owner.ownerTextStyle
+import com.tbterminal.app.ui.theme.Brand
+import com.tbterminal.app.ui.theme.Ink
+import com.tbterminal.app.ui.theme.Muted
+import com.tbterminal.app.ui.theme.OnBrand
 import com.tbterminal.app.ui.theme.TbBackground
 
 // ── COLOR PALETTE ACCORDING TO HTML & RIWAYAT PENJUALAN DESIGN ──
@@ -127,15 +134,14 @@ private val RoleAdminText = Color(0xFF256B57)
 private val RoleKasirBg = Color(0xFFF1F5F9)
 private val RoleKasirText = Color(0xFF334155)
 
-enum class UserStatusFilter(val label: String) {
-    All("Semua status"),
-    Active("Aktif"),
-    Inactive("Nonaktif"),
+enum class UserStatusFilter(val label: String, val chipLabel: String) {
+    All("Semua status", "Semua"),
+    Active("Aktif", "Aktif"),
+    Inactive("Nonaktif", "Nonaktif"),
 }
 
 enum class UserRoleFilter(val label: String) {
     All("Semua"),
-    Owner("Owner"),
     Admin("Admin"),
     Kasir("Kasir"),
 }
@@ -183,7 +189,6 @@ fun UserManagementContent(
             }
             val matchesRole = when (roleFilter) {
                 UserRoleFilter.All -> true
-                UserRoleFilter.Owner -> staff.role == StaffRole.Owner
                 UserRoleFilter.Admin -> staff.role == StaffRole.Admin
                 UserRoleFilter.Kasir -> staff.role == StaffRole.Kasir
             }
@@ -255,7 +260,7 @@ fun UserManagementContent(
                                     .weight(1f)
                                     .testTag("user-search-input"),
                                 singleLine = true,
-                                textStyle = TextStyle(
+                                textStyle = TextStyle(fontFamily = com.tbterminal.app.ui.theme.KawanSans, 
                                     color = Color(0xFF1E293B),
                                     fontSize = 13.sp
                                 ),
@@ -621,7 +626,7 @@ private fun UserToolbar(
                         value = searchQuery,
                         onValueChange = onSearchQueryChanged,
                         singleLine = true,
-                        textStyle = TextStyle(
+                        textStyle = TextStyle(fontFamily = com.tbterminal.app.ui.theme.KawanSans, 
                             color = Slate900,
                             fontSize = if (compact) 13.sp else 14.sp,
                         ),
@@ -1100,15 +1105,18 @@ private fun UserMenuItem(label: String, icon: ImageVector, color: Color = Slate9
 // ═════════════════════════════════════════════════════════════════════════════
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun UserFilterSheet(
+internal fun UserFilterSheet(
     roleFilter: UserRoleFilter,
     statusFilter: UserStatusFilter,
     onApplyFilter: (UserRoleFilter, UserStatusFilter) -> Unit,
     onDismiss: () -> Unit,
+    sortOrder: UserSortOrder? = null,
+    onSortApply: ((UserSortOrder) -> Unit)? = null,
 ) {
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     var tempRoleFilter by remember(roleFilter) { mutableStateOf(roleFilter) }
     var tempStatusFilter by remember(statusFilter) { mutableStateOf(statusFilter) }
+    var tempSortOrder by remember(sortOrder) { mutableStateOf(sortOrder ?: UserSortOrder.NAME_ASC) }
 
     ModalBottomSheet(
         onDismissRequest = onDismiss,
@@ -1119,25 +1127,26 @@ private fun UserFilterSheet(
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(top = 10.dp, bottom = 6.dp),
+                    .padding(top = 12.dp, bottom = 4.dp),
                 contentAlignment = Alignment.Center,
             ) {
                 Box(
                     modifier = Modifier
                         .size(width = 40.dp, height = 4.dp)
-                        .background(Color(0xFFCBD5E1), RoundedCornerShape(999.dp)),
+                        .background(Color(0xFFCBD5E1), RoundedCornerShape(2.dp)),
                 )
             }
         },
-        tonalElevation = 0.dp,
     ) {
         Column(
             modifier = Modifier
                 .fillMaxWidth()
+                .verticalScroll(rememberScrollState())
+                .navigationBarsPadding()
                 .padding(horizontal = 24.dp)
                 .padding(bottom = 24.dp)
                 .testTag("user-filter-sheet"),
-            verticalArrangement = Arrangement.spacedBy(20.dp),
+            verticalArrangement = Arrangement.spacedBy(18.dp),
         ) {
             // Header
             Row(
@@ -1145,17 +1154,28 @@ private fun UserFilterSheet(
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                Column {
                     Text(
                         text = "Filter Pengguna",
-                        fontSize = 18.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = Color(0xFF0F172A),
+                        style = ownerTextStyle(
+                            fontSize = 18.sp,
+                            lineHeight = 24.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = Ink,
+                        ),
                     )
                     Text(
-                        text = "Atur peran dan status akun pengguna",
-                        fontSize = 12.sp,
-                        color = Color(0xFF64748B),
+                        text = if (sortOrder != null && onSortApply != null) {
+                            "Atur peran, status, dan urutan pengguna"
+                        } else {
+                            "Atur peran dan status akun pengguna"
+                        },
+                        style = ownerTextStyle(
+                            fontSize = 14.sp,
+                            lineHeight = 20.sp,
+                            fontWeight = FontWeight.Normal,
+                            color = Muted,
+                        ),
                     )
                 }
                 Box(
@@ -1175,92 +1195,128 @@ private fun UserFilterSheet(
                 }
             }
 
-            // Group 1: PERAN PENGGUNA
-            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                Text(
-                    text = "PERAN PENGGUNA",
-                    fontSize = 11.sp,
-                    fontWeight = FontWeight.Bold,
-                    letterSpacing = 0.5.sp,
-                    color = Color(0xFF64748B),
-                )
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .background(Color(0xFFF1F5F9), RoundedCornerShape(12.dp))
-                        .padding(4.dp)
-                        .testTag("user-filter"),
-                    horizontalArrangement = Arrangement.spacedBy(4.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    UserRoleFilter.entries.forEach { filter ->
-                        val isSelected = filter == tempRoleFilter
-                        Surface(
-                            modifier = Modifier
-                                .weight(1f)
-                                .clickable { tempRoleFilter = filter }
-                                .testTag("user-role-filter-${filter.name}"),
-                            shape = RoundedCornerShape(8.dp),
-                            color = if (isSelected) Color.White else Color.Transparent,
-                            shadowElevation = if (isSelected) 1.dp else 0.dp,
-                        ) {
-                            Text(
-                                text = filter.label,
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .padding(vertical = 8.dp),
-                                fontSize = 12.sp,
-                                fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
-                                color = if (isSelected) Color(0xFF1E293B) else Color(0xFF64748B),
-                                textAlign = TextAlign.Center,
-                            )
-                        }
-                    }
-                }
-            }
-
-            // Group 2: STATUS AKUN
-            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                Text(
-                    text = "STATUS AKUN",
-                    fontSize = 11.sp,
-                    fontWeight = FontWeight.Bold,
-                    letterSpacing = 0.5.sp,
-                    color = Color(0xFF64748B),
-                )
-                UserStatusFilter.entries.forEach { statusOption ->
-                    UserFilterOptionCard(
-                        title = statusOption.label,
-                        selected = tempStatusFilter == statusOption,
-                        onClick = { tempStatusFilter = statusOption },
-                        testTag = "user-status-option-${statusOption.name}"
+            // Section 1: Peran pengguna
+            Text(
+                text = "Peran pengguna",
+                style = ownerTextStyle(
+                    fontSize = 14.sp,
+                    lineHeight = 20.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    color = Ink,
+                ),
+            )
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .testTag("user-filter"),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                UserRoleFilter.entries.forEach { filter ->
+                    CustomerFilterOptionCard(
+                        label = filter.label,
+                        isSelected = filter == tempRoleFilter,
+                        onClick = { tempRoleFilter = filter },
+                        modifier = Modifier
+                            .weight(1f)
+                            .testTag("user-role-filter-${filter.name}"),
                     )
                 }
             }
 
-            // Sticky footer buttons
+            // Section 2: Status akun
+            Text(
+                text = "Status akun",
+                style = ownerTextStyle(
+                    fontSize = 14.sp,
+                    lineHeight = 20.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    color = Ink,
+                ),
+            )
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                UserStatusFilter.entries.forEach { statusOption ->
+                    CustomerFilterOptionCard(
+                        label = statusOption.chipLabel,
+                        isSelected = tempStatusFilter == statusOption,
+                        onClick = { tempStatusFilter = statusOption },
+                        modifier = Modifier
+                            .weight(1f)
+                            .testTag("user-status-option-${statusOption.name}"),
+                    )
+                }
+            }
+
+            if (sortOrder != null && onSortApply != null) {
+                Text(
+                    text = "Urutan",
+                    style = ownerTextStyle(
+                        fontSize = 14.sp,
+                        lineHeight = 20.sp,
+                        fontWeight = FontWeight.SemiBold,
+                        color = Ink,
+                    ),
+                )
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    UserSortOrder.entries.forEach { order ->
+                        CustomerFilterOptionCard(
+                            label = order.label,
+                            isSelected = tempSortOrder == order,
+                            onClick = { tempSortOrder = order },
+                            modifier = Modifier
+                                .weight(1f)
+                                .testTag("user-sort-option-${order.name}"),
+                        )
+                    }
+                }
+            }
+
+            Spacer(Modifier.height(8.dp))
+
+            // Footer buttons
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.spacedBy(12.dp),
             ) {
-                OutlinedButton(
+                Button(
                     onClick = {
                         tempRoleFilter = UserRoleFilter.All
                         tempStatusFilter = UserStatusFilter.All
+                        tempSortOrder = UserSortOrder.NAME_ASC
                         onApplyFilter(UserRoleFilter.All, UserStatusFilter.All)
+                        onSortApply?.invoke(UserSortOrder.NAME_ASC)
                         onDismiss()
                     },
                     modifier = Modifier
                         .weight(1f)
-                        .height(48.dp),
+                        .height(48.dp)
+                        .testTag("user-filter-reset"),
                     shape = RoundedCornerShape(12.dp),
-                    border = BorderStroke(1.dp, Color(0xFFE2E8F0)),
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = Color.White,
+                        contentColor = Brand,
+                    ),
+                    border = BorderStroke(1.dp, Brand),
                 ) {
-                    Text("Reset", color = Color(0xFF64748B), fontWeight = FontWeight.SemiBold)
+                    Text(
+                        text = "Reset",
+                        style = ownerTextStyle(
+                            fontSize = 14.sp,
+                            lineHeight = 20.sp,
+                            fontWeight = FontWeight.SemiBold,
+                            color = Brand,
+                        ),
+                    )
                 }
                 Button(
                     onClick = {
                         onApplyFilter(tempRoleFilter, tempStatusFilter)
+                        onSortApply?.invoke(tempSortOrder)
                         onDismiss()
                     },
                     modifier = Modifier
@@ -1268,52 +1324,22 @@ private fun UserFilterSheet(
                         .height(48.dp)
                         .testTag("user-filter-done"),
                     shape = RoundedCornerShape(12.dp),
-                    colors = ButtonDefaults.buttonColors(containerColor = BrandSage),
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = Brand,
+                        contentColor = Color.White,
+                    ),
+                    elevation = ButtonDefaults.buttonElevation(defaultElevation = 2.dp),
                 ) {
-                    Text("Terapkan", fontWeight = FontWeight.Bold)
+                    Text(
+                        text = "Terapkan",
+                        style = ownerTextStyle(
+                            fontSize = 14.sp,
+                            lineHeight = 20.sp,
+                            fontWeight = FontWeight.SemiBold,
+                            color = OnBrand,
+                        ),
+                    )
                 }
-            }
-        }
-    }
-}
-
-@Composable
-private fun UserFilterOptionCard(
-    title: String,
-    selected: Boolean,
-    onClick: () -> Unit,
-    testTag: String = "",
-) {
-    Surface(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clip(RoundedCornerShape(12.dp))
-            .clickable(onClick = onClick)
-            .then(if (testTag.isNotEmpty()) Modifier.testTag(testTag) else Modifier),
-        shape = RoundedCornerShape(12.dp),
-        color = if (selected) BrandSageLight else Color(0xFFF8FAFC),
-        border = BorderStroke(1.dp, if (selected) BrandSage else Color(0xFFE2E8F0)),
-    ) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 16.dp, vertical = 14.dp),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Text(
-                text = title,
-                fontSize = 14.sp,
-                fontWeight = if (selected) FontWeight.Bold else FontWeight.Medium,
-                color = if (selected) BrandSage else Color(0xFF334155),
-            )
-            if (selected) {
-                Icon(
-                    imageVector = Icons.Outlined.Check,
-                    contentDescription = null,
-                    tint = BrandSage,
-                    modifier = Modifier.size(18.dp),
-                )
             }
         }
     }

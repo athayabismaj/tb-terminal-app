@@ -23,6 +23,12 @@ enum class StaffStatus {
     Inactive
 }
 
+enum class UserSortOrder(val label: String) {
+    NAME_ASC("Nama A\u2013Z"),
+    NAME_DESC("Nama Z\u2013A"),
+    RECENT_LOGIN("Login terbaru")
+}
+
 data class StaffMember(
     val id: String,
     val name: String,

@@ -4,6 +4,7 @@ import com.tbterminal.app.data.model.Customer
 import java.math.BigDecimal
 
 internal const val CUSTOMER_PAGE_SIZE = 10
+internal const val CUSTOMER_REACTIVATE_ENABLED = true
 
 enum class CustomerCategoryFilter(val label: String) {
     ALL("Semua pelanggan"),
@@ -11,10 +12,14 @@ enum class CustomerCategoryFilter(val label: String) {
     CONTRACTOR("Kontraktor")
 }
 
-enum class CustomerStatusFilter(val label: String) {
-    ALL("Semua status"),
-    ACTIVE("Aktif"),
-    INACTIVE("Nonaktif")
+enum class CustomerStatusFilter(
+    val label: String,
+    val chipLabel: String,
+    val apiValue: String
+) {
+    ALL(label = "Semua status", chipLabel = "Semua", apiValue = "all"),
+    ACTIVE(label = "Aktif", chipLabel = "Aktif", apiValue = "active"),
+    INACTIVE(label = "Nonaktif", chipLabel = "Nonaktif", apiValue = "inactive")
 }
 
 data class CustomerListUiState(
@@ -83,5 +88,10 @@ data class CustomerFormUiState(
 data class CustomerDetailUiState(
     val customer: Customer? = null,
     val isLoading: Boolean = true,
-    val errorMessage: String? = null
+    val isMutating: Boolean = false,
+    val isDeactivated: Boolean = false,
+    val isReactivated: Boolean = false,
+    val isNotFoundError: Boolean = false,
+    val errorMessage: String? = null,
+    val actionErrorMessage: String? = null
 )
