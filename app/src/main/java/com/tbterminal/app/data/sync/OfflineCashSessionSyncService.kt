@@ -9,6 +9,7 @@ import com.tbterminal.app.data.local.model.SyncStatus
 import com.tbterminal.app.data.remote.OfflineCashSessionCloseSyncRequestDto
 import com.tbterminal.app.data.remote.OfflineCashSessionOpenSyncRequestDto
 import com.tbterminal.app.data.remote.SalesApi
+import com.tbterminal.app.navigation.AppAccessPolicy
 import java.io.IOException
 import java.math.BigDecimal
 import java.math.RoundingMode
@@ -18,7 +19,8 @@ import java.time.ZoneId
 class OfflineCashSessionSyncService(
     private val database: TbTerminalDatabase,
     private val salesApi: SalesApi,
-    private val deviceId: String
+    private val deviceId: String,
+    private val roleProvider: () -> String? = { "KASIR" },
 ) {
     suspend fun syncOpenSession(localSessionId: Long): OfflineCashSessionSyncResult {
         val session = database.cashSessionDao().getByLocalId(localSessionId)
@@ -34,6 +36,15 @@ class OfflineCashSessionSyncService(
         }
 
         return runCatching {
+            if (!AppAccessPolicy.canOpenCashSession(roleProvider())) {
+                return@runCatching fail(
+                    localSessionId = localSessionId,
+                    message = "Hanya kasir yang dapat membuka sesi kas.",
+                    errorCode = "FORBIDDEN_CASH_SESSION_ROLE",
+                    retryIncrement = 0,
+                    kind = OfflineCheckoutSyncFailureKind.CONFLICT,
+                )
+            }
             val lockedSession = database.cashSessionDao().getByLocalId(localSessionId)
                 ?: return@runCatching fail(localSessionId, "Sesi kas lokal tidak ditemukan.", 1)
             val request = when (val buildResult = buildRequest(lockedSession)) {

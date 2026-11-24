@@ -26,7 +26,8 @@ fun CashierCashReconciliationScreen(
     viewModel: CashReconciliationViewModel = viewModel(
         factory = CashReconciliationViewModel.factory(
             repository = cashReconciliationRepository,
-            cashSessionLocalDataSource = cashSessionLocalDataSource
+            cashSessionLocalDataSource = cashSessionLocalDataSource,
+            actorRole = role,
         )
     )
 ) {

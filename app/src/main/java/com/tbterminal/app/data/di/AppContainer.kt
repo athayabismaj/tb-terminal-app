@@ -147,7 +147,8 @@ class DefaultAppContainer(
     override val localCashSessionService: LocalCashSessionService by lazy {
         LocalCashSessionService(
             database = localDatabase,
-            deviceId = deviceIdProvider.deviceId
+            deviceId = deviceIdProvider.deviceId,
+            roleProvider = { sessionManager.readSessionUser()?.role },
         )
     }
 
@@ -174,7 +175,8 @@ class DefaultAppContainer(
         OfflineCashSessionSyncService(
             database = localDatabase,
             salesApi = networkModule.salesApi,
-            deviceId = deviceIdProvider.deviceId
+            deviceId = deviceIdProvider.deviceId,
+            roleProvider = { sessionManager.readSessionUser()?.role },
         )
     }
 

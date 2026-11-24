@@ -77,7 +77,6 @@ internal object AppAccessPolicy {
         AppCapability.POS,
         AppCapability.OWN_TRANSACTIONS,
         AppCapability.APPROVED_TRANSACTION_CORRECTION,
-        AppCapability.CASHIER_SHIFT,
     )) - setOf(
         AppCapability.USER_MANAGEMENT,
         AppCapability.SERVER_BACKUP,
@@ -111,6 +110,8 @@ internal object AppAccessPolicy {
         }
         return capability in capabilities
     }
+
+    fun canOpenCashSession(role: String?): Boolean = can(role, AppCapability.CASHIER_SHIFT)
 
     fun visibleMenuFeatures(role: String?): List<AppMenuFeature> =
         AppMenuFeature.entries.filter { feature -> can(role, feature.capability) }

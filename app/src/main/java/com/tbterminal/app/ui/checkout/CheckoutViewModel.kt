@@ -33,6 +33,7 @@ import com.tbterminal.app.data.sync.InternetStatus
 import com.tbterminal.app.data.sync.OfflineSyncScheduler
 import com.tbterminal.app.data.sync.OfflineStatus
 import com.tbterminal.app.data.sync.OfflineStatusRepository
+import com.tbterminal.app.navigation.AppAccessPolicy
 import com.tbterminal.app.ui.common.UiText
 import com.tbterminal.app.ui.common.viewModelFactory
 import java.math.BigDecimal
@@ -72,8 +73,11 @@ class CheckoutViewModel(
     private val localAppSettingsDataSource: LocalAppSettingsDataSource? = null,
     private val systemRepository: SystemRepository? = null,
     private val quotationRepository: com.tbterminal.app.data.repository.QuotationRepository? = null,
+    private val actorRole: String = "KASIR",
 ) : ViewModel() {
-    private val _uiState = MutableStateFlow(CheckoutUiState())
+    private val _uiState = MutableStateFlow(
+        CheckoutUiState(canOpenCashSession = AppAccessPolicy.canOpenCashSession(actorRole))
+    )
     val uiState: StateFlow<CheckoutUiState> = _uiState.asStateFlow()
 
     private val _checkoutEvents = MutableSharedFlow<CheckoutEvent>(
@@ -214,6 +218,12 @@ class CheckoutViewModel(
     }
 
     fun openCashSession() {
+        if (!_uiState.value.canOpenCashSession) {
+            _uiState.update { state ->
+                state.copy(cashSessionError = UiText.DynamicString("Hanya kasir yang dapat membuka sesi kas."))
+            }
+            return
+        }
         val startingCash = _uiState.value.startingCashInput.toBigDecimalOrNull()
         if (startingCash == null || startingCash < BigDecimal.ZERO) {
             _uiState.update { state ->
@@ -2194,6 +2204,7 @@ class CheckoutViewModel(
         customers = customers,
         activeCashSession = activeCashSession,
         hasActiveCashSession = hasActiveCashSession,
+        canOpenCashSession = canOpenCashSession,
         heldCarts = heldCarts,
         storeName = storeName,
         storeNpwp = storeNpwp,
@@ -2473,6 +2484,7 @@ class CheckoutViewModel(
             localAppSettingsDataSource: LocalAppSettingsDataSource? = null,
             systemRepository: SystemRepository? = null,
             quotationRepository: com.tbterminal.app.data.repository.QuotationRepository? = null,
+            actorRole: String = "KASIR",
         ): ViewModelProvider.Factory {
             return viewModelFactory {
                 CheckoutViewModel(
@@ -2489,6 +2501,7 @@ class CheckoutViewModel(
                     localAppSettingsDataSource = localAppSettingsDataSource,
                     systemRepository = systemRepository,
                     quotationRepository = quotationRepository,
+                    actorRole = actorRole,
                 )
             }
         }

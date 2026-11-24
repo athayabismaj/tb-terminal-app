@@ -46,6 +46,7 @@ data class CheckoutUiState(
     val splitPaymentLines: List<SplitPaymentLineUi> = emptyList(),
     val activeCashSession: ActiveCashSessionUi? = null,
     val hasActiveCashSession: Boolean = false,
+    val canOpenCashSession: Boolean = true,
     val isCashSessionLoading: Boolean = false,
     val isOpeningCashSession: Boolean = false,
     val startingCashInput: String = "",

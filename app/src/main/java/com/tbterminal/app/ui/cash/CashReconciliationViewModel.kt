@@ -18,6 +18,7 @@ import com.tbterminal.app.data.repository.RepositoryResult
 import com.tbterminal.app.data.sync.BackendStatus
 import com.tbterminal.app.data.sync.OfflineStatus
 import com.tbterminal.app.data.sync.OfflineStatusRepository
+import com.tbterminal.app.navigation.AppAccessPolicy
 import com.tbterminal.app.ui.common.viewModelFactory
 import java.math.BigDecimal
 import java.time.Instant
@@ -36,9 +37,15 @@ class CashReconciliationViewModel(
     private val localCashExpenseService: LocalCashExpenseService? = null,
     private val offlineStatusRepository: OfflineStatusRepository? = null,
     private val cashierUserId: String? = null,
-    private val cashierNameFallback: String? = null
+    private val cashierNameFallback: String? = null,
+    private val actorRole: String = "KASIR",
 ) : ViewModel() {
-    private val _uiState = MutableStateFlow(CashReconciliationUiState(isLoading = true))
+    private val _uiState = MutableStateFlow(
+        CashReconciliationUiState(
+            isLoading = true,
+            canOpenCashSession = AppAccessPolicy.canOpenCashSession(actorRole),
+        )
+    )
     val uiState: StateFlow<CashReconciliationUiState> = _uiState.asStateFlow()
     private var latestOfflineStatus = OfflineStatus()
 
@@ -71,7 +78,11 @@ class CashReconciliationViewModel(
                             isUsingLocalActiveSession = false,
                             localCashSessionId = null,
                             localCashSessionSyncStatus = null,
-                            message = "Mode kas lokal aktif. Buka sesi lokal untuk mulai transaksi offline."
+                            message = if (it.canOpenCashSession) {
+                                "Mode kas lokal aktif. Buka sesi lokal untuk mulai transaksi offline."
+                            } else {
+                                "Mode kas lokal aktif. Hanya kasir yang dapat membuka sesi kas."
+                            }
                         )
                     }
                 }
@@ -143,6 +154,9 @@ class CashReconciliationViewModel(
     }
 
     fun openSession() {
+        if (!_uiState.value.canOpenCashSession) {
+            return setActionError("Hanya kasir yang dapat membuka sesi kas.")
+        }
         val startingCash = _uiState.value.openingCashInput.toBigDecimalOrNull()
             ?: return setActionError("Modal awal wajib diisi dengan angka valid.")
         if (startingCash < BigDecimal.ZERO) return setActionError("Modal awal tidak boleh kurang dari nol.")
@@ -597,7 +611,8 @@ class CashReconciliationViewModel(
             localCashExpenseService: LocalCashExpenseService? = null,
             offlineStatusRepository: OfflineStatusRepository? = null,
             cashierUserId: String? = null,
-            cashierNameFallback: String? = null
+            cashierNameFallback: String? = null,
+            actorRole: String = "KASIR",
         ): ViewModelProvider.Factory {
             return viewModelFactory {
                 CashReconciliationViewModel(
@@ -607,7 +622,8 @@ class CashReconciliationViewModel(
                     localCashExpenseService = localCashExpenseService,
                     offlineStatusRepository = offlineStatusRepository,
                     cashierUserId = cashierUserId,
-                    cashierNameFallback = cashierNameFallback
+                    cashierNameFallback = cashierNameFallback,
+                    actorRole = actorRole,
                 )
             }
         }

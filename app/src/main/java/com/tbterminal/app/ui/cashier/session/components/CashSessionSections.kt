@@ -1192,16 +1192,42 @@ fun OpenShiftForm(
     onOpeningCashChanged: (String) -> Unit,
     onOpenSession: () -> Unit
 ) {
-    CashierBukaShiftView(
-        cashierName = "Kasir",
-        terminalName = "Terminal Barokah Jaya",
-        openingCashInput = uiState.openingCashInput,
-        onOpeningCashChanged = onOpeningCashChanged,
-        onOpenSession = onOpenSession,
-        isSubmitting = uiState.isSubmitting,
-        errorMessage = if (!uiState.hasActiveSession) uiState.errorMessage else null,
-        modifier = modifier
-    )
+    if (uiState.canOpenCashSession) {
+        CashierBukaShiftView(
+            cashierName = "Kasir",
+            terminalName = "Terminal Barokah Jaya",
+            openingCashInput = uiState.openingCashInput,
+            onOpeningCashChanged = onOpeningCashChanged,
+            onOpenSession = onOpenSession,
+            isSubmitting = uiState.isSubmitting,
+            errorMessage = if (!uiState.hasActiveSession) uiState.errorMessage else null,
+            modifier = modifier
+        )
+    } else {
+        Surface(
+            modifier = modifier.fillMaxWidth(),
+            shape = RoundedCornerShape(18.dp),
+            color = Color.White,
+            border = BorderStroke(1.dp, Color(0xFFE2E8F0)),
+        ) {
+            Column(
+                modifier = Modifier.padding(24.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                Text(
+                    text = "Belum Ada Sesi Kas Aktif",
+                    color = Color(0xFF0F172A),
+                    fontSize = 18.sp,
+                    fontWeight = FontWeight.Bold,
+                )
+                Text(
+                    text = "Hanya kasir yang dapat membuka sesi kas.",
+                    color = Color(0xFF64748B),
+                    fontSize = 13.sp,
+                )
+            }
+        }
+    }
 }
 
 /**

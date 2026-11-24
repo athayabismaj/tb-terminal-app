@@ -1,5 +1,6 @@
 package com.tbterminal.app.ui.cashier.session
 
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -11,7 +12,10 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.Surface
+import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -21,7 +25,9 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import com.tbterminal.app.ui.cash.CashReconciliationUiState
 import com.tbterminal.app.ui.cashier.session.components.CashierBukaShiftView
 import com.tbterminal.app.ui.cashier.session.components.LocalCashSessionBadges
@@ -110,17 +116,43 @@ fun CashierCashSessionScreen(
                         itemCount = 3
                     )
                 } else if (!uiState.hasActiveSession) {
-                    // FORM BUKA SESI SHIFT BARU (Keputusan 2)
-                    CashierBukaShiftView(
-                        cashierName = "Kasir",
-                        terminalName = "Terminal Barokah Jaya",
-                        openingCashInput = uiState.openingCashInput,
-                        onOpeningCashChanged = onOpeningCashChanged,
-                        onOpenSession = onOpenSession,
-                        isSubmitting = uiState.isSubmitting,
-                        errorMessage = if (!uiState.hasActiveSession) uiState.errorMessage else null,
-                        modifier = Modifier.fillMaxWidth()
-                    )
+                    if (uiState.canOpenCashSession) {
+                        // FORM BUKA SESI SHIFT BARU (Keputusan 2)
+                        CashierBukaShiftView(
+                            cashierName = "Kasir",
+                            terminalName = "Terminal Barokah Jaya",
+                            openingCashInput = uiState.openingCashInput,
+                            onOpeningCashChanged = onOpeningCashChanged,
+                            onOpenSession = onOpenSession,
+                            isSubmitting = uiState.isSubmitting,
+                            errorMessage = if (!uiState.hasActiveSession) uiState.errorMessage else null,
+                            modifier = Modifier.fillMaxWidth()
+                        )
+                    } else {
+                        Surface(
+                            modifier = Modifier.fillMaxWidth(),
+                            shape = RoundedCornerShape(18.dp),
+                            color = Color.White,
+                            border = BorderStroke(1.dp, Color(0xFFE2E8F0)),
+                        ) {
+                            Column(
+                                modifier = Modifier.padding(24.dp),
+                                verticalArrangement = Arrangement.spacedBy(8.dp),
+                            ) {
+                                Text(
+                                    text = "Belum Ada Sesi Kas Aktif",
+                                    color = Color(0xFF0F172A),
+                                    fontSize = 18.sp,
+                                    fontWeight = FontWeight.Bold,
+                                )
+                                Text(
+                                    text = "Hanya kasir yang dapat membuka sesi kas.",
+                                    color = Color(0xFF64748B),
+                                    fontSize = 13.sp,
+                                )
+                            }
+                        }
+                    }
                 } else {
                     // ── SHIFT AKTIF (FASE 4) ──
 

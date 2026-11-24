@@ -140,7 +140,8 @@ fun CashierDashboardScreen(
             repository = cashReconciliationRepository,
             cashSessionLocalDataSource = cashSessionLocalDataSource,
             localCashExpenseService = localCashExpenseService,
-            cashierNameFallback = name
+            cashierNameFallback = name,
+            actorRole = role,
         )
     )
     val cashUiState by cashViewModel.uiState.collectAsStateWithLifecycle()
@@ -193,22 +194,48 @@ fun CashierDashboardScreen(
                     SkeletonCard()
                 }
             } else if (uiState.activeSession == null && !cashUiState.hasActiveSession) {
-                // Layar Buka Shift sederhana: input modal awal kas dan satu tombol utama
+                // Layar Buka Shift sederhana: input modal awal kas dan satu tombol utama (khusus kasir)
                 Column(
                     modifier = Modifier
                         .fillMaxWidth()
                         .widthIn(max = 480.dp)
                         .padding(16.dp)
                 ) {
-                    CashierBukaShiftView(
-                        cashierName = name,
-                        terminalName = "Terminal Barokah Jaya",
-                        openingCashInput = cashUiState.openingCashInput,
-                        onOpeningCashChanged = cashViewModel::onOpeningCashChanged,
-                        onOpenSession = cashViewModel::openSession,
-                        isSubmitting = cashUiState.isSubmitting,
-                        errorMessage = cashUiState.errorMessage
-                    )
+                    if (cashUiState.canOpenCashSession) {
+                        CashierBukaShiftView(
+                            cashierName = name,
+                            terminalName = "Terminal Barokah Jaya",
+                            openingCashInput = cashUiState.openingCashInput,
+                            onOpeningCashChanged = cashViewModel::onOpeningCashChanged,
+                            onOpenSession = cashViewModel::openSession,
+                            isSubmitting = cashUiState.isSubmitting,
+                            errorMessage = cashUiState.errorMessage
+                        )
+                    } else {
+                        Surface(
+                            modifier = Modifier.fillMaxWidth(),
+                            shape = RoundedCornerShape(18.dp),
+                            color = Color.White,
+                            border = BorderStroke(1.dp, Color(0xFFE2E8F0)),
+                        ) {
+                            Column(
+                                modifier = Modifier.padding(24.dp),
+                                verticalArrangement = Arrangement.spacedBy(8.dp),
+                            ) {
+                                Text(
+                                    text = "Belum Ada Sesi Kas Aktif",
+                                    color = Color(0xFF0F172A),
+                                    fontSize = 18.sp,
+                                    fontWeight = FontWeight.Bold,
+                                )
+                                Text(
+                                    text = "Hanya kasir yang dapat membuka sesi kas.",
+                                    color = Color(0xFF64748B),
+                                    fontSize = 13.sp,
+                                )
+                            }
+                        }
+                    }
                 }
             }
         }
