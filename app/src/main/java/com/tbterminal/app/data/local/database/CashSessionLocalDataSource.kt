@@ -36,6 +36,10 @@ class CashSessionLocalDataSource(
         }
     }
 
+    suspend fun getUnsyncedOfflineSessions(): List<LocalCashSessionEntity> {
+        return cashSessionDao.getUnsyncedOfflineSessions()
+    }
+
     suspend fun mirrorRemoteSession(session: CashSession): LocalCashSessionEntity {
         val existing = cashSessionDao.getByServerId(session.id)
         val entity = session.toLocalCashSessionEntity(existing = existing)

@@ -1,6 +1,8 @@
 package com.tbterminal.app.data.repository
 
+import com.tbterminal.app.data.local.dao.CashSessionDao
 import com.tbterminal.app.data.local.dao.SyncQueueDao
+import com.tbterminal.app.data.local.entity.LocalCashSessionEntity
 import com.tbterminal.app.data.local.entity.SyncQueueEntity
 import com.tbterminal.app.data.local.model.SyncEntityType
 import com.tbterminal.app.data.local.model.SyncOperation
@@ -10,6 +12,8 @@ import com.tbterminal.app.data.sync.OfflineCashSessionSyncResult
 import com.tbterminal.app.data.sync.OfflineCashSessionSyncService
 import com.tbterminal.app.data.sync.OfflineCheckoutSyncResult
 import com.tbterminal.app.data.sync.OfflineCheckoutSyncService
+import com.tbterminal.app.data.sync.OfflineSessionAgeAlert
+import com.tbterminal.app.data.sync.OfflineSessionAgePolicy
 import com.tbterminal.app.data.sync.SyncErrorCategory
 import com.tbterminal.app.data.sync.SyncErrorClassification
 import com.tbterminal.app.data.sync.SyncErrorClassifier
@@ -17,28 +21,27 @@ import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneId
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.map
 
 class SyncMonitoringRepository(
     private val syncQueueDao: SyncQueueDao,
     private val offlineCashSessionSyncService: OfflineCashSessionSyncService,
     private val offlineCheckoutSyncService: OfflineCheckoutSyncService,
-    private val offlineCashExpenseSyncService: OfflineCashExpenseSyncService
+    private val offlineCashExpenseSyncService: OfflineCashExpenseSyncService,
+    private val cashSessionDao: CashSessionDao? = null,
+    private val clockMillis: () -> Long = { System.currentTimeMillis() }
 ) {
     fun observeSnapshot(): Flow<SyncMonitoringSnapshot> {
-        return syncQueueDao.observeQueue().map { queue ->
-            val startOfToday = LocalDate.now()
-                .atStartOfDay(ZoneId.systemDefault())
-                .toInstant()
-                .toEpochMilli()
-            SyncMonitoringSnapshot(
-                totalPending = queue.count { it.status == SyncStatus.PENDING },
-                totalSyncing = queue.count { it.status == SyncStatus.SYNCING },
-                totalFailed = queue.count { it.status == SyncStatus.FAILED },
-                totalConflict = queue.count { it.status == SyncStatus.CONFLICT },
-                totalSyncedToday = queue.count { it.status == SyncStatus.SYNCED && it.updatedAt >= startOfToday },
-                queueItems = queue.map { it.toUiModel() }
-            )
+        val dao = cashSessionDao
+        return if (dao == null) {
+            syncQueueDao.observeQueue().map { queue ->
+                buildSnapshot(queue = queue, sessions = emptyList())
+            }
+        } else {
+            combine(syncQueueDao.observeQueue(), dao.observeSessions()) { queue, sessions ->
+                buildSnapshot(queue = queue, sessions = sessions)
+            }
         }
     }
 
@@ -48,20 +51,37 @@ class SyncMonitoringRepository(
             syncQueueDao.getByStatus(SyncStatus.FAILED, MAX_QUEUE_READ) +
             syncQueueDao.getByStatus(SyncStatus.CONFLICT, MAX_QUEUE_READ) +
             syncQueueDao.getByStatus(SyncStatus.SYNCED, MAX_QUEUE_READ)
+        val sessions = cashSessionDao?.getUnsyncedOfflineSessions().orEmpty()
+        return buildSnapshot(
+            queue = queue.distinctBy { it.id }.sortedByDescending { it.updatedAt },
+            sessions = sessions
+        )
+    }
+
+    private fun buildSnapshot(
+        queue: List<SyncQueueEntity>,
+        sessions: List<LocalCashSessionEntity>
+    ): SyncMonitoringSnapshot {
         val startOfToday = LocalDate.now()
             .atStartOfDay(ZoneId.systemDefault())
             .toInstant()
             .toEpochMilli()
+        val ageAlert = if (sessions.isEmpty()) {
+            null
+        } else {
+            OfflineSessionAgePolicy.evaluateUnsyncedSessions(
+                sessions = sessions,
+                nowMillis = clockMillis()
+            )
+        }
         return SyncMonitoringSnapshot(
             totalPending = queue.count { it.status == SyncStatus.PENDING },
             totalSyncing = queue.count { it.status == SyncStatus.SYNCING },
             totalFailed = queue.count { it.status == SyncStatus.FAILED },
             totalConflict = queue.count { it.status == SyncStatus.CONFLICT },
             totalSyncedToday = queue.count { it.status == SyncStatus.SYNCED && it.updatedAt >= startOfToday },
-            queueItems = queue
-                .distinctBy { it.id }
-                .sortedByDescending { it.updatedAt }
-                .map { it.toUiModel() }
+            queueItems = queue.map { it.toUiModel() },
+            offlineSessionAgeAlert = ageAlert
         )
     }
 
@@ -217,7 +237,8 @@ data class SyncMonitoringSnapshot(
     val totalFailed: Int = 0,
     val totalConflict: Int = 0,
     val totalSyncedToday: Int = 0,
-    val queueItems: List<SyncQueueUiModel> = emptyList()
+    val queueItems: List<SyncQueueUiModel> = emptyList(),
+    val offlineSessionAgeAlert: OfflineSessionAgeAlert? = null
 )
 
 data class SyncQueueUiModel(

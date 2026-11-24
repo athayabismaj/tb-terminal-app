@@ -37,6 +37,7 @@ import com.tbterminal.app.ui.cashier.session.components.ShiftRecentTransactionsS
 import com.tbterminal.app.ui.cashier.session.components.ShiftReprintChooserDialog
 import com.tbterminal.app.ui.cashier.session.components.ShiftSingleLineSummaryCard
 import com.tbterminal.app.ui.cashier.session.components.ShiftUtilityRow
+import com.tbterminal.app.ui.components.OfflineSessionAgeBanner
 import com.tbterminal.app.ui.components.SkeletonList
 import com.tbterminal.app.ui.components.TopFloatingCapsule
 import java.math.BigDecimal
@@ -106,6 +107,13 @@ fun CashierCashSessionScreen(
             ) {
                 // Sesi lokal offline badge jika ada
                 LocalCashSessionBadges(uiState = uiState)
+
+                uiState.offlineSessionAgeAlert?.let { alert ->
+                    OfflineSessionAgeBanner(
+                        alert = alert,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                }
 
                 // ── KONTEN UTAMA ──
                 if (uiState.isLoading && !uiState.isSubmitting) {

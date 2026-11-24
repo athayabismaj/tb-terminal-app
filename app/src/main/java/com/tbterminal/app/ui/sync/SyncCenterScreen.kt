@@ -63,6 +63,7 @@ import com.tbterminal.app.data.local.model.SyncEntityType
 import com.tbterminal.app.data.local.model.SyncStatus
 import com.tbterminal.app.data.repository.SyncQueueUiModel
 import com.tbterminal.app.data.sync.SyncErrorCategory
+import com.tbterminal.app.ui.components.OfflineSessionAgeBanner
 import com.tbterminal.app.ui.components.SkeletonBox
 import com.tbterminal.app.ui.components.TopFloatingCapsule
 import com.tbterminal.app.ui.components.SkeletonList
@@ -118,6 +119,15 @@ fun SyncCenterScreen(
                     item {
                         SyncSectionHeader(
                             onOpenStatusSheet = onOpenStatusSheet,
+                        )
+                    }
+                }
+
+                uiState.offlineSessionAgeAlert?.let { alert ->
+                    item {
+                        OfflineSessionAgeBanner(
+                            alert = alert,
+                            modifier = Modifier.fillMaxWidth(),
                         )
                     }
                 }
