@@ -3,9 +3,13 @@ package com.tbterminal.app.ui.products
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
+import androidx.compose.ui.platform.LocalContext
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.tbterminal.app.data.media.AndroidProductImageCompressor
 import com.tbterminal.app.data.repository.InventoryRepository
+import com.tbterminal.app.data.sync.NetworkConnectivity
 import com.tbterminal.app.ui.dashboard.admin.AdminDashboardShell
 import com.tbterminal.app.ui.dashboard.admin.AdminDestination
 
@@ -36,18 +40,27 @@ fun AdminProductFormScreen(
     onProfileClick: () -> Unit = {},
     onSettingsClick: () -> Unit = {},
     onLogout: () -> Unit,
-    viewModel: ProductFormViewModel = viewModel(
+    networkConnectivity: NetworkConnectivity? = null,
+    imageCompressor: com.tbterminal.app.data.media.ImageCompressor? = null,
+    viewModel: ProductFormViewModel? = null
+) {
+    val context = LocalContext.current
+    val resolvedCompressor = remember(context, imageCompressor) {
+        imageCompressor ?: AndroidProductImageCompressor(context.applicationContext.contentResolver)
+    }
+    val activeViewModel = viewModel ?: viewModel(
         factory = ProductFormViewModel.factory(
             inventoryRepository = inventoryRepository,
-            productId = productId
+            productId = productId,
+            imageCompressor = resolvedCompressor,
+            networkConnectivity = networkConnectivity
         )
     )
-) {
-    val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+    val uiState by activeViewModel.uiState.collectAsStateWithLifecycle()
 
     LaunchedEffect(uiState.isSaved) {
         if (uiState.isSaved) {
-            viewModel.resetSavedState()
+            activeViewModel.resetSavedState()
             onBackToProducts()
         }
     }
@@ -82,8 +95,12 @@ fun AdminProductFormScreen(
         ProductFormContent(
             modifier = contentModifier,
             uiState = uiState,
-            onInputChanged = viewModel::onInputChanged,
-            onSave = viewModel::save,
+            onInputChanged = activeViewModel::onInputChanged,
+            onPhotoPicked = activeViewModel::onPhotoPicked,
+            onPhotoSelectionError = activeViewModel::onPhotoSelectionError,
+            onRemovePhoto = activeViewModel::onRemovePhoto,
+            onRetryPhotoUpload = activeViewModel::retryPhotoUpload,
+            onSave = activeViewModel::save,
             onCancel = onBackToProducts
         )
     }

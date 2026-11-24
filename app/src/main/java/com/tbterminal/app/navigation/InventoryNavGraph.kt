@@ -266,6 +266,7 @@ internal fun NavGraphBuilder.inventoryGraph(navController: NavHostController, se
                     role = sessionUser.role,
                     inventoryRepository = appContainer.inventoryRepository,
                     productId = null,
+                    networkConnectivity = appContainer.networkMonitor,
                     onDashboardClick = {
                         navController.navigate(AppRoute.Dashboard.route) {
                             launchSingleTop = true
@@ -402,6 +403,7 @@ internal fun NavGraphBuilder.inventoryGraph(navController: NavHostController, se
                     role = sessionUser.role,
                     inventoryRepository = appContainer.inventoryRepository,
                     productId = productId,
+                    networkConnectivity = appContainer.networkMonitor,
                     onDashboardClick = {
                         navController.navigate(AppRoute.Dashboard.route) {
                             launchSingleTop = true

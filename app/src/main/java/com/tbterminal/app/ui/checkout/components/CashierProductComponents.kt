@@ -53,9 +53,11 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.tbterminal.app.data.media.ImageSize
 import com.tbterminal.app.ui.checkout.CartItem
 import com.tbterminal.app.ui.checkout.Product
 import com.tbterminal.app.ui.components.TbPagination
+import com.tbterminal.app.ui.products.components.ProductPhotoThumbnail
 import java.math.BigDecimal
 import java.text.NumberFormat
 import java.util.Locale
@@ -296,22 +298,33 @@ internal fun ProductMinimalCard(
                     .clip(RoundedCornerShape(topStart = 16.dp, topEnd = 16.dp))
                     .background(Color(0xFFF1F5F9))
             ) {
-                // Centered subtle category icon
-                Box(
-                    modifier = Modifier
-                        .size(46.dp)
-                        .clip(RoundedCornerShape(12.dp))
-                        .background(Color(0xFFE2E8F0).copy(alpha = 0.8f))
-                        .align(Alignment.Center),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Icon(
-                        imageVector = getCategoryIcon(product.categoryName),
-                        contentDescription = null,
-                        tint = Slate500,
-                        modifier = Modifier.size(24.dp)
-                    )
-                }
+                ProductPhotoThumbnail(
+                    photoUrl = product.photoUrl,
+                    imageSize = ImageSize.THUMB_MEDIUM,
+                    contentDescription = product.name,
+                    modifier = Modifier.fillMaxSize(),
+                    fallback = {
+                        Box(
+                            modifier = Modifier.fillMaxSize(),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Box(
+                                modifier = Modifier
+                                    .size(46.dp)
+                                    .clip(RoundedCornerShape(12.dp))
+                                    .background(Color(0xFFE2E8F0).copy(alpha = 0.8f)),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Icon(
+                                    imageVector = getCategoryIcon(product.categoryName),
+                                    contentDescription = null,
+                                    tint = Slate500,
+                                    modifier = Modifier.size(24.dp)
+                                )
+                            }
+                        }
+                    }
+                )
 
                 // Floating Stock Pill Badge at Bottom Right (like HTML mockup)
                 FloatingStockBadge(

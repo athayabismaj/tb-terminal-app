@@ -1,5 +1,6 @@
 package com.tbterminal.app.ui.products
 
+import android.net.Uri
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -17,12 +18,17 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.zIndex
 import com.tbterminal.app.ui.components.TopFloatingCapsule
+import java.io.File
 
 @Composable
 internal fun ProductFormContent(
     modifier: Modifier,
     uiState: ProductFormUiState,
     onInputChanged: (ProductFormInput) -> Unit,
+    onPhotoPicked: (Uri, File?) -> Unit = { _, _ -> },
+    onPhotoSelectionError: (String) -> Unit = {},
+    onRemovePhoto: () -> Unit = {},
+    onRetryPhotoUpload: () -> Unit = {},
     onSave: () -> Unit,
     onCancel: () -> Unit
 ) {
@@ -33,7 +39,7 @@ internal fun ProductFormContent(
             containerColor = ProductBackground,
             bottomBar = {
                 ProductFormBottomBar(
-                    isSaving = uiState.isSaving,
+                    isSaving = uiState.isSaving || uiState.photoStatus is ProductPhotoUploadStatus.Uploading,
                     isLoading = uiState.isLoading,
                     compact = compact,
                     onCancel = onCancel,
@@ -58,6 +64,10 @@ internal fun ProductFormContent(
                     ProductFormBody(
                         uiState = uiState,
                         onInputChanged = onInputChanged,
+                        onPhotoPicked = onPhotoPicked,
+                        onPhotoSelectionError = onPhotoSelectionError,
+                        onRemovePhoto = onRemovePhoto,
+                        onRetryPhotoUpload = onRetryPhotoUpload,
                         compact = compact,
                     )
                 }

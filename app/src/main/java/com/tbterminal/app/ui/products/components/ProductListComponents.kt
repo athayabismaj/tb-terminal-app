@@ -35,6 +35,7 @@ import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.outlined.Check
 import androidx.compose.material.icons.outlined.Close
 import androidx.compose.material.icons.outlined.ExpandMore
+import androidx.compose.material.icons.outlined.Inventory2
 import androidx.compose.material.icons.outlined.QrCode2
 import androidx.compose.material.icons.outlined.Search
 import androidx.compose.material.icons.outlined.Tune
@@ -75,6 +76,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.tbterminal.app.data.media.ImageSize
 import com.tbterminal.app.data.model.ProductStock
 import com.tbterminal.app.ui.components.TbMobileControlSheet
 import com.tbterminal.app.ui.components.TbMobileFilterButton
@@ -479,7 +481,24 @@ private fun ProductCompactRow(
             .testTag("product-list-row-${product.productId}"),
         verticalArrangement = Arrangement.spacedBy(10.dp),
     ) {
-        Row(verticalAlignment = Alignment.Top, horizontalArrangement = Arrangement.SpaceBetween) {
+        Row(verticalAlignment = Alignment.Top, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+            ProductPhotoThumbnail(
+                photoUrl = product.photoUrl,
+                imageSize = ImageSize.THUMB_SMALL,
+                contentDescription = product.productName,
+                modifier = Modifier
+                    .size(48.dp)
+                    .clip(RoundedCornerShape(10.dp))
+                    .background(ProductSoft),
+                fallback = {
+                    Box(
+                        modifier = Modifier.fillMaxSize().background(ProductSoft),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(Icons.Outlined.Inventory2, contentDescription = null, tint = ProductMuted, modifier = Modifier.size(22.dp))
+                    }
+                }
+            )
             Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
                 Text(
                     product.productName,
@@ -587,22 +606,45 @@ internal fun ProductTableRow(
             .padding(horizontal = 24.dp, vertical = 20.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        Column(modifier = Modifier.weight(2.5f)) {
-            Text(
-                product.productName,
-                color = titleColor,
-                fontSize = 14.sp,
-                fontWeight = FontWeight.Medium,
-                maxLines = 2,
-                overflow = TextOverflow.Ellipsis
+        Row(
+            modifier = Modifier.weight(2.5f),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            ProductPhotoThumbnail(
+                photoUrl = product.photoUrl,
+                imageSize = ImageSize.THUMB_SMALL,
+                contentDescription = product.productName,
+                modifier = Modifier
+                    .size(44.dp)
+                    .clip(RoundedCornerShape(10.dp))
+                    .background(ProductSoft),
+                fallback = {
+                    Box(
+                        modifier = Modifier.fillMaxSize().background(ProductSoft),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(Icons.Outlined.Inventory2, contentDescription = null, tint = ProductMuted, modifier = Modifier.size(20.dp))
+                    }
+                }
             )
-            Text(
-                text = if (isLowStock) "Stok perlu dicek" else "Produk fisik",
-                color = if (isLowStock) ProductWarning else ProductMuted,
-                fontSize = 14.sp,
-                fontWeight = if (isLowStock) FontWeight.SemiBold else FontWeight.Normal,
-                modifier = Modifier.padding(top = 2.dp)
-            )
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    product.productName,
+                    color = titleColor,
+                    fontSize = 14.sp,
+                    fontWeight = FontWeight.Medium,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis
+                )
+                Text(
+                    text = if (isLowStock) "Stok perlu dicek" else "Produk fisik",
+                    color = if (isLowStock) ProductWarning else ProductMuted,
+                    fontSize = 14.sp,
+                    fontWeight = if (isLowStock) FontWeight.SemiBold else FontWeight.Normal,
+                    modifier = Modifier.padding(top = 2.dp)
+                )
+            }
         }
 
         Column(modifier = Modifier.weight(2f)) {

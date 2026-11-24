@@ -2,6 +2,7 @@ package com.tbterminal.app.ui.products
 
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -15,10 +16,13 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.Close
 import androidx.compose.material.icons.outlined.Edit
+import androidx.compose.material.icons.outlined.Inventory2
 import androidx.compose.material.icons.outlined.Label
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -35,14 +39,20 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
+import com.tbterminal.app.data.media.ImageSize
 import com.tbterminal.app.data.model.ProductDetail
 import com.tbterminal.app.data.model.ProductStock
 import com.tbterminal.app.ui.products.components.PriceTagDialog
+import com.tbterminal.app.ui.products.components.ProductPhotoThumbnail
 import java.math.BigDecimal
 
 @Composable
@@ -99,7 +109,18 @@ private fun ProductDetailCards(
     onEdit: () -> Unit,
     onPrintTag: () -> Unit = {}
 ) {
-    ProductIdentityCard(detail = detail, onEdit = onEdit, onPrintTag = onPrintTag)
+    var showFullPhoto by remember { mutableStateOf(false) }
+
+    ProductIdentityCard(
+        detail = detail,
+        onEdit = onEdit,
+        onPrintTag = onPrintTag,
+        onPhotoClick = {
+            if (!detail.product.photoUrl.isNullOrBlank()) {
+                showFullPhoto = true
+            }
+        }
+    )
     if (compact) {
         ProductPricesCard(detail = detail, modifier = Modifier.fillMaxWidth())
         ProductStockCard(detail = detail, modifier = Modifier.fillMaxWidth())
@@ -109,16 +130,84 @@ private fun ProductDetailCards(
             ProductStockCard(detail = detail, modifier = Modifier.weight(1f))
         }
     }
+
+    if (showFullPhoto && !detail.product.photoUrl.isNullOrBlank()) {
+        Dialog(
+            onDismissRequest = { showFullPhoto = false },
+            properties = DialogProperties(usePlatformDefaultWidth = false)
+        ) {
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(Color.Black.copy(alpha = 0.92f))
+                    .clickable { showFullPhoto = false }
+                    .testTag("product-detail-photo-zoom"),
+                contentAlignment = Alignment.Center
+            ) {
+                ProductPhotoThumbnail(
+                    photoUrl = detail.product.photoUrl,
+                    imageSize = ImageSize.FULL,
+                    contentDescription = detail.product.name,
+                    contentScale = ContentScale.Fit,
+                    modifier = Modifier.fillMaxSize().padding(20.dp),
+                    fallback = {
+                        Icon(
+                            imageVector = Icons.Outlined.Inventory2,
+                            contentDescription = null,
+                            tint = Color.White.copy(alpha = 0.7f),
+                            modifier = Modifier.size(64.dp)
+                        )
+                    }
+                )
+                IconButton(
+                    onClick = { showFullPhoto = false },
+                    modifier = Modifier
+                        .align(Alignment.TopEnd)
+                        .padding(16.dp)
+                        .clip(CircleShape)
+                        .background(Color.Black.copy(alpha = 0.55f))
+                ) {
+                    Icon(Icons.Outlined.Close, contentDescription = "Tutup foto", tint = Color.White)
+                }
+            }
+        }
+    }
 }
 
 @Composable
 private fun ProductIdentityCard(
     detail: ProductDetail,
     onEdit: () -> Unit,
-    onPrintTag: () -> Unit = {}
+    onPrintTag: () -> Unit = {},
+    onPhotoClick: () -> Unit = {}
 ) {
+    val hasPhoto = !detail.product.photoUrl.isNullOrBlank()
     ProductDetailCard(modifier = Modifier.fillMaxWidth().testTag("product-detail-identity")) {
-        Row(verticalAlignment = Alignment.Top) {
+        Row(verticalAlignment = Alignment.Top, horizontalArrangement = Arrangement.spacedBy(14.dp)) {
+            ProductPhotoThumbnail(
+                photoUrl = detail.product.photoUrl,
+                imageSize = ImageSize.FULL,
+                contentDescription = "Foto ${detail.product.name}",
+                modifier = Modifier
+                    .size(72.dp)
+                    .clip(RoundedCornerShape(14.dp))
+                    .background(ProductSoft)
+                    .clickable(enabled = hasPhoto, onClick = onPhotoClick)
+                    .testTag("product-detail-photo"),
+                fallback = {
+                    Box(
+                        modifier = Modifier.fillMaxSize().background(ProductSoft),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(
+                            imageVector = Icons.Outlined.Inventory2,
+                            contentDescription = null,
+                            tint = ProductMuted,
+                            modifier = Modifier.size(28.dp)
+                        )
+                    }
+                }
+            )
             Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
                 Text(
                     detail.product.name,

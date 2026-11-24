@@ -81,6 +81,31 @@ data class ProductFormInput(
     val minStock: String = ""
 )
 
+data class PendingProductPhoto(
+    val previewUri: String,
+    val bytes: ByteArray,
+    val fileName: String = "product.jpg"
+) {
+    override fun equals(other: Any?): Boolean {
+        if (this === other) return true
+        if (other !is PendingProductPhoto) return false
+        return previewUri == other.previewUri && bytes.contentEquals(other.bytes) && fileName == other.fileName
+    }
+
+    override fun hashCode(): Int {
+        var result = previewUri.hashCode()
+        result = 31 * result + bytes.contentHashCode()
+        result = 31 * result + fileName.hashCode()
+        return result
+    }
+}
+
+sealed interface ProductPhotoUploadStatus {
+    data object Idle : ProductPhotoUploadStatus
+    data object Uploading : ProductPhotoUploadStatus
+    data class Error(val message: String) : ProductPhotoUploadStatus
+}
+
 data class ProductFormUiState(
     val input: ProductFormInput = ProductFormInput(),
     val categories: List<ProductCategory> = emptyList(),
@@ -89,7 +114,13 @@ data class ProductFormUiState(
     val isLoading: Boolean = true,
     val isSaving: Boolean = false,
     val isSaved: Boolean = false,
-    val errorMessage: String? = null
+    val errorMessage: String? = null,
+    val isOnline: Boolean = true,
+    val photoUrl: String? = null,
+    val pendingPhoto: PendingProductPhoto? = null,
+    val removePhotoRequested: Boolean = false,
+    val photoStatus: ProductPhotoUploadStatus = ProductPhotoUploadStatus.Idle,
+    val createdProductId: String? = null
 )
 
 
@@ -129,4 +160,3 @@ data class ProductUnitUiState(
     val isSaving: Boolean = false,
     val message: String? = null
 )
-
