@@ -243,7 +243,7 @@ internal fun TransactionHistoryContent(
                                         value = state.query,
                                         onValueChange = onSearchChanged,
                                         singleLine = true,
-                                        textStyle = TextStyle(
+                                        textStyle = TextStyle(fontFamily = com.tbterminal.app.ui.theme.KawanSans, 
                                             color = Color(0xFF0F172A),
                                             fontSize = 13.sp,
                                             fontWeight = FontWeight.Medium
@@ -665,7 +665,7 @@ private fun SalesSearchField(
                     value = value,
                     onValueChange = onValueChange,
                     singleLine = true,
-                    textStyle = TextStyle(
+                    textStyle = TextStyle(fontFamily = com.tbterminal.app.ui.theme.KawanSans, 
                         color = Color(0xFF0F172A),
                         fontSize = 14.sp,
                     ),
@@ -781,7 +781,7 @@ private fun SalesFilterDropdown(
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun SalesFilterBottomSheet(
+internal fun SalesFilterBottomSheet(
     state: AdminTransactionHistoryUiState,
     onDismiss: () -> Unit,
     onApplyFilter: (String, String, String?, String?, String?, SalesSortOrder) -> Unit,
@@ -1293,7 +1293,7 @@ private fun SalesFilterOptionCard(
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun SalesSummaryBottomSheet(
+internal fun SalesSummaryBottomSheet(
     state: AdminTransactionHistoryUiState,
     onDismiss: () -> Unit,
 ) {
@@ -1524,7 +1524,7 @@ private fun SalesHistorySectionHeader(
 
 
 @Composable
-private fun SalesTransactionMobileItem(
+internal fun SalesTransactionMobileItem(
     transaction: CashTransaction,
     onReceiptClick: (String) -> Unit,
 ) {
@@ -1656,7 +1656,7 @@ private fun SalesTransactionCard(transaction: CashTransaction, onReceiptClick: (
 }
 
 @Composable
-private fun SalesTransactionTable(transactions: List<CashTransaction>, onReceiptClick: (String) -> Unit) {
+internal fun SalesTransactionTable(transactions: List<CashTransaction>, onReceiptClick: (String) -> Unit) {
     Surface(
         modifier = Modifier.fillMaxWidth().testTag("sales-history-table"),
         color = TbSurface,
@@ -1760,7 +1760,7 @@ private fun SalesStatusBadge(status: String) {
 }
 
 @Composable
-private fun SalesHistoryLoading(compact: Boolean) {
+internal fun SalesHistoryLoading(compact: Boolean) {
     if (compact) {
         Surface(
             modifier = Modifier
@@ -1904,7 +1904,7 @@ private fun SalesHistoryEmpty(
 }
 
 @Composable
-private fun SalesHistoryError(message: String, onRetry: () -> Unit) {
+internal fun SalesHistoryError(message: String, onRetry: () -> Unit) {
     Box(
         modifier = Modifier
             .fillMaxWidth()
@@ -1968,7 +1968,7 @@ private fun SalesHistoryError(message: String, onRetry: () -> Unit) {
 }
 
 @Composable
-private fun SalesHistoryPagination(
+internal fun SalesHistoryPagination(
     state: AdminTransactionHistoryUiState,
     compact: Boolean,
     onPreviousPage: () -> Unit,

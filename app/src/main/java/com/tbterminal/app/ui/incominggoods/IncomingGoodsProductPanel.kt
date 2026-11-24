@@ -470,7 +470,7 @@ private fun IncomingSearchField(
                     value = value,
                     onValueChange = onValueChange,
                     singleLine = true,
-                    textStyle = TextStyle(
+                    textStyle = TextStyle(fontFamily = com.tbterminal.app.ui.theme.KawanSans, 
                         color = Color(0xFF0F172A),
                         fontSize = 14.sp,
                     ),
@@ -750,7 +750,7 @@ private fun IncomingCategoryFilterBottomSheet(
                                         value = categoryQuery,
                                         onValueChange = { categoryQuery = it },
                                         singleLine = true,
-                                        textStyle = TextStyle(
+                                        textStyle = TextStyle(fontFamily = com.tbterminal.app.ui.theme.KawanSans, 
                                             fontSize = 13.sp,
                                             color = Color(0xFF0F172A),
                                             fontWeight = FontWeight.Medium

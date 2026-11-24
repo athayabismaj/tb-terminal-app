@@ -58,6 +58,8 @@ import com.tbterminal.app.data.repository.InventoryRepository
 import com.tbterminal.app.data.repository.PurchasingRepository
 import com.tbterminal.app.ui.dashboard.admin.AdminDashboardShell
 import com.tbterminal.app.ui.dashboard.admin.AdminDestination
+import com.tbterminal.app.ui.dashboard.isOwnerPersona
+import com.tbterminal.app.ui.dashboard.owner.OwnerBarangMasukRoute
 
 import androidx.activity.compose.BackHandler
 
@@ -226,6 +228,7 @@ fun AdminIncomingGoodsFormScreen(
     onOperationalAuditClick: () -> Unit = {},
     onProfileClick: () -> Unit = {},
     onSettingsClick: () -> Unit = {},
+    onAddSupplierClick: () -> Unit = {},
     onBack: () -> Unit = onIncomingGoodsClick,
     onLogout: () -> Unit,
     viewModel: IncomingGoodsViewModel = viewModel(
@@ -239,6 +242,21 @@ fun AdminIncomingGoodsFormScreen(
     )
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+
+    if (isOwnerPersona(role)) {
+        OwnerBarangMasukRoute(
+            uiState = uiState,
+            viewModel = viewModel,
+            onAddSupplierClick = onAddSupplierClick,
+            onBack = onBack,
+            onDashboardClick = onDashboardClick,
+            onProductsClick = onProductsClick,
+            onReceivablesClick = onReceivablesClick,
+            onSalesTransactionsClick = onSalesTransactionsClick,
+            onSettingsClick = onSettingsClick
+        )
+        return
+    }
 
     BackHandler(onBack = onBack)
 

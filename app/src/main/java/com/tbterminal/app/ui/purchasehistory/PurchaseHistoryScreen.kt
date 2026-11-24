@@ -453,7 +453,7 @@ private fun PurchaseHeaderToolbar(
                             value = uiState.searchQuery,
                             onValueChange = onSearchChanged,
                             singleLine = true,
-                            textStyle = TextStyle(
+                            textStyle = TextStyle(fontFamily = com.tbterminal.app.ui.theme.KawanSans, 
                                 color = Color(0xFF0F172A),
                                 fontSize = 13.sp,
                                 fontWeight = FontWeight.Medium
@@ -658,7 +658,7 @@ private fun PurchaseHeaderToolbar(
 }
 
 @Composable
-private fun PurchaseSummaryBottomSheet(
+internal fun PurchaseSummaryBottomSheet(
     uiState: PurchaseHistoryUiState,
     onDismiss: () -> Unit
 ) {
@@ -882,7 +882,7 @@ private fun PurchaseSummaryBottomSheet(
 
 @OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class)
 @Composable
-private fun PurchaseFilterBottomSheet(
+internal fun PurchaseFilterBottomSheet(
     uiState: PurchaseHistoryUiState,
     onDismiss: () -> Unit,
     onApplyFilter: (String?, String?, String?, String, PurchaseSortOrder) -> Unit
@@ -1193,7 +1193,7 @@ private fun PurchaseFilterBottomSheet(
                                         value = supplierSearchQuery,
                                         onValueChange = { supplierSearchQuery = it },
                                         singleLine = true,
-                                        textStyle = TextStyle(
+                                        textStyle = TextStyle(fontFamily = com.tbterminal.app.ui.theme.KawanSans, 
                                             color = Color(0xFF0F172A),
                                             fontSize = 13.sp,
                                             fontWeight = FontWeight.Medium
@@ -1499,7 +1499,7 @@ private fun PurchaseFilterBottomSheet(
 }
 
 @Composable
-private fun PurchaseMobileRow(purchase: PurchaseSummary, onShowDetail: (String) -> Unit) {
+internal fun PurchaseMobileRow(purchase: PurchaseSummary, onShowDetail: (String) -> Unit) {
     Column(
         modifier = Modifier
             .fillMaxWidth()
@@ -1609,7 +1609,7 @@ private fun PurchaseMobileRow(purchase: PurchaseSummary, onShowDetail: (String) 
 }
 
 @Composable
-private fun PurchaseTableHeader() {
+internal fun PurchaseTableHeader() {
     Row(Modifier.fillMaxWidth().background(PurchaseSoft).padding(horizontal = 20.dp, vertical = 14.dp)) {
         TableLabel("NO. NOTA", Modifier.weight(1.6f))
         TableLabel("SUPPLIER", Modifier.weight(1.8f))
@@ -1620,7 +1620,7 @@ private fun PurchaseTableHeader() {
 }
 
 @Composable
-private fun PurchaseRow(purchase: PurchaseSummary, index: Int, onShowDetail: (String) -> Unit) {
+internal fun PurchaseRow(purchase: PurchaseSummary, index: Int, onShowDetail: (String) -> Unit) {
     Row(
         Modifier
             .fillMaxWidth()
@@ -1647,7 +1647,7 @@ private fun PurchaseRow(purchase: PurchaseSummary, index: Int, onShowDetail: (St
 }
 
 @Composable
-private fun PurchasePagination(
+internal fun PurchasePagination(
     uiState: PurchaseHistoryUiState,
     compact: Boolean,
     onPreviousPage: () -> Unit,
@@ -1688,7 +1688,7 @@ private fun PurchasePageButton(enabled: Boolean, onClick: () -> Unit, icon: Imag
 
 @OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class)
 @Composable
-private fun PurchaseDetailDialog(detail: PurchaseDetail?, isLoading: Boolean = false, onDismiss: () -> Unit) {
+internal fun PurchaseDetailDialog(detail: PurchaseDetail?, isLoading: Boolean = false, onDismiss: () -> Unit) {
     androidx.compose.material3.ModalBottomSheet(
         onDismissRequest = onDismiss,
         containerColor = Color.White,
@@ -1970,7 +1970,7 @@ private fun DetailInfoMobile(label: String, value: String, isNote: Boolean) {
 }
 
 @Composable
-private fun PurchaseMobileSkeleton() {
+internal fun PurchaseMobileSkeleton() {
     Column {
         repeat(3) { index ->
             Column(modifier = Modifier.fillMaxWidth().padding(16.dp)) {
@@ -2021,7 +2021,7 @@ private fun PurchaseMobileSkeleton() {
 }
 
 @Composable
-private fun PurchaseTableSkeleton() {
+internal fun PurchaseTableSkeleton() {
     Column {
         repeat(5) { index ->
             Row(
@@ -2216,7 +2216,7 @@ private fun EmptyBox(
 }
 
 @Composable
-private fun PurchaseError(message: String, onRefresh: () -> Unit) {
+internal fun PurchaseError(message: String, onRefresh: () -> Unit) {
     Box(
         modifier = Modifier
             .fillMaxWidth()

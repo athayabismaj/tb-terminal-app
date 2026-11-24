@@ -6,6 +6,9 @@ import androidx.lifecycle.viewModelScope
 import com.tbterminal.app.data.repository.PurchasingRepository
 import com.tbterminal.app.data.repository.RepositoryResult
 import com.tbterminal.app.ui.common.viewModelFactory
+import java.math.BigDecimal
+import kotlinx.coroutines.async
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -21,6 +24,7 @@ class PurchaseHistoryViewModel(
     init {
         loadSuppliers()
         loadPurchases()
+        loadOpenPayables()
     }
 
     fun loadPurchases(page: Int = _uiState.value.page) {
@@ -57,7 +61,10 @@ class PurchaseHistoryViewModel(
         }
     }
 
-    fun refresh() = loadPurchases(_uiState.value.page)
+    fun refresh() {
+        loadPurchases(_uiState.value.page)
+        loadOpenPayables()
+    }
 
     fun onFilterApplied(
         supplierId: String?, 
@@ -131,6 +138,37 @@ class PurchaseHistoryViewModel(
             when (val result = purchasingRepository.getSuppliers(page = 1, limit = 100)) {
                 is RepositoryResult.Success -> _uiState.update { it.copy(suppliers = result.data.data) }
                 else -> Unit
+            }
+        }
+    }
+
+    private fun loadOpenPayables() {
+        viewModelScope.launch {
+            coroutineScope {
+                val unpaidDeferred = async {
+                    purchasingRepository.getPayables(page = 1, limit = 100, status = "belum_lunas")
+                }
+                val partialDeferred = async {
+                    purchasingRepository.getPayables(page = 1, limit = 100, status = "sebagian")
+                }
+                val unpaidResult = unpaidDeferred.await()
+                val partialResult = partialDeferred.await()
+                if (unpaidResult is RepositoryResult.Success || partialResult is RepositoryResult.Success) {
+                    val remainingByPurchase = buildMap<String, BigDecimal> {
+                        val combined = buildList {
+                            if (unpaidResult is RepositoryResult.Success) addAll(unpaidResult.data.data)
+                            if (partialResult is RepositoryResult.Success) addAll(partialResult.data.data)
+                        }
+                        combined.forEach { payable ->
+                            val purchaseId = payable.purchaseId
+                            if (purchaseId.isNotBlank()) {
+                                val current = get(purchaseId) ?: BigDecimal.ZERO
+                                put(purchaseId, current.add(payable.remainingAmount.coerceAtLeast(BigDecimal.ZERO)))
+                            }
+                        }
+                    }
+                    _uiState.update { it.copy(unpaidPayableByPurchaseId = remainingByPurchase) }
+                }
             }
         }
     }

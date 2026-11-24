@@ -34,7 +34,8 @@ data class PurchaseHistoryUiState(
     val pageSize: Int = 10,
     val isLoading: Boolean = true,
     val isLoadingDetail: Boolean = false,
-    val errorMessage: String? = null
+    val errorMessage: String? = null,
+    val unpaidPayableByPurchaseId: Map<String, BigDecimal> = emptyMap()
 ) {
     val isFiltered: Boolean
         get() {
@@ -50,39 +51,15 @@ data class PurchaseHistoryUiState(
         }
 
     val visiblePurchases: List<PurchaseSummary>
-        get() {
-            val query = searchQuery.trim()
-            var list = if (query.isBlank()) purchases else {
-                purchases.filter { purchase ->
-                    purchase.invoiceNo.orEmpty().contains(query, ignoreCase = true) ||
-                        purchase.supplierName.contains(query, ignoreCase = true)
-                }
-            }
-
-            if (selectedSupplierId != null) {
-                list = list.filter { it.supplierId == selectedSupplierId }
-            }
-
-            if (selectedPeriodType != "Semua") {
-                val start = startDate?.take(10)
-                val end = endDate?.take(10)
-                if (start != null || end != null) {
-                    list = list.filter { purchase ->
-                        val purchaseDate = purchase.receivedAt.take(10)
-                        val matchesStart = start == null || purchaseDate >= start
-                        val matchesEnd = end == null || purchaseDate <= end
-                        matchesStart && matchesEnd
-                    }
-                }
-            }
-
-            return when (sortOrder) {
-                PurchaseSortOrder.NEWEST -> list.sortedByDescending { it.receivedAt }
-                PurchaseSortOrder.NAME_ASC -> list.sortedBy { it.supplierName.lowercase() }
-                PurchaseSortOrder.HIGHEST_AMOUNT -> list.sortedByDescending { it.total }
-                PurchaseSortOrder.DUE_NEAREST -> list.sortedBy { it.receivedAt }
-            }
-        }
+        get() = filterAndSortPurchases(
+            purchases = purchases,
+            searchQuery = searchQuery,
+            selectedSupplierId = selectedSupplierId,
+            selectedPeriodType = selectedPeriodType,
+            startDate = startDate,
+            endDate = endDate,
+            sortOrder = sortOrder
+        )
 
     val effectiveTotalPurchases: Long
         get() {
@@ -101,4 +78,46 @@ data class PurchaseHistoryUiState(
 
     val pageEndIndex: Long
         get() = if (visiblePurchases.isEmpty() || effectiveTotalPurchases == 0L) 0L else minOf(page.toLong() * pageSize, effectiveTotalPurchases)
+}
+
+internal fun filterAndSortPurchases(
+    purchases: List<PurchaseSummary>,
+    searchQuery: String,
+    selectedSupplierId: String?,
+    selectedPeriodType: String,
+    startDate: String?,
+    endDate: String?,
+    sortOrder: PurchaseSortOrder
+): List<PurchaseSummary> {
+    val query = searchQuery.trim()
+    var list = if (query.isBlank()) purchases else {
+        purchases.filter { purchase ->
+            purchase.invoiceNo.orEmpty().contains(query, ignoreCase = true) ||
+                purchase.supplierName.contains(query, ignoreCase = true)
+        }
+    }
+
+    if (selectedSupplierId != null) {
+        list = list.filter { it.supplierId == selectedSupplierId }
+    }
+
+    if (selectedPeriodType != "Semua") {
+        val start = startDate?.take(10)
+        val end = endDate?.take(10)
+        if (start != null || end != null) {
+            list = list.filter { purchase ->
+                val purchaseDate = purchase.receivedAt.take(10)
+                val matchesStart = start == null || purchaseDate >= start
+                val matchesEnd = end == null || purchaseDate <= end
+                matchesStart && matchesEnd
+            }
+        }
+    }
+
+    return when (sortOrder) {
+        PurchaseSortOrder.NEWEST -> list.sortedByDescending { it.receivedAt }
+        PurchaseSortOrder.NAME_ASC -> list.sortedBy { it.supplierName.lowercase() }
+        PurchaseSortOrder.HIGHEST_AMOUNT -> list.sortedByDescending { it.total }
+        PurchaseSortOrder.DUE_NEAREST -> list.sortedBy { it.receivedAt }
+    }
 }

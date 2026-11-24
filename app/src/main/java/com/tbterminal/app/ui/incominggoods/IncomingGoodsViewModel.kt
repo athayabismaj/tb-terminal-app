@@ -139,6 +139,19 @@ class IncomingGoodsViewModel(
         _uiState.update { it.copy(selectedSupplier = supplier, errorMessage = null, message = null) }
     }
 
+    fun onSupplierCreatedExternally(supplier: Supplier) {
+        _uiState.update { state ->
+            state.copy(
+                suppliers = (listOf(supplier) + state.suppliers).distinctBy(Supplier::id),
+                selectedSupplier = supplier,
+                dueDaysInput = supplier.paymentTermDays.toString(),
+                errorMessage = null,
+                message = null
+            )
+        }
+        loadSuppliers()
+    }
+
     fun onSupplierNameChanged(value: String) {
         _uiState.update { it.copy(newSupplierNameInput = value) }
     }
@@ -265,6 +278,57 @@ class IncomingGoodsViewModel(
                         )
                     }
                     loadProducts()
+                }
+                is RepositoryResult.Error -> setActionError(result.message)
+                is RepositoryResult.Exception -> setActionError("Barang masuk gagal dicatat karena koneksi bermasalah.")
+            }
+        }
+    }
+
+    fun submitOwnerIncomingGoods(
+        invoiceNo: String?,
+        paymentMethod: IncomingPaymentMethod,
+        amountPaid: BigDecimal,
+        dueDays: Int,
+        notes: String?,
+        onSuccess: () -> Unit
+    ) {
+        val state = _uiState.value
+        val product = state.selectedProduct ?: return setActionError("Pilih produk yang akan direstok.")
+        val supplier = state.selectedSupplier ?: return setActionError("Pilih supplier terlebih dahulu.")
+        val quantity = state.quantity?.setScale(0, java.math.RoundingMode.HALF_UP)
+            ?: return setActionError("Jumlah masuk wajib diisi dengan bilangan bulat valid.")
+        val buyPrice = state.buyPrice ?: return setActionError("Harga beli wajib diisi dengan angka valid.")
+        val total = state.total ?: return setActionError("Total pembelian tidak valid.")
+
+        if (quantity <= BigDecimal.ZERO) return setActionError("Jumlah masuk harus lebih dari nol.")
+        if (buyPrice <= BigDecimal.ZERO) return setActionError("Harga beli harus lebih dari nol.")
+        if (amountPaid < BigDecimal.ZERO) return setActionError("Jumlah dibayar tidak boleh negatif.")
+        if (amountPaid > total) return setActionError("Tidak boleh melebihi total pembelian.")
+        if (state.isSubmitting) return
+
+        viewModelScope.launch {
+            _uiState.update { it.copy(isSubmitting = true, errorMessage = null, message = null) }
+            val command = CreatePurchaseCommand(
+                supplierId = supplier.id,
+                invoiceNo = invoiceNo?.trim()?.takeIf(String::isNotBlank),
+                paymentMethod = paymentMethod.apiValue,
+                amountPaid = amountPaid,
+                notes = notes?.trim()?.takeIf(String::isNotBlank),
+                dueDays = dueDays,
+                items = listOf(
+                    PurchaseItemCommand(
+                        productId = product.productId,
+                        qty = quantity,
+                        price = buyPrice
+                    )
+                )
+            )
+
+            when (val result = purchasingRepository.createPurchase(command)) {
+                is RepositoryResult.Success -> {
+                    _uiState.update { it.copy(isSubmitting = false, errorMessage = null, message = null) }
+                    onSuccess()
                 }
                 is RepositoryResult.Error -> setActionError(result.message)
                 is RepositoryResult.Exception -> setActionError("Barang masuk gagal dicatat karena koneksi bermasalah.")

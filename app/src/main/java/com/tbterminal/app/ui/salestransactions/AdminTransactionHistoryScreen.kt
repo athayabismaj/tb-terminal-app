@@ -40,6 +40,8 @@ import com.tbterminal.app.ui.dashboard.DashboardTextSecondary
 import com.tbterminal.app.ui.dashboard.DashboardWarningOrange
 import com.tbterminal.app.ui.dashboard.admin.AdminDashboardShell
 import com.tbterminal.app.ui.dashboard.admin.AdminDestination
+import com.tbterminal.app.ui.dashboard.isOwnerPersona
+import com.tbterminal.app.ui.dashboard.owner.OwnerRiwayatPenjualanRoute
 import java.math.BigDecimal
 import java.text.NumberFormat
 import java.time.Instant
@@ -104,6 +106,53 @@ fun AdminTransactionHistoryScreen(
     val isFiltered = isDateFiltered || isStatusFiltered || isPaymentFiltered || isSortFiltered
 
     LaunchedEffect(Unit) { viewModel.loadTransactions(page = 1) }
+
+    if (isOwnerPersona(role)) {
+        OwnerRiwayatPenjualanRoute(
+            uiState = uiState,
+            isSearchExpanded = isSearchExpanded,
+            showFilterPopup = showFilterPopup,
+            showSummaryPopup = showSummaryPopup,
+            onOpenSearch = { isSearchExpanded = true },
+            onCloseSearch = {
+                isSearchExpanded = false
+                if (uiState.query.isNotEmpty()) {
+                    viewModel.updateSearchQuery("")
+                }
+            },
+            onSearchChanged = viewModel::updateSearchQuery,
+            onOpenFilter = { showFilterPopup = true },
+            onDismissFilter = { showFilterPopup = false },
+            onApplyFilter = viewModel::applyFilters,
+            onResetAllFilters = {
+                val today = LocalDate.now(WIB_ZONE).toString()
+                viewModel.updateSearchQuery("")
+                viewModel.applyFilters(
+                    status = "Semua",
+                    paymentMethod = "Semua",
+                    startDateStr = today,
+                    endDateStr = today,
+                    preset = "Hari ini",
+                    sortOrder = SalesSortOrder.Newest
+                )
+            },
+            onOpenSummary = { showSummaryPopup = true },
+            onDismissSummary = { showSummaryPopup = false },
+            onSyncClick = viewModel::syncLocalTransaction,
+            onSyncAllClick = viewModel::syncAllLocalTransactions,
+            onRefresh = viewModel::refresh,
+            onPreviousPage = viewModel::previousPage,
+            onNextPage = viewModel::nextPage,
+            onReceiptClick = onReceiptClick,
+            onBack = onBack,
+            onDashboardClick = onDashboardClick,
+            onProductsClick = onProductsClick,
+            onReceivablesClick = onReceivablesClick,
+            onSettingsClick = onSettingsClick,
+            onDismissError = viewModel::clearError
+        )
+        return
+    }
 
     AdminDashboardShell(
         userName = name,

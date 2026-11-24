@@ -12,6 +12,8 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import com.tbterminal.app.data.repository.PurchasingRepository
 import com.tbterminal.app.ui.dashboard.admin.AdminDashboardShell
 import com.tbterminal.app.ui.dashboard.admin.AdminDestination
+import com.tbterminal.app.ui.dashboard.isOwnerPersona
+import com.tbterminal.app.ui.dashboard.owner.OwnerRiwayatPembelianRoute
 import com.tbterminal.app.ui.components.RefreshableContent
 import com.tbterminal.app.ui.components.TopFloatingCapsule
 import androidx.compose.material.icons.Icons
@@ -58,12 +60,58 @@ fun AdminPurchaseHistoryScreen(
     onReportsClick: () -> Unit,
     onOperationalAuditClick: () -> Unit,
     onLogout: () -> Unit,
+    onPurchaseDetailClick: ((String) -> Unit)? = null,
+    onSupplierDetailClick: ((String) -> Unit)? = null,
     viewModel: PurchaseHistoryViewModel = viewModel(factory = PurchaseHistoryViewModel.factory(purchasingRepository))
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     var isSearchExpanded by rememberSaveable { mutableStateOf(false) }
     var showFilterPopup by remember { mutableStateOf(false) }
     var showSummaryPopup by rememberSaveable { mutableStateOf(false) }
+
+    if (isOwnerPersona(role)) {
+        OwnerRiwayatPembelianRoute(
+            uiState = uiState,
+            isSearchExpanded = isSearchExpanded,
+            showFilterPopup = showFilterPopup,
+            showSummaryPopup = showSummaryPopup,
+            onOpenSearch = { isSearchExpanded = true },
+            onCloseSearch = {
+                isSearchExpanded = false
+                if (uiState.searchQuery.isNotEmpty()) {
+                    viewModel.onSearchChanged("")
+                }
+            },
+            onSearchChanged = viewModel::onSearchChanged,
+            onOpenFilter = { showFilterPopup = true },
+            onDismissFilter = { showFilterPopup = false },
+            onApplyFilter = { supplierId, startDate, endDate, periodType, sortOrder ->
+                viewModel.onFilterApplied(supplierId, startDate, endDate, periodType, sortOrder)
+                showFilterPopup = false
+            },
+            onOpenSummary = { showSummaryPopup = true },
+            onDismissSummary = { showSummaryPopup = false },
+            onRefresh = viewModel::refresh,
+            onShowDetail = { purchaseId ->
+                if (onPurchaseDetailClick != null) {
+                    onPurchaseDetailClick(purchaseId)
+                } else {
+                    viewModel.showDetail(purchaseId)
+                }
+            },
+            onDismissDetail = viewModel::dismissDetail,
+            onLoadNextPage = viewModel::nextPage,
+            onRetryLoadMore = { page -> viewModel.loadPurchases(page) },
+            onBack = onTransactionsClick,
+            onDashboardClick = onDashboardClick,
+            onProductsClick = onProductsClick,
+            onReceivablesClick = onSupplierDebtsClick,
+            onSettingsClick = onOperationalAuditClick,
+            onDismissError = viewModel::clearError,
+            onSupplierClick = onSupplierDetailClick
+        )
+        return
+    }
 
     val isFiltered = uiState.isFiltered
 
