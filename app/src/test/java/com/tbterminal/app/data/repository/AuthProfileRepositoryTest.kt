@@ -16,11 +16,20 @@ import com.tbterminal.app.data.remote.UserApi
 import com.tbterminal.app.data.remote.UserCreateRequest
 import com.tbterminal.app.data.remote.UserResponseDto
 import com.tbterminal.app.data.remote.UserUpdateRequest
+import com.tbterminal.app.data.session.SessionEvent
 import com.tbterminal.app.data.session.SessionManager
 import com.tbterminal.app.data.session.SessionUser
 import com.tbterminal.app.data.session.TokenStore
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.test.UnconfinedTestDispatcher
+import kotlinx.coroutines.test.runTest
+import okhttp3.MediaType.Companion.toMediaType
+import okhttp3.ResponseBody.Companion.toResponseBody
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import retrofit2.Response
@@ -61,6 +70,41 @@ class AuthProfileRepositoryTest {
         assertEquals(ChangePasswordRequestDto("old-pass", "new-pass"), api.passwordRequest)
         assertTrue(repository.changeMyPin("1234", "5678") is RepositoryResult.Success)
         assertEquals(ChangePinRequestDto("1234", "5678"), api.pinRequest)
+    }
+
+    @Test
+    fun changeMyPasswordSuccessClearsSessionAndEmitsPasswordChangedWhileFailureKeepsSession() = runTest {
+        val store = ProfileTokenStore().apply {
+            saveTokens("access-1", "refresh-1")
+            saveSessionUser(SessionUser("Siti", "KASIR", true, "2026-01-02", null, "usr-1"))
+        }
+        val sessionManager = SessionManager(store)
+        val failingApi = FakeProfileAuthApi(
+            passwordResponse = Response.error(
+                400,
+                """{"success":false,"code":"INVALID_PASSWORD","message":"Kata sandi saat ini salah"}"""
+                    .toResponseBody("application/json".toMediaType())
+            )
+        )
+        val failingRepo = RemoteAuthRepository(failingApi, sessionManager)
+
+        assertTrue(failingRepo.changeMyPassword("wrong-pass", "new-pass-8") is RepositoryResult.Error)
+        assertTrue(sessionManager.hasAccessToken())
+        assertEquals("access-1", store.readAccessToken())
+
+        val events = mutableListOf<SessionEvent>()
+        val job = launch(UnconfinedTestDispatcher(testScheduler)) {
+            events.add(sessionManager.events.first())
+        }
+        val successRepo = RemoteAuthRepository(FakeProfileAuthApi(), sessionManager)
+        assertTrue(successRepo.changeMyPassword("old-pass", "new-pass-8") is RepositoryResult.Success)
+        job.join()
+
+        assertFalse(sessionManager.hasAccessToken())
+        assertNull(store.readAccessToken())
+        assertNull(store.readRefreshToken())
+        assertNull(store.readSessionUser())
+        assertEquals(listOf(SessionEvent.PasswordChanged), events)
     }
 
     @Test
@@ -160,7 +204,9 @@ private class FakeProfileUserApi : UserApi {
     override suspend fun deactivateUser(id: String): Response<ApiResponse<Unit>> = error("not used")
 }
 
-private class FakeProfileAuthApi : AuthApi {
+private class FakeProfileAuthApi(
+    private val passwordResponse: Response<ApiResponse<Unit>> = Response.success(ApiResponse(success = true, data = Unit))
+) : AuthApi {
     var passwordRequest: ChangePasswordRequestDto? = null
     var pinRequest: ChangePinRequestDto? = null
 
@@ -172,7 +218,7 @@ private class FakeProfileAuthApi : AuthApi {
     )
     override suspend fun changeMyPassword(request: ChangePasswordRequestDto): Response<ApiResponse<Unit>> {
         passwordRequest = request
-        return Response.success(ApiResponse(success = true, data = Unit))
+        return passwordResponse
     }
     override suspend fun changeMyPin(request: ChangePinRequestDto): Response<ApiResponse<Unit>> {
         pinRequest = request

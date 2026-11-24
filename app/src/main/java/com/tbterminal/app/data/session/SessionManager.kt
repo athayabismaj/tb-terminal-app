@@ -207,6 +207,7 @@ class SharedPreferencesTokenStore(
 
 sealed interface SessionEvent {
     data object Unauthorized : SessionEvent
+    data object PasswordChanged : SessionEvent
 }
 
 class SessionManager(
@@ -284,5 +285,10 @@ class SessionManager(
     fun handleUnauthorized() {
         clearSession()
         _events.tryEmit(SessionEvent.Unauthorized)
+    }
+
+    fun handlePasswordChanged() {
+        clearSession()
+        _events.tryEmit(SessionEvent.PasswordChanged)
     }
 }

@@ -485,9 +485,15 @@ class RemoteAuthRepository private constructor(
         if (oldPassword == newPassword) {
             return RepositoryResult.Error("VALIDATION_ERROR", "Password baru harus berbeda dari password lama")
         }
-        return safeApiCall {
+        val result = safeApiCall {
             authApi.changeMyPassword(ChangePasswordRequestDto(oldPassword, newPassword))
         }.toRepositoryResult(::successfulUnitResult)
+        if (result is RepositoryResult.Success) {
+            withContext(ioDispatcher) {
+                sessionManager.handlePasswordChanged()
+            }
+        }
+        return result
     }
 
     override suspend fun changeMyPin(oldPin: String, newPin: String): RepositoryResult<Unit> {

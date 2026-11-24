@@ -276,6 +276,30 @@ class LoginScreenBehaviorTest {
         composeRule.onNodeWithTag("login-password-input-error").assertIsDisplayed()
         composeRule.onNodeWithText("Nama pengguna atau kata sandi salah").assertIsDisplayed()
     }
+
+    @Test
+    @Config(qualifiers = "w390dp-h844dp-mdpi")
+    fun passwordChangedNotificationDisplaysLoginMessageWithoutErrorHighlights() {
+        val viewModel = AuthViewModel(FakeLoginAuthRepository())
+
+        composeRule.setContent {
+            TbterminalappTheme {
+                LoginScreen(
+                    viewModel = viewModel,
+                    onLoginSuccess = { _, _ -> }
+                )
+            }
+        }
+
+        composeRule.runOnIdle {
+            viewModel.notifyPasswordChanged()
+        }
+        composeRule.waitForIdle()
+
+        composeRule.onNodeWithTag("app-alert-card").assertIsDisplayed()
+        composeRule.onNodeWithText("Password diubah").assertIsDisplayed()
+        composeRule.onNodeWithText("Password diubah, silakan login kembali").assertIsDisplayed()
+    }
 }
 
 private class FakeLoginAuthRepository(

@@ -1,5 +1,9 @@
 package com.tbterminal.app.data.session
 
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.test.UnconfinedTestDispatcher
+import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
@@ -68,6 +72,32 @@ class SessionManagerTest {
 
         assertFalse(manager.hasAccessToken())
         assertNull(store.readRefreshToken())
+    }
+
+    @Test
+    fun handlePasswordChanged_clearsSessionWithoutRemoteLogoutAndEmitsEvent() = runTest {
+        val store = FakeTokenStore().apply {
+            saveTokens("access", "refresh")
+            saveSessionUser(SessionUser("Owner", "owner", true, "2026-01-01", null, "usr-1"))
+        }
+        val manager = SessionManager(store)
+        var remoteLogoutCalled = false
+        manager.configureRemoteLogout { remoteLogoutCalled = true }
+
+        val emitted = mutableListOf<SessionEvent>()
+        val collectJob = launch(UnconfinedTestDispatcher(testScheduler)) {
+            emitted.add(manager.events.first())
+        }
+
+        manager.handlePasswordChanged()
+        collectJob.join()
+
+        assertFalse(remoteLogoutCalled)
+        assertFalse(manager.hasAccessToken())
+        assertNull(store.readAccessToken())
+        assertNull(store.readRefreshToken())
+        assertNull(store.readSessionUser())
+        assertEquals(listOf(SessionEvent.PasswordChanged), emitted)
     }
 }
 

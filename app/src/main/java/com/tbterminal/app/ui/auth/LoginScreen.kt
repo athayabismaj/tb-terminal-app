@@ -124,12 +124,13 @@ fun LoginScreen(
 ) {
     val context = LocalContext.current
     val authState by viewModel.authState.collectAsState()
+    val loginNotice by viewModel.loginNotice.collectAsState()
     var showForgotPasswordDialog by remember { mutableStateOf(false) }
     var lastSubmittedUsername by rememberSaveable { mutableStateOf("") }
     var lastSubmittedPassword by rememberSaveable { mutableStateOf("") }
     var alertDismissed by remember { mutableStateOf(false) }
 
-    LaunchedEffect(authState) {
+    LaunchedEffect(authState, loginNotice) {
         alertDismissed = false
         if (authState is AuthState.Success) {
             val state = authState as AuthState.Success
@@ -173,6 +174,11 @@ fun LoginScreen(
             message = "Periksa koneksi internet.",
             actionLabel = "Coba lagi"
         )
+        !loginNotice.isNullOrBlank() -> LoginAlertState(
+            type = AlertType.Success,
+            title = "Password diubah",
+            message = loginNotice.orEmpty()
+        )
         else -> null
     }
 
@@ -200,7 +206,10 @@ fun LoginScreen(
                 viewModel.resetState()
             }
         },
-        onAlertDismiss = { alertDismissed = true },
+        onAlertDismiss = {
+            alertDismissed = true
+            viewModel.clearLoginNotice()
+        },
         onUsernameChanged = { viewModel.onLoginInputChanged(isUsername = true) },
         onPasswordChanged = { viewModel.onLoginInputChanged(isUsername = false) }
     )

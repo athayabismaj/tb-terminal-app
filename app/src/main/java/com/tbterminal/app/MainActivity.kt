@@ -72,6 +72,13 @@ class MainActivity : ComponentActivity() {
                         lifecycle.repeatOnLifecycle(Lifecycle.State.STARTED) {
                             sessionManager.events.collect { event ->
                                 when (event) {
+                                    SessionEvent.PasswordChanged -> {
+                                        authViewModel.notifyPasswordChanged()
+                                        navController.navigate(AppRoute.Login.route) {
+                                            popUpTo(0)
+                                            launchSingleTop = true
+                                        }
+                                    }
                                     SessionEvent.Unauthorized -> {
                                         authViewModel.notifySessionExpired()
                                         navController.navigate(AppRoute.Login.route) {

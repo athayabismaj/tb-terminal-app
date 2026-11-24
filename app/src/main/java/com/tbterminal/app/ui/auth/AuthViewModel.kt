@@ -67,6 +67,9 @@ class AuthViewModel(
     private val _pendingForgotPinReset = MutableStateFlow(false)
     val pendingForgotPinReset: StateFlow<Boolean> = _pendingForgotPinReset.asStateFlow()
 
+    private val _loginNotice = MutableStateFlow<String?>(null)
+    val loginNotice: StateFlow<String?> = _loginNotice.asStateFlow()
+
     private var verifiedPasswordForPinReset: String? = null
     private var lockoutCountdownJob: Job? = null
 
@@ -74,6 +77,7 @@ class AuthViewModel(
         get() = !verifiedPasswordForPinReset.isNullOrBlank()
 
     fun login(username: String, password: String) {
+        _loginNotice.value = null
         val normalizedUsername = username.trim()
         val isUsernameBlank = normalizedUsername.isBlank()
         val isPasswordBlank = password.isBlank()
@@ -388,10 +392,24 @@ class AuthViewModel(
         _unlockState.value = UnlockState.Idle
     }
 
+    fun clearLoginNotice() {
+        _loginNotice.value = null
+    }
+
+    fun notifyPasswordChanged() {
+        lockoutCountdownJob?.cancel()
+        verifiedPasswordForPinReset = null
+        _pendingForgotPinReset.value = false
+        _unlockState.value = UnlockState.Idle
+        _authState.value = AuthState.Idle
+        _loginNotice.value = PASSWORD_CHANGED_LOGIN_MESSAGE
+    }
+
     fun notifySessionExpired() {
         lockoutCountdownJob?.cancel()
         verifiedPasswordForPinReset = null
         _pendingForgotPinReset.value = false
+        _loginNotice.value = null
         _unlockState.value = UnlockState.Idle
         _authState.value = AuthState.Error("Sesi telah berakhir. Silakan login kembali.")
     }
@@ -403,6 +421,8 @@ class AuthViewModel(
     }
 
     companion object {
+        const val PASSWORD_CHANGED_LOGIN_MESSAGE = "Password diubah, silakan login kembali"
+
         fun factory(authRepository: AuthRepository): ViewModelProvider.Factory {
             return viewModelFactory {
                 AuthViewModel(authRepository = authRepository)
