@@ -55,7 +55,7 @@ import com.tbterminal.app.data.local.entity.SyncQueueEntity
         SyncQueueEntity::class,
         AppSettingEntity::class
     ],
-    version = 4,
+    version = 5,
     exportSchema = false
 )
 @TypeConverters(LocalConverters::class)
@@ -92,7 +92,7 @@ abstract class TbTerminalDatabase : RoomDatabase() {
                     TbTerminalDatabase::class.java,
                     DATABASE_NAME
                 )
-                    .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4)
+                    .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5)
                     .build()
                     .also { instance = it }
             }
@@ -135,6 +135,12 @@ abstract class TbTerminalDatabase : RoomDatabase() {
                 db.execSQL("ALTER TABLE local_transactions ADD COLUMN roundingAmount REAL NOT NULL DEFAULT 0.0")
                 db.execSQL("ALTER TABLE local_transaction_items ADD COLUMN note TEXT")
                 db.execSQL("ALTER TABLE local_payments ADD COLUMN reference TEXT")
+            }
+        }
+
+        internal val MIGRATION_4_5 = object : Migration(4, 5) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE sync_queue ADD COLUMN lastErrorCode TEXT")
             }
         }
 

@@ -97,6 +97,7 @@ class SyncMonitoringRepository(
             id = item.id,
             status = SyncStatus.CONFLICT,
             lastError = reviewedError,
+            lastErrorCode = item.lastErrorCode,
             retryIncrement = 0,
             updatedAt = System.currentTimeMillis()
         )
@@ -170,7 +171,7 @@ class SyncMonitoringRepository(
     }
 
     private fun SyncQueueEntity.toUiModel(): SyncQueueUiModel {
-        val classification = conflictAwareClassification(status, lastError)
+        val classification = conflictAwareClassification(status, lastError, lastErrorCode)
         return SyncQueueUiModel(
             localId = id,
             entityType = entityType,
@@ -178,7 +179,9 @@ class SyncMonitoringRepository(
             syncStatus = status,
             retryCount = retryCount,
             lastError = lastError,
+            lastErrorCode = lastErrorCode,
             errorCategory = classification.category,
+            conflictTitle = classification.title,
             recommendation = classification.recommendation,
             createdAt = createdAt,
             updatedAt = updatedAt
@@ -187,13 +190,15 @@ class SyncMonitoringRepository(
 
     private fun conflictAwareClassification(
         status: SyncStatus,
-        lastError: String?
+        lastError: String?,
+        lastErrorCode: String?,
     ): SyncErrorClassification {
-        val classification = SyncErrorClassifier.classifyMessage(lastError)
+        val classification = SyncErrorClassifier.classifyMessage(lastError, lastErrorCode)
         return if (status == SyncStatus.CONFLICT && classification.category != SyncErrorCategory.CONFLICT) {
             SyncErrorClassification(
                 category = SyncErrorCategory.CONFLICT,
-                recommendation = "Tinjau data lokal dan aturan bisnis server sebelum mencoba sync ulang."
+                recommendation = "Tinjau data lokal dan aturan bisnis server sebelum mencoba sync ulang.",
+                title = classification.title
             )
         } else {
             classification
@@ -222,7 +227,9 @@ data class SyncQueueUiModel(
     val syncStatus: SyncStatus,
     val retryCount: Int,
     val lastError: String?,
+    val lastErrorCode: String? = null,
     val errorCategory: SyncErrorCategory,
+    val conflictTitle: String? = null,
     val recommendation: String,
     val createdAt: Long,
     val updatedAt: Long

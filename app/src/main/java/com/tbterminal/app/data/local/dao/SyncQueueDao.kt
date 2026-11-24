@@ -75,6 +75,7 @@ interface SyncQueueDao {
         SET status = :status,
             retryCount = retryCount + :retryIncrement,
             lastError = :lastError,
+            lastErrorCode = :lastErrorCode,
             updatedAt = :updatedAt
         WHERE id = :id
         """
@@ -83,6 +84,7 @@ interface SyncQueueDao {
         id: Long,
         status: SyncStatus,
         lastError: String?,
+        lastErrorCode: String?,
         retryIncrement: Int,
         updatedAt: Long
     ): Unit
@@ -93,6 +95,7 @@ interface SyncQueueDao {
         SET status = :failed,
             retryCount = retryCount + 1,
             lastError = :lastError,
+            lastErrorCode = NULL,
             updatedAt = :updatedAt
         WHERE entityType = :entityType
             AND status != :syncedStatus
