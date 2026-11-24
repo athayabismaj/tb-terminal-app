@@ -1,5 +1,7 @@
 package com.tbterminal.app.data.local.checkout
 
+import java.math.BigDecimal
+
 data class LocalCheckoutPaymentLineCommand(
     val method: String,
     val amount: Double,
@@ -45,5 +47,14 @@ data class LocalCheckoutItemCommand(
     val cogsAtTransaction: Double = 0.0,
     val discount: Double = 0.0,
     val subtotal: Double,
-    val note: String? = null
-)
+    val note: String? = null,
+    val unitServerId: String? = null,
+    val baseQuantityExact: BigDecimal? = null,
+    val conversionFactorExact: BigDecimal? = null
+) {
+    val resolvedBaseQuantity: BigDecimal
+        get() = normalizeExactDecimal(baseQuantityExact ?: BigDecimal.valueOf(baseQuantity))
+
+    val resolvedConversionFactor: BigDecimal
+        get() = normalizeExactDecimal(conversionFactorExact ?: BigDecimal.valueOf(conversionFactor))
+}

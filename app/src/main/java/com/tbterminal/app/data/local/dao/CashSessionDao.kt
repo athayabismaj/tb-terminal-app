@@ -83,6 +83,17 @@ interface CashSessionDao {
     @Query("SELECT * FROM local_cash_sessions WHERE syncStatus = :status ORDER BY createdAt ASC LIMIT :limit")
     suspend fun getBySyncStatus(status: SyncStatus, limit: Int): List<LocalCashSessionEntity>
 
+    @Query(
+        """
+        SELECT * FROM local_cash_sessions
+        WHERE serverId IS NULL
+          AND deletedAt IS NULL
+          AND syncStatus != :syncedStatus
+        ORDER BY openedAt ASC
+        """
+    )
+    suspend fun getUnsyncedOfflineSessions(syncedStatus: SyncStatus = SyncStatus.SYNCED): List<LocalCashSessionEntity>
+
     @Query("SELECT COUNT(*) FROM local_cash_sessions WHERE status = :status AND deletedAt IS NULL")
     suspend fun countByStatus(status: String): Int
 

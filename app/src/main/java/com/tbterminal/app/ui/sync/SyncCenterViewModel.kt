@@ -7,6 +7,7 @@ import com.tbterminal.app.data.local.model.SyncEntityType
 import com.tbterminal.app.data.repository.SyncMonitoringRepository
 import com.tbterminal.app.data.repository.SyncQueueUiModel
 import com.tbterminal.app.data.repository.SyncRetryResult
+import com.tbterminal.app.data.sync.OfflineSessionAgeAlert
 import com.tbterminal.app.ui.common.viewModelFactory
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -34,6 +35,7 @@ class SyncCenterViewModel(
                         totalSyncedToday = snapshot.totalSyncedToday,
                         queueItems = snapshot.queueItems,
                         groupedItems = snapshot.queueItems.groupBy { item -> item.entityType },
+                        offlineSessionAgeAlert = snapshot.offlineSessionAgeAlert,
                         isInitialLoading = false,
                     )
                 }
@@ -55,6 +57,7 @@ class SyncCenterViewModel(
                             totalSyncedToday = snapshot.totalSyncedToday,
                             queueItems = snapshot.queueItems,
                             groupedItems = snapshot.queueItems.groupBy { item -> item.entityType },
+                            offlineSessionAgeAlert = snapshot.offlineSessionAgeAlert,
                             isRefreshing = false,
                             isInitialLoading = false,
                         )
@@ -172,6 +175,7 @@ data class SyncCenterUiState(
     val totalSyncedToday: Int = 0,
     val queueItems: List<SyncQueueUiModel> = emptyList(),
     val groupedItems: Map<SyncEntityType, List<SyncQueueUiModel>> = emptyMap(),
+    val offlineSessionAgeAlert: OfflineSessionAgeAlert? = null,
     val isInitialLoading: Boolean = true,
     val isRefreshing: Boolean = false,
     val isRetrying: Boolean = false,

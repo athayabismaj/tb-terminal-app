@@ -4,6 +4,7 @@ import androidx.room.Entity
 import androidx.room.Index
 import androidx.room.PrimaryKey
 import com.tbterminal.app.data.local.model.SyncStatus
+import java.math.BigDecimal
 
 @Entity(
     tableName = "local_transaction_items",
@@ -23,7 +24,10 @@ data class LocalTransactionItemEntity(
     val productNameSnapshot: String,
     val skuSnapshot: String? = null,
     val unitNameSnapshot: String? = null,
+    val unitServerId: String? = null,
     val quantity: Double = 0.0,
+    val baseQuantity: BigDecimal? = null,
+    val conversionFactor: BigDecimal? = null,
     val priceAtTransaction: Double = 0.0,
     val cogsAtTransaction: Double = 0.0,
     val discount: Double = 0.0,

@@ -2,6 +2,7 @@ package com.tbterminal.app.ui.cash
 
 import com.tbterminal.app.data.model.CashSession
 import com.tbterminal.app.data.model.CashTransaction
+import com.tbterminal.app.data.sync.OfflineSessionAgeAlert
 import java.math.BigDecimal
 
 data class CashReconciliationUiState(
@@ -31,6 +32,7 @@ data class CashReconciliationUiState(
     val localCashSessionSyncStatus: String? = null,
     val lastClosedSession: CashSession? = null,
     val canOpenCashSession: Boolean = true,
+    val offlineSessionAgeAlert: OfflineSessionAgeAlert? = null,
     val errorMessage: String? = null,
     val message: String? = null
 ) {

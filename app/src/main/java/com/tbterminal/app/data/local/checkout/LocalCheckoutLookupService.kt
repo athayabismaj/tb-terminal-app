@@ -3,6 +3,7 @@ package com.tbterminal.app.data.local.checkout
 import com.tbterminal.app.data.local.dao.CashSessionDao
 import com.tbterminal.app.data.local.database.CustomerLocalDataSource
 import com.tbterminal.app.data.local.database.ProductLocalDataSource
+import java.math.BigDecimal
 
 class LocalCheckoutLookupService(
     private val productLocalDataSource: ProductLocalDataSource,
@@ -17,7 +18,10 @@ class LocalCheckoutLookupService(
             localId = product.localId,
             serverId = product.serverId,
             cogsAtTransaction = product.priceBuy,
-            stock = product.stock
+            stock = product.stock,
+            baseUnitServerId = product.unitServerId,
+            secondaryUnitServerId = product.secondaryUnitServerId,
+            secondaryUnitFactor = product.secondaryUnitFactor
         )
     }
 
@@ -48,7 +52,10 @@ data class LocalCheckoutProductLookup(
     val localId: Long,
     val serverId: String?,
     val cogsAtTransaction: Double,
-    val stock: Double
+    val stock: Double,
+    val baseUnitServerId: String? = null,
+    val secondaryUnitServerId: String? = null,
+    val secondaryUnitFactor: BigDecimal? = null
 )
 
 data class LocalCheckoutCustomerLookup(

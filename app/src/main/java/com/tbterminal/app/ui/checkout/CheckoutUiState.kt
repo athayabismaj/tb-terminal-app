@@ -159,7 +159,8 @@ data class Product(
     val contractorPrice: BigDecimal = BigDecimal.ZERO,
     val priceTiers: List<ProductPriceTier> = emptyList(),
     val masterDiscount: BigDecimal = BigDecimal.ZERO,
-    val photoUrl: String? = null
+    val photoUrl: String? = null,
+    val baseUnitId: String? = null
 )
 
 data class CartItem(
@@ -185,7 +186,8 @@ data class CartItem(
     val isContractorPriceApplied: Boolean = false,
     val masterUnitDiscount: BigDecimal = BigDecimal.ZERO,
     val hasManualDiscountOverride: Boolean = false,
-    val isMasterDiscountApplied: Boolean = false
+    val isMasterDiscountApplied: Boolean = false,
+    val baseUnitId: String? = null
 ) {
     val hasSecondaryUnit: Boolean
         get() = secondaryUnitFactor != null && secondaryUnitFactor > BigDecimal.ONE

@@ -12,6 +12,7 @@ import com.tbterminal.app.data.local.id.LocalIdGenerator
 import com.tbterminal.app.data.local.model.SyncEntityType
 import com.tbterminal.app.data.local.model.SyncOperation
 import com.tbterminal.app.data.local.model.SyncStatus
+import java.math.BigDecimal
 import java.time.Instant
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
@@ -69,7 +70,7 @@ class LocalCheckoutService(
                     item.productLocalId?.let { productLocalId ->
                         database.productDao().decrementStock(
                             localId = productLocalId,
-                            quantity = item.baseQuantity,
+                            quantity = item.resolvedBaseQuantity.toDouble(),
                             status = SyncStatus.PENDING,
                             updatedAt = now
                         )
@@ -169,6 +170,13 @@ class LocalCheckoutService(
         command.items.forEach { item ->
             if (item.productNameSnapshot.isBlank()) return "Nama produk wajib diisi"
             if (item.quantity <= 0.0) return "Qty item harus lebih dari 0"
+            if (item.resolvedBaseQuantity <= BigDecimal.ZERO) return "Qty satuan dasar harus lebih dari 0"
+            if (item.resolvedConversionFactor <= BigDecimal.ZERO) return "Faktor konversi satuan harus lebih dari 0"
+            if (item.resolvedConversionFactor.compareTo(BigDecimal.ONE) != 0 &&
+                exceedsMaxBaseQuantityScale(item.resolvedBaseQuantity)
+            ) {
+                return "Jumlah satuan dasar ${item.productNameSnapshot} melebihi 2 angka desimal"
+            }
             if (item.priceAtTransaction < 0.0) return "Harga item tidak boleh negatif"
             if (item.cogsAtTransaction < 0.0) return "HPP item tidak boleh negatif"
             if (item.discount < 0.0) return "Diskon item tidak boleh negatif"
@@ -189,7 +197,10 @@ class LocalCheckoutService(
             productNameSnapshot = productNameSnapshot,
             skuSnapshot = skuSnapshot,
             unitNameSnapshot = unitNameSnapshot,
+            unitServerId = unitServerId?.trim()?.takeIf(String::isNotBlank),
             quantity = quantity,
+            baseQuantity = resolvedBaseQuantity,
+            conversionFactor = resolvedConversionFactor,
             priceAtTransaction = priceAtTransaction,
             cogsAtTransaction = cogsAtTransaction,
             discount = discount,
@@ -285,9 +296,10 @@ class LocalCheckoutService(
             append("\"productNameSnapshot\":${productNameSnapshot.replace("\"", "\\\"").quoted()},")
             append("\"skuSnapshot\":${skuSnapshot?.replace("\"", "\\\"")?.quoted() ?: "null"},")
             append("\"unitNameSnapshot\":${unitNameSnapshot?.replace("\"", "\\\"")?.quoted() ?: "null"},")
+            append("\"unitServerId\":${unitServerId?.trim()?.takeIf(String::isNotBlank)?.replace("\"", "\\\"")?.quoted() ?: "null"},")
             append("\"quantity\":$quantity,")
-            append("\"baseQuantity\":$baseQuantity,")
-            append("\"conversionFactor\":$conversionFactor,")
+            append("\"baseQuantity\":${resolvedBaseQuantity.toPlainString()},")
+            append("\"conversionFactor\":${resolvedConversionFactor.toPlainString()},")
             append("\"priceAtTransaction\":$priceAtTransaction,")
             append("\"cogsAtTransaction\":$cogsAtTransaction,")
             append("\"discount\":$discount,")

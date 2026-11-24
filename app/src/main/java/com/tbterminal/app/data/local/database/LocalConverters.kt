@@ -5,8 +5,24 @@ import com.tbterminal.app.data.local.model.AppDataMode
 import com.tbterminal.app.data.local.model.SyncEntityType
 import com.tbterminal.app.data.local.model.SyncOperation
 import com.tbterminal.app.data.local.model.SyncStatus
+import java.math.BigDecimal
 
 class LocalConverters {
+    @TypeConverter
+    fun fromBigDecimal(value: BigDecimal?): String? {
+        if (value == null) return null
+        return if (value.compareTo(BigDecimal.ZERO) == 0) {
+            "0"
+        } else {
+            value.stripTrailingZeros().toPlainString()
+        }
+    }
+
+    @TypeConverter
+    fun toBigDecimal(value: String?): BigDecimal? {
+        return value?.trim()?.takeIf(String::isNotBlank)?.toBigDecimalOrNull()
+    }
+
     @TypeConverter
     fun fromSyncStatus(value: SyncStatus): String = value.name
 

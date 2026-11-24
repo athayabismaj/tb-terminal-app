@@ -81,7 +81,8 @@ data class ProductStock(
     val secondaryUnitName: String? = null,
     val secondaryUnitFactor: BigDecimal? = null,
     val priceTiers: List<ProductPriceTier> = emptyList(),
-    val photoUrl: String? = null
+    val photoUrl: String? = null,
+    val baseUnitId: String? = null
 )
 
 data class ProductStockPage(

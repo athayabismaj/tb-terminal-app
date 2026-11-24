@@ -84,3 +84,5 @@ docs/UI_DESIGN_RULES.md   acuan wajib untuk layar baru dan refactor UI
    `fallbackToDestructiveMigration`, karena data offline belum tersinkron bisa hilang.
 4. Tambah unit test untuk setiap perubahan perilaku; jalankan perintah build di atas sebelum selesai
    dan laporkan hasilnya apa adanya.
+5. JANGAN commit, push, tag, merge, atau rebase. Cukup ubah file dan laporkan.
+   Commit dilakukan oleh pemilik repo atau Antigravity.

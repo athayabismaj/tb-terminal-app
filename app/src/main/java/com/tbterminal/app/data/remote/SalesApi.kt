@@ -389,7 +389,9 @@ data class OfflineCheckoutSyncItemRequestDto(
     @Serializable(with = BigDecimalStringSerializer::class) val cogsAtTransaction: BigDecimal,
     @Serializable(with = BigDecimalStringSerializer::class) val discount: BigDecimal = BigDecimal.ZERO,
     @Serializable(with = BigDecimalStringSerializer::class) val subtotal: BigDecimal,
-    val note: String? = null
+    val note: String? = null,
+    val unitId: String? = null,
+    @Serializable(with = BigDecimalStringSerializer::class) val baseQuantity: BigDecimal? = null
 )
 
 @Serializable

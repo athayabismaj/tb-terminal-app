@@ -14,6 +14,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.zIndex
+import com.tbterminal.app.ui.components.OfflineSessionAgeBanner
 import com.tbterminal.app.ui.components.TopFloatingCapsule
 
 @Composable
@@ -50,6 +51,12 @@ internal fun CashReconciliationScreen(
             verticalArrangement = Arrangement.spacedBy(20.dp)
         ) {
             CashHeader()
+            uiState.offlineSessionAgeAlert?.let { alert ->
+                OfflineSessionAgeBanner(
+                    alert = alert,
+                    modifier = Modifier.fillMaxWidth()
+                )
+            }
             CashMetrics(uiState)
             CashSessionPanel(
                 uiState = uiState,

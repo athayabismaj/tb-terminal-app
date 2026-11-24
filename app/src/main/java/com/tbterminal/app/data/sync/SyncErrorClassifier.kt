@@ -146,6 +146,7 @@ object SyncErrorClassifier {
         "OFFLINE_PRICE_CONFLICT",
         "OFFLINE_ROUNDING_CONFLICT",
         "OFFLINE_TAX_CONFLICT",
+        "OFFLINE_UNIT_CONFLICT",
         "OFFLINE_OCCURRED_AT_INVALID",
         "OFFLINE_OPENED_AT_INVALID",
         "OFFLINE_CLOSED_AT_INVALID",
@@ -164,6 +165,10 @@ object SyncErrorClassifier {
         "OFFLINE_TAX_CONFLICT" to SyncConflictGuidance(
             title = "Konflik aturan pajak",
             recommendation = "Pengaturan pajak transaksi offline berbeda dengan pengaturan pajak server saat ini. Segarkan pengaturan toko lalu tinjau transaksi."
+        ),
+        "OFFLINE_UNIT_CONFLICT" to SyncConflictGuidance(
+            title = "Konflik satuan produk",
+            recommendation = "Satuan atau isi per satuan berbeda dengan server. Segarkan data produk lalu tinjau transaksi ini."
         ),
         "OFFLINE_OCCURRED_AT_INVALID" to SyncConflictGuidance(
             title = "Waktu kejadian di luar jendela sesi",
