@@ -9,11 +9,12 @@ import org.junit.Test
 
 class SyncErrorClassifierTest {
     @Test
-    fun allSixOfflineConflictCodesClassifyAsConflictByCodeEvenWithoutMessageKeywords() {
+    fun allSevenOfflineConflictCodesClassifyAsConflictByCodeEvenWithoutMessageKeywords() {
         val codes = listOf(
             "OFFLINE_PRICE_CONFLICT",
             "OFFLINE_ROUNDING_CONFLICT",
             "OFFLINE_TAX_CONFLICT",
+            "OFFLINE_UNIT_CONFLICT",
             "OFFLINE_OCCURRED_AT_INVALID",
             "OFFLINE_OPENED_AT_INVALID",
             "OFFLINE_CLOSED_AT_INVALID",
@@ -43,8 +44,19 @@ class SyncErrorClassifierTest {
             assertEquals(result, stored)
         }
 
-        assertEquals(6, distinctTitles.size)
-        assertEquals(6, distinctRecommendations.size)
+        assertEquals(7, distinctTitles.size)
+        assertEquals(7, distinctRecommendations.size)
+
+        val unitResult = SyncErrorClassifier.classify(
+            httpCode = 409,
+            message = "Ditolak oleh server",
+            errorCode = "OFFLINE_UNIT_CONFLICT",
+        )
+        assertEquals("Konflik satuan produk", unitResult.title)
+        assertEquals(
+            "Satuan atau isi per satuan berbeda dengan server. Segarkan data produk lalu tinjau transaksi ini.",
+            unitResult.recommendation,
+        )
     }
 
     @Test

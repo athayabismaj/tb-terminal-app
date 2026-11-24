@@ -15,6 +15,7 @@ import com.tbterminal.app.data.local.model.SyncOperation
 import com.tbterminal.app.data.local.model.SyncStatus
 import com.tbterminal.app.data.remote.SalesApi
 import com.tbterminal.app.data.repository.SyncMonitoringRepository
+import java.math.BigDecimal
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.json.Json
@@ -235,5 +236,91 @@ class OfflineSyncConflictHandlingTest {
         assertEquals("OFFLINE_OPENED_AT_INVALID", database.syncQueueDao().getById(openQueueId)!!.lastErrorCode)
         assertEquals("OFFLINE_CLOSED_AT_INVALID", database.syncQueueDao().getById(closeQueueId)!!.lastErrorCode)
         assertEquals("OFFLINE_OCCURRED_AT_INVALID", database.syncQueueDao().getById(expenseQueueId)!!.lastErrorCode)
+    }
+
+    @Test
+    fun checkout409OfflineUnitConflictMarksConflictWithSpecificGuidanceWithoutRawCode() = runBlocking {
+        val txId = database.transactionDao().upsert(
+            LocalTransactionEntity(
+                clientGeneratedId = "tx-client-unit-1",
+                deviceId = "android-dev-1",
+                transactionCode = "OFF-UNIT-001",
+                cashSessionLocalId = 20L,
+                cashSessionServerId = "srv-session-unit-1",
+                cashierUserId = "kasir-1",
+                status = "PAID",
+                subtotal = 240_000.0,
+                total = 240_000.0,
+                paidAmount = 240_000.0,
+                remainingAmount = 0.0,
+            )
+        )
+        database.transactionItemDao().upsert(
+            LocalTransactionItemEntity(
+                transactionLocalId = txId,
+                productServerId = "prod-1",
+                productNameSnapshot = "Paku 5 cm",
+                unitNameSnapshot = "Dus",
+                unitServerId = "unit-dus",
+                quantity = 2.0,
+                baseQuantity = BigDecimal("24"),
+                conversionFactor = BigDecimal("12"),
+                priceAtTransaction = 120_000.0,
+                cogsAtTransaction = 96_000.0,
+                subtotal = 240_000.0,
+            )
+        )
+        database.paymentDao().upsert(
+            LocalPaymentEntity(
+                clientGeneratedId = "pay-client-unit-1",
+                transactionLocalId = txId,
+                method = "tunai",
+                amount = 240_000.0,
+            )
+        )
+        val queueId = database.syncQueueDao().enqueue(
+            SyncQueueEntity(
+                entityType = SyncEntityType.TRANSACTION,
+                entityLocalId = txId,
+                operation = SyncOperation.CREATE,
+                payloadJson = "{}",
+            )
+        )
+
+        server.enqueue(
+            MockResponse()
+                .setResponseCode(409)
+                .setBody("""{"success":false,"code":"OFFLINE_UNIT_CONFLICT","message":"Satuan tidak cocok dengan produk di server"}""")
+        )
+
+        val checkoutSync = OfflineCheckoutSyncService(database, salesApi, "android-dev-1")
+        val cashSessionSync = OfflineCashSessionSyncService(database, salesApi, "android-dev-1")
+        val cashExpenseSync = OfflineCashExpenseSyncService(database, salesApi, "android-dev-1", cashSessionSync)
+        val monitoringRepo = SyncMonitoringRepository(
+            syncQueueDao = database.syncQueueDao(),
+            offlineCashSessionSyncService = cashSessionSync,
+            offlineCheckoutSyncService = checkoutSync,
+            offlineCashExpenseSyncService = cashExpenseSync,
+        )
+
+        val result = checkoutSync.syncOne(txId)
+        assertTrue(result is OfflineCheckoutSyncResult.Failed)
+        result as OfflineCheckoutSyncResult.Failed
+        assertEquals(OfflineCheckoutSyncFailureKind.CONFLICT, result.kind)
+
+        val queueEntry = database.syncQueueDao().getById(queueId)!!
+        assertEquals(SyncStatus.CONFLICT, queueEntry.status)
+        assertEquals("OFFLINE_UNIT_CONFLICT", queueEntry.lastErrorCode)
+
+        val snapshot = monitoringRepo.observeSnapshot().first()
+        val uiItem = snapshot.queueItems.first { it.localId == queueId }
+        assertEquals(SyncErrorCategory.CONFLICT, uiItem.errorCategory)
+        assertEquals("Konflik satuan produk", uiItem.conflictTitle)
+        assertEquals(
+            "Satuan atau isi per satuan berbeda dengan server. Segarkan data produk lalu tinjau transaksi ini.",
+            uiItem.recommendation,
+        )
+        assertFalse(uiItem.conflictTitle!!.contains("OFFLINE_"))
+        assertFalse(uiItem.recommendation.contains("OFFLINE_"))
     }
 }
