@@ -918,7 +918,7 @@ internal fun CashierPayDebtDialog(
                                 keyboardOptions = KeyboardOptions(
                                     keyboardType = KeyboardType.Decimal
                                 ),
-                                textStyle = TextStyle(
+                                textStyle = TextStyle(fontFamily = com.tbterminal.app.ui.theme.KawanSans, 
                                     color = Color(0xFF0F172A),
                                     fontSize = 18.sp,
                                     fontWeight = FontWeight.Bold,

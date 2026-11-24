@@ -233,7 +233,7 @@ internal fun InlineCustomerPicker(
                                     isDropdownOpen = true
                                 },
                                 singleLine = true,
-                                textStyle = TextStyle(
+                                textStyle = TextStyle(fontFamily = com.tbterminal.app.ui.theme.KawanSans, 
                                     fontSize = 13.sp,
                                     color = Color(0xFF111827),
                                     fontWeight = FontWeight.Medium
@@ -458,7 +458,7 @@ internal fun InlineCustomerPicker(
                                 value = newName,
                                 onValueChange = { newName = it },
                                 singleLine = true,
-                                textStyle = TextStyle(fontSize = 12.sp, color = Color(0xFF0F172A), fontWeight = FontWeight.Medium),
+                                textStyle = TextStyle(fontFamily = com.tbterminal.app.ui.theme.KawanSans, fontSize = 12.sp, color = Color(0xFF0F172A), fontWeight = FontWeight.Medium),
                                 modifier = Modifier
                                     .fillMaxWidth()
                                     .padding(horizontal = 10.dp, vertical = 8.dp)
@@ -486,7 +486,7 @@ internal fun InlineCustomerPicker(
                                 onValueChange = { newPhone = it },
                                 singleLine = true,
                                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Phone),
-                                textStyle = TextStyle(fontSize = 12.sp, color = Color(0xFF0F172A), fontWeight = FontWeight.Medium),
+                                textStyle = TextStyle(fontFamily = com.tbterminal.app.ui.theme.KawanSans, fontSize = 12.sp, color = Color(0xFF0F172A), fontWeight = FontWeight.Medium),
                                 modifier = Modifier
                                     .fillMaxWidth()
                                     .padding(horizontal = 10.dp, vertical = 8.dp)
@@ -513,7 +513,7 @@ internal fun InlineCustomerPicker(
                                 value = newAddress,
                                 onValueChange = { newAddress = it },
                                 singleLine = true,
-                                textStyle = TextStyle(fontSize = 12.sp, color = Color(0xFF0F172A), fontWeight = FontWeight.Medium),
+                                textStyle = TextStyle(fontFamily = com.tbterminal.app.ui.theme.KawanSans, fontSize = 12.sp, color = Color(0xFF0F172A), fontWeight = FontWeight.Medium),
                                 modifier = Modifier
                                     .fillMaxWidth()
                                     .padding(horizontal = 10.dp, vertical = 8.dp)

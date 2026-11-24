@@ -476,7 +476,7 @@ private fun EstimatorCompactField(
                     singleLine = true,
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
                     cursorBrush = SolidColor(BrandPrimary),
-                    textStyle = TextStyle(
+                    textStyle = TextStyle(fontFamily = com.tbterminal.app.ui.theme.KawanSans, 
                         fontSize = 14.sp,
                         fontWeight = FontWeight.SemiBold,
                         color = Slate900

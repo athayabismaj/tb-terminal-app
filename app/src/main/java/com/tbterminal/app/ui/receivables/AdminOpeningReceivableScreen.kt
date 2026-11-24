@@ -616,7 +616,7 @@ private fun AmountAndLegacyInvoiceInputs(
                     value = amountInput,
                     onValueChange = onAmountChanged,
                     modifier = Modifier.weight(1f),
-                    textStyle = TextStyle(fontSize = 18.sp, fontWeight = FontWeight.Bold, color = Slate900),
+                    textStyle = TextStyle(fontFamily = com.tbterminal.app.ui.theme.KawanSans, fontSize = 18.sp, fontWeight = FontWeight.Bold, color = Slate900),
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                     singleLine = true,
                     decorationBox = { innerTextField ->
@@ -691,7 +691,7 @@ private fun AmountAndLegacyInvoiceInputs(
                     value = legacyInvoiceInput,
                     onValueChange = onLegacyInvoiceChanged,
                     modifier = Modifier.fillMaxWidth(),
-                    textStyle = TextStyle(fontSize = 13.sp, fontWeight = FontWeight.Medium, color = Slate900),
+                    textStyle = TextStyle(fontFamily = com.tbterminal.app.ui.theme.KawanSans, fontSize = 13.sp, fontWeight = FontWeight.Medium, color = Slate900),
                     singleLine = true,
                     decorationBox = { innerTextField ->
                         if (legacyInvoiceInput.isEmpty()) {
@@ -843,7 +843,7 @@ private fun NotesInput(
             value = notes,
             onValueChange = onNotesChanged,
             modifier = Modifier.fillMaxWidth().heightIn(min = 60.dp),
-            textStyle = TextStyle(fontSize = 13.sp, fontWeight = FontWeight.Medium, color = Slate900, lineHeight = 18.sp),
+            textStyle = TextStyle(fontFamily = com.tbterminal.app.ui.theme.KawanSans, fontSize = 13.sp, fontWeight = FontWeight.Medium, color = Slate900, lineHeight = 18.sp),
             decorationBox = { innerTextField ->
                 if (notes.isEmpty()) {
                     Text("Tambahkan catatan riwayat bon manual, nama proyek, atau keterangan lainnya...", fontSize = 13.sp, color = Slate400, lineHeight = 18.sp)

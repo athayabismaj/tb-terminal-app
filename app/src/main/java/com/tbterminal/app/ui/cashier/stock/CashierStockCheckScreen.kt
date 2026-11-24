@@ -293,7 +293,7 @@ private fun StockToolbar(
     val search: @Composable (Modifier) -> Unit = { searchModifier -> Surface(shape = RoundedCornerShape(16.dp), color = StockSurface, border = BorderStroke(1.dp, StockBorder), modifier = searchModifier.height(52.dp)) {
         Row(Modifier.fillMaxSize().padding(horizontal = 16.dp), verticalAlignment = Alignment.CenterVertically) {
             Icon(Icons.Outlined.Search, null, tint = StockTextSecondary, modifier = Modifier.size(20.dp)); Spacer(Modifier.width(12.dp))
-            Box(Modifier.weight(1f), contentAlignment = Alignment.CenterStart) { if (query.isEmpty()) Text("Cari produk atau SKU", color = StockTextMuted, fontSize = 14.sp); BasicTextField(query, onQueryChange, singleLine = true, textStyle = androidx.compose.ui.text.TextStyle(fontSize = 14.sp, color = StockTextPrimary), modifier = Modifier.fillMaxWidth()) }
+            Box(Modifier.weight(1f), contentAlignment = Alignment.CenterStart) { if (query.isEmpty()) Text("Cari produk atau SKU", color = StockTextMuted, fontSize = 14.sp); BasicTextField(query, onQueryChange, singleLine = true, textStyle = androidx.compose.ui.text.TextStyle(fontFamily = com.tbterminal.app.ui.theme.KawanSans, fontSize = 14.sp, color = StockTextPrimary), modifier = Modifier.fillMaxWidth()) }
         }
     } }
     if (compact) Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(10.dp)) {

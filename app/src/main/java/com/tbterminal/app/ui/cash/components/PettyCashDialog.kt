@@ -363,7 +363,7 @@ fun PettyCashDialog(
                                 onValueChange = onAmountChanged,
                                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                                 singleLine = true,
-                                textStyle = TextStyle(
+                                textStyle = TextStyle(fontFamily = com.tbterminal.app.ui.theme.KawanSans, 
                                     fontSize = 16.sp,
                                     fontWeight = FontWeight.SemiBold,
                                     color = Slate900
@@ -445,7 +445,7 @@ fun PettyCashDialog(
                                 onValueChange = onDescriptionChanged,
                                 minLines = 2,
                                 maxLines = 4,
-                                textStyle = TextStyle(
+                                textStyle = TextStyle(fontFamily = com.tbterminal.app.ui.theme.KawanSans, 
                                     fontSize = 12.sp,
                                     color = Slate800
                                 ),

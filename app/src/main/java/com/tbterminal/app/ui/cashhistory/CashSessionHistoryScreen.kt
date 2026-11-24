@@ -572,7 +572,7 @@ private fun SessionListSection(
                                 value = uiState.searchQuery,
                                 onValueChange = onSearchChanged,
                                 singleLine = true,
-                                textStyle = TextStyle(
+                                textStyle = TextStyle(fontFamily = com.tbterminal.app.ui.theme.KawanSans, 
                                     color = Color(0xFF0F172A),
                                     fontSize = 13.sp,
                                 ),
@@ -711,7 +711,7 @@ private fun SessionToolbar(
                         value = searchQuery,
                         onValueChange = onSearchChanged,
                         singleLine = true,
-                        textStyle = TextStyle(
+                        textStyle = TextStyle(fontFamily = com.tbterminal.app.ui.theme.KawanSans, 
                             color = Color(0xFF0F172A),
                             fontSize = 14.sp,
                         ),

@@ -477,7 +477,7 @@ fun CustomerPickerSheetView(
                     value = searchQuery,
                     onValueChange = { searchQuery = it },
                     modifier = Modifier.weight(1f),
-                    textStyle = TextStyle(
+                    textStyle = TextStyle(fontFamily = com.tbterminal.app.ui.theme.KawanSans, 
                         fontSize = 13.sp,
                         fontWeight = FontWeight.Medium,
                         color = Slate900
@@ -934,7 +934,7 @@ fun AddCustomerSheetView(
                             if (errorMessage != null) errorMessage = null
                         },
                         modifier = Modifier.fillMaxWidth(),
-                        textStyle = TextStyle(fontSize = 13.sp, fontWeight = FontWeight.SemiBold, color = Slate900),
+                        textStyle = TextStyle(fontFamily = com.tbterminal.app.ui.theme.KawanSans, fontSize = 13.sp, fontWeight = FontWeight.SemiBold, color = Slate900),
                         singleLine = true,
                         decorationBox = { innerTextField ->
                             if (name.isEmpty()) {
@@ -970,7 +970,7 @@ fun AddCustomerSheetView(
                         value = phone,
                         onValueChange = { phone = it },
                         modifier = Modifier.fillMaxWidth(),
-                        textStyle = TextStyle(fontSize = 13.sp, fontWeight = FontWeight.SemiBold, color = Slate900),
+                        textStyle = TextStyle(fontFamily = com.tbterminal.app.ui.theme.KawanSans, fontSize = 13.sp, fontWeight = FontWeight.SemiBold, color = Slate900),
                         singleLine = true,
                         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Phone),
                         decorationBox = { innerTextField ->
@@ -1007,7 +1007,7 @@ fun AddCustomerSheetView(
                         modifier = Modifier
                             .fillMaxWidth()
                             .heightIn(min = 48.dp),
-                        textStyle = TextStyle(fontSize = 13.sp, fontWeight = FontWeight.Medium, color = Slate900),
+                        textStyle = TextStyle(fontFamily = com.tbterminal.app.ui.theme.KawanSans, fontSize = 13.sp, fontWeight = FontWeight.Medium, color = Slate900),
                         decorationBox = { innerTextField ->
                             if (address.isEmpty()) {
                                 Text("Contoh: Jl. Diponegoro No. 12, RT 02/RW 04", fontSize = 13.sp, color = Slate400)

@@ -625,7 +625,7 @@ private fun AdjustmentAmountInputs(
                     value = amountInput,
                     onValueChange = onAmountChanged,
                     modifier = Modifier.weight(1f),
-                    textStyle = TextStyle(fontSize = 18.sp, fontWeight = FontWeight.Bold, color = Slate900),
+                    textStyle = TextStyle(fontFamily = com.tbterminal.app.ui.theme.KawanSans, fontSize = 18.sp, fontWeight = FontWeight.Bold, color = Slate900),
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                     singleLine = true,
                     decorationBox = { innerTextField ->
@@ -988,7 +988,7 @@ private fun AdjustmentDocInputs(
                     value = reference,
                     onValueChange = onReferenceChanged,
                     modifier = Modifier.fillMaxWidth(),
-                    textStyle = TextStyle(fontSize = 13.sp, fontWeight = FontWeight.Medium, color = Slate900),
+                    textStyle = TextStyle(fontFamily = com.tbterminal.app.ui.theme.KawanSans, fontSize = 13.sp, fontWeight = FontWeight.Medium, color = Slate900),
                     singleLine = true,
                     decorationBox = { innerTextField ->
                         if (reference.isEmpty()) {
@@ -1017,7 +1017,7 @@ private fun AdjustmentDocInputs(
                     value = reason,
                     onValueChange = onReasonChanged,
                     modifier = Modifier.fillMaxWidth().heightIn(min = 60.dp),
-                    textStyle = TextStyle(fontSize = 13.sp, fontWeight = FontWeight.Medium, color = Slate900, lineHeight = 18.sp),
+                    textStyle = TextStyle(fontFamily = com.tbterminal.app.ui.theme.KawanSans, fontSize = 13.sp, fontWeight = FontWeight.Medium, color = Slate900, lineHeight = 18.sp),
                     decorationBox = { innerTextField ->
                         if (reason.isEmpty()) {
                             Text("Jelaskan alasan penyesuaian (contoh: Diskon khusus disetujui owner, selisih pembulatan nota lama, retur barang)...", fontSize = 13.sp, color = Slate400, lineHeight = 18.sp)

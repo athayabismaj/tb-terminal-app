@@ -275,7 +275,7 @@ internal fun AdjustmentReceivableDialog(
                             value = uiState.adjustmentAmountInput,
                             onValueChange = onAmountChanged,
                             modifier = Modifier.weight(1f),
-                            textStyle = androidx.compose.ui.text.TextStyle(
+                            textStyle = androidx.compose.ui.text.TextStyle(fontFamily = com.tbterminal.app.ui.theme.KawanSans, 
                                 fontSize = 20.sp,
                                 fontWeight = FontWeight.ExtraBold,
                                 color = Gray900,
@@ -565,7 +565,7 @@ internal fun AdjustmentReceivableDialog(
                             value = uiState.adjustmentReferenceInput,
                             onValueChange = onReferenceChanged,
                             modifier = Modifier.fillMaxWidth(),
-                            textStyle = androidx.compose.ui.text.TextStyle(
+                            textStyle = androidx.compose.ui.text.TextStyle(fontFamily = com.tbterminal.app.ui.theme.KawanSans, 
                                 fontSize = 13.sp,
                                 fontWeight = FontWeight.SemiBold,
                                 color = Gray900
@@ -615,7 +615,7 @@ internal fun AdjustmentReceivableDialog(
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .heightIn(min = 44.dp),
-                            textStyle = androidx.compose.ui.text.TextStyle(
+                            textStyle = androidx.compose.ui.text.TextStyle(fontFamily = com.tbterminal.app.ui.theme.KawanSans, 
                                 fontSize = 13.sp,
                                 fontWeight = FontWeight.Medium,
                                 color = Gray900,

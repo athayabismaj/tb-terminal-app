@@ -27,7 +27,7 @@ internal fun transactionActionAccess(
     return TransactionActionAccess(
         canVoid = eligible,
         canRefund = eligible,
-        requiresManagerApproval = eligible && approvedCorrection,
+        requiresManagerApproval = eligible && !directCorrection && approvedCorrection,
     )
 }
 

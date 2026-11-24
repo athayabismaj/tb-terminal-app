@@ -57,6 +57,7 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
+import com.tbterminal.app.ui.theme.KawanSans
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.tbterminal.app.R
@@ -639,7 +640,7 @@ private fun QuickBillBottomSheetContent(
                                     fontSize = 12.sp,
                                     color = Color(0xFF1E293B),
                                     lineHeight = 18.sp,
-                                    fontFamily = FontFamily.Default
+                                    fontFamily = KawanSans
                                 ),
                                 modifier = Modifier
                                     .fillMaxWidth()

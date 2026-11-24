@@ -289,7 +289,7 @@ fun CustomerSelectionDialog(
                             value = searchQuery,
                             onValueChange = { searchQuery = it },
                             modifier = Modifier.weight(1f),
-                            textStyle = androidx.compose.ui.text.TextStyle(
+                            textStyle = androidx.compose.ui.text.TextStyle(fontFamily = com.tbterminal.app.ui.theme.KawanSans, 
                                 fontSize = 13.sp,
                                 fontWeight = FontWeight.Medium,
                                 color = Slate900

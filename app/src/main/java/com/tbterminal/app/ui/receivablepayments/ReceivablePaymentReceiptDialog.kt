@@ -51,6 +51,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
+import com.tbterminal.app.ui.theme.KawanSans
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
@@ -306,7 +307,7 @@ private fun ReceiptLine(label: String, value: String, isMonospace: Boolean = fal
             fontSize = 12.sp,
             fontWeight = FontWeight.SemiBold,
             color = Color(0xFF0F172A),
-            fontFamily = if (isMonospace) FontFamily.Monospace else FontFamily.Default
+            fontFamily = if (isMonospace) FontFamily.Monospace else KawanSans
         )
     }
 }

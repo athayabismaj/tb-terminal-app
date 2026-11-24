@@ -226,7 +226,7 @@ private fun StockOpnameSearchField(
                     value = value,
                     onValueChange = onValueChange,
                     singleLine = true,
-                    textStyle = TextStyle(
+                    textStyle = TextStyle(fontFamily = com.tbterminal.app.ui.theme.KawanSans, 
                         color = TextPrimary,
                         fontSize = 14.sp,
                     ),

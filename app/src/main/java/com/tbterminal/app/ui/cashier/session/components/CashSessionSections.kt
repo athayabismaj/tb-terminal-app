@@ -767,7 +767,7 @@ fun ShiftClosureBottomSheetModal(
                                 onValueChange = onCashChange,
                                 singleLine = true,
                                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                                textStyle = androidx.compose.ui.text.TextStyle(
+                                textStyle = androidx.compose.ui.text.TextStyle(fontFamily = com.tbterminal.app.ui.theme.KawanSans, 
                                     fontSize = 20.sp,
                                     fontWeight = FontWeight.Bold,
                                     color = Slate900

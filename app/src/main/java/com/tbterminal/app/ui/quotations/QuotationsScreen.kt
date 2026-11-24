@@ -346,7 +346,7 @@ fun QuotationsScreen(
                                         value = uiState.searchQuery,
                                         onValueChange = viewModel::onSearchChanged,
                                         singleLine = true,
-                                        textStyle = TextStyle(
+                                        textStyle = TextStyle(fontFamily = com.tbterminal.app.ui.theme.KawanSans, 
                                             color = Color(0xFF0F172A),
                                             fontSize = 13.sp,
                                             fontWeight = FontWeight.Medium
