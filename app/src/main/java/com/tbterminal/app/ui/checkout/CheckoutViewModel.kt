@@ -3,6 +3,7 @@ package com.tbterminal.app.ui.checkout
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
+import com.tbterminal.app.data.auth.PinUnlockService
 import com.tbterminal.app.data.local.checkout.LocalCheckoutCommand
 import com.tbterminal.app.data.local.checkout.LocalCheckoutItemCommand
 import com.tbterminal.app.data.local.checkout.LocalCheckoutLookupService
@@ -26,6 +27,7 @@ import com.tbterminal.app.data.repository.CheckoutRepository
 import com.tbterminal.app.data.repository.CashReconciliationRepository
 import com.tbterminal.app.data.repository.CustomerRepository
 import com.tbterminal.app.data.repository.InventoryRepository
+import com.tbterminal.app.data.repository.PinUnlockResult
 import com.tbterminal.app.data.repository.RepositoryResult
 import com.tbterminal.app.data.repository.SystemRepository
 import com.tbterminal.app.data.sync.BackendStatus
@@ -33,7 +35,9 @@ import com.tbterminal.app.data.sync.InternetStatus
 import com.tbterminal.app.data.sync.OfflineSyncScheduler
 import com.tbterminal.app.data.sync.OfflineStatus
 import com.tbterminal.app.data.sync.OfflineStatusRepository
+import com.tbterminal.app.data.validation.CredentialValidator
 import com.tbterminal.app.navigation.AppAccessPolicy
+import com.tbterminal.app.ui.auth.formatPinLockoutMessage
 import com.tbterminal.app.ui.common.UiText
 import com.tbterminal.app.ui.common.viewModelFactory
 import java.math.BigDecimal
@@ -74,6 +78,9 @@ class CheckoutViewModel(
     private val systemRepository: SystemRepository? = null,
     private val quotationRepository: com.tbterminal.app.data.repository.QuotationRepository? = null,
     private val actorRole: String = "KASIR",
+    private val pinUnlockService: PinUnlockService? = null,
+    private val clockMillis: () -> Long = { System.currentTimeMillis() },
+    private val lockoutTickIntervalMillis: Long = 1_000L,
 ) : ViewModel() {
     private val _uiState = MutableStateFlow(
         CheckoutUiState(canOpenCashSession = AppAccessPolicy.canOpenCashSession(actorRole))
@@ -90,6 +97,7 @@ class CheckoutViewModel(
         .distinctUntilChanged()
     private var searchJob: Job? = null
     private var customerSearchJob: Job? = null
+    private var lockScreenCountdownJob: Job? = null
     private var latestOfflineStatus: OfflineStatus = OfflineStatus()
     private var pendingOnlineCheckout: PendingOnlineCheckout? = null
     private var ambiguousOnlineCheckout: CheckoutSubmitCommand? = null
@@ -1504,25 +1512,185 @@ class CheckoutViewModel(
     }
 
     fun lockScreen() {
-        _uiState.update { it.copy(isScreenLocked = true, lockPinInput = "", lockPinError = null) }
+        lockScreenCountdownJob?.cancel()
+        _uiState.update {
+            it.copy(
+                isScreenLocked = true,
+                lockPinInput = "",
+                lockPinError = null,
+                isUnlockingScreen = false,
+                lockScreenLockedUntilEpochMillis = null,
+                lockScreenRemainingSeconds = 0L,
+            )
+        }
     }
 
     fun updateLockPinInput(pin: String) {
-        val cleanPin = pin.filter(Char::isDigit).take(6)
+        val currentState = _uiState.value
+        if (currentState.isUnlockingScreen || currentState.lockScreenRemainingSeconds > 0L) {
+            return
+        }
+        val cleanPin = pin.filter(Char::isDigit).take(CredentialValidator.PIN_MAX_LENGTH)
         _uiState.update { it.copy(lockPinInput = cleanPin, lockPinError = null) }
     }
 
-    fun unlockScreen(validPin: String? = null) {
-        val input = _uiState.value.lockPinInput
-        if (input.length < 4) {
-            _uiState.update { it.copy(lockPinError = "PIN minimal 4 angka.") }
+    fun unlockScreen() {
+        val currentState = _uiState.value
+        if (currentState.isUnlockingScreen || currentState.lockScreenRemainingSeconds > 0L) {
             return
         }
-        if (validPin != null && input != validPin) {
-            _uiState.update { it.copy(lockPinError = "PIN salah. Coba lagi.") }
+        val input = currentState.lockPinInput
+        if (!CredentialValidator.isValidPin(input)) {
+            _uiState.update {
+                it.copy(
+                    lockPinError = "PIN harus terdiri dari ${CredentialValidator.PIN_MIN_LENGTH} sampai ${CredentialValidator.PIN_MAX_LENGTH} digit angka."
+                )
+            }
             return
         }
-        _uiState.update { it.copy(isScreenLocked = false, lockPinInput = "", lockPinError = null) }
+        val verifierService = pinUnlockService
+        if (verifierService == null) {
+            _uiState.update {
+                it.copy(
+                    lockPinInput = "",
+                    lockPinError = "Layanan verifikasi PIN tidak tersedia.",
+                )
+            }
+            return
+        }
+        lockScreenCountdownJob?.cancel()
+        _uiState.update { it.copy(isUnlockingScreen = true, lockPinError = null) }
+        viewModelScope.launch {
+            when (val result = verifierService.unlock(input)) {
+                is RepositoryResult.Success -> handleQuickPinUnlockResult(result.data)
+                is RepositoryResult.Error -> {
+                    _uiState.update {
+                        it.copy(
+                            isScreenLocked = true,
+                            isUnlockingScreen = false,
+                            lockPinInput = "",
+                            lockPinError = result.message,
+                        )
+                    }
+                }
+                is RepositoryResult.Exception -> {
+                    _uiState.update {
+                        it.copy(
+                            isScreenLocked = true,
+                            isUnlockingScreen = false,
+                            lockPinInput = "",
+                            lockPinError = "Terjadi kesalahan saat memverifikasi PIN. Coba lagi.",
+                        )
+                    }
+                }
+            }
+        }
+    }
+
+    private fun handleQuickPinUnlockResult(result: PinUnlockResult) {
+        when (result) {
+            PinUnlockResult.Unlocked -> {
+                lockScreenCountdownJob?.cancel()
+                _uiState.update {
+                    it.copy(
+                        isScreenLocked = false,
+                        lockPinInput = "",
+                        lockPinError = null,
+                        isUnlockingScreen = false,
+                        lockScreenLockedUntilEpochMillis = null,
+                        lockScreenRemainingSeconds = 0L,
+                    )
+                }
+            }
+
+            is PinUnlockResult.ForceLogout -> {
+                lockScreenCountdownJob?.cancel()
+                _uiState.update {
+                    it.copy(
+                        isScreenLocked = true,
+                        lockPinInput = "",
+                        lockPinError = result.message,
+                        isUnlockingScreen = false,
+                    )
+                }
+            }
+
+            is PinUnlockResult.Failed -> {
+                val lockedUntil = result.lockedUntilEpochMillis
+                val remaining = if (result.isLocked && lockedUntil != null) {
+                    remainingLockSecondsUntil(lockedUntil)
+                } else {
+                    0L
+                }
+                if (result.isLocked && lockedUntil != null && remaining > 0L) {
+                    startLockScreenCountdown(lockedUntil, remaining)
+                } else {
+                    val errorText = when {
+                        result.isLocked -> result.message
+                        result.attemptsLeft > 0 -> "PIN salah. Sisa percobaan: ${result.attemptsLeft}."
+                        else -> "PIN salah. Coba lagi."
+                    }
+                    _uiState.update {
+                        it.copy(
+                            isScreenLocked = true,
+                            lockPinInput = "",
+                            lockPinError = errorText,
+                            isUnlockingScreen = false,
+                        )
+                    }
+                }
+            }
+        }
+    }
+
+    private fun startLockScreenCountdown(
+        lockedUntilEpochMillis: Long,
+        initialRemainingSeconds: Long,
+    ) {
+        lockScreenCountdownJob?.cancel()
+        _uiState.update {
+            it.copy(
+                isScreenLocked = true,
+                lockPinInput = "",
+                isUnlockingScreen = false,
+                lockScreenLockedUntilEpochMillis = lockedUntilEpochMillis,
+                lockScreenRemainingSeconds = initialRemainingSeconds,
+                lockPinError = formatPinLockoutMessage(lockedUntilEpochMillis, initialRemainingSeconds),
+            )
+        }
+        lockScreenCountdownJob = viewModelScope.launch {
+            var remaining = initialRemainingSeconds
+            while (remaining > 0L) {
+                delay(lockoutTickIntervalMillis)
+                remaining = remainingLockSecondsUntil(lockedUntilEpochMillis)
+                if (remaining > 0L) {
+                    _uiState.update {
+                        it.copy(
+                            lockScreenRemainingSeconds = remaining,
+                            lockPinError = formatPinLockoutMessage(lockedUntilEpochMillis, remaining),
+                        )
+                    }
+                }
+            }
+            _uiState.update {
+                it.copy(
+                    lockScreenLockedUntilEpochMillis = null,
+                    lockScreenRemainingSeconds = 0L,
+                    lockPinError = null,
+                )
+            }
+        }
+    }
+
+    private fun remainingLockSecondsUntil(lockedUntilEpochMillis: Long): Long {
+        val diffMillis = lockedUntilEpochMillis - clockMillis()
+        if (diffMillis <= 0L) return 0L
+        return (diffMillis + 999L) / 1000L
+    }
+
+    override fun onCleared() {
+        lockScreenCountdownJob?.cancel()
+        super.onCleared()
     }
 
     fun clearQuickFeedback() {
@@ -2485,6 +2653,7 @@ class CheckoutViewModel(
             systemRepository: SystemRepository? = null,
             quotationRepository: com.tbterminal.app.data.repository.QuotationRepository? = null,
             actorRole: String = "KASIR",
+            pinUnlockService: PinUnlockService? = null,
         ): ViewModelProvider.Factory {
             return viewModelFactory {
                 CheckoutViewModel(
@@ -2502,6 +2671,7 @@ class CheckoutViewModel(
                     systemRepository = systemRepository,
                     quotationRepository = quotationRepository,
                     actorRole = actorRole,
+                    pinUnlockService = pinUnlockService,
                 )
             }
         }

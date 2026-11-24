@@ -1,40 +1,25 @@
 package com.tbterminal.app.data.repository
 
+import com.tbterminal.app.data.auth.DefaultPinUnlockService
+import com.tbterminal.app.data.auth.InMemoryOfflinePinVerifierStore
+import com.tbterminal.app.data.auth.PinUnlockService
 import com.tbterminal.app.data.model.AuthenticatedSession
 import com.tbterminal.app.data.model.AuthenticatedUser
 import com.tbterminal.app.data.model.UserProfile
-import com.tbterminal.app.data.remote.ApiResponse
 import com.tbterminal.app.data.remote.AuthApi
 import com.tbterminal.app.data.remote.ChangePasswordRequestDto
 import com.tbterminal.app.data.remote.ChangePinRequestDto
 import com.tbterminal.app.data.remote.LoginRequest
-import com.tbterminal.app.data.remote.PinUnlockResponse
 import com.tbterminal.app.data.remote.ResetPinRequestDto
-import com.tbterminal.app.data.remote.UnlockRequest
 import com.tbterminal.app.data.remote.UserApi
-import com.tbterminal.app.data.remote.UserFacingErrorMapper
 import com.tbterminal.app.data.remote.UserUpdateRequest
-import com.tbterminal.app.data.remote.parseRetryAfterSeconds
 import com.tbterminal.app.data.remote.safeApiCall
 import com.tbterminal.app.data.session.SessionManager
 import com.tbterminal.app.data.session.SessionUser
 import com.tbterminal.app.data.validation.CredentialValidator
-import java.io.IOException
-import java.net.ConnectException
-import java.net.SocketTimeoutException
-import java.net.UnknownHostException
-import java.time.Instant
-import java.time.OffsetDateTime
-import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
-import kotlinx.serialization.json.Json
-import kotlinx.serialization.json.booleanOrNull
-import kotlinx.serialization.json.contentOrNull
-import kotlinx.serialization.json.intOrNull
-import kotlinx.serialization.json.jsonObject
-import kotlinx.serialization.json.jsonPrimitive
 
 sealed interface PinUnlockResult {
     data object Unlocked : PinUnlockResult
@@ -74,6 +59,7 @@ class RemoteAuthRepository private constructor(
     private val ioDispatcher: CoroutineDispatcher = Dispatchers.IO,
     private val userApiProvider: (() -> UserApi)? = null,
     private val clockMillis: () -> Long = { System.currentTimeMillis() },
+    pinUnlockService: PinUnlockService? = null,
 ) : AuthRepository {
     constructor(
         authApi: AuthApi,
@@ -88,10 +74,27 @@ class RemoteAuthRepository private constructor(
         ioDispatcher: CoroutineDispatcher = Dispatchers.IO,
         userApiProvider: (() -> UserApi)? = null,
         clockMillis: () -> Long = { System.currentTimeMillis() },
-    ) : this(authApiProvider, sessionManager, deviceIdProvider, ioDispatcher, userApiProvider, clockMillis)
+        pinUnlockService: PinUnlockService? = null,
+    ) : this(
+        authApiProvider,
+        sessionManager,
+        deviceIdProvider,
+        ioDispatcher,
+        userApiProvider,
+        clockMillis,
+        pinUnlockService,
+    )
 
     private val authApi: AuthApi by lazy(authApiProvider)
     private val userApi: UserApi? by lazy { userApiProvider?.invoke() }
+    private val resolvedPinUnlockService: PinUnlockService = pinUnlockService ?: DefaultPinUnlockService(
+        authApiProvider = authApiProvider,
+        sessionManager = sessionManager,
+        deviceIdProvider = deviceIdProvider,
+        verifierStore = InMemoryOfflinePinVerifierStore(),
+        ioDispatcher = ioDispatcher,
+        clockMillis = clockMillis,
+    )
 
     override suspend fun login(
         username: String,
@@ -141,166 +144,8 @@ class RemoteAuthRepository private constructor(
             }
     }
 
-    override suspend fun unlock(pin: String): RepositoryResult<PinUnlockResult> {
-        if (!CredentialValidator.isValidPin(pin)) {
-            return RepositoryResult.Error(
-                "VALIDATION_ERROR",
-                "PIN harus terdiri dari ${CredentialValidator.PIN_MIN_LENGTH} sampai ${CredentialValidator.PIN_MAX_LENGTH} digit angka"
-            )
-        }
-        return try {
-            val response = authApi.unlock(UnlockRequest(pin = pin, deviceId = deviceIdProvider()))
-            if (response.isSuccessful) {
-                val payload = response.body()
-                val status = payload?.data
-                if (payload?.success == true && (status == null || status.valid)) {
-                    sessionManager.markPinUnlocked()
-                    return RepositoryResult.Success(PinUnlockResult.Unlocked)
-                }
-                if (status != null) {
-                    return mapUnlockStatus(payload.code, status)
-                }
-                return RepositoryResult.Error(
-                    code = payload?.code ?: "UNLOCK_FAILED",
-                    message = payload?.message ?: payload?.error ?: "PIN salah"
-                )
-            }
-
-            val rawError = response.errorBody()?.string().orEmpty()
-            val retryAfterSeconds = parseRetryAfterSeconds(response.headers()["Retry-After"], clockMillis)
-            val parsedStatusResponse = rawError.takeIf(String::isNotBlank)?.let {
-                runCatching { unlockJson.decodeFromString<ApiResponse<PinUnlockResponse>>(it) }.getOrNull()
-            }
-            val rootJson = rawError.takeIf(String::isNotBlank)?.let {
-                runCatching { unlockJson.parseToJsonElement(it).jsonObject }.getOrNull()
-            }
-            val dataJson = runCatching { rootJson?.get("data")?.jsonObject }.getOrNull()
-            val fallbackCode = parsedStatusResponse?.code
-                ?: rootJson?.get("code")?.jsonPrimitive?.contentOrNull
-                ?: "HTTP_${response.code()}"
-            val fallbackMessage = parsedStatusResponse?.error
-                ?: parsedStatusResponse?.message
-                ?: rootJson?.get("error")?.jsonPrimitive?.contentOrNull
-                ?: rootJson?.get("message")?.jsonPrimitive?.contentOrNull
-
-            val parsedData = parsedStatusResponse?.data
-            if (parsedData != null) {
-                val revoked401 = response.code() == 401 &&
-                    fallbackCode !in WRONG_PIN_ERROR_CODES &&
-                    fallbackCode != "PIN_LOCKED"
-                return mapUnlockStatus(
-                    code = fallbackCode,
-                    data = if (revoked401) parsedData.copy(forceLogout = true) else parsedData,
-                    retryAfterSeconds = retryAfterSeconds,
-                )
-            }
-
-            val lockedUntil = dataJson?.get("locked_until")?.jsonPrimitive?.contentOrNull
-                ?: dataJson?.get("lockedUntil")?.jsonPrimitive?.contentOrNull
-                ?: rootJson?.get("locked_until")?.jsonPrimitive?.contentOrNull
-                ?: rootJson?.get("lockedUntil")?.jsonPrimitive?.contentOrNull
-            val attemptsLeft = dataJson?.get("attempts_left")?.jsonPrimitive?.intOrNull
-                ?: dataJson?.get("attemptsLeft")?.jsonPrimitive?.intOrNull
-                ?: 0
-            val valid = dataJson?.get("valid")?.jsonPrimitive?.booleanOrNull == true
-            val forceLogout = dataJson?.get("force_logout")?.jsonPrimitive?.booleanOrNull == true ||
-                dataJson?.get("forceLogout")?.jsonPrimitive?.booleanOrNull == true ||
-                fallbackCode == "PIN_MAX_ATTEMPTS_EXCEEDED" ||
-                (response.code() == 401 && fallbackCode !in WRONG_PIN_ERROR_CODES && fallbackCode != "PIN_LOCKED")
-
-            if (forceLogout ||
-                lockedUntil != null ||
-                response.code() == 423 ||
-                fallbackCode == "PIN_LOCKED" ||
-                (dataJson != null && (dataJson.containsKey("attempts_left") || dataJson.containsKey("valid")))
-            ) {
-                return mapUnlockStatus(
-                    code = if (response.code() == 423 && fallbackCode.startsWith("HTTP_")) "PIN_LOCKED" else fallbackCode,
-                    data = PinUnlockResponse(
-                        valid = valid,
-                        attemptsLeft = attemptsLeft,
-                        lockedUntil = lockedUntil,
-                        forceLogout = forceLogout
-                    ),
-                    retryAfterSeconds = retryAfterSeconds,
-                )
-            }
-
-            if ((response.code() == 400 && fallbackCode != "INVALID_REQUEST") ||
-                response.code() == 422 ||
-                fallbackCode in WRONG_PIN_ERROR_CODES
-            ) {
-                return RepositoryResult.Error(
-                    code = fallbackCode,
-                    message = "PIN salah. Silakan coba lagi.",
-                    retryAfterSeconds = retryAfterSeconds,
-                )
-            }
-
-            RepositoryResult.Error(
-                code = fallbackCode,
-                message = UserFacingErrorMapper.message(
-                    httpStatus = response.code(),
-                    code = fallbackCode,
-                    backendMessage = fallbackMessage,
-                    retryAfterSeconds = retryAfterSeconds,
-                ),
-                retryAfterSeconds = retryAfterSeconds,
-            )
-        } catch (cancellation: CancellationException) {
-            throw cancellation
-        } catch (_: SocketTimeoutException) {
-            RepositoryResult.Error("NETWORK_TIMEOUT", UserFacingErrorMapper.message(code = "NETWORK_TIMEOUT"))
-        } catch (_: UnknownHostException) {
-            RepositoryResult.Error("NETWORK_UNAVAILABLE", UserFacingErrorMapper.message(code = "NETWORK_UNAVAILABLE"))
-        } catch (_: ConnectException) {
-            RepositoryResult.Error("CONNECTION_FAILED", UserFacingErrorMapper.message(code = "CONNECTION_FAILED"))
-        } catch (_: IOException) {
-            RepositoryResult.Error("CONNECTION_INTERRUPTED", UserFacingErrorMapper.message(code = "CONNECTION_INTERRUPTED"))
-        } catch (exception: Exception) {
-            RepositoryResult.Exception(exception)
-        }
-    }
-
-    private suspend fun mapUnlockStatus(
-        code: String?,
-        data: PinUnlockResponse,
-        retryAfterSeconds: Long? = null,
-    ): RepositoryResult<PinUnlockResult> {
-        if (data.forceLogout || code == "PIN_MAX_ATTEMPTS_EXCEEDED") {
-            val message = "Batas percobaan PIN terlampaui. Silakan login kembali."
-            withContext(ioDispatcher) {
-                sessionManager.handleUnauthorized(message)
-            }
-            return RepositoryResult.Success(
-                PinUnlockResult.ForceLogout(message)
-            )
-        }
-        if (data.valid) {
-            sessionManager.markPinUnlocked()
-            return RepositoryResult.Success(PinUnlockResult.Unlocked)
-        }
-        val lockedMillis = data.lockedUntil?.let(::parseIsoEpochMillis)
-            ?: retryAfterSeconds?.let { clockMillis() + it * 1000L }
-        val isLocked = lockedMillis != null || code == "PIN_LOCKED"
-        val message = if (isLocked) {
-            UserFacingErrorMapper.message(
-                httpStatus = 423,
-                code = "PIN_LOCKED",
-                retryAfterSeconds = retryAfterSeconds,
-            )
-        } else {
-            "PIN salah"
-        }
-        return RepositoryResult.Success(
-            PinUnlockResult.Failed(
-                message = message,
-                attemptsLeft = data.attemptsLeft.coerceAtLeast(0),
-                lockedUntilEpochMillis = lockedMillis,
-                isLocked = isLocked
-            )
-        )
-    }
+    override suspend fun unlock(pin: String): RepositoryResult<PinUnlockResult> =
+        resolvedPinUnlockService.unlock(pin)
 
     override suspend fun resetPinWithPassword(currentPassword: String, newPin: String): RepositoryResult<Unit> {
         if (currentPassword.isBlank()) {
@@ -322,6 +167,7 @@ class RemoteAuthRepository private constructor(
             )
         }.toRepositoryResult(::successfulUnitResult)
         if (result is RepositoryResult.Success) {
+            resolvedPinUnlockService.recordOnlineVerifiedPin(newPin)
             sessionManager.markPinUnlocked()
         } else {
             handleCredentialMaxAttemptsIfNeeded(result)
@@ -557,7 +403,9 @@ class RemoteAuthRepository private constructor(
         val result = safeApiCall {
             authApi.changeMyPin(ChangePinRequestDto(oldPin, newPin))
         }.toRepositoryResult(::successfulUnitResult)
-        if (result !is RepositoryResult.Success) {
+        if (result is RepositoryResult.Success) {
+            resolvedPinUnlockService.recordOnlineVerifiedPin(newPin)
+        } else {
             handleCredentialMaxAttemptsIfNeeded(result)
         }
         return result
@@ -577,6 +425,7 @@ class RemoteAuthRepository private constructor(
                 "Batas percobaan terlampaui. Silakan login kembali."
             }
             withContext(ioDispatcher) {
+                resolvedPinUnlockService.clearOfflineState()
                 sessionManager.handleUnauthorized(reason)
             }
         }
@@ -593,19 +442,8 @@ class RemoteAuthRepository private constructor(
         }
     }
 
-    private fun parseIsoEpochMillis(rawTimestamp: String): Long? {
-        return runCatching { OffsetDateTime.parse(rawTimestamp).toInstant().toEpochMilli() }.getOrNull()
-            ?: runCatching { Instant.parse(rawTimestamp).toEpochMilli() }.getOrNull()
-    }
-
     private companion object {
         val USERNAME_PATTERN = Regex("^[a-zA-Z0-9._-]{3,50}$")
         val EMAIL_PATTERN = Regex("^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$")
-        val WRONG_PIN_ERROR_CODES = setOf("INVALID_PIN", "WRONG_PIN", "PIN_MISMATCH", "UNLOCK_FAILED")
-        val unlockJson = Json {
-            ignoreUnknownKeys = true
-            isLenient = true
-            coerceInputValues = true
-        }
     }
 }

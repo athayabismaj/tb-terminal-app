@@ -256,4 +256,45 @@ class PinScreenBehaviorTest {
         composeRule.onNodeWithText("PIN salah. Silakan coba lagi.").assertDoesNotExist()
         assertEquals(UnlockState.Idle, viewModel.unlockState.value)
     }
+
+    @Test
+    @Config(qualifiers = "w390dp-h844dp-mdpi")
+    fun offlineWithoutVerifierShowsButuhKoneksiVerbatimInsteadOfGenericNetworkAlert() {
+        val fakeRepo = object : AuthRepository {
+            override suspend fun login(username: String, password: String): RepositoryResult<AuthenticatedSession> =
+                error("unused")
+
+            override suspend fun unlock(pin: String): RepositoryResult<PinUnlockResult> =
+                RepositoryResult.Error("OFFLINE_VERIFIER_UNAVAILABLE", "Butuh koneksi untuk membuka kunci")
+
+            override suspend fun resetPinWithPassword(currentPassword: String, newPin: String): RepositoryResult<Unit> =
+                error("unused")
+
+            override suspend fun getProfile(): RepositoryResult<UserProfile> = error("unused")
+            override suspend fun changeMyPassword(oldPassword: String, newPassword: String): RepositoryResult<Unit> =
+                error("unused")
+
+            override suspend fun changeMyPin(oldPin: String, newPin: String): RepositoryResult<Unit> = error("unused")
+        }
+        val viewModel = AuthViewModel(fakeRepo)
+
+        composeRule.setContent {
+            TbterminalappTheme {
+                PinScreen(
+                    viewModel = viewModel,
+                    userName = "Kasir",
+                    onUnlockSuccess = {},
+                    onBackToLogin = {}
+                )
+            }
+        }
+
+        listOf("1", "2", "3", "4", "5", "6").forEach { d ->
+            composeRule.onNodeWithTag("pin-key-$d").performClick()
+        }
+        composeRule.waitForIdle()
+
+        composeRule.onNodeWithText("Butuh koneksi untuk membuka kunci").assertIsDisplayed()
+        composeRule.onNodeWithText("Periksa koneksi internet.").assertDoesNotExist()
+    }
 }

@@ -1,6 +1,10 @@
 package com.tbterminal.app.data.di
 
 import android.content.Context
+import com.tbterminal.app.data.auth.DefaultPinUnlockService
+import com.tbterminal.app.data.auth.EncryptedOfflinePinVerifierStore
+import com.tbterminal.app.data.auth.OfflinePinVerifierStore
+import com.tbterminal.app.data.auth.PinUnlockService
 import com.tbterminal.app.data.local.cashexpense.LocalCashExpenseService
 import com.tbterminal.app.data.local.cashsession.LocalCashSessionService
 import com.tbterminal.app.data.local.checkout.LocalCheckoutLookupService
@@ -79,6 +83,7 @@ interface AppContainer {
     val serverBackupRepository: ServerBackupRepository
     val syncManager: SyncManager
     val offlineSyncScheduler: OfflineSyncScheduler
+    val pinUnlockService: PinUnlockService
     val authRepository: AuthRepository
     val cashReconciliationRepository: CashReconciliationRepository
     val quotationRepository: com.tbterminal.app.data.repository.QuotationRepository
@@ -104,6 +109,16 @@ class DefaultAppContainer(
     private val networkModule = NetworkModule(context.applicationContext)
 
     override val sessionManager: SessionManager = networkModule.sessionManager
+
+    private val offlinePinVerifierStore: OfflinePinVerifierStore by lazy {
+        EncryptedOfflinePinVerifierStore(appContext)
+    }
+
+    init {
+        sessionManager.addSessionClearedListener {
+            offlinePinVerifierStore.clearAll()
+        }
+    }
 
     override val localDatabase: TbTerminalDatabase by lazy {
         TbTerminalDatabase.getInstance(appContext)
@@ -280,12 +295,22 @@ class DefaultAppContainer(
         DailyDocumentNumberGenerator()
     }
 
+    override val pinUnlockService: PinUnlockService by lazy {
+        DefaultPinUnlockService(
+            authApiProvider = { networkModule.authApi },
+            sessionManager = networkModule.sessionManager,
+            deviceIdProvider = { deviceIdProvider.deviceId },
+            verifierStore = offlinePinVerifierStore,
+        )
+    }
+
     override val authRepository: AuthRepository by lazy {
         RemoteAuthRepository(
             sessionManager = networkModule.sessionManager,
             authApiProvider = { networkModule.authApi },
             deviceIdProvider = { deviceIdProvider.deviceId },
-            userApiProvider = { networkModule.userApi }
+            userApiProvider = { networkModule.userApi },
+            pinUnlockService = pinUnlockService,
         )
     }
 

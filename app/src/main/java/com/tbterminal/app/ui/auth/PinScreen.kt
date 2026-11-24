@@ -144,7 +144,9 @@ fun PinScreen(
     val isLockedOut = lockedState != null && lockedState.remainingSeconds > 0L
     val rawError = (unlockState as? UnlockState.Error)?.message
     val lowerError = rawError?.lowercase().orEmpty()
-    val isNetworkError = rawError != null && (
+    val isOfflineVerifierRequired = rawError != null &&
+        lowerError.contains("butuh koneksi untuk membuka kunci")
+    val isNetworkError = rawError != null && !isOfflineVerifierRequired && (
         lowerError.contains("koneksi") || lowerError.contains("internet") ||
             lowerError.contains("network") || lowerError.contains("timeout") ||
             lowerError.contains("server tidak dapat dihubungi")
@@ -170,7 +172,7 @@ fun PinScreen(
             }
             is UnlockState.Error -> {
                 pin = ""
-                if (!isNetworkError) {
+                if (!isNetworkError && !isOfflineVerifierRequired) {
                     delay(3000L)
                     viewModel.resetUnlockState()
                 }

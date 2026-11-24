@@ -315,7 +315,9 @@ fun CashierPosRoute(
             pinInput = uiState.lockPinInput,
             errorMessage = uiState.lockPinError,
             onPinChange = viewModel::updateLockPinInput,
-            onUnlock = { viewModel.unlockScreen() }
+            onUnlock = { viewModel.unlockScreen() },
+            isLoading = uiState.isUnlockingScreen,
+            isLockedOut = uiState.lockScreenRemainingSeconds > 0L,
         )
     }
     if (uiState.isQrisDialogOpen) {
@@ -784,7 +786,9 @@ fun CashierCartRoute(
             pinInput = uiState.lockPinInput,
             errorMessage = uiState.lockPinError,
             onPinChange = viewModel::updateLockPinInput,
-            onUnlock = { viewModel.unlockScreen() }
+            onUnlock = { viewModel.unlockScreen() },
+            isLoading = uiState.isUnlockingScreen,
+            isLockedOut = uiState.lockScreenRemainingSeconds > 0L,
         )
     }
     if (uiState.isQrisDialogOpen) {
@@ -1018,7 +1022,9 @@ fun CashierPaymentRoute(
             pinInput = uiState.lockPinInput,
             errorMessage = uiState.lockPinError,
             onPinChange = viewModel::updateLockPinInput,
-            onUnlock = { viewModel.unlockScreen() }
+            onUnlock = { viewModel.unlockScreen() },
+            isLoading = uiState.isUnlockingScreen,
+            isLockedOut = uiState.lockScreenRemainingSeconds > 0L,
         )
     }
     if (uiState.isQrisDialogOpen) {
