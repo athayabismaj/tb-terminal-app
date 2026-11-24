@@ -26,6 +26,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import com.tbterminal.app.data.model.UserProfile
 import com.tbterminal.app.ui.components.TbLayoutInfo
+import com.tbterminal.app.ui.dashboard.LocalBackofficeAccountSheet
 import com.tbterminal.app.ui.dashboard.RoleMenuGroupCard
 import com.tbterminal.app.ui.dashboard.RoleMenuItemSpec
 import com.tbterminal.app.ui.dashboard.RoleMenuProfileCard
@@ -61,10 +62,11 @@ internal fun OwnerMenuContent(
             .padding(top = if (layout.isCompact) 12.dp else 0.dp, bottom = 24.dp),
         verticalArrangement = Arrangement.spacedBy(if (layout.isCompact) 14.dp else 18.dp),
     ) {
+        val openAccountSheet = LocalBackofficeAccountSheet.current
         RoleMenuProfileCard(
             displayName = displayName,
             roleLabel = roleLabel,
-            onClick = onProfileClick,
+            onClick = { openAccountSheet?.invoke() ?: onProfileClick() },
             testTag = "owner-menu-profile",
             modifier = (if (layout.isCompact) Modifier.padding(horizontal = 16.dp) else Modifier)
                 .staggeredEntrance(profileSlidePx) { entrance.progress(0) },
@@ -117,6 +119,7 @@ private fun OwnerMenuGroupSection(
     onLogout: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    val openAccountSheet = LocalBackofficeAccountSheet.current
     val groupTitle = stringResource(group.titleRes)
     val items = group.actions.map { action ->
         RoleMenuItemSpec(
@@ -127,10 +130,10 @@ private fun OwnerMenuGroupSection(
             isDestructive = action == OwnerMenuAction.LOGOUT,
             testTag = "owner-menu-${action.name}",
             onClick = {
-                if (action == OwnerMenuAction.LOGOUT) {
-                    onLogout()
-                } else {
-                    action.destination?.let(onNavigate)
+                when (action) {
+                    OwnerMenuAction.LOGOUT -> onLogout()
+                    OwnerMenuAction.ACCOUNT -> openAccountSheet?.invoke() ?: Unit
+                    else -> action.destination?.let(onNavigate)
                 }
             },
         )
@@ -154,5 +157,6 @@ private fun OwnerMenuAction.icon(): ImageVector = when (this) {
     OwnerMenuAction.SYNC -> Icons.Outlined.Sync
     OwnerMenuAction.ACTIVITY -> Icons.Outlined.Security
     OwnerMenuAction.SECURITY_LOG -> Icons.Outlined.Lock
+    OwnerMenuAction.ACCOUNT -> Icons.Outlined.Person
     OwnerMenuAction.LOGOUT -> Icons.AutoMirrored.Outlined.Logout
 }

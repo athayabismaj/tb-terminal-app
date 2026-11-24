@@ -1,14 +1,15 @@
 package com.tbterminal.app.ui.settings
 
 import androidx.compose.runtime.Composable
-import androidx.compose.ui.Modifier
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.tbterminal.app.data.repository.AuthRepository
-import com.tbterminal.app.ui.dashboard.admin.AdminDashboardShell
 import com.tbterminal.app.ui.dashboard.admin.AdminDestination
-import com.tbterminal.app.ui.dashboard.isOwnerPersona
+import com.tbterminal.app.ui.dashboard.admin.LocalAdminDestinationNavigator
+import com.tbterminal.app.ui.dashboard.owner.DashboardNavDestination
+import com.tbterminal.app.ui.dashboard.owner.OwnerProfileDetailRoute
 
+@Suppress("UNUSED_PARAMETER")
 @Composable
 fun AdminProfileScreen(
     name: String,
@@ -41,58 +42,44 @@ fun AdminProfileScreen(
     profileViewModel: ProfileViewModel = viewModel(factory = ProfileViewModel.factory(authRepository))
 ) {
     val uiState = profileViewModel.uiState.collectAsStateWithLifecycle().value
-    AdminDashboardShell(
-        userName = name,
-        role = role,
-        activeDestination = AdminDestination.Profile,
-        pageTitle = if (editMode) "Edit profil" else "Detail profil",
-        onBack = onBackToPrevious,
-        onDashboardClick = onDashboardClick,
-        onProductsClick = onProductsClick,
-        onAddProductClick = onAddProductClick,
-        onProductCategoriesClick = onProductCategoriesClick,
-        onProductUnitsClick = onProductUnitsClick,
-        onCashReconciliationClick = onCashReconciliationClick,
-        onSalesTransactionsClick = onSalesTransactionsClick,
-        onReportsClick = onReportsClick,
-        onPriceManagementClick = onPriceManagementClick,
-        onStockOpnameClick = onStockOpnameClick,
-        onStockOpnameFormClick = onStockOpnameFormClick,
-        onIncomingGoodsClick = onIncomingGoodsClick,
-        onIncomingGoodsFormClick = onIncomingGoodsFormClick,
-        onSupplierDebtsClick = onSupplierDebtsClick,
-        onReceivablesClick = onReceivablesClick,
-        onCustomersClick = onCustomersClick,
-        onOperationalAuditClick = onOperationalAuditClick,
-        onProfileClick = onProfileClick,
-        onSettingsClick = onSettingsClick,
-        onLogout = onLogout
-    ) { contentModifier ->
-        if (editMode) {
-            SharedEditProfileScreen(
-                uiState = uiState,
-                onSave = profileViewModel::updateProfile,
-                onBack = onBackToPrevious ?: onProfileClick,
-                onSaved = {
-                    profileViewModel.consumeProfileUpdated()
-                    onProfileSaved()
-                },
-                onClearMessage = profileViewModel::clearMessage,
-                showHeader = false,
-                modifier = contentModifier,
-            )
-        } else {
-            SharedProfileScreen(
-                uiState = uiState,
-                onReload = profileViewModel::loadProfile,
-                onChangePassword = profileViewModel::changePassword,
-                onChangePin = profileViewModel::changePin,
-                onClearMessage = profileViewModel::clearMessage,
-                showHeader = false,
-                onLogout = if (isOwnerPersona(role)) onLogout else null,
-                onEditProfile = onEditProfile,
-                modifier = contentModifier
-            )
-        }
+    if (!editMode) {
+        OwnerProfileDetailRoute(
+            fallbackName = name,
+            fallbackRole = role,
+            profileViewModel = profileViewModel,
+            onBack = { onBackToPrevious?.invoke() },
+            onEditProfile = onEditProfile,
+            onDashboardClick = onDashboardClick,
+            onLogout = onLogout
+        )
+        return
     }
+
+    val destinationNavigator = LocalAdminDestinationNavigator.current
+    val handleBack = onBackToPrevious ?: onProfileClick
+    SharedEditProfileScreen(
+        uiState = uiState,
+        onSave = profileViewModel::updateProfile,
+        onBack = handleBack,
+        onSaved = {
+            profileViewModel.consumeProfileUpdated()
+            onProfileSaved()
+        },
+        onClearMessage = profileViewModel::clearMessage,
+        fallbackName = name,
+        fallbackRole = role,
+        onNavSelect = { dest ->
+            when (dest) {
+                DashboardNavDestination.BERANDA ->
+                    destinationNavigator?.invoke(AdminDestination.Dashboard) ?: onDashboardClick()
+                DashboardNavDestination.TRANSAKSI ->
+                    destinationNavigator?.invoke(AdminDestination.TransactionsHub)
+                DashboardNavDestination.KEUANGAN ->
+                    destinationNavigator?.invoke(AdminDestination.FinanceHub)
+                DashboardNavDestination.STOK ->
+                    destinationNavigator?.invoke(AdminDestination.StockHub)
+                DashboardNavDestination.MENU -> handleBack()
+            }
+        }
+    )
 }

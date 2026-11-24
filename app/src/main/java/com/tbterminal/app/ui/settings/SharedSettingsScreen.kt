@@ -2740,7 +2740,7 @@ private fun TerminalPreferencesCard(
                             BasicTextField(
                                 value = cashTolerance,
                                 onValueChange = onCashToleranceChanged,
-                                textStyle = TextStyle(
+                                textStyle = TextStyle(fontFamily = com.tbterminal.app.ui.theme.KawanSans, 
                                     fontSize = 15.sp,
                                     fontWeight = FontWeight.Bold,
                                     color = Slate900,
@@ -2793,7 +2793,7 @@ private fun TerminalPreferencesCard(
                             BasicTextField(
                                 value = autoLockMinutes,
                                 onValueChange = onAutoLockMinutesChanged,
-                                textStyle = TextStyle(
+                                textStyle = TextStyle(fontFamily = com.tbterminal.app.ui.theme.KawanSans, 
                                     fontSize = 15.sp,
                                     fontWeight = FontWeight.Bold,
                                     color = Slate900,

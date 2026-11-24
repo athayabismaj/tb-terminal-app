@@ -43,6 +43,8 @@ fun CashierProfileScreen(
                 onProfileSaved()
             },
             onClearMessage = profileViewModel::clearMessage,
+            fallbackName = userName,
+            fallbackRole = role,
         )
     } else {
         SharedProfileScreen(

@@ -23,6 +23,7 @@ internal enum class OwnerMenuAction(
     SYNC(R.string.owner_menu_sync, "Antrean & status data offline", AppCapability.SYNC, AdminDestination.SyncCenter),
     ACTIVITY(R.string.owner_menu_activity, "Audit perubahan data operasional", AppCapability.AUDIT, AdminDestination.OperationalAudit),
     SECURITY_LOG(R.string.owner_menu_security_log, "Login, PIN, dan keamanan akun", AppCapability.SECURITY_SETTINGS, AdminDestination.SecurityLog),
+    ACCOUNT(R.string.owner_menu_group_account, "Status sinkronisasi, profil, & perangkat", AppCapability.ACCOUNT, null),
     LOGOUT(R.string.profile_logout, "Akhiri sesi akun pemilik", AppCapability.ACCOUNT, null),
 }
 
@@ -41,17 +42,11 @@ internal fun ownerMenuGroups(role: String?): List<OwnerMenuGroup> {
         OwnerMenuGroup(
             R.string.owner_menu_group_system,
             listOf(
-                OwnerMenuAction.STORE_SETTINGS,
-                OwnerMenuAction.DEVICE_SETTINGS,
                 OwnerMenuAction.SYNC,
                 OwnerMenuAction.BACKUP,
                 OwnerMenuAction.ACTIVITY,
                 OwnerMenuAction.SECURITY_LOG,
             ),
-        ),
-        OwnerMenuGroup(
-            R.string.owner_menu_group_account,
-            listOf(OwnerMenuAction.LOGOUT),
         ),
     ).map { group ->
         group.copy(actions = group.actions.filter { AppAccessPolicy.can(role, it.capability) })

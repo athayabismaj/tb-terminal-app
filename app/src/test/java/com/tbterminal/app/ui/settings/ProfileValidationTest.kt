@@ -24,11 +24,15 @@ class ProfileValidationTest {
     }
 
     @Test
-    fun profileRequiresValidNameAndOptionalValidEmail() {
+    fun profileRequiresValidNameUsernameAndOptionalValidEmail() {
         assertNotNull(validateProfileForm("P", null))
         assertNotNull(validateProfileForm("Pemilik Toko", "email-tidak-valid"))
         assertNotNull(validateProfileForm("Pemilik Toko", "a".repeat(151)))
         assertNull(validateProfileForm("Pemilik Toko", null))
         assertNull(validateProfileForm("Pemilik Toko", "pemilik@tbterminal.id"))
+
+        assertNotNull(validateProfileForm("Pemilik Toko", "ab", "pemilik@tbterminal.id"))
+        assertNotNull(validateProfileForm("Pemilik Toko", "user spasi", "pemilik@tbterminal.id"))
+        assertNull(validateProfileForm("Pemilik Toko", "owner.barokah", "pemilik@tbterminal.id"))
     }
 }
