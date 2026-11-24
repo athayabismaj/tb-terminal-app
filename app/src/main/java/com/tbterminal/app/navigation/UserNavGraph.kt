@@ -55,6 +55,7 @@ import com.tbterminal.app.ui.stockopname.AdminStockOpnameScreen
 import com.tbterminal.app.ui.users.OwnerAddUserScreen
 import com.tbterminal.app.ui.users.OwnerEditUserScreen
 import com.tbterminal.app.ui.users.OwnerUserCredentialScreen
+import com.tbterminal.app.ui.users.OwnerUserDetailRouteScreen
 import com.tbterminal.app.ui.users.OwnerUserManagementScreen
 import com.tbterminal.app.ui.users.UserCredentialMode
 internal fun NavGraphBuilder.userGraph(navController: NavHostController, sessionManager: SessionManager, appContainer: AppContainer) {
@@ -89,6 +90,11 @@ internal fun NavGraphBuilder.userGraph(navController: NavHostController, session
                     },
                     onAddUserClick = {
                         navController.navigate(AppRoute.AddUser.route) {
+                            launchSingleTop = true
+                        }
+                    },
+                    onUserDetailClick = { userId ->
+                        navController.navigate(AppRoute.UserDetail.createRoute(userId)) {
                             launchSingleTop = true
                         }
                     },
@@ -132,6 +138,51 @@ internal fun NavGraphBuilder.userGraph(navController: NavHostController, session
         }
 
         composable(
+            route = AppRoute.UserDetail.route,
+            arguments = listOf(
+                navArgument(AppRoute.UserDetail.USER_ID_ARG) {
+                    type = NavType.StringType
+                }
+            )
+        ) { backStackEntry ->
+            val sessionUser = sessionManager.readSessionUser()
+            val userId = backStackEntry.arguments?.getString(AppRoute.UserDetail.USER_ID_ARG)
+
+            if (sessionUser == null || userId.isNullOrBlank()) {
+                LaunchedEffect(Unit) {
+                    sessionManager.logout()
+                    navController.navigate(AppRoute.Login.route) {
+                        popUpTo(0)
+                        launchSingleTop = true
+                    }
+                }
+            } else {
+                OwnerUserDetailRouteScreen(
+                    userId = userId,
+                    userRepository = appContainer.userRepository,
+                    onDashboardClick = {
+                        navController.navigate(AppRoute.Dashboard.route) {
+                            popUpTo(AppRoute.Dashboard.route) { inclusive = true }
+                            launchSingleTop = true
+                        }
+                    },
+                    onBackToUsers = {
+                        if (!navController.popBackStack()) {
+                            navController.navigate(AppRoute.UserManagement.route) {
+                                launchSingleTop = true
+                            }
+                        }
+                    },
+                    onEditUserClick = { targetUserId ->
+                        navController.navigate(AppRoute.EditUser.createRoute(targetUserId)) {
+                            launchSingleTop = true
+                        }
+                    }
+                )
+            }
+        }
+
+        composable(
             route = AppRoute.EditUser.route,
             arguments = listOf(
                 navArgument(AppRoute.EditUser.USER_ID_ARG) {
@@ -163,9 +214,10 @@ internal fun NavGraphBuilder.userGraph(navController: NavHostController, session
                         }
                     },
                     onUserManagementClick = {
-                        navController.navigate(AppRoute.UserManagement.route) {
-                            popUpTo(AppRoute.UserManagement.route) { inclusive = true }
-                            launchSingleTop = true
+                        if (!navController.popBackStack()) {
+                            navController.navigate(AppRoute.UserManagement.route) {
+                                launchSingleTop = true
+                            }
                         }
                     },
                     onSecurityLogClick = {
@@ -231,9 +283,10 @@ internal fun NavGraphBuilder.userGraph(navController: NavHostController, session
                         }
                     },
                     onUserManagementClick = {
-                        navController.navigate(AppRoute.UserManagement.route) {
-                            popUpTo(AppRoute.UserManagement.route) { inclusive = true }
-                            launchSingleTop = true
+                        if (!navController.popBackStack()) {
+                            navController.navigate(AppRoute.UserManagement.route) {
+                                launchSingleTop = true
+                            }
                         }
                     },
                     onSecurityLogClick = {
@@ -299,9 +352,10 @@ internal fun NavGraphBuilder.userGraph(navController: NavHostController, session
                         }
                     },
                     onUserManagementClick = {
-                        navController.navigate(AppRoute.UserManagement.route) {
-                            popUpTo(AppRoute.UserManagement.route) { inclusive = true }
-                            launchSingleTop = true
+                        if (!navController.popBackStack()) {
+                            navController.navigate(AppRoute.UserManagement.route) {
+                                launchSingleTop = true
+                            }
                         }
                     },
                     onSecurityLogClick = {
@@ -404,9 +458,10 @@ internal fun NavGraphBuilder.userGraph(navController: NavHostController, session
                         }
                     },
                     onUserManagementClick = {
-                        navController.navigate(AppRoute.UserManagement.route) {
-                            popUpTo(AppRoute.UserManagement.route) { inclusive = true }
-                            launchSingleTop = true
+                        if (!navController.popBackStack()) {
+                            navController.navigate(AppRoute.UserManagement.route) {
+                                launchSingleTop = true
+                            }
                         }
                     },
                     onSecurityLogClick = {

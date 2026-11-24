@@ -48,11 +48,13 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.tbterminal.app.ui.components.TbLayoutInfo
 import com.tbterminal.app.ui.dashboard.admin.AdminDestination
+import com.tbterminal.app.ui.theme.TbOutline
+import com.tbterminal.app.ui.theme.TbSurface
 import java.util.Locale
 
 private val MenuBrandGreen = Color(0xFF047857)
 private val MenuBrandTint = Color(0xFFECFDF5)
-private val MenuCardBorder = Color(0xFFE2E8F0)
+private val MenuCardBorder = TbOutline.copy(alpha = 0.25f)
 private val MenuRowDivider = Color(0xFFF1F5F9)
 private val MenuBadgeBg = Color(0xFFF1F5F9)
 private val MenuTextPrimary = Color(0xFF1E293B)
@@ -91,8 +93,10 @@ internal fun BackofficeMoreContent(
     val density = LocalDensity.current
     val groupBaseSlidePx = remember(density) { with(density) { 14.dp.toPx() } }
     val groupStepSlidePx = remember(density) { with(density) { 4.dp.toPx() } }
+    val openAccountSheet = LocalBackofficeAccountSheet.current
     val onSelect: (MoreMenuAction) -> Unit = { action ->
         when (action) {
+            MoreMenuAction.ACCOUNT -> openAccountSheet?.invoke() ?: Unit
             MoreMenuAction.USERS -> onUserManagementClick()
             MoreMenuAction.SECURITY_LOG -> onSecurityLogClick()
             MoreMenuAction.LOGOUT -> onLogout()
@@ -171,9 +175,9 @@ internal fun RoleMenuProfileCard(
             .testTag(testTag)
             .clickable(role = Role.Button, onClick = onClick),
         shape = RoundedCornerShape(16.dp),
-        color = Color.White,
-        border = BorderStroke(1.dp, MenuCardBorder.copy(alpha = 0.75f)),
-        shadowElevation = 0.5.dp,
+        color = TbSurface,
+        border = BorderStroke(1.dp, MenuCardBorder),
+        shadowElevation = 0.dp,
     ) {
         Row(
             modifier = Modifier
@@ -247,9 +251,9 @@ internal fun RoleMenuGroupCard(
         Surface(
             modifier = Modifier.fillMaxWidth(),
             shape = RoundedCornerShape(16.dp),
-            color = Color.White,
-            border = BorderStroke(1.dp, MenuCardBorder.copy(alpha = 0.75f)),
-            shadowElevation = 0.5.dp,
+            color = TbSurface,
+            border = BorderStroke(1.dp, MenuCardBorder),
+            shadowElevation = 0.dp,
         ) {
             Column(
                 modifier = Modifier
@@ -361,5 +365,6 @@ private fun MoreMenuAction.icon(): ImageVector = when (this) {
     MoreMenuAction.DEVICE_SETTINGS -> Icons.Outlined.Print
     MoreMenuAction.SETTINGS -> Icons.Outlined.Settings
     MoreMenuAction.SYNC -> Icons.Outlined.Sync
+    MoreMenuAction.ACCOUNT -> Icons.Outlined.Person
     MoreMenuAction.LOGOUT -> Icons.AutoMirrored.Outlined.Logout
 }

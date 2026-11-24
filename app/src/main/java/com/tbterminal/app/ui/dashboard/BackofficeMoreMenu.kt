@@ -24,6 +24,7 @@ internal enum class MoreMenuAction(
     DEVICE_SETTINGS("Perangkat & struk", "Printer dan nota kasir", AppCapability.DEVICE_SETTINGS, AdminDestination.DeviceSettings),
     SETTINGS("Pengaturan aplikasi", "Printer, toko, dan perangkat", AppCapability.DEVICE_SETTINGS, AdminDestination.Settings),
     SYNC("Sinkronisasi", "Status data offline", AppCapability.SYNC, AdminDestination.SyncCenter),
+    ACCOUNT("Akun", "Status sinkronisasi, profil, & perangkat", AppCapability.ACCOUNT),
     LOGOUT("Keluar", "Akhiri sesi akun", AppCapability.ACCOUNT),
 }
 

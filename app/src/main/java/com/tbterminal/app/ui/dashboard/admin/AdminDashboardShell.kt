@@ -131,7 +131,8 @@ fun AdminDashboardShell(
         topBarActions = topBarActions,
         showPageHeader = showPageHeader,
         showProfileMenu = activeDestination.isBackofficeRootDestination(),
-        showBottomBar = showBottomBar,
+        showBottomBar = showBottomBar && activeDestination.isBackofficeRootDestination(),
+        isRootDestination = activeDestination.isBackofficeRootDestination(),
     ) { contentModifier ->
         content(contentModifier)
     }

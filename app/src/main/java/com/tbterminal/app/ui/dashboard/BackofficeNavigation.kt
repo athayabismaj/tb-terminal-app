@@ -42,7 +42,10 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.Stable
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -58,6 +61,13 @@ import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.testTag
+import com.tbterminal.app.TbTerminalApplication
+import com.tbterminal.app.data.local.database.DevicePreferences
+import com.tbterminal.app.data.sync.OfflineStatus
+import com.tbterminal.app.ui.dashboard.admin.AdminDestination
+import com.tbterminal.app.ui.dashboard.admin.LocalAdminDestinationNavigator
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -155,11 +165,13 @@ fun BackofficeAdaptiveShell(
     showPageHeader: Boolean = true,
     showProfileMenu: Boolean = true,
     showBottomBar: Boolean = true,
+    isRootDestination: Boolean = false,
     topBarActions: @Composable androidx.compose.foundation.layout.RowScope.() -> Unit = {},
     modifier: Modifier = Modifier,
     content: @Composable (Modifier) -> Unit
 ) {
     val ownerNavigation = isOwnerPersona(role)
+    val destinationNavigator = LocalAdminDestinationNavigator.current
     val pageNavigation = LocalBackofficePageNavigation.current
     val sidebarState = LocalBackofficeSidebarState.current
     val effectiveTitle = pageTitle ?: pageNavigation.title ?: activeSection.defaultRootTitle(ownerNavigation)
@@ -168,8 +180,23 @@ fun BackofficeAdaptiveShell(
     val effectiveShowProfileMenu = showProfileMenu && effectiveBack == null
     val navigationDividerColor = MaterialTheme.colorScheme.outlineVariant
     var showSystemInfoSheet by rememberSaveable { mutableStateOf(false) }
+    var showAccountSheet by rememberSaveable { mutableStateOf(false) }
 
-    BoxWithConstraints(modifier = modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
+    val context = LocalContext.current
+    val app = context.applicationContext as? TbTerminalApplication
+    val appContainer = app?.appContainer
+    val offlineStatusFlow = remember(appContainer) { appContainer?.offlineStatusRepository?.status }
+    val offlineStatus by (offlineStatusFlow?.collectAsState(initial = OfflineStatus()) ?: remember { mutableStateOf(OfflineStatus()) })
+    var devicePreferences by remember { mutableStateOf(DevicePreferences()) }
+    LaunchedEffect(appContainer) {
+        devicePreferences = appContainer?.localAppSettingsDataSource?.getDevicePreferences() ?: DevicePreferences()
+    }
+    val isRootScreen = isRootDestination && effectiveBack == null
+
+    CompositionLocalProvider(
+        LocalBackofficeAccountSheet provides { showAccountSheet = true }
+    ) {
+        BoxWithConstraints(modifier = modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
         val navigationMode = backofficeNavigationMode(maxWidth.value, maxHeight.value)
         val expandedNavigation = navigationMode == BackofficeNavigationMode.DRAWER
         val navigationItems = backofficeNavigationItems.filter { item ->
@@ -180,20 +207,10 @@ fun BackofficeAdaptiveShell(
                 modifier = Modifier.fillMaxSize(),
                 containerColor = MaterialTheme.colorScheme.background,
                 topBar = {
-                    if (showPageHeader) {
-                        BackofficeTopBar(
-                            userName = userName,
-                            role = role,
-                            pageTitle = effectiveTitle,
-                            pageSubtitle = effectiveSubtitle,
+                    if (!isRootScreen && showPageHeader) {
+                        CompactBackofficeTopBar(
+                            title = effectiveTitle,
                             onBack = effectiveBack,
-                            showProfileMenu = effectiveShowProfileMenu,
-                            onSystemInfoClick = { showSystemInfoSheet = true },
-                            onProfileClick = onProfileClick,
-                            onSettingsClick = onSettingsClick,
-                            onSyncCenterClick = onSyncCenterClick,
-                            onReportsClick = onReportsClick,
-                            onLogout = onLogout,
                             actions = topBarActions
                         )
                     }
@@ -251,10 +268,29 @@ fun BackofficeAdaptiveShell(
                     }
                 }
             ) { paddingValues ->
-                content(
-                    Modifier.fillMaxSize().padding(paddingValues)
-                        .then(if (showPageHeader) Modifier else Modifier.statusBarsPadding())
-                )
+                val baseModifier = Modifier
+                    .fillMaxSize()
+                    .padding(paddingValues)
+
+                if (isRootScreen) {
+                    Column(
+                        modifier = baseModifier.statusBarsPadding()
+                    ) {
+                        BackofficeGlobalStatusBanner(
+                            offlineStatus = offlineStatus,
+                            onClick = { showAccountSheet = true }
+                        )
+                        Box(
+                            modifier = Modifier
+                                .weight(1f)
+                                .fillMaxWidth()
+                        ) {
+                            content(Modifier.fillMaxSize())
+                        }
+                    }
+                } else {
+                    content(baseModifier)
+                }
             }
         } else {
             Row(modifier = Modifier.fillMaxSize()) {
@@ -349,7 +385,26 @@ fun BackofficeAdaptiveShell(
                 onDismiss = { showSystemInfoSheet = false },
             )
         }
+
+        if (showAccountSheet) {
+            BackofficeAccountBottomSheet(
+                userName = userName,
+                role = role,
+                offlineStatus = offlineStatus,
+                devicePreferences = devicePreferences,
+                onDismiss = { showAccountSheet = false },
+                onProfileClick = onProfileClick,
+                onSettingsClick = onSettingsClick,
+                onSyncCenterClick = onSyncCenterClick,
+                onReportsClick = onReportsClick,
+                onStoreSettingsClick = {
+                    destinationNavigator?.invoke(AdminDestination.StoreSettings) ?: onSettingsClick()
+                },
+                onLogout = onLogout,
+            )
+        }
     }
+}
 }
 
 private fun BackofficeSection.defaultRootTitle(isOwner: Boolean): String = when (this) {

@@ -311,6 +311,11 @@ internal fun NavGraphBuilder.purchasingGraph(navController: NavHostController, s
                             launchSingleTop = true
                         }
                     },
+                    onAddSupplierClick = {
+                        navController.navigate(AppRoute.SupplierForm.route) {
+                            launchSingleTop = true
+                        }
+                    },
                     onBack = {
                         if (!navController.popBackStack(AppRoute.IncomingGoods.route, false)) {
                             if (!navController.popBackStack()) {

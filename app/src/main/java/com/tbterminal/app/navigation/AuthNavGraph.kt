@@ -2,6 +2,8 @@ package com.tbterminal.app.navigation
 
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavGraphBuilder
@@ -17,6 +19,7 @@ import com.tbterminal.app.ui.audit.AdminOperationalAuditViewModel
 import com.tbterminal.app.ui.auth.AuthViewModel
 import com.tbterminal.app.ui.auth.LoginScreen
 import com.tbterminal.app.ui.auth.PinScreen
+import com.tbterminal.app.ui.auth.ResetPinScreen
 import com.tbterminal.app.ui.cash.AdminCashReconciliationScreen
 import com.tbterminal.app.ui.cashier.session.CashierCloseShiftScreen
 import com.tbterminal.app.ui.cashier.stock.CashierStockCheckScreen
@@ -58,10 +61,16 @@ import com.tbterminal.app.ui.users.OwnerUserManagementScreen
 import com.tbterminal.app.ui.users.UserCredentialMode
 internal fun NavGraphBuilder.authGraph(navController: NavHostController, authViewModel: AuthViewModel, sessionManager: SessionManager) {
         composable(AppRoute.Login.route) {
+            val pendingForgotPinReset by authViewModel.pendingForgotPinReset.collectAsState()
             LoginScreen(
                 viewModel = authViewModel,
                 onLoginSuccess = { _, _ ->
-                    navController.navigate(AppRoute.Dashboard.route) {
+                    val nextRoute = if (pendingForgotPinReset) {
+                        AppRoute.ResetPin.route
+                    } else {
+                        AppRoute.Dashboard.route
+                    }
+                    navController.navigate(nextRoute) {
                         popUpTo(AppRoute.Login.route) { inclusive = true }
                     }
                 }
@@ -89,6 +98,45 @@ internal fun NavGraphBuilder.authGraph(navController: NavHostController, authVie
                         }
                     },
                     onBackToLogin = {
+                        authViewModel.cancelForgotPinFlow()
+                        sessionManager.logout()
+                        navController.navigate(AppRoute.Login.route) {
+                            popUpTo(0)
+                            launchSingleTop = true
+                        }
+                    },
+                    onForgotPin = {
+                        authViewModel.startForgotPinFlow()
+                        sessionManager.logout()
+                        navController.navigate(AppRoute.Login.route) {
+                            popUpTo(0)
+                            launchSingleTop = true
+                        }
+                    }
+                )
+            }
+        }
+
+        composable(AppRoute.ResetPin.route) {
+            val sessionUser = sessionManager.readSessionUser()
+            if (sessionUser == null) {
+                LaunchedEffect(Unit) {
+                    authViewModel.cancelForgotPinFlow()
+                    sessionManager.logout()
+                    navController.navigate(AppRoute.Login.route) {
+                        popUpTo(0)
+                        launchSingleTop = true
+                    }
+                }
+            } else {
+                ResetPinScreen(
+                    viewModel = authViewModel,
+                    onResetSuccess = {
+                        navController.navigate(AppRoute.Dashboard.route) {
+                            popUpTo(AppRoute.ResetPin.route) { inclusive = true }
+                        }
+                    },
+                    onCancelToLogin = {
                         sessionManager.logout()
                         navController.navigate(AppRoute.Login.route) {
                             popUpTo(0)

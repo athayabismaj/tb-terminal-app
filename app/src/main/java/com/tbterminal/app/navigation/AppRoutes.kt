@@ -17,6 +17,10 @@ sealed interface AppRoute {
         override val route = "pin"
     }
 
+    data object ResetPin : AppRoute {
+        override val route = "reset_pin"
+    }
+
     data object Dashboard : AppRoute {
         override val route = "dashboard"
     }
@@ -195,12 +199,26 @@ sealed interface AppRoute {
         override val route = "admin/suppliers"
     }
 
+    data object SupplierDetail : AppRoute {
+        const val SUPPLIER_ID_ARG = "supplierId"
+        override val route = "admin/suppliers/detail/{$SUPPLIER_ID_ARG}"
+
+        fun createRoute(supplierId: String): String = "admin/suppliers/detail/$supplierId"
+    }
+
     data object SupplierForm : AppRoute {
         override val route = "admin/suppliers/form"
     }
 
     data object PurchaseHistory : AppRoute {
         override val route = "admin/purchases"
+    }
+
+    data object PurchaseDetail : AppRoute {
+        const val PURCHASE_ID_ARG = "purchaseId"
+        override val route = "admin/purchases/detail/{$PURCHASE_ID_ARG}"
+
+        fun createRoute(purchaseId: String): String = "admin/purchases/detail/$purchaseId"
     }
 
     data object IncomingGoodsForm : AppRoute {
@@ -347,6 +365,15 @@ sealed interface AppRoute {
 
     data object AddUser : AppRoute {
         override val route = "user-management/add"
+    }
+
+    data object UserDetail : AppRoute {
+        const val USER_ID_ARG = "userId"
+        override val route = "user-management/detail/{$USER_ID_ARG}"
+
+        fun createRoute(userId: String): String {
+            return "user-management/detail/$userId"
+        }
     }
 
     data object EditUser : AppRoute {

@@ -12,7 +12,9 @@ import com.tbterminal.app.data.remote.SalesReportTotalsDto
 import com.tbterminal.app.data.repository.AnalyticsRepository
 import com.tbterminal.app.data.repository.CashReconciliationRepository
 import com.tbterminal.app.data.repository.RepositoryResult
+import java.time.Instant
 import java.time.LocalDate
+import java.time.ZoneOffset
 import java.time.format.DateTimeFormatter
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -28,7 +30,10 @@ data class AdminDashboardUiState(
     val dailySalesTrend: List<DailySalesSummaryDto> = emptyList(),
     val recentTransactions: List<CashTransaction> = emptyList(),
     val activeCashierSession: CashSession? = null,
-    val selectedPeriodDays: Int = 1, // 1 = Hari Ini, 7 = 7 Hari, 30 = Bulan Ini
+    val selectedPeriodDays: Int = 1, // 1 = Hari Ini, 7 = 7 Hari, 30 = Bulan Ini, 0 = Kustom
+    val customStartDateMillis: Long? = null,
+    val customEndDateMillis: Long? = null,
+    val previousPeriodNetRevenue: Double? = null,
     val financialError: String? = null,
     val error: String? = null
 )
@@ -47,26 +52,58 @@ class AdminDashboardViewModel(
     }
 
     fun setPeriod(days: Int) {
-        if (_uiState.value.selectedPeriodDays == days) return
-        _uiState.update { it.copy(selectedPeriodDays = days) }
+        if (_uiState.value.selectedPeriodDays == days && _uiState.value.customStartDateMillis == null) return
+        _uiState.update {
+            it.copy(
+                selectedPeriodDays = days,
+                customStartDateMillis = null,
+                customEndDateMillis = null
+            )
+        }
         loadMetrics(periodDays = days)
     }
 
-    fun loadMetrics(periodDays: Int = _uiState.value.selectedPeriodDays) {
+    fun setCustomRange(startDateMillis: Long, endDateMillis: Long) {
+        val normalizedStart = minOf(startDateMillis, endDateMillis)
+        val normalizedEnd = maxOf(startDateMillis, endDateMillis)
+        _uiState.update {
+            it.copy(
+                selectedPeriodDays = 0,
+                customStartDateMillis = normalizedStart,
+                customEndDateMillis = normalizedEnd
+            )
+        }
+        loadMetrics(
+            periodDays = 0,
+            customStartMillis = normalizedStart,
+            customEndMillis = normalizedEnd
+        )
+    }
+
+    fun loadMetrics(
+        periodDays: Int = _uiState.value.selectedPeriodDays,
+        customStartMillis: Long? = _uiState.value.customStartDateMillis,
+        customEndMillis: Long? = _uiState.value.customEndDateMillis
+    ) {
         viewModelScope.launch {
             _uiState.update { it.copy(isLoading = true, error = null) }
             try {
                 val data = analyticsRepository.getDashboardMetrics()
 
                 val today = LocalDate.now()
-                val startDate = if (periodDays == 1) {
-                    today.toString()
+                val (startLocal, endLocal) = if (periodDays == 0 && customStartMillis != null && customEndMillis != null) {
+                    val s = Instant.ofEpochMilli(customStartMillis).atZone(ZoneOffset.UTC).toLocalDate()
+                    val e = Instant.ofEpochMilli(customEndMillis).atZone(ZoneOffset.UTC).toLocalDate()
+                    s to e
+                } else if (periodDays == 1) {
+                    today to today
                 } else if (periodDays == 7) {
-                    today.minusDays(6).toString()
+                    today.minusDays(6) to today
                 } else {
-                    today.withDayOfMonth(1).toString()
+                    today.withDayOfMonth(1) to today
                 }
-                val endDate = today.toString()
+                val startDate = startLocal.toString()
+                val endDate = endLocal.toString()
 
                 val fullReportResult = if (includeFinancialSummary) {
                     runCatching {
@@ -76,9 +113,23 @@ class AdminDashboardViewModel(
                     null
                 }
 
+                val previousPeriodNetRevenue = if (includeFinancialSummary) {
+                    val spanDays = java.time.temporal.ChronoUnit.DAYS.between(startLocal, endLocal).coerceAtLeast(0L) + 1L
+                    val prevEnd = startLocal.minusDays(1)
+                    val prevStart = prevEnd.minusDays(spanDays - 1L)
+                    runCatching {
+                        analyticsRepository.getSalesReport(
+                            startDate = prevStart.toString(),
+                            endDate = prevEnd.toString()
+                        ).totals.netRevenue.toDouble()
+                    }.getOrNull()
+                } else {
+                    null
+                }
+
                 val trendResult = if (includeFinancialSummary) {
                     runCatching {
-                        val sevenDaysAgo = today.minusDays(6).toString()
+                        val sevenDaysAgo = endLocal.minusDays(6).toString()
                         analyticsRepository.getDailySales(startDate = sevenDaysAgo, endDate = endDate)
                     }.getOrDefault(emptyList())
                 } else {
@@ -114,6 +165,7 @@ class AdminDashboardViewModel(
                         dailySalesTrend = trendResult,
                         recentTransactions = recentTrx,
                         activeCashierSession = activeSession,
+                        previousPeriodNetRevenue = previousPeriodNetRevenue,
                         financialError = fullReportResult?.exceptionOrNull()?.message,
                     )
                 }

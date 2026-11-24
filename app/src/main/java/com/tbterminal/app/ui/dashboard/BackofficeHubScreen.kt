@@ -105,6 +105,9 @@ import com.tbterminal.app.ui.components.TbAdaptiveBox
 import com.tbterminal.app.ui.dashboard.admin.AdminDashboardShell
 import com.tbterminal.app.ui.dashboard.admin.AdminDestination
 import com.tbterminal.app.ui.dashboard.admin.LocalAdminDestinationNavigator
+import com.tbterminal.app.ui.theme.TbBackground
+import com.tbterminal.app.ui.theme.TbOutline
+import com.tbterminal.app.ui.theme.TbSurface
 import java.math.BigDecimal
 import java.text.NumberFormat
 import java.time.LocalDate
@@ -214,8 +217,68 @@ fun BackofficeHubScreen(
                 }
                 Column(
                     modifier = containerModifier.verticalScroll(rememberScrollState()),
-                    verticalArrangement = Arrangement.spacedBy(if (layout.isCompact) 16.dp else 20.dp),
+                    verticalArrangement = Arrangement.spacedBy(if (layout.isCompact) 14.dp else 20.dp),
                 ) {
+                    if (layout.isCompact) {
+                        when (section) {
+                            BackofficeSection.TRANSACTIONS -> {
+                                RootScreenTitle(
+                                    title = "Transaksi",
+                                    testTag = "root-title-transactions"
+                                )
+                            }
+                            BackofficeSection.FINANCE -> {
+                                RootScreenTitle(
+                                    title = "Keuangan",
+                                    testTag = "root-title-finance",
+                                    actions = {
+                                        HubTopBarIconButton(
+                                            icon = Icons.Outlined.Search,
+                                            contentDescription = "Cari transaksi",
+                                            onClick = { navigate(AdminDestination.SalesTransactions) },
+                                            testTag = "hub-finance-search",
+                                        )
+                                        if (canViewReportsAnalytics) {
+                                            HubTopBarIconButton(
+                                                icon = Icons.Outlined.Assessment,
+                                                contentDescription = "Analitik & Laporan",
+                                                onClick = { navigate(AdminDestination.Reports) },
+                                                testTag = "hub-finance-reports",
+                                            )
+                                        }
+                                    }
+                                )
+                            }
+                            BackofficeSection.STOCK -> {
+                                RootScreenTitle(
+                                    title = "Stok",
+                                    testTag = "root-title-stock",
+                                    actions = {
+                                        HubTopBarIconButton(
+                                            icon = Icons.Outlined.Search,
+                                            contentDescription = "Cari produk",
+                                            onClick = { navigate(AdminDestination.Products) },
+                                            testTag = "hub-stock-search",
+                                        )
+                                        HubTopBarIconButton(
+                                            icon = Icons.Outlined.QrCodeScanner,
+                                            contentDescription = "Scan barcode",
+                                            onClick = { showStockBarcodeScanner = true },
+                                            testTag = "hub-stock-scan",
+                                        )
+                                    }
+                                )
+                            }
+                            BackofficeSection.MORE -> {
+                                RootScreenTitle(
+                                    title = if (isOwnerPersona(role)) "Menu" else "Lainnya",
+                                    testTag = "root-title-more"
+                                )
+                            }
+                            else -> Unit
+                        }
+                    }
+
                     when (section) {
                         BackofficeSection.TRANSACTIONS -> TransactionsHub(
                             role = role,
@@ -261,13 +324,13 @@ fun BackofficeHubScreen(
 }
 
 // ── COLOR PALETTE: REFINED INDUSTRIAL STANDARD ──
-private val HubCanvasBg = Color(0xFFF2F4F7)
+private val HubCanvasBg = TbBackground
 private val HubSlate900 = Color(0xFF0F172A)
 private val HubSlate800 = Color(0xFF1E293B)
 private val HubSlate500 = Color(0xFF64748B)
 private val HubSlate400 = Color(0xFF94A3B8)
 private val HubSlate100 = Color(0xFFF1F5F9)
-private val HubCardBorder = Color(0xFFE2E8F0)
+private val HubCardBorder = TbOutline.copy(alpha = 0.25f)
 private val HubAmberBg = Color(0xFFFEF3C7)
 private val HubAmberText = Color(0xFFB45309)
 
@@ -489,13 +552,16 @@ private fun FinanceHub(
 
             if (purchasingRepository != null) {
                 runCatching {
-                    when (val payRes = purchasingRepository.getPayables(page = 1, limit = 50, status = "unpaid")) {
-                        is RepositoryResult.Success -> {
-                            val page = payRes.data
-                            loadedPayablesCount = page.total.toInt().coerceAtLeast(page.data.size)
-                            loadedPayables = page.data.fold(BigDecimal.ZERO) { acc, p -> acc.add(p.remainingAmount) }
-                        }
-                        else -> Unit
+                    val unpaidRes = purchasingRepository.getPayables(page = 1, limit = 50, status = "belum_lunas")
+                    val partialRes = purchasingRepository.getPayables(page = 1, limit = 50, status = "sebagian")
+                    val pages = listOfNotNull(
+                        (unpaidRes as? RepositoryResult.Success)?.data,
+                        (partialRes as? RepositoryResult.Success)?.data
+                    )
+                    if (pages.isNotEmpty()) {
+                        loadedPayablesCount = pages.sumOf { it.total.toInt().coerceAtLeast(it.data.size) }
+                        loadedPayables = pages.flatMap { it.data }
+                            .fold(BigDecimal.ZERO) { acc, p -> acc.add(p.remainingAmount) }
                     }
                 }
             }
@@ -642,9 +708,9 @@ private fun HeroFinancialCard(
     Surface(
         modifier = modifier.fillMaxWidth(),
         shape = RoundedCornerShape(16.dp),
-        color = Color.White,
-        border = BorderStroke(1.dp, HubCardBorder.copy(alpha = 0.75f)),
-        shadowElevation = 0.5.dp,
+        color = TbSurface,
+        border = BorderStroke(1.dp, HubCardBorder),
+        shadowElevation = 0.dp,
     ) {
         Column(
             modifier = Modifier
@@ -839,21 +905,25 @@ private fun HubTopBarIconButton(
     onClick: () -> Unit,
     testTag: String,
 ) {
-    Surface(
+    IconButton(
         onClick = onClick,
-        shape = CircleShape,
-        color = Color.Transparent,
         modifier = Modifier
-            .size(32.dp)
+            .size(48.dp)
             .testTag(testTag),
     ) {
-        Box(contentAlignment = Alignment.Center) {
-            Icon(
-                imageVector = icon,
-                contentDescription = contentDescription,
-                tint = Color(0xFF475569),
-                modifier = Modifier.size(18.dp),
-            )
+        Surface(
+            shape = CircleShape,
+            color = Color(0xFFF1F5F9),
+            modifier = Modifier.size(36.dp),
+        ) {
+            Box(contentAlignment = Alignment.Center) {
+                Icon(
+                    imageVector = icon,
+                    contentDescription = contentDescription,
+                    tint = Color(0xFF334155),
+                    modifier = Modifier.size(18.dp),
+                )
+            }
         }
     }
 }
@@ -1109,9 +1179,9 @@ private fun StockValuationDashboardCard(
     Surface(
         modifier = modifier.fillMaxWidth(),
         shape = RoundedCornerShape(16.dp),
-        color = Color.White,
-        border = BorderStroke(1.dp, HubCardBorder.copy(alpha = 0.75f)),
-        shadowElevation = 0.5.dp,
+        color = TbSurface,
+        border = BorderStroke(1.dp, HubCardBorder),
+        shadowElevation = 0.dp,
     ) {
         Column(
             modifier = Modifier
@@ -1558,9 +1628,9 @@ private fun TransactionSegmentedTabStrip(
                             .width(tabWidth)
                             .height(38.dp),
                         shape = RoundedCornerShape(9.dp),
-                        color = Color.White,
-                        border = BorderStroke(0.5.dp, HubCardBorder.copy(alpha = 0.7f)),
-                        shadowElevation = 1.5.dp,
+                        color = TbSurface,
+                        border = BorderStroke(0.5.dp, HubCardBorder),
+                        shadowElevation = 0.dp,
                     ) {}
 
                     Row(
@@ -1620,9 +1690,9 @@ private fun TransactionSummaryCard(
     Surface(
         modifier = modifier.fillMaxWidth(),
         shape = RoundedCornerShape(16.dp),
-        color = Color.White,
-        border = BorderStroke(1.dp, HubCardBorder.copy(alpha = 0.75f)),
-        shadowElevation = 0.5.dp,
+        color = TbSurface,
+        border = BorderStroke(1.dp, HubCardBorder),
+        shadowElevation = 0.dp,
     ) {
         Column(
             modifier = Modifier
@@ -1791,9 +1861,9 @@ private fun HubActivityGroupSection(
         Surface(
             modifier = Modifier.fillMaxWidth(),
             shape = RoundedCornerShape(16.dp),
-            color = Color.White,
-            border = BorderStroke(1.dp, HubCardBorder.copy(alpha = 0.75f)),
-            shadowElevation = 0.5.dp,
+            color = TbSurface,
+            border = BorderStroke(1.dp, HubCardBorder),
+            shadowElevation = 0.dp,
         ) {
             Column(
                 modifier = Modifier

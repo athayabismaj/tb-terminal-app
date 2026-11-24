@@ -73,7 +73,12 @@ internal object AppAccessPolicy {
         AppCapability.CASHIER_SHIFT,
     )
 
-    private val adminCapabilities = ownerCapabilities - setOf(
+    private val adminCapabilities = (ownerCapabilities + setOf(
+        AppCapability.POS,
+        AppCapability.OWN_TRANSACTIONS,
+        AppCapability.APPROVED_TRANSACTION_CORRECTION,
+        AppCapability.CASHIER_SHIFT,
+    )) - setOf(
         AppCapability.USER_MANAGEMENT,
         AppCapability.SERVER_BACKUP,
         AppCapability.SECURITY_SETTINGS,
@@ -120,7 +125,9 @@ internal object AppRouteAccessPolicy {
     internal fun requiredCapability(route: String?): AppCapability? {
         val value = route?.substringBefore('?')?.lowercase() ?: return null
         return when {
-            value == AppRoute.Login.route || value == AppRoute.Pin.route -> AppCapability.AUTH
+            value == AppRoute.Login.route ||
+                value == AppRoute.Pin.route ||
+                value == AppRoute.ResetPin.route -> AppCapability.AUTH
             value == AppRoute.Dashboard.route -> AppCapability.DASHBOARD
             value in setOf(
                 AppRoute.BackofficeTransactions.route,
@@ -145,8 +152,10 @@ internal object AppRouteAccessPolicy {
             value == AppRoute.StockOpname.route || value.matchesRoute(AppRoute.StockOpnameForm.route) ->
                 AppCapability.MANAGE_INVENTORY
             value == AppRoute.IncomingGoods.route || value.matchesRoute(AppRoute.IncomingGoodsForm.route) ||
-                value == AppRoute.PurchaseHistory.route -> AppCapability.PURCHASES
-            value == AppRoute.Suppliers.route || value == AppRoute.SupplierForm.route -> AppCapability.SUPPLIERS
+                value == AppRoute.PurchaseHistory.route ||
+                value.matchesRoute(AppRoute.PurchaseDetail.route) -> AppCapability.PURCHASES
+            value == AppRoute.Suppliers.route || value == AppRoute.SupplierForm.route ||
+                value.matchesRoute(AppRoute.SupplierDetail.route) -> AppCapability.SUPPLIERS
             value == AppRoute.SupplierDebts.route || value.matchesRoute(AppRoute.SupplierDebtDetail.route) ||
                 value.matchesRoute(AppRoute.OpeningSupplierDebtForm.route) ||
                 value.matchesRoute(AppRoute.AdjustmentSupplierDebtForm.route) ->
@@ -177,6 +186,7 @@ internal object AppRouteAccessPolicy {
             value == AppRoute.BackupRestore.route -> AppCapability.SERVER_BACKUP
 
             value == AppRoute.UserManagement.route || value == AppRoute.AddUser.route ||
+                value.matchesRoute(AppRoute.UserDetail.route) ||
                 value.matchesRoute(AppRoute.EditUser.route) || value.matchesRoute(AppRoute.ChangeUserPassword.route) ||
                 value.matchesRoute(AppRoute.ChangeUserPin.route) -> AppCapability.USER_MANAGEMENT
             value == AppRoute.SecurityLog.route -> AppCapability.SECURITY_SETTINGS
