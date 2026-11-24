@@ -914,6 +914,7 @@ internal fun CashierPayDebtDialog(
                             BasicTextField(
                                 value = state.payDebtAmountInput,
                                 onValueChange = onAmountChanged,
+                                enabled = !submitting,
                                 singleLine = true,
                                 keyboardOptions = KeyboardOptions(
                                     keyboardType = KeyboardType.Decimal
@@ -926,7 +927,7 @@ internal fun CashierPayDebtDialog(
                                 modifier = Modifier.fillMaxWidth(),
                             )
                         }
-                        if (state.payDebtAmountInput.isNotEmpty()) {
+                        if (state.payDebtAmountInput.isNotEmpty() && !submitting) {
                             Box(
                                 modifier = Modifier
                                     .size(24.dp)
@@ -984,7 +985,7 @@ internal fun CashierPayDebtDialog(
                                     BorderStroke(1.dp, if (isSelected) Color(0xFFC7E0D6) else Color(0xFFE2E8F0)),
                                     RoundedCornerShape(8.dp),
                                 )
-                                .clickable { onAmountChanged(value) }
+                                .clickable(enabled = !submitting) { onAmountChanged(value) }
                                 .padding(horizontal = 10.dp, vertical = 6.dp),
                             contentAlignment = Alignment.Center,
                         ) {
@@ -1028,7 +1029,7 @@ internal fun CashierPayDebtDialog(
                                     .height(38.dp)
                                     .clip(RoundedCornerShape(8.dp))
                                     .background(if (isSelected) Color(0xFF256B57) else Color.Transparent)
-                                    .clickable { onMethodChanged(key) },
+                                    .clickable(enabled = !submitting) { onMethodChanged(key) },
                                 contentAlignment = Alignment.Center,
                             ) {
                                 Row(
@@ -1050,6 +1051,22 @@ internal fun CashierPayDebtDialog(
                                 }
                             }
                         }
+                    }
+                }
+
+                state.payDebtError?.takeIf(String::isNotBlank)?.let { errorMsg ->
+                    Surface(
+                        shape = RoundedCornerShape(10.dp),
+                        color = Color(0xFFFFF1F2),
+                        border = BorderStroke(1.dp, Color(0xFFFECDD3)),
+                        modifier = Modifier.fillMaxWidth(),
+                    ) {
+                        Text(
+                            text = errorMsg,
+                            fontSize = 12.sp,
+                            color = Color(0xFFBE123C),
+                            modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp),
+                        )
                     }
                 }
             }

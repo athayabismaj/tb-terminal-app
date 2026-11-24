@@ -28,7 +28,9 @@ import kotlinx.coroutines.test.setMain
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNotEquals
 import org.junit.Assert.assertNotNull
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
@@ -188,6 +190,58 @@ class CashierTransactionActionViewModelTest {
         assertEquals("VOIDED", viewModel.uiState.value.selectedTransaction?.status)
     }
 
+    @Test
+    fun payDebtGeneratesUuidOncePerDialogReusesOnRetryAndCreatesNewKeyForNextPayment() = runTest(dispatcher) {
+        val repository = FakeTransactionActionRepository(payDebtErrorOnce = "NETWORK_TIMEOUT")
+        repository.detail = transactionDetail().copy(
+            status = "HUTANG",
+            paidAmount = BigDecimal("40000"),
+            total = BigDecimal("100000"),
+        )
+        var counter = 0
+        val viewModel = CashierTransactionHistoryViewModel(
+            repository = repository,
+            actorRole = "KASIR",
+            idempotencyKeyGenerator = { "uuid-debt-${++counter}" },
+        )
+        viewModel.loadReceipt(repository.detail.id)
+        advanceUntilIdle()
+
+        viewModel.showPayDebtDialog()
+        val firstDialogKey = viewModel.uiState.value.payDebtIdempotencyKey
+        assertEquals("uuid-debt-1", firstDialogKey)
+        assertTrue(viewModel.uiState.value.isPayDebtDialogOpen)
+
+        viewModel.onPayDebtAmountChanged("30000")
+        viewModel.payDebt()
+        advanceUntilIdle()
+
+        assertTrue(viewModel.uiState.value.isPayDebtDialogOpen)
+        assertEquals("timeout", viewModel.uiState.value.payDebtError)
+        assertEquals("uuid-debt-1", viewModel.uiState.value.payDebtIdempotencyKey)
+
+        viewModel.payDebt()
+        advanceUntilIdle()
+
+        assertEquals(2, repository.payDebtCalls)
+        assertEquals(listOf("uuid-debt-1", "uuid-debt-1"), repository.payDebtKeys)
+        assertFalse(viewModel.uiState.value.isPayDebtDialogOpen)
+        assertNull(viewModel.uiState.value.payDebtIdempotencyKey)
+        assertNull(viewModel.uiState.value.payDebtError)
+
+        // New payment generates a brand-new UUID
+        viewModel.showPayDebtDialog()
+        val secondDialogKey = viewModel.uiState.value.payDebtIdempotencyKey
+        assertEquals("uuid-debt-2", secondDialogKey)
+        assertNotEquals(firstDialogKey, secondDialogKey)
+
+        // Closing dialog clears key so reopening generates another new UUID
+        viewModel.hidePayDebtDialog()
+        assertNull(viewModel.uiState.value.payDebtIdempotencyKey)
+        viewModel.showPayDebtDialog()
+        assertEquals("uuid-debt-3", viewModel.uiState.value.payDebtIdempotencyKey)
+    }
+
     private suspend fun loadedViewModel(
         repository: FakeTransactionActionRepository,
         role: String,
@@ -213,15 +267,19 @@ private class FakeTransactionActionRepository(
     private val voidGate: CompletableDeferred<Unit>? = null,
     private val refundGate: CompletableDeferred<Unit>? = null,
     voidErrorOnce: String? = null,
+    payDebtErrorOnce: String? = null,
 ) : CashReconciliationRepository {
     var detail = transactionDetail()
     var voidCalls = 0
     var refundCalls = 0
+    var payDebtCalls = 0
     var lastVoidApprovalId: String? = null
     var lastRefundApprovalId: String? = null
     var lastRefundDisposition: RefundDisposition? = null
     val voidKeys = mutableListOf<String>()
+    val payDebtKeys = mutableListOf<String>()
     private var pendingVoidErrorCode = voidErrorOnce
+    private var pendingPayDebtErrorCode = payDebtErrorOnce
 
     override suspend fun getTransactionById(id: String) = RepositoryResult.Success(detail)
 
@@ -294,7 +352,19 @@ private class FakeTransactionActionRepository(
         transactionId: String,
         amount: BigDecimal,
         method: String,
-    ) = RepositoryResult.Success(detail)
+        idempotencyKey: String?,
+    ): RepositoryResult<CashTransactionDetail> {
+        payDebtCalls++
+        if (idempotencyKey != null) {
+            payDebtKeys += idempotencyKey
+        }
+        pendingPayDebtErrorCode?.let { code ->
+            pendingPayDebtErrorCode = null
+            return RepositoryResult.Error(code, "timeout")
+        }
+        detail = detail.copy(paidAmount = detail.paidAmount + amount)
+        return RepositoryResult.Success(detail)
+    }
 }
 
 private fun transactionDetail() = CashTransactionDetail(

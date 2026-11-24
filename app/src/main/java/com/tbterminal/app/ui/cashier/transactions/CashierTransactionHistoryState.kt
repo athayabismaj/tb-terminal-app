@@ -42,6 +42,8 @@ data class CashierTransactionHistoryUiState(
     val isPayDebtDialogOpen: Boolean = false,
     val payDebtAmountInput: String = "",
     val payDebtMethodInput: String = "TUNAI",
+    val payDebtIdempotencyKey: String? = null,
+    val payDebtError: String? = null,
     val isSubmittingDebt: Boolean = false,
     val isVoidDialogOpen: Boolean = false,
     val voidReasonInput: String = "",
