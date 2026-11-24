@@ -6,8 +6,9 @@ import java.math.BigDecimal
 
 @Serializable
 data class ApiErrorResponse(
-    val code: String,
-    val message: String,
+    val code: String = "",
+    val message: String = "",
+    val error: String? = null,
     val details: String? = null
 )
 

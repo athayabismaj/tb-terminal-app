@@ -586,15 +586,15 @@ private fun UserCredentialMode.confirmationLabel(): String {
 
 private fun UserCredentialMode.inputPlaceholder(): String {
     return when (this) {
-        UserCredentialMode.Password -> "Masukkan password baru"
-        UserCredentialMode.Pin -> "Masukkan 6 digit PIN"
+        UserCredentialMode.Password -> "8–72 karakter"
+        UserCredentialMode.Pin -> "Masukkan 4–6 digit PIN"
     }
 }
 
 private fun UserCredentialMode.confirmationPlaceholder(): String {
     return when (this) {
         UserCredentialMode.Password -> "Ulangi password baru"
-        UserCredentialMode.Pin -> "Ulangi 6 digit PIN"
+        UserCredentialMode.Pin -> "Ulangi 4–6 digit PIN"
     }
 }
 
@@ -628,8 +628,8 @@ private fun UserCredentialMode.policyTitle(): String {
 
 private fun UserCredentialMode.policyPrimaryTitle(): String {
     return when (this) {
-        UserCredentialMode.Password -> "Minimal 6 karakter"
-        UserCredentialMode.Pin -> "Tepat 6 digit angka"
+        UserCredentialMode.Password -> "8–72 karakter"
+        UserCredentialMode.Pin -> "4–6 digit angka"
     }
 }
 

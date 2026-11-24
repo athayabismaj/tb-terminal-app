@@ -6,6 +6,7 @@ import androidx.compose.runtime.getValue
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.tbterminal.app.data.repository.UserRepository
+import com.tbterminal.app.data.validation.CredentialValidator
 import com.tbterminal.app.ui.dashboard.admin.AdminDashboardShell
 import com.tbterminal.app.ui.dashboard.admin.AdminDestination
 import com.tbterminal.app.ui.dashboard.owner.OwnerUserToastBridge
@@ -81,12 +82,12 @@ fun OwnerUserCredentialScreen(
             uiState = uiState,
             onCredentialChange = { value ->
                 viewModel.updateCredential(
-                    if (mode == UserCredentialMode.Pin) value.filter(Char::isDigit).take(PIN_LENGTH) else value
+                    if (mode == UserCredentialMode.Pin) value.filter(Char::isDigit).take(PIN_MAX_LENGTH) else value
                 )
             },
             onConfirmationChange = { value ->
                 viewModel.updateConfirmation(
-                    if (mode == UserCredentialMode.Pin) value.filter(Char::isDigit).take(PIN_LENGTH) else value
+                    if (mode == UserCredentialMode.Pin) value.filter(Char::isDigit).take(PIN_MAX_LENGTH) else value
                 )
             },
             onRetry = { viewModel.load(userId) },
@@ -96,4 +97,4 @@ fun OwnerUserCredentialScreen(
     }
 }
 
-private const val PIN_LENGTH = 6
+private const val PIN_MAX_LENGTH = CredentialValidator.PIN_MAX_LENGTH

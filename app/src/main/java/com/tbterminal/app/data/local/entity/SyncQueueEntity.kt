@@ -24,6 +24,7 @@ data class SyncQueueEntity(
     val status: SyncStatus = SyncStatus.PENDING,
     val retryCount: Int = 0,
     val lastError: String? = null,
+    val lastErrorCode: String? = null,
     val createdAt: Long = System.currentTimeMillis(),
     val updatedAt: Long = System.currentTimeMillis()
 ) {

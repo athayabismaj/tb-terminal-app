@@ -6,6 +6,7 @@ import androidx.lifecycle.viewModelScope
 import com.tbterminal.app.data.repository.AuthRepository
 import com.tbterminal.app.data.repository.PinUnlockResult
 import com.tbterminal.app.data.repository.RepositoryResult
+import com.tbterminal.app.data.validation.CredentialValidator
 import com.tbterminal.app.ui.common.viewModelFactory
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
@@ -66,6 +67,9 @@ class AuthViewModel(
     private val _pendingForgotPinReset = MutableStateFlow(false)
     val pendingForgotPinReset: StateFlow<Boolean> = _pendingForgotPinReset.asStateFlow()
 
+    private val _loginNotice = MutableStateFlow<String?>(null)
+    val loginNotice: StateFlow<String?> = _loginNotice.asStateFlow()
+
     private var verifiedPasswordForPinReset: String? = null
     private var lockoutCountdownJob: Job? = null
 
@@ -73,6 +77,7 @@ class AuthViewModel(
         get() = !verifiedPasswordForPinReset.isNullOrBlank()
 
     fun login(username: String, password: String) {
+        _loginNotice.value = null
         val normalizedUsername = username.trim()
         val isUsernameBlank = normalizedUsername.isBlank()
         val isPasswordBlank = password.isBlank()
@@ -105,6 +110,15 @@ class AuthViewModel(
             _authState.value = AuthState.Error(
                 message = "Kata sandi minimal 6 karakter",
                 passwordError = "Kata sandi minimal 6 karakter",
+                isPasswordHighlighted = true
+            )
+            return
+        }
+        if (password.length > CredentialValidator.PASSWORD_MAX_LENGTH) {
+            val maxMsg = "Kata sandi maksimal ${CredentialValidator.PASSWORD_MAX_LENGTH} karakter"
+            _authState.value = AuthState.Error(
+                message = maxMsg,
+                passwordError = maxMsg,
                 isPasswordHighlighted = true
             )
             return
@@ -215,8 +229,10 @@ class AuthViewModel(
         if (currentUnlock is UnlockState.LockedOut && currentUnlock.remainingSeconds > 0L) {
             return
         }
-        if (!pin.matches(Regex("\\d{4,6}"))) {
-            _unlockState.value = UnlockState.Error("PIN harus terdiri dari 4 sampai 6 digit")
+        if (!CredentialValidator.isValidPin(pin)) {
+            _unlockState.value = UnlockState.Error(
+                "PIN harus terdiri dari ${CredentialValidator.PIN_MIN_LENGTH} sampai ${CredentialValidator.PIN_MAX_LENGTH} digit angka"
+            )
             return
         }
 
@@ -261,10 +277,14 @@ class AuthViewModel(
                         return
                     }
                 }
-                _unlockState.value = UnlockState.WrongPin(
-                    message = result.message,
-                    attemptsLeft = result.attemptsLeft
-                )
+                _unlockState.value = if (result.isLocked) {
+                    UnlockState.Error(result.message)
+                } else {
+                    UnlockState.WrongPin(
+                        message = result.message,
+                        attemptsLeft = result.attemptsLeft
+                    )
+                }
             }
         }
     }
@@ -329,8 +349,10 @@ class AuthViewModel(
             _resetPinState.value = ResetPinState.Error("Kata sandi saat ini wajib diisi")
             return
         }
-        if (!newPin.matches(Regex("\\d{4,6}"))) {
-            _resetPinState.value = ResetPinState.Error("PIN baru harus terdiri dari 4 sampai 6 digit")
+        if (!CredentialValidator.isValidPin(newPin)) {
+            _resetPinState.value = ResetPinState.Error(
+                "PIN baru harus terdiri dari ${CredentialValidator.PIN_MIN_LENGTH} sampai ${CredentialValidator.PIN_MAX_LENGTH} digit angka"
+            )
             return
         }
         if (newPin != confirmPin) {
@@ -374,12 +396,28 @@ class AuthViewModel(
         _unlockState.value = UnlockState.Idle
     }
 
-    fun notifySessionExpired() {
+    fun clearLoginNotice() {
+        _loginNotice.value = null
+    }
+
+    fun notifyPasswordChanged() {
         lockoutCountdownJob?.cancel()
         verifiedPasswordForPinReset = null
         _pendingForgotPinReset.value = false
         _unlockState.value = UnlockState.Idle
-        _authState.value = AuthState.Error("Sesi telah berakhir. Silakan login kembali.")
+        _authState.value = AuthState.Idle
+        _loginNotice.value = PASSWORD_CHANGED_LOGIN_MESSAGE
+    }
+
+    fun notifySessionExpired(reason: String? = null) {
+        lockoutCountdownJob?.cancel()
+        verifiedPasswordForPinReset = null
+        _pendingForgotPinReset.value = false
+        _loginNotice.value = null
+        _unlockState.value = UnlockState.Idle
+        _authState.value = AuthState.Error(
+            reason?.takeIf(String::isNotBlank) ?: "Sesi telah berakhir. Silakan login kembali."
+        )
     }
 
     override fun onCleared() {
@@ -389,6 +427,8 @@ class AuthViewModel(
     }
 
     companion object {
+        const val PASSWORD_CHANGED_LOGIN_MESSAGE = "Password diubah, silakan login kembali"
+
         fun factory(authRepository: AuthRepository): ViewModelProvider.Factory {
             return viewModelFactory {
                 AuthViewModel(authRepository = authRepository)

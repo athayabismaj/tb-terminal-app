@@ -376,7 +376,8 @@ data class OfflineCashExpenseSyncResponseDto(
 @Serializable
 data class PayDebtRequestDto(
     @Serializable(with = BigDecimalStringSerializer::class) val amount: BigDecimal,
-    val method: String // "tunai", "transfer", "qris"
+    val method: String, // "tunai", "transfer", "qris"
+    val idempotencyKey: String? = null
 )
 
 @Serializable

@@ -42,6 +42,7 @@ class CashierTransactionHistoryViewModel(
     private val transactionDao: TransactionDao? = null,
     private val offlineCheckoutSyncService: OfflineCheckoutSyncService? = null,
     private val actorRole: String = "KASIR",
+    private val idempotencyKeyGenerator: () -> String = { UUID.randomUUID().toString() },
 ) : ViewModel() {
     private val _uiState = MutableStateFlow(CashierTransactionHistoryUiState(isLoading = true))
     val uiState: StateFlow<CashierTransactionHistoryUiState> = _uiState.asStateFlow()
@@ -466,10 +467,14 @@ class CashierTransactionHistoryViewModel(
     fun loadReceipt(transactionId: String, preserveMessage: Boolean = false) {
         viewModelScope.launch {
             _uiState.update { state ->
+                val switchingReceipt = state.selectedTransaction?.id != null && state.selectedTransaction.id != transactionId
                 state.copy(
                     isReceiptLoading = true,
                     errorMessage = null,
                     receiptMessage = if (preserveMessage) state.receiptMessage else null,
+                    isPayDebtDialogOpen = if (switchingReceipt) false else state.isPayDebtDialogOpen,
+                    payDebtIdempotencyKey = if (switchingReceipt) null else state.payDebtIdempotencyKey,
+                    payDebtError = if (switchingReceipt) null else state.payDebtError,
                 )
             }
 
@@ -863,53 +868,93 @@ class CashierTransactionHistoryViewModel(
     fun showPayDebtDialog() {
         _uiState.update { state ->
             val sisa = state.selectedTransaction?.remainingAmount()?.toPlainString() ?: ""
-            state.copy(isPayDebtDialogOpen = true, payDebtAmountInput = sisa, payDebtMethodInput = "TUNAI")
+            state.copy(
+                isPayDebtDialogOpen = true,
+                payDebtAmountInput = sisa,
+                payDebtMethodInput = "TUNAI",
+                payDebtIdempotencyKey = idempotencyKeyGenerator(),
+                payDebtError = null,
+            )
         }
     }
 
     fun hidePayDebtDialog() {
-        _uiState.update { it.copy(isPayDebtDialogOpen = false) }
+        if (_uiState.value.isSubmittingDebt) return
+        _uiState.update {
+            it.copy(
+                isPayDebtDialogOpen = false,
+                payDebtIdempotencyKey = null,
+                payDebtError = null,
+            )
+        }
     }
 
     fun onPayDebtAmountChanged(value: String) {
+        if (_uiState.value.isSubmittingDebt) return
         val filtered = value.filter { it.isDigit() || it == '.' || it == ',' }.replace(',', '.')
-        _uiState.update { it.copy(payDebtAmountInput = filtered) }
+        _uiState.update { it.copy(payDebtAmountInput = filtered, payDebtError = null) }
     }
 
     fun onPayDebtMethodChanged(method: String) {
-        _uiState.update { it.copy(payDebtMethodInput = method) }
+        if (_uiState.value.isSubmittingDebt) return
+        _uiState.update { it.copy(payDebtMethodInput = method, payDebtError = null) }
     }
 
     fun payDebt() {
         val state = _uiState.value
+        if (state.isSubmittingDebt) return
         val transactionId = state.selectedTransaction?.id ?: return
         val amount = state.payDebtAmountInput.toBigDecimalOrNull()
         if (amount == null || amount <= java.math.BigDecimal.ZERO) {
-            setReceiptError("Nominal bayar tidak valid")
+            _uiState.update { it.copy(payDebtError = "Nominal bayar tidak valid") }
             return
         }
+        val idempotencyKey = state.payDebtIdempotencyKey ?: idempotencyKeyGenerator()
 
         viewModelScope.launch {
-            _uiState.update { it.copy(isSubmittingDebt = true, errorMessage = null, receiptMessage = null) }
-            
-            when (val result = repository.payTransactionDebt(transactionId, amount, state.payDebtMethodInput)) {
+            _uiState.update {
+                it.copy(
+                    isSubmittingDebt = true,
+                    payDebtIdempotencyKey = idempotencyKey,
+                    payDebtError = null,
+                    errorMessage = null,
+                    receiptMessage = null,
+                )
+            }
+
+            when (val result = repository.payTransactionDebt(transactionId, amount, state.payDebtMethodInput, idempotencyKey)) {
                 is RepositoryResult.Success -> {
-                    _uiState.update { 
+                    _uiState.update {
                         it.copy(
                             isSubmittingDebt = false,
                             isPayDebtDialogOpen = false,
+                            payDebtIdempotencyKey = null,
+                            payDebtError = null,
                             selectedTransaction = result.data,
-                            receiptMessage = "Pelunasan berhasil disimpan"
+                            receiptMessage = "Pelunasan berhasil disimpan",
                         )
                     }
                     // Refresh history transactions silently
                     loadTransactions(_uiState.value.page)
                 }
                 is RepositoryResult.Error -> {
-                    _uiState.update { it.copy(isSubmittingDebt = false, errorMessage = result.message) }
+                    _uiState.update {
+                        it.copy(
+                            isSubmittingDebt = false,
+                            payDebtError = result.message,
+                            errorMessage = result.message,
+                        )
+                    }
                 }
                 is RepositoryResult.Exception -> {
-                    _uiState.update { it.copy(isSubmittingDebt = false, errorMessage = "Gagal memproses pelunasan") }
+                    val fallback = "Gagal memproses pelunasan"
+                    _uiState.update {
+                        it.copy(
+                            isSubmittingDebt = false,
+                            payDebtError = fallback,
+                            errorMessage = fallback,
+                        )
+                    }
                 }
             }
         }

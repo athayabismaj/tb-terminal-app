@@ -72,7 +72,12 @@ interface CashReconciliationRepository {
         startDate: String? = null,
         endDate: String? = null
     ): RepositoryResult<CashExpensePage>
-    suspend fun payTransactionDebt(transactionId: String, amount: BigDecimal, method: String): RepositoryResult<CashTransactionDetail>
+    suspend fun payTransactionDebt(
+        transactionId: String,
+        amount: BigDecimal,
+        method: String,
+        idempotencyKey: String? = null
+    ): RepositoryResult<CashTransactionDetail>
 }
 
 class RemoteCashReconciliationRepository(
@@ -376,11 +381,13 @@ class RemoteCashReconciliationRepository(
     override suspend fun payTransactionDebt(
         transactionId: String,
         amount: BigDecimal,
-        method: String
+        method: String,
+        idempotencyKey: String?
     ): RepositoryResult<CashTransactionDetail> {
-        val request = com.tbterminal.app.data.remote.PayDebtRequestDto(
+        val request = buildPayDebtRequest(
             amount = amount,
-            method = method
+            method = method,
+            idempotencyKey = idempotencyKey
         )
         return safeApiCall { salesApi.payTransactionDebt(transactionId, request) }
             .toRepositoryResult { response ->
@@ -396,6 +403,16 @@ class RemoteCashReconciliationRepository(
             }
     }
 }
+
+internal fun buildPayDebtRequest(
+    amount: BigDecimal,
+    method: String,
+    idempotencyKey: String? = null,
+) = com.tbterminal.app.data.remote.PayDebtRequestDto(
+    amount = amount,
+    method = method,
+    idempotencyKey = idempotencyKey,
+)
 
 internal fun buildVoidTransactionRequest(
     idempotencyKey: String,

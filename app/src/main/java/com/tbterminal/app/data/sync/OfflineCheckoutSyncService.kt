@@ -114,19 +114,29 @@ class OfflineCheckoutSyncService(
 
             val response = salesApi.syncOfflineCheckout(request)
             if (!response.isSuccessful) {
-                val message = when (response.code()) {
-                    401, 403 -> "Sesi login tidak valid. Login ulang sebelum sinkronisasi."
-                    in 400..499 -> response.errorBody()?.string()?.takeIf { it.isNotBlank() }
-                        ?: "Server menolak transaksi offline (${response.code()})"
-                    else -> "Gagal terhubung ke server (${response.code()})"
+                val parsedError = SyncErrorResponseParser.parseHttpError(
+                    response = response,
+                    defaultMessage = if (response.code() in 400..499) {
+                        "Server menolak transaksi offline (${response.code()})"
+                    } else {
+                        "Gagal terhubung ke server (${response.code()})"
+                    }
+                )
+                val message = if (response.code() >= 500) {
+                    "Gagal terhubung ke server (${response.code()})"
+                } else {
+                    parsedError.message
                 }
+                val errorCode = if (response.code() >= 500) null else parsedError.code
                 return@runCatching fail(
                     transactionLocalId = transactionLocalId,
                     message = message,
+                    errorCode = errorCode,
                     retryIncrement = 1,
                     kind = SyncErrorClassifier.classify(
                         httpCode = response.code(),
-                        message = message
+                        message = message,
+                        errorCode = errorCode
                     ).toFailureKind(),
                     transientFailuresRetryable = transientFailuresRetryable
                 )
@@ -135,11 +145,14 @@ class OfflineCheckoutSyncService(
             val body = response.body()
             val syncResponse = body?.data
             if (body?.success != true || syncResponse == null) {
+                val errorCode = body?.code?.takeIf(String::isNotBlank)
+                val message = body?.message ?: body?.error ?: "Response sync tidak valid"
                 return@runCatching fail(
                     transactionLocalId = transactionLocalId,
-                    message = body?.message ?: body?.error ?: "Response sync tidak valid",
+                    message = message,
+                    errorCode = errorCode,
                     retryIncrement = 1,
-                    kind = SyncErrorClassifier.classifyMessage(body?.message ?: body?.error).toFailureKind()
+                    kind = SyncErrorClassifier.classifyMessage(message, errorCode).toFailureKind()
                 )
             }
 
@@ -197,6 +210,7 @@ class OfflineCheckoutSyncService(
                         id = queue.id,
                         status = SyncStatus.SYNCED,
                         lastError = null,
+                        lastErrorCode = null,
                         retryIncrement = 0,
                         updatedAt = syncedAt
                     )
@@ -462,6 +476,7 @@ class OfflineCheckoutSyncService(
                         id = queue.id,
                         status = SyncStatus.SYNCING,
                         lastError = null,
+                        lastErrorCode = null,
                         retryIncrement = 0,
                         updatedAt = now
                     )
@@ -476,17 +491,18 @@ class OfflineCheckoutSyncService(
         message: String,
         retryIncrement: Int,
         kind: OfflineCheckoutSyncFailureKind = OfflineCheckoutSyncFailureKind.VALIDATION,
-        transientFailuresRetryable: Boolean = false
+        transientFailuresRetryable: Boolean = false,
+        errorCode: String? = null
     ): OfflineCheckoutSyncResult.Failed {
         if (transientFailuresRetryable && kind == OfflineCheckoutSyncFailureKind.TRANSIENT) {
-            markPendingWithChildren(transactionLocalId, message, retryIncrement)
+            markPendingWithChildren(transactionLocalId, message, retryIncrement, errorCode)
         } else {
             val status = if (kind == OfflineCheckoutSyncFailureKind.CONFLICT) {
                 SyncStatus.CONFLICT
             } else {
                 SyncStatus.FAILED
             }
-            markFailedWithChildren(transactionLocalId, message, retryIncrement, status)
+            markFailedWithChildren(transactionLocalId, message, retryIncrement, status, errorCode)
         }
         return OfflineCheckoutSyncResult.Failed(message, kind)
     }
@@ -495,7 +511,8 @@ class OfflineCheckoutSyncService(
         transactionLocalId: Long,
         message: String,
         retryIncrement: Int,
-        status: SyncStatus
+        status: SyncStatus,
+        errorCode: String? = null
     ) {
         val now = System.currentTimeMillis()
         database.withTransaction {
@@ -531,6 +548,7 @@ class OfflineCheckoutSyncService(
                     id = queue.id,
                     status = status,
                     lastError = message,
+                    lastErrorCode = errorCode,
                     retryIncrement = retryIncrement,
                     updatedAt = now
                 )
@@ -541,7 +559,8 @@ class OfflineCheckoutSyncService(
     private suspend fun markPendingWithChildren(
         transactionLocalId: Long,
         message: String,
-        retryIncrement: Int
+        retryIncrement: Int,
+        errorCode: String? = null
     ) {
         val now = System.currentTimeMillis()
         database.withTransaction {
@@ -577,6 +596,7 @@ class OfflineCheckoutSyncService(
                     id = queue.id,
                     status = SyncStatus.PENDING,
                     lastError = message,
+                    lastErrorCode = errorCode,
                     retryIncrement = retryIncrement,
                     updatedAt = now
                 )

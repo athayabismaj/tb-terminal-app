@@ -1,11 +1,17 @@
 package com.tbterminal.app.data.session
 
+import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.test.UnconfinedTestDispatcher
+import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
+@OptIn(ExperimentalCoroutinesApi::class)
 class SessionManagerTest {
     @Test
     fun `initialization checks session marker without decrypting token`() {
@@ -60,14 +66,49 @@ class SessionManagerTest {
     }
 
     @Test
-    fun handleUnauthorized_clearsSession() {
+    fun handleUnauthorized_clearsSession() = runTest {
         val store = FakeTokenStore().apply { saveTokens("access", "refresh") }
         val manager = SessionManager(store)
+        val emitted = mutableListOf<SessionEvent>()
+        val job = launch(UnconfinedTestDispatcher(testScheduler)) {
+            emitted.add(manager.events.first())
+        }
 
-        manager.handleUnauthorized()
+        manager.handleUnauthorized("Batas percobaan terlampaui. Silakan login kembali.")
+        job.join()
 
         assertFalse(manager.hasAccessToken())
         assertNull(store.readRefreshToken())
+        assertEquals(
+            listOf(SessionEvent.Unauthorized("Batas percobaan terlampaui. Silakan login kembali.")),
+            emitted
+        )
+    }
+
+    @Test
+    fun handlePasswordChanged_clearsSessionWithoutRemoteLogoutAndEmitsEvent() = runTest {
+        val store = FakeTokenStore().apply {
+            saveTokens("access", "refresh")
+            saveSessionUser(SessionUser("Owner", "owner", true, "2026-01-01", null, "usr-1"))
+        }
+        val manager = SessionManager(store)
+        var remoteLogoutCalled = false
+        manager.configureRemoteLogout { remoteLogoutCalled = true }
+
+        val emitted = mutableListOf<SessionEvent>()
+        val collectJob = launch(UnconfinedTestDispatcher(testScheduler)) {
+            emitted.add(manager.events.first())
+        }
+
+        manager.handlePasswordChanged()
+        collectJob.join()
+
+        assertFalse(remoteLogoutCalled)
+        assertFalse(manager.hasAccessToken())
+        assertNull(store.readAccessToken())
+        assertNull(store.readRefreshToken())
+        assertNull(store.readSessionUser())
+        assertEquals(listOf(SessionEvent.PasswordChanged), emitted)
     }
 }
 

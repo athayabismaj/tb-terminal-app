@@ -8,7 +8,9 @@ import com.tbterminal.app.data.model.ManagerApprovalContext
 import com.tbterminal.app.data.model.ManagerApprovalGrant
 import com.tbterminal.app.data.model.ManagerApprovalStatus
 import com.tbterminal.app.data.remote.NetworkResult
+import com.tbterminal.app.data.remote.UserFacingErrorMapper
 import com.tbterminal.app.data.repository.ManagerApprovalRepository
+import com.tbterminal.app.data.validation.CredentialValidator
 import com.tbterminal.app.ui.common.viewModelFactory
 import java.util.concurrent.atomic.AtomicBoolean
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -107,7 +109,13 @@ class ManagerApprovalViewModel internal constructor(
             try {
                 when (val result = repository.createApproval(command)) {
                     is NetworkResult.Success -> handleSuccess(result.data)
-                    is NetworkResult.Error -> setError(managerApprovalErrorMessage(result.code, result.message))
+                    is NetworkResult.Error -> setError(
+                        managerApprovalErrorMessage(
+                            code = result.code,
+                            fallback = result.message,
+                            retryAfterSeconds = result.retryAfterSeconds,
+                        )
+                    )
                     is NetworkResult.Exception -> setError("Persetujuan gagal karena koneksi bermasalah.")
                 }
             } finally {
@@ -177,12 +185,18 @@ class ManagerApprovalViewModel internal constructor(
 
 internal fun validateManagerApprovalInput(username: String, pin: String): String? = when {
     username.isBlank() -> "Akun manager wajib diisi."
-    pin.length != 6 || !pin.all(Char::isDigit) -> "PIN manager harus terdiri dari 6 digit."
+    !CredentialValidator.isValidPin(pin) ->
+        "PIN manager harus terdiri dari ${CredentialValidator.PIN_MIN_LENGTH} sampai ${CredentialValidator.PIN_MAX_LENGTH} digit angka."
     else -> null
 }
 
-internal fun managerApprovalErrorMessage(code: String, fallback: String): String {
+internal fun managerApprovalErrorMessage(
+    code: String,
+    fallback: String,
+    retryAfterSeconds: Long? = null,
+): String {
     val normalized = code.trim().uppercase()
+    val waitDuration = retryAfterSeconds?.takeIf { it > 0L }?.let(UserFacingErrorMapper::formatRetryWaitDuration)
     return when {
         normalized == "MANAGER_APPROVAL_INVALID" -> "PIN atau akun manager tidak valid."
         normalized == "MANAGER_APPROVER_FORBIDDEN" -> "Akun tersebut tidak dapat memberikan persetujuan manager."
@@ -193,8 +207,23 @@ internal fun managerApprovalErrorMessage(code: String, fallback: String): String
             normalized == "MANAGER_APPROVAL_ACTION_MISMATCH" ||
             normalized == "MANAGER_APPROVAL_REQUESTER_MISMATCH" ->
             "Persetujuan tidak sesuai dengan tindakan yang diminta."
-        normalized == "HTTP_429" || "RATE_LIMIT" in normalized || normalized == "TOO_MANY_REQUESTS" ->
-            "Terlalu banyak percobaan. Coba kembali beberapa saat lagi."
+        normalized == "MANAGER_APPROVER_LOCKED" -> {
+            if (waitDuration != null) {
+                "Terlalu banyak PIN manager salah. Persetujuan akun ini dikunci sementara. Coba lagi dalam $waitDuration."
+            } else {
+                "Terlalu banyak PIN manager salah. Persetujuan akun ini dikunci sementara. Coba lagi nanti."
+            }
+        }
+        normalized == "TOO_MANY_ATTEMPTS" ||
+            normalized == "HTTP_429" ||
+            "RATE_LIMIT" in normalized ||
+            normalized == "TOO_MANY_REQUESTS" -> {
+            if (waitDuration != null) {
+                "Terlalu banyak percobaan. Coba lagi dalam $waitDuration."
+            } else {
+                "Terlalu banyak percobaan. Coba kembali beberapa saat lagi."
+            }
+        }
         normalized.startsWith("NETWORK_") || normalized.startsWith("CONNECTION_") ->
             "Persetujuan gagal karena koneksi bermasalah."
         else -> fallback.ifBlank { "Persetujuan manager gagal diproses." }

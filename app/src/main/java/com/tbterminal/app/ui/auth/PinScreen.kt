@@ -46,6 +46,9 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import java.time.Instant
+import java.time.ZoneId
+import java.time.format.DateTimeFormatter
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.clipToBounds
@@ -141,7 +144,9 @@ fun PinScreen(
     val isLockedOut = lockedState != null && lockedState.remainingSeconds > 0L
     val rawError = (unlockState as? UnlockState.Error)?.message
     val lowerError = rawError?.lowercase().orEmpty()
-    val isNetworkError = rawError != null && (
+    val isOfflineVerifierRequired = rawError != null &&
+        lowerError.contains("butuh koneksi untuk membuka kunci")
+    val isNetworkError = rawError != null && !isOfflineVerifierRequired && (
         lowerError.contains("koneksi") || lowerError.contains("internet") ||
             lowerError.contains("network") || lowerError.contains("timeout") ||
             lowerError.contains("server tidak dapat dihubungi")
@@ -167,7 +172,7 @@ fun PinScreen(
             }
             is UnlockState.Error -> {
                 pin = ""
-                if (!isNetworkError) {
+                if (!isNetworkError && !isOfflineVerifierRequired) {
                     delay(3000L)
                     viewModel.resetUnlockState()
                 }
@@ -193,7 +198,7 @@ fun PinScreen(
 
     val pinFieldError = when {
         lockedState != null && isLockedOut ->
-            "Terlalu banyak percobaan · ${formatPinLockoutCountdown(lockedState.remainingSeconds)}"
+            formatPinLockoutMessage(lockedState.lockedUntilEpochMillis, lockedState.remainingSeconds)
         wrongPinState != null ->
             "PIN salah. Silakan coba lagi."
         rawError != null && !isNetworkError ->
@@ -265,6 +270,22 @@ fun PinScreen(
         },
         onAlertDismiss = { alertDismissed = true }
     )
+}
+
+internal fun formatPinLockoutMessage(
+    lockedUntilEpochMillis: Long,
+    remainingSeconds: Long,
+    zoneId: ZoneId = ZoneId.of("Asia/Jakarta")
+): String {
+    val countdown = formatPinLockoutCountdown(remainingSeconds)
+    if (lockedUntilEpochMillis <= 0L) {
+        return "Terlalu banyak percobaan · $countdown"
+    }
+    val timeText = Instant.ofEpochMilli(lockedUntilEpochMillis)
+        .atZone(zoneId)
+        .toLocalTime()
+        .format(DateTimeFormatter.ofPattern("HH:mm:ss"))
+    return "PIN terkunci hingga $timeText · $countdown"
 }
 
 internal fun formatPinLockoutCountdown(seconds: Long): String {

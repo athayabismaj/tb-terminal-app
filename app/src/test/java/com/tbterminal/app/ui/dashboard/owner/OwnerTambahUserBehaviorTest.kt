@@ -18,6 +18,8 @@ import com.tbterminal.app.ui.theme.TbterminalappTheme
 import com.tbterminal.app.ui.users.AddUserUiState
 import com.tbterminal.app.ui.users.EditUserUiState
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNotNull
+import org.junit.Assert.assertNull
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -143,5 +145,20 @@ class OwnerTambahUserBehaviorTest {
             .performClick()
 
         assertEquals(1, saveCount)
+    }
+
+    @Test
+    fun ownerTambahUserValidatorsEnforce8To72PasswordAnd4To6NumericPin() {
+        assertNotNull(validateOwnerUserPassword("1234567"))
+        assertNotNull(validateOwnerUserPassword("x".repeat(73)))
+        assertNull(validateOwnerUserPassword("12345678"))
+        assertNull(validateOwnerUserPassword("x".repeat(72)))
+
+        assertNotNull(validateOwnerUserPin("123"))
+        assertNotNull(validateOwnerUserPin("1234567"))
+        assertNotNull(validateOwnerUserPin("12ab"))
+        assertNull(validateOwnerUserPin("1234"))
+        assertNull(validateOwnerUserPin("12345"))
+        assertNull(validateOwnerUserPin("123456"))
     }
 }

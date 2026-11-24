@@ -17,6 +17,7 @@ import kotlinx.coroutines.test.setMain
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Before
@@ -120,6 +121,20 @@ class UserDetailViewModelTest {
         advanceUntilIdle()
         assertEquals("Kata sandi berhasil diperbarui", viewModel.uiState.value.credentialSuccessMessage)
         assertEquals("barokah25", repo.lastCommand?.newPassword)
+
+        viewModel.clearCredentialMessages()
+        viewModel.changePassword("1234567", "1234567")
+        assertNotNull(viewModel.uiState.value.credentialErrorMessage)
+
+        viewModel.clearCredentialMessages()
+        viewModel.changePassword("a".repeat(73), "a".repeat(73))
+        assertNotNull(viewModel.uiState.value.credentialErrorMessage)
+
+        viewModel.clearCredentialMessages()
+        viewModel.changePin("1234", "1234")
+        advanceUntilIdle()
+        assertEquals("PIN transaksi berhasil diperbarui", viewModel.uiState.value.credentialSuccessMessage)
+        assertEquals("1234", repo.lastCommand?.newPin)
 
         viewModel.clearCredentialMessages()
         viewModel.changePin("357924", "357924")

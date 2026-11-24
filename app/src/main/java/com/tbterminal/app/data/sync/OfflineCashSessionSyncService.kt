@@ -9,6 +9,7 @@ import com.tbterminal.app.data.local.model.SyncStatus
 import com.tbterminal.app.data.remote.OfflineCashSessionCloseSyncRequestDto
 import com.tbterminal.app.data.remote.OfflineCashSessionOpenSyncRequestDto
 import com.tbterminal.app.data.remote.SalesApi
+import com.tbterminal.app.navigation.AppAccessPolicy
 import java.io.IOException
 import java.math.BigDecimal
 import java.math.RoundingMode
@@ -18,7 +19,8 @@ import java.time.ZoneId
 class OfflineCashSessionSyncService(
     private val database: TbTerminalDatabase,
     private val salesApi: SalesApi,
-    private val deviceId: String
+    private val deviceId: String,
+    private val roleProvider: () -> String? = { "KASIR" },
 ) {
     suspend fun syncOpenSession(localSessionId: Long): OfflineCashSessionSyncResult {
         val session = database.cashSessionDao().getByLocalId(localSessionId)
@@ -34,6 +36,15 @@ class OfflineCashSessionSyncService(
         }
 
         return runCatching {
+            if (!AppAccessPolicy.canOpenCashSession(roleProvider())) {
+                return@runCatching fail(
+                    localSessionId = localSessionId,
+                    message = "Hanya kasir yang dapat membuka sesi kas.",
+                    errorCode = "FORBIDDEN_CASH_SESSION_ROLE",
+                    retryIncrement = 0,
+                    kind = OfflineCheckoutSyncFailureKind.CONFLICT,
+                )
+            }
             val lockedSession = database.cashSessionDao().getByLocalId(localSessionId)
                 ?: return@runCatching fail(localSessionId, "Sesi kas lokal tidak ditemukan.", 1)
             val request = when (val buildResult = buildRequest(lockedSession)) {
@@ -50,19 +61,29 @@ class OfflineCashSessionSyncService(
 
             val response = salesApi.syncOpenCashSession(request)
             if (!response.isSuccessful) {
-                val message = when (response.code()) {
-                    401, 403 -> "Sesi login tidak valid. Login ulang sebelum sinkronisasi sesi kas."
-                    in 400..499 -> response.errorBody()?.string()?.takeIf { it.isNotBlank() }
-                        ?: "Server menolak sesi kas offline (${response.code()})"
-                    else -> "Gagal terhubung ke server (${response.code()})"
+                val parsedError = SyncErrorResponseParser.parseHttpError(
+                    response = response,
+                    defaultMessage = if (response.code() in 400..499) {
+                        "Server menolak sesi kas offline (${response.code()})"
+                    } else {
+                        "Gagal terhubung ke server (${response.code()})"
+                    }
+                )
+                val message = if (response.code() >= 500) {
+                    "Gagal terhubung ke server (${response.code()})"
+                } else {
+                    parsedError.message
                 }
+                val errorCode = if (response.code() >= 500) null else parsedError.code
                 return@runCatching fail(
                     localSessionId = localSessionId,
                     message = message,
+                    errorCode = errorCode,
                     retryIncrement = 1,
                     kind = SyncErrorClassifier.classify(
                         httpCode = response.code(),
-                        message = message
+                        message = message,
+                        errorCode = errorCode
                     ).toFailureKind()
                 )
             }
@@ -70,11 +91,14 @@ class OfflineCashSessionSyncService(
             val body = response.body()
             val syncResponse = body?.data
             if (body?.success != true || syncResponse == null) {
+                val errorCode = body?.code?.takeIf(String::isNotBlank)
+                val message = body?.message ?: body?.error ?: "Response sync sesi kas tidak valid"
                 return@runCatching fail(
                     localSessionId = localSessionId,
-                    message = body?.message ?: body?.error ?: "Response sync sesi kas tidak valid",
+                    message = message,
+                    errorCode = errorCode,
                     retryIncrement = 1,
-                    kind = SyncErrorClassifier.classifyMessage(body?.message ?: body?.error).toFailureKind()
+                    kind = SyncErrorClassifier.classifyMessage(message, errorCode).toFailureKind()
                 )
             }
 
@@ -220,19 +244,29 @@ class OfflineCashSessionSyncService(
 
             val response = salesApi.syncCloseCashSession(request)
             if (!response.isSuccessful) {
-                val message = when (response.code()) {
-                    401, 403 -> "Sesi login tidak valid. Login ulang sebelum sinkronisasi tutup sesi kas."
-                    in 400..499 -> response.errorBody()?.string()?.takeIf { it.isNotBlank() }
-                        ?: "Server menolak tutup sesi kas offline (${response.code()})"
-                    else -> "Gagal terhubung ke server (${response.code()})"
+                val parsedError = SyncErrorResponseParser.parseHttpError(
+                    response = response,
+                    defaultMessage = if (response.code() in 400..499) {
+                        "Server menolak tutup sesi kas offline (${response.code()})"
+                    } else {
+                        "Gagal terhubung ke server (${response.code()})"
+                    }
+                )
+                val message = if (response.code() >= 500) {
+                    "Gagal terhubung ke server (${response.code()})"
+                } else {
+                    parsedError.message
                 }
+                val errorCode = if (response.code() >= 500) null else parsedError.code
                 return@runCatching failClose(
                     localSessionId = localSessionId,
                     message = message,
+                    errorCode = errorCode,
                     retryIncrement = 1,
                     kind = SyncErrorClassifier.classify(
                         httpCode = response.code(),
-                        message = message
+                        message = message,
+                        errorCode = errorCode
                     ).toFailureKind()
                 )
             }
@@ -240,11 +274,14 @@ class OfflineCashSessionSyncService(
             val body = response.body()
             val syncResponse = body?.data
             if (body?.success != true || syncResponse == null) {
+                val errorCode = body?.code?.takeIf(String::isNotBlank)
+                val message = body?.message ?: body?.error ?: "Response sync tutup sesi kas tidak valid"
                 return@runCatching failClose(
                     localSessionId = localSessionId,
-                    message = body?.message ?: body?.error ?: "Response sync tutup sesi kas tidak valid",
+                    message = message,
+                    errorCode = errorCode,
                     retryIncrement = 1,
-                    kind = SyncErrorClassifier.classifyMessage(body?.message ?: body?.error).toFailureKind()
+                    kind = SyncErrorClassifier.classifyMessage(message, errorCode).toFailureKind()
                 )
             }
 
@@ -355,6 +392,7 @@ class OfflineCashSessionSyncService(
                         id = queue.id,
                         status = SyncStatus.SYNCING,
                         lastError = null,
+                        lastErrorCode = null,
                         retryIncrement = 0,
                         updatedAt = now
                     )
@@ -387,6 +425,7 @@ class OfflineCashSessionSyncService(
                         id = queue.id,
                         status = SyncStatus.SYNCING,
                         lastError = null,
+                        lastErrorCode = null,
                         retryIncrement = 0,
                         updatedAt = now
                     )
@@ -431,6 +470,7 @@ class OfflineCashSessionSyncService(
                     id = queue.id,
                     status = SyncStatus.SYNCED,
                     lastError = null,
+                    lastErrorCode = null,
                     retryIncrement = 0,
                     updatedAt = now
                 )
@@ -456,6 +496,7 @@ class OfflineCashSessionSyncService(
                     id = queue.id,
                     status = SyncStatus.SYNCED,
                     lastError = null,
+                    lastErrorCode = null,
                     retryIncrement = 0,
                     updatedAt = now
                 )
@@ -481,7 +522,8 @@ class OfflineCashSessionSyncService(
         localSessionId: Long,
         message: String,
         retryIncrement: Int,
-        kind: OfflineCheckoutSyncFailureKind = OfflineCheckoutSyncFailureKind.VALIDATION
+        kind: OfflineCheckoutSyncFailureKind = OfflineCheckoutSyncFailureKind.VALIDATION,
+        errorCode: String? = null
     ): OfflineCashSessionSyncResult.Failed {
         val now = System.currentTimeMillis()
         database.withTransaction {
@@ -505,6 +547,7 @@ class OfflineCashSessionSyncService(
                     id = queue.id,
                     status = status,
                     lastError = message,
+                    lastErrorCode = errorCode,
                     retryIncrement = retryIncrement,
                     updatedAt = now
                 )
@@ -517,7 +560,8 @@ class OfflineCashSessionSyncService(
         localSessionId: Long,
         message: String,
         retryIncrement: Int,
-        kind: OfflineCheckoutSyncFailureKind = OfflineCheckoutSyncFailureKind.VALIDATION
+        kind: OfflineCheckoutSyncFailureKind = OfflineCheckoutSyncFailureKind.VALIDATION,
+        errorCode: String? = null
     ): OfflineCashSessionSyncResult.Failed {
         val now = System.currentTimeMillis()
         database.withTransaction {
@@ -541,6 +585,7 @@ class OfflineCashSessionSyncService(
                     id = queue.id,
                     status = status,
                     lastError = message,
+                    lastErrorCode = errorCode,
                     retryIncrement = retryIncrement,
                     updatedAt = now
                 )

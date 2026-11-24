@@ -89,6 +89,7 @@ class NetworkModule(
     private val refreshOkHttpClient: OkHttpClient by lazy {
         OkHttpClient.Builder()
             .applyStandardTimeouts()
+            .retryOnConnectionFailure(false)
             .addInterceptor(devAutoHostInterceptor)
             .build()
     }

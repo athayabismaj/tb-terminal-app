@@ -146,4 +146,25 @@ class AppRouteAccessPolicyTest {
         assertTrue(AppRouteAccessPolicy.isAllowed(AppRoute.CashierEditProfile.route, "KASIR"))
         assertFalse(AppRouteAccessPolicy.isAllowed(AppRoute.AdminEditProfile.route, "guest"))
     }
+
+    @Test
+    fun onlyCashierCanOpenCashSessionOrAccessCashierShiftRoute() {
+        assertTrue(AppAccessPolicy.canOpenCashSession("KASIR"))
+        assertTrue(AppAccessPolicy.canOpenCashSession("kasir"))
+        assertFalse(AppAccessPolicy.canOpenCashSession("ADMIN"))
+        assertFalse(AppAccessPolicy.canOpenCashSession("OWNER"))
+        assertFalse(AppAccessPolicy.canOpenCashSession("guest"))
+        assertFalse(AppAccessPolicy.canOpenCashSession(null))
+
+        assertFalse(AppAccessPolicy.can("ADMIN", AppCapability.CASHIER_SHIFT))
+        assertTrue(AppAccessPolicy.can("ADMIN", AppCapability.POS))
+        assertTrue(AppAccessPolicy.can("ADMIN", AppCapability.CASH_SESSIONS))
+
+        assertTrue(AppRouteAccessPolicy.isAllowed(AppRoute.CashierCashSession.route, "kasir"))
+        assertFalse(AppRouteAccessPolicy.isAllowed(AppRoute.CashierCashSession.route, "admin"))
+        assertFalse(AppRouteAccessPolicy.isAllowed(AppRoute.CashierCashSession.route, "owner"))
+
+        assertTrue(AppRouteAccessPolicy.isAllowed(AppRoute.CashReconciliation.route, "admin"))
+        assertTrue(AppRouteAccessPolicy.isAllowed(AppRoute.CashReconciliation.route, "owner"))
+    }
 }

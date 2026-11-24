@@ -888,7 +888,7 @@ private fun ErrorDetails(item: SyncQueueUiModel) {
         )
         if (item.syncStatus == SyncStatus.CONFLICT) {
             Text(
-                text = "Jenis kendala: ${item.errorCategory.displayName()}",
+                text = "Jenis kendala: ${item.conflictTitle ?: item.errorCategory.displayName()}",
                 color = errorColor,
                 fontSize = 11.sp,
                 fontWeight = FontWeight.SemiBold,

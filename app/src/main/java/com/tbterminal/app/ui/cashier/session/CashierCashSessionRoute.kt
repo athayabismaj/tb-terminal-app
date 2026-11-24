@@ -53,7 +53,8 @@ fun CashierCashSessionRoute(
             localCashExpenseService = localCashExpenseService,
             offlineStatusRepository = offlineStatusRepository,
             cashierUserId = cashierUserId,
-            cashierNameFallback = cashierNameFallback
+            cashierNameFallback = cashierNameFallback,
+            actorRole = role,
         )
     )
 ) {

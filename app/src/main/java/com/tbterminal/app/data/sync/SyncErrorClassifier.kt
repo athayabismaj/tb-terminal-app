@@ -15,6 +15,12 @@ enum class SyncErrorCategory {
 
 data class SyncErrorClassification(
     val category: SyncErrorCategory,
+    val recommendation: String,
+    val title: String? = null
+)
+
+private data class SyncConflictGuidance(
+    val title: String,
     val recommendation: String
 )
 
@@ -22,23 +28,36 @@ object SyncErrorClassifier {
     fun classify(
         httpCode: Int? = null,
         message: String? = null,
-        throwable: Throwable? = null
+        throwable: Throwable? = null,
+        errorCode: String? = null
     ): SyncErrorClassification {
+        val normalizedCode = errorCode?.trim()?.uppercase(Locale.ROOT).orEmpty()
+        val codeGuidance = CONFLICT_GUIDANCE_BY_CODE[normalizedCode]
+
         val category = when {
-            httpCode == 401 || httpCode == 403 -> SyncErrorCategory.AUTH
+            codeGuidance != null || normalizedCode in OFFLINE_CONFLICT_CODES -> SyncErrorCategory.CONFLICT
+            httpCode == 401 -> SyncErrorCategory.AUTH
+            httpCode == 403 || httpCode == 409 -> SyncErrorCategory.CONFLICT
             throwable.isNetworkError() || message.hasNetworkKeyword() -> SyncErrorCategory.NETWORK
             message.hasConflictKeyword() -> SyncErrorCategory.CONFLICT
             httpCode != null && httpCode in 400..499 -> SyncErrorCategory.VALIDATION
             else -> SyncErrorCategory.UNKNOWN
         }
+        val title = codeGuidance?.title ?: if (httpCode == 403) "Akses sinkronisasi ditolak" else null
+        val recommendation = when {
+            codeGuidance != null -> codeGuidance.recommendation
+            httpCode == 403 -> "Peran akun saat ini tidak diizinkan untuk melakukan tindakan sinkronisasi ini."
+            else -> category.recommendation(message)
+        }
         return SyncErrorClassification(
             category = category,
-            recommendation = category.recommendation(message)
+            recommendation = recommendation,
+            title = title
         )
     }
 
-    fun classifyMessage(message: String?): SyncErrorClassification {
-        return classify(message = message)
+    fun classifyMessage(message: String?, errorCode: String? = null): SyncErrorClassification {
+        return classify(message = message, errorCode = errorCode)
     }
 
     private fun Throwable?.isNetworkError(): Boolean {
@@ -121,5 +140,46 @@ object SyncErrorClassifier {
         "reference",
         "produk tidak ditemukan",
         "product not found"
+    )
+
+    private val OFFLINE_CONFLICT_CODES = setOf(
+        "OFFLINE_PRICE_CONFLICT",
+        "OFFLINE_ROUNDING_CONFLICT",
+        "OFFLINE_TAX_CONFLICT",
+        "OFFLINE_OCCURRED_AT_INVALID",
+        "OFFLINE_OPENED_AT_INVALID",
+        "OFFLINE_CLOSED_AT_INVALID",
+        "FORBIDDEN_CASH_SESSION_ROLE"
+    )
+
+    private val CONFLICT_GUIDANCE_BY_CODE = mapOf(
+        "OFFLINE_PRICE_CONFLICT" to SyncConflictGuidance(
+            title = "Konflik harga produk",
+            recommendation = "Harga transaksi offline berbeda dengan daftar harga server. Cek daftar harga terbaru lalu tinjau transaksi lokal ini."
+        ),
+        "OFFLINE_ROUNDING_CONFLICT" to SyncConflictGuidance(
+            title = "Konflik aturan pembulatan",
+            recommendation = "Nominal pembulatan tidak sesuai aturan kas server. Segarkan pengaturan toko dan tinjau nominal pembulatan transaksi ini."
+        ),
+        "OFFLINE_TAX_CONFLICT" to SyncConflictGuidance(
+            title = "Konflik aturan pajak",
+            recommendation = "Pengaturan pajak transaksi offline berbeda dengan pengaturan pajak server saat ini. Segarkan pengaturan toko lalu tinjau transaksi."
+        ),
+        "OFFLINE_OCCURRED_AT_INVALID" to SyncConflictGuidance(
+            title = "Waktu kejadian di luar jendela sesi",
+            recommendation = "Waktu transaksi atau pengeluaran berada di luar rentang sesi kas atau mendahului jam server. Pastikan jam perangkat akurat lalu coba sinkronkan lagi bila hanya selisih waktu."
+        ),
+        "OFFLINE_OPENED_AT_INVALID" to SyncConflictGuidance(
+            title = "Waktu buka sesi kas tidak valid",
+            recommendation = "Sesi kas offline melewati batas umur sinkronisasi (72 jam) atau jam perangkat terlalu cepat dari server. Tunggu jam server menyusul jika selisih waktu; jika kedaluwarsa, tinjau data lokal."
+        ),
+        "OFFLINE_CLOSED_AT_INVALID" to SyncConflictGuidance(
+            title = "Waktu tutup sesi kas tidak valid",
+            recommendation = "Waktu tutup sesi lebih awal dari pembukaan sesi atau mendahului jam server. Pastikan jam perangkat akurat lalu coba sinkronkan ulang."
+        ),
+        "FORBIDDEN_CASH_SESSION_ROLE" to SyncConflictGuidance(
+            title = "Akses buka sesi kas ditolak",
+            recommendation = "Hanya peran KASIR yang boleh membuka sesi kas. Masuk dengan akun kasir atau tandai item ini sudah ditinjau."
+        )
     )
 }

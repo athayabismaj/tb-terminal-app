@@ -9,6 +9,7 @@ import com.tbterminal.app.data.model.UserPage
 import com.tbterminal.app.data.model.UserRole
 import com.tbterminal.app.data.repository.RepositoryResult
 import com.tbterminal.app.data.repository.UserRepository
+import com.tbterminal.app.data.validation.CredentialValidator
 import com.tbterminal.app.ui.common.viewModelFactory
 import java.time.Duration
 import java.time.Instant
@@ -94,22 +95,33 @@ class UserManagementViewModel(
         staff: StaffMember,
         input: StaffEditInput
     ) {
-        val sanitizedPin = input.newPin.filter(Char::isDigit)
+        val passwordError = if (input.newPassword.isNotEmpty()) {
+            CredentialValidator.validatePassword(
+                password = input.newPassword,
+                requiredMessage = "Password baru minimal ${CredentialValidator.PASSWORD_MIN_LENGTH} karakter.",
+                minMessage = "Password baru minimal ${CredentialValidator.PASSWORD_MIN_LENGTH} karakter.",
+                maxMessage = "Password baru maksimal ${CredentialValidator.PASSWORD_MAX_LENGTH} karakter."
+            )
+        } else null
+        val pinError = if (input.newPin.isNotEmpty()) {
+            CredentialValidator.validatePin(
+                pin = input.newPin,
+                requiredMessage = "PIN baru harus terdiri dari ${CredentialValidator.PIN_MIN_LENGTH} sampai ${CredentialValidator.PIN_MAX_LENGTH} digit angka.",
+                nonDigitMessage = "PIN baru harus terdiri dari ${CredentialValidator.PIN_MIN_LENGTH} sampai ${CredentialValidator.PIN_MAX_LENGTH} digit angka.",
+                lengthMessage = "PIN baru harus terdiri dari ${CredentialValidator.PIN_MIN_LENGTH} sampai ${CredentialValidator.PIN_MAX_LENGTH} digit angka."
+            )
+        } else null
 
         when {
             _uiState.value.isMutating -> return
             input.name.isBlank() -> setActionError("Nama lengkap tidak boleh kosong.")
             input.username.isBlank() -> setActionError("Username tidak boleh kosong.")
             input.roleId.isBlank() -> setActionError("Role pengguna wajib dipilih.")
-            input.newPassword.isNotBlank() && input.newPassword.length < MIN_PASSWORD_LENGTH -> {
-                setActionError("Password baru minimal $MIN_PASSWORD_LENGTH karakter.")
-            }
-            input.newPin.isNotBlank() && sanitizedPin.length != PIN_LENGTH -> {
-                setActionError("PIN baru harus terdiri dari $PIN_LENGTH digit.")
-            }
+            passwordError != null -> setActionError(passwordError)
+            pinError != null -> setActionError(pinError)
             else -> submitUserUpdate(
                 staff = staff,
-                input = input.copy(newPin = sanitizedPin)
+                input = input
             )
         }
     }
@@ -476,8 +488,13 @@ class UserDetailViewModel(
     fun changePassword(newPassword: String, confirmPassword: String) {
         val current = _uiState.value.staff ?: return
         if (_uiState.value.isMutating || userId.isBlank()) return
-        if (newPassword.length < MIN_PASSWORD_LENGTH) {
-            _uiState.update { it.copy(credentialErrorMessage = "Kata sandi baru minimal $MIN_PASSWORD_LENGTH karakter.") }
+        CredentialValidator.validatePassword(
+            password = newPassword,
+            requiredMessage = "Kata sandi baru minimal ${CredentialValidator.PASSWORD_MIN_LENGTH} karakter.",
+            minMessage = "Kata sandi baru minimal ${CredentialValidator.PASSWORD_MIN_LENGTH} karakter.",
+            maxMessage = "Kata sandi baru maksimal ${CredentialValidator.PASSWORD_MAX_LENGTH} karakter."
+        )?.let { error ->
+            _uiState.update { it.copy(credentialErrorMessage = error) }
             return
         }
         if (newPassword != confirmPassword) {
@@ -496,8 +513,12 @@ class UserDetailViewModel(
     fun changePin(newPin: String, confirmPin: String) {
         val current = _uiState.value.staff ?: return
         if (_uiState.value.isMutating || userId.isBlank()) return
-        if (newPin.length != PIN_LENGTH || !newPin.all(Char::isDigit)) {
-            _uiState.update { it.copy(credentialErrorMessage = "PIN baru harus terdiri dari $PIN_LENGTH digit.") }
+        if (!CredentialValidator.isValidPin(newPin)) {
+            _uiState.update {
+                it.copy(
+                    credentialErrorMessage = "PIN baru harus terdiri dari ${CredentialValidator.PIN_MIN_LENGTH} sampai ${CredentialValidator.PIN_MAX_LENGTH} digit angka."
+                )
+            }
             return
         }
         if (newPin != confirmPin) {
@@ -637,8 +658,6 @@ private fun String.toInitials(): String {
 }
 
 private const val NO_LOGIN_TEXT = "Belum pernah"
-private const val MIN_PASSWORD_LENGTH = 6
-private const val PIN_LENGTH = 6
 private const val MINUTE_SECONDS = 60
 private const val HOUR_MINUTES = 60
 private const val DAY_HOURS = 24

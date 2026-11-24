@@ -8,6 +8,7 @@ import com.tbterminal.app.data.model.ManagedUser
 import com.tbterminal.app.data.model.UserRole
 import com.tbterminal.app.data.repository.RepositoryResult
 import com.tbterminal.app.data.repository.UserRepository
+import com.tbterminal.app.data.validation.CredentialValidator
 import com.tbterminal.app.ui.common.viewModelFactory
 import kotlinx.coroutines.channels.BufferOverflow
 import kotlinx.coroutines.flow.MutableSharedFlow
@@ -77,7 +78,7 @@ class AddUserViewModel(
     fun updatePassword(value: String) = updateForm { state -> state.copy(password = value) }
 
     fun updatePin(value: String) = updateForm { state ->
-        state.copy(pin = value.filter(Char::isDigit).take(PIN_LENGTH))
+        state.copy(pin = value)
     }
 
     fun selectRole(roleId: String) = updateForm { state -> state.copy(selectedRoleId = roleId) }
@@ -85,17 +86,25 @@ class AddUserViewModel(
     fun submit() {
         val state = _uiState.value
         val selectedRoleId = state.selectedRoleId
+        val passwordError = CredentialValidator.validatePassword(
+            password = state.password,
+            requiredMessage = "Password wajib diisi.",
+            minMessage = "Password minimal ${CredentialValidator.PASSWORD_MIN_LENGTH} karakter.",
+            maxMessage = "Password maksimal ${CredentialValidator.PASSWORD_MAX_LENGTH} karakter."
+        )
+        val pinError = CredentialValidator.validatePin(
+            pin = state.pin,
+            requiredMessage = "PIN akses wajib diisi.",
+            nonDigitMessage = "PIN akses harus terdiri dari ${CredentialValidator.PIN_MIN_LENGTH} sampai ${CredentialValidator.PIN_MAX_LENGTH} digit angka.",
+            lengthMessage = "PIN akses harus terdiri dari ${CredentialValidator.PIN_MIN_LENGTH} sampai ${CredentialValidator.PIN_MAX_LENGTH} digit angka."
+        )
 
         when {
             state.isSubmitting -> return
             state.fullName.isBlank() -> setFormError("Nama lengkap tidak boleh kosong.")
             state.username.isBlank() -> setFormError("Username tidak boleh kosong.")
-            state.password.length < MIN_PASSWORD_LENGTH -> {
-                setFormError("Password minimal $MIN_PASSWORD_LENGTH karakter.")
-            }
-            state.pin.length != PIN_LENGTH -> {
-                setFormError("PIN akses harus terdiri dari $PIN_LENGTH digit.")
-            }
+            passwordError != null -> setFormError(passwordError)
+            pinError != null -> setFormError(pinError)
             selectedRoleId == null -> setFormError("Pilih role pengguna terlebih dahulu.")
             else -> createUser(state = state, roleId = selectedRoleId)
         }
@@ -186,9 +195,6 @@ class AddUserViewModel(
     }
 
     companion object {
-        private const val MIN_PASSWORD_LENGTH = 6
-        private const val PIN_LENGTH = 6
-
         fun factory(userRepository: UserRepository): ViewModelProvider.Factory {
             return viewModelFactory {
                 AddUserViewModel(userRepository = userRepository)

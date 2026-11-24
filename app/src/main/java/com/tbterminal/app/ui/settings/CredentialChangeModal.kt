@@ -67,6 +67,7 @@ import androidx.compose.ui.unit.em
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
+import com.tbterminal.app.data.validation.CredentialValidator
 import com.tbterminal.app.ui.auth.ForgotPasswordDialog
 import com.tbterminal.app.ui.auth.MaxPinLength
 import com.tbterminal.app.ui.auth.PinDots
@@ -97,19 +98,21 @@ private val MutedPlaceholderColor = Color(0xFF8A938E)
 internal data class PasswordChecklistState(
     val hasMin8Chars: Boolean,
     val hasLetterAndDigit: Boolean,
-    val isDifferentFromCurrent: Boolean
+    val isDifferentFromCurrent: Boolean,
+    val withinMax72Chars: Boolean = true
 ) {
     val allSatisfied: Boolean
-        get() = hasMin8Chars && hasLetterAndDigit && isDifferentFromCurrent
+        get() = hasMin8Chars && withinMax72Chars && hasLetterAndDigit && isDifferentFromCurrent
 }
 
 internal fun evaluatePasswordChecklist(
     currentPassword: String,
     newPassword: String
 ): PasswordChecklistState = PasswordChecklistState(
-    hasMin8Chars = newPassword.length >= 8,
+    hasMin8Chars = newPassword.length >= CredentialValidator.PASSWORD_MIN_LENGTH,
     hasLetterAndDigit = newPassword.any(Char::isLetter) && newPassword.any(Char::isDigit),
-    isDifferentFromCurrent = newPassword.isNotEmpty() && newPassword != currentPassword
+    isDifferentFromCurrent = newPassword.isNotEmpty() && newPassword != currentPassword,
+    withinMax72Chars = newPassword.length <= CredentialValidator.PASSWORD_MAX_LENGTH
 )
 
 internal fun isWeakPin(pin: String): Boolean {
@@ -409,8 +412,11 @@ internal fun PasswordModalContent(
     val isChecklistSatisfied = if (requireCurrentCredential) {
         checklist.allSatisfied
     } else {
-        checklist.hasMin8Chars && checklist.hasLetterAndDigit
+        checklist.hasMin8Chars && checklist.withinMax72Chars && checklist.hasLetterAndDigit
     }
+    val maxLengthError = if (!checklist.withinMax72Chars) {
+        "Password maksimal ${CredentialValidator.PASSWORD_MAX_LENGTH} karakter"
+    } else null
     val isReady = (!requireCurrentCredential || currentValue.isNotBlank()) &&
         isChecklistSatisfied &&
         confirmValue == newValue &&
@@ -488,6 +494,7 @@ internal fun PasswordModalContent(
                     onInputChanged()
                 },
                 enabled = !isSaving,
+                errorText = maxLengthError,
                 forceFocusedBorder = initialNewFocused,
                 imeAction = ImeAction.Next,
                 onImeAction = { focusManager.moveFocus(FocusDirection.Down) },
@@ -1062,7 +1069,7 @@ private fun ResetPinViaPasswordSheet(
     var newPin by remember { mutableStateOf("") }
     var confirmPin by remember { mutableStateOf("") }
 
-    val pinValid = newPin.length == MaxPinLength && !isWeakPin(newPin)
+    val pinValid = CredentialValidator.isValidPin(newPin) && !isWeakPin(newPin)
     val isReady = currentPassword.isNotBlank() && pinValid && confirmPin == newPin && !isSaving
 
     BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
@@ -1091,14 +1098,14 @@ private fun ResetPinViaPasswordSheet(
                     )
                     Spacer(modifier = Modifier.height(16.dp))
                     PasswordField(
-                        label = "PIN baru (6 digit)",
+                        label = "PIN baru (4–6 digit)",
                         value = newPin,
                         onValueChange = {
                             newPin = it.filter(Char::isDigit).take(MaxPinLength)
                             onInputChanged()
                         },
                         enabled = !isSaving,
-                        errorText = if (newPin.length == MaxPinLength && isWeakPin(newPin)) {
+                        errorText = if (newPin.length >= CredentialValidator.PIN_MIN_LENGTH && isWeakPin(newPin)) {
                             "PIN terlalu mudah ditebak"
                         } else null,
                         imeAction = ImeAction.Next,

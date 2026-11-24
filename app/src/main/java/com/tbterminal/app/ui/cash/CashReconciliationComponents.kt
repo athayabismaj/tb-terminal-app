@@ -194,8 +194,35 @@ internal fun CashSessionPanel(
                 onCloseSession = onCloseSession
             )
         }
-    } else {
+    } else if (uiState.canOpenCashSession) {
         OpenSessionCard(uiState, onOpeningCashChanged, onOpenSession)
+    } else {
+        OpenSessionRestrictedCard()
+    }
+}
+
+@Composable
+private fun OpenSessionRestrictedCard() {
+    Card(
+        colors = CardDefaults.cardColors(containerColor = CashSurface),
+        shape = RoundedCornerShape(18.dp),
+        border = BorderStroke(1.dp, CashLine),
+        modifier = Modifier.fillMaxWidth()
+    ) {
+        Column(modifier = Modifier.padding(24.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Text(
+                "Belum Ada Sesi Kas Aktif",
+                color = CashText,
+                fontSize = 20.sp,
+                fontWeight = FontWeight.ExtraBold
+            )
+            Text(
+                "Hanya kasir yang dapat membuka sesi kas.",
+                color = CashMuted,
+                fontSize = 13.sp,
+                fontWeight = FontWeight.Medium
+            )
+        }
     }
 }
 

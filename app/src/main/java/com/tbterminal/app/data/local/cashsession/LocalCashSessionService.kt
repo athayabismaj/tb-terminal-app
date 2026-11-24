@@ -8,17 +8,22 @@ import com.tbterminal.app.data.local.id.LocalIdGenerator
 import com.tbterminal.app.data.local.model.SyncEntityType
 import com.tbterminal.app.data.local.model.SyncOperation
 import com.tbterminal.app.data.local.model.SyncStatus
+import com.tbterminal.app.navigation.AppAccessPolicy
 import java.math.BigDecimal
 
 class LocalCashSessionService(
     private val database: TbTerminalDatabase,
-    private val deviceId: String? = null
+    private val deviceId: String? = null,
+    private val roleProvider: () -> String? = { "KASIR" },
 ) {
     suspend fun openLocalSession(
         cashierUserId: String,
         startingCash: BigDecimal,
         openingNote: String? = null
     ): LocalCashSessionResult {
+        if (!AppAccessPolicy.canOpenCashSession(roleProvider())) {
+            return LocalCashSessionResult.Failed("Hanya kasir yang dapat membuka sesi kas.")
+        }
         val validationError = validateOpenInput(cashierUserId, startingCash)
             ?: validateSingleOpenSession(cashierUserId)
         if (validationError != null) {

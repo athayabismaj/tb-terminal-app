@@ -55,19 +55,29 @@ class OfflineCashExpenseSyncService(
 
             val response = salesApi.syncCashExpense(request)
             if (!response.isSuccessful) {
-                val message = when (response.code()) {
-                    401, 403 -> "Sesi login tidak valid. Login ulang sebelum sinkronisasi pengeluaran kas."
-                    in 400..499 -> response.errorBody()?.string()?.takeIf { it.isNotBlank() }
-                        ?: "Server menolak pengeluaran kas offline (${response.code()})"
-                    else -> "Gagal terhubung ke server (${response.code()})"
+                val parsedError = SyncErrorResponseParser.parseHttpError(
+                    response = response,
+                    defaultMessage = if (response.code() in 400..499) {
+                        "Server menolak pengeluaran kas offline (${response.code()})"
+                    } else {
+                        "Gagal terhubung ke server (${response.code()})"
+                    }
+                )
+                val message = if (response.code() >= 500) {
+                    "Gagal terhubung ke server (${response.code()})"
+                } else {
+                    parsedError.message
                 }
+                val errorCode = if (response.code() >= 500) null else parsedError.code
                 return@runCatching fail(
                     localExpenseId = localExpenseId,
                     message = message,
+                    errorCode = errorCode,
                     retryIncrement = 1,
                     kind = SyncErrorClassifier.classify(
                         httpCode = response.code(),
-                        message = message
+                        message = message,
+                        errorCode = errorCode
                     ).toFailureKind()
                 )
             }
@@ -75,11 +85,14 @@ class OfflineCashExpenseSyncService(
             val body = response.body()
             val syncResponse = body?.data
             if (body?.success != true || syncResponse == null) {
+                val errorCode = body?.code?.takeIf(String::isNotBlank)
+                val message = body?.message ?: body?.error ?: "Response sync pengeluaran kas tidak valid"
                 return@runCatching fail(
                     localExpenseId = localExpenseId,
-                    message = body?.message ?: body?.error ?: "Response sync pengeluaran kas tidak valid",
+                    message = message,
+                    errorCode = errorCode,
                     retryIncrement = 1,
-                    kind = SyncErrorClassifier.classifyMessage(body?.message ?: body?.error).toFailureKind()
+                    kind = SyncErrorClassifier.classifyMessage(message, errorCode).toFailureKind()
                 )
             }
 
@@ -287,6 +300,7 @@ class OfflineCashExpenseSyncService(
                         id = queue.id,
                         status = SyncStatus.SYNCING,
                         lastError = null,
+                        lastErrorCode = null,
                         retryIncrement = 0,
                         updatedAt = now
                     )
@@ -315,6 +329,7 @@ class OfflineCashExpenseSyncService(
                     id = queue.id,
                     status = SyncStatus.SYNCED,
                     lastError = null,
+                    lastErrorCode = null,
                     retryIncrement = 0,
                     updatedAt = now
                 )
@@ -326,7 +341,8 @@ class OfflineCashExpenseSyncService(
         localExpenseId: Long,
         message: String,
         retryIncrement: Int,
-        kind: OfflineCheckoutSyncFailureKind = OfflineCheckoutSyncFailureKind.VALIDATION
+        kind: OfflineCheckoutSyncFailureKind = OfflineCheckoutSyncFailureKind.VALIDATION,
+        errorCode: String? = null
     ): OfflineCashExpenseSyncResult.Failed {
         val now = System.currentTimeMillis()
         database.withTransaction {
@@ -350,6 +366,7 @@ class OfflineCashExpenseSyncService(
                     id = queue.id,
                     status = status,
                     lastError = message,
+                    lastErrorCode = errorCode,
                     retryIncrement = retryIncrement,
                     updatedAt = now
                 )

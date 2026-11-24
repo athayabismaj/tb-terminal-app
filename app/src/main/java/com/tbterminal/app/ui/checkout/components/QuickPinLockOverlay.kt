@@ -23,6 +23,7 @@ import androidx.compose.material.icons.outlined.Lock
 import androidx.compose.material.icons.outlined.Person
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -32,6 +33,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
@@ -61,7 +63,10 @@ fun QuickPinLockOverlay(
     onPinChange: (String) -> Unit,
     onUnlock: () -> Unit,
     modifier: Modifier = Modifier,
+    isLoading: Boolean = false,
+    isLockedOut: Boolean = false,
 ) {
+    val controlsEnabled = !isLoading && !isLockedOut
     val currentTime = remember {
         SimpleDateFormat("HH:mm", Locale.forLanguageTag("id-ID")).format(Date())
     }
@@ -189,9 +194,10 @@ fun QuickPinLockOverlay(
                                 modifier = Modifier
                                     .weight(1f)
                                     .height(52.dp)
+                                    .alpha(if (controlsEnabled) 1f else 0.45f)
                                     .clip(RoundedCornerShape(12.dp))
                                     .background(if (key == "C" || key == "DEL") CardBg.copy(alpha = 0.5f) else CardBg)
-                                    .clickable {
+                                    .clickable(enabled = controlsEnabled) {
                                         when (key) {
                                             "C" -> onPinChange("")
                                             "DEL" -> if (pinInput.isNotEmpty()) onPinChange(pinInput.dropLast(1))
@@ -225,9 +231,10 @@ fun QuickPinLockOverlay(
             }
 
             // Tombol Buka Kunci
+            val canClickUnlock = controlsEnabled && pinInput.length >= 4
             Button(
                 onClick = onUnlock,
-                enabled = pinInput.length >= 4,
+                enabled = canClickUnlock,
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(50.dp),
@@ -237,12 +244,27 @@ fun QuickPinLockOverlay(
                     disabledContainerColor = Color(0xFF1E293B)
                 )
             ) {
-                Text(
-                    text = "Buka Kunci Layar",
-                    fontWeight = FontWeight.Bold,
-                    fontSize = 15.sp,
-                    color = if (pinInput.length >= 4) Color.White else Color(0xFF64748B)
-                )
+                if (isLoading) {
+                    CircularProgressIndicator(
+                        modifier = Modifier.size(18.dp),
+                        color = Color.White,
+                        strokeWidth = 2.dp,
+                    )
+                    Spacer(Modifier.width(8.dp))
+                    Text(
+                        text = "Memverifikasi...",
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 15.sp,
+                        color = Color(0xFF94A3B8)
+                    )
+                } else {
+                    Text(
+                        text = "Buka Kunci Layar",
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 15.sp,
+                        color = if (canClickUnlock) Color.White else Color(0xFF64748B)
+                    )
+                }
             }
         }
     }

@@ -12,13 +12,18 @@ import com.tbterminal.app.data.remote.ResetPinRequestDto
 import com.tbterminal.app.data.remote.UnlockRequest
 import com.tbterminal.app.data.remote.UserDto
 import com.tbterminal.app.data.repository.RemoteAuthRepository
+import com.tbterminal.app.data.session.SessionEvent
 import com.tbterminal.app.data.session.SessionManager
 import com.tbterminal.app.data.session.SessionUser
 import com.tbterminal.app.data.session.TokenStore
 import java.time.Instant
+import java.time.ZoneOffset
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.StandardTestDispatcher
+import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.advanceTimeBy
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.resetMain
@@ -233,6 +238,92 @@ class PinVerificationFlowTest {
         assertFalse(viewModel.pendingForgotPinReset.value)
         assertFalse(viewModel.hasVerifiedPasswordForPinReset)
         assertEquals(ResetPinRequestDto("secret123", "258014", "android-dev-1"), api.lastResetPinRequest)
+    }
+
+    @Test
+    fun http423PinLockedDisplaysLockedUntilTimestampAndFallsBackToRetryAfter() = runTest(testDispatcher) {
+        val nowMillis = 1_795_000_000_000L
+        val lockedUntilIso = Instant.ofEpochMilli(nowMillis + 90_000L).toString()
+        val apiWithTimestamp = FakeUnlockAuthApi {
+            errorResponse(
+                httpCode = 423,
+                code = "PIN_LOCKED",
+                error = "PIN terkunci",
+                data = PinUnlockResponse(valid = false, attemptsLeft = 0, lockedUntil = lockedUntilIso, forceLogout = false)
+            )
+        }
+        val sessionManager1 = seededSessionManager()
+        val repo1 = RemoteAuthRepository(sessionManager1, { apiWithTimestamp }, { "android-dev-1" }, testDispatcher, clockMillis = { nowMillis })
+        val vm1 = AuthViewModel(repo1, clockMillis = { nowMillis }, tickIntervalMillis = 100L)
+
+        vm1.unlock("999999")
+        testDispatcher.scheduler.runCurrent()
+
+        val locked1 = vm1.unlockState.value as UnlockState.LockedOut
+        assertEquals(nowMillis + 90_000L, locked1.lockedUntilEpochMillis)
+        assertEquals(90L, locked1.remainingSeconds)
+        val expectedTime = java.time.format.DateTimeFormatter.ofPattern("HH:mm:ss")
+            .format(Instant.ofEpochMilli(locked1.lockedUntilEpochMillis).atZone(ZoneOffset.UTC).toLocalTime())
+        assertEquals(
+            "PIN terkunci hingga $expectedTime · 01:30",
+            formatPinLockoutMessage(locked1.lockedUntilEpochMillis, locked1.remainingSeconds, ZoneOffset.UTC)
+        )
+        vm1.forceClearUnlockState()
+
+        val apiWithRetryAfterOnly = FakeUnlockAuthApi {
+            val raw = Response.error<ApiResponse<PinUnlockResponse>>(
+                423,
+                """{"success":false,"code":"PIN_LOCKED","message":"Locked"}"""
+                    .toResponseBody("application/json".toMediaType())
+            ).raw().newBuilder()
+                .header("Retry-After", "45")
+                .build()
+            Response.error(
+                """{"success":false,"code":"PIN_LOCKED","message":"Locked"}"""
+                    .toResponseBody("application/json".toMediaType()),
+                raw
+            )
+        }
+        val sessionManager2 = seededSessionManager()
+        val repo2 = RemoteAuthRepository(sessionManager2, { apiWithRetryAfterOnly }, { "android-dev-1" }, testDispatcher, clockMillis = { nowMillis })
+        val vm2 = AuthViewModel(repo2, clockMillis = { nowMillis }, tickIntervalMillis = 100L)
+
+        vm2.unlock("999999")
+        testDispatcher.scheduler.runCurrent()
+
+        val locked2 = vm2.unlockState.value as UnlockState.LockedOut
+        assertEquals(nowMillis + 45_000L, locked2.lockedUntilEpochMillis)
+        assertEquals(45L, locked2.remainingSeconds)
+        vm2.forceClearUnlockState()
+    }
+
+    @Test
+    fun http401MaxAttemptsOnUnlockRevokesSessionAndEmitsUnauthorized() = runTest(testDispatcher) {
+        val api = FakeUnlockAuthApi {
+            Response.error(
+                401,
+                """{"success":false,"code":"UNAUTHORIZED","message":"Batas percobaan PIN terlampaui. Silakan login kembali."}"""
+                    .toResponseBody("application/json".toMediaType())
+            )
+        }
+        val sessionManager = seededSessionManager()
+        val events = mutableListOf<SessionEvent>()
+        val job = launch(UnconfinedTestDispatcher(testScheduler)) {
+            events.add(sessionManager.events.first())
+        }
+        val repo = RemoteAuthRepository(sessionManager, { api }, { "android-dev-1" }, testDispatcher)
+        val viewModel = AuthViewModel(repo)
+
+        viewModel.unlock("999999")
+        advanceUntilIdle()
+        job.join()
+
+        assertTrue(viewModel.unlockState.value is UnlockState.ForceLogout)
+        assertFalse(sessionManager.hasAccessToken())
+        assertEquals(
+            listOf(SessionEvent.Unauthorized("Batas percobaan PIN terlampaui. Silakan login kembali.")),
+            events
+        )
     }
 
     private fun seededSessionManager(): SessionManager {

@@ -209,5 +209,5 @@ private class FakeCashierDashboardCashReconciliationRepository : CashReconciliat
     override suspend fun addExpense(amount: BigDecimal, description: String): RepositoryResult<CashExpense> = error("Not used")
     override suspend fun getExpenses(sessionId: String): RepositoryResult<List<CashExpense>> = error("Not used")
     override suspend fun getExpenseHistory(page: Int, limit: Int, sessionId: String?, startDate: String?, endDate: String?): RepositoryResult<CashExpensePage> = error("Not used")
-    override suspend fun payTransactionDebt(transactionId: String, amount: BigDecimal, method: String): RepositoryResult<CashTransactionDetail> = error("Not used")
+    override suspend fun payTransactionDebt(transactionId: String, amount: BigDecimal, method: String, idempotencyKey: String?): RepositoryResult<CashTransactionDetail> = error("Not used")
 }

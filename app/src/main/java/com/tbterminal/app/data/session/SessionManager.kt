@@ -4,6 +4,7 @@ import android.content.Context
 import android.security.keystore.KeyGenParameterSpec
 import android.security.keystore.KeyProperties
 import android.util.Base64
+import java.util.concurrent.CopyOnWriteArrayList
 import kotlinx.coroutines.channels.BufferOverflow
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.SharedFlow
@@ -206,7 +207,8 @@ class SharedPreferencesTokenStore(
 }
 
 sealed interface SessionEvent {
-    data object Unauthorized : SessionEvent
+    data class Unauthorized(val reason: String? = null) : SessionEvent
+    data object PasswordChanged : SessionEvent
 }
 
 class SessionManager(
@@ -215,6 +217,7 @@ class SessionManager(
     @Volatile
     private var remoteLogout: ((String) -> Unit)? = null
     private var requiresPinUnlock = hasAccessToken()
+    private val sessionClearedListeners = CopyOnWriteArrayList<() -> Unit>()
 
     private val _events = MutableSharedFlow<SessionEvent>(
         replay = 0,
@@ -223,11 +226,20 @@ class SessionManager(
     )
     val events: SharedFlow<SessionEvent> = _events.asSharedFlow()
 
+    fun addSessionClearedListener(listener: () -> Unit) {
+        sessionClearedListeners.addIfAbsent(listener)
+    }
+
     fun saveAccessToken(token: String) {
         tokenStore.saveAccessToken(token)
     }
 
     fun saveAuthenticatedSession(token: String, refreshToken: String, user: SessionUser) {
+        val previousIdentity = resolveSessionIdentity(tokenStore.readSessionUser())
+        val nextIdentity = resolveSessionIdentity(user)
+        if (previousIdentity != null && nextIdentity != null && previousIdentity != nextIdentity) {
+            notifySessionClearedListeners()
+        }
         tokenStore.saveTokens(token, refreshToken)
         tokenStore.saveSessionUser(user)
         requiresPinUnlock = false
@@ -268,6 +280,20 @@ class SessionManager(
     fun clearSession() {
         tokenStore.clearAccessToken()
         requiresPinUnlock = false
+        notifySessionClearedListeners()
+    }
+
+    private fun notifySessionClearedListeners() {
+        sessionClearedListeners.forEach { listener ->
+            runCatching { listener() }
+        }
+    }
+
+    private fun resolveSessionIdentity(user: SessionUser?): String? {
+        if (user == null) return null
+        return user.userId?.takeIf(String::isNotBlank)
+            ?: user.username?.takeIf(String::isNotBlank)
+            ?: user.name.takeIf(String::isNotBlank)
     }
 
     fun configureRemoteLogout(action: (String) -> Unit) {
@@ -281,8 +307,13 @@ class SessionManager(
         clearSession()
     }
 
-    fun handleUnauthorized() {
+    fun handleUnauthorized(reason: String? = null) {
         clearSession()
-        _events.tryEmit(SessionEvent.Unauthorized)
+        _events.tryEmit(SessionEvent.Unauthorized(reason))
+    }
+
+    fun handlePasswordChanged() {
+        clearSession()
+        _events.tryEmit(SessionEvent.PasswordChanged)
     }
 }
