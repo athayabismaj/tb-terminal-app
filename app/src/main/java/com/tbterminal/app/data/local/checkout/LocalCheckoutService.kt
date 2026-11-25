@@ -12,11 +12,17 @@ import com.tbterminal.app.data.local.id.LocalIdGenerator
 import com.tbterminal.app.data.local.model.SyncEntityType
 import com.tbterminal.app.data.local.model.SyncOperation
 import com.tbterminal.app.data.local.model.SyncStatus
+import com.tbterminal.app.data.remote.BigDecimalStringSerializer
 import java.math.BigDecimal
 import java.time.Instant
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 import kotlin.math.max
+import kotlinx.serialization.Serializable
+import kotlinx.serialization.encodeToString
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.put
 
 class LocalCheckoutService(
     private val database: TbTerminalDatabase,
@@ -136,7 +142,10 @@ class LocalCheckoutService(
                         tableName = "sales.transactions",
                         recordId = transactionClientId,
                         description = "Checkout lokal dibuat",
-                        metadataJson = """{"transactionCode":"$transactionCode","total":${command.total}}""",
+                        metadataJson = buildJsonObject {
+                            put("transactionCode", transactionCode)
+                            put("total", command.total)
+                        }.toString(),
                         occurredAt = command.occurredAt,
                         syncStatus = SyncStatus.PENDING,
                         createdAt = now,
@@ -251,61 +260,51 @@ class LocalCheckoutService(
         )
     }
 
-    private fun LocalCheckoutCommand.toSyncPayloadJson(
+    internal fun LocalCheckoutCommand.toSyncPayloadJson(
         transactionLocalId: Long,
         transactionClientGeneratedId: String,
         transactionCode: String,
         remainingAmount: Double
     ): String {
-        val safeCustomerName = customerName?.replace("\"", "\\\"")
-        val safeNote = note?.replace("\"", "\\\"")
-        return buildString {
-            append("{")
-            append("\"transactionLocalId\":$transactionLocalId,")
-            append("\"clientGeneratedId\":\"$transactionClientGeneratedId\",")
-            append("\"transactionCode\":\"$transactionCode\",")
-            append("\"cashierUserId\":\"$cashierUserId\",")
-            append("\"cashSessionLocalId\":${cashSessionLocalId ?: "null"},")
-            append("\"cashSessionServerId\":${cashSessionServerId?.quoted() ?: "null"},")
-            append("\"customerLocalId\":${customerLocalId ?: "null"},")
-            append("\"customerServerId\":${customerServerId?.quoted() ?: "null"},")
-            append("\"customerName\":${safeCustomerName?.quoted() ?: "null"},")
-            append("\"paymentMethod\":\"$paymentMethod\",")
-            append("\"subtotal\":$subtotal,")
-            append("\"discount\":$discount,")
-            append("\"total\":$total,")
-            append("\"paidAmount\":$paidAmount,")
-            append("\"remainingAmount\":$remainingAmount,")
-            append("\"occurredAt\":$occurredAt,")
-            append("\"note\":${safeNote?.quoted() ?: "null"},")
-            append("\"items\":[")
-            items.forEachIndexed { index, item ->
-                if (index > 0) append(",")
-                append(item.toPayloadJson())
-            }
-            append("]")
-            append("}")
-        }
+        val payload = LocalCheckoutSyncPayload(
+            transactionLocalId = transactionLocalId,
+            clientGeneratedId = transactionClientGeneratedId,
+            transactionCode = transactionCode,
+            cashierUserId = cashierUserId,
+            cashSessionLocalId = cashSessionLocalId,
+            cashSessionServerId = cashSessionServerId,
+            customerLocalId = customerLocalId,
+            customerServerId = customerServerId,
+            customerName = customerName,
+            paymentMethod = paymentMethod,
+            subtotal = subtotal,
+            discount = discount,
+            total = total,
+            paidAmount = paidAmount,
+            remainingAmount = remainingAmount,
+            occurredAt = occurredAt,
+            note = note,
+            items = items.map { it.toPayloadItem() }
+        )
+        return SYNC_PAYLOAD_JSON.encodeToString(payload)
     }
 
-    private fun LocalCheckoutItemCommand.toPayloadJson(): String {
-        return buildString {
-            append("{")
-            append("\"productLocalId\":${productLocalId ?: "null"},")
-            append("\"productServerId\":${productServerId?.quoted() ?: "null"},")
-            append("\"productNameSnapshot\":${productNameSnapshot.replace("\"", "\\\"").quoted()},")
-            append("\"skuSnapshot\":${skuSnapshot?.replace("\"", "\\\"")?.quoted() ?: "null"},")
-            append("\"unitNameSnapshot\":${unitNameSnapshot?.replace("\"", "\\\"")?.quoted() ?: "null"},")
-            append("\"unitServerId\":${unitServerId?.trim()?.takeIf(String::isNotBlank)?.replace("\"", "\\\"")?.quoted() ?: "null"},")
-            append("\"quantity\":$quantity,")
-            append("\"baseQuantity\":${resolvedBaseQuantity.toPlainString()},")
-            append("\"conversionFactor\":${resolvedConversionFactor.toPlainString()},")
-            append("\"priceAtTransaction\":$priceAtTransaction,")
-            append("\"cogsAtTransaction\":$cogsAtTransaction,")
-            append("\"discount\":$discount,")
-            append("\"subtotal\":$subtotal")
-            append("}")
-        }
+    private fun LocalCheckoutItemCommand.toPayloadItem(): LocalCheckoutSyncItemPayload {
+        return LocalCheckoutSyncItemPayload(
+            productLocalId = productLocalId,
+            productServerId = productServerId,
+            productNameSnapshot = productNameSnapshot,
+            skuSnapshot = skuSnapshot,
+            unitNameSnapshot = unitNameSnapshot,
+            unitServerId = unitServerId?.trim()?.takeIf(String::isNotBlank),
+            quantity = quantity,
+            baseQuantity = resolvedBaseQuantity,
+            conversionFactor = resolvedConversionFactor,
+            priceAtTransaction = priceAtTransaction,
+            cogsAtTransaction = cogsAtTransaction,
+            discount = discount,
+            subtotal = subtotal
+        )
     }
 
     private fun shouldCreateReceivable(paymentMethod: String, remainingAmount: Double): Boolean {
@@ -329,9 +328,51 @@ class LocalCheckoutService(
         return "TRX-$dateKey-$suffix"
     }
 
-    private fun String.quoted(): String = "\"$this\""
-
-    private companion object {
+    internal companion object {
         val DATE_FORMATTER: DateTimeFormatter = DateTimeFormatter.ofPattern("yyyyMMdd")
+        val SYNC_PAYLOAD_JSON: Json = Json {
+            encodeDefaults = true
+            ignoreUnknownKeys = true
+            isLenient = true
+        }
     }
 }
+
+@Serializable
+internal data class LocalCheckoutSyncPayload(
+    val transactionLocalId: Long,
+    val clientGeneratedId: String,
+    val transactionCode: String,
+    val cashierUserId: String,
+    val cashSessionLocalId: Long? = null,
+    val cashSessionServerId: String? = null,
+    val customerLocalId: Long? = null,
+    val customerServerId: String? = null,
+    val customerName: String? = null,
+    val paymentMethod: String,
+    val subtotal: Double,
+    val discount: Double,
+    val total: Double,
+    val paidAmount: Double,
+    val remainingAmount: Double,
+    val occurredAt: Long,
+    val note: String? = null,
+    val items: List<LocalCheckoutSyncItemPayload>
+)
+
+@Serializable
+internal data class LocalCheckoutSyncItemPayload(
+    val productLocalId: Long? = null,
+    val productServerId: String? = null,
+    val productNameSnapshot: String,
+    val skuSnapshot: String? = null,
+    val unitNameSnapshot: String? = null,
+    val unitServerId: String? = null,
+    val quantity: Double,
+    @Serializable(with = BigDecimalStringSerializer::class) val baseQuantity: BigDecimal,
+    @Serializable(with = BigDecimalStringSerializer::class) val conversionFactor: BigDecimal,
+    val priceAtTransaction: Double,
+    val cogsAtTransaction: Double,
+    val discount: Double,
+    val subtotal: Double
+)
