@@ -104,6 +104,9 @@ fun SharedProfileScreen(
     onBack: (() -> Unit)? = null,
     onLogout: (() -> Unit)? = null,
     onEditProfile: (() -> Unit)? = null,
+    onVerifyCurrentPin: ((String, (PinVerifyOutcome) -> Unit) -> Unit)? = null,
+    onResetPinWithPassword: ((String, String, String, () -> Unit) -> Unit)? = null,
+    onForceLogout: (() -> Unit)? = onLogout,
 ) {
     var dialog by remember { mutableStateOf<CredentialDialog?>(null) }
     var confirmLogout by remember { mutableStateOf(false) }
@@ -147,8 +150,14 @@ fun SharedProfileScreen(
                     currentProfile != null -> ProfileContent(
                         profile = currentProfile,
                         isSaving = uiState.isSaving,
-                        onPassword = { dialog = CredentialDialog.PASSWORD },
-                        onPin = { dialog = CredentialDialog.PIN },
+                        onPassword = {
+                            onClearMessage()
+                            dialog = CredentialDialog.PASSWORD
+                        },
+                        onPin = {
+                            onClearMessage()
+                            dialog = CredentialDialog.PIN
+                        },
                         onLogout = onLogout?.let { { confirmLogout = true } },
                         onEditProfile = onEditProfile,
                     )
@@ -216,14 +225,22 @@ fun SharedProfileScreen(
             isSaving = uiState.isSaving,
             errorMessage = uiState.error,
             onInputChanged = onClearMessage,
-            onDismiss = { if (!uiState.isSaving) dialog = null },
+            onDismiss = {
+                if (!uiState.isSaving) {
+                    dialog = null
+                    onClearMessage()
+                }
+            },
             onSubmit = { oldValue, newValue, confirmation ->
                 if (type == CredentialDialog.PASSWORD) {
                     onChangePassword(oldValue, newValue, confirmation)
                 } else {
                     onChangePin(oldValue, newValue, confirmation)
                 }
-            }
+            },
+            onVerifyCurrentPin = onVerifyCurrentPin,
+            onResetPinWithPassword = onResetPinWithPassword,
+            onForceLogout = onForceLogout,
         )
     }
 }

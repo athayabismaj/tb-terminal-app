@@ -58,6 +58,9 @@ fun CashierProfileScreen(
             onBack = handleBack,
             onLogout = onLogout,
             onEditProfile = onEditProfile,
+            onVerifyCurrentPin = profileViewModel::verifyCurrentPin,
+            onResetPinWithPassword = profileViewModel::resetPinWithPassword,
+            onForceLogout = onLogout,
         )
     }
 }
