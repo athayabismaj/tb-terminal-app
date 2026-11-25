@@ -94,8 +94,8 @@ android {
         applicationId = "com.tbterminal.app"
         minSdk = 28
         targetSdk = 36
-        versionCode = 6
-        versionName = "1.0.6"
+        versionCode = 8
+        versionName = "1.0.8"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
