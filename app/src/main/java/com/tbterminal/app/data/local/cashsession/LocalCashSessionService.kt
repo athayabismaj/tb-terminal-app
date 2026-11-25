@@ -10,6 +10,9 @@ import com.tbterminal.app.data.local.model.SyncOperation
 import com.tbterminal.app.data.local.model.SyncStatus
 import com.tbterminal.app.navigation.AppAccessPolicy
 import java.math.BigDecimal
+import kotlinx.serialization.Serializable
+import kotlinx.serialization.encodeToString
+import kotlinx.serialization.json.Json
 
 class LocalCashSessionService(
     private val database: TbTerminalDatabase,
@@ -168,46 +171,41 @@ class LocalCashSessionService(
         return runCatching { toDouble() }.getOrDefault(0.0)
     }
 
-    private fun LocalCashSessionEntity.toOpenSyncPayloadJson(): String {
-        return buildString {
-            append('{')
-            append("\"clientGeneratedId\":\"").append(clientGeneratedId.escapeJson()).append("\",")
-            append("\"deviceId\":\"").append(deviceId.orEmpty().escapeJson()).append("\",")
-            append("\"cashierUserId\":\"").append(cashierUserId.escapeJson()).append("\",")
-            append("\"openedAt\":").append(openedAt).append(',')
-            append("\"startingCash\":").append(startingCash)
-            openingNote?.let { note ->
-                append(",\"openingNote\":\"").append(note.escapeJson()).append("\"")
-            }
-            append('}')
-        }
+    internal fun LocalCashSessionEntity.toOpenSyncPayloadJson(): String {
+        val payload = LocalCashSessionOpenSyncPayload(
+            clientGeneratedId = clientGeneratedId,
+            deviceId = deviceId.orEmpty(),
+            cashierUserId = cashierUserId,
+            openedAt = openedAt,
+            startingCash = startingCash,
+            openingNote = openingNote,
+        )
+        return SYNC_PAYLOAD_JSON.encodeToString(payload)
     }
 
-    private fun LocalCashSessionEntity.toCloseSyncPayloadJson(): String {
-        return buildString {
-            append('{')
-            append("\"clientGeneratedId\":\"").append(clientGeneratedId.escapeJson()).append("\",")
-            append("\"deviceId\":\"").append(deviceId.orEmpty().escapeJson()).append("\",")
-            append("\"cashierUserId\":\"").append(cashierUserId.escapeJson()).append("\",")
-            append("\"serverId\":\"").append(serverId.orEmpty().escapeJson()).append("\",")
-            append("\"closedAt\":").append(closedAt ?: 0L).append(',')
-            append("\"actualCash\":").append(actualCash ?: 0.0).append(',')
-            append("\"expectedCash\":").append(expectedCash ?: 0.0).append(',')
-            append("\"difference\":").append(difference ?: 0.0)
-            closingNote?.let { note ->
-                append(",\"closingNote\":\"").append(note.escapeJson()).append("\"")
-            }
-            append('}')
-        }
+    internal fun LocalCashSessionEntity.toCloseSyncPayloadJson(): String {
+        val payload = LocalCashSessionCloseSyncPayload(
+            clientGeneratedId = clientGeneratedId,
+            deviceId = deviceId.orEmpty(),
+            cashierUserId = cashierUserId,
+            serverId = serverId.orEmpty(),
+            closedAt = closedAt ?: 0L,
+            actualCash = actualCash ?: 0.0,
+            expectedCash = expectedCash ?: 0.0,
+            difference = difference ?: 0.0,
+            closingNote = closingNote,
+        )
+        return SYNC_PAYLOAD_JSON.encodeToString(payload)
     }
 
-    private fun String.escapeJson(): String {
-        return replace("\\", "\\\\").replace("\"", "\\\"")
-    }
-
-    private companion object {
+    internal companion object {
         const val CASH_SESSION_OPEN = "OPEN"
         const val CASH_SESSION_CLOSED = "CLOSED"
+        val SYNC_PAYLOAD_JSON: Json = Json {
+            encodeDefaults = false
+            ignoreUnknownKeys = true
+            isLenient = true
+        }
     }
 }
 
@@ -215,3 +213,26 @@ sealed interface LocalCashSessionResult {
     data class Success(val session: LocalCashSessionEntity) : LocalCashSessionResult
     data class Failed(val message: String) : LocalCashSessionResult
 }
+
+@Serializable
+internal data class LocalCashSessionOpenSyncPayload(
+    val clientGeneratedId: String,
+    val deviceId: String,
+    val cashierUserId: String,
+    val openedAt: Long,
+    val startingCash: Double,
+    val openingNote: String? = null,
+)
+
+@Serializable
+internal data class LocalCashSessionCloseSyncPayload(
+    val clientGeneratedId: String,
+    val deviceId: String,
+    val cashierUserId: String,
+    val serverId: String,
+    val closedAt: Long,
+    val actualCash: Double,
+    val expectedCash: Double,
+    val difference: Double,
+    val closingNote: String? = null,
+)

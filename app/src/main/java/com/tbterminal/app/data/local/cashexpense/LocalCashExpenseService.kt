@@ -10,6 +10,9 @@ import com.tbterminal.app.data.local.model.SyncEntityType
 import com.tbterminal.app.data.local.model.SyncOperation
 import com.tbterminal.app.data.local.model.SyncStatus
 import java.math.BigDecimal
+import kotlinx.serialization.Serializable
+import kotlinx.serialization.encodeToString
+import kotlinx.serialization.json.Json
 
 enum class CashMovementType {
     CASH_IN,
@@ -114,28 +117,28 @@ class LocalCashExpenseService(
         return runCatching { toDouble() }.getOrDefault(0.0)
     }
 
-    private fun LocalCashExpenseEntity.toSyncPayloadJson(session: LocalCashSessionEntity): String {
-        return buildString {
-            append('{')
-            append("\"clientGeneratedId\":\"").append(clientGeneratedId.escapeJson()).append("\",")
-            append("\"deviceId\":\"").append((deviceId ?: this@LocalCashExpenseService.deviceId).orEmpty().escapeJson()).append("\",")
-            append("\"cashierUserId\":\"").append(session.cashierUserId.escapeJson()).append("\",")
-            append("\"serverCashSessionId\":\"").append(cashSessionServerId.orEmpty().escapeJson()).append("\",")
-            append("\"amount\":").append(amount).append(',')
-            append("\"category\":\"").append((category ?: DEFAULT_CATEGORY).escapeJson()).append("\",")
-            append("\"note\":\"").append(description.orEmpty().escapeJson()).append("\",")
-            append("\"occurredAt\":").append(occurredAt)
-            append('}')
-        }
+    internal fun LocalCashExpenseEntity.toSyncPayloadJson(session: LocalCashSessionEntity): String {
+        val payload = LocalCashExpenseSyncPayload(
+            clientGeneratedId = clientGeneratedId,
+            deviceId = (deviceId ?: this@LocalCashExpenseService.deviceId).orEmpty(),
+            cashierUserId = session.cashierUserId,
+            serverCashSessionId = cashSessionServerId.orEmpty(),
+            amount = amount,
+            category = category ?: DEFAULT_CATEGORY,
+            note = description.orEmpty(),
+            occurredAt = occurredAt,
+        )
+        return SYNC_PAYLOAD_JSON.encodeToString(payload)
     }
 
-    private fun String.escapeJson(): String {
-        return replace("\\", "\\\\").replace("\"", "\\\"")
-    }
-
-    private companion object {
+    internal companion object {
         const val CASH_SESSION_OPEN = "OPEN"
         const val DEFAULT_CATEGORY = "OPERASIONAL"
+        val SYNC_PAYLOAD_JSON: Json = Json {
+            encodeDefaults = true
+            ignoreUnknownKeys = true
+            isLenient = true
+        }
     }
 }
 
@@ -143,3 +146,15 @@ sealed interface LocalCashExpenseResult {
     data class Success(val expense: LocalCashExpenseEntity) : LocalCashExpenseResult
     data class Failed(val message: String) : LocalCashExpenseResult
 }
+
+@Serializable
+internal data class LocalCashExpenseSyncPayload(
+    val clientGeneratedId: String,
+    val deviceId: String,
+    val cashierUserId: String,
+    val serverCashSessionId: String,
+    val amount: Double,
+    val category: String,
+    val note: String,
+    val occurredAt: Long,
+)
