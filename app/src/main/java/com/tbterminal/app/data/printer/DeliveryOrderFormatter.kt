@@ -249,9 +249,13 @@ object DeliveryOrderFormatter {
             val qtyStr = formatQty(item.quantity)
             val unitStr = item.unitName?.takeIf { it.isNotBlank() } ?: "pcs"
             val itemLine = "[ ]  ${qtyStr.padStart(3)} $unitStr  ${item.productName}"
-            builder.textLine(itemLine)
+            itemLine.chunked(builder.maxCharsPerLine).forEach { line ->
+                builder.textLine(line)
+            }
             item.note?.trim()?.takeIf { it.isNotBlank() }?.let { note ->
-                builder.textLine("     Cat: $note")
+                "     Cat: $note".chunked(builder.maxCharsPerLine).forEach { line ->
+                    builder.textLine(line)
+                }
             }
         }
 

@@ -291,13 +291,9 @@ internal fun buildReceiptShareText(transaction: CashTransactionDetail, storeName
     sb.appendLine("--------------------------------")
     sb.appendLine("RINCIAN BARANG:")
     transaction.items.forEach { item ->
-        val qtyText = if (item.quantity.stripTrailingZeros().scale() <= 0) {
-            item.quantity.setScale(0).toPlainString()
-        } else {
-            item.quantity.stripTrailingZeros().toPlainString()
-        }
+        val qtyUnitText = formatTransactionQtyWithOptionalUnit(item.quantity, item.unitName)
         sb.appendLine("• ${item.productName.ifBlank { "Barang" }}")
-        sb.appendLine("  $qtyText x ${item.priceAtTransaction.formatReceiptMoney()} = ${item.subtotal.formatReceiptMoney()}")
+        sb.appendLine("  $qtyUnitText x ${item.priceAtTransaction.formatReceiptMoney()} = ${item.subtotal.formatReceiptMoney()}")
         item.note?.trim()?.takeIf { it.isNotBlank() }?.let { note ->
             sb.appendLine("  Catatan: $note")
         }
@@ -638,11 +634,8 @@ internal fun ReceiptSummaryCard(
 ) {
     val context = LocalContext.current
     val totalQty = transaction.items.fold(BigDecimal.ZERO) { acc, item -> acc.add(item.quantity) }
-    val totalQtyText = if (totalQty.stripTrailingZeros().scale() <= 0) {
-        totalQty.setScale(0).toPlainString()
-    } else {
-        totalQty.stripTrailingZeros().toPlainString()
-    }
+    val totalQtyText = formatTransactionQty(totalQty)
+    val summaryUnit = resolveSummaryTotalUnitLabel(transaction.items)
 
     val grossSubtotal = transaction.items.fold(BigDecimal.ZERO) { acc, item ->
         acc.add(item.priceAtTransaction.multiply(item.quantity))
@@ -958,11 +951,7 @@ internal fun ReceiptSummaryCard(
 
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     transaction.items.forEachIndexed { index, item ->
-                        val qtyText = if (item.quantity.stripTrailingZeros().scale() <= 0) {
-                            item.quantity.setScale(0).toPlainString()
-                        } else {
-                            item.quantity.stripTrailingZeros().toPlainString()
-                        }
+                        val qtyUnitText = formatTransactionQtyWithOptionalUnit(item.quantity, item.unitName)
 
                         val lineGross = item.priceAtTransaction.multiply(item.quantity)
                         val lineDiscount = lineGross.subtract(item.subtotal).coerceAtLeast(BigDecimal.ZERO)
@@ -983,7 +972,7 @@ internal fun ReceiptSummaryCard(
                                 )
                                 val discountText = if (lineDiscount > BigDecimal.ZERO) " (Diskon -${lineDiscount.formatReceiptMoney()})" else ""
                                 Text(
-                                    text = "$qtyText × ${item.priceAtTransaction.formatReceiptMoney()}$discountText",
+                                    text = "$qtyUnitText × ${item.priceAtTransaction.formatReceiptMoney()}$discountText",
                                     fontSize = 12.sp,
                                     color = if (lineDiscount > BigDecimal.ZERO) Color(0xFF006C4A) else Color(0xFF64748B),
                                     modifier = Modifier.padding(top = 2.dp)
@@ -1020,7 +1009,7 @@ internal fun ReceiptSummaryCard(
                             color = Color(0xFF64748B)
                         )
                         Text(
-                            text = "${transaction.items.size} Jenis • $totalQtyText Pcs",
+                            text = "${transaction.items.size} Jenis • $totalQtyText $summaryUnit",
                             fontSize = 13.sp,
                             fontWeight = FontWeight.SemiBold,
                             color = Color(0xFF131B2E)
@@ -1965,16 +1954,12 @@ fun CetakStrukPreviewDialog(
 
                         // Rincian Item Belanja
                         transaction.items.forEach { item ->
-                            val qtyText = if (item.quantity.stripTrailingZeros().scale() <= 0) {
-                                item.quantity.setScale(0).toPlainString()
-                            } else {
-                                item.quantity.stripTrailingZeros().toPlainString()
-                            }
+                            val qtyUnitText = formatTransactionQtyWithOptionalUnit(item.quantity, item.unitName)
                             Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
                                 Text(item.productName.ifBlank { "Barang" }, fontSize = 12.sp, fontWeight = FontWeight.SemiBold, color = Color.Black, modifier = Modifier.weight(1f))
                             }
                             Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                                Text("  $qtyText x ${item.priceAtTransaction.formatReceiptMoney()}", fontSize = 11.sp, color = Color(0xFF475569))
+                                Text("  $qtyUnitText x ${item.priceAtTransaction.formatReceiptMoney()}", fontSize = 11.sp, color = Color(0xFF475569))
                                 Text(item.subtotal.formatReceiptMoney(), fontSize = 12.sp, fontWeight = FontWeight.Medium, color = Color.Black)
                             }
                             item.note?.trim()?.takeIf { it.isNotBlank() }?.let { note ->
@@ -2529,7 +2514,7 @@ private class TransactionReceiptPrintAdapter(
                 canvas.drawText(qtyStr, xQty + colQtyW - 4f, y + 11.5f, tableCellBoldPaint.apply { textAlign = Paint.Align.RIGHT })
 
                 // Kolom Satuan
-                val unitStr = item.unitName?.takeIf { it.isNotBlank() } ?: "pcs"
+                val unitStr = resolveInvoiceUnitLabel(item.unitName)
                 canvas.drawText(unitStr, xUnit + 4f, y + 11.5f, tableCellPaint.apply { textAlign = Paint.Align.LEFT })
 
                 // Kolom Harga

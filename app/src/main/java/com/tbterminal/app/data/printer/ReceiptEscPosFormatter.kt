@@ -4,6 +4,7 @@ import com.tbterminal.app.data.model.CashTransactionDetail
 import com.tbterminal.app.data.model.receiptNumber
 import com.tbterminal.app.data.model.remainingAmount
 import java.math.BigDecimal
+import java.math.RoundingMode
 import java.text.DecimalFormat
 import java.text.DecimalFormatSymbols
 import java.text.SimpleDateFormat
@@ -21,7 +22,70 @@ object ReceiptEscPosFormatter {
     }
 
     private fun formatQty(qty: BigDecimal): String {
-        return qty.setScale(0, java.math.RoundingMode.HALF_UP).toPlainString()
+        if (qty.compareTo(BigDecimal.ZERO) == 0) return "0"
+        val stripped = qty.stripTrailingZeros()
+        return if (stripped.scale() <= 0) {
+            stripped.setScale(0, RoundingMode.UNNECESSARY).toPlainString()
+        } else {
+            stripped.toPlainString()
+        }
+    }
+
+    internal fun formatItemPriceLines(
+        quantity: BigDecimal,
+        unitName: String?,
+        unitPrice: BigDecimal,
+        subtotal: BigDecimal,
+        maxCharsPerLine: Int,
+    ): List<String> {
+        val qtyText = formatQty(quantity)
+        val cleanUnit = unitName?.trim()?.takeIf(String::isNotBlank)
+        val priceStr = formatMoney(unitPrice)
+        val subtotalStr = formatMoney(subtotal)
+        val qtyUnitText = if (cleanUnit != null) "$qtyText $cleanUnit" else qtyText
+        val singleLineLeft = " $qtyUnitText x $priceStr"
+
+        if (singleLineLeft.length + subtotalStr.length + 1 <= maxCharsPerLine) {
+            val spaceCount = maxCharsPerLine - singleLineLeft.length - subtotalStr.length
+            return listOf(singleLineLeft + " ".repeat(spaceCount) + subtotalStr)
+        }
+
+        val priceSuffix = " x $priceStr"
+        val leftLine = if (singleLineLeft.length <= maxCharsPerLine) {
+            singleLineLeft
+        } else if (cleanUnit != null) {
+            val fixedLen = 1 + qtyText.length + 1 + priceSuffix.length
+            val availableUnitChars = maxCharsPerLine - fixedLen
+            if (availableUnitChars >= 1) {
+                " $qtyText ${cleanUnit.take(availableUnitChars)}$priceSuffix"
+            } else {
+                return wrapEscPosLeftAndRight(" $qtyText$priceSuffix", subtotalStr, maxCharsPerLine)
+            }
+        } else {
+            return wrapEscPosLeftAndRight(singleLineLeft, subtotalStr, maxCharsPerLine)
+        }
+
+        val rightLine = if (subtotalStr.length <= maxCharsPerLine) {
+            " ".repeat(maxCharsPerLine - subtotalStr.length) + subtotalStr
+        } else {
+            subtotalStr.take(maxCharsPerLine)
+        }
+        return listOf(leftLine, rightLine)
+    }
+
+    private fun wrapEscPosLeftAndRight(
+        left: String,
+        right: String,
+        maxCharsPerLine: Int,
+    ): List<String> {
+        val lines = left.chunked(maxCharsPerLine).toMutableList()
+        val rightLine = if (right.length <= maxCharsPerLine) {
+            " ".repeat(maxCharsPerLine - right.length) + right
+        } else {
+            right.take(maxCharsPerLine)
+        }
+        lines += rightLine
+        return lines
     }
 
     private fun formatTimestamp(isoDate: String): String {
@@ -106,10 +170,16 @@ object ReceiptEscPosFormatter {
                 .textLine(item.productName)
                 .bold(false)
 
-            // Line 2: Qty x Price = Subtotal
-            val qtyStr = "${formatQty(item.quantity)} x ${formatMoney(item.priceAtTransaction)}"
-            val subtotalStr = formatMoney(item.subtotal)
-            builder.twoColumn(" $qtyStr", subtotalStr)
+            // Line 2: Qty [Unit] x Price = Subtotal (respecting 32/48 column width)
+            formatItemPriceLines(
+                quantity = item.quantity,
+                unitName = item.unitName,
+                unitPrice = item.priceAtTransaction,
+                subtotal = item.subtotal,
+                maxCharsPerLine = builder.maxCharsPerLine,
+            ).forEach { line ->
+                builder.textLine(line)
+            }
             item.note?.trim()?.takeIf { it.isNotBlank() }?.let { note ->
                 builder.textLine("  Cat: $note")
             }

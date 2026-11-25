@@ -562,6 +562,7 @@ private fun TransactionItemDto.toCashTransactionItem(): CashTransactionItem {
         productId = productId,
         productName = productName,
         unitId = unitId,
+        unitName = unitName?.trim()?.takeIf(String::isNotBlank),
         quantity = quantity,
         priceAtTransaction = priceAtTransaction,
         subtotal = subtotal,

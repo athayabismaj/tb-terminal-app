@@ -76,13 +76,9 @@ object WhatsAppReceiptHelper {
         sb.appendLine("--------------------------------")
         sb.appendLine("*RINCIAN BELANJA:*")
         transaction.items.forEach { item ->
-            val qtyText = if (item.quantity.stripTrailingZeros().scale() <= 0) {
-                item.quantity.setScale(0).toPlainString()
-            } else {
-                item.quantity.stripTrailingZeros().toPlainString()
-            }
+            val qtyUnitText = formatTransactionQtyWithOptionalUnit(item.quantity, item.unitName)
             sb.appendLine("• ${item.productName.ifBlank { "Barang" }}")
-            sb.appendLine("  $qtyText x ${item.priceAtTransaction.toRupiahText()} = ${item.subtotal.toRupiahText()}")
+            sb.appendLine("  $qtyUnitText x ${item.priceAtTransaction.toRupiahText()} = ${item.subtotal.toRupiahText()}")
             item.note?.trim()?.takeIf { it.isNotBlank() }?.let { note ->
                 sb.appendLine("  Catatan: $note")
             }

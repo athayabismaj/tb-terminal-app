@@ -331,6 +331,7 @@ data class TransactionItemDto(
     val productId: String,
     val productName: String,
     val unitId: String,
+    val unitName: String? = null,
     @Serializable(with = BigDecimalStringSerializer::class) val quantity: BigDecimal,
     @Serializable(with = BigDecimalStringSerializer::class) val priceAtTransaction: BigDecimal,
     @Serializable(with = BigDecimalStringSerializer::class) val subtotal: BigDecimal,
