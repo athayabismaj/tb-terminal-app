@@ -1,5 +1,6 @@
 package com.tbterminal.app.data.repository
 
+import com.tbterminal.app.data.local.checkout.normalizeExactDecimal
 import com.tbterminal.app.data.model.CheckoutReceipt
 import com.tbterminal.app.data.model.CheckoutPreview
 import com.tbterminal.app.data.model.CheckoutPreviewCommand
@@ -30,7 +31,7 @@ class RemoteCheckoutRepository(
             items = command.items.map { item ->
                 CheckoutLineItemRequest(
                     productId = item.productId,
-                    qty = item.quantity.toString(),
+                    qty = normalizeExactDecimal(item.quantity).toPlainString(),
                     discountRequest = item.discountRequest.toDto(),
                     note = item.note,
                 )
@@ -106,7 +107,7 @@ class RemoteCheckoutRepository(
             items = command.items.map { item ->
                 CheckoutLineItemRequest(
                     productId = item.productId,
-                    qty = item.quantity.toString(),
+                    qty = normalizeExactDecimal(item.quantity).toPlainString(),
                     discountRequest = item.discountRequest.toDto(),
                     note = item.note,
                 )

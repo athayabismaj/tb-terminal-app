@@ -11,6 +11,7 @@ import com.tbterminal.app.data.local.checkout.LocalCheckoutPaymentLineCommand
 import com.tbterminal.app.data.local.checkout.LocalCheckoutResult
 import com.tbterminal.app.data.local.checkout.LocalCheckoutService
 import com.tbterminal.app.data.local.checkout.OfflineItemUnitResolution
+import com.tbterminal.app.data.local.checkout.normalizeExactDecimal
 import com.tbterminal.app.data.local.checkout.resolveOfflineCheckoutItemUnit
 import com.tbterminal.app.data.local.database.CashSessionLocalDataSource
 import com.tbterminal.app.data.local.database.LocalAppSettingsDataSource
@@ -1914,20 +1915,22 @@ class CheckoutViewModel(
             }
 
             val cartSnapshot = _uiState.value.cartItems
-            val previewCommand = CheckoutPreviewCommand(
-                items = cartSnapshot.map { item ->
-                    val effectiveQty = if (item.isSecondaryUnit && item.secondaryUnitFactor != null) {
-                        (item.quantity.toBigDecimal() * item.secondaryUnitFactor).toInt()
-                    } else {
-                        item.quantity
+            val resolvedItems = when (val resolution = resolveOnlineCheckoutItems(cartSnapshot)) {
+                is OnlineCheckoutItemsResult.Success -> resolution.items
+                is OnlineCheckoutItemsResult.Error -> {
+                    invalidatePendingCheckout()
+                    _uiState.update {
+                        it.copy(
+                            isLoading = false,
+                            isPreviewLoading = false,
+                            errorEvent = UiText.DynamicString(resolution.message),
+                        )
                     }
-                    CheckoutSubmitItem(
-                        productId = item.productId,
-                        quantity = effectiveQty,
-                        discountRequest = item.discountRequest,
-                        note = item.note,
-                    )
-                },
+                    return@launch
+                }
+            }
+            val previewCommand = CheckoutPreviewCommand(
+                items = resolvedItems,
                 transactionDiscount = _uiState.value.transactionDiscount,
                 customerId = _uiState.value.selectedCustomer?.id,
             )
@@ -2078,6 +2081,20 @@ class CheckoutViewModel(
             paymentMethod.apiValue()
         }
         val cartSnapshot = _uiState.value.cartItems
+        val resolvedItems = when (val resolution = resolveOnlineCheckoutItems(cartSnapshot)) {
+            is OnlineCheckoutItemsResult.Success -> resolution.items
+            is OnlineCheckoutItemsResult.Error -> {
+                invalidatePendingCheckout()
+                _uiState.update {
+                    it.copy(
+                        isLoading = false,
+                        isPreviewLoading = false,
+                        errorEvent = UiText.DynamicString(resolution.message),
+                    )
+                }
+                return
+            }
+        }
         val notes = checkoutCustomerNote(typedCustomerName)
         val approvalAttemptId = preview.checkoutAttemptId.takeIf { preview.approvalRequired }
         val command = CheckoutSubmitCommand(
@@ -2093,19 +2110,7 @@ class CheckoutViewModel(
                 checkoutAttemptId = approvalAttemptId,
                 managerApprovalId = managerApprovalId,
             ),
-            items = cartSnapshot.map { item ->
-                val effectiveQty = if (item.isSecondaryUnit && item.secondaryUnitFactor != null) {
-                    (item.quantity.toBigDecimal() * item.secondaryUnitFactor).toInt()
-                } else {
-                    item.quantity
-                }
-                CheckoutSubmitItem(
-                    productId = item.productId,
-                    quantity = effectiveQty,
-                    discountRequest = item.discountRequest,
-                    note = item.note,
-                )
-            },
+            items = resolvedItems,
             paymentMethod = paymentMethodForSubmit,
             amountPaid = effectiveAmountPaid.toPlainString(),
             payments = paymentLinesForSubmit,
@@ -2315,23 +2320,18 @@ class CheckoutViewModel(
         checkoutAttemptId: String?,
         managerApprovalId: String?,
     ): String {
-        val fingerprint = buildString {
-            append(paymentMethod.apiValue()).append('|').append(amountPaid.toPlainString()).append('|')
-            append(isSplitDpMode).append('|')
-            paymentLines.orEmpty().forEach { line ->
-                append(line.method).append(':').append(line.amount).append(':').append(line.reference.orEmpty()).append(',')
-            }
-            append('|')
-            append(customerId.orEmpty()).append('|').append(notes.orEmpty()).append('|')
-            append(checkoutAttemptId.orEmpty()).append('|').append(managerApprovalId.orEmpty()).append('|')
-            append(transactionDiscount.fingerprintPart()).append('|')
-            items.sortedBy(CartItem::cartItemId).forEach { item ->
-                append(item.cartItemId).append(':').append(item.quantity).append(':')
-                    .append(item.discountRequest.fingerprintPart()).append(':')
-                    .append(item.isSecondaryUnit).append(':')
-                    .append(item.note.orEmpty()).append(';')
-            }
-        }
+        val fingerprint = buildOnlineCheckoutIdempotencyFingerprint(
+            items = items,
+            paymentMethod = paymentMethod,
+            amountPaid = amountPaid,
+            paymentLines = paymentLines,
+            isSplitDpMode = isSplitDpMode,
+            customerId = customerId,
+            notes = notes,
+            transactionDiscount = transactionDiscount,
+            checkoutAttemptId = checkoutAttemptId,
+            managerApprovalId = managerApprovalId,
+        )
         val existing = pendingOnlineCheckout
         if (existing?.fingerprint == fingerprint) return existing.idempotencyKey
         return UUID.randomUUID().toString().also { key ->
@@ -2739,10 +2739,6 @@ private data class PendingOnlineCheckout(
     val idempotencyKey: String,
     val fingerprint: String
 )
-
-private fun CheckoutDiscount?.fingerprintPart(): String = this?.let { discount ->
-    "${discount.type.name}:${discount.value.stripTrailingZeros().toPlainString()}"
-}.orEmpty()
 
 private fun CheckoutUiState.hasDiscountRequest(): Boolean =
     transactionDiscount != null || cartItems.any { it.discountRequest != null }
