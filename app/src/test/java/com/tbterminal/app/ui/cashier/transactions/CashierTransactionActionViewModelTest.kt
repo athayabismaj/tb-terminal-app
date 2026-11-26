@@ -244,6 +244,69 @@ class CashierTransactionActionViewModelTest {
     }
 
     @Test
+    fun payDebtPreservesKeyAcrossDialogCloseReopenOnAmbiguousTimeoutAndRotatesWhenAmountOrMethodChanges() = runTest(dispatcher) {
+        val repository = FakeTransactionActionRepository(payDebtErrorOnce = "NETWORK_TIMEOUT")
+        repository.detail = transactionDetail().copy(
+            status = "HUTANG",
+            paidAmount = BigDecimal("20000"),
+            total = BigDecimal("100000"),
+        )
+        var counter = 0
+        val viewModel = CashierTransactionHistoryViewModel(
+            repository = repository,
+            actorRole = "KASIR",
+            idempotencyKeyGenerator = { "uuid-ambig-${++counter}" },
+        )
+        viewModel.loadReceipt(repository.detail.id)
+        advanceUntilIdle()
+
+        viewModel.showPayDebtDialog()
+        viewModel.onPayDebtAmountChanged("30000")
+        viewModel.payDebt()
+        advanceUntilIdle()
+
+        assertTrue(viewModel.uiState.value.isPayDebtOutcomeAmbiguous)
+        assertEquals("uuid-ambig-1", viewModel.uiState.value.payDebtIdempotencyKey)
+
+        // Closing and reopening dialog before definitive outcome must preserve key, amount, and method
+        viewModel.hidePayDebtDialog()
+        assertFalse(viewModel.uiState.value.isPayDebtDialogOpen)
+        assertEquals("uuid-ambig-1", viewModel.uiState.value.payDebtIdempotencyKey)
+
+        viewModel.showPayDebtDialog()
+        assertTrue(viewModel.uiState.value.isPayDebtDialogOpen)
+        assertEquals("uuid-ambig-1", viewModel.uiState.value.payDebtIdempotencyKey)
+        assertEquals("30000", viewModel.uiState.value.payDebtAmountInput)
+
+        // Retry after reopen sends exact same key
+        viewModel.payDebt()
+        advanceUntilIdle()
+        assertEquals(listOf("uuid-ambig-1", "uuid-ambig-1"), repository.payDebtKeys)
+
+        // Now start another payment, fail ambiguously, then change amount -> key must rotate
+        repository.setNextPayDebtError("NETWORK_TIMEOUT")
+        viewModel.showPayDebtDialog()
+        viewModel.onPayDebtAmountChanged("20000")
+        viewModel.payDebt()
+        advanceUntilIdle()
+        val keyBeforeEdit = viewModel.uiState.value.payDebtIdempotencyKey
+        assertEquals("uuid-ambig-2", keyBeforeEdit)
+
+        viewModel.onPayDebtAmountChanged("25000")
+        val keyAfterAmountChange = viewModel.uiState.value.payDebtIdempotencyKey
+        assertNotEquals(keyBeforeEdit, keyAfterAmountChange)
+        assertFalse(viewModel.uiState.value.isPayDebtOutcomeAmbiguous)
+
+        // Fail ambiguously again, then change method -> key must rotate
+        repository.setNextPayDebtError("NETWORK_TIMEOUT")
+        viewModel.payDebt()
+        advanceUntilIdle()
+        val keyBeforeMethodChange = viewModel.uiState.value.payDebtIdempotencyKey
+        viewModel.onPayDebtMethodChanged("TRANSFER")
+        assertNotEquals(keyBeforeMethodChange, viewModel.uiState.value.payDebtIdempotencyKey)
+    }
+
+    @Test
     fun payDebtAllowsExactRemainingCentsAndWholePartialWhileRejectingArbitraryCents() = runTest(dispatcher) {
         val repository = FakeTransactionActionRepository()
         repository.detail = transactionDetail().copy(
@@ -321,6 +384,10 @@ private class FakeTransactionActionRepository(
     val payDebtKeys = mutableListOf<String>()
     private var pendingVoidErrorCode = voidErrorOnce
     private var pendingPayDebtErrorCode = payDebtErrorOnce
+
+    fun setNextPayDebtError(code: String?) {
+        pendingPayDebtErrorCode = code
+    }
 
     override suspend fun getTransactionById(id: String) = RepositoryResult.Success(detail)
 

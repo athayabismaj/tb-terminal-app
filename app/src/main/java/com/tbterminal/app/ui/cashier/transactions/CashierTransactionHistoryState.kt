@@ -45,6 +45,7 @@ data class CashierTransactionHistoryUiState(
     val payDebtIdempotencyKey: String? = null,
     val payDebtError: String? = null,
     val isSubmittingDebt: Boolean = false,
+    val isPayDebtOutcomeAmbiguous: Boolean = false,
     val isVoidDialogOpen: Boolean = false,
     val voidReasonInput: String = "",
     val voidIdempotencyKey: String? = null,
