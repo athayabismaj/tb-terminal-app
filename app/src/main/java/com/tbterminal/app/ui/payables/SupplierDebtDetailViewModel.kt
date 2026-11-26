@@ -7,11 +7,14 @@ import com.tbterminal.app.data.model.CreateSupplierPaymentCommand
 import com.tbterminal.app.data.model.SupplierPayable
 import com.tbterminal.app.data.repository.PurchasingRepository
 import com.tbterminal.app.data.repository.RepositoryResult
+import com.tbterminal.app.ui.common.SubmissionIdempotencyTracker
 import com.tbterminal.app.ui.common.parseWholeRupiahOrExactRemainingInput
 import com.tbterminal.app.ui.common.sanitizeWholeRupiahInput
+import com.tbterminal.app.ui.common.toNormalizedIdempotencyNumber
 import com.tbterminal.app.ui.common.toWholeRupiahInputText
 import com.tbterminal.app.ui.common.viewModelFactory
 import java.math.BigDecimal
+import java.util.UUID
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -57,10 +60,17 @@ internal data class SupplierDebtDetailUiState(
 
 internal class SupplierDebtDetailViewModel(
     private val purchasingRepository: PurchasingRepository,
-    private val supplierId: String
+    private val supplierId: String,
+    private val idempotencyKeyGenerator: () -> String = { UUID.randomUUID().toString() }
 ) : ViewModel() {
     private val _uiState = MutableStateFlow(SupplierDebtDetailUiState())
     val uiState: StateFlow<SupplierDebtDetailUiState> = _uiState.asStateFlow()
+
+    private val paymentIdempotency = SubmissionIdempotencyTracker<SupplierPaymentIntent>(
+        prefix = "supplier-pay",
+        keyGenerator = idempotencyKeyGenerator
+    )
+    private var pendingAmbiguousDraft: SupplierPaymentDraft? = null
 
     init {
         load()
@@ -129,13 +139,25 @@ internal class SupplierDebtDetailViewModel(
     }
 
     fun openPayment(payable: SupplierPayable) {
+        val pendingDraft = pendingAmbiguousDraft
+        val restoreDraft = if (
+            pendingDraft != null &&
+            pendingDraft.payableId == payable.id &&
+            paymentIdempotency.hasPendingAmbiguousIntent { it.payableId == payable.id }
+        ) {
+            pendingDraft
+        } else {
+            pendingAmbiguousDraft = null
+            paymentIdempotency.clear()
+            null
+        }
         _uiState.update {
             it.copy(
                 selectedPayable = payable,
-                paymentAmountInput = payable.remainingAmount.toWholeRupiahInputText(),
-                paymentMethod = SupplierPaymentMethod.Cash,
-                referenceInput = "",
-                notesInput = "",
+                paymentAmountInput = restoreDraft?.amountInput ?: payable.remainingAmount.toWholeRupiahInputText(),
+                paymentMethod = restoreDraft?.method ?: SupplierPaymentMethod.Cash,
+                referenceInput = restoreDraft?.referenceInput.orEmpty(),
+                notesInput = restoreDraft?.notesInput.orEmpty(),
                 errorMessage = null,
                 message = null
             )
@@ -143,6 +165,10 @@ internal class SupplierDebtDetailViewModel(
     }
 
     fun closePayment() {
+        paymentIdempotency.onDialogDismissed()
+        if (!paymentIdempotency.isOutcomeAmbiguous) {
+            pendingAmbiguousDraft = null
+        }
         _uiState.update { it.copy(selectedPayable = null, isSubmittingPayment = false) }
     }
 
@@ -174,16 +200,29 @@ internal class SupplierDebtDetailViewModel(
 
         viewModelScope.launch {
             _uiState.update { it.copy(isSubmittingPayment = true, errorMessage = null, message = null) }
+            val normalizedReference = state.referenceInput.trim().takeIf(String::isNotBlank)
+            val normalizedNotes = state.notesInput.trim().takeIf(String::isNotBlank)
+            val intent = SupplierPaymentIntent(
+                payableId = payable.id,
+                normalizedAmount = amount.toNormalizedIdempotencyNumber(),
+                method = state.paymentMethod.apiValue.uppercase(),
+                reference = normalizedReference,
+                notes = normalizedNotes
+            )
+            val idempotencyKey = paymentIdempotency.resolveKey(intent)
             val command = CreateSupplierPaymentCommand(
                 payableId = payable.id,
                 amount = amount,
                 method = state.paymentMethod.apiValue,
-                reference = state.referenceInput.trim().takeIf(String::isNotBlank),
-                notes = state.notesInput.trim().takeIf(String::isNotBlank)
+                reference = normalizedReference,
+                notes = normalizedNotes,
+                idempotencyKey = idempotencyKey
             )
 
             when (val result = purchasingRepository.createSupplierPayment(command)) {
                 is RepositoryResult.Success -> {
+                    paymentIdempotency.onSuccess()
+                    pendingAmbiguousDraft = null
                     _uiState.update {
                         it.copy(
                             selectedPayable = null,
@@ -194,8 +233,33 @@ internal class SupplierDebtDetailViewModel(
                     load()
                 }
 
-                is RepositoryResult.Error -> setActionError(result.message)
-                is RepositoryResult.Exception -> setActionError("Pembayaran gagal dicatat karena koneksi bermasalah.")
+                is RepositoryResult.Error -> {
+                    paymentIdempotency.onError(result.code, result.message)
+                    pendingAmbiguousDraft = if (paymentIdempotency.isOutcomeAmbiguous) {
+                        SupplierPaymentDraft(
+                            payableId = payable.id,
+                            amountInput = state.paymentAmountInput,
+                            method = state.paymentMethod,
+                            referenceInput = state.referenceInput,
+                            notesInput = state.notesInput
+                        )
+                    } else {
+                        null
+                    }
+                    setActionError(result.message)
+                }
+
+                is RepositoryResult.Exception -> {
+                    paymentIdempotency.onException()
+                    pendingAmbiguousDraft = SupplierPaymentDraft(
+                        payableId = payable.id,
+                        amountInput = state.paymentAmountInput,
+                        method = state.paymentMethod,
+                        referenceInput = state.referenceInput,
+                        notesInput = state.notesInput
+                    )
+                    setActionError("Pembayaran gagal dicatat karena koneksi bermasalah.")
+                }
             }
         }
     }
