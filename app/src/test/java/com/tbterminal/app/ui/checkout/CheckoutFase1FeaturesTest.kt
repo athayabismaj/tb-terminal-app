@@ -43,7 +43,7 @@ class CheckoutFase1FeaturesTest {
         )
         assertEquals(0, BigDecimal("140000").compareTo(stateWithDelivery.subtotal))
         assertEquals(0, BigDecimal("175000").compareTo(stateWithDelivery.finalTotal))
-        assertEquals(stateWithDelivery.finalTotal.toPlainString(), stateWithDelivery.amountPaidInput)
+        assertEquals("175000", stateWithDelivery.amountPaidInput)
     }
 
     @Test

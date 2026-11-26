@@ -13,20 +13,20 @@ class OpeningReceivableValidationTest {
     fun validOpeningBalanceIsParsed() {
         val result = validateOpeningReceivableInput(
             customerId = "customer-1",
-            amountInput = "1250.50",
+            amountInput = "1.250.000,00",
             debtDateInput = "2026-07-01",
             dueDateInput = "2026-08-15",
             today = today
         ).getOrThrow()
 
-        assertEquals(BigDecimal("1250.50"), result.amount)
+        assertEquals(BigDecimal("1250000"), result.amount)
         assertEquals(LocalDate.of(2026, 7, 1), result.debtDate)
     }
 
     @Test
     fun invalidAmountAndMissingCustomerAreRejected() {
         assertTrue(validateOpeningReceivableInput("", "10", "2026-08-01", "2026-08-02", today).isFailure)
-        listOf("0", "-1", "1.001").forEach { amount ->
+        listOf("0", "-1", "1.500,50", "1,001", "100.01").forEach { amount ->
             assertTrue(
                 validateOpeningReceivableInput("customer-1", amount, "2026-08-01", "2026-08-02", today).isFailure
             )

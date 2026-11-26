@@ -52,6 +52,9 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.tbterminal.app.data.model.CheckoutDiscount
 import com.tbterminal.app.data.model.DiscountType
+import com.tbterminal.app.ui.common.parseWholeRupiahInput
+import com.tbterminal.app.ui.common.sanitizeWholeRupiahInput
+import com.tbterminal.app.ui.common.toWholeRupiahInputText
 import java.math.BigDecimal
 import java.math.RoundingMode
 import java.text.DecimalFormat
@@ -65,6 +68,28 @@ private val TextMuted = Color(0xFF64748B)
 private val BorderColor = Color(0xFFE2E8F0)
 private val ErrorRed = Color(0xFFEF4444)
 
+internal fun parseDiscountInputValue(type: DiscountType, raw: String): BigDecimal? {
+    return when (type) {
+        DiscountType.FIXED_AMOUNT -> parseWholeRupiahInput(raw)
+        DiscountType.PERCENTAGE -> raw.trim().replace(',', '.').toBigDecimalOrNull()
+    }
+}
+
+internal fun sanitizeDiscountInput(type: DiscountType, raw: String): String {
+    return when (type) {
+        DiscountType.FIXED_AMOUNT -> sanitizeWholeRupiahInput(raw)
+        DiscountType.PERCENTAGE -> raw.filter { char -> char.isDigit() || char == '.' || char == ',' }
+    }
+}
+
+internal fun formatInitialDiscountInput(initialValue: CheckoutDiscount?): String {
+    initialValue ?: return ""
+    return when (initialValue.type) {
+        DiscountType.FIXED_AMOUNT -> initialValue.value.toWholeRupiahInputText()
+        DiscountType.PERCENTAGE -> initialValue.value.stripTrailingZeros().toPlainString()
+    }
+}
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun DiscountInputDialog(
@@ -77,17 +102,12 @@ fun DiscountInputDialog(
 ) {
     var type by remember(initialValue) { mutableStateOf(initialValue?.type ?: DiscountType.PERCENTAGE) }
     var valueInput by remember(initialValue) {
-        mutableStateOf(initialValue?.value?.stripTrailingZeros()?.toPlainString().orEmpty())
+        mutableStateOf(formatInitialDiscountInput(initialValue))
     }
     var error by remember { mutableStateOf<String?>(null) }
 
     fun apply() {
-        val cleaned = valueInput.trim().replace(',', '.')
-        if (cleaned.isBlank()) {
-            error = "Masukkan nilai diskon yang valid."
-            return
-        }
-        val value = cleaned.toBigDecimalOrNull()
+        val value = parseDiscountInputValue(type, valueInput)
         if (value == null) {
             error = "Masukkan nilai diskon yang valid."
             return
@@ -102,7 +122,7 @@ fun DiscountInputDialog(
     }
 
     // Live preview calculation
-    val parsedValue = valueInput.trim().replace(',', '.').toBigDecimalOrNull()
+    val parsedValue = parseDiscountInputValue(type, valueInput)
     val previewCut: BigDecimal? = if (parsedValue != null && parsedValue > BigDecimal.ZERO) {
         if (type == DiscountType.PERCENTAGE) {
             baseAmount.multiply(parsedValue).divide(BigDecimal(100), 2, RoundingMode.HALF_UP)
@@ -336,7 +356,7 @@ fun DiscountInputDialog(
                 OutlinedTextField(
                     value = valueInput,
                     onValueChange = { input ->
-                        valueInput = input.filter { char -> char.isDigit() || char == '.' || char == ',' }
+                        valueInput = sanitizeDiscountInput(type, input)
                         error = null
                     },
                     placeholder = {

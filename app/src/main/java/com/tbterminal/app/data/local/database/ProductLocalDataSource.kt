@@ -49,11 +49,31 @@ class ProductLocalDataSource(
             if (existing == null) {
                 product
             } else {
-                val resolvedSecondaryId = product.secondaryUnitServerId ?: existing.secondaryUnitServerId
-                val resolvedSecondaryName = product.secondaryUnitName
-                    ?: if (resolvedSecondaryId == existing.secondaryUnitServerId) existing.secondaryUnitName else null
-                val resolvedSecondaryFactor = product.secondaryUnitFactor
-                    ?: if (resolvedSecondaryId == existing.secondaryUnitServerId) existing.secondaryUnitFactor else null
+                // Backend 5b includes baseUnitId authoritatively; null secondaryUnitId means no secondary unit.
+                val hasAuthoritativeUnits = !product.unitServerId.isNullOrBlank()
+                val resolvedSecondaryId: String?
+                val resolvedSecondaryName: String?
+                val resolvedSecondaryFactor: java.math.BigDecimal?
+                if (hasAuthoritativeUnits) {
+                    resolvedSecondaryId = product.secondaryUnitServerId
+                    resolvedSecondaryName = when {
+                        resolvedSecondaryId == null -> null
+                        !product.secondaryUnitName.isNullOrBlank() -> product.secondaryUnitName
+                        resolvedSecondaryId == existing.secondaryUnitServerId -> existing.secondaryUnitName
+                        else -> null
+                    }
+                    resolvedSecondaryFactor = if (resolvedSecondaryId != null) {
+                        product.secondaryUnitFactor
+                    } else {
+                        null
+                    }
+                } else {
+                    resolvedSecondaryId = product.secondaryUnitServerId ?: existing.secondaryUnitServerId
+                    resolvedSecondaryName = product.secondaryUnitName
+                        ?: if (resolvedSecondaryId == existing.secondaryUnitServerId) existing.secondaryUnitName else null
+                    resolvedSecondaryFactor = product.secondaryUnitFactor
+                        ?: if (resolvedSecondaryId == existing.secondaryUnitServerId) existing.secondaryUnitFactor else null
+                }
                 existing.copy(
                     name = product.name,
                     sku = product.sku ?: existing.sku,
@@ -98,8 +118,12 @@ class ProductLocalDataSource(
             val existing = productDao.getByServerId(serverId) ?: return@mapNotNull null
             val resolvedUnitName = existing.unitName?.takeIf(String::isNotBlank)
                 ?: existing.unitServerId?.let(unitNameByServerId::get)
-            val resolvedSecondaryName = existing.secondaryUnitServerId?.let(unitNameByServerId::get)
-                ?: existing.secondaryUnitName
+            val resolvedSecondaryName = if (existing.secondaryUnitServerId.isNullOrBlank()) {
+                null
+            } else {
+                existing.secondaryUnitServerId.let(unitNameByServerId::get)
+                    ?: existing.secondaryUnitName
+            }
             if (resolvedUnitName == existing.unitName && resolvedSecondaryName == existing.secondaryUnitName) {
                 null
             } else {

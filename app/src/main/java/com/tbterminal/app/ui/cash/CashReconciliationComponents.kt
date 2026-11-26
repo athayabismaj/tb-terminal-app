@@ -389,7 +389,7 @@ private fun CashTextField(
             supportingText = supportingText?.let {
                 { Text(it, color = CashDanger, fontSize = 12.sp) }
             },
-            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
             modifier = Modifier.fillMaxWidth(),
             singleLine = true,
             shape = RoundedCornerShape(12.dp),

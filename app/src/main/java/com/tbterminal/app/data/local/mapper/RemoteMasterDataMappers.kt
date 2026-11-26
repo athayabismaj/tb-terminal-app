@@ -40,16 +40,17 @@ fun ProductResponseDto.toLocalProductEntity(now: Long = System.currentTimeMillis
 }
 
 fun StockDetailResponseDto.toLocalProductEntity(now: Long = System.currentTimeMillis()): LocalProductEntity {
+    val resolvedSecondaryId = secondaryUnitId?.trim()?.takeIf(String::isNotBlank)
     return LocalProductEntity(
         serverId = productId,
         clientGeneratedId = "server-product-$productId",
         name = productName,
         sku = sku,
         unitServerId = baseUnitId?.trim()?.takeIf(String::isNotBlank),
-        unitName = unitName.trim().takeIf(String::isNotBlank),
-        secondaryUnitServerId = secondaryUnitId?.trim()?.takeIf(String::isNotBlank),
-        secondaryUnitName = secondaryUnitName?.trim()?.takeIf(String::isNotBlank),
-        secondaryUnitFactor = secondaryUnitFactor?.trim()?.toBigDecimalOrNull(),
+        unitName = baseUnitName?.trim()?.takeIf(String::isNotBlank) ?: unitName.trim().takeIf(String::isNotBlank),
+        secondaryUnitServerId = resolvedSecondaryId,
+        secondaryUnitName = if (resolvedSecondaryId != null) secondaryUnitName?.trim()?.takeIf(String::isNotBlank) else null,
+        secondaryUnitFactor = if (resolvedSecondaryId != null) secondaryUnitFactor?.trim()?.toBigDecimalOrNull() else null,
         priceSell = priceRetail.toSafeDouble(),
         priceBuy = priceBuy.toSafeDouble(),
         priceRetail = priceRetail.toSafeDouble(),

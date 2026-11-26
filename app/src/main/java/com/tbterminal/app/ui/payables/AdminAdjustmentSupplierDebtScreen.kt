@@ -44,6 +44,8 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.tbterminal.app.data.model.Supplier
 import com.tbterminal.app.data.model.SupplierPayable
 import com.tbterminal.app.data.repository.PurchasingRepository
+import com.tbterminal.app.ui.common.parseWholeRupiahInput
+import com.tbterminal.app.ui.common.parseWholeRupiahOrExactRemainingInput
 import com.tbterminal.app.ui.components.AppDatePickerDialog
 import com.tbterminal.app.ui.dashboard.admin.AdminDashboardShell
 import com.tbterminal.app.ui.dashboard.admin.AdminDestination
@@ -358,6 +360,7 @@ fun AdminAdjustmentSupplierDebtScreen(
                                 selectedSupplier = selectedSupplier,
                                 currentRemaining = currentRemaining,
                                 inputAmountStr = uiState.adjustmentAmountInput,
+                                prefilledRemaining = uiState.adjustmentPrefilledRemaining,
                                 reference = uiState.adjustmentReferenceInput,
                                 dueDate = dueDate,
                                 tenorDays = tenorDays,
@@ -411,6 +414,7 @@ fun AdminAdjustmentSupplierDebtScreen(
                             selectedSupplier = selectedSupplier,
                             currentRemaining = currentRemaining,
                             inputAmountStr = uiState.adjustmentAmountInput,
+                            prefilledRemaining = uiState.adjustmentPrefilledRemaining,
                             reference = uiState.adjustmentReferenceInput,
                             dueDate = dueDate,
                             tenorDays = tenorDays,
@@ -665,7 +669,7 @@ private fun AdjustmentSupplierDebtAmountInputs(
                     val isCurrent = amountInput == value
                     Surface(
                         onClick = {
-                            val current = amountInput.toBigDecimalOrNull() ?: BigDecimal.ZERO
+                            val current = parseWholeRupiahInput(amountInput) ?: BigDecimal.ZERO
                             val add = value.toBigDecimal()
                             onAmountChanged((current + add).toPlainString())
                         },
@@ -1328,12 +1332,13 @@ private fun AdjustmentSupplierDebtAccountingSummary(
     selectedSupplier: Supplier?,
     currentRemaining: BigDecimal,
     inputAmountStr: String,
+    prefilledRemaining: BigDecimal? = null,
     reference: String,
     dueDate: String,
     tenorDays: Long,
     reason: String
 ) {
-    val inputAmount = inputAmountStr.toBigDecimalOrNull() ?: BigDecimal.ZERO
+    val inputAmount = parseWholeRupiahOrExactRemainingInput(inputAmountStr, prefilledRemaining) ?: BigDecimal.ZERO
 
     Card(
         modifier = Modifier.fillMaxWidth(),

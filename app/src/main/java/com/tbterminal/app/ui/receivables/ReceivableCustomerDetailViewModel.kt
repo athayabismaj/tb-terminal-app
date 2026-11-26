@@ -9,6 +9,8 @@ import com.tbterminal.app.data.model.ReceivablePaymentHistory
 import com.tbterminal.app.data.repository.CustomerRepository
 import com.tbterminal.app.data.repository.ReceivableRepository
 import com.tbterminal.app.data.repository.RepositoryResult
+import com.tbterminal.app.ui.common.sanitizeWholeRupiahInput
+import com.tbterminal.app.ui.common.toWholeRupiahInputText
 import com.tbterminal.app.ui.common.viewModelFactory
 import java.math.BigDecimal
 import java.util.UUID
@@ -112,7 +114,7 @@ internal class ReceivableCustomerDetailViewModel(
                 selectedReceivableForPayment = receivable,
                 isPayAllOpen = true,
                 selectedPayAllInvoiceIds = setOf(receivable.id),
-                paymentAmountInput = receivable.remainingAmount.stripTrailingZeros().toPlainString(),
+                paymentAmountInput = receivable.remainingAmount.toWholeRupiahInputText(),
                 paymentMethod = ReceivablePaymentMethod.Cash,
                 referenceInput = "",
                 notesInput = "",
@@ -131,7 +133,7 @@ internal class ReceivableCustomerDetailViewModel(
                 selectedReceivableForPayment = null,
                 isPayAllOpen = true,
                 selectedPayAllInvoiceIds = unpaidIds,
-                paymentAmountInput = totalRemaining.stripTrailingZeros().toPlainString(),
+                paymentAmountInput = totalRemaining.toWholeRupiahInputText(),
                 paymentMethod = ReceivablePaymentMethod.Cash,
                 referenceInput = "",
                 notesInput = "",
@@ -154,7 +156,7 @@ internal class ReceivableCustomerDetailViewModel(
         _uiState.update {
             it.copy(
                 selectedPayAllInvoiceIds = newSelected,
-                paymentAmountInput = newTotal.stripTrailingZeros().toPlainString(),
+                paymentAmountInput = newTotal.toWholeRupiahInputText(),
                 paymentErrorMessage = null
             )
         }
@@ -172,7 +174,7 @@ internal class ReceivableCustomerDetailViewModel(
         _uiState.update {
             it.copy(
                 selectedPayAllInvoiceIds = newSelected,
-                paymentAmountInput = newTotal.stripTrailingZeros().toPlainString(),
+                paymentAmountInput = newTotal.toWholeRupiahInputText(),
                 paymentErrorMessage = null
             )
         }
@@ -189,7 +191,7 @@ internal class ReceivableCustomerDetailViewModel(
     }
 
     fun onPaymentAmountChanged(value: String) {
-        _uiState.update { it.copy(paymentAmountInput = value, paymentErrorMessage = null) }
+        _uiState.update { it.copy(paymentAmountInput = sanitizeWholeRupiahInput(value), paymentErrorMessage = null) }
     }
 
     fun onPaymentMethodChanged(method: ReceivablePaymentMethod) {
@@ -219,7 +221,7 @@ internal class ReceivableCustomerDetailViewModel(
 
         val receivable = state.selectedReceivableForPayment ?: return
         val amount = validateReceivablePaymentInput(
-            state.paymentAmountInput.trim().replace(",", "."),
+            state.paymentAmountInput,
             receivable.remainingAmount,
             "idempotency-check"
         ).getOrElse {
@@ -284,7 +286,7 @@ internal class ReceivableCustomerDetailViewModel(
 
         val selectedTotalRemaining = selectedInvoices.fold(BigDecimal.ZERO) { sum, it -> sum + it.remainingAmount }
         val amount = validateReceivablePaymentInput(
-            state.paymentAmountInput.trim().replace(",", "."),
+            state.paymentAmountInput,
             selectedTotalRemaining,
             "idempotency-check"
         ).getOrElse {

@@ -2,6 +2,7 @@ package com.tbterminal.app.ui.incominggoods
 
 import com.tbterminal.app.data.model.ProductStock
 import com.tbterminal.app.data.model.Supplier
+import com.tbterminal.app.ui.common.parseWholeRupiahInput
 import java.math.BigDecimal
 
 data class IncomingGoodsUiState(
@@ -51,7 +52,7 @@ data class IncomingGoodsUiState(
             IncomingPaymentMethod.TRANSFER,
             IncomingPaymentMethod.QRIS -> total
             IncomingPaymentMethod.DEBT -> BigDecimal.ZERO
-            IncomingPaymentMethod.DOWN_PAYMENT -> amountPaidInput.toBigDecimalOrNull()
+            IncomingPaymentMethod.DOWN_PAYMENT -> parseWholeRupiahInput(amountPaidInput)
         }
 
     val payableAmount: BigDecimal?

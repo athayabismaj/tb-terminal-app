@@ -801,8 +801,8 @@ class RemoteInventoryRepository(
         val basePage = stockPage.toProductStockPage()
         if (stockPage.data.isEmpty()) return basePage
 
-        // StockDetailResponse does not yet include baseUnitId or secondary unit metadata,
-        // so hydrate from authoritative /api/inventory/products and /api/inventory/units.
+        // Backend v1.0.7 omits baseUnitId on /stock; fall back to /products and /units.
+        // Backend 5b includes baseUnitId authoritatively, so skip /products and treat null secondaryUnitId as none.
         val needsProductMetadata = stockPage.data.any { dto ->
             dto.baseUnitId.isNullOrBlank() ||
                 (!dto.secondaryUnitId.isNullOrBlank() && dto.secondaryUnitFactor.isNullOrBlank())
@@ -812,23 +812,40 @@ class RemoteInventoryRepository(
         } else {
             emptyMap()
         }
-        val cachedById = loadCachedProductsByServerId(stockPage.data.map { it.productId })
+        val needsLegacyFallbackCache = stockPage.data.any { it.baseUnitId.isNullOrBlank() }
+        val cachedById = if (needsLegacyFallbackCache) {
+            loadCachedProductsByServerId(stockPage.data.map { it.productId })
+        } else {
+            emptyMap()
+        }
 
         val unitIdsNeeded = buildSet {
             stockPage.data.forEach { dto ->
-                val remote = productsById[dto.productId]
-                val cached = cachedById[dto.productId]
-                val secUnitId = dto.secondaryUnitId?.trim()?.takeIf(String::isNotBlank)
-                    ?: if (remote != null) remote.secondaryUnitId?.trim()?.takeIf(String::isNotBlank)
-                    else cached?.secondaryUnitServerId?.trim()?.takeIf(String::isNotBlank)
-                if (secUnitId != null && dto.secondaryUnitName.isNullOrBlank()) {
-                    add(secUnitId)
-                }
-                val baseUnitId = dto.baseUnitId?.trim()?.takeIf(String::isNotBlank)
-                    ?: remote?.baseUnitId?.trim()?.takeIf(String::isNotBlank)
-                    ?: cached?.unitServerId?.trim()?.takeIf(String::isNotBlank)
-                if (baseUnitId != null && dto.unitName.isBlank()) {
-                    add(baseUnitId)
+                val hasAuthoritativeUnits = !dto.baseUnitId.isNullOrBlank()
+                if (hasAuthoritativeUnits) {
+                    val secUnitId = dto.secondaryUnitId?.trim()?.takeIf(String::isNotBlank)
+                    if (secUnitId != null && dto.secondaryUnitName.isNullOrBlank()) {
+                        add(secUnitId)
+                    }
+                    val baseUnitId = dto.baseUnitId?.trim()?.takeIf(String::isNotBlank)
+                    if (baseUnitId != null && dto.baseUnitName.isNullOrBlank() && dto.unitName.isBlank()) {
+                        add(baseUnitId)
+                    }
+                } else {
+                    val remote = productsById[dto.productId]
+                    val cached = cachedById[dto.productId]
+                    val secUnitId = dto.secondaryUnitId?.trim()?.takeIf(String::isNotBlank)
+                        ?: if (remote != null) remote.secondaryUnitId?.trim()?.takeIf(String::isNotBlank)
+                        else cached?.secondaryUnitServerId?.trim()?.takeIf(String::isNotBlank)
+                    if (secUnitId != null && dto.secondaryUnitName.isNullOrBlank()) {
+                        add(secUnitId)
+                    }
+                    val baseUnitId = dto.baseUnitId?.trim()?.takeIf(String::isNotBlank)
+                        ?: remote?.baseUnitId?.trim()?.takeIf(String::isNotBlank)
+                        ?: cached?.unitServerId?.trim()?.takeIf(String::isNotBlank)
+                    if (baseUnitId != null && dto.unitName.isBlank()) {
+                        add(baseUnitId)
+                    }
                 }
             }
         }
@@ -842,29 +859,56 @@ class RemoteInventoryRepository(
             }
         }
 
-        val enrichedItems = basePage.data.map { item ->
+        val enrichedItems = basePage.data.mapIndexed { index, item ->
+            val dto = stockPage.data[index]
             val remote = productsById[item.productId]
-            val cached = cachedById[item.productId]
-            val resolvedBaseUnitId = item.baseUnitId?.takeIf(String::isNotBlank)
-                ?: remote?.baseUnitId?.trim()?.takeIf(String::isNotBlank)
-                ?: cached?.unitServerId?.trim()?.takeIf(String::isNotBlank)
-            val resolvedSecondaryUnitId = item.secondaryUnitId?.takeIf(String::isNotBlank)
-                ?: if (remote != null) remote.secondaryUnitId?.trim()?.takeIf(String::isNotBlank)
-                else cached?.secondaryUnitServerId?.trim()?.takeIf(String::isNotBlank)
-            val resolvedSecondaryFactor = item.secondaryUnitFactor
-                ?: if (remote != null) remote.secondaryUnitFactor?.trim()?.toBigDecimalOrNull()
-                else cached?.secondaryUnitFactor
-            val resolvedSecondaryUnitName = item.secondaryUnitName?.takeIf(String::isNotBlank)
-                ?: resolvedSecondaryUnitId?.let { unitId ->
-                    unitNameById[unitId]
-                        ?: cached?.takeIf { it.secondaryUnitServerId == unitId }?.secondaryUnitName
+            if (!dto.baseUnitId.isNullOrBlank()) {
+                val resolvedBaseUnitId = item.baseUnitId
+                val resolvedUnitName = item.unitName.takeIf(String::isNotBlank)
+                    ?: resolvedBaseUnitId?.let(unitNameById::get)
+                    ?: ""
+                val resolvedSecondaryUnitId = item.secondaryUnitId
+                val resolvedSecondaryFactor = if (resolvedSecondaryUnitId != null) {
+                    item.secondaryUnitFactor
+                        ?: remote?.secondaryUnitFactor?.trim()?.toBigDecimalOrNull()
+                } else {
+                    null
                 }
-            item.copy(
-                baseUnitId = resolvedBaseUnitId,
-                secondaryUnitId = resolvedSecondaryUnitId,
-                secondaryUnitName = resolvedSecondaryUnitName,
-                secondaryUnitFactor = resolvedSecondaryFactor
-            )
+                val resolvedSecondaryUnitName = if (resolvedSecondaryUnitId != null) {
+                    item.secondaryUnitName ?: unitNameById[resolvedSecondaryUnitId]
+                } else {
+                    null
+                }
+                item.copy(
+                    unitName = resolvedUnitName,
+                    baseUnitId = resolvedBaseUnitId,
+                    secondaryUnitId = resolvedSecondaryUnitId,
+                    secondaryUnitName = resolvedSecondaryUnitName,
+                    secondaryUnitFactor = resolvedSecondaryFactor
+                )
+            } else {
+                val cached = cachedById[item.productId]
+                val resolvedBaseUnitId = item.baseUnitId?.takeIf(String::isNotBlank)
+                    ?: remote?.baseUnitId?.trim()?.takeIf(String::isNotBlank)
+                    ?: cached?.unitServerId?.trim()?.takeIf(String::isNotBlank)
+                val resolvedSecondaryUnitId = item.secondaryUnitId?.takeIf(String::isNotBlank)
+                    ?: if (remote != null) remote.secondaryUnitId?.trim()?.takeIf(String::isNotBlank)
+                    else cached?.secondaryUnitServerId?.trim()?.takeIf(String::isNotBlank)
+                val resolvedSecondaryFactor = item.secondaryUnitFactor
+                    ?: if (remote != null) remote.secondaryUnitFactor?.trim()?.toBigDecimalOrNull()
+                    else cached?.secondaryUnitFactor
+                val resolvedSecondaryUnitName = item.secondaryUnitName?.takeIf(String::isNotBlank)
+                    ?: resolvedSecondaryUnitId?.let { unitId ->
+                        unitNameById[unitId]
+                            ?: cached?.takeIf { it.secondaryUnitServerId == unitId }?.secondaryUnitName
+                    }
+                item.copy(
+                    baseUnitId = resolvedBaseUnitId,
+                    secondaryUnitId = resolvedSecondaryUnitId,
+                    secondaryUnitName = resolvedSecondaryUnitName,
+                    secondaryUnitFactor = resolvedSecondaryFactor
+                )
+            }
         }
         return basePage.copy(data = enrichedItems)
     }

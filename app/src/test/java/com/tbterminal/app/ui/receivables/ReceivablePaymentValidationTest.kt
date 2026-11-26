@@ -1,6 +1,7 @@
 package com.tbterminal.app.ui.receivables
 
 import com.tbterminal.app.data.model.Receivable
+import com.tbterminal.app.ui.common.toWholeRupiahInputText
 import java.math.BigDecimal
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -10,16 +11,18 @@ import org.junit.Test
 class ReceivablePaymentValidationTest {
     @Test
     fun `partial payment is accepted`() {
-        val result = validateReceivablePaymentInput("40.25", BigDecimal("100.00"), "payment-key-001")
-        assertEquals(BigDecimal("40.25"), result.getOrThrow())
+        val grouped = validateReceivablePaymentInput("40.000", BigDecimal("100.00"), "payment-key-001")
+        assertTrue(validateReceivablePaymentInput("40.000", BigDecimal("100000"), "payment-key-001").isSuccess)
+        assertEquals(BigDecimal("40000"), validateReceivablePaymentInput("40000,00", BigDecimal("100000"), "payment-key-001").getOrThrow())
+        assertTrue(grouped.isFailure)
     }
 
     @Test
     fun `invalid amount and overpayment are rejected`() {
-        listOf("0", "-1", "10.001", "100.01").forEach { input ->
+        listOf("0", "-1", "10.000,50", "100.001").forEach { input ->
             assertTrue(
                 input,
-                validateReceivablePaymentInput(input, BigDecimal("100.00"), "payment-key-001").isFailure
+                validateReceivablePaymentInput(input, BigDecimal("100000"), "payment-key-001").isFailure
             )
         }
     }
@@ -27,6 +30,30 @@ class ReceivablePaymentValidationTest {
     @Test
     fun `retry key is required`() {
         assertTrue(validateReceivablePaymentInput("10", BigDecimal("100"), "short").isFailure)
+    }
+
+    @Test
+    fun `cent remaining balance allows exact lunas and whole partial while rejecting arbitrary cents`() {
+        val remaining = BigDecimal("150000.50")
+        val lunasText = remaining.toWholeRupiahInputText()
+        assertEquals("150000,5", lunasText)
+
+        val lunasResult = validateReceivablePaymentInput(lunasText, remaining, "payment-key-001")
+        assertEquals(0, BigDecimal("150000.50").compareTo(lunasResult.getOrThrow()))
+
+        val partialResult = validateReceivablePaymentInput("150000", remaining, "payment-key-001")
+        val partialPaid = partialResult.getOrThrow()
+        assertEquals(0, BigDecimal("150000").compareTo(partialPaid))
+
+        val allocation = calculateFifoAllocations(
+            invoices = listOf(createDummyReceivable(id = "cent-1", remaining = remaining, dueDate = "2026-08-01")),
+            selectedIds = setOf("cent-1"),
+            totalPaymentAmount = partialPaid
+        ).single()
+        assertEquals(0, BigDecimal("0.50").compareTo(allocation.remainingAfterPayment))
+        assertFalse(allocation.isFullyPaid)
+
+        assertTrue(validateReceivablePaymentInput("150000,25", remaining, "payment-key-001").isFailure)
     }
 
     @Test

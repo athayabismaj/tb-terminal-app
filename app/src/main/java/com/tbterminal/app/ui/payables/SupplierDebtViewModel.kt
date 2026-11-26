@@ -10,6 +10,9 @@ import com.tbterminal.app.data.model.Supplier
 import com.tbterminal.app.data.model.SupplierPayable
 import com.tbterminal.app.data.repository.PurchasingRepository
 import com.tbterminal.app.data.repository.RepositoryResult
+import com.tbterminal.app.ui.common.parseWholeRupiahOrExactRemainingInput
+import com.tbterminal.app.ui.common.sanitizeWholeRupiahInput
+import com.tbterminal.app.ui.common.toWholeRupiahInputText
 import com.tbterminal.app.ui.common.viewModelFactory
 import java.math.BigDecimal
 import java.time.LocalDate
@@ -139,7 +142,7 @@ class SupplierDebtViewModel(
     fun submitPayment() {
         val state = _uiState.value
         val payable = state.selectedPayable ?: return
-        val amount = state.paymentAmountInput.toBigDecimalOrNull()
+        val amount = parseWholeRupiahOrExactRemainingInput(state.paymentAmountInput, payable.remainingAmount)
             ?: return setActionError("Nominal pembayaran wajib diisi dengan angka valid.")
 
         if (amount <= BigDecimal.ZERO) return setActionError("Nominal pembayaran harus lebih dari nol.")
@@ -283,6 +286,7 @@ class SupplierDebtViewModel(
                 isAdjustmentOpen = true,
                 adjustmentSupplierId = "",
                 adjustmentAmountInput = "",
+                adjustmentPrefilledRemaining = null,
                 adjustmentDebtDateInput = today,
                 adjustmentDueDateInput = LocalDate.now().plusDays(30).toString(),
                 adjustmentReferenceInput = "",
@@ -304,6 +308,7 @@ class SupplierDebtViewModel(
                 isAdjustmentOpen = true,
                 adjustmentSupplierId = sid,
                 adjustmentAmountInput = "",
+                adjustmentPrefilledRemaining = null,
                 adjustmentDebtDateInput = LocalDate.now().toString(),
                 adjustmentDueDateInput = LocalDate.now().plusDays(30).toString(),
                 adjustmentReferenceInput = "",
@@ -322,14 +327,14 @@ class SupplierDebtViewModel(
     }
 
     fun onAdjustmentSupplierChanged(value: String) {
-        _uiState.update { it.copy(adjustmentSupplierId = value) }
+        _uiState.update { it.copy(adjustmentSupplierId = value, adjustmentPrefilledRemaining = null) }
         loadSupplierDebtsForAdjustment(value)
     }
 
     fun onAdjustmentSupplierSelected(supplier: Supplier) {
         _uiState.update { state ->
             val updated = if (state.suppliers.none { it.id == supplier.id }) state.suppliers + supplier else state.suppliers
-            state.copy(adjustmentSupplierId = supplier.id, suppliers = updated)
+            state.copy(adjustmentSupplierId = supplier.id, suppliers = updated, adjustmentPrefilledRemaining = null)
         }
         loadSupplierDebtsForAdjustment(supplier.id)
     }
@@ -340,6 +345,7 @@ class SupplierDebtViewModel(
             state.copy(
                 adjustmentReferenceInput = debtRef,
                 adjustmentAmountInput = debt.remainingAmount.toInputText(),
+                adjustmentPrefilledRemaining = debt.remainingAmount,
                 adjustmentDueDateInput = debt.dueDate.take(10).ifBlank { state.adjustmentDueDateInput }
             )
         }
@@ -381,7 +387,8 @@ class SupplierDebtViewModel(
             debtDateInput = state.adjustmentDebtDateInput,
             dueDateInput = state.adjustmentDueDateInput,
             referenceInput = state.adjustmentReferenceInput,
-            reasonInput = state.adjustmentReasonInput
+            reasonInput = state.adjustmentReasonInput,
+            exactRemainingAmount = state.adjustmentPrefilledRemaining
         ).getOrElse {
             setAdjustmentError(it.message ?: "Data penyesuaian hutang belum valid.")
             return
@@ -465,9 +472,9 @@ class SupplierDebtViewModel(
 }
 
 internal fun String.decimalInput(): String {
-    return filter { it.isDigit() || it == '.' || it == ',' }.replace(',', '.')
+    return sanitizeWholeRupiahInput(this)
 }
 
 internal fun BigDecimal.toInputText(): String {
-    return stripTrailingZeros().toPlainString()
+    return toWholeRupiahInputText()
 }

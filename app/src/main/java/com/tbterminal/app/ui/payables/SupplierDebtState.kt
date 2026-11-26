@@ -34,6 +34,7 @@ data class SupplierDebtUiState(
     val isAdjustmentOpen: Boolean = false,
     val adjustmentSupplierId: String = "",
     val adjustmentAmountInput: String = "",
+    val adjustmentPrefilledRemaining: BigDecimal? = null,
     val adjustmentDebtDateInput: String = java.time.LocalDate.now().toString(),
     val adjustmentDueDateInput: String = java.time.LocalDate.now().toString(),
     val adjustmentReferenceInput: String = "",

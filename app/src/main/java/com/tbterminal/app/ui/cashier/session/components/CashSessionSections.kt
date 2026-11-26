@@ -1,5 +1,7 @@
 package com.tbterminal.app.ui.cashier.session.components
 
+import com.tbterminal.app.ui.common.parseWholeRupiahInput
+
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -579,8 +581,7 @@ fun ShiftClosureBottomSheetModal(
 
     val session = uiState.activeSession
     val parsedClosingCash = remember(cashAmount) {
-        val clean = cashAmount.replace(".", "").replace(",", "").trim()
-        clean.toBigDecimalOrNull()
+        parseWholeRupiahInput(cashAmount)
     }
 
     val cashDifference = remember(parsedClosingCash, uiState.systemCash) {

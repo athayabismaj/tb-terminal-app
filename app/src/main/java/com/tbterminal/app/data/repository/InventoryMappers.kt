@@ -56,12 +56,14 @@ internal fun ProductResponseDto.toProduct(): Product {
 }
 
 internal fun StockDetailResponseDto.toProductStock(): ProductStock {
+    val resolvedUnitName = baseUnitName?.trim()?.takeIf(String::isNotBlank) ?: unitName
+    val resolvedSecondaryId = secondaryUnitId?.trim()?.takeIf(String::isNotBlank)
     return ProductStock(
         productId = productId,
         sku = sku,
         productName = productName,
         categoryName = categoryName,
-        unitName = unitName,
+        unitName = resolvedUnitName,
         quantity = quantity,
         minStock = minStock,
         priceBuy = priceBuy,
@@ -69,9 +71,9 @@ internal fun StockDetailResponseDto.toProductStock(): ProductStock {
         priceContractor = priceContractor,
         discount = discount,
         isActive = isActive,
-        secondaryUnitId = secondaryUnitId?.trim()?.takeIf(String::isNotBlank),
-        secondaryUnitName = secondaryUnitName?.trim()?.takeIf(String::isNotBlank),
-        secondaryUnitFactor = secondaryUnitFactor?.trim()?.toBigDecimalOrNull(),
+        secondaryUnitId = resolvedSecondaryId,
+        secondaryUnitName = if (resolvedSecondaryId != null) secondaryUnitName?.trim()?.takeIf(String::isNotBlank) else null,
+        secondaryUnitFactor = if (resolvedSecondaryId != null) secondaryUnitFactor?.trim()?.toBigDecimalOrNull() else null,
         priceTiers = priceTiers.map(ProductPriceTierDto::toProductPriceTier),
         photoUrl = photoUrl,
         baseUnitId = baseUnitId?.trim()?.takeIf(String::isNotBlank)

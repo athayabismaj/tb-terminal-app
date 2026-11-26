@@ -21,6 +21,8 @@ import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.ui.text.input.KeyboardType
+import com.tbterminal.app.ui.common.parseWholeRupiahOrExactRemainingInput
+import com.tbterminal.app.ui.common.toWholeRupiahInputText
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.Undo
 import androidx.compose.material.icons.filled.Close
@@ -917,7 +919,7 @@ internal fun CashierPayDebtDialog(
                                 enabled = !submitting,
                                 singleLine = true,
                                 keyboardOptions = KeyboardOptions(
-                                    keyboardType = KeyboardType.Decimal
+                                    keyboardType = KeyboardType.Number
                                 ),
                                 textStyle = TextStyle(fontFamily = com.tbterminal.app.ui.theme.KawanSans, 
                                     color = Color(0xFF0F172A),
@@ -948,9 +950,9 @@ internal fun CashierPayDebtDialog(
 
                 // Quick Amount Shortcuts (Chips)
                 val remainingLong = remaining.toLong()
-                val chips = remember(remainingLong) {
+                val chips = remember(remaining) {
                     buildList {
-                        add("Bayar penuh" to remaining.stripTrailingZeros().toPlainString())
+                        add("Bayar penuh" to remaining.toWholeRupiahInputText())
                         if (remainingLong >= 20000L) {
                             val half = (remainingLong / 2L / 1000L) * 1000L
                             if (half > 0 && half != remainingLong) {
@@ -1101,7 +1103,7 @@ internal fun CashierPayDebtDialog(
                     )
                 }
 
-                val amountValid = (state.payDebtAmountInput.toBigDecimalOrNull() ?: BigDecimal.ZERO) > BigDecimal.ZERO
+                val amountValid = (parseWholeRupiahOrExactRemainingInput(state.payDebtAmountInput, remaining) ?: BigDecimal.ZERO) > BigDecimal.ZERO
                 Button(
                     onClick = onConfirm,
                     enabled = !submitting && amountValid,

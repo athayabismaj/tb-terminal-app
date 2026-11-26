@@ -34,7 +34,9 @@ import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Text
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.Immutable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -783,14 +785,45 @@ private fun PinFlowModalContainer(
     var localError by remember { mutableStateOf<String?>(null) }
     var shakeCount by remember { mutableIntStateOf(0) }
 
+    fun clearSensitivePinState() {
+        currentPin = ""
+        verifiedOldPin = ""
+        candidateNewPin = ""
+    }
+
+    DisposableEffect(Unit) {
+        onDispose { clearSensitivePinState() }
+    }
+
+    LaunchedEffect(errorMessage) {
+        if (errorMessage != null) {
+            clearSensitivePinState()
+            step = if (requireCurrentCredential) 1 else 2
+        }
+    }
+
+    val handleDismiss: () -> Unit = {
+        clearSensitivePinState()
+        onDismiss()
+    }
+
     val handleBackStep: () -> Unit = {
         if (!isSaving) {
             localError = null
             currentPin = ""
             when (step) {
-                3 -> step = 2
-                2 -> if (requireCurrentCredential) step = 1 else onDismiss()
-                else -> onDismiss()
+                3 -> {
+                    candidateNewPin = ""
+                    step = 2
+                }
+                2 -> if (requireCurrentCredential) {
+                    verifiedOldPin = ""
+                    candidateNewPin = ""
+                    step = 1
+                } else {
+                    handleDismiss()
+                }
+                else -> handleDismiss()
             }
         }
     }
@@ -830,7 +863,7 @@ private fun PinFlowModalContainer(
                                     triggerPinError(msg)
                                 }
                                 is PinVerifyOutcome.ForceLogout -> {
-                                    onDismiss()
+                                    handleDismiss()
                                     onForceLogout?.invoke()
                                 }
                                 is PinVerifyOutcome.Error -> {
@@ -862,7 +895,10 @@ private fun PinFlowModalContainer(
                         step = 2
                         triggerPinError("PIN tidak sama. Ulangi dari awal.")
                     } else {
-                        onSubmitPinChange(verifiedOldPin, candidateNewPin, updated)
+                        val oldPinSnapshot = verifiedOldPin
+                        val newPinSnapshot = candidateNewPin
+                        clearSensitivePinState()
+                        onSubmitPinChange(oldPinSnapshot, newPinSnapshot, updated)
                     }
                 }
             }
@@ -874,7 +910,7 @@ private fun PinFlowModalContainer(
         isTablet = isTablet,
         tabletHeight = if (requireCurrentCredential) 600.dp else 544.dp,
         dismissEnabled = !isSaving,
-        onDismiss = onDismiss,
+        onDismiss = handleDismiss,
         content = {
             PinModalContent(
                 step = step,
@@ -889,7 +925,10 @@ private fun PinFlowModalContainer(
                         localError = null
                     }
                 },
-                onForgotPinClick = onForgotPinClick,
+                onForgotPinClick = {
+                    clearSensitivePinState()
+                    onForgotPinClick()
+                },
                 totalSteps = if (requireCurrentCredential) 3 else 2,
                 stepProgressValue = if (requireCurrentCredential) step else (step - 1),
                 showForgotPin = requireCurrentCredential
@@ -1069,8 +1108,32 @@ private fun ResetPinViaPasswordSheet(
     var newPin by remember { mutableStateOf("") }
     var confirmPin by remember { mutableStateOf("") }
 
+    fun clearSensitiveInputs() {
+        currentPassword = ""
+        newPin = ""
+        confirmPin = ""
+    }
+
+    DisposableEffect(Unit) {
+        onDispose { clearSensitiveInputs() }
+    }
+
+    LaunchedEffect(errorMessage) {
+        if (errorMessage != null) {
+            clearSensitiveInputs()
+        }
+    }
+
     val pinValid = CredentialValidator.isValidPin(newPin) && !isWeakPin(newPin)
     val isReady = currentPassword.isNotBlank() && pinValid && confirmPin == newPin && !isSaving
+
+    fun submitAndClear() {
+        val passwordSnapshot = currentPassword
+        val newPinSnapshot = newPin
+        val confirmPinSnapshot = confirmPin
+        clearSensitiveInputs()
+        onSubmit(passwordSnapshot, newPinSnapshot, confirmPinSnapshot)
+    }
 
     BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
         val isTablet = maxWidth >= MODAL_TABLET_BREAKPOINT
@@ -1079,7 +1142,10 @@ private fun ResetPinViaPasswordSheet(
             isTablet = isTablet,
             tabletHeight = 520.dp,
             dismissEnabled = !isSaving,
-            onDismiss = onDismiss,
+            onDismiss = {
+                clearSensitiveInputs()
+                onDismiss()
+            },
             sheetTestTag = "reset-pin-dialog",
             content = {
                 Column(modifier = Modifier.fillMaxWidth()) {
@@ -1125,7 +1191,7 @@ private fun ResetPinViaPasswordSheet(
                             "PIN tidak sama"
                         } else errorMessage,
                         imeAction = ImeAction.Done,
-                        onImeAction = { if (isReady) onSubmit(currentPassword, newPin, confirmPin) },
+                        onImeAction = { if (isReady) submitAndClear() },
                         testTag = "reset-pin-confirm"
                     )
                     Spacer(modifier = Modifier.height(24.dp))
@@ -1136,7 +1202,7 @@ private fun ResetPinViaPasswordSheet(
                             .clip(RoundedCornerShape(16.dp))
                             .background(if (isReady || isSaving) Brand else OwnerBorder)
                             .clickable(enabled = isReady, role = Role.Button) {
-                                onSubmit(currentPassword, newPin, confirmPin)
+                                submitAndClear()
                             }
                             .testTag("reset-pin-save"),
                         contentAlignment = Alignment.Center

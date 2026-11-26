@@ -41,6 +41,7 @@ import androidx.compose.material.icons.filled.Close
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import com.tbterminal.app.data.repository.CustomerRepository
+import com.tbterminal.app.ui.common.parseWholeRupiahInput
 import androidx.compose.material.icons.outlined.AccountBalance
 import androidx.compose.material.icons.outlined.AccountBalanceWallet
 import androidx.compose.material.icons.outlined.Add
@@ -570,7 +571,7 @@ fun CashierPaymentScreen(
                                 // Quick Cash Preset Chips (Uang Pas, Pecahan terdekat di atas total)
                                 if (state.finalTotal > BigDecimal.ZERO) {
                                     val presets = getCashQuickPresets(state.finalTotal)
-                                    val parsedInput = state.amountPaidInput.trim().replace(',', '.').toBigDecimalOrNull()
+                                    val parsedInput = parseWholeRupiahInput(state.amountPaidInput)
                                     val isUangPasSelected = parsedInput != null && parsedInput.compareTo(state.finalTotal) == 0
 
                                     Row(
@@ -641,7 +642,7 @@ fun CashierPaymentScreen(
                                 }
 
                                 // Change / Shortage Result Banner (Kembalian Hijau Besar / Uang Kurang Merah)
-                                val parsedAmount = state.amountPaidInput.trim().replace(',', '.').toBigDecimalOrNull()
+                                val parsedAmount = parseWholeRupiahInput(state.amountPaidInput)
                                 val isPaidSufficient = parsedAmount != null && parsedAmount >= state.finalTotal
                                 val changeAmount = checkoutChange(state.amountPaidInput, state.finalTotal)
                                 val shortage = if (parsedAmount != null && parsedAmount < state.finalTotal) {
@@ -946,7 +947,7 @@ fun CashierPaymentScreen(
                                         singleLine = true
                                     )
 
-                                    val parsedDp = state.amountPaidInput.trim().replace(',', '.').toBigDecimalOrNull()
+                                    val parsedDp = parseWholeRupiahInput(state.amountPaidInput)
                                     if (parsedDp != null && parsedDp > BigDecimal.ZERO && parsedDp < state.finalTotal) {
                                         val sisaHutang = state.finalTotal.subtract(parsedDp)
                                         Surface(
@@ -2515,10 +2516,10 @@ private fun SplitPaymentBuilderCard(
                                 val otherPaid = state.splitPaymentLines
                                     .filter { it.id != line.id }
                                     .fold(BigDecimal.ZERO) { acc, other ->
-                                        acc.add(other.amountInput.trim().replace(',', '.').toBigDecimalOrNull() ?: BigDecimal.ZERO)
+                                        acc.add(parseWholeRupiahInput(other.amountInput) ?: BigDecimal.ZERO)
                                     }
                                 val lineRemaining = state.finalTotal.subtract(otherPaid).coerceAtLeast(BigDecimal.ZERO)
-                                val currentLineAmt = line.amountInput.trim().replace(',', '.').toBigDecimalOrNull() ?: BigDecimal.ZERO
+                                val currentLineAmt = parseWholeRupiahInput(line.amountInput) ?: BigDecimal.ZERO
                                 if (lineRemaining > BigDecimal.ZERO && lineRemaining.compareTo(currentLineAmt) != 0) {
                                     Text(
                                         text = "Isi Sisa",

@@ -1,5 +1,6 @@
 package com.tbterminal.app.ui.payables
 
+import com.tbterminal.app.ui.common.parseWholeRupiahInput
 import java.math.BigDecimal
 import java.time.LocalDate
 import java.time.format.DateTimeParseException
@@ -18,7 +19,7 @@ internal fun validateOpeningSupplierDebtInput(
     today: LocalDate = LocalDate.now()
 ): Result<OpeningSupplierDebtInput> = runCatching {
     require(supplierId.isNotBlank()) { "Supplier aktif wajib dipilih." }
-    val amount = amountInput.trim().replace(',', '.').toBigDecimalOrNull()
+    val amount = parseWholeRupiahInput(amountInput)
         ?: error("Nominal hutang wajib diisi dengan angka valid.")
     require(amount > BigDecimal.ZERO) { "Nominal hutang harus lebih dari nol." }
     require(amount.scale() <= 2) { "Nominal hutang maksimal dua angka desimal." }

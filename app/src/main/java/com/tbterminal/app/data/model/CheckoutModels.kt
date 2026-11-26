@@ -34,10 +34,22 @@ data class CheckoutSubmitCommand(
 
 data class CheckoutSubmitItem(
     val productId: String,
-    val quantity: Int,
+    val quantity: BigDecimal,
     val discountRequest: CheckoutDiscount? = null,
     val note: String? = null,
-)
+) {
+    constructor(
+        productId: String,
+        quantity: Int,
+        discountRequest: CheckoutDiscount? = null,
+        note: String? = null,
+    ) : this(
+        productId = productId,
+        quantity = quantity.toBigDecimal(),
+        discountRequest = discountRequest,
+        note = note,
+    )
+}
 
 data class CheckoutPreviewCommand(
     val items: List<CheckoutSubmitItem>,

@@ -1,5 +1,6 @@
 package com.tbterminal.app.ui.receivables
 
+import com.tbterminal.app.ui.common.parseWholeRupiahOrExactRemainingInput
 import java.math.BigDecimal
 import java.time.LocalDate
 import java.time.format.DateTimeParseException
@@ -20,10 +21,11 @@ internal fun validateAdjustmentReceivableInput(
     dueDateInput: String,
     referenceInput: String,
     reasonInput: String,
-    today: LocalDate = LocalDate.now()
+    today: LocalDate = LocalDate.now(),
+    exactRemainingAmount: BigDecimal? = null
 ): Result<AdjustmentReceivableInput> = runCatching {
     require(customerId.isNotBlank() && customerId in activeCustomerIds) { "Pelanggan aktif wajib dipilih." }
-    val amount = amountInput.trim().replace(',', '.').toBigDecimalOrNull()
+    val amount = parseWholeRupiahOrExactRemainingInput(amountInput, exactRemainingAmount)
         ?: error("Nominal adjustment wajib diisi dengan angka valid.")
     require(amount > BigDecimal.ZERO) { "Nominal adjustment harus lebih dari nol." }
     require(amount.scale() <= 2) { "Nominal adjustment maksimal dua angka desimal." }

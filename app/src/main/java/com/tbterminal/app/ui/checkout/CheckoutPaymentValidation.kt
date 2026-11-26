@@ -1,5 +1,6 @@
 package com.tbterminal.app.ui.checkout
 
+import com.tbterminal.app.ui.common.parseWholeRupiahInput
 import java.math.BigDecimal
 
 data class CheckoutPaymentInputResult(
@@ -13,7 +14,7 @@ fun validateCheckoutPaymentInput(
     total: BigDecimal
 ): CheckoutPaymentInputResult {
     if (total < BigDecimal.ZERO) return CheckoutPaymentInputResult(error = "Total transaksi tidak boleh negatif.")
-    val parsed = amountPaidInput.trim().replace(',', '.').toBigDecimalOrNull()
+    val parsed = parseWholeRupiahInput(amountPaidInput)
     val amount = when (paymentMethod) {
         PaymentMethod.HUTANG -> BigDecimal.ZERO
         PaymentMethod.TRANSFER, PaymentMethod.QRIS -> total
@@ -46,7 +47,7 @@ fun validateCheckoutPaymentInput(
 }
 
 fun checkoutChange(amountPaidInput: String, total: BigDecimal): BigDecimal {
-    val amount = amountPaidInput.toBigDecimalOrNull() ?: return BigDecimal.ZERO
+    val amount = parseWholeRupiahInput(amountPaidInput) ?: return BigDecimal.ZERO
     return amount.subtract(total).coerceAtLeast(BigDecimal.ZERO)
 }
 
@@ -78,7 +79,7 @@ fun validateSplitCheckoutPayment(
     var nonCash = BigDecimal.ZERO
     var cash = BigDecimal.ZERO
     for (line in lines) {
-        val amt = line.amountInput.trim().replace(',', '.').toBigDecimalOrNull()
+        val amt = parseWholeRupiahInput(line.amountInput)
             ?: return SplitPaymentValidationResult(error = "Nominal split payment belum valid.")
         if (amt <= BigDecimal.ZERO && total > BigDecimal.ZERO) {
             return SplitPaymentValidationResult(error = "Setiap nominal pembayaran harus lebih dari nol.")

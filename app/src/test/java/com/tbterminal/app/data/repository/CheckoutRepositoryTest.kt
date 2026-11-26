@@ -86,6 +86,34 @@ class CheckoutRepositoryTest {
         assertEquals("PERCENTAGE", api.checkoutRequest?.items?.single()?.discountRequest?.type)
     }
 
+    @Test
+    fun previewAndSubmitSerializeExactDecimalAndPlainWholeQuantitiesWithoutScientificNotation() = runTest {
+        val api = FakeCheckoutApi(validPreview())
+        val repository = RemoteCheckoutRepository(api)
+
+        val items = listOf(
+            CheckoutSubmitItem(productId = "product-frac", quantity = BigDecimal("7.50")),
+            CheckoutSubmitItem(productId = "product-whole", quantity = BigDecimal("10.00")),
+        )
+
+        val previewResult = repository.previewCheckout(CheckoutPreviewCommand(items = items))
+        assertTrue(previewResult is RepositoryResult.Success)
+        assertEquals("7.5", api.previewRequest?.items?.get(0)?.qty)
+        assertEquals("10", api.previewRequest?.items?.get(1)?.qty)
+
+        val submitResult = repository.submitCheckout(
+            CheckoutSubmitCommand(
+                idempotencyKey = "idem-decimal-1",
+                items = items,
+                paymentMethod = "tunai",
+                amountPaid = "100000",
+            ),
+        )
+        assertTrue(submitResult is RepositoryResult.Success)
+        assertEquals("7.5", api.checkoutRequest?.items?.get(0)?.qty)
+        assertEquals("10", api.checkoutRequest?.items?.get(1)?.qty)
+    }
+
     private fun validPreview() = CheckoutPreviewResponse(
         checkoutAttemptId = "00000000-0000-0000-0000-000000000001",
         discountFingerprint = "hash",

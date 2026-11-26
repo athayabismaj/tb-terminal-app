@@ -4,6 +4,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import com.tbterminal.app.data.model.UserProfile
+import com.tbterminal.app.data.remote.UserFacingErrorMapper
 import com.tbterminal.app.data.repository.AuthRepository
 import com.tbterminal.app.data.repository.PinUnlockResult
 import com.tbterminal.app.data.repository.RepositoryResult
@@ -72,7 +73,7 @@ class ProfileViewModel(
         }
         submitCredentialChange(
             successMessage = "PIN diperbarui",
-            mapError = { _, msg -> msg }
+            mapError = ::mapPinError
         ) {
             authRepository.changeMyPin(oldPin, newPin)
         }
@@ -82,6 +83,15 @@ class ProfileViewModel(
         pin: String,
         onResult: (PinVerifyOutcome) -> Unit
     ) {
+        CredentialValidator.validatePin(
+            pin = pin,
+            requiredMessage = "PIN saat ini wajib diisi.",
+            nonDigitMessage = "PIN saat ini harus terdiri dari ${CredentialValidator.PIN_MIN_LENGTH} sampai ${CredentialValidator.PIN_MAX_LENGTH} digit angka.",
+            lengthMessage = "PIN saat ini harus terdiri dari ${CredentialValidator.PIN_MIN_LENGTH} sampai ${CredentialValidator.PIN_MAX_LENGTH} digit angka."
+        )?.let { pinError ->
+            onResult(PinVerifyOutcome.Error(message = pinError, isNetworkError = false))
+            return
+        }
         if (_uiState.value.isSaving) return
         viewModelScope.launch {
             _uiState.update { it.copy(isSaving = true, error = null, isNetworkError = false, message = null) }
@@ -105,7 +115,11 @@ class ProfileViewModel(
                     _uiState.update { it.copy(isSaving = false) }
                     onResult(
                         PinVerifyOutcome.Error(
-                            message = if (networkFail) "Tidak dapat terhubung" else res.message,
+                            message = if (networkFail) {
+                                "Tidak dapat terhubung"
+                            } else {
+                                mapPinError(res.code, res.message, res.retryAfterSeconds)
+                            },
                             isNetworkError = networkFail
                         )
                     )
@@ -154,7 +168,11 @@ class ProfileViewModel(
                     _uiState.update {
                         it.copy(
                             isSaving = false,
-                            error = if (networkFail) "Tidak dapat terhubung" else mapPasswordChangeError(result.code, result.message),
+                            error = if (networkFail) {
+                                "Tidak dapat terhubung"
+                            } else {
+                                mapPasswordChangeError(result.code, result.message, result.retryAfterSeconds)
+                            },
                             isNetworkError = networkFail
                         )
                     }
@@ -211,7 +229,7 @@ class ProfileViewModel(
 
     private fun submitCredentialChange(
         successMessage: String,
-        mapError: (String, String) -> String,
+        mapError: (String, String, Long?) -> String,
         request: suspend () -> RepositoryResult<Unit>
     ) {
         if (_uiState.value.isSaving) return
@@ -226,7 +244,7 @@ class ProfileViewModel(
                     _uiState.update {
                         it.copy(
                             isSaving = false,
-                            error = if (networkFail) "Tidak dapat terhubung" else mapError(result.code, result.message),
+                            error = if (networkFail) "Tidak dapat terhubung" else mapError(result.code, result.message, result.retryAfterSeconds),
                             isNetworkError = networkFail
                         )
                     }
@@ -240,7 +258,7 @@ class ProfileViewModel(
 
     private fun isNetworkFailureCode(code: String): Boolean = code in NETWORK_FAILURE_CODES
 
-    private fun mapPasswordChangeError(code: String, message: String): String {
+    private fun mapPinError(code: String, message: String, retryAfterSeconds: Long? = null): String {
         val normalized = code.trim().uppercase()
         val lower = message.lowercase()
         val isLockoutOrRateLimit = normalized in LOCKOUT_OR_RATE_LIMIT_CODES ||
@@ -249,7 +267,25 @@ class ProfileViewModel(
             lower.contains("terkunci") ||
             lower.contains("login kembali")
         if (isLockoutOrRateLimit) {
-            return message
+            return formatLockoutOrRateLimitMessage(normalized, message, retryAfterSeconds)
+        }
+        return message
+    }
+
+    private fun mapPasswordChangeError(
+        code: String,
+        message: String,
+        retryAfterSeconds: Long? = null
+    ): String {
+        val normalized = code.trim().uppercase()
+        val lower = message.lowercase()
+        val isLockoutOrRateLimit = normalized in LOCKOUT_OR_RATE_LIMIT_CODES ||
+            lower.contains("batas percobaan") ||
+            lower.contains("terlalu banyak") ||
+            lower.contains("terkunci") ||
+            lower.contains("login kembali")
+        if (isLockoutOrRateLimit) {
+            return formatLockoutOrRateLimitMessage(normalized, message, retryAfterSeconds)
         }
         val isWrongCurrent = normalized == "HTTP_401" ||
             normalized == "INVALID_CREDENTIALS" ||
@@ -259,6 +295,24 @@ class ProfileViewModel(
             lower.contains("incorrect") ||
             lower.contains("invalid current password")
         return if (isWrongCurrent) "Kata sandi saat ini salah" else message
+    }
+
+    private fun formatLockoutOrRateLimitMessage(
+        normalizedCode: String,
+        message: String,
+        retryAfterSeconds: Long?
+    ): String {
+        val hasWaitUnit = message.contains("detik", ignoreCase = true) ||
+            message.contains("menit", ignoreCase = true)
+        return if (message.isBlank() || (retryAfterSeconds != null && retryAfterSeconds > 0L && !hasWaitUnit)) {
+            UserFacingErrorMapper.message(
+                code = normalizedCode,
+                backendMessage = message.takeIf(String::isNotBlank),
+                retryAfterSeconds = retryAfterSeconds
+            )
+        } else {
+            message
+        }
     }
 
     companion object {

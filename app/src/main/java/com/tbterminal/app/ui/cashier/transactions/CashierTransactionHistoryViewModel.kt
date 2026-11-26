@@ -15,6 +15,9 @@ import com.tbterminal.app.data.repository.CashReconciliationRepository
 import com.tbterminal.app.data.repository.RepositoryResult
 import com.tbterminal.app.data.sync.OfflineCheckoutSyncResult
 import com.tbterminal.app.data.sync.OfflineCheckoutSyncService
+import com.tbterminal.app.ui.common.parseWholeRupiahOrExactRemainingInput
+import com.tbterminal.app.ui.common.sanitizeWholeRupiahInput
+import com.tbterminal.app.ui.common.toWholeRupiahInputText
 import com.tbterminal.app.ui.common.viewModelFactory
 import com.tbterminal.app.ui.offline.toLocalPendingTransactionUi
 import com.tbterminal.app.ui.salestransactions.SalesSortOrder
@@ -867,7 +870,7 @@ class CashierTransactionHistoryViewModel(
 
     fun showPayDebtDialog() {
         _uiState.update { state ->
-            val sisa = state.selectedTransaction?.remainingAmount()?.toPlainString() ?: ""
+            val sisa = state.selectedTransaction?.remainingAmount()?.toWholeRupiahInputText() ?: ""
             state.copy(
                 isPayDebtDialogOpen = true,
                 payDebtAmountInput = sisa,
@@ -891,7 +894,7 @@ class CashierTransactionHistoryViewModel(
 
     fun onPayDebtAmountChanged(value: String) {
         if (_uiState.value.isSubmittingDebt) return
-        val filtered = value.filter { it.isDigit() || it == '.' || it == ',' }.replace(',', '.')
+        val filtered = sanitizeWholeRupiahInput(value)
         _uiState.update { it.copy(payDebtAmountInput = filtered, payDebtError = null) }
     }
 
@@ -903,8 +906,12 @@ class CashierTransactionHistoryViewModel(
     fun payDebt() {
         val state = _uiState.value
         if (state.isSubmittingDebt) return
-        val transactionId = state.selectedTransaction?.id ?: return
-        val amount = state.payDebtAmountInput.toBigDecimalOrNull()
+        val selected = state.selectedTransaction ?: return
+        val transactionId = selected.id
+        val amount = parseWholeRupiahOrExactRemainingInput(
+            state.payDebtAmountInput,
+            selected.remainingAmount()
+        )
         if (amount == null || amount <= java.math.BigDecimal.ZERO) {
             _uiState.update { it.copy(payDebtError = "Nominal bayar tidak valid") }
             return

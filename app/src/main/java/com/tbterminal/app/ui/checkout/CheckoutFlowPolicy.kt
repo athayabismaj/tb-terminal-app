@@ -1,6 +1,7 @@
 package com.tbterminal.app.ui.checkout
 
 import com.tbterminal.app.data.model.CheckoutPreview
+import com.tbterminal.app.ui.common.toWholeRupiahInputText
 
 internal enum class CheckoutPreviewDecision {
     FINAL_CHECKOUT,
@@ -34,7 +35,7 @@ internal fun CheckoutUiState.withAuthoritativePreview(preview: CheckoutPreview):
     amountPaidInput = when (selectedPaymentMethod) {
         PaymentMethod.HUTANG -> "0"
         PaymentMethod.DP -> amountPaidInput
-        else -> preview.netTotal.toPlainString()
+        else -> preview.netTotal.toWholeRupiahInputText()
     },
     isPreviewLoading = false,
     errorEvent = null,

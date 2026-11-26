@@ -13,10 +13,10 @@ class AdjustmentReceivableValidationTest {
     @Test
     fun validAdjustmentIsNormalized() {
         val value = validateAdjustmentReceivableInput(
-            "active-1", activeCustomers, "1500.25", "2026-08-19", "2026-09-19",
+            "active-1", activeCustomers, "1.500.000", "2026-08-19", "2026-09-19",
             " NOTA-42 ", " Koreksi migrasi ", today
         ).getOrThrow()
-        assertEquals(BigDecimal("1500.25"), value.amount)
+        assertEquals(BigDecimal("1500000"), value.amount)
         assertEquals("NOTA-42", value.reference)
         assertEquals("Koreksi migrasi", value.reason)
     }
@@ -24,7 +24,7 @@ class AdjustmentReceivableValidationTest {
     @Test
     fun inactiveCustomerAndInvalidAmountsAreRejected() {
         assertTrue(validate("inactive", "10", "REF", "Alasan").isFailure)
-        listOf("0", "-1", "1.001", "abc").forEach { assertTrue(validate("active-1", it, "REF", "Alasan").isFailure) }
+        listOf("0", "-1", "1.500,50", "1,001", "100.01", "abc").forEach { assertTrue(validate("active-1", it, "REF", "Alasan").isFailure) }
     }
 
     @Test
@@ -40,6 +40,29 @@ class AdjustmentReceivableValidationTest {
         assertTrue(canManageReceivableAdjustment("owner"))
         assertTrue(canManageReceivableAdjustment("ADMIN"))
         assertTrue(!canManageReceivableAdjustment("kasir"))
+    }
+
+    @Test
+    fun prefilledCentRemainingAllowsExactMatchAndWholeRupiahOnly() {
+        val exactRemaining = BigDecimal("150000.50")
+        val prefilled = validateAdjustmentReceivableInput(
+            "active-1", activeCustomers, "150000,5", "2026-08-19", "2026-08-20",
+            "NOTA-CENT", "Koreksi sisa sen", today, exactRemainingAmount = exactRemaining
+        ).getOrThrow()
+        assertEquals(0, exactRemaining.compareTo(prefilled.amount))
+
+        val wholeTyped = validateAdjustmentReceivableInput(
+            "active-1", activeCustomers, "150000", "2026-08-19", "2026-08-20",
+            "NOTA-CENT", "Koreksi bulat", today, exactRemainingAmount = exactRemaining
+        ).getOrThrow()
+        assertEquals(0, BigDecimal("150000").compareTo(wholeTyped.amount))
+
+        assertTrue(
+            validateAdjustmentReceivableInput(
+                "active-1", activeCustomers, "150000,25", "2026-08-19", "2026-08-20",
+                "NOTA-CENT", "Koreksi sen lain", today, exactRemainingAmount = exactRemaining
+            ).isFailure
+        )
     }
 
     private fun validate(

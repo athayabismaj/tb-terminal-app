@@ -1,6 +1,8 @@
 package com.tbterminal.app.ui.cashdetail
 
 import androidx.compose.foundation.BorderStroke
+import com.tbterminal.app.ui.common.parseWholeRupiahInput
+import com.tbterminal.app.ui.common.sanitizeWholeRupiahInput
 import com.tbterminal.app.ui.components.SkeletonBox
 import com.tbterminal.app.ui.components.TbPagination
 import androidx.compose.foundation.background
@@ -660,8 +662,7 @@ private fun SupervisorCloseSessionDialog(
                 OutlinedTextField(
                     value = cashInput,
                     onValueChange = { input ->
-                        val filtered = input.filter { it.isDigit() }
-                        cashInput = filtered
+                        cashInput = sanitizeWholeRupiahInput(input)
                         localError = null
                     },
                     label = { Text("Jumlah Kas Fisik (Rp)") },
@@ -701,7 +702,7 @@ private fun SupervisorCloseSessionDialog(
                         localError = "Masukkan jumlah uang kas fisik."
                         return@Button
                     }
-                    val amount = raw.toBigDecimalOrNull()
+                    val amount = parseWholeRupiahInput(raw)
                     if (amount == null || amount < BigDecimal.ZERO) {
                         localError = "Nominal kas fisik tidak valid."
                         return@Button

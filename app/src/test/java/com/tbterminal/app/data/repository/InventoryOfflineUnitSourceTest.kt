@@ -7,6 +7,8 @@ import com.tbterminal.app.data.local.database.CategoryLocalDataSource
 import com.tbterminal.app.data.local.database.ProductLocalDataSource
 import com.tbterminal.app.data.local.database.TbTerminalDatabase
 import com.tbterminal.app.data.local.database.UnitLocalDataSource
+import com.tbterminal.app.data.local.entity.LocalProductEntity
+import com.tbterminal.app.data.local.model.SyncStatus
 import com.tbterminal.app.data.remote.InventoryApi
 import java.math.BigDecimal
 import kotlinx.coroutines.runBlocking
@@ -248,5 +250,177 @@ class InventoryOfflineUnitSourceTest {
         assertNull(item.secondaryUnitId)
         assertNull(item.secondaryUnitName)
         assertNull(item.secondaryUnitFactor)
+    }
+
+    @Test
+    fun getProductStocks_5bContractHydratesAndCachesFromStockWithoutCallingProductsOrUnits() = runBlocking {
+        val requestedPaths = mutableListOf<String>()
+        server.dispatcher = object : Dispatcher() {
+            override fun dispatch(request: RecordedRequest): MockResponse {
+                val path = request.path.orEmpty()
+                requestedPaths += path
+                return when {
+                    path.startsWith("/api/inventory/stock") -> MockResponse().setResponseCode(200).setBody(
+                        """
+                        {
+                          "success": true,
+                          "data": {
+                            "data": [
+                              {
+                                "productId": "prod-5b-1",
+                                "sku": "PK-5B",
+                                "productName": "Paku 5 cm",
+                                "categoryName": "Paku",
+                                "unitName": "Pcs",
+                                "baseUnitId": "unit-pcs",
+                                "baseUnitName": "Pcs",
+                                "quantity": "100.00",
+                                "minStock": "10.00",
+                                "priceBuy": "8000.00",
+                                "priceRetail": "10000.00",
+                                "priceContractor": "9500.00",
+                                "discount": "0.00",
+                                "isActive": true,
+                                "secondaryUnitId": "unit-dus",
+                                "secondaryUnitName": "Dus",
+                                "secondaryUnitFactor": "2.5"
+                              }
+                            ],
+                            "total": 1,
+                            "page": 1,
+                            "limit": 24,
+                            "totalPages": 1
+                          }
+                        }
+                        """.trimIndent()
+                    )
+                    else -> MockResponse().setResponseCode(500)
+                }
+            }
+        }
+
+        val result = repository.getProductStocks(page = 1, limit = 24)
+        assertTrue(result is RepositoryResult.Success)
+        val item = (result as RepositoryResult.Success).data.data.single()
+        assertEquals("unit-pcs", item.baseUnitId)
+        assertEquals("Pcs", item.unitName)
+        assertEquals("unit-dus", item.secondaryUnitId)
+        assertEquals("Dus", item.secondaryUnitName)
+        assertEquals(0, BigDecimal("2.5").compareTo(item.secondaryUnitFactor))
+
+        assertEquals(1, requestedPaths.size)
+        assertTrue(requestedPaths.single().startsWith("/api/inventory/stock"))
+        assertTrue(requestedPaths.none { it.startsWith("/api/inventory/products") })
+        assertTrue(requestedPaths.none { it.startsWith("/api/inventory/units") })
+
+        val cached = database.productDao().getByServerId("prod-5b-1")
+        assertNotNull(cached)
+        cached!!
+        assertEquals("unit-pcs", cached.unitServerId)
+        assertEquals("Pcs", cached.unitName)
+        assertEquals("unit-dus", cached.secondaryUnitServerId)
+        assertEquals("Dus", cached.secondaryUnitName)
+        assertEquals(0, BigDecimal("2.5").compareTo(cached.secondaryUnitFactor))
+    }
+
+    @Test
+    fun getProductStocks_5bContractWithNullSecondaryUnitClearsCachedRoomSecondaryUnit() = runBlocking {
+        database.productDao().upsert(
+            LocalProductEntity(
+                serverId = "prod-clear-1",
+                clientGeneratedId = "server-product-prod-clear-1",
+                name = "Paku 5 cm",
+                sku = "PK-CLR",
+                unitServerId = "unit-pcs",
+                unitName = "Pcs",
+                secondaryUnitServerId = "unit-dus",
+                secondaryUnitName = "Dus",
+                secondaryUnitFactor = BigDecimal("12"),
+                priceSell = 10_000.0,
+                priceBuy = 8_000.0,
+                priceRetail = 10_000.0,
+                priceContractor = 9_500.0,
+                stock = 50.0,
+                minimumStock = 5.0,
+                syncStatus = SyncStatus.SYNCED
+            )
+        )
+
+        val requestedPaths = mutableListOf<String>()
+        server.dispatcher = object : Dispatcher() {
+            override fun dispatch(request: RecordedRequest): MockResponse {
+                val path = request.path.orEmpty()
+                requestedPaths += path
+                return when {
+                    path.startsWith("/api/inventory/stock") -> MockResponse().setResponseCode(200).setBody(
+                        """
+                        {
+                          "success": true,
+                          "data": {
+                            "data": [
+                              {
+                                "productId": "prod-clear-1",
+                                "sku": "PK-CLR",
+                                "productName": "Paku 5 cm",
+                                "categoryName": "Paku",
+                                "unitName": "Pcs",
+                                "baseUnitId": "unit-pcs",
+                                "baseUnitName": "Pcs",
+                                "quantity": "80.00",
+                                "minStock": "5.00",
+                                "priceBuy": "8000.00",
+                                "priceRetail": "10000.00",
+                                "priceContractor": "9500.00",
+                                "discount": "0.00",
+                                "isActive": true
+                              }
+                            ],
+                            "total": 1,
+                            "page": 1,
+                            "limit": 24,
+                            "totalPages": 1
+                          }
+                        }
+                        """.trimIndent()
+                    )
+                    else -> MockResponse().setResponseCode(500)
+                }
+            }
+        }
+
+        val onlineResult = repository.getProductStocks(page = 1, limit = 24)
+        assertTrue(onlineResult is RepositoryResult.Success)
+        val onlineItem = (onlineResult as RepositoryResult.Success).data.data.single()
+        assertEquals("unit-pcs", onlineItem.baseUnitId)
+        assertEquals("Pcs", onlineItem.unitName)
+        assertNull(onlineItem.secondaryUnitId)
+        assertNull(onlineItem.secondaryUnitName)
+        assertNull(onlineItem.secondaryUnitFactor)
+
+        assertTrue(requestedPaths.none { it.startsWith("/api/inventory/products") })
+        assertTrue(requestedPaths.none { it.startsWith("/api/inventory/units") })
+
+        val cached = database.productDao().getByServerId("prod-clear-1")
+        assertNotNull(cached)
+        cached!!
+        assertEquals("unit-pcs", cached.unitServerId)
+        assertEquals("Pcs", cached.unitName)
+        assertNull(cached.secondaryUnitServerId)
+        assertNull(cached.secondaryUnitName)
+        assertNull(cached.secondaryUnitFactor)
+
+        // Verify offline fallback also observes the cleared secondary unit.
+        server.dispatcher = object : Dispatcher() {
+            override fun dispatch(request: RecordedRequest): MockResponse = MockResponse().setResponseCode(503)
+        }
+        val offlineStocks = repository.getProductStocks(page = 1, limit = 24) as RepositoryResult.Success
+        val offlineItem = offlineStocks.data.data.single()
+        assertNull(offlineItem.secondaryUnitId)
+        assertNull(offlineItem.secondaryUnitName)
+        assertNull(offlineItem.secondaryUnitFactor)
+
+        val offlineProduct = repository.getProduct("prod-clear-1") as RepositoryResult.Success
+        assertNull(offlineProduct.data.secondaryUnitId)
+        assertNull(offlineProduct.data.secondaryUnitFactor)
     }
 }
