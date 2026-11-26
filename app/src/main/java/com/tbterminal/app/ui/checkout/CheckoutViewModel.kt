@@ -1446,7 +1446,7 @@ class CheckoutViewModel(
                 customerSearchQuery = target.customer?.name.orEmpty(),
                 isDeliveryEnabled = target.isDeliveryEnabled,
                 deliveryFee = target.deliveryFee,
-                deliveryFeeInput = if (target.deliveryFee > BigDecimal.ZERO) target.deliveryFee.toPlainString() else "",
+                deliveryFeeInput = if (target.deliveryFee > BigDecimal.ZERO) target.deliveryFee.toWholeRupiahInputText() else "",
                 deliveryAddress = target.deliveryAddress,
                 deliveryCourier = target.deliveryCourier,
                 deliveryFleet = target.deliveryFleet,
@@ -1483,11 +1483,11 @@ class CheckoutViewModel(
     }
 
     fun updateDeliveryFee(feeInput: String) {
-        val sanitized = feeInput.filter(Char::isDigit).trimStart('0').ifBlank { "0" }
-        val feeAmount = BigDecimal(sanitized)
+        val sanitized = sanitizeWholeRupiahInput(feeInput)
+        val feeAmount = parseWholeRupiahInput(sanitized) ?: BigDecimal.ZERO
         _uiState.update { state ->
             state.copy(
-                deliveryFeeInput = feeInput,
+                deliveryFeeInput = sanitized,
                 deliveryFee = feeAmount,
             ).recalculateCheckoutState(
                 items = state.cartItems,

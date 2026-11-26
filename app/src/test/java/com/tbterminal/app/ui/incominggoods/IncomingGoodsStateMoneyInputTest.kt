@@ -1,5 +1,7 @@
 package com.tbterminal.app.ui.incominggoods
 
+import com.tbterminal.app.ui.common.sanitizeIdrDecimalInput
+import com.tbterminal.app.ui.common.toIdrDecimalInputText
 import java.math.BigDecimal
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
@@ -7,17 +9,22 @@ import org.junit.Test
 
 class IncomingGoodsStateMoneyInputTest {
     @Test
-    fun `buyPrice accepts decimal unit prices and preserves prefill and total`() {
-        assertEquals("1250.50", "1250.50".decimalInput())
-        assertEquals("1250.50", "1250,50".decimalInput())
-        assertEquals("1250.5", BigDecimal("1250.50").toInputText())
+    fun `buyPrice uses Indonesian thousands and comma decimal rules`() {
+        assertEquals("1.250,50", sanitizeIdrDecimalInput("1.250,50"))
+        assertEquals("1333,33", BigDecimal("1333.33").toIdrDecimalInputText())
+        assertEquals("15000", BigDecimal("15000.00").toIdrDecimalInputText())
 
-        val state = IncomingGoodsUiState(
-            quantityInput = "3",
-            buyPriceInput = "1250,50".decimalInput()
-        )
-        assertEquals(0, BigDecimal("1250.50").compareTo(state.buyPrice))
-        assertEquals(0, BigDecimal("3751.50").compareTo(state.total))
+        val groupedWhole = IncomingGoodsUiState(quantityInput = "2", buyPriceInput = "15.000")
+        assertEquals(0, BigDecimal("15000").compareTo(groupedWhole.buyPrice))
+        assertEquals(0, BigDecimal("30000").compareTo(groupedWhole.total))
+
+        val decimalComma = IncomingGoodsUiState(quantityInput = "3", buyPriceInput = "1.333,33")
+        assertEquals(0, BigDecimal("1333.33").compareTo(decimalComma.buyPrice))
+        assertEquals(0, BigDecimal("3999.99").compareTo(decimalComma.total))
+
+        val rejectedDotDecimal = IncomingGoodsUiState(quantityInput = "3", buyPriceInput = "1333.33")
+        assertNull(rejectedDotDecimal.buyPrice)
+        assertNull(rejectedDotDecimal.total)
     }
 
     @Test

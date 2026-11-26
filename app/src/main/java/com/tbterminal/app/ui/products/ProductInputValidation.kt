@@ -1,5 +1,7 @@
 package com.tbterminal.app.ui.products
 
+import com.tbterminal.app.ui.common.parseIdrDecimalInput
+import com.tbterminal.app.ui.common.parseWholeRupiahInput
 import java.math.BigDecimal
 
 private val SKU_PATTERN = Regex("^[A-Z0-9][A-Z0-9._-]{0,49}$")
@@ -11,9 +13,9 @@ internal fun normalizeProductSku(value: String): String = value.trim().uppercase
 
 internal fun validateProductFormInput(input: ProductFormInput, isEditMode: Boolean): String? {
     val sku = normalizeProductSku(input.sku)
-    val priceBuy = input.priceBuy.toProductDecimalOrNull()
-    val priceRetail = input.priceRetail.toProductDecimalOrNull()
-    val priceContractor = input.priceContractor.toProductDecimalOrNull()
+    val priceBuy = parseIdrDecimalInput(input.priceBuy)
+    val priceRetail = parseWholeRupiahInput(input.priceRetail)
+    val priceContractor = parseWholeRupiahInput(input.priceContractor)
     val minStock = input.minStock.toProductDecimalOrNull()
     val secondaryUnitFactor = input.secondaryUnitFactor.toProductDecimalOrNull()
     return when {
@@ -30,8 +32,8 @@ internal fun validateProductFormInput(input: ProductFormInput, isEditMode: Boole
         input.usesSecondaryUnit && secondaryUnitFactor?.let { it > MAX_UNIT_CONVERSION_FACTOR } == true -> "Faktor konversi melebihi batas."
         input.usesSecondaryUnit && secondaryUnitFactor?.let { it.scale() > 4 } == true -> "Faktor konversi maksimal 4 angka desimal."
         priceBuy == null -> "Harga beli harus berupa angka valid."
-        priceRetail == null -> "Harga retail harus berupa angka valid."
-        priceContractor == null -> "Harga kontraktor harus berupa angka valid."
+        priceRetail == null -> "Harga retail harus berupa rupiah bulat tanpa desimal."
+        priceContractor == null -> "Harga kontraktor harus berupa rupiah bulat tanpa desimal."
         minStock == null -> "Stok minimum harus berupa angka valid."
         priceBuy < BigDecimal.ZERO -> "Harga beli tidak boleh negatif."
         priceRetail < BigDecimal.ZERO -> "Harga retail tidak boleh negatif."
@@ -39,7 +41,7 @@ internal fun validateProductFormInput(input: ProductFormInput, isEditMode: Boole
         minStock < BigDecimal.ZERO -> "Stok minimum tidak boleh negatif."
         priceBuy > MAX_PRICE || priceRetail > MAX_PRICE || priceContractor > MAX_PRICE -> "Harga melebihi batas."
         minStock > MAX_STOCK -> "Stok minimum melebihi batas."
-        priceBuy.scale() > 2 || priceRetail.scale() > 2 || priceContractor.scale() > 2 -> "Harga maksimal 2 angka desimal."
+        priceBuy.scale() > 2 -> "Harga beli maksimal 2 angka desimal."
         minStock.scale() > 2 -> "Stok minimum maksimal 2 angka desimal."
         else -> null
     }

@@ -77,4 +77,37 @@ class IdrMoneyInputParserTest {
         assertNull(parseWholeRupiahOrExactRemainingInput("150000,505", exactCents))
         assertNull(parseWholeRupiahOrExactRemainingInput("150000,50", BigDecimal("150000.00")))
     }
+
+    @Test
+    fun parseIdrDecimalInput_acceptsGroupedThousandsAndCommaDecimalUpToTwoPlaces() {
+        assertEquals(BigDecimal("15000"), parseIdrDecimalInput("15.000"))
+        assertEquals(BigDecimal("1333.33"), parseIdrDecimalInput("1.333,33"))
+        assertEquals(BigDecimal("1250.5"), parseIdrDecimalInput("1250,5"))
+        assertEquals(BigDecimal("15000"), parseIdrDecimalInput("15.000,00"))
+        assertEquals(BigDecimal.ZERO, parseIdrDecimalInput("0"))
+        assertEquals(BigDecimal.ZERO, parseIdrDecimalInput("0,00"))
+    }
+
+    @Test
+    fun parseIdrDecimalInput_rejectsDotDecimalsMalformedGroupingAndExcessScale() {
+        assertNull(parseIdrDecimalInput("1333.33"))
+        assertNull(parseIdrDecimalInput("15.00"))
+        assertNull(parseIdrDecimalInput("1.333,333"))
+        assertNull(parseIdrDecimalInput("1333,"))
+        assertNull(parseIdrDecimalInput(".500"))
+        assertNull(parseIdrDecimalInput("1.25.000"))
+        assertNull(parseIdrDecimalInput(""))
+        assertNull(parseIdrDecimalInput("   "))
+        assertNull(parseIdrDecimalInput("-1000"))
+    }
+
+    @Test
+    fun sanitizeIdrDecimalInput_and_toIdrDecimalInputText_behaveConsistently() {
+        assertEquals("1.333,33", sanitizeIdrDecimalInput("Rp 1.333,339"))
+        assertEquals("1333.33", sanitizeIdrDecimalInput("1333.33"))
+        assertEquals("15000", BigDecimal("15000.00").toIdrDecimalInputText())
+        assertEquals("1333,33", BigDecimal("1333.33").toIdrDecimalInputText())
+        assertEquals("1250,5", BigDecimal("1250.50").toIdrDecimalInputText())
+        assertEquals("0", BigDecimal("0.00").toIdrDecimalInputText())
+    }
 }

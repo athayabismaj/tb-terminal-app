@@ -130,10 +130,88 @@ internal fun parseWholeRupiahOrExactRemainingInput(
  * Formats an authoritative monetary [BigDecimal] for text field pre-fill without ".00" noise.
  */
 internal fun BigDecimal.toWholeRupiahInputText(): String {
-    val normalized = stripTrailingZeros()
+    val normalized = if (compareTo(BigDecimal.ZERO) == 0) BigDecimal.ZERO else stripTrailingZeros()
     return if (normalized.scale() <= 0) {
         normalized.setScale(0).toPlainString()
     } else {
         normalized.toPlainString().replace('.', ',')
     }
 }
+
+internal fun sanitizeIdrDecimalInput(
+    raw: String,
+    maxIntegerDigits: Int = DEFAULT_MAX_RUPIAH_DIGITS,
+    maxDecimalDigits: Int = 2,
+): String {
+    if (raw.isEmpty()) return ""
+    val builder = StringBuilder(raw.length)
+    var integerDigits = 0
+    var decimalDigits = 0
+    var seenComma = false
+    for (ch in raw) {
+        when {
+            ch.isDigit() -> {
+                if (!seenComma) {
+                    if (integerDigits < maxIntegerDigits) {
+                        builder.append(ch)
+                        integerDigits++
+                    }
+                } else if (decimalDigits < maxDecimalDigits) {
+                    builder.append(ch)
+                    decimalDigits++
+                }
+            }
+            ch == '.' && !seenComma -> {
+                if (builder.isNotEmpty() && builder.last() != '.') {
+                    builder.append(ch)
+                }
+            }
+            ch == ',' && !seenComma -> {
+                seenComma = true
+                builder.append(ch)
+            }
+        }
+    }
+    return builder.toString()
+}
+
+/**
+ * Parses Indonesian decimal rupiah input (e.g. buy prices with optional cents).
+ * Dots are accepted only as strict 3-digit thousand separators (`15.000`, `1.333,33`),
+ * and decimal cents require a comma with 1 to [maxDecimalDigits] digits (`1333.33` is rejected).
+ */
+internal fun parseIdrDecimalInput(
+    raw: String,
+    maxIntegerDigits: Int = DEFAULT_MAX_RUPIAH_DIGITS,
+    maxDecimalDigits: Int = 2,
+): BigDecimal? {
+    val trimmed = raw.trim()
+    if (trimmed.isEmpty()) return null
+    val parts = trimmed.split(',')
+    if (parts.size > 2) return null
+
+    val integerPart = parts[0]
+    val validIntegerFormat =
+        PLAIN_INTEGER_REGEX.matches(integerPart) || GROUPED_THOUSANDS_REGEX.matches(integerPart)
+    if (!validIntegerFormat) return null
+
+    val integerDigits = integerPart.replace(".", "")
+    if (integerDigits.length > maxIntegerDigits) return null
+
+    val canonicalNumber = if (parts.size == 2) {
+        val decimalPart = parts[1]
+        if (decimalPart.isEmpty() || decimalPart.length > maxDecimalDigits || !decimalPart.all(Char::isDigit)) {
+            return null
+        }
+        "$integerDigits.$decimalPart"
+    } else {
+        integerDigits
+    }
+
+    val parsed = canonicalNumber.toBigDecimalOrNull() ?: return null
+    if (parsed.compareTo(BigDecimal.ZERO) == 0) return BigDecimal.ZERO
+    val normalized = parsed.stripTrailingZeros()
+    return if (normalized.scale() < 0) normalized.setScale(0) else normalized
+}
+
+internal fun BigDecimal.toIdrDecimalInputText(): String = toWholeRupiahInputText()

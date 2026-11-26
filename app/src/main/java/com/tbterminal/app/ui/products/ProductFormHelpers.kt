@@ -1,6 +1,8 @@
 package com.tbterminal.app.ui.products
 
 import com.tbterminal.app.data.model.ProductUnit
+import com.tbterminal.app.ui.common.parseIdrDecimalInput
+import com.tbterminal.app.ui.common.parseWholeRupiahInput
 import java.math.BigDecimal
 import java.math.RoundingMode
 
@@ -11,8 +13,8 @@ internal fun List<ProductUnit>.selectedUnitLabel(unitId: String): String {
 }
 
 internal fun String.marginText(basePrice: String): String {
-    val buy = basePrice.toProductFormDecimalOrNull() ?: return "0%"
-    val sell = toProductFormDecimalOrNull() ?: return "0%"
+    val buy = parseIdrDecimalInput(basePrice) ?: return "0%"
+    val sell = parseWholeRupiahInput(this) ?: return "0%"
     if (buy.compareTo(BigDecimal.ZERO) <= 0) return "0%"
 
     val margin = sell.subtract(buy)
@@ -28,8 +30,4 @@ internal fun generateSku(productName: String): String {
         .take(3)
         .ifBlank { "PRD" }
     return "$prefix-${System.currentTimeMillis().toString().takeLast(6)}"
-}
-
-private fun String.toProductFormDecimalOrNull(): BigDecimal? {
-    return trim().replace(",", ".").takeIf(String::isNotBlank)?.toBigDecimalOrNull()
 }

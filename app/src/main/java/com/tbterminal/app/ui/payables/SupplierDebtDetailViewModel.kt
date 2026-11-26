@@ -9,6 +9,7 @@ import com.tbterminal.app.data.repository.PurchasingRepository
 import com.tbterminal.app.data.repository.RepositoryResult
 import com.tbterminal.app.ui.common.parseWholeRupiahOrExactRemainingInput
 import com.tbterminal.app.ui.common.sanitizeWholeRupiahInput
+import com.tbterminal.app.ui.common.toWholeRupiahInputText
 import com.tbterminal.app.ui.common.viewModelFactory
 import java.math.BigDecimal
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -131,7 +132,7 @@ internal class SupplierDebtDetailViewModel(
         _uiState.update {
             it.copy(
                 selectedPayable = payable,
-                paymentAmountInput = payable.remainingAmount.toInputText(),
+                paymentAmountInput = payable.remainingAmount.toWholeRupiahInputText(),
                 paymentMethod = SupplierPaymentMethod.Cash,
                 referenceInput = "",
                 notesInput = "",

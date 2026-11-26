@@ -108,7 +108,7 @@ class ReceivableViewModel(
         _uiState.update {
             it.copy(
                 selectedReceivable = receivable,
-                paymentAmountInput = receivable.remainingAmount.toInputText(),
+                paymentAmountInput = receivable.remainingAmount.toWholeRupiahInputText(),
                 paymentMethod = ReceivablePaymentMethod.Cash,
                 referenceInput = "",
                 notesInput = "",
@@ -129,7 +129,7 @@ class ReceivableViewModel(
     }
 
     fun onPaymentAmountChanged(value: String) {
-        _uiState.update { it.copy(paymentAmountInput = value.decimalInput()) }
+        _uiState.update { it.copy(paymentAmountInput = sanitizeWholeRupiahInput(value)) }
     }
 
     fun openOpeningBalance() {
@@ -194,7 +194,7 @@ class ReceivableViewModel(
         _uiState.update { state ->
             state.copy(
                 adjustmentReferenceInput = invoiceRef,
-                adjustmentAmountInput = invoice.remainingAmount.toInputText(),
+                adjustmentAmountInput = invoice.remainingAmount.toWholeRupiahInputText(),
                 adjustmentPrefilledRemaining = invoice.remainingAmount,
                 adjustmentDueDateInput = invoice.dueDate.ifBlank { state.adjustmentDueDateInput }
             )
@@ -219,7 +219,7 @@ class ReceivableViewModel(
             }
         }
     }
-    fun onAdjustmentAmountChanged(value: String) = _uiState.update { it.copy(adjustmentAmountInput = value.decimalInput()) }
+    fun onAdjustmentAmountChanged(value: String) = _uiState.update { it.copy(adjustmentAmountInput = sanitizeWholeRupiahInput(value)) }
     fun onAdjustmentDebtDateChanged(value: String) = _uiState.update { it.copy(adjustmentDebtDateInput = value) }
     fun onAdjustmentDueDateChanged(value: String) = _uiState.update { it.copy(adjustmentDueDateInput = value) }
     fun onAdjustmentReferenceChanged(value: String) = _uiState.update { it.copy(adjustmentReferenceInput = value.take(100)) }
@@ -277,7 +277,7 @@ class ReceivableViewModel(
         val updated = if (state.customers.none { it.id == customer.id }) state.customers + customer else state.customers
         state.copy(openingCustomerId = customer.id, customers = updated)
     }
-    fun onOpeningAmountChanged(value: String) = _uiState.update { it.copy(openingAmountInput = value.decimalInput()) }
+    fun onOpeningAmountChanged(value: String) = _uiState.update { it.copy(openingAmountInput = sanitizeWholeRupiahInput(value)) }
     fun onOpeningDebtDateChanged(value: String) = _uiState.update { it.copy(openingDebtDateInput = value) }
     fun onOpeningDueDateChanged(value: String) = _uiState.update { it.copy(openingDueDateInput = value) }
     fun onOpeningLegacyInvoiceChanged(value: String) =
@@ -518,13 +518,7 @@ class ReceivableViewModel(
     }
 }
 
-private fun String.decimalInput(): String {
-    return sanitizeWholeRupiahInput(this)
-}
 
-private fun BigDecimal.toInputText(): String {
-    return toWholeRupiahInputText()
-}
 
 internal fun canManageReceivableAdjustment(role: String): Boolean =
     AppAccessPolicy.can(role, AppCapability.ADJUST_RECEIVABLES)

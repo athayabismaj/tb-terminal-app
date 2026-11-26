@@ -14,6 +14,9 @@ import com.tbterminal.app.data.printer.PrinterResult
 import com.tbterminal.app.data.printer.ThermalPrinterManager
 import com.tbterminal.app.data.remote.NetworkResult
 import com.tbterminal.app.data.repository.SystemRepository
+import com.tbterminal.app.ui.common.parseWholeRupiahInput
+import com.tbterminal.app.ui.common.sanitizeWholeRupiahInput
+import com.tbterminal.app.ui.common.toWholeRupiahInputText
 import com.tbterminal.app.ui.common.viewModelFactory
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -21,6 +24,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import java.math.BigDecimal
+import java.math.RoundingMode
 
 data class SettingsUiState(
     val isLoading: Boolean = false,
@@ -216,7 +220,7 @@ class SettingsViewModel(
                 _uiState.update {
                     it.copy(
                         isSaving = false,
-                        cashTolerance = preferences.cashTolerance,
+                        cashTolerance = normalizeLegacyCashToleranceInput(preferences.cashTolerance),
                         autoLockMinutes = preferences.autoLockMinutes.toString(),
                         message = "Preferensi perangkat berhasil disimpan pada terminal ini."
                     )
@@ -255,7 +259,7 @@ class SettingsViewModel(
                             selectedPrinterName = displayName,
                             autoCutPaper = preferences.autoCutPaper,
                             openCashDrawer = preferences.openCashDrawer,
-                            cashTolerance = preferences.cashTolerance,
+                            cashTolerance = normalizeLegacyCashToleranceInput(preferences.cashTolerance),
                             autoLockMinutes = preferences.autoLockMinutes.toString(),
                             autoPrintReceipt = preferences.autoPrintReceipt,
                             scannerSoundFeedback = preferences.scannerSoundFeedback,
@@ -290,7 +294,7 @@ class SettingsViewModel(
     fun onCashRoundingRuleChanged(value: String) = _uiState.update { it.copy(cashRoundingRule = value, error = null) }
     fun onPrinterSizeChanged(value: String) = _uiState.update { it.copy(printerSize = value, error = null) }
     fun onCashToleranceChanged(value: String) = _uiState.update {
-        it.copy(cashTolerance = sanitizeMoneyInput(value), error = null)
+        it.copy(cashTolerance = sanitizeWholeRupiahInput(value), error = null)
     }
     fun onAutoLockMinutesChanged(value: String) = _uiState.update { it.copy(autoLockMinutes = value.filter(Char::isDigit), error = null) }
     fun onAutoPrintReceiptChanged(value: Boolean) = _uiState.update { it.copy(autoPrintReceipt = value, error = null) }
@@ -465,11 +469,10 @@ internal fun validateDevicePreferences(
     if (paperSize !in setOf("58mm", "80mm")) {
         return DevicePreferencesValidation(error = "Ukuran kertas harus 58mm atau 80mm.")
     }
-    val normalizedTolerance = cashTolerance.trim().replace(',', '.')
-    val tolerance = normalizedTolerance.toBigDecimalOrNull()
-        ?: return DevicePreferencesValidation(error = "Toleransi selisih kas harus berupa angka.")
-    if (tolerance < BigDecimal.ZERO || tolerance.scale() > 2) {
-        return DevicePreferencesValidation(error = "Toleransi kas tidak boleh negatif dan maksimal dua desimal.")
+    val tolerance = parseWholeRupiahInput(cashTolerance)
+        ?: return DevicePreferencesValidation(error = "Toleransi selisih kas harus berupa rupiah bulat tanpa desimal.")
+    if (tolerance < BigDecimal.ZERO) {
+        return DevicePreferencesValidation(error = "Toleransi kas tidak boleh negatif.")
     }
     val lockMinutes = autoLockMinutes.toIntOrNull()
         ?.takeIf { it in 1..120 }
@@ -482,7 +485,7 @@ internal fun validateDevicePreferences(
             printerBluetoothName = printerBluetoothName,
             autoCutPaper = autoCutPaper,
             openCashDrawer = openCashDrawer,
-            cashTolerance = tolerance.stripTrailingZeros().toPlainString(),
+            cashTolerance = tolerance.toWholeRupiahInputText(),
             autoLockMinutes = lockMinutes,
             scannerSoundFeedback = scannerSoundFeedback,
             scannerVibrateFeedback = scannerVibrateFeedback
@@ -490,22 +493,11 @@ internal fun validateDevicePreferences(
     )
 }
 
-private fun sanitizeMoneyInput(value: String): String {
-    val normalized = value.replace(',', '.')
-    val result = StringBuilder()
-    var separatorSeen = false
-    var decimals = 0
-    normalized.forEach { character ->
-        when {
-            character.isDigit() && (!separatorSeen || decimals < 2) -> {
-                result.append(character)
-                if (separatorSeen) decimals += 1
-            }
-            character == '.' && !separatorSeen -> {
-                result.append(character)
-                separatorSeen = true
-            }
-        }
-    }
-    return result.toString()
+internal fun normalizeLegacyCashToleranceInput(raw: String): String {
+    val trimmed = raw.trim()
+    parseWholeRupiahInput(trimmed)?.let { return it.toWholeRupiahInputText() }
+    val decimal = trimmed.replace(',', '.').toBigDecimalOrNull() ?: return trimmed
+    return decimal.setScale(0, RoundingMode.HALF_UP)
+        .coerceAtLeast(BigDecimal.ZERO)
+        .toWholeRupiahInputText()
 }

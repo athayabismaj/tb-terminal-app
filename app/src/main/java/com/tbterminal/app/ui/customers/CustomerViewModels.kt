@@ -1,5 +1,8 @@
 package com.tbterminal.app.ui.customers
 
+import com.tbterminal.app.ui.common.parseWholeRupiahInput
+import com.tbterminal.app.ui.common.toWholeRupiahInputText
+
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
@@ -383,7 +386,7 @@ private fun Customer.toFormInput(): CustomerFormInput {
         phone = phone.orEmpty(),
         address = address.orEmpty(),
         isContractor = isContractor,
-        creditLimit = creditLimit.stripTrailingZeros().toPlainString(),
+        creditLimit = creditLimit.toWholeRupiahInputText(),
         paymentTermDays = paymentTermDays.toString()
     )
 }
@@ -395,9 +398,9 @@ private fun CustomerFormInput.toCommandOrError(onError: (String) -> Unit): Custo
         return null
     }
 
-    val limit = creditLimit.numericInput().toBigDecimalOrNull()
+    val limit = parseWholeRupiahInput(creditLimit)
     if (limit == null || limit < BigDecimal.ZERO) {
-        onError("Limit kredit wajib berupa angka nol atau lebih.")
+        onError("Limit kredit wajib berupa rupiah bulat nol atau lebih.")
         return null
     }
 
@@ -437,12 +440,9 @@ internal fun validateCustomerForm(input: CustomerFormInput): Map<String, String>
         put(CUSTOMER_FIELD_ADDRESS, "Alamat maksimal 500 karakter.")
     }
 
-    val creditLimit = input.creditLimit.numericInput().toBigDecimalOrNull()
-    when {
-        creditLimit == null -> put(CUSTOMER_FIELD_CREDIT_LIMIT, "Limit kredit wajib berupa angka.")
-        creditLimit < BigDecimal.ZERO -> put(CUSTOMER_FIELD_CREDIT_LIMIT, "Limit kredit tidak boleh negatif.")
-        creditLimit.stripTrailingZeros().scale().coerceAtLeast(0) > 2 ->
-            put(CUSTOMER_FIELD_CREDIT_LIMIT, "Limit kredit maksimal dua angka desimal.")
+    val creditLimit = parseWholeRupiahInput(input.creditLimit)
+    if (creditLimit == null || creditLimit < BigDecimal.ZERO) {
+        put(CUSTOMER_FIELD_CREDIT_LIMIT, "Limit kredit wajib berupa rupiah bulat tanpa desimal.")
     }
 
     val paymentTerm = input.paymentTermDays.toIntOrNull()
@@ -458,6 +458,4 @@ internal const val CUSTOMER_FIELD_ADDRESS = "address"
 internal const val CUSTOMER_FIELD_CREDIT_LIMIT = "creditLimit"
 internal const val CUSTOMER_FIELD_PAYMENT_TERM = "paymentTermDays"
 
-internal fun String.numericInput(): String {
-    return filter { it.isDigit() || it == '.' || it == ',' }.replace(',', '.')
-}
+
