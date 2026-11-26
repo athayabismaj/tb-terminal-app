@@ -38,6 +38,8 @@ object SyncErrorClassifier {
             codeGuidance != null || normalizedCode in OFFLINE_CONFLICT_CODES -> SyncErrorCategory.CONFLICT
             httpCode == 401 -> SyncErrorCategory.AUTH
             httpCode == 403 || httpCode == 409 -> SyncErrorCategory.CONFLICT
+            httpCode == 429 || normalizedCode in RATE_LIMIT_CODES -> SyncErrorCategory.NETWORK
+            httpCode != null && httpCode >= 500 -> SyncErrorCategory.NETWORK
             throwable.isNetworkError() || message.hasNetworkKeyword() -> SyncErrorCategory.NETWORK
             message.hasConflictKeyword() -> SyncErrorCategory.CONFLICT
             httpCode != null && httpCode in 400..499 -> SyncErrorCategory.VALIDATION
@@ -47,6 +49,8 @@ object SyncErrorClassifier {
         val recommendation = when {
             codeGuidance != null -> codeGuidance.recommendation
             httpCode == 403 -> "Peran akun saat ini tidak diizinkan untuk melakukan tindakan sinkronisasi ini."
+            httpCode == 429 || normalizedCode in RATE_LIMIT_CODES ->
+                "Server sedang membatasi permintaan sementara. Sinkronisasi akan dicoba ulang otomatis."
             else -> category.recommendation(message)
         }
         return SyncErrorClassification(
@@ -140,6 +144,11 @@ object SyncErrorClassifier {
         "reference",
         "produk tidak ditemukan",
         "product not found"
+    )
+
+    private val RATE_LIMIT_CODES = setOf(
+        "RATE_LIMITED",
+        "TOO_MANY_REQUESTS",
     )
 
     private val OFFLINE_CONFLICT_CODES = setOf(

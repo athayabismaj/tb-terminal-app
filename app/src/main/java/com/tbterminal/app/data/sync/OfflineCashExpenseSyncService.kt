@@ -18,25 +18,61 @@ class OfflineCashExpenseSyncService(
     private val database: TbTerminalDatabase,
     private val salesApi: SalesApi,
     private val deviceId: String,
-    private val cashSessionSyncService: OfflineCashSessionSyncService
+    private val cashSessionSyncService: OfflineCashSessionSyncService,
+    private val clockMillis: () -> Long = { System.currentTimeMillis() },
 ) {
+    suspend fun recoverStaleSyncing(nowMillis: Long = clockMillis()) {
+        OfflineSyncCoordinator.withSyncLock {
+            recoverStaleSyncingUnlocked(nowMillis)
+        }
+    }
+
+    internal suspend fun recoverStaleSyncingUnlocked(nowMillis: Long = clockMillis()) {
+        val cutoff = nowMillis - SYNC_STALE_TIMEOUT_MS
+        database.withTransaction {
+            database.syncQueueDao().recoverStaleSyncingCashExpenses(
+                syncing = SyncStatus.SYNCING,
+                targetStatus = SyncStatus.PENDING,
+                syncedStatus = SyncStatus.SYNCED,
+                entityType = SyncEntityType.CASH_EXPENSE,
+                cutoffUpdatedAt = cutoff,
+                lastError = SYNC_STALE_ERROR,
+                updatedAt = nowMillis,
+            )
+            database.cashExpenseDao().recoverStaleSyncing(
+                syncing = SyncStatus.SYNCING,
+                targetStatus = SyncStatus.PENDING,
+                cutoffUpdatedAt = cutoff,
+                updatedAt = nowMillis,
+            )
+        }
+    }
+
     suspend fun syncExpense(localExpenseId: Long): OfflineCashExpenseSyncResult {
+        return OfflineSyncCoordinator.withSyncLock {
+            syncExpenseUnlocked(localExpenseId)
+        }
+    }
+
+    internal suspend fun syncExpenseUnlocked(localExpenseId: Long): OfflineCashExpenseSyncResult {
+        recoverStaleSyncingUnlocked()
         if (!markSyncingIfAllowed(localExpenseId)) {
             return OfflineCashExpenseSyncResult.Failed("Pengeluaran kas sedang disinkronkan atau sudah selesai.")
         }
 
-        return runCatching {
+        return runSuspendCatching {
             val expense = database.cashExpenseDao().getByLocalId(localExpenseId)
-                ?: return@runCatching fail(localExpenseId, "Pengeluaran kas lokal tidak ditemukan.", 1)
+                ?: return@runSuspendCatching fail(localExpenseId, "Pengeluaran kas lokal tidak ditemukan.", 1)
 
             val expenseForSync = when (val ensureResult = ensureCashSessionServerId(expense)) {
                 is EnsureExpenseSessionResult.Success -> ensureResult.expense
                 is EnsureExpenseSessionResult.Error -> {
-                    return@runCatching fail(
+                    return@runSuspendCatching fail(
                         localExpenseId = localExpenseId,
                         message = ensureResult.message,
                         retryIncrement = 1,
-                        kind = ensureResult.kind
+                        kind = ensureResult.kind,
+                        retryAfterSeconds = ensureResult.retryAfterSeconds,
                     )
                 }
             }
@@ -44,7 +80,7 @@ class OfflineCashExpenseSyncService(
             val request = when (val buildResult = buildRequest(expenseForSync)) {
                 is BuildExpenseSyncRequestResult.Success -> buildResult.request
                 is BuildExpenseSyncRequestResult.Error -> {
-                    return@runCatching fail(
+                    return@runSuspendCatching fail(
                         localExpenseId = localExpenseId,
                         message = buildResult.message,
                         retryIncrement = 1,
@@ -61,7 +97,8 @@ class OfflineCashExpenseSyncService(
                         "Server menolak pengeluaran kas offline (${response.code()})"
                     } else {
                         "Gagal terhubung ke server (${response.code()})"
-                    }
+                    },
+                    clockMillis = clockMillis,
                 )
                 val message = if (response.code() >= 500) {
                     "Gagal terhubung ke server (${response.code()})"
@@ -69,7 +106,7 @@ class OfflineCashExpenseSyncService(
                     parsedError.message
                 }
                 val errorCode = if (response.code() >= 500) null else parsedError.code
-                return@runCatching fail(
+                return@runSuspendCatching fail(
                     localExpenseId = localExpenseId,
                     message = message,
                     errorCode = errorCode,
@@ -78,7 +115,8 @@ class OfflineCashExpenseSyncService(
                         httpCode = response.code(),
                         message = message,
                         errorCode = errorCode
-                    ).toFailureKind()
+                    ).toFailureKind(),
+                    retryAfterSeconds = parsedError.retryAfterSeconds,
                 )
             }
 
@@ -87,7 +125,7 @@ class OfflineCashExpenseSyncService(
             if (body?.success != true || syncResponse == null) {
                 val errorCode = body?.code?.takeIf(String::isNotBlank)
                 val message = body?.message ?: body?.error ?: "Response sync pengeluaran kas tidak valid"
-                return@runCatching fail(
+                return@runSuspendCatching fail(
                     localExpenseId = localExpenseId,
                     message = message,
                     errorCode = errorCode,
@@ -98,7 +136,7 @@ class OfflineCashExpenseSyncService(
 
             val acceptedStatus = syncResponse.syncStatus.uppercase()
             if (acceptedStatus != "CREATED" && acceptedStatus != "DUPLICATE") {
-                return@runCatching fail(
+                return@runSuspendCatching fail(
                     localExpenseId = localExpenseId,
                     message = "Status sync pengeluaran kas tidak dikenali: ${syncResponse.syncStatus}",
                     retryIncrement = 1,
@@ -125,6 +163,16 @@ class OfflineCashExpenseSyncService(
         limit: Int = DEFAULT_AUTO_SYNC_LIMIT,
         includeFailed: Boolean = false
     ): OfflineCashExpenseBulkSyncResult {
+        return OfflineSyncCoordinator.withSyncLock {
+            syncPendingExpensesUnlocked(limit = limit, includeFailed = includeFailed)
+        }
+    }
+
+    internal suspend fun syncPendingExpensesUnlocked(
+        limit: Int = DEFAULT_AUTO_SYNC_LIMIT,
+        includeFailed: Boolean = false
+    ): OfflineCashExpenseBulkSyncResult {
+        recoverStaleSyncingUnlocked()
         val failedStatus = if (includeFailed) SyncStatus.FAILED else SyncStatus.PENDING
         val expenses = database.cashExpenseDao().getSyncCandidates(
             pending = SyncStatus.PENDING,
@@ -139,6 +187,21 @@ class OfflineCashExpenseSyncService(
         limit: Int = DEFAULT_AUTO_SYNC_LIMIT,
         includeFailed: Boolean = false
     ): OfflineCashExpenseBulkSyncResult {
+        return OfflineSyncCoordinator.withSyncLock {
+            syncPendingExpensesForSessionUnlocked(
+                cashSessionLocalId = cashSessionLocalId,
+                limit = limit,
+                includeFailed = includeFailed,
+            )
+        }
+    }
+
+    internal suspend fun syncPendingExpensesForSessionUnlocked(
+        cashSessionLocalId: Long,
+        limit: Int = DEFAULT_AUTO_SYNC_LIMIT,
+        includeFailed: Boolean = false
+    ): OfflineCashExpenseBulkSyncResult {
+        recoverStaleSyncingUnlocked()
         val failedStatus = if (includeFailed) SyncStatus.FAILED else SyncStatus.PENDING
         val expenses = database.cashExpenseDao().getSyncCandidatesByCashSession(
             cashSessionLocalId = cashSessionLocalId,
@@ -159,11 +222,13 @@ class OfflineCashExpenseSyncService(
         var authFailureCount = 0
         var transientFailureCount = 0
         var validationFailureCount = 0
+        var maxRetryAfterSeconds: Long? = null
         expenses.forEach { expense ->
-            when (val result = syncExpense(expense.localId)) {
+            when (val result = syncExpenseUnlocked(expense.localId)) {
                 is OfflineCashExpenseSyncResult.Success -> successCount += 1
                 is OfflineCashExpenseSyncResult.Failed -> {
                     failedCount += 1
+                    maxRetryAfterSeconds = maxNullableSeconds(maxRetryAfterSeconds, result.retryAfterSeconds)
                     when (result.kind) {
                         OfflineCheckoutSyncFailureKind.AUTH -> authFailureCount += 1
                         OfflineCheckoutSyncFailureKind.TRANSIENT -> transientFailureCount += 1
@@ -178,7 +243,8 @@ class OfflineCashExpenseSyncService(
                             failedCount = failedCount,
                             authFailureCount = authFailureCount,
                             transientFailureCount = transientFailureCount,
-                            validationFailureCount = validationFailureCount
+                            validationFailureCount = validationFailureCount,
+                            maxRetryAfterSeconds = maxRetryAfterSeconds,
                         )
                     }
                 }
@@ -191,7 +257,8 @@ class OfflineCashExpenseSyncService(
             failedCount = failedCount,
             authFailureCount = authFailureCount,
             transientFailureCount = transientFailureCount,
-            validationFailureCount = validationFailureCount
+            validationFailureCount = validationFailureCount,
+            maxRetryAfterSeconds = maxRetryAfterSeconds,
         )
     }
 
@@ -208,7 +275,7 @@ class OfflineCashExpenseSyncService(
                 kind = OfflineCheckoutSyncFailureKind.VALIDATION
             )
 
-        return when (val result = cashSessionSyncService.syncOpenSession(cashSessionLocalId)) {
+        return when (val result = cashSessionSyncService.syncOpenSessionUnlocked(cashSessionLocalId)) {
             is OfflineCashSessionSyncResult.Success -> {
                 database.cashExpenseDao().updateCashSessionServerIdForLocalSession(
                     cashSessionLocalId = cashSessionLocalId,
@@ -229,7 +296,8 @@ class OfflineCashExpenseSyncService(
                     EnsureExpenseSessionResult.Success(updatedExpense)
                 }
             }
-            is OfflineCashSessionSyncResult.Failed -> EnsureExpenseSessionResult.Error(result.message, result.kind)
+            is OfflineCashSessionSyncResult.Failed ->
+                EnsureExpenseSessionResult.Error(result.message, result.kind, result.retryAfterSeconds)
             is OfflineCashSessionSyncResult.Skipped -> EnsureExpenseSessionResult.Error(
                 message = result.message,
                 kind = OfflineCheckoutSyncFailureKind.VALIDATION
@@ -253,7 +321,7 @@ class OfflineCashExpenseSyncService(
         if (sessionLocalId == null) {
             return BuildExpenseSyncRequestResult.Error("Sesi kas lokal pengeluaran belum tersedia.")
         }
-        val session = runCatching { database.cashSessionDao().getByLocalId(sessionLocalId) }.getOrNull()
+        val session = database.cashSessionDao().getByLocalId(sessionLocalId)
             ?: return BuildExpenseSyncRequestResult.Error("Sesi kas lokal pengeluaran tidak ditemukan.")
         if (session.cashierUserId.isBlank()) {
             return BuildExpenseSyncRequestResult.Error("Kasir pengeluaran kas lokal belum tersedia.")
@@ -342,37 +410,40 @@ class OfflineCashExpenseSyncService(
         message: String,
         retryIncrement: Int,
         kind: OfflineCheckoutSyncFailureKind = OfflineCheckoutSyncFailureKind.VALIDATION,
-        errorCode: String? = null
+        errorCode: String? = null,
+        retryAfterSeconds: Long? = null,
     ): OfflineCashExpenseSyncResult.Failed {
-        val now = System.currentTimeMillis()
+        val now = clockMillis()
+        val effectiveRetryIncrement = if (kind == OfflineCheckoutSyncFailureKind.AUTH) 0 else retryIncrement
         database.withTransaction {
-            val status = if (kind == OfflineCheckoutSyncFailureKind.CONFLICT) {
-                SyncStatus.CONFLICT
-            } else {
-                SyncStatus.FAILED
-            }
+            val queue = database.syncQueueDao().getLatestForEntityAndOperation(
+                entityLocalId = localExpenseId,
+                entityType = SyncEntityType.CASH_EXPENSE,
+                operation = SyncOperation.CREATE
+            )
+            val status = resolveSyncFailureStatus(
+                kind = kind,
+                existingRetryCount = queue?.retryCount ?: 0,
+                retryIncrement = effectiveRetryIncrement,
+            )
             database.cashExpenseDao().updateSyncStatus(
                 localId = localExpenseId,
                 status = status,
                 syncedAt = null,
                 updatedAt = now
             )
-            database.syncQueueDao().getLatestForEntityAndOperation(
-                entityLocalId = localExpenseId,
-                entityType = SyncEntityType.CASH_EXPENSE,
-                operation = SyncOperation.CREATE
-            )?.let { queue ->
+            queue?.let {
                 database.syncQueueDao().updateStatus(
-                    id = queue.id,
+                    id = it.id,
                     status = status,
                     lastError = message,
                     lastErrorCode = errorCode,
-                    retryIncrement = retryIncrement,
+                    retryIncrement = effectiveRetryIncrement,
                     updatedAt = now
                 )
             }
         }
-        return OfflineCashExpenseSyncResult.Failed(message, kind)
+        return OfflineCashExpenseSyncResult.Failed(message, kind, retryAfterSeconds)
     }
 
     private fun Double.toMoney(): BigDecimal = BigDecimal.valueOf(this).setScale(2, RoundingMode.HALF_UP)
@@ -387,7 +458,8 @@ class OfflineCashExpenseSyncService(
         data class Success(val expense: LocalCashExpenseEntity) : EnsureExpenseSessionResult
         data class Error(
             val message: String,
-            val kind: OfflineCheckoutSyncFailureKind
+            val kind: OfflineCheckoutSyncFailureKind,
+            val retryAfterSeconds: Long? = null,
         ) : EnsureExpenseSessionResult
     }
 
@@ -410,7 +482,8 @@ sealed interface OfflineCashExpenseSyncResult {
 
     data class Failed(
         val message: String,
-        val kind: OfflineCheckoutSyncFailureKind = OfflineCheckoutSyncFailureKind.UNKNOWN
+        val kind: OfflineCheckoutSyncFailureKind = OfflineCheckoutSyncFailureKind.UNKNOWN,
+        val retryAfterSeconds: Long? = null,
     ) : OfflineCashExpenseSyncResult
 }
 
@@ -420,7 +493,8 @@ data class OfflineCashExpenseBulkSyncResult(
     val failedCount: Int,
     val authFailureCount: Int = 0,
     val transientFailureCount: Int = 0,
-    val validationFailureCount: Int = 0
+    val validationFailureCount: Int = 0,
+    val maxRetryAfterSeconds: Long? = null,
 ) {
     val hasAuthFailure: Boolean get() = authFailureCount > 0
     val hasTransientFailure: Boolean get() = transientFailureCount > 0

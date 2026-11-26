@@ -11,7 +11,7 @@ import com.tbterminal.app.data.session.SessionManager
 
 class SyncManager(
     private val database: TbTerminalDatabase,
-    private val networkMonitor: NetworkMonitor,
+    private val networkMonitor: NetworkConnectivity,
     private val backendHealthMonitor: BackendHealthMonitor,
     private val localAppSettingsDataSource: LocalAppSettingsDataSource,
     private val sessionManager: SessionManager,
@@ -55,22 +55,50 @@ class SyncManager(
             return SyncResult.Retry("Server belum tersambung.")
         }
 
-        return runCatching {
-            val sessionResult = offlineCashSessionSyncService.syncPendingOpenSessions()
-            if (sessionResult.hasAuthFailure) {
-                return SyncResult.AuthRequired("Sesi login tidak valid. Login ulang sebelum sinkronisasi.")
-            }
-            val result = offlineCheckoutSyncService.syncPendingOnly()
-            val expenseResult = offlineCashExpenseSyncService.syncPendingExpenses()
-            val closeSessionResult = offlineCashSessionSyncService.syncPendingCloseSessions()
-            when {
-                result.hasAuthFailure || expenseResult.hasAuthFailure || closeSessionResult.hasAuthFailure -> SyncResult.AuthRequired("Sesi login tidak valid. Login ulang sebelum sinkronisasi.")
-                result.hasTransientFailure -> SyncResult.Retry("Koneksi server belum stabil. Sinkronisasi akan dicoba lagi.")
-                sessionResult.hasTransientFailure -> SyncResult.Retry("Koneksi server belum stabil. Sinkronisasi sesi kas akan dicoba lagi.")
-                expenseResult.hasTransientFailure -> SyncResult.Retry("Koneksi server belum stabil. Sinkronisasi pengeluaran kas akan dicoba lagi.")
-                closeSessionResult.hasTransientFailure -> SyncResult.Retry("Koneksi server belum stabil. Sinkronisasi tutup sesi kas akan dicoba lagi.")
-                else -> SyncResult.Success(
-                    processedCount = sessionResult.successCount +
+        return runSuspendCatching {
+            OfflineSyncCoordinator.withSyncLock {
+                var totalProcessed = 0
+                var completedAllBatches = false
+                for (batch in 0 until MAX_BATCHES_PER_RUN) {
+                    val sessionResult = offlineCashSessionSyncService.syncPendingOpenSessionsUnlocked()
+                    if (sessionResult.hasAuthFailure) {
+                        return@withSyncLock SyncResult.AuthRequired("Sesi login tidak valid. Login ulang sebelum sinkronisasi.")
+                    }
+                    val result = offlineCheckoutSyncService.syncPendingOnlyUnlocked()
+                    val expenseResult = offlineCashExpenseSyncService.syncPendingExpensesUnlocked()
+                    val closeSessionResult = offlineCashSessionSyncService.syncPendingCloseSessionsUnlocked()
+
+                    if (result.hasAuthFailure || expenseResult.hasAuthFailure || closeSessionResult.hasAuthFailure) {
+                        return@withSyncLock SyncResult.AuthRequired("Sesi login tidak valid. Login ulang sebelum sinkronisasi.")
+                    }
+
+                    val maxRetryAfter = listOfNotNull(
+                        sessionResult.maxRetryAfterSeconds,
+                        result.maxRetryAfterSeconds,
+                        expenseResult.maxRetryAfterSeconds,
+                        closeSessionResult.maxRetryAfterSeconds,
+                    ).maxOrNull()
+
+                    when {
+                        result.hasTransientFailure -> return@withSyncLock SyncResult.Retry(
+                            reason = "Koneksi server belum stabil. Sinkronisasi akan dicoba lagi.",
+                            retryAfterSeconds = maxRetryAfter,
+                        )
+                        sessionResult.hasTransientFailure -> return@withSyncLock SyncResult.Retry(
+                            reason = "Koneksi server belum stabil. Sinkronisasi sesi kas akan dicoba lagi.",
+                            retryAfterSeconds = maxRetryAfter,
+                        )
+                        expenseResult.hasTransientFailure -> return@withSyncLock SyncResult.Retry(
+                            reason = "Koneksi server belum stabil. Sinkronisasi pengeluaran kas akan dicoba lagi.",
+                            retryAfterSeconds = maxRetryAfter,
+                        )
+                        closeSessionResult.hasTransientFailure -> return@withSyncLock SyncResult.Retry(
+                            reason = "Koneksi server belum stabil. Sinkronisasi tutup sesi kas akan dicoba lagi.",
+                            retryAfterSeconds = maxRetryAfter,
+                        )
+                    }
+
+                    val batchProcessed = sessionResult.successCount +
                         sessionResult.failedCount +
                         result.successCount +
                         result.failedCount +
@@ -78,18 +106,46 @@ class SyncManager(
                         expenseResult.failedCount +
                         closeSessionResult.successCount +
                         closeSessionResult.failedCount
+                    totalProcessed += batchProcessed
+
+                    if (batchProcessed == 0) {
+                        completedAllBatches = true
+                        break
+                    }
+                }
+                val hasMorePending = !completedAllBatches && hasRemainingPendingWork()
+                SyncResult.Success(
+                    processedCount = totalProcessed,
+                    hasMorePending = hasMorePending,
                 )
             }
         }.getOrElse { error ->
             SyncResult.Failed(error)
         }
     }
+
+    private suspend fun hasRemainingPendingWork(): Boolean {
+        return database.cashSessionDao().countPendingOpenSessions() > 0 ||
+            database.transactionDao().countPendingTransactions() > 0 ||
+            database.cashExpenseDao().countPendingExpenses() > 0 ||
+            database.cashSessionDao().countActionablePendingCloseSessions() > 0
+    }
+
+    private companion object {
+        const val MAX_BATCHES_PER_RUN = 10
+    }
 }
 
 sealed interface SyncResult {
-    data class Success(val processedCount: Int) : SyncResult
+    data class Success(
+        val processedCount: Int,
+        val hasMorePending: Boolean = false,
+    ) : SyncResult
     data class Skipped(val reason: String) : SyncResult
-    data class Retry(val reason: String) : SyncResult
+    data class Retry(
+        val reason: String,
+        val retryAfterSeconds: Long? = null,
+    ) : SyncResult
     data class AuthRequired(val reason: String) : SyncResult
     data class Failed(val error: Throwable) : SyncResult
 }

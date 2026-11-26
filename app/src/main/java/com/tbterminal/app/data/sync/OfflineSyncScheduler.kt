@@ -14,7 +14,7 @@ import java.util.concurrent.TimeUnit
 class OfflineSyncScheduler(
     context: Context,
     private val localAppSettingsDataSource: LocalAppSettingsDataSource,
-    private val networkMonitor: NetworkMonitor
+    private val networkMonitor: NetworkConnectivity
 ) {
     private val appContext = context.applicationContext
 
@@ -25,19 +25,7 @@ class OfflineSyncScheduler(
     }
 
     fun schedule() {
-        val request = OneTimeWorkRequestBuilder<SyncWorker>()
-            .setConstraints(
-                Constraints.Builder()
-                    .setRequiredNetworkType(NetworkType.CONNECTED)
-                    .build()
-            )
-            .setBackoffCriteria(
-                BackoffPolicy.EXPONENTIAL,
-                BACKOFF_DELAY_MINUTES,
-                TimeUnit.MINUTES
-            )
-            .build()
-
+        val request = buildSyncWorkRequest()
         WorkManager.getInstance(appContext).enqueueUniqueWork(
             SyncWorker.WORK_NAME,
             ExistingWorkPolicy.KEEP,
@@ -45,7 +33,47 @@ class OfflineSyncScheduler(
         )
     }
 
+    fun scheduleDelayed(delaySeconds: Long) {
+        val clampedDelay = delaySeconds.coerceIn(MIN_DELAYED_SECONDS, MAX_DELAYED_SECONDS)
+        val request = buildSyncWorkRequest(initialDelaySeconds = clampedDelay)
+        WorkManager.getInstance(appContext).enqueueUniqueWork(
+            SyncWorker.DELAYED_WORK_NAME,
+            ExistingWorkPolicy.APPEND_OR_REPLACE,
+            request
+        )
+    }
+
+    fun scheduleImmediateContinuation() {
+        val request = buildSyncWorkRequest()
+        WorkManager.getInstance(appContext).enqueueUniqueWork(
+            SyncWorker.DELAYED_WORK_NAME,
+            ExistingWorkPolicy.APPEND_OR_REPLACE,
+            request
+        )
+    }
+
+    private fun buildSyncWorkRequest(initialDelaySeconds: Long? = null) =
+        OneTimeWorkRequestBuilder<SyncWorker>()
+            .setConstraints(
+                Constraints.Builder()
+                    .setRequiredNetworkType(NetworkType.CONNECTED)
+                    .build()
+            )
+            .apply {
+                if (initialDelaySeconds != null && initialDelaySeconds > 0L) {
+                    setInitialDelay(initialDelaySeconds, TimeUnit.SECONDS)
+                }
+            }
+            .setBackoffCriteria(
+                BackoffPolicy.EXPONENTIAL,
+                BACKOFF_DELAY_SECONDS,
+                TimeUnit.SECONDS
+            )
+            .build()
+
     private companion object {
-        const val BACKOFF_DELAY_MINUTES = 10L
+        const val BACKOFF_DELAY_SECONDS = 60L
+        const val MIN_DELAYED_SECONDS = 1L
+        const val MAX_DELAYED_SECONDS = 3600L
     }
 }

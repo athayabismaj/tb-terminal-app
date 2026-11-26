@@ -117,6 +117,62 @@ interface SyncQueueDao {
         updatedAt: Long
     ): Unit
 
+    @Query(
+        """
+        UPDATE sync_queue
+        SET status = :targetStatus,
+            retryCount = retryCount + 1,
+            lastError = :lastError,
+            lastErrorCode = NULL,
+            updatedAt = :updatedAt
+        WHERE entityType = :entityType
+            AND status != :syncedStatus
+            AND entityLocalId IN (
+                SELECT localId
+                FROM local_cash_sessions
+                WHERE syncStatus = :syncing
+                    AND updatedAt < :cutoffUpdatedAt
+            )
+        """
+    )
+    suspend fun recoverStaleSyncingCashSessions(
+        syncing: SyncStatus,
+        targetStatus: SyncStatus,
+        syncedStatus: SyncStatus,
+        entityType: SyncEntityType,
+        cutoffUpdatedAt: Long,
+        lastError: String,
+        updatedAt: Long,
+    ): Unit
+
+    @Query(
+        """
+        UPDATE sync_queue
+        SET status = :targetStatus,
+            retryCount = retryCount + 1,
+            lastError = :lastError,
+            lastErrorCode = NULL,
+            updatedAt = :updatedAt
+        WHERE entityType = :entityType
+            AND status != :syncedStatus
+            AND entityLocalId IN (
+                SELECT localId
+                FROM local_cash_expenses
+                WHERE syncStatus = :syncing
+                    AND updatedAt < :cutoffUpdatedAt
+            )
+        """
+    )
+    suspend fun recoverStaleSyncingCashExpenses(
+        syncing: SyncStatus,
+        targetStatus: SyncStatus,
+        syncedStatus: SyncStatus,
+        entityType: SyncEntityType,
+        cutoffUpdatedAt: Long,
+        lastError: String,
+        updatedAt: Long,
+    ): Unit
+
     @Query("DELETE FROM sync_queue WHERE status = :status")
     suspend fun deleteByStatus(status: SyncStatus): Unit
 }
