@@ -76,14 +76,14 @@ private fun BackofficePreview() {
                 BackofficeDashboardContent(
                     role = "OWNER",
                     metrics = DashboardMetricsDto(
-                        totalRevenueToday = 4_850_000.0,
-                        totalRevenueThisMonth = 86_400_000.0,
-                        totalActiveReceivables = 7_250_000.0,
+                        totalRevenueToday = BigDecimal("4850000"),
+                        totalRevenueThisMonth = BigDecimal("86400000"),
+                        totalActiveReceivables = BigDecimal("7250000"),
                         activeReceivableCount = 6,
                         lowStockCount = 3,
                         lowStockItems = listOf(
-                            StockLowSummaryDto("preview-1", "BRG-001", "Beras Premium", 4.0, 10.0),
-                            StockLowSummaryDto("preview-2", "BRG-002", "Minyak Goreng", 2.0, 8.0)
+                            StockLowSummaryDto("preview-1", "BRG-001", "Beras Premium", BigDecimal("4"), BigDecimal("10")),
+                            StockLowSummaryDto("preview-2", "BRG-002", "Minyak Goreng", BigDecimal("2"), BigDecimal("8"))
                         )
                     ),
                     isLoading = false,

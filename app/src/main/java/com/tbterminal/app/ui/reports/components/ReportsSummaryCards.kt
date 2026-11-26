@@ -31,6 +31,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.tbterminal.app.data.remote.DashboardMetricsDto
+import java.math.BigDecimal
 
 @Composable
 fun ReportsSummaryCards(metrics: DashboardMetricsDto?) {
@@ -40,7 +41,7 @@ fun ReportsSummaryCards(metrics: DashboardMetricsDto?) {
     ) {
         DashboardSummaryCard(
             title = "Pendapatan Hari Ini",
-            value = (metrics?.totalRevenueToday ?: 0.0).toReportCurrency(),
+            value = (metrics?.totalRevenueToday ?: BigDecimal.ZERO).toReportCurrency(),
             description = "Ringkasan dari dashboard",
             icon = Icons.AutoMirrored.Outlined.TrendingUp,
             iconTint = ReportColors.Secondary,
@@ -49,7 +50,7 @@ fun ReportsSummaryCards(metrics: DashboardMetricsDto?) {
         )
         DashboardSummaryCard(
             title = "Pendapatan Bulan Ini",
-            value = (metrics?.totalRevenueThisMonth ?: 0.0).toReportCurrency(),
+            value = (metrics?.totalRevenueThisMonth ?: BigDecimal.ZERO).toReportCurrency(),
             description = "Akumulasi bulan berjalan",
             icon = Icons.Outlined.AccountBalanceWallet,
             iconTint = ReportColors.Primary,
@@ -58,7 +59,7 @@ fun ReportsSummaryCards(metrics: DashboardMetricsDto?) {
         )
         DashboardSummaryCard(
             title = "Total Piutang Aktif",
-            value = (metrics?.totalActiveReceivables ?: 0.0).toReportCurrency(),
+            value = (metrics?.totalActiveReceivables ?: BigDecimal.ZERO).toReportCurrency(),
             description = "${metrics?.activeReceivableCount ?: 0} tagihan aktif",
             icon = Icons.Outlined.CreditScore,
             iconTint = ReportColors.Orange,

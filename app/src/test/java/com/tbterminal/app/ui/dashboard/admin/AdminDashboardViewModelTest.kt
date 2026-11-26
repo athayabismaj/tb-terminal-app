@@ -69,7 +69,7 @@ class AdminDashboardViewModelTest {
         val state = viewModel.uiState.value
         assertFalse(state.isLoading)
         assertNotNull(state.metrics)
-        assertEquals(5000000.0, state.metrics?.totalRevenueToday ?: 0.0, 0.01)
+        assertEquals(0, BigDecimal("5000000").compareTo(state.metrics?.totalRevenueToday))
         assertNull(state.fullSalesReport)
         assertNull(state.financialTotals)
     }
@@ -135,9 +135,9 @@ class AdminDashboardViewModelTest {
 
 private class FakeDashboardAnalyticsRepository : AnalyticsRepository {
     override suspend fun getDashboardMetrics(): DashboardMetricsDto = DashboardMetricsDto(
-        totalRevenueToday = 5000000.0,
-        totalRevenueThisMonth = 85000000.0,
-        totalActiveReceivables = 12500000.0,
+        totalRevenueToday = BigDecimal("5000000"),
+        totalRevenueThisMonth = BigDecimal("85000000"),
+        totalActiveReceivables = BigDecimal("12500000"),
         activeReceivableCount = 4,
         lowStockCount = 3,
         lowStockItems = emptyList()
@@ -148,8 +148,8 @@ private class FakeDashboardAnalyticsRepository : AnalyticsRepository {
             DailySalesSummaryDto(
                 date = "2026-10-1$index",
                 transactionCount = 10L,
-                totalRevenue = 1500000.0,
-                totalDp = 0.0
+                totalRevenue = BigDecimal("1500000"),
+                totalDp = BigDecimal.ZERO
             )
         }
 

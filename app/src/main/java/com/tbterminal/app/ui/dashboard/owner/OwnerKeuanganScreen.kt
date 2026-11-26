@@ -135,8 +135,9 @@ internal fun OwnerKeuanganRoute(
             var activeSession = false
 
             metricsRes.getOrNull()?.let { metrics ->
-                loadedInflow = metrics.totalRevenueToday
-                loadedReceivables = metrics.totalActiveReceivables
+                // Display-only conversion for UI summary state; never used for calculations, storage, or server submission (see docs/BACKLOG.md).
+                loadedInflow = metrics.totalRevenueToday.toDouble()
+                loadedReceivables = metrics.totalActiveReceivables.toDouble()
                 loadedReceivablesCount = metrics.activeReceivableCount.toInt()
             }
 

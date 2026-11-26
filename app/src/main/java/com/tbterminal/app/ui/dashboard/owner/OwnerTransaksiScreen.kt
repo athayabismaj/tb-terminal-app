@@ -66,7 +66,6 @@ import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
-import kotlin.math.roundToLong
 import kotlinx.coroutines.async
 import kotlinx.coroutines.coroutineScope
 
@@ -158,7 +157,7 @@ internal fun OwnerTransaksiRoute(
                 TransaksiSummary(
                     label = "Ringkasan penjualan",
                     periodChip = "Hari ini",
-                    amount = metrics.totalRevenueToday.roundToLong(),
+                    amount = metrics.totalRevenueToday.toLongAmount(),
                     footerLabel = "Total transaksi",
                     footerValue = "$todayTxCount struk"
                 )
