@@ -3,7 +3,6 @@ package com.tbterminal.app.ui.incominggoods
 import com.tbterminal.app.data.model.ProductStock
 import com.tbterminal.app.data.model.Supplier
 import com.tbterminal.app.ui.common.parseWholeRupiahInput
-import com.tbterminal.app.ui.common.toWholeRupiahInputText
 import java.math.BigDecimal
 
 data class IncomingGoodsUiState(
@@ -35,7 +34,7 @@ data class IncomingGoodsUiState(
         get() = quantityInput.toBigDecimalOrNull()
 
     val buyPrice: BigDecimal?
-        get() = parseWholeRupiahInput(buyPriceInput)
+        get() = buyPriceInput.toBigDecimalOrNull()
 
     val total: BigDecimal?
         get() {
@@ -171,7 +170,7 @@ internal fun String.decimalInput(): String {
 }
 
 internal fun BigDecimal.toInputText(): String {
-    return toWholeRupiahInputText()
+    return stripTrailingZeros().toPlainString()
 }
 
 

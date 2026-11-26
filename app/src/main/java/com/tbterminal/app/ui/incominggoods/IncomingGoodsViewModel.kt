@@ -201,7 +201,7 @@ class IncomingGoodsViewModel(
     }
 
     fun onBuyPriceChanged(value: String) {
-        _uiState.update { it.copy(buyPriceInput = sanitizeWholeRupiahInput(value)).withSyncedCashPayment() }
+        _uiState.update { it.copy(buyPriceInput = value.decimalInput()).withSyncedCashPayment() }
     }
 
     fun onAmountPaidChanged(value: String) {
