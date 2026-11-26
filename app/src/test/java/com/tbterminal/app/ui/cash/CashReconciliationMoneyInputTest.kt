@@ -49,7 +49,13 @@ import com.tbterminal.app.data.repository.RepositoryResult
 import com.tbterminal.app.data.sync.OfflineCashExpenseSyncResult
 import com.tbterminal.app.data.sync.OfflineCashExpenseSyncService
 import com.tbterminal.app.data.sync.OfflineCashSessionSyncService
+import com.tbterminal.app.ui.cash.components.applyPettyCashQuickChip
 import com.tbterminal.app.ui.checkout.CheckoutViewModel
+import com.tbterminal.app.ui.checkout.PaymentMethod
+import com.tbterminal.app.ui.checkout.SplitPaymentLineUi
+import com.tbterminal.app.ui.checkout.validateCheckoutPaymentInput
+import com.tbterminal.app.ui.checkout.validateSplitCheckoutPayment
+import org.junit.Assert.assertNotNull
 import java.io.IOException
 import java.math.BigDecimal
 import kotlinx.coroutines.Dispatchers
@@ -150,7 +156,10 @@ class CashReconciliationMoneyInputTest {
         val cases = listOf(
             Triple("20000", 20_000.0, "20000.00"),
             Triple("20.000", 20_000.0, "20000.00"),
-            Triple("1.250.000", 1_250_000.0, "1250000.00")
+            Triple("1.250.000", 1_250_000.0, "1250000.00"),
+            Triple("20000,00", 20_000.0, "20000.00"),
+            Triple("20.000,0", 20_000.0, "20000.00"),
+            Triple(applyPettyCashQuickChip("", 20_000L), 20_000.0, "20000.00"),
         )
 
         cases.forEachIndexed { index, (input, expectedDouble, expectedSyncAmount) ->
@@ -183,15 +192,19 @@ class CashReconciliationMoneyInputTest {
             assertEquals("Wrong synced amount for input '$input'", expectedSyncAmount, requestJson["amount"]?.jsonPrimitive?.content)
         }
 
-        val countBeforeZero = database.cashExpenseDao().getByCashSession(sessionLocalId).size
+        val countBeforeRejected = database.cashExpenseDao().getByCashSession(sessionLocalId).size
         vm.showPettyCashDialog(CashMovementType.CASH_OUT)
         vm.onPettyCashAmountChanged("0")
         vm.onPettyCashDescriptionChanged("Bensin 0")
         vm.addPettyCash()
         advanceUntilIdle()
-
         assertEquals("Nominal harus lebih besar dari nol.", vm.uiState.value.errorMessage)
-        assertEquals(countBeforeZero, database.cashExpenseDao().getByCashSession(sessionLocalId).size)
+
+        vm.onPettyCashAmountChanged("1.500,50")
+        vm.addPettyCash()
+        advanceUntilIdle()
+        assertEquals("Nominal wajib diisi dengan angka valid.", vm.uiState.value.errorMessage)
+        assertEquals(countBeforeRejected, database.cashExpenseDao().getByCashSession(sessionLocalId).size)
     }
 
     @Test
@@ -210,7 +223,10 @@ class CashReconciliationMoneyInputTest {
         val validCases = listOf(
             "20000" to BigDecimal("20000"),
             "20.000" to BigDecimal("20000"),
-            "1.250.000" to BigDecimal("1250000")
+            "1.250.000" to BigDecimal("1250000"),
+            "20000,00" to BigDecimal("20000"),
+            "20.000,0" to BigDecimal("20000"),
+            applyPettyCashQuickChip("", 20_000L) to BigDecimal("20000"),
         )
 
         validCases.forEachIndexed { index, (input, expected) ->
@@ -225,15 +241,19 @@ class CashReconciliationMoneyInputTest {
             assertEquals(0, expected.compareTo(onlineRepo.recordedExpenses.last().first))
         }
 
-        val countBeforeZero = onlineRepo.recordedExpenses.size
+        val countBeforeRejected = onlineRepo.recordedExpenses.size
         vm.showPettyCashDialog(CashMovementType.CASH_OUT)
         vm.onPettyCashAmountChanged("0")
         vm.onPettyCashDescriptionChanged("Zero")
         vm.addPettyCash()
         advanceUntilIdle()
-
         assertEquals("Nominal harus lebih besar dari nol.", vm.uiState.value.errorMessage)
-        assertEquals(countBeforeZero, onlineRepo.recordedExpenses.size)
+
+        vm.onPettyCashAmountChanged("1.500,50")
+        vm.addPettyCash()
+        advanceUntilIdle()
+        assertEquals("Nominal wajib diisi dengan angka valid.", vm.uiState.value.errorMessage)
+        assertEquals(countBeforeRejected, onlineRepo.recordedExpenses.size)
     }
 
     @Test
@@ -248,11 +268,19 @@ class CashReconciliationMoneyInputTest {
         )
         advanceUntilIdle()
 
+        vm.onOpeningCashChanged("1.500,50")
+        vm.openSession()
+        advanceUntilIdle()
+        assertEquals("Modal awal wajib diisi dengan angka valid.", vm.uiState.value.errorMessage)
+
         val inputs = listOf(
             "0" to 0.0,
             "20000" to 20_000.0,
             "20.000" to 20_000.0,
-            "1.250.000" to 1_250_000.0
+            "1.250.000" to 1_250_000.0,
+            "20000,00" to 20_000.0,
+            "20.000,0" to 20_000.0,
+            applyPettyCashQuickChip("", 20_000L) to 20_000.0,
         )
 
         inputs.forEachIndexed { index, (input, expectedDouble) ->
@@ -264,6 +292,11 @@ class CashReconciliationMoneyInputTest {
             val localId = vm.uiState.value.localCashSessionId!!
             val openedEntity = database.cashSessionDao().getByLocalId(localId)!!
             assertEquals("Wrong startingCash for '$input'", expectedDouble, openedEntity.startingCash, 0.001)
+
+            vm.onClosingCashChanged("1.500,50")
+            vm.closeSession()
+            advanceUntilIdle()
+            assertEquals("Kas fisik akhir wajib diisi dengan angka valid.", vm.uiState.value.errorMessage)
 
             vm.onClosingCashChanged(input)
             vm.onClosingNotesChanged("Tutup $index")
@@ -278,29 +311,74 @@ class CashReconciliationMoneyInputTest {
 
     @Test
     fun checkoutCashPaymentInput_stripsThousandSeparatorsCleanly() = runTest(testDispatcher) {
-        val checkoutVm = buildCheckoutViewModel()
+        val onlineRepo = RecordingOnlineCashRepo()
+        val checkoutVm = buildCheckoutViewModel(onlineRepo)
         advanceUntilIdle()
 
-        val cases = listOf(
-            "20000" to "20000",
-            "20.000" to "20000",
-            "1.250.000" to "1250000",
-            "0" to "0"
+        val validCases = listOf(
+            "20000" to BigDecimal("20000"),
+            "20.000" to BigDecimal("20000"),
+            "1.250.000" to BigDecimal("1250000"),
+            "20000,00" to BigDecimal("20000"),
+            "20.000,0" to BigDecimal("20000"),
+            applyPettyCashQuickChip("", 20_000L) to BigDecimal("20000"),
         )
 
-        cases.forEach { (raw, expectedNormalized) ->
+        validCases.forEach { (raw, expected) ->
             checkoutVm.onAmountPaidChanged(raw)
-            assertEquals(expectedNormalized, checkoutVm.uiState.value.amountPaidInput)
+            val payRes = validateCheckoutPaymentInput(PaymentMethod.TUNAI, checkoutVm.uiState.value.amountPaidInput, BigDecimal("20000"))
+            assertNull("Unexpected payment error for '$raw'", payRes.error)
+            assertEquals(0, expected.compareTo(payRes.amountPaid!!))
+
+            val splitRes = validateSplitCheckoutPayment(
+                lines = listOf(
+                    SplitPaymentLineUi(method = PaymentMethod.TUNAI, amountInput = raw),
+                    SplitPaymentLineUi(method = PaymentMethod.QRIS, amountInput = "10.000"),
+                ),
+                total = expected.add(BigDecimal("10000")),
+                isDpMode = false,
+                customerSelected = false,
+            )
+            assertNull("Unexpected split payment error for '$raw'", splitRes.error)
+            assertEquals(0, expected.compareTo(splitRes.cashTendered))
 
             checkoutVm.onStartingCashChanged(raw)
-            assertEquals(expectedNormalized, checkoutVm.uiState.value.startingCashInput)
-
             checkoutVm.onPettyCashAmountChanged(raw)
-            assertEquals(expectedNormalized, checkoutVm.uiState.value.pettyCashAmountInput)
+            assertEquals(raw, checkoutVm.uiState.value.amountPaidInput)
         }
+
+        // Reject comma non-zero decimal "1.500,50" without turning it into 150050
+        checkoutVm.onAmountPaidChanged("1.500,50")
+        assertEquals("1.500,50", checkoutVm.uiState.value.amountPaidInput)
+        assertNotNull(validateCheckoutPaymentInput(PaymentMethod.TUNAI, checkoutVm.uiState.value.amountPaidInput, BigDecimal("1000")).error)
+        assertNotNull(
+            validateSplitCheckoutPayment(
+                lines = listOf(SplitPaymentLineUi(method = PaymentMethod.TUNAI, amountInput = checkoutVm.uiState.value.amountPaidInput)),
+                total = BigDecimal("1000"),
+                isDpMode = false,
+                customerSelected = false,
+            ).error
+        )
+
+        // Check zero payment and opening session via CheckoutViewModel
+        val zeroPay = validateCheckoutPaymentInput(PaymentMethod.TUNAI, "0", BigDecimal.ZERO)
+        assertNull(zeroPay.error)
+        assertEquals(0, BigDecimal.ZERO.compareTo(zeroPay.amountPaid!!))
+
+        checkoutVm.onStartingCashChanged("1.500,50")
+        checkoutVm.openCashSession()
+        advanceUntilIdle()
+        assertNotNull(checkoutVm.uiState.value.cashSessionError)
+
+        checkoutVm.onStartingCashChanged("20.000")
+        checkoutVm.openCashSession()
+        advanceUntilIdle()
+        assertEquals(0, BigDecimal("20000").compareTo(onlineRepo.openedSessions.last()))
     }
 
-    private fun buildCheckoutViewModel(): CheckoutViewModel {
+    private fun buildCheckoutViewModel(
+        cashRepo: CashReconciliationRepository = OfflineCashRepo(),
+    ): CheckoutViewModel {
         return CheckoutViewModel(
             checkoutRepository = object : CheckoutRepository {
                 override suspend fun previewCheckout(command: CheckoutPreviewCommand): RepositoryResult<CheckoutPreview> = error("unused")
@@ -342,7 +420,7 @@ class CashReconciliationMoneyInputTest {
                 override suspend fun deactivateCustomer(id: String): RepositoryResult<Unit> = error("unused")
                 override suspend fun activateCustomer(id: String): RepositoryResult<Customer> = error("unused")
             },
-            cashReconciliationRepository = OfflineCashRepo()
+            cashReconciliationRepository = cashRepo
         )
     }
 }
@@ -375,6 +453,7 @@ private class OfflineCashRepo : CashReconciliationRepository {
 
 private class RecordingOnlineCashRepo : CashReconciliationRepository {
     val recordedExpenses = mutableListOf<Pair<BigDecimal, String>>()
+    val openedSessions = mutableListOf<BigDecimal>()
 
     override suspend fun getActiveSession(): RepositoryResult<CashSession?> = RepositoryResult.Success(
         CashSession(
@@ -392,7 +471,24 @@ private class RecordingOnlineCashRepo : CashReconciliationRepository {
         )
     )
 
-    override suspend fun openSession(startingCash: BigDecimal): RepositoryResult<CashSession> = error("unused")
+    override suspend fun openSession(startingCash: BigDecimal): RepositoryResult<CashSession> {
+        openedSessions += startingCash
+        return RepositoryResult.Success(
+            CashSession(
+                id = "srv-sess-opened-${openedSessions.size}",
+                userId = "kasir-1",
+                openedAt = "2026-11-26T08:00:00+07:00",
+                closedAt = null,
+                openingCash = startingCash,
+                closingCash = null,
+                systemCash = startingCash,
+                difference = null,
+                totalExpenses = BigDecimal.ZERO,
+                notes = null,
+                status = "OPEN"
+            )
+        )
+    }
     override suspend fun getSessions(page: Int, limit: Int, status: String?, startDate: String?, endDate: String?): RepositoryResult<CashSessionPage> = error("unused")
     override suspend fun getSessionById(id: String): RepositoryResult<CashSession> = error("unused")
     override suspend fun closeSession(endingCashPhysical: BigDecimal, notes: String?): RepositoryResult<CashSession> = error("unused")

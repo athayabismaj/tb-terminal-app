@@ -13,10 +13,10 @@ class AdjustmentSupplierDebtValidationTest {
     @Test
     fun validAdjustmentIsNormalized() {
         val value = validateAdjustmentSupplierDebtInput(
-            "active-supplier-1", activeSuppliers, "1500000.25", "2026-08-19", "2026-09-19",
+            "active-supplier-1", activeSuppliers, "1.500.000,00", "2026-08-19", "2026-09-19",
             " FAKTUR-ADJ-01 ", " Koreksi retur semen ", today
         ).getOrThrow()
-        assertEquals(BigDecimal("1500000.25"), value.amount)
+        assertEquals(BigDecimal("1500000"), value.amount)
         assertEquals("FAKTUR-ADJ-01", value.reference)
         assertEquals("Koreksi retur semen", value.reason)
     }
@@ -24,7 +24,7 @@ class AdjustmentSupplierDebtValidationTest {
     @Test
     fun inactiveSupplierAndInvalidAmountsAreRejected() {
         assertTrue(validate("inactive", "100000", "REF", "Alasan").isFailure)
-        listOf("0", "-1", "1.001", "abc").forEach { assertTrue(validate("active-supplier-1", it, "REF", "Alasan").isFailure) }
+        listOf("0", "-1", "1.500,50", "1,001", "100.01", "abc").forEach { assertTrue(validate("active-supplier-1", it, "REF", "Alasan").isFailure) }
     }
 
     @Test

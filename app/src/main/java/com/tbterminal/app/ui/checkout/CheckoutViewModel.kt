@@ -42,6 +42,9 @@ import com.tbterminal.app.data.validation.CredentialValidator
 import com.tbterminal.app.navigation.AppAccessPolicy
 import com.tbterminal.app.ui.auth.formatPinLockoutMessage
 import com.tbterminal.app.ui.common.UiText
+import com.tbterminal.app.ui.common.parseWholeRupiahInput
+import com.tbterminal.app.ui.common.sanitizeWholeRupiahInput
+import com.tbterminal.app.ui.common.toWholeRupiahInputText
 import com.tbterminal.app.ui.common.viewModelFactory
 import java.math.BigDecimal
 import java.time.Instant
@@ -222,9 +225,9 @@ class CheckoutViewModel(
     }
 
     fun onStartingCashChanged(value: String) {
-        val digitsOnly = value.filter(Char::isDigit).take(MAX_CASH_INPUT_LENGTH)
+        val sanitized = sanitizeWholeRupiahInput(value, MAX_CASH_INPUT_LENGTH)
         _uiState.update { state ->
-            state.copy(startingCashInput = digitsOnly, cashSessionError = null)
+            state.copy(startingCashInput = sanitized, cashSessionError = null)
         }
     }
 
@@ -235,7 +238,7 @@ class CheckoutViewModel(
             }
             return
         }
-        val startingCash = _uiState.value.startingCashInput.toBigDecimalOrNull()
+        val startingCash = parseWholeRupiahInput(_uiState.value.startingCashInput)
         if (startingCash == null || startingCash < BigDecimal.ZERO) {
             _uiState.update { state ->
                 state.copy(cashSessionError = UiText.DynamicString("Modal awal kas belum valid."))
@@ -1340,7 +1343,9 @@ class CheckoutViewModel(
     }
 
     fun onPettyCashAmountChanged(amount: String) {
-        _uiState.update { it.copy(pettyCashAmountInput = amount.filter(Char::isDigit), pettyCashError = null) }
+        _uiState.update {
+            it.copy(pettyCashAmountInput = sanitizeWholeRupiahInput(amount, MAX_CASH_INPUT_LENGTH), pettyCashError = null)
+        }
     }
 
     fun onPettyCashCategoryChanged(category: String) {
@@ -1353,7 +1358,7 @@ class CheckoutViewModel(
 
     fun submitPettyCash() {
         val state = _uiState.value
-        val amount = state.pettyCashAmountInput.toBigDecimalOrNull()
+        val amount = parseWholeRupiahInput(state.pettyCashAmountInput)
             ?: return _uiState.update { it.copy(pettyCashError = "Nominal wajib diisi angka valid.") }
         if (amount <= BigDecimal.ZERO) return _uiState.update { it.copy(pettyCashError = "Nominal harus lebih dari nol.") }
         val type = state.pettyCashType
@@ -1741,7 +1746,7 @@ class CheckoutViewModel(
                     PaymentMethod.DP -> {
                         if (state.selectedPaymentMethod == PaymentMethod.DP) state.amountPaidInput else ""
                     }
-                    else -> updated.finalTotal.toPlainString()
+                    else -> updated.finalTotal.toWholeRupiahInputText()
                 }
             )
         }
@@ -1749,7 +1754,7 @@ class CheckoutViewModel(
 
     fun onAmountPaidChanged(value: String) {
         _uiState.update { state ->
-            state.copy(amountPaidInput = value.moneyInput(), errorEvent = null)
+            state.copy(amountPaidInput = sanitizeWholeRupiahInput(value, MAX_CASH_INPUT_LENGTH), errorEvent = null)
         }
     }
 
@@ -1817,7 +1822,7 @@ class CheckoutViewModel(
                 method
             }
             val currentPaid = state.splitPaymentLines.fold(BigDecimal.ZERO) { acc, line ->
-                acc.add(line.amountInput.trim().replace(',', '.').toBigDecimalOrNull() ?: BigDecimal.ZERO)
+                acc.add(parseWholeRupiahInput(line.amountInput) ?: BigDecimal.ZERO)
             }
             val remaining = state.finalTotal.subtract(currentPaid).coerceAtLeast(BigDecimal.ZERO)
             val newLines = state.splitPaymentLines + SplitPaymentLineUi(
@@ -1854,7 +1859,7 @@ class CheckoutViewModel(
 
     fun updateSplitPaymentLineAmount(lineId: String, value: String) {
         _uiState.update { state ->
-            val sanitized = value.moneyInput()
+            val sanitized = sanitizeWholeRupiahInput(value, MAX_CASH_INPUT_LENGTH)
             val newLines = state.splitPaymentLines.map { line ->
                 if (line.id == lineId) line.copy(amountInput = sanitized) else line
             }
@@ -2067,7 +2072,7 @@ class CheckoutViewModel(
         }
         val paymentLinesForSubmit = if (isSplit) {
             state.splitPaymentLines.mapNotNull { line ->
-                val amt = line.amountInput.trim().replace(',', '.').toBigDecimalOrNull() ?: return@mapNotNull null
+                val amt = parseWholeRupiahInput(line.amountInput) ?: return@mapNotNull null
                 CheckoutPaymentLine(
                     method = line.method.apiValue(),
                     amount = amt.toPlainString(),
@@ -2608,7 +2613,7 @@ class CheckoutViewModel(
                 state.finalTotal.subtract(splitValidation!!.nonCashPaid).coerceAtLeast(BigDecimal.ZERO)
             } else null
             state.splitPaymentLines.mapNotNull { line ->
-                val rawAmt = line.amountInput.trim().replace(',', '.').toBigDecimalOrNull() ?: return@mapNotNull null
+                val rawAmt = parseWholeRupiahInput(line.amountInput) ?: return@mapNotNull null
                 val appliedAmt = if (line.method == PaymentMethod.TUNAI && remainingCashApplied != null) {
                     remainingCashApplied
                 } else rawAmt
@@ -2652,7 +2657,7 @@ class CheckoutViewModel(
     private fun resolveLocalCheckoutPaidAmount(state: CheckoutUiState): Double? {
         return when (state.selectedPaymentMethod) {
             PaymentMethod.HUTANG -> BigDecimal.ZERO
-            PaymentMethod.DP -> state.amountPaidInput.toBigDecimalOrNull()
+            PaymentMethod.DP -> parseWholeRupiahInput(state.amountPaidInput)
             else -> state.finalTotal
         }?.toSafeDouble()
     }
@@ -2708,10 +2713,6 @@ class CheckoutViewModel(
     private fun CheckoutUiState.withTransactionDiscount(discount: CheckoutDiscount?): CheckoutUiState =
         recalculateCheckoutState(cartItems, discount)
 
-    private fun String.moneyInput(): String {
-        return filter(Char::isDigit).trimStart('0').ifBlank { "0" }.take(MAX_CASH_INPUT_LENGTH)
-    }
-
     private fun PaymentMethod.requiresRegisteredCustomer(): Boolean {
         return this == PaymentMethod.HUTANG || this == PaymentMethod.DP
     }
@@ -2764,7 +2765,7 @@ internal fun CheckoutUiState.recalculateCheckoutState(
     val hasCashPayment = if (isSplitPaymentEnabled) {
         splitPaymentLines.any {
             it.method == PaymentMethod.TUNAI &&
-                (it.amountInput.trim().replace(',', '.').toBigDecimalOrNull() ?: BigDecimal.ZERO) > BigDecimal.ZERO
+                (parseWholeRupiahInput(it.amountInput) ?: BigDecimal.ZERO) > BigDecimal.ZERO
         }
     } else {
         selectedPaymentMethod == PaymentMethod.TUNAI
@@ -2794,7 +2795,7 @@ internal fun CheckoutUiState.recalculateCheckoutState(
         amountPaidInput = when (selectedPaymentMethod) {
             PaymentMethod.HUTANG -> "0"
             PaymentMethod.DP -> amountPaidInput
-            else -> calculatedFinalTotal.toPlainString()
+            else -> calculatedFinalTotal.toWholeRupiahInputText()
         },
         errorEvent = null,
     )

@@ -48,6 +48,7 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.tbterminal.app.data.local.cashexpense.CashMovementType
+import com.tbterminal.app.ui.common.parseWholeRupiahInput
 import java.text.NumberFormat
 import java.util.Locale
 
@@ -77,8 +78,14 @@ private fun formatIDR(value: Long): String {
 }
 
 private fun parseAmount(input: String): Long {
-    val clean = input.filter { it.isDigit() }
+    val parsed = parseWholeRupiahInput(input)?.toLong()
+    if (parsed != null) return parsed.coerceAtLeast(0L)
+    val clean = input.substringBefore(',').filter { it.isDigit() }
     return clean.toLongOrNull() ?: 0L
+}
+
+internal fun applyPettyCashQuickChip(currentInput: String, addVal: Long): String {
+    return formatIDR(parseAmount(currentInput) + addVal)
 }
 
 /**
@@ -386,9 +393,7 @@ fun PettyCashDialog(
                         ).forEach { (addVal, label) ->
                             Surface(
                                 onClick = {
-                                    val current = parseAmount(amountInput)
-                                    val next = current + addVal
-                                    onAmountChanged(formatIDR(next))
+                                    onAmountChanged(applyPettyCashQuickChip(amountInput, addVal))
                                 },
                                 shape = RoundedCornerShape(8.dp),
                                 color = Slate50,

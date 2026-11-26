@@ -12,6 +12,7 @@ import com.tbterminal.app.data.numbering.DocumentNumberType
 import com.tbterminal.app.data.repository.InventoryRepository
 import com.tbterminal.app.data.repository.PurchasingRepository
 import com.tbterminal.app.data.repository.RepositoryResult
+import com.tbterminal.app.ui.common.sanitizeWholeRupiahInput
 import com.tbterminal.app.ui.common.viewModelFactory
 import java.math.BigDecimal
 import kotlinx.coroutines.Job
@@ -200,11 +201,11 @@ class IncomingGoodsViewModel(
     }
 
     fun onBuyPriceChanged(value: String) {
-        _uiState.update { it.copy(buyPriceInput = value.decimalInput()).withSyncedCashPayment() }
+        _uiState.update { it.copy(buyPriceInput = sanitizeWholeRupiahInput(value)).withSyncedCashPayment() }
     }
 
     fun onAmountPaidChanged(value: String) {
-        _uiState.update { it.copy(amountPaidInput = value.decimalInput()) }
+        _uiState.update { it.copy(amountPaidInput = sanitizeWholeRupiahInput(value)) }
     }
 
     fun onDueDaysChanged(value: String) {

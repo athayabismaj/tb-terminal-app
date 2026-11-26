@@ -1,5 +1,7 @@
 package com.tbterminal.app.ui.receivables
 
+import com.tbterminal.app.ui.common.parseWholeRupiahInput
+
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
@@ -152,7 +154,7 @@ internal fun ReceivablePayAllDialog(
     onDismiss: () -> Unit,
     onSubmit: () -> Unit
 ) {
-    val payAmount = paymentAmountInput.trim().replace(",", ".").toBigDecimalOrNull() ?: BigDecimal.ZERO
+    val payAmount = parseWholeRupiahInput(paymentAmountInput) ?: BigDecimal.ZERO
     val selectedInvoices = remember(unpaidReceivables, selectedInvoiceIds) {
         unpaidReceivables.filter { it.id in selectedInvoiceIds }
     }
@@ -697,7 +699,7 @@ internal fun ReceivablePaymentDialog(
     onDismiss: () -> Unit,
     onSubmit: () -> Unit
 ) {
-    val payAmount = paymentAmountInput.trim().replace(",", ".").toBigDecimalOrNull() ?: BigDecimal.ZERO
+    val payAmount = parseWholeRupiahInput(paymentAmountInput) ?: BigDecimal.ZERO
 
     ModalBottomSheet(
         onDismissRequest = { if (!isSubmittingPayment) onDismiss() },

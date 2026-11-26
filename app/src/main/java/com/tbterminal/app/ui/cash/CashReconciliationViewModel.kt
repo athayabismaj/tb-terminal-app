@@ -22,6 +22,8 @@ import com.tbterminal.app.data.sync.OfflineSessionAgePolicy
 import com.tbterminal.app.data.sync.OfflineStatus
 import com.tbterminal.app.data.sync.OfflineStatusRepository
 import com.tbterminal.app.navigation.AppAccessPolicy
+import com.tbterminal.app.ui.common.parseWholeRupiahInput
+import com.tbterminal.app.ui.common.sanitizeWholeRupiahInput
 import com.tbterminal.app.ui.common.viewModelFactory
 import java.math.BigDecimal
 import java.time.Instant
@@ -153,11 +155,11 @@ class CashReconciliationViewModel(
     }
 
     fun onOpeningCashChanged(value: String) {
-        _uiState.update { it.copy(openingCashInput = value.moneyInput(), errorMessage = null) }
+        _uiState.update { it.copy(openingCashInput = sanitizeWholeRupiahInput(value), errorMessage = null) }
     }
 
     fun onClosingCashChanged(value: String) {
-        _uiState.update { it.copy(closingCashInput = value.moneyInput(), errorMessage = null) }
+        _uiState.update { it.copy(closingCashInput = sanitizeWholeRupiahInput(value), errorMessage = null) }
     }
 
     fun onClosingNotesChanged(value: String) {
@@ -168,7 +170,7 @@ class CashReconciliationViewModel(
         if (!_uiState.value.canOpenCashSession) {
             return setActionError("Hanya kasir yang dapat membuka sesi kas.")
         }
-        val startingCash = parseIdrCashInput(_uiState.value.openingCashInput)
+        val startingCash = parseWholeRupiahInput(_uiState.value.openingCashInput)
             ?: return setActionError("Modal awal wajib diisi dengan angka valid.")
         if (startingCash < BigDecimal.ZERO) return setActionError("Modal awal tidak boleh kurang dari nol.")
 
@@ -204,7 +206,7 @@ class CashReconciliationViewModel(
 
     fun closeSession() {
         if (!_uiState.value.hasActiveSession) return setActionError("Tidak ada sesi kas aktif.")
-        val closingCash = parseIdrCashInput(_uiState.value.closingCashInput)
+        val closingCash = parseWholeRupiahInput(_uiState.value.closingCashInput)
             ?: return setActionError("Kas fisik akhir wajib diisi dengan angka valid.")
         if (closingCash < BigDecimal.ZERO) return setActionError("Kas fisik akhir tidak boleh kurang dari nol.")
 
@@ -362,10 +364,11 @@ class CashReconciliationViewModel(
     }
 
     fun onPettyCashAmountChanged(value: String) {
+        val sanitized = sanitizeWholeRupiahInput(value)
         _uiState.update {
             it.copy(
-                pettyCashAmountInput = value.moneyInput(),
-                expenseAmountInput = value.moneyInput(),
+                pettyCashAmountInput = sanitized,
+                expenseAmountInput = sanitized,
                 errorMessage = null
             )
         }
@@ -388,7 +391,7 @@ class CashReconciliationViewModel(
     fun addPettyCash() {
         val state = _uiState.value
         val rawInput = state.pettyCashAmountInput.ifBlank { state.expenseAmountInput }
-        val amount = parseIdrCashInput(rawInput)
+        val amount = parseWholeRupiahInput(rawInput)
             ?: return setActionError("Nominal wajib diisi dengan angka valid.")
         if (amount <= BigDecimal.ZERO) return setActionError("Nominal harus lebih besar dari nol.")
         val type = state.pettyCashType
@@ -739,23 +742,4 @@ private fun Long.toOffsetDateTimeString(): String {
         .atZone(ZoneId.of("Asia/Jakarta"))
         .toOffsetDateTime()
         .toString()
-}
-
-private const val MAX_CASH_INPUT_LENGTH = 12
-
-internal fun parseIdrCashInput(raw: String): BigDecimal? {
-    val trimmed = raw.trim()
-    if (trimmed.isEmpty()) return null
-    val isNegative = trimmed.startsWith("-")
-    val body = if (isNegative) trimmed.substring(1).trim() else trimmed
-    if (body.isEmpty() || !body.all { it.isDigit() || it == '.' || it == ',' || it.isWhitespace() }) {
-        return null
-    }
-    val digits = body.filter(Char::isDigit)
-    if (digits.isEmpty()) return null
-    return (if (isNegative) "-$digits" else digits).toBigDecimalOrNull()
-}
-
-private fun String.moneyInput(): String {
-    return filter(Char::isDigit).take(MAX_CASH_INPUT_LENGTH)
 }

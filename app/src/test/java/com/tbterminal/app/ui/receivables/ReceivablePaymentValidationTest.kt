@@ -10,16 +10,18 @@ import org.junit.Test
 class ReceivablePaymentValidationTest {
     @Test
     fun `partial payment is accepted`() {
-        val result = validateReceivablePaymentInput("40.25", BigDecimal("100.00"), "payment-key-001")
-        assertEquals(BigDecimal("40.25"), result.getOrThrow())
+        val grouped = validateReceivablePaymentInput("40.000", BigDecimal("100.00"), "payment-key-001")
+        assertTrue(validateReceivablePaymentInput("40.000", BigDecimal("100000"), "payment-key-001").isSuccess)
+        assertEquals(BigDecimal("40000"), validateReceivablePaymentInput("40000,00", BigDecimal("100000"), "payment-key-001").getOrThrow())
+        assertTrue(grouped.isFailure)
     }
 
     @Test
     fun `invalid amount and overpayment are rejected`() {
-        listOf("0", "-1", "10.001", "100.01").forEach { input ->
+        listOf("0", "-1", "10.000,50", "100.001").forEach { input ->
             assertTrue(
                 input,
-                validateReceivablePaymentInput(input, BigDecimal("100.00"), "payment-key-001").isFailure
+                validateReceivablePaymentInput(input, BigDecimal("100000"), "payment-key-001").isFailure
             )
         }
     }

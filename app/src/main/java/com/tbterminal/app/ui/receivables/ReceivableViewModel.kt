@@ -11,6 +11,8 @@ import com.tbterminal.app.data.model.Receivable
 import com.tbterminal.app.data.repository.CustomerRepository
 import com.tbterminal.app.data.repository.ReceivableRepository
 import com.tbterminal.app.data.repository.RepositoryResult
+import com.tbterminal.app.ui.common.sanitizeWholeRupiahInput
+import com.tbterminal.app.ui.common.toWholeRupiahInputText
 import com.tbterminal.app.ui.common.viewModelFactory
 import java.math.BigDecimal
 import java.time.LocalDate
@@ -513,11 +515,11 @@ class ReceivableViewModel(
 }
 
 private fun String.decimalInput(): String {
-    return filter { it.isDigit() || it == '.' || it == ',' }.replace(',', '.')
+    return sanitizeWholeRupiahInput(this)
 }
 
 private fun BigDecimal.toInputText(): String {
-    return stripTrailingZeros().toPlainString()
+    return toWholeRupiahInputText()
 }
 
 internal fun canManageReceivableAdjustment(role: String): Boolean =

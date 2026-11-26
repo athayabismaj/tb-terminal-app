@@ -10,6 +10,9 @@ import com.tbterminal.app.data.model.Supplier
 import com.tbterminal.app.data.model.SupplierPayable
 import com.tbterminal.app.data.repository.PurchasingRepository
 import com.tbterminal.app.data.repository.RepositoryResult
+import com.tbterminal.app.ui.common.parseWholeRupiahInput
+import com.tbterminal.app.ui.common.sanitizeWholeRupiahInput
+import com.tbterminal.app.ui.common.toWholeRupiahInputText
 import com.tbterminal.app.ui.common.viewModelFactory
 import java.math.BigDecimal
 import java.time.LocalDate
@@ -139,7 +142,7 @@ class SupplierDebtViewModel(
     fun submitPayment() {
         val state = _uiState.value
         val payable = state.selectedPayable ?: return
-        val amount = state.paymentAmountInput.toBigDecimalOrNull()
+        val amount = parseWholeRupiahInput(state.paymentAmountInput)
             ?: return setActionError("Nominal pembayaran wajib diisi dengan angka valid.")
 
         if (amount <= BigDecimal.ZERO) return setActionError("Nominal pembayaran harus lebih dari nol.")
@@ -465,9 +468,9 @@ class SupplierDebtViewModel(
 }
 
 internal fun String.decimalInput(): String {
-    return filter { it.isDigit() || it == '.' || it == ',' }.replace(',', '.')
+    return sanitizeWholeRupiahInput(this)
 }
 
 internal fun BigDecimal.toInputText(): String {
-    return stripTrailingZeros().toPlainString()
+    return toWholeRupiahInputText()
 }

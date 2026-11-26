@@ -28,3 +28,4 @@ Temuan berikut diidentifikasi saat pengerjaan Fase B1b namun tidak diubah pada f
 Temuan berikut diidentifikasi saat pengerjaan Fase B1c namun tidak diubah pada fase ini agar ruang lingkup tetap terisolasi:
 
 - [SEDANG] Menggabungkan baris keranjang dengan `productId` sama (satuan dasar + satuan sekunder) menjadi satu baris satuan dasar pada checkout online — app/src/main/java/com/tbterminal/app/ui/checkout/OnlineCheckoutQuantityResolver.kt, app/src/main/java/com/tbterminal/app/ui/checkout/CheckoutViewModel.kt — Saat ini keranjang berisi produk sama dalam satuan dasar + sekunder diblokir sebelum preview/submit online agar sesuai validasi backend online (jalur sync offline `/api/sales/checkout/sync` sudah mendukung item duplikat `productId`) — Fase B2
+- [SEDANG] Kebijakan rupiah bulat end-to-end (harga, pajak, diskon, total) — fase backend tersendiri; putuskan aturan pembulatan memakai rounding settings toko.

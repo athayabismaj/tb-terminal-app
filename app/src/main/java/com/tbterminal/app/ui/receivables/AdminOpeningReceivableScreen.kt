@@ -37,6 +37,7 @@ import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.tbterminal.app.data.model.Customer
 import com.tbterminal.app.data.repository.CustomerRepository
+import com.tbterminal.app.ui.common.parseWholeRupiahInput
 import com.tbterminal.app.ui.components.AppDatePickerDialog
 import com.tbterminal.app.ui.dashboard.admin.AdminDashboardShell
 import com.tbterminal.app.ui.dashboard.admin.AdminDestination
@@ -652,7 +653,7 @@ private fun AmountAndLegacyInvoiceInputs(
                     val isCurrent = amountInput == value
                     Surface(
                         onClick = {
-                            val current = amountInput.toBigDecimalOrNull() ?: BigDecimal.ZERO
+                            val current = parseWholeRupiahInput(amountInput) ?: BigDecimal.ZERO
                             val add = value.toBigDecimal()
                             onAmountChanged((current + add).toPlainString())
                         },
@@ -863,7 +864,7 @@ private fun OpeningBalanceAccountingSummary(
     tenorDays: Long,
     legacyInvoice: String
 ) {
-    val inputAmount = inputAmountStr.toBigDecimalOrNull() ?: BigDecimal.ZERO
+    val inputAmount = parseWholeRupiahInput(inputAmountStr) ?: BigDecimal.ZERO
     val projectedTotal = currentRemaining + inputAmount
 
     Card(

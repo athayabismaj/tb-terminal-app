@@ -1,5 +1,7 @@
 package com.tbterminal.app.ui.receivables
 
+import com.tbterminal.app.ui.common.parseWholeRupiahInput
+
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
@@ -115,7 +117,7 @@ internal fun ReceivableDedicatedPaymentScreen(
     onSubmit: () -> Unit
 ) {
     val payAmount: BigDecimal = remember(paymentAmountInput) {
-        paymentAmountInput.trim().replace(",", ".").toBigDecimalOrNull() ?: BigDecimal.ZERO
+        parseWholeRupiahInput(paymentAmountInput) ?: BigDecimal.ZERO
     }
     val selectedInvoices: List<Receivable> = remember(unpaidReceivables, selectedInvoiceIds) {
         unpaidReceivables.filter { it.id in selectedInvoiceIds }

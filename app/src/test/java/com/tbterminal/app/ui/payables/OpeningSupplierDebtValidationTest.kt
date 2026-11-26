@@ -13,13 +13,13 @@ class OpeningSupplierDebtValidationTest {
     fun validOpeningBalanceIsParsed() {
         val result = validateOpeningSupplierDebtInput(
             supplierId = "supplier-1",
-            amountInput = "1250000.50",
+            amountInput = "1.250.000,00",
             debtDateInput = "2026-07-01",
             dueDateInput = "2026-08-15",
             today = today
         ).getOrThrow()
 
-        assertEquals(BigDecimal("1250000.50"), result.amount)
+        assertEquals(BigDecimal("1250000"), result.amount)
         assertEquals(LocalDate.of(2026, 7, 1), result.debtDate)
         assertEquals(LocalDate.of(2026, 8, 15), result.dueDate)
     }
@@ -27,7 +27,7 @@ class OpeningSupplierDebtValidationTest {
     @Test
     fun invalidAmountAndMissingSupplierAreRejected() {
         assertTrue(validateOpeningSupplierDebtInput("", "100000", "2026-08-01", "2026-08-02", today).isFailure)
-        listOf("0", "-1", "1.001", "abc").forEach { amount ->
+        listOf("0", "-1", "1.500,50", "1,001", "100.01", "abc").forEach { amount ->
             assertTrue(
                 validateOpeningSupplierDebtInput("supplier-1", amount, "2026-08-01", "2026-08-02", today).isFailure
             )
