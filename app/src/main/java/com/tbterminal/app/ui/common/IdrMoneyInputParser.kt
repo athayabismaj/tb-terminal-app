@@ -80,6 +80,53 @@ internal fun parseWholeRupiahInput(raw: String): BigDecimal? {
 }
 
 /**
+ * Parses whole-rupiah user input, or accepts a 1-2 digit cent decimal if and only if
+ * it matches [exactAllowedAmount] (used for settling or prefilling cent-bearing server balances).
+ */
+internal fun parseWholeRupiahOrExactRemainingInput(
+    raw: String,
+    exactAllowedAmount: BigDecimal?,
+): BigDecimal? {
+    parseWholeRupiahInput(raw)?.let { return it }
+
+    if (exactAllowedAmount == null ||
+        exactAllowedAmount <= BigDecimal.ZERO ||
+        exactAllowedAmount.stripTrailingZeros().scale() !in 1..2
+    ) {
+        return null
+    }
+
+    val trimmed = raw.trim()
+    if (trimmed.isEmpty() || trimmed.startsWith("-")) return null
+
+    val commaCount = trimmed.count { it == ',' }
+    val dotCount = trimmed.count { it == '.' }
+    val normalized = when {
+        commaCount == 1 -> {
+            val intPart = trimmed.substringBefore(',')
+            val fracPart = trimmed.substringAfter(',')
+            if (fracPart.length !in 1..2 || !fracPart.all(Char::isDigit)) return null
+            if (!PLAIN_INTEGER_REGEX.matches(intPart) && !GROUPED_THOUSANDS_REGEX.matches(intPart)) {
+                return null
+            }
+            "${intPart.filter(Char::isDigit)}.$fracPart"
+        }
+        commaCount == 0 && dotCount == 1 -> {
+            val intPart = trimmed.substringBefore('.')
+            val fracPart = trimmed.substringAfter('.')
+            if (!PLAIN_INTEGER_REGEX.matches(intPart) || fracPart.length !in 1..2 || !fracPart.all(Char::isDigit)) {
+                return null
+            }
+            "$intPart.$fracPart"
+        }
+        else -> return null
+    }
+
+    val candidate = normalized.toBigDecimalOrNull() ?: return null
+    return candidate.takeIf { it.compareTo(exactAllowedAmount) == 0 }
+}
+
+/**
  * Formats an authoritative monetary [BigDecimal] for text field pre-fill without ".00" noise.
  */
 internal fun BigDecimal.toWholeRupiahInputText(): String {

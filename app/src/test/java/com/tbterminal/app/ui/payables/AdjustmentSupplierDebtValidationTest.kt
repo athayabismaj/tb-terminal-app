@@ -35,6 +35,29 @@ class AdjustmentSupplierDebtValidationTest {
         assertTrue(validate("active-supplier-1", "100000", "REF", "Alasan", due = "2026-08-18").isFailure)
     }
 
+    @Test
+    fun prefilledCentRemainingAllowsExactMatchAndWholeRupiahOnly() {
+        val exactRemaining = BigDecimal("150000.50")
+        val prefilled = validateAdjustmentSupplierDebtInput(
+            "active-supplier-1", activeSuppliers, "150000,5", "2026-08-19", "2026-08-20",
+            "FAKTUR-CENT", "Koreksi sisa sen", today, exactRemainingAmount = exactRemaining
+        ).getOrThrow()
+        assertEquals(0, exactRemaining.compareTo(prefilled.amount))
+
+        val wholeTyped = validateAdjustmentSupplierDebtInput(
+            "active-supplier-1", activeSuppliers, "150000", "2026-08-19", "2026-08-20",
+            "FAKTUR-CENT", "Koreksi bulat", today, exactRemainingAmount = exactRemaining
+        ).getOrThrow()
+        assertEquals(0, BigDecimal("150000").compareTo(wholeTyped.amount))
+
+        assertTrue(
+            validateAdjustmentSupplierDebtInput(
+                "active-supplier-1", activeSuppliers, "150000,25", "2026-08-19", "2026-08-20",
+                "FAKTUR-CENT", "Koreksi sen lain", today, exactRemainingAmount = exactRemaining
+            ).isFailure
+        )
+    }
+
     private fun validate(
         supplier: String,
         amount: String,

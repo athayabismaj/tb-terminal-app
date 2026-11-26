@@ -7,7 +7,7 @@ import com.tbterminal.app.data.model.CreateSupplierPaymentCommand
 import com.tbterminal.app.data.model.SupplierPayable
 import com.tbterminal.app.data.repository.PurchasingRepository
 import com.tbterminal.app.data.repository.RepositoryResult
-import com.tbterminal.app.ui.common.parseWholeRupiahInput
+import com.tbterminal.app.ui.common.parseWholeRupiahOrExactRemainingInput
 import com.tbterminal.app.ui.common.sanitizeWholeRupiahInput
 import com.tbterminal.app.ui.common.viewModelFactory
 import java.math.BigDecimal
@@ -164,7 +164,7 @@ internal class SupplierDebtDetailViewModel(
     fun submitPayment() {
         val state = _uiState.value
         val payable = state.selectedPayable ?: return
-        val amount = parseWholeRupiahInput(state.paymentAmountInput)
+        val amount = parseWholeRupiahOrExactRemainingInput(state.paymentAmountInput, payable.remainingAmount)
             ?: return setActionError("Nominal pembayaran wajib diisi dengan angka valid.")
 
         if (amount <= BigDecimal.ZERO) return setActionError("Nominal pembayaran harus lebih dari nol.")

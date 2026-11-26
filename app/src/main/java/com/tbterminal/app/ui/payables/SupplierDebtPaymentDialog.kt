@@ -1,6 +1,6 @@
 package com.tbterminal.app.ui.payables
 
-import com.tbterminal.app.ui.common.parseWholeRupiahInput
+import com.tbterminal.app.ui.common.parseWholeRupiahOrExactRemainingInput
 
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
@@ -315,7 +315,10 @@ internal fun SupplierPaymentDialog(
                     }
 
                     // Lunas button
-                    val isLunas = parseWholeRupiahInput(uiState.paymentAmountInput)?.compareTo(remaining) == 0
+                    val isLunas = parseWholeRupiahOrExactRemainingInput(
+                        uiState.paymentAmountInput,
+                        remaining
+                    )?.compareTo(remaining) == 0
                     Surface(
                         onClick = { onAmountChanged(payable.remainingAmount.toInputText()) },
                         modifier = Modifier

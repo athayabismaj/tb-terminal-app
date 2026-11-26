@@ -40,6 +40,7 @@ data class ReceivableUiState(
     val isAdjustmentOpen: Boolean = false,
     val adjustmentCustomerId: String = "",
     val adjustmentAmountInput: String = "",
+    val adjustmentPrefilledRemaining: BigDecimal? = null,
     val adjustmentDebtDateInput: String = LocalDate.now().toString(),
     val adjustmentDueDateInput: String = LocalDate.now().toString(),
     val adjustmentReferenceInput: String = "",

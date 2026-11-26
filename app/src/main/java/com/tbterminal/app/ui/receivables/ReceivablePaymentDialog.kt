@@ -1,6 +1,7 @@
 package com.tbterminal.app.ui.receivables
 
-import com.tbterminal.app.ui.common.parseWholeRupiahInput
+import com.tbterminal.app.ui.common.parseWholeRupiahOrExactRemainingInput
+import com.tbterminal.app.ui.common.toWholeRupiahInputText
 
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
@@ -154,13 +155,14 @@ internal fun ReceivablePayAllDialog(
     onDismiss: () -> Unit,
     onSubmit: () -> Unit
 ) {
-    val payAmount = parseWholeRupiahInput(paymentAmountInput) ?: BigDecimal.ZERO
     val selectedInvoices = remember(unpaidReceivables, selectedInvoiceIds) {
         unpaidReceivables.filter { it.id in selectedInvoiceIds }
     }
     val selectedTotalRemaining = remember(selectedInvoices) {
         selectedInvoices.fold(BigDecimal.ZERO) { sum, it -> sum + it.remainingAmount }
     }
+    val payAmount = parseWholeRupiahOrExactRemainingInput(paymentAmountInput, selectedTotalRemaining)
+        ?: BigDecimal.ZERO
     val allocations = remember(unpaidReceivables, selectedInvoiceIds, payAmount) {
         calculateFifoAllocations(unpaidReceivables, selectedInvoiceIds, payAmount)
     }
@@ -699,7 +701,7 @@ internal fun ReceivablePaymentDialog(
     onDismiss: () -> Unit,
     onSubmit: () -> Unit
 ) {
-    val payAmount = parseWholeRupiahInput(paymentAmountInput) ?: BigDecimal.ZERO
+    val payAmount = parseWholeRupiahOrExactRemainingInput(paymentAmountInput, totalRemaining) ?: BigDecimal.ZERO
 
     ModalBottomSheet(
         onDismissRequest = { if (!isSubmittingPayment) onDismiss() },
@@ -1101,5 +1103,4 @@ private fun PaymentMethodRow(
     }
 }
 
-private fun BigDecimal.toInputText(): String =
-    stripTrailingZeros().toPlainString()
+private fun BigDecimal.toInputText(): String = toWholeRupiahInputText()

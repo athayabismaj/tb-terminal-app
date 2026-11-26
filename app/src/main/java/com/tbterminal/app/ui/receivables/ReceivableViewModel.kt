@@ -160,6 +160,7 @@ class ReceivableViewModel(
                 isAdjustmentOpen = true,
                 adjustmentCustomerId = "",
                 adjustmentAmountInput = "",
+                adjustmentPrefilledRemaining = null,
                 adjustmentDebtDateInput = today,
                 adjustmentDueDateInput = today,
                 adjustmentReferenceInput = "",
@@ -175,13 +176,13 @@ class ReceivableViewModel(
     }
 
     fun onAdjustmentCustomerChanged(value: String) {
-        _uiState.update { it.copy(adjustmentCustomerId = value) }
+        _uiState.update { it.copy(adjustmentCustomerId = value, adjustmentPrefilledRemaining = null) }
         loadCustomerInvoicesForAdjustment(value)
     }
     fun onAdjustmentCustomerSelected(customer: Customer) {
         val updated = if (_uiState.value.customers.none { it.id == customer.id }) _uiState.value.customers + customer else _uiState.value.customers
         _uiState.update { state ->
-            state.copy(adjustmentCustomerId = customer.id, customers = updated)
+            state.copy(adjustmentCustomerId = customer.id, customers = updated, adjustmentPrefilledRemaining = null)
         }
         loadCustomerInvoicesForAdjustment(customer.id)
     }
@@ -194,6 +195,7 @@ class ReceivableViewModel(
             state.copy(
                 adjustmentReferenceInput = invoiceRef,
                 adjustmentAmountInput = invoice.remainingAmount.toInputText(),
+                adjustmentPrefilledRemaining = invoice.remainingAmount,
                 adjustmentDueDateInput = invoice.dueDate.ifBlank { state.adjustmentDueDateInput }
             )
         }
@@ -234,7 +236,8 @@ class ReceivableViewModel(
             debtDateInput = state.adjustmentDebtDateInput,
             dueDateInput = state.adjustmentDueDateInput,
             referenceInput = state.adjustmentReferenceInput,
-            reasonInput = state.adjustmentReasonInput
+            reasonInput = state.adjustmentReasonInput,
+            exactRemainingAmount = state.adjustmentPrefilledRemaining
         ).getOrElse {
             setAdjustmentError(it.message ?: "Data adjustment belum valid.")
             return
@@ -415,6 +418,7 @@ class ReceivableViewModel(
                 isAdjustmentOpen = true,
                 adjustmentCustomerId = cid,
                 adjustmentAmountInput = "",
+                adjustmentPrefilledRemaining = null,
                 adjustmentDebtDateInput = LocalDate.now().toString(),
                 adjustmentDueDateInput = LocalDate.now().plusDays(30).toString(),
                 adjustmentReferenceInput = "",

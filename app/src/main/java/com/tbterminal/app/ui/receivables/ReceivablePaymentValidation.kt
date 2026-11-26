@@ -1,7 +1,7 @@
 package com.tbterminal.app.ui.receivables
 
 import com.tbterminal.app.data.model.Receivable
-import com.tbterminal.app.ui.common.parseWholeRupiahInput
+import com.tbterminal.app.ui.common.parseWholeRupiahOrExactRemainingInput
 import java.math.BigDecimal
 
 internal fun validateReceivablePaymentInput(
@@ -9,7 +9,7 @@ internal fun validateReceivablePaymentInput(
     remainingAmount: BigDecimal,
     idempotencyKey: String
 ): Result<BigDecimal> = runCatching {
-    val amount = parseWholeRupiahInput(amountInput)
+    val amount = parseWholeRupiahOrExactRemainingInput(amountInput, remainingAmount)
         ?: error("Nominal pembayaran wajib diisi dengan angka valid.")
     require(amount > BigDecimal.ZERO) { "Nominal pembayaran harus lebih dari nol." }
     require(amount.scale() <= 2) { "Nominal pembayaran maksimal dua angka desimal." }

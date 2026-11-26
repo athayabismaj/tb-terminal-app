@@ -13,6 +13,7 @@ import com.tbterminal.app.data.model.ManagerApprovalStatus
 import com.tbterminal.app.data.model.RefundDisposition
 import com.tbterminal.app.data.model.TransactionRefundResult
 import com.tbterminal.app.data.model.TransactionVoidResult
+import com.tbterminal.app.data.model.remainingAmount
 import com.tbterminal.app.data.repository.CashReconciliationRepository
 import com.tbterminal.app.data.repository.RepositoryResult
 import java.math.BigDecimal
@@ -242,6 +243,45 @@ class CashierTransactionActionViewModelTest {
         assertEquals("uuid-debt-3", viewModel.uiState.value.payDebtIdempotencyKey)
     }
 
+    @Test
+    fun payDebtAllowsExactRemainingCentsAndWholePartialWhileRejectingArbitraryCents() = runTest(dispatcher) {
+        val repository = FakeTransactionActionRepository()
+        repository.detail = transactionDetail().copy(
+            status = "HUTANG",
+            total = BigDecimal("150000.50"),
+            paidAmount = BigDecimal.ZERO,
+        )
+        val viewModel = loadedViewModel(repository, "KASIR")
+
+        // Arbitrary cents rejected
+        viewModel.showPayDebtDialog()
+        assertEquals("150000,5", viewModel.uiState.value.payDebtAmountInput)
+        viewModel.onPayDebtAmountChanged("150000,25")
+        viewModel.payDebt()
+        assertEquals("Nominal bayar tidak valid", viewModel.uiState.value.payDebtError)
+        assertEquals(0, repository.payDebtCalls)
+
+        // Whole rupiah partial leaves 0.50 remaining
+        viewModel.onPayDebtAmountChanged("150000")
+        viewModel.payDebt()
+        advanceUntilIdle()
+        assertEquals(1, repository.payDebtCalls)
+        assertEquals(0, BigDecimal("150000").compareTo(repository.lastPayDebtAmount))
+        assertEquals(0, BigDecimal("0.50").compareTo(viewModel.uiState.value.selectedTransaction?.remainingAmount()))
+
+        // Reset to 150000.50 remaining and settle in full using Lunas prefill ("150000,5")
+        repository.detail = repository.detail.copy(paidAmount = BigDecimal.ZERO)
+        viewModel.loadReceipt(repository.detail.id)
+        advanceUntilIdle()
+        viewModel.showPayDebtDialog()
+        assertEquals("150000,5", viewModel.uiState.value.payDebtAmountInput)
+        viewModel.payDebt()
+        advanceUntilIdle()
+        assertEquals(2, repository.payDebtCalls)
+        assertEquals(0, BigDecimal("150000.50").compareTo(repository.lastPayDebtAmount))
+        assertEquals(0, BigDecimal.ZERO.compareTo(viewModel.uiState.value.selectedTransaction?.remainingAmount()))
+    }
+
     private suspend fun loadedViewModel(
         repository: FakeTransactionActionRepository,
         role: String,
@@ -273,6 +313,7 @@ private class FakeTransactionActionRepository(
     var voidCalls = 0
     var refundCalls = 0
     var payDebtCalls = 0
+    var lastPayDebtAmount: BigDecimal? = null
     var lastVoidApprovalId: String? = null
     var lastRefundApprovalId: String? = null
     var lastRefundDisposition: RefundDisposition? = null
@@ -355,6 +396,7 @@ private class FakeTransactionActionRepository(
         idempotencyKey: String?,
     ): RepositoryResult<CashTransactionDetail> {
         payDebtCalls++
+        lastPayDebtAmount = amount
         if (idempotencyKey != null) {
             payDebtKeys += idempotencyKey
         }

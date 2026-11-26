@@ -1,6 +1,7 @@
 package com.tbterminal.app.ui.receivables
 
-import com.tbterminal.app.ui.common.parseWholeRupiahInput
+import com.tbterminal.app.ui.common.parseWholeRupiahOrExactRemainingInput
+import com.tbterminal.app.ui.common.toWholeRupiahInputText
 
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.BorderStroke
@@ -116,14 +117,14 @@ internal fun ReceivableDedicatedPaymentScreen(
     onBack: () -> Unit,
     onSubmit: () -> Unit
 ) {
-    val payAmount: BigDecimal = remember(paymentAmountInput) {
-        parseWholeRupiahInput(paymentAmountInput) ?: BigDecimal.ZERO
-    }
     val selectedInvoices: List<Receivable> = remember(unpaidReceivables, selectedInvoiceIds) {
         unpaidReceivables.filter { it.id in selectedInvoiceIds }
     }
     val selectedTotalRemaining: BigDecimal = remember(selectedInvoices) {
         selectedInvoices.fold(BigDecimal.ZERO) { sum, it -> sum + it.remainingAmount }
+    }
+    val payAmount: BigDecimal = remember(paymentAmountInput, selectedTotalRemaining) {
+        parseWholeRupiahOrExactRemainingInput(paymentAmountInput, selectedTotalRemaining) ?: BigDecimal.ZERO
     }
     val allocations: List<InvoicePaymentAllocation> = remember(unpaidReceivables, selectedInvoiceIds, payAmount) {
         calculateFifoAllocations(unpaidReceivables, selectedInvoiceIds, payAmount)
@@ -769,5 +770,4 @@ internal fun ReceivableDedicatedPaymentScreen(
     }
 }
 
-private fun BigDecimal.toInputText(): String =
-    stripTrailingZeros().toPlainString()
+private fun BigDecimal.toInputText(): String = toWholeRupiahInputText()

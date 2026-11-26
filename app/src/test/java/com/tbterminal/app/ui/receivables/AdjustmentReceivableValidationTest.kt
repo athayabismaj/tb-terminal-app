@@ -42,6 +42,29 @@ class AdjustmentReceivableValidationTest {
         assertTrue(!canManageReceivableAdjustment("kasir"))
     }
 
+    @Test
+    fun prefilledCentRemainingAllowsExactMatchAndWholeRupiahOnly() {
+        val exactRemaining = BigDecimal("150000.50")
+        val prefilled = validateAdjustmentReceivableInput(
+            "active-1", activeCustomers, "150000,5", "2026-08-19", "2026-08-20",
+            "NOTA-CENT", "Koreksi sisa sen", today, exactRemainingAmount = exactRemaining
+        ).getOrThrow()
+        assertEquals(0, exactRemaining.compareTo(prefilled.amount))
+
+        val wholeTyped = validateAdjustmentReceivableInput(
+            "active-1", activeCustomers, "150000", "2026-08-19", "2026-08-20",
+            "NOTA-CENT", "Koreksi bulat", today, exactRemainingAmount = exactRemaining
+        ).getOrThrow()
+        assertEquals(0, BigDecimal("150000").compareTo(wholeTyped.amount))
+
+        assertTrue(
+            validateAdjustmentReceivableInput(
+                "active-1", activeCustomers, "150000,25", "2026-08-19", "2026-08-20",
+                "NOTA-CENT", "Koreksi sen lain", today, exactRemainingAmount = exactRemaining
+            ).isFailure
+        )
+    }
+
     private fun validate(
         customer: String,
         amount: String,

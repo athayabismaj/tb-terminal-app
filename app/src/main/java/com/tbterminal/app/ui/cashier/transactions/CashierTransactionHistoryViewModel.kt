@@ -15,7 +15,7 @@ import com.tbterminal.app.data.repository.CashReconciliationRepository
 import com.tbterminal.app.data.repository.RepositoryResult
 import com.tbterminal.app.data.sync.OfflineCheckoutSyncResult
 import com.tbterminal.app.data.sync.OfflineCheckoutSyncService
-import com.tbterminal.app.ui.common.parseWholeRupiahInput
+import com.tbterminal.app.ui.common.parseWholeRupiahOrExactRemainingInput
 import com.tbterminal.app.ui.common.sanitizeWholeRupiahInput
 import com.tbterminal.app.ui.common.toWholeRupiahInputText
 import com.tbterminal.app.ui.common.viewModelFactory
@@ -906,8 +906,12 @@ class CashierTransactionHistoryViewModel(
     fun payDebt() {
         val state = _uiState.value
         if (state.isSubmittingDebt) return
-        val transactionId = state.selectedTransaction?.id ?: return
-        val amount = parseWholeRupiahInput(state.payDebtAmountInput)
+        val selected = state.selectedTransaction ?: return
+        val transactionId = selected.id
+        val amount = parseWholeRupiahOrExactRemainingInput(
+            state.payDebtAmountInput,
+            selected.remainingAmount()
+        )
         if (amount == null || amount <= java.math.BigDecimal.ZERO) {
             _uiState.update { it.copy(payDebtError = "Nominal bayar tidak valid") }
             return

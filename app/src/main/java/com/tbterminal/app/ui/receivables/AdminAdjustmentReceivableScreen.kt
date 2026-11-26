@@ -44,6 +44,7 @@ import com.tbterminal.app.data.model.Customer
 import com.tbterminal.app.data.model.Receivable
 import com.tbterminal.app.data.repository.CustomerRepository
 import com.tbterminal.app.ui.common.parseWholeRupiahInput
+import com.tbterminal.app.ui.common.parseWholeRupiahOrExactRemainingInput
 import com.tbterminal.app.ui.components.AppDatePickerDialog
 import com.tbterminal.app.ui.dashboard.admin.AdminDashboardShell
 import com.tbterminal.app.ui.dashboard.admin.AdminDestination
@@ -357,6 +358,7 @@ fun AdminAdjustmentReceivableScreen(
                                 selectedCustomer = selectedCustomer,
                                 currentRemaining = customerSummary?.totalRemaining ?: BigDecimal.ZERO,
                                 inputAmountStr = uiState.adjustmentAmountInput,
+                                prefilledRemaining = uiState.adjustmentPrefilledRemaining,
                                 reference = uiState.adjustmentReferenceInput,
                                 reason = uiState.adjustmentReasonInput,
                                 dueDate = dueDate,
@@ -412,6 +414,7 @@ fun AdminAdjustmentReceivableScreen(
                             selectedCustomer = selectedCustomer,
                             currentRemaining = customerSummary?.totalRemaining ?: BigDecimal.ZERO,
                             inputAmountStr = uiState.adjustmentAmountInput,
+                            prefilledRemaining = uiState.adjustmentPrefilledRemaining,
                             reference = uiState.adjustmentReferenceInput,
                             reason = uiState.adjustmentReasonInput,
                             dueDate = dueDate,
@@ -1335,12 +1338,13 @@ private fun AdjustmentAccountingSummary(
     selectedCustomer: Customer?,
     currentRemaining: BigDecimal,
     inputAmountStr: String,
+    prefilledRemaining: BigDecimal? = null,
     reference: String,
     reason: String,
     dueDate: String,
     tenorDays: Long
 ) {
-    val inputAmount = parseWholeRupiahInput(inputAmountStr) ?: BigDecimal.ZERO
+    val inputAmount = parseWholeRupiahOrExactRemainingInput(inputAmountStr, prefilledRemaining) ?: BigDecimal.ZERO
 
     Card(
         modifier = Modifier.fillMaxWidth(),

@@ -64,4 +64,17 @@ class IdrMoneyInputParserTest {
         assertEquals("40.000", applyPettyCashQuickChip("20.000", 20_000L))
         assertEquals("40.000", applyPettyCashQuickChip("20000,00", 20_000L))
     }
+
+    @Test
+    fun parseWholeRupiahOrExactRemainingInput_allowsExactCentsOnly() {
+        val exactCents = BigDecimal("150000.50")
+        assertEquals(0, exactCents.compareTo(parseWholeRupiahOrExactRemainingInput("150000,5", exactCents)))
+        assertEquals(BigDecimal("150000.50"), parseWholeRupiahOrExactRemainingInput("150.000,50", exactCents))
+        assertEquals(BigDecimal("150000.50"), parseWholeRupiahOrExactRemainingInput("150000.50", exactCents))
+        assertEquals(BigDecimal("150000"), parseWholeRupiahOrExactRemainingInput("150000", exactCents))
+
+        assertNull(parseWholeRupiahOrExactRemainingInput("150000,25", exactCents))
+        assertNull(parseWholeRupiahOrExactRemainingInput("150000,505", exactCents))
+        assertNull(parseWholeRupiahOrExactRemainingInput("150000,50", BigDecimal("150000.00")))
+    }
 }
