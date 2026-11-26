@@ -3,6 +3,7 @@ package com.tbterminal.app.data.local.entity
 import androidx.room.Entity
 import androidx.room.Index
 import androidx.room.PrimaryKey
+import com.tbterminal.app.data.local.model.ScaledDecimal2
 import com.tbterminal.app.data.local.model.SyncStatus
 
 @Entity(
@@ -32,18 +33,18 @@ data class LocalTransactionEntity(
     val cashSessionServerId: String? = null,
     val cashierUserId: String? = null,
     val status: String,
-    val subtotal: Double = 0.0,
-    val discount: Double = 0.0,
+    val subtotal: ScaledDecimal2 = ScaledDecimal2.ZERO,
+    val discount: ScaledDecimal2 = ScaledDecimal2.ZERO,
     val taxEnabled: Boolean = false,
     val taxMode: String? = null,
-    val taxRate: Double = 0.0,
+    val taxRate: ScaledDecimal2 = ScaledDecimal2.ZERO,
     val taxLabel: String? = null,
-    val taxableBase: Double = 0.0,
-    val taxAmount: Double = 0.0,
-    val roundingAmount: Double = 0.0,
-    val total: Double = 0.0,
-    val paidAmount: Double = 0.0,
-    val remainingAmount: Double = 0.0,
+    val taxableBase: ScaledDecimal2 = ScaledDecimal2.ZERO,
+    val taxAmount: ScaledDecimal2 = ScaledDecimal2.ZERO,
+    val roundingAmount: ScaledDecimal2 = ScaledDecimal2.ZERO,
+    val total: ScaledDecimal2 = ScaledDecimal2.ZERO,
+    val paidAmount: ScaledDecimal2 = ScaledDecimal2.ZERO,
+    val remainingAmount: ScaledDecimal2 = ScaledDecimal2.ZERO,
     val syncStatus: SyncStatus = SyncStatus.PENDING,
     val createdAt: Long = System.currentTimeMillis(),
     val updatedAt: Long = System.currentTimeMillis(),

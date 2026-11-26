@@ -10,6 +10,7 @@ import com.tbterminal.app.data.local.entity.LocalPaymentEntity
 import com.tbterminal.app.data.local.entity.LocalTransactionEntity
 import com.tbterminal.app.data.local.entity.LocalTransactionItemEntity
 import com.tbterminal.app.data.local.entity.SyncQueueEntity
+import com.tbterminal.app.data.local.model.ScaledDecimal2
 import com.tbterminal.app.data.local.model.SyncEntityType
 import com.tbterminal.app.data.local.model.SyncOperation
 import com.tbterminal.app.data.local.model.SyncStatus
@@ -79,10 +80,10 @@ class OfflineSyncConflictHandlingTest {
                 cashSessionServerId = "srv-session-1",
                 cashierUserId = "kasir-1",
                 status = "PAID",
-                subtotal = 50_000.0,
-                total = 50_000.0,
-                paidAmount = 50_000.0,
-                remainingAmount = 0.0,
+                subtotal = ScaledDecimal2.ofWhole(50_000L),
+                total = ScaledDecimal2.ofWhole(50_000L),
+                paidAmount = ScaledDecimal2.ofWhole(50_000L),
+                remainingAmount = ScaledDecimal2.ZERO,
             )
         )
         database.transactionItemDao().upsert(
@@ -90,10 +91,10 @@ class OfflineSyncConflictHandlingTest {
                 transactionLocalId = txId,
                 productServerId = "prod-1",
                 productNameSnapshot = "Semen 50kg",
-                quantity = 1.0,
-                priceAtTransaction = 50_000.0,
-                cogsAtTransaction = 40_000.0,
-                subtotal = 50_000.0,
+                quantity = ScaledDecimal2.ofWhole(1L),
+                priceAtTransaction = ScaledDecimal2.ofWhole(50_000L),
+                cogsAtTransaction = ScaledDecimal2.ofWhole(40_000L),
+                subtotal = ScaledDecimal2.ofWhole(50_000L),
             )
         )
         database.paymentDao().upsert(
@@ -101,7 +102,7 @@ class OfflineSyncConflictHandlingTest {
                 clientGeneratedId = "pay-client-1",
                 transactionLocalId = txId,
                 method = "tunai",
-                amount = 50_000.0,
+                amount = ScaledDecimal2.ofWhole(50_000L),
             )
         )
         val queueId = database.syncQueueDao().enqueue(
@@ -155,7 +156,7 @@ class OfflineSyncConflictHandlingTest {
                 deviceId = "android-dev-1",
                 cashierUserId = "kasir-1",
                 status = "OPEN",
-                startingCash = 100_000.0,
+                startingCash = ScaledDecimal2.ofWhole(100_000L),
             )
         )
         val openQueueId = database.syncQueueDao().enqueue(
@@ -176,8 +177,8 @@ class OfflineSyncConflictHandlingTest {
                 status = "CLOSED",
                 openedAt = 1_795_000_000_000L,
                 closedAt = 1_794_999_000_000L,
-                startingCash = 100_000.0,
-                actualCash = 150_000.0,
+                startingCash = ScaledDecimal2.ofWhole(100_000L),
+                actualCash = ScaledDecimal2.ofWhole(150_000L),
             )
         )
         val closeQueueId = database.syncQueueDao().enqueue(
@@ -196,7 +197,7 @@ class OfflineSyncConflictHandlingTest {
                 deviceId = "android-dev-1",
                 cashierUserId = "kasir-1",
                 status = "OPEN",
-                startingCash = 100_000.0,
+                startingCash = ScaledDecimal2.ofWhole(100_000L),
             )
         )
         val expenseId = database.cashExpenseDao().upsert(
@@ -206,7 +207,7 @@ class OfflineSyncConflictHandlingTest {
                 cashSessionLocalId = expenseSessionId,
                 cashSessionServerId = "srv-sess-3",
                 description = "Beli plastik",
-                amount = 15_000.0,
+                amount = ScaledDecimal2.ofWhole(15_000L),
             )
         )
         val expenseQueueId = database.syncQueueDao().enqueue(
@@ -249,10 +250,10 @@ class OfflineSyncConflictHandlingTest {
                 cashSessionServerId = "srv-session-unit-1",
                 cashierUserId = "kasir-1",
                 status = "PAID",
-                subtotal = 240_000.0,
-                total = 240_000.0,
-                paidAmount = 240_000.0,
-                remainingAmount = 0.0,
+                subtotal = ScaledDecimal2.ofWhole(240_000L),
+                total = ScaledDecimal2.ofWhole(240_000L),
+                paidAmount = ScaledDecimal2.ofWhole(240_000L),
+                remainingAmount = ScaledDecimal2.ZERO,
             )
         )
         database.transactionItemDao().upsert(
@@ -262,12 +263,12 @@ class OfflineSyncConflictHandlingTest {
                 productNameSnapshot = "Paku 5 cm",
                 unitNameSnapshot = "Dus",
                 unitServerId = "unit-dus",
-                quantity = 2.0,
+                quantity = ScaledDecimal2.ofWhole(2L),
                 baseQuantity = BigDecimal("24"),
                 conversionFactor = BigDecimal("12"),
-                priceAtTransaction = 120_000.0,
-                cogsAtTransaction = 96_000.0,
-                subtotal = 240_000.0,
+                priceAtTransaction = ScaledDecimal2.ofWhole(120_000L),
+                cogsAtTransaction = ScaledDecimal2.ofWhole(96_000L),
+                subtotal = ScaledDecimal2.ofWhole(240_000L),
             )
         )
         database.paymentDao().upsert(
@@ -275,7 +276,7 @@ class OfflineSyncConflictHandlingTest {
                 clientGeneratedId = "pay-client-unit-1",
                 transactionLocalId = txId,
                 method = "tunai",
-                amount = 240_000.0,
+                amount = ScaledDecimal2.ofWhole(240_000L),
             )
         )
         val queueId = database.syncQueueDao().enqueue(

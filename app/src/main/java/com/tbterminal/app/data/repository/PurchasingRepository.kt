@@ -237,7 +237,8 @@ class RemotePurchasingRepository(
             amountPaid = command.amountPaid,
             notes = command.notes?.takeIf(String::isNotBlank),
             dueDays = command.dueDays,
-            items = command.items.map(PurchaseItemCommand::toRequestDto)
+            items = command.items.map(PurchaseItemCommand::toRequestDto),
+            idempotencyKey = command.idempotencyKey?.trim()?.takeIf(String::isNotBlank)
         )
 
         return safeApiCall { purchasingApi.createPurchase(request) }
@@ -346,7 +347,8 @@ class RemotePurchasingRepository(
             amount = command.amount,
             method = command.method,
             reference = command.reference?.takeIf(String::isNotBlank),
-            notes = command.notes?.takeIf(String::isNotBlank)
+            notes = command.notes?.takeIf(String::isNotBlank),
+            idempotencyKey = command.idempotencyKey?.trim()?.takeIf(String::isNotBlank)
         )
 
         return safeApiCall { purchasingApi.createSupplierPayment(request) }
@@ -500,7 +502,8 @@ private fun PurchaseResponseDto.toPurchaseReceipt(): PurchaseReceipt {
         supplierName = supplierName,
         invoiceNo = invoiceNo,
         total = total,
-        receivedAt = receivedAt
+        receivedAt = receivedAt,
+        idempotentReplay = idempotentReplay
     )
 }
 
@@ -539,6 +542,7 @@ private fun SupplierPaymentResponseDto.toSupplierPaymentReceipt(): SupplierPayme
         notes = notes,
         paidAt = paidAt,
         payableStatus = payableStatus,
-        payableRemainingAmount = payableRemainingAmount
+        payableRemainingAmount = payableRemainingAmount,
+        idempotentReplay = idempotentReplay
     )
 }

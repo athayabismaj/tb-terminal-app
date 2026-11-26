@@ -40,6 +40,19 @@ Temuan berikut diidentifikasi saat pengerjaan Fase B1c namun tidak diubah pada f
 
 ## Temuan di Luar Scope (Fase B2a)
 
-- [TINGGI] Pembayaran utang supplier (`SupplierDebtViewModel.kt`, `SupplierDebtDetailViewModel.kt`) dan restok barang masuk (`IncomingGoodsViewModel.kt`) belum mengirimkan/mengelola idempotency key — membutuhkan dukungan idempotency di endpoint backend terlebih dahulu (Fase B2/backend)
+- [TINGGI] Pembayaran utang supplier (`SupplierDebtViewModel.kt`, `SupplierDebtDetailViewModel.kt`) dan restok barang masuk (`IncomingGoodsViewModel.kt`) belum mengirimkan/mengelola idempotency key — membutuhkan dukungan idempotency di endpoint backend terlebih dahulu (Fase B2/backend) — **[SELESAI DI FASE B2b]**
 - [SEDANG] Audit & pembersihan `runCatching` / `catch Throwable` di luar jalur sync dan pembayaran agar tidak menelan `CancellationException` pada ViewModel UI maupun background job lain (Fase B2/B3)
 - [SEDANG] Kebijakan retensi / TTL antrean sync offline (`> 72 jam`) dan alur pembersihan/eskalasi permanen jika terminal offline sangat lama atau gagal non-transien berulang kali (Fase B2/B3)
+
+## Selesai di Fase B2b
+
+- [SELESAI] Sinkronisasi `docs/API_CHANGES.md` terhadap kontrak backend `main @ c503509`
+- [SELESAI] Migrasi seluruh kolom uang & kuantitas Room dari `REAL`/`Double` ke integer eksak berskala `×100` (`ScaledDecimal2` dengan `ofExact` yang menolak `> 2` desimal; `conversionFactor`, `secondaryUnitFactor`, dan `baseQuantity` tetap `TEXT`), penghapusan `toSafeDouble()` & aritmetika `Double` di jalur offline, perhitungan pajak/diskon/pembulatan `BigDecimal` paritas backend, migrasi eksplisit Room v6 → v7 (`HALF_UP` ke 2 desimal, transaksi, `PRAGMA foreign_key_check`, indeks lengkap, `exportSchema = true` + `app/schemas`), test migrasi `4→7`, `5→7`, `6→7` termasuk antrean sync `PENDING` end-to-end, serta `LocalBackupRepository` v7 yang dapat me-restore backup v6 (`ScaledDecimal2.kt`, `RoomMigration6To7.kt`, `TbTerminalDatabase.kt`, `LocalBackupRepository.kt`, `OfflineExactMoneyAndParityTest.kt`)
+- [SELESAI] Idempotency key pembelian (`POST /api/purchasing/purchases`) & pembayaran utang supplier (`POST /api/purchasing/payables/payments`) di `SupplierDebtViewModel.kt`, `SupplierDebtDetailViewModel.kt`, dan `IncomingGoodsViewModel.kt` via `SubmissionIdempotencyTracker.kt`, termasuk pelestarian key saat retry/timeout/dialog ditutup-buka, rotasi saat niat berubah/sukses, dan perlakuan `idempotentReplay = true` sebagai sukses normal
+- [SELESAI] Migrasi field angka DTO dashboard & ringkasan penjualan harian di `NetworkModels.kt` (`StockLowSummaryDto`, `DashboardMetricsDto`, `DailySalesSummaryDto`) dari `Double` ke `BigDecimal` dengan `BigDecimalStringSerializer` tanpa mengubah UI
+
+## Temuan di Luar Scope (Fase B2b)
+
+- [SEDANG] Migrasi state tampilan layar Owner & Checkout (`OwnerDashboardScreen.kt` `DashboardUiState`/`DayPoint`, `OwnerKeuanganScreen.kt`, dan `CheckoutUiState.equivalentBaseQuantity`) dari `Double` ke `BigDecimal` — app/src/main/java/com/tbterminal/app/ui/dashboard/owner/OwnerDashboardScreen.kt, app/src/main/java/com/tbterminal/app/ui/dashboard/owner/OwnerKeuanganScreen.kt, app/src/main/java/com/tbterminal/app/ui/checkout/CheckoutUiState.kt — Saat ini konversi `.toDouble()` dipertahankan murni untuk tampilan UI/grafik saja (tidak dipakai menghitung, menyimpan, atau dikirim ke server) agar tidak menyentuh komponen di tengah redesain UI — Pasca redesain UI
+- [SEDANG] Persistensi idempotency key lintas process death (`SavedStateHandle` atau draft Room) — app/src/main/java/com/tbterminal/app/ui/payables/SupplierDebtViewModel.kt, app/src/main/java/com/tbterminal/app/ui/payables/SupplierDebtDetailViewModel.kt, app/src/main/java/com/tbterminal/app/ui/incominggoods/IncomingGoodsViewModel.kt — Key idempotency saat ini disimpan di memori selama lifecycle ViewModel agar konsisten dengan pola B2a — Fase B3
+- [RENDAH] Audit format tampilan kuantitas stok rendah pada `LowStockWarningCard.kt` (`item.quantity.toString()` / `item.minStock.toString()`) agar disatukan dengan helper `stripTrailingZeros()` jika diperlukan tanpa mengubah tata letak kartu — Pasca redesain UI

@@ -56,7 +56,7 @@ import com.tbterminal.app.data.local.entity.SyncQueueEntity
         AppSettingEntity::class
     ],
     version = TbTerminalDatabase.DATABASE_VERSION,
-    exportSchema = false
+    exportSchema = true
 )
 @TypeConverters(LocalConverters::class)
 abstract class TbTerminalDatabase : RoomDatabase() {
@@ -80,7 +80,7 @@ abstract class TbTerminalDatabase : RoomDatabase() {
     abstract fun offlineExpenseReportDao(): OfflineExpenseReportDao
 
     companion object {
-        const val DATABASE_VERSION = 6
+        const val DATABASE_VERSION = 7
         const val DATABASE_NAME = "tb_terminal_local.db"
 
         @Volatile
@@ -93,7 +93,14 @@ abstract class TbTerminalDatabase : RoomDatabase() {
                     TbTerminalDatabase::class.java,
                     DATABASE_NAME
                 )
-                    .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6)
+                    .addMigrations(
+                        MIGRATION_1_2,
+                        MIGRATION_2_3,
+                        MIGRATION_3_4,
+                        MIGRATION_4_5,
+                        MIGRATION_5_6,
+                        MIGRATION_6_7
+                    )
                     .build()
                     .also { instance = it }
             }
@@ -154,6 +161,12 @@ abstract class TbTerminalDatabase : RoomDatabase() {
                 db.execSQL("ALTER TABLE local_products ADD COLUMN secondaryUnitServerId TEXT")
                 db.execSQL("ALTER TABLE local_products ADD COLUMN secondaryUnitName TEXT")
                 db.execSQL("ALTER TABLE local_products ADD COLUMN secondaryUnitFactor TEXT")
+            }
+        }
+
+        internal val MIGRATION_6_7 = object : Migration(6, 7) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                RoomMigration6To7.migrate(db)
             }
         }
 

@@ -2,6 +2,7 @@ package com.tbterminal.app.data.local.dao
 
 import androidx.room.Dao
 import androidx.room.Query
+import com.tbterminal.app.data.local.model.ScaledDecimal2
 import com.tbterminal.app.data.local.model.SyncStatus
 import kotlinx.coroutines.flow.Flow
 
@@ -18,21 +19,21 @@ interface OfflineSalesReportDao {
                     AND occurredAt < :endAt
             ) AS totalTransactions,
             (
-                SELECT COALESCE(SUM(total), 0.0)
+                SELECT COALESCE(SUM(total), 0)
                 FROM local_transactions
                 WHERE deletedAt IS NULL
                     AND occurredAt >= :startAt
                     AND occurredAt < :endAt
             ) AS localRevenue,
             (
-                SELECT COALESCE(SUM(amount), 0.0)
+                SELECT COALESCE(SUM(amount), 0)
                 FROM local_payments
                 WHERE deletedAt IS NULL
                     AND paidAt >= :startAt
                     AND paidAt < :endAt
             ) AS collectedAmount,
             (
-                SELECT COALESCE(SUM(remainingAmount), 0.0)
+                SELECT COALESCE(SUM(remainingAmount), 0)
                 FROM local_receivables
                 WHERE deletedAt IS NULL
                     AND occurredAt >= :startAt
@@ -72,9 +73,9 @@ interface OfflineSalesReportDao {
 
 data class OfflineSalesReportSummary(
     val totalTransactions: Int = 0,
-    val localRevenue: Double = 0.0,
-    val collectedAmount: Double = 0.0,
-    val outstandingAmount: Double = 0.0
+    val localRevenue: ScaledDecimal2 = ScaledDecimal2.ZERO,
+    val collectedAmount: ScaledDecimal2 = ScaledDecimal2.ZERO,
+    val outstandingAmount: ScaledDecimal2 = ScaledDecimal2.ZERO
 )
 
 data class OfflineSalesReportRow(
@@ -82,9 +83,9 @@ data class OfflineSalesReportRow(
     val transactionCode: String,
     val customerName: String,
     val status: String,
-    val total: Double,
-    val paidAmount: Double,
-    val remainingAmount: Double,
+    val total: ScaledDecimal2,
+    val paidAmount: ScaledDecimal2,
+    val remainingAmount: ScaledDecimal2,
     val occurredAt: Long,
     val syncStatus: SyncStatus
 )

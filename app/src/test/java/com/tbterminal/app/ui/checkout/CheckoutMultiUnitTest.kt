@@ -128,18 +128,18 @@ class CheckoutMultiUnitTest {
             productNameSnapshot = "Semen Padang",
             skuSnapshot = "CEM-50",
             unitNameSnapshot = "Sak",
-            quantity = 2.0,
-            baseQuantity = 100.0,
-            conversionFactor = 50.0,
-            priceAtTransaction = 75000.0,
-            cogsAtTransaction = 60000.0,
-            discount = 0.0,
-            subtotal = 150000.0
+            quantity = BigDecimal("2"),
+            baseQuantity = BigDecimal("100"),
+            conversionFactor = BigDecimal("50"),
+            priceAtTransaction = BigDecimal("75000.00"),
+            cogsAtTransaction = BigDecimal("60000.00"),
+            discount = BigDecimal.ZERO,
+            subtotal = BigDecimal("150000.00")
         )
 
-        assertEquals(2.0, command.quantity, 0.001)
-        assertEquals(100.0, command.baseQuantity, 0.001)
-        assertEquals(50.0, command.conversionFactor, 0.001)
-        assertEquals(75000.0, command.priceAtTransaction, 0.001)
+        assertEquals(0, BigDecimal("2").compareTo(command.quantity))
+        assertEquals(0, BigDecimal("100").compareTo(command.baseQuantity))
+        assertEquals(0, BigDecimal("50").compareTo(command.conversionFactor))
+        assertEquals(0, BigDecimal("75000.00").compareTo(command.priceAtTransaction))
     }
 }

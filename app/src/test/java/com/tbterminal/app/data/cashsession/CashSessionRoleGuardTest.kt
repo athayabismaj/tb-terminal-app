@@ -8,6 +8,7 @@ import com.tbterminal.app.data.local.cashsession.LocalCashSessionService
 import com.tbterminal.app.data.local.database.TbTerminalDatabase
 import com.tbterminal.app.data.local.entity.LocalCashSessionEntity
 import com.tbterminal.app.data.local.entity.SyncQueueEntity
+import com.tbterminal.app.data.local.model.ScaledDecimal2
 import com.tbterminal.app.data.local.model.SyncEntityType
 import com.tbterminal.app.data.local.model.SyncOperation
 import com.tbterminal.app.data.local.model.SyncStatus
@@ -145,7 +146,7 @@ class CashSessionRoleGuardTest {
                     deviceId = "android-dev-1",
                     cashierUserId = "user-$idx",
                     status = "OPEN",
-                    startingCash = 100_000.0,
+                    startingCash = ScaledDecimal2.ofWhole(100_000L),
                 )
             )
             val queueId = database.syncQueueDao().enqueue(
@@ -174,7 +175,7 @@ class CashSessionRoleGuardTest {
                 deviceId = "android-dev-1",
                 cashierUserId = "kasir-1",
                 status = "OPEN",
-                startingCash = 100_000.0,
+                startingCash = ScaledDecimal2.ofWhole(100_000L),
             )
         )
         database.syncQueueDao().enqueue(

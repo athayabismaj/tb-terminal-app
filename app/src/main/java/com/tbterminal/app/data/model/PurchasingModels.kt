@@ -34,7 +34,8 @@ data class CreatePurchaseCommand(
     val amountPaid: BigDecimal,
     val notes: String?,
     val dueDays: Int,
-    val items: List<PurchaseItemCommand>
+    val items: List<PurchaseItemCommand>,
+    val idempotencyKey: String? = null
 )
 
 data class PurchaseReceipt(
@@ -43,7 +44,8 @@ data class PurchaseReceipt(
     val supplierName: String,
     val invoiceNo: String?,
     val total: BigDecimal,
-    val receivedAt: String
+    val receivedAt: String,
+    val idempotentReplay: Boolean = false
 )
 
 data class PurchaseSummary(
@@ -110,7 +112,8 @@ data class CreateSupplierPaymentCommand(
     val amount: BigDecimal,
     val method: String,
     val reference: String?,
-    val notes: String?
+    val notes: String?,
+    val idempotencyKey: String? = null
 )
 
 data class CreateOpeningPayableCommand(
@@ -140,5 +143,6 @@ data class SupplierPaymentReceipt(
     val notes: String?,
     val paidAt: String,
     val payableStatus: String,
-    val payableRemainingAmount: BigDecimal
+    val payableRemainingAmount: BigDecimal,
+    val idempotentReplay: Boolean = false
 )

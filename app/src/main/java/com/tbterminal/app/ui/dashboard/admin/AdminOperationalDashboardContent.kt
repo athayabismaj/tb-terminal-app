@@ -1457,11 +1457,12 @@ private fun resolveTransactionStatusDisplay(trx: CashTransaction): Pair<String, 
     return trx.status to Slate600
 }
 
-private fun Double.formatStockQty(): String {
-    return if (this % 1.0 == 0.0) {
-        toLong().toString()
+private fun BigDecimal.formatStockQty(): String {
+    val normalized = stripTrailingZeros()
+    return if (normalized.scale() <= 0) {
+        normalized.toBigInteger().toString()
     } else {
-        String.format(Locale.forLanguageTag("id-ID"), "%.1f", this)
+        normalized.toPlainString()
     }
 }
 
@@ -1511,9 +1512,9 @@ private fun AdminOperationalDashboardNormalPreview() {
         AdminOperationalDashboardContent(
             adminName = "Ahmad",
             metrics = DashboardMetricsDto(
-                totalRevenueToday = 5200000.0,
-                totalRevenueThisMonth = 42000000.0,
-                totalActiveReceivables = 850000.0,
+                totalRevenueToday = BigDecimal("5200000"),
+                totalRevenueThisMonth = BigDecimal("42000000"),
+                totalActiveReceivables = BigDecimal("850000"),
                 activeReceivableCount = 3,
                 lowStockCount = 1,
                 lowStockItems = emptyList()
@@ -1559,9 +1560,9 @@ private fun AdminOperationalDashboardOfflineWithQueuePreview() {
         AdminOperationalDashboardContent(
             adminName = "Ahmad",
             metrics = DashboardMetricsDto(
-                totalRevenueToday = 2100000.0,
-                totalRevenueThisMonth = 31000000.0,
-                totalActiveReceivables = 450000.0,
+                totalRevenueToday = BigDecimal("2100000"),
+                totalRevenueThisMonth = BigDecimal("31000000"),
+                totalActiveReceivables = BigDecimal("450000"),
                 activeReceivableCount = 2,
                 lowStockCount = 4,
                 lowStockItems = emptyList()

@@ -5,6 +5,7 @@ import androidx.room.Insert
 import androidx.room.OnConflictStrategy
 import androidx.room.Query
 import com.tbterminal.app.data.local.entity.LocalCashSessionEntity
+import com.tbterminal.app.data.local.model.ScaledDecimal2
 import com.tbterminal.app.data.local.model.SyncStatus
 import kotlinx.coroutines.flow.Flow
 
@@ -300,9 +301,9 @@ interface CashSessionDao {
         localId: Long,
         status: String,
         closedAt: Long,
-        expectedCash: Double?,
-        actualCash: Double?,
-        difference: Double?,
+        expectedCash: ScaledDecimal2?,
+        actualCash: ScaledDecimal2?,
+        difference: ScaledDecimal2?,
         closingNote: String?,
         syncStatus: SyncStatus,
         updatedAt: Long

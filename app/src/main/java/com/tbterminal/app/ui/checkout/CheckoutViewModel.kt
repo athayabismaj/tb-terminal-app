@@ -684,7 +684,7 @@ class CheckoutViewModel(
                         val stock = detail.stock
                         val resolvedStockQty = stock?.quantity
                             ?: cachedFromUi?.stockQty
-                            ?: localLookup?.let { BigDecimal.valueOf(it.stock) }
+                            ?: localLookup?.stock
                             ?: BigDecimal.ZERO
                         val uiProduct = Product(
                             productId = domainProduct.id,
@@ -2502,9 +2502,9 @@ class CheckoutViewModel(
             ?: lookupService.findCashSessionByServerId(activeSession.serverId)?.localId
             ?: return LocalCheckoutCommandBuildResult.Failed("Sesi kasir lokal belum tersedia.")
 
-        val subtotal = state.subtotal.toSafeDouble()
-        val discount = state.totalDiscount.toSafeDouble()
-        val total = state.finalTotal.toSafeDouble()
+        val subtotal = state.subtotal
+        val discount = state.totalDiscount
+        val total = state.finalTotal
         val selectedCustomer = state.selectedCustomer
         val splitValidation = if (state.isSplitPaymentEnabled) {
             validateSplitCheckoutPayment(
@@ -2518,16 +2518,16 @@ class CheckoutViewModel(
             return LocalCheckoutCommandBuildResult.Failed(splitValidation.error)
         }
         val paidAmount = if (state.isSplitPaymentEnabled) {
-            if (state.isSplitDpMode) splitValidation!!.totalTendered.toSafeDouble() else state.finalTotal.toSafeDouble()
+            if (state.isSplitDpMode) splitValidation!!.totalTendered else state.finalTotal
         } else {
             resolveLocalCheckoutPaidAmount(state)
                 ?: return LocalCheckoutCommandBuildResult.Failed("Nominal bayar belum valid.")
         }
 
-        if (subtotal < 0.0 || discount < 0.0 || total < 0.0) {
+        if (subtotal < BigDecimal.ZERO || discount < BigDecimal.ZERO || total < BigDecimal.ZERO) {
             return LocalCheckoutCommandBuildResult.Failed("Nilai transaksi lokal belum valid.")
         }
-        if (paidAmount < 0.0) {
+        if (paidAmount < BigDecimal.ZERO) {
             return LocalCheckoutCommandBuildResult.Failed("Nominal bayar tidak boleh negatif.")
         }
         if (paidAmount > total) {
@@ -2553,7 +2553,7 @@ class CheckoutViewModel(
                 ?: return LocalCheckoutCommandBuildResult.Failed(
                     "Data lokal produk ${cartItem.productName} belum tersedia."
                 )
-            val quantity = cartItem.quantity.toDouble()
+            val quantity = cartItem.quantity.toBigDecimal()
             val unitResolution = resolveOfflineCheckoutItemUnit(
                 productName = cartItem.productName,
                 quantity = cartItem.quantity,
@@ -2579,14 +2579,18 @@ class CheckoutViewModel(
                     }
                     acc.add(item.quantity.toBigDecimal().multiply(itemFactor))
                 }
-            if (BigDecimal.valueOf(productLookup.stock) < totalProductBaseQty) {
+            if (productLookup.stock < totalProductBaseQty) {
                 return LocalCheckoutCommandBuildResult.Failed(
                     "Stok lokal ${cartItem.productName} tidak cukup."
                 )
             }
 
-            val grossSubtotal = cartItem.unitPrice.multiply(cartItem.quantity.toBigDecimal())
-            val lineSubtotal = grossSubtotal
+            val lineSubtotal = cartItem.unitPrice
+                .multiply(quantity)
+                .setScale(2, java.math.RoundingMode.HALF_UP)
+            val lineCogs = productLookup.cogsAtTransaction
+                .multiply(unitResolution.conversionFactor)
+                .setScale(2, java.math.RoundingMode.HALF_UP)
             items += LocalCheckoutItemCommand(
                 productLocalId = productLookup.localId,
                 productServerId = cartItem.productId,
@@ -2594,12 +2598,12 @@ class CheckoutViewModel(
                 skuSnapshot = cartItem.sku.takeIf(String::isNotBlank),
                 unitNameSnapshot = cartItem.unitName.takeIf(String::isNotBlank),
                 quantity = quantity,
-                baseQuantity = unitResolution.baseQuantity.toDouble(),
-                conversionFactor = unitResolution.conversionFactor.toDouble(),
-                priceAtTransaction = cartItem.unitPrice.toSafeDouble(),
-                cogsAtTransaction = productLookup.cogsAtTransaction * unitResolution.conversionFactor.toDouble(),
-                discount = 0.0,
-                subtotal = lineSubtotal.toSafeDouble(),
+                baseQuantity = unitResolution.baseQuantity,
+                conversionFactor = unitResolution.conversionFactor,
+                priceAtTransaction = cartItem.unitPrice,
+                cogsAtTransaction = lineCogs,
+                discount = BigDecimal.ZERO,
+                subtotal = lineSubtotal,
                 note = cartItem.note,
                 unitServerId = unitResolution.unitServerId,
                 baseQuantityExact = unitResolution.baseQuantity,
@@ -2607,7 +2611,7 @@ class CheckoutViewModel(
             )
         }
 
-        val remainingAmount = (total - paidAmount).coerceAtLeast(0.0)
+        val remainingAmount = total.subtract(paidAmount).coerceAtLeast(BigDecimal.ZERO)
         val localSplitLines = if (state.isSplitPaymentEnabled) {
             val remainingCashApplied = if (!state.isSplitDpMode) {
                 state.finalTotal.subtract(splitValidation!!.nonCashPaid).coerceAtLeast(BigDecimal.ZERO)
@@ -2619,7 +2623,7 @@ class CheckoutViewModel(
                 } else rawAmt
                 LocalCheckoutPaymentLineCommand(
                     method = line.method.apiValue(),
-                    amount = appliedAmt.toSafeDouble(),
+                    amount = appliedAmt,
                     reference = line.reference.trim().takeIf { it.isNotEmpty() }
                 )
             }
@@ -2640,11 +2644,11 @@ class CheckoutViewModel(
                 discount = discount,
                 taxEnabled = state.taxEnabled,
                 taxMode = if (state.taxEnabled) state.taxMode else null,
-                taxRate = if (state.taxEnabled) state.taxRate.toSafeDouble() else 0.0,
+                taxRate = if (state.taxEnabled) state.taxRate else BigDecimal.ZERO,
                 taxLabel = if (state.taxEnabled) state.taxLabel else null,
-                taxableBase = if (state.taxEnabled) state.taxableBase.toSafeDouble() else 0.0,
-                taxAmount = if (state.taxEnabled) state.taxAmount.toSafeDouble() else 0.0,
-                roundingAmount = state.roundingAmount.toSafeDouble(),
+                taxableBase = if (state.taxEnabled) state.taxableBase else BigDecimal.ZERO,
+                taxAmount = if (state.taxEnabled) state.taxAmount else BigDecimal.ZERO,
+                roundingAmount = state.roundingAmount,
                 total = total,
                 paidAmount = paidAmount,
                 remainingAmount = remainingAmount,
@@ -2654,12 +2658,12 @@ class CheckoutViewModel(
         )
     }
 
-    private fun resolveLocalCheckoutPaidAmount(state: CheckoutUiState): Double? {
+    private fun resolveLocalCheckoutPaidAmount(state: CheckoutUiState): BigDecimal? {
         return when (state.selectedPaymentMethod) {
             PaymentMethod.HUTANG -> BigDecimal.ZERO
             PaymentMethod.DP -> parseWholeRupiahInput(state.amountPaidInput)
             else -> state.finalTotal
-        }?.toSafeDouble()
+        }
     }
 
     companion object {
@@ -2818,7 +2822,7 @@ private fun LocalCashSessionEntity.toActiveCashSessionUi(): ActiveCashSessionUi 
         serverId = serverId.orEmpty(),
         cashierUserId = cashierUserId,
         openedAt = openedAt.toOffsetDateTimeString(),
-        startingCash = BigDecimal.valueOf(startingCash),
+        startingCash = startingCash.toBigDecimal(),
         status = status
     )
 }
@@ -2829,8 +2833,6 @@ private fun Long.toOffsetDateTimeString(): String {
         .toOffsetDateTime()
         .toString()
 }
-
-private fun BigDecimal.toSafeDouble(): Double = runCatching { toDouble() }.getOrDefault(0.0)
 
 private fun com.tbterminal.app.data.model.ProductStock.toCheckoutProduct(): Product = Product(
     productId = productId,

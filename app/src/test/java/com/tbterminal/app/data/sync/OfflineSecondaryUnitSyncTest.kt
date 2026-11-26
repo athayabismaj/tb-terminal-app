@@ -16,6 +16,7 @@ import com.tbterminal.app.data.local.entity.LocalProductEntity
 import com.tbterminal.app.data.local.entity.LocalTransactionEntity
 import com.tbterminal.app.data.local.entity.LocalTransactionItemEntity
 import com.tbterminal.app.data.local.entity.SyncQueueEntity
+import com.tbterminal.app.data.local.model.ScaledDecimal2
 import com.tbterminal.app.data.local.model.SyncEntityType
 import com.tbterminal.app.data.local.model.SyncOperation
 import com.tbterminal.app.data.local.model.SyncStatus
@@ -94,10 +95,10 @@ class OfflineSecondaryUnitSyncTest {
                 secondaryUnitServerId = "unit-dus",
                 secondaryUnitName = "Dus",
                 secondaryUnitFactor = BigDecimal("12"),
-                priceSell = 10_000.0,
-                priceBuy = 8_000.0,
-                priceRetail = 10_000.0,
-                stock = 100.0,
+                priceSell = ScaledDecimal2.ofWhole(10_000L),
+                priceBuy = ScaledDecimal2.ofWhole(8_000L),
+                priceRetail = ScaledDecimal2.ofWhole(10_000L),
+                stock = ScaledDecimal2.ofWhole(100L),
                 syncStatus = SyncStatus.SYNCED
             )
         )
@@ -109,9 +110,9 @@ class OfflineSecondaryUnitSyncTest {
                 cashSessionLocalId = sessionLocalId,
                 cashSessionServerId = "srv-sess-1",
                 paymentMethod = "tunai",
-                subtotal = 240_000.0,
-                total = 240_000.0,
-                paidAmount = 240_000.0,
+                subtotal = BigDecimal("240000.00"),
+                total = BigDecimal("240000.00"),
+                paidAmount = BigDecimal("240000.00"),
                 items = listOf(
                     LocalCheckoutItemCommand(
                         productLocalId = productLocalId,
@@ -119,12 +120,12 @@ class OfflineSecondaryUnitSyncTest {
                         productNameSnapshot = "Paku 5 cm",
                         skuSnapshot = "PK-05",
                         unitNameSnapshot = "Dus",
-                        quantity = 2.0,
-                        baseQuantity = 24.0,
-                        conversionFactor = 12.0,
-                        priceAtTransaction = 120_000.0,
-                        cogsAtTransaction = 96_000.0,
-                        subtotal = 240_000.0,
+                        quantity = BigDecimal("2"),
+                        baseQuantity = BigDecimal("24"),
+                        conversionFactor = BigDecimal("12"),
+                        priceAtTransaction = BigDecimal("120000.00"),
+                        cogsAtTransaction = BigDecimal("96000.00"),
+                        subtotal = BigDecimal("240000.00"),
                         unitServerId = "unit-dus",
                         baseQuantityExact = BigDecimal("24"),
                         conversionFactorExact = BigDecimal("12")
@@ -139,13 +140,13 @@ class OfflineSecondaryUnitSyncTest {
         assertEquals(1, storedItems.size)
         val stored = storedItems.single()
         assertEquals("unit-dus", stored.unitServerId)
-        assertEquals(2.0, stored.quantity, 0.001)
+        assertEquals(ScaledDecimal2.ofWhole(2L), stored.quantity)
         assertEquals(0, BigDecimal("24").compareTo(stored.baseQuantity))
         assertEquals(0, BigDecimal("12").compareTo(stored.conversionFactor))
-        assertEquals(120_000.0, stored.priceAtTransaction, 0.001)
+        assertEquals(ScaledDecimal2.ofWhole(120_000L), stored.priceAtTransaction)
 
         val updatedProduct = database.productDao().getByLocalId(productLocalId)!!
-        assertEquals(76.0, updatedProduct.stock, 0.001)
+        assertEquals(ScaledDecimal2.ofWhole(76L), updatedProduct.stock)
 
         enqueueSuccessSyncResponse("srv-trx-1")
         val syncResult = syncService.syncOne(txLocalId)
@@ -175,10 +176,10 @@ class OfflineSecondaryUnitSyncTest {
                 secondaryUnitServerId = "unit-dus",
                 secondaryUnitName = "Dus",
                 secondaryUnitFactor = BigDecimal("12"),
-                priceSell = 10_000.0,
-                priceBuy = 8_000.0,
-                priceRetail = 10_000.0,
-                stock = 100.0,
+                priceSell = ScaledDecimal2.ofWhole(10_000L),
+                priceBuy = ScaledDecimal2.ofWhole(8_000L),
+                priceRetail = ScaledDecimal2.ofWhole(10_000L),
+                stock = ScaledDecimal2.ofWhole(100L),
                 syncStatus = SyncStatus.SYNCED
             )
         )
@@ -190,21 +191,21 @@ class OfflineSecondaryUnitSyncTest {
                 cashSessionLocalId = sessionLocalId,
                 cashSessionServerId = "srv-sess-2",
                 paymentMethod = "tunai",
-                subtotal = 270_000.0,
-                total = 270_000.0,
-                paidAmount = 270_000.0,
+                subtotal = BigDecimal("270000.00"),
+                total = BigDecimal("270000.00"),
+                paidAmount = BigDecimal("270000.00"),
                 items = listOf(
                     LocalCheckoutItemCommand(
                         productLocalId = productLocalId,
                         productServerId = "prod-paku",
                         productNameSnapshot = "Paku 5 cm",
                         unitNameSnapshot = "Dus",
-                        quantity = 2.0,
-                        baseQuantity = 24.0,
-                        conversionFactor = 12.0,
-                        priceAtTransaction = 120_000.0,
-                        cogsAtTransaction = 96_000.0,
-                        subtotal = 240_000.0,
+                        quantity = BigDecimal("2"),
+                        baseQuantity = BigDecimal("24"),
+                        conversionFactor = BigDecimal("12"),
+                        priceAtTransaction = BigDecimal("120000.00"),
+                        cogsAtTransaction = BigDecimal("96000.00"),
+                        subtotal = BigDecimal("240000.00"),
                         unitServerId = "unit-dus",
                         baseQuantityExact = BigDecimal("24"),
                         conversionFactorExact = BigDecimal("12")
@@ -214,12 +215,12 @@ class OfflineSecondaryUnitSyncTest {
                         productServerId = "prod-paku",
                         productNameSnapshot = "Paku 5 cm",
                         unitNameSnapshot = "Pcs",
-                        quantity = 3.0,
-                        baseQuantity = 3.0,
-                        conversionFactor = 1.0,
-                        priceAtTransaction = 10_000.0,
-                        cogsAtTransaction = 8_000.0,
-                        subtotal = 30_000.0,
+                        quantity = BigDecimal("3"),
+                        baseQuantity = BigDecimal("3"),
+                        conversionFactor = BigDecimal.ONE,
+                        priceAtTransaction = BigDecimal("10000.00"),
+                        cogsAtTransaction = BigDecimal("8000.00"),
+                        subtotal = BigDecimal("30000.00"),
                         unitServerId = "unit-pcs",
                         baseQuantityExact = BigDecimal("3"),
                         conversionFactorExact = BigDecimal.ONE
@@ -231,7 +232,7 @@ class OfflineSecondaryUnitSyncTest {
         val txLocalId = (saveResult as LocalCheckoutResult.Success).transactionLocalId
 
         val updatedProduct = database.productDao().getByLocalId(productLocalId)!!
-        assertEquals(73.0, updatedProduct.stock, 0.001)
+        assertEquals(ScaledDecimal2.ofWhole(73L), updatedProduct.stock)
 
         enqueueSuccessSyncResponse("srv-trx-2")
         val syncResult = syncService.syncOne(txLocalId)
@@ -267,7 +268,7 @@ class OfflineSecondaryUnitSyncTest {
                 unitServerId = "unit-pcs",
                 secondaryUnitServerId = "unit-dus",
                 secondaryUnitFactor = BigDecimal("12"),
-                stock = 50.0,
+                stock = ScaledDecimal2.ofWhole(50L),
                 syncStatus = SyncStatus.SYNCED
             )
         )
@@ -343,19 +344,19 @@ class OfflineSecondaryUnitSyncTest {
                 cashSessionLocalId = sessionLocalId,
                 cashSessionServerId = "srv-sess-scale",
                 paymentMethod = "tunai",
-                subtotal = 5_000.0,
-                total = 5_000.0,
-                paidAmount = 5_000.0,
+                subtotal = BigDecimal("5000.00"),
+                total = BigDecimal("5000.00"),
+                paidAmount = BigDecimal("5000.00"),
                 items = listOf(
                     LocalCheckoutItemCommand(
                         productServerId = "prod-kawat",
                         productNameSnapshot = "Kawat Bendrat",
                         unitNameSnapshot = "Ons",
-                        quantity = 1.0,
-                        baseQuantity = 0.125,
-                        conversionFactor = 0.125,
-                        priceAtTransaction = 5_000.0,
-                        subtotal = 5_000.0,
+                        quantity = BigDecimal("1"),
+                        baseQuantity = BigDecimal("0.125"),
+                        conversionFactor = BigDecimal("0.125"),
+                        priceAtTransaction = BigDecimal("5000.00"),
+                        subtotal = BigDecimal("5000.00"),
                         unitServerId = "unit-ons",
                         baseQuantityExact = BigDecimal("0.125"),
                         conversionFactorExact = BigDecimal("0.125")
@@ -387,19 +388,19 @@ class OfflineSecondaryUnitSyncTest {
                 cashSessionLocalId = sessionLocalId,
                 cashSessionServerId = "srv-sess-scale",
                 paymentMethod = "tunai",
-                subtotal = 10_000.0,
-                total = 10_000.0,
-                paidAmount = 10_000.0,
+                subtotal = BigDecimal("10000.00"),
+                total = BigDecimal("10000.00"),
+                paidAmount = BigDecimal("10000.00"),
                 items = listOf(
                     LocalCheckoutItemCommand(
                         productServerId = "prod-kawat",
                         productNameSnapshot = "Kawat Bendrat",
                         unitNameSnapshot = "Ons",
-                        quantity = 2.0,
-                        baseQuantity = 0.25,
-                        conversionFactor = 0.125,
-                        priceAtTransaction = 5_000.0,
-                        subtotal = 10_000.0,
+                        quantity = BigDecimal("2"),
+                        baseQuantity = BigDecimal("0.25"),
+                        conversionFactor = BigDecimal("0.125"),
+                        priceAtTransaction = BigDecimal("5000.00"),
+                        subtotal = BigDecimal("10000.00"),
                         unitServerId = accepted.unitServerId,
                         baseQuantityExact = accepted.baseQuantity,
                         conversionFactorExact = accepted.conversionFactor
@@ -429,7 +430,7 @@ class OfflineSecondaryUnitSyncTest {
                 deviceId = "android-dev-1",
                 cashierUserId = "kasir-1",
                 status = "OPEN",
-                startingCash = 100_000.0,
+                startingCash = ScaledDecimal2.ofWhole(100_000L),
                 syncStatus = SyncStatus.SYNCED
             )
         )
@@ -450,10 +451,10 @@ class OfflineSecondaryUnitSyncTest {
                 cashSessionServerId = "srv-sess-legacy",
                 cashierUserId = "kasir-1",
                 status = "PAID",
-                subtotal = 240_000.0,
-                total = 240_000.0,
-                paidAmount = 240_000.0,
-                remainingAmount = 0.0
+                subtotal = ScaledDecimal2.ofWhole(240_000L),
+                total = ScaledDecimal2.ofWhole(240_000L),
+                paidAmount = ScaledDecimal2.ofWhole(240_000L),
+                remainingAmount = ScaledDecimal2.ZERO
             )
         )
         database.transactionItemDao().upsert(
@@ -463,12 +464,12 @@ class OfflineSecondaryUnitSyncTest {
                 productNameSnapshot = "Paku 5 cm",
                 unitNameSnapshot = "Dus",
                 unitServerId = unitServerId,
-                quantity = 2.0,
+                quantity = ScaledDecimal2.ofWhole(2L),
                 baseQuantity = baseQuantity,
                 conversionFactor = conversionFactor,
-                priceAtTransaction = 120_000.0,
-                cogsAtTransaction = 96_000.0,
-                subtotal = 240_000.0
+                priceAtTransaction = ScaledDecimal2.ofWhole(120_000L),
+                cogsAtTransaction = ScaledDecimal2.ofWhole(96_000L),
+                subtotal = ScaledDecimal2.ofWhole(240_000L)
             )
         )
         database.paymentDao().upsert(
@@ -476,7 +477,7 @@ class OfflineSecondaryUnitSyncTest {
                 clientGeneratedId = "pay-$clientGeneratedId",
                 transactionLocalId = txId,
                 method = "tunai",
-                amount = 240_000.0
+                amount = ScaledDecimal2.ofWhole(240_000L)
             )
         )
         database.syncQueueDao().enqueue(

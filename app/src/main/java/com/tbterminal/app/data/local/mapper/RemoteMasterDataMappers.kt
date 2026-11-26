@@ -4,6 +4,7 @@ import com.tbterminal.app.data.local.entity.LocalCategoryEntity
 import com.tbterminal.app.data.local.entity.LocalCustomerEntity
 import com.tbterminal.app.data.local.entity.LocalProductEntity
 import com.tbterminal.app.data.local.entity.LocalUnitEntity
+import com.tbterminal.app.data.local.model.ScaledDecimal2
 import com.tbterminal.app.data.local.model.SyncStatus
 import com.tbterminal.app.data.model.Customer
 import com.tbterminal.app.data.model.Product
@@ -26,12 +27,12 @@ fun ProductResponseDto.toLocalProductEntity(now: Long = System.currentTimeMillis
         unitServerId = baseUnitId.trim().takeIf(String::isNotBlank),
         secondaryUnitServerId = secondaryUnitId?.trim()?.takeIf(String::isNotBlank),
         secondaryUnitFactor = secondaryUnitFactor?.trim()?.toBigDecimalOrNull(),
-        priceSell = priceRetail.toSafeDouble(),
-        priceBuy = priceBuy.toSafeDouble(),
-        priceRetail = priceRetail.toSafeDouble(),
-        priceContractor = priceContractor.toSafeDouble(),
-        discount = discount.toSafeDouble(),
-        minimumStock = minStock.toSafeDouble(),
+        priceSell = ScaledDecimal2.ofExact(priceRetail),
+        priceBuy = ScaledDecimal2.ofExact(priceBuy),
+        priceRetail = ScaledDecimal2.ofExact(priceRetail),
+        priceContractor = ScaledDecimal2.ofExact(priceContractor),
+        discount = ScaledDecimal2.ofExact(discount),
+        minimumStock = ScaledDecimal2.ofExact(minStock),
         photoFilename = photoUrl,
         isActive = isActive,
         syncStatus = SyncStatus.SYNCED,
@@ -51,13 +52,13 @@ fun StockDetailResponseDto.toLocalProductEntity(now: Long = System.currentTimeMi
         secondaryUnitServerId = resolvedSecondaryId,
         secondaryUnitName = if (resolvedSecondaryId != null) secondaryUnitName?.trim()?.takeIf(String::isNotBlank) else null,
         secondaryUnitFactor = if (resolvedSecondaryId != null) secondaryUnitFactor?.trim()?.toBigDecimalOrNull() else null,
-        priceSell = priceRetail.toSafeDouble(),
-        priceBuy = priceBuy.toSafeDouble(),
-        priceRetail = priceRetail.toSafeDouble(),
-        priceContractor = priceContractor.toSafeDouble(),
-        discount = discount.toSafeDouble(),
-        stock = quantity.toSafeDouble(),
-        minimumStock = minStock.toSafeDouble(),
+        priceSell = ScaledDecimal2.ofExact(priceRetail),
+        priceBuy = ScaledDecimal2.ofExact(priceBuy),
+        priceRetail = ScaledDecimal2.ofExact(priceRetail),
+        priceContractor = ScaledDecimal2.ofExact(priceContractor),
+        discount = ScaledDecimal2.ofExact(discount),
+        stock = ScaledDecimal2.ofExact(quantity),
+        minimumStock = ScaledDecimal2.ofExact(minStock),
         photoFilename = photoUrl,
         isActive = isActive,
         syncStatus = SyncStatus.SYNCED,
@@ -98,7 +99,7 @@ fun CustomerResponseDto.toLocalCustomerEntity(now: Long = System.currentTimeMill
         address = address,
         isContractor = isContractor,
         creditAllowed = creditLimit > BigDecimal.ZERO || paymentTermDays > 0,
-        creditLimit = creditLimit.toSafeDouble(),
+        creditLimit = ScaledDecimal2.ofExact(creditLimit),
         paymentTermDays = paymentTermDays,
         isActive = isActive,
         syncStatus = SyncStatus.SYNCED,
@@ -157,8 +158,4 @@ fun LocalCustomerEntity.toCustomer(): Customer {
         createdAt = remoteCreatedAt.orEmpty(),
         updatedAt = remoteUpdatedAt.orEmpty()
     )
-}
-
-private fun BigDecimal.toSafeDouble(): Double {
-    return runCatching { toDouble() }.getOrDefault(0.0)
 }

@@ -20,6 +20,7 @@ import com.tbterminal.app.data.remote.DashboardMetricsDto
 import com.tbterminal.app.data.remote.StockLowSummaryDto
 import com.tbterminal.app.ui.dashboard.offline.OfflineDashboardUiState
 import com.tbterminal.app.ui.theme.TbterminalappTheme
+import java.math.BigDecimal
 
 @Preview(name = "Owner - Phone", widthDp = 412, heightDp = 915, showBackground = true)
 @Composable
@@ -75,23 +76,23 @@ private fun BackofficePreview() {
                 BackofficeDashboardContent(
                     role = "OWNER",
                     metrics = DashboardMetricsDto(
-                        totalRevenueToday = 4_850_000.0,
-                        totalRevenueThisMonth = 86_400_000.0,
-                        totalActiveReceivables = 7_250_000.0,
+                        totalRevenueToday = BigDecimal("4850000"),
+                        totalRevenueThisMonth = BigDecimal("86400000"),
+                        totalActiveReceivables = BigDecimal("7250000"),
                         activeReceivableCount = 6,
                         lowStockCount = 3,
                         lowStockItems = listOf(
-                            StockLowSummaryDto("preview-1", "BRG-001", "Beras Premium", 4.0, 10.0),
-                            StockLowSummaryDto("preview-2", "BRG-002", "Minyak Goreng", 2.0, 8.0)
+                            StockLowSummaryDto("preview-1", "BRG-001", "Beras Premium", BigDecimal("4"), BigDecimal("10")),
+                            StockLowSummaryDto("preview-2", "BRG-002", "Minyak Goreng", BigDecimal("2"), BigDecimal("8"))
                         )
                     ),
                     isLoading = false,
                     error = null,
                     offlineUiState = OfflineDashboardUiState(
-                        localRevenueToday = 1_250_000.0,
-                        localCollectedToday = 1_000_000.0,
-                        localReceivableOutstanding = 250_000.0,
-                        localExpenseToday = 75_000.0,
+                        localRevenueToday = BigDecimal("1250000"),
+                        localCollectedToday = BigDecimal("1000000"),
+                        localReceivableOutstanding = BigDecimal("250000"),
+                        localExpenseToday = BigDecimal("75000"),
                         localTransactionCount = 12,
                         pendingSyncCount = 2,
                         failedSyncCount = 0,

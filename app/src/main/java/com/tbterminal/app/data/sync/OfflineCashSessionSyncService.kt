@@ -685,7 +685,7 @@ class OfflineCashSessionSyncService(
         if (session.cashierUserId.isBlank()) {
             return BuildOpenSessionRequestResult.Error("Kasir sesi kas lokal belum tersedia.")
         }
-        if (session.startingCash < 0.0) {
+        if (session.startingCash.isNegative) {
             return BuildOpenSessionRequestResult.Error("Modal awal sesi kas tidak boleh negatif.")
         }
 
@@ -695,7 +695,7 @@ class OfflineCashSessionSyncService(
                 deviceId = resolvedDeviceId,
                 cashierUserId = session.cashierUserId,
                 openedAt = session.openedAt.toOffsetDateTimeString(),
-                startingCash = session.startingCash.toMoney(),
+                startingCash = session.startingCash.toBigDecimal(),
                 openingNote = session.openingNote
             )
         )
@@ -721,7 +721,7 @@ class OfflineCashSessionSyncService(
         if (closedAt == null || closedAt <= 0L) {
             return BuildCloseSessionRequestResult.Error("Waktu tutup sesi lokal belum tersedia.")
         }
-        if (actualCash == null || actualCash < 0.0) {
+        if (actualCash == null || actualCash.isNegative) {
             return BuildCloseSessionRequestResult.Error("Kas fisik akhir sesi lokal belum valid.")
         }
 
@@ -732,15 +732,13 @@ class OfflineCashSessionSyncService(
                 serverCashSessionId = serverCashSessionId,
                 cashierUserId = session.cashierUserId,
                 closedAt = closedAt.toOffsetDateTimeString(),
-                actualCash = actualCash.toMoney(),
-                expectedCash = session.expectedCash?.toMoney(),
-                difference = session.difference?.toMoney(),
+                actualCash = actualCash.toBigDecimal(),
+                expectedCash = session.expectedCash?.toBigDecimal(),
+                difference = session.difference?.toBigDecimal(),
                 closingNote = session.closingNote
             )
         )
     }
-
-    private fun Double.toMoney(): BigDecimal = BigDecimal.valueOf(this).setScale(2, RoundingMode.HALF_UP)
 
     private fun Long.toOffsetDateTimeString(): String =
         Instant.ofEpochMilli(this)

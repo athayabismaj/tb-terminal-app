@@ -3,6 +3,7 @@ package com.tbterminal.app.data.local.entity
 import androidx.room.Entity
 import androidx.room.Index
 import androidx.room.PrimaryKey
+import com.tbterminal.app.data.local.model.ScaledDecimal2
 import com.tbterminal.app.data.local.model.SyncStatus
 
 @Entity(
@@ -26,10 +27,10 @@ data class LocalCashSessionEntity(
     val status: String,
     val openedAt: Long = System.currentTimeMillis(),
     val closedAt: Long? = null,
-    val startingCash: Double = 0.0,
-    val expectedCash: Double? = null,
-    val actualCash: Double? = null,
-    val difference: Double? = null,
+    val startingCash: ScaledDecimal2 = ScaledDecimal2.ZERO,
+    val expectedCash: ScaledDecimal2? = null,
+    val actualCash: ScaledDecimal2? = null,
+    val difference: ScaledDecimal2? = null,
     val openingNote: String? = null,
     val closingNote: String? = null,
     val syncStatus: SyncStatus = SyncStatus.PENDING,

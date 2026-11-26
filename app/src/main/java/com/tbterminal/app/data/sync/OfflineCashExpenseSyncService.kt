@@ -326,7 +326,7 @@ class OfflineCashExpenseSyncService(
         if (session.cashierUserId.isBlank()) {
             return BuildExpenseSyncRequestResult.Error("Kasir pengeluaran kas lokal belum tersedia.")
         }
-        if (expense.amount <= 0.0) {
+        if (!expense.amount.isPositive) {
             return BuildExpenseSyncRequestResult.Error("Nominal pengeluaran kas harus lebih besar dari nol.")
         }
         val note = expense.description?.trim()?.takeIf { it.isNotBlank() }
@@ -338,7 +338,7 @@ class OfflineCashExpenseSyncService(
                 deviceId = resolvedDeviceId,
                 cashierUserId = session.cashierUserId,
                 serverCashSessionId = sessionServerId,
-                amount = expense.amount.toMoney(),
+                amount = expense.amount.toBigDecimal(),
                 category = expense.category?.trim()?.takeIf { it.isNotBlank() } ?: DEFAULT_CATEGORY,
                 note = note,
                 occurredAt = expense.occurredAt.toOffsetDateTimeString()
@@ -445,8 +445,6 @@ class OfflineCashExpenseSyncService(
         }
         return OfflineCashExpenseSyncResult.Failed(message, kind, retryAfterSeconds)
     }
-
-    private fun Double.toMoney(): BigDecimal = BigDecimal.valueOf(this).setScale(2, RoundingMode.HALF_UP)
 
     private fun Long.toOffsetDateTimeString(): String =
         Instant.ofEpochMilli(this)

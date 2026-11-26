@@ -6,6 +6,7 @@ import androidx.test.core.app.ApplicationProvider
 import com.tbterminal.app.data.local.database.TbTerminalDatabase
 import com.tbterminal.app.data.local.entity.LocalCashSessionEntity
 import com.tbterminal.app.data.local.entity.LocalProductEntity
+import com.tbterminal.app.data.local.model.ScaledDecimal2
 import com.tbterminal.app.data.local.model.SyncStatus
 import java.math.BigDecimal
 import kotlinx.coroutines.runBlocking
@@ -56,9 +57,9 @@ class LocalCheckoutSyncPayloadTest {
             cashSessionServerId = "srv-sess-1",
             customerName = specialCustomer,
             paymentMethod = "tunai",
-            subtotal = 75_000.0,
-            total = 75_000.0,
-            paidAmount = 75_000.0,
+            subtotal = BigDecimal("75000.00"),
+            total = BigDecimal("75000.00"),
+            paidAmount = BigDecimal("75000.00"),
             note = specialNote,
             items = listOf(
                 LocalCheckoutItemCommand(
@@ -68,12 +69,12 @@ class LocalCheckoutSyncPayloadTest {
                     skuSnapshot = specialSku,
                     unitNameSnapshot = specialUnit,
                     unitServerId = "unit-kaleng",
-                    quantity = 3.0,
-                    baseQuantity = 7.5,
-                    conversionFactor = 2.5,
-                    priceAtTransaction = 25_000.0,
-                    cogsAtTransaction = 20_000.0,
-                    subtotal = 75_000.0,
+                    quantity = BigDecimal("3"),
+                    baseQuantity = BigDecimal("7.5"),
+                    conversionFactor = BigDecimal("2.5"),
+                    priceAtTransaction = BigDecimal("25000.00"),
+                    cogsAtTransaction = BigDecimal("20000.00"),
+                    subtotal = BigDecimal("75000.00"),
                     baseQuantityExact = BigDecimal("7.5"),
                     conversionFactorExact = BigDecimal("2.5"),
                 )
@@ -85,7 +86,7 @@ class LocalCheckoutSyncPayloadTest {
                 transactionLocalId = 42L,
                 transactionClientGeneratedId = "TRX-CLIENT-1",
                 transactionCode = "TRX-20261125-ABCD",
-                remainingAmount = 0.0,
+                remainingAmount = BigDecimal.ZERO,
             )
         }
 
@@ -118,10 +119,10 @@ class LocalCheckoutSyncPayloadTest {
                 sku = "BS-1",
                 unitServerId = "unit-btg",
                 unitName = "Btg",
-                priceSell = 50_000.0,
-                priceBuy = 40_000.0,
-                priceRetail = 50_000.0,
-                stock = 20.0,
+                priceSell = ScaledDecimal2.ofWhole(50_000L),
+                priceBuy = ScaledDecimal2.ofWhole(40_000L),
+                priceRetail = ScaledDecimal2.ofWhole(50_000L),
+                stock = ScaledDecimal2.ofWhole(20L),
                 syncStatus = SyncStatus.SYNCED,
             )
         )
@@ -133,7 +134,7 @@ class LocalCheckoutSyncPayloadTest {
                 cashierUserId = "kasir-1",
                 status = "OPEN",
                 openedAt = 1_700_000_000_000L,
-                startingCash = 100_000.0,
+                startingCash = ScaledDecimal2.ofWhole(100_000L),
                 syncStatus = SyncStatus.SYNCED,
             )
         )
@@ -147,9 +148,9 @@ class LocalCheckoutSyncPayloadTest {
                 cashSessionServerId = "srv-sess-1",
                 customerName = specialCustomer,
                 paymentMethod = "tunai",
-                subtotal = 100_000.0,
-                total = 100_000.0,
-                paidAmount = 100_000.0,
+                subtotal = BigDecimal("100000.00"),
+                total = BigDecimal("100000.00"),
+                paidAmount = BigDecimal("100000.00"),
                 note = "Catatan:\n\"Barang dicek\\ulangi\"",
                 items = listOf(
                     LocalCheckoutItemCommand(
@@ -159,10 +160,10 @@ class LocalCheckoutSyncPayloadTest {
                         skuSnapshot = "BS\\1\"",
                         unitNameSnapshot = "Btg\t\"",
                         unitServerId = "unit-btg",
-                        quantity = 2.0,
-                        priceAtTransaction = 50_000.0,
-                        cogsAtTransaction = 40_000.0,
-                        subtotal = 100_000.0,
+                        quantity = BigDecimal("2"),
+                        priceAtTransaction = BigDecimal("50000.00"),
+                        cogsAtTransaction = BigDecimal("40000.00"),
+                        subtotal = BigDecimal("100000.00"),
                     )
                 )
             )

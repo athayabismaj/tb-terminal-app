@@ -5,6 +5,7 @@ import androidx.room.Insert
 import androidx.room.OnConflictStrategy
 import androidx.room.Query
 import com.tbterminal.app.data.local.entity.LocalReceivableEntity
+import com.tbterminal.app.data.local.model.ScaledDecimal2
 import com.tbterminal.app.data.local.model.SyncStatus
 import kotlinx.coroutines.flow.Flow
 
@@ -31,8 +32,8 @@ interface ReceivableDao {
     @Query("UPDATE local_receivables SET paidAmount = :paidAmount, remainingAmount = :remainingAmount, status = :status, syncStatus = :syncStatus, updatedAt = :updatedAt WHERE localId = :localId")
     suspend fun updatePaymentState(
         localId: Long,
-        paidAmount: Double,
-        remainingAmount: Double,
+        paidAmount: ScaledDecimal2,
+        remainingAmount: ScaledDecimal2,
         status: String,
         syncStatus: SyncStatus,
         updatedAt: Long

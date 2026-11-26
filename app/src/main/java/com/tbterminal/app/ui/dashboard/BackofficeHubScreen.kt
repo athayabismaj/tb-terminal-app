@@ -483,8 +483,8 @@ private fun FinanceHub(
             if (analyticsRepository != null) {
                 runCatching {
                     val metrics = analyticsRepository.getDashboardMetrics()
-                    loadedInflow = BigDecimal.valueOf(metrics.totalRevenueToday)
-                    loadedReceivables = BigDecimal.valueOf(metrics.totalActiveReceivables)
+                    loadedInflow = metrics.totalRevenueToday
+                    loadedReceivables = metrics.totalActiveReceivables
                     loadedReceivablesCount = metrics.activeReceivableCount.toInt()
                 }
             }
@@ -1424,7 +1424,7 @@ private fun TransactionsHub(
             if (analyticsRepository != null) {
                 runCatching {
                     val metrics = analyticsRepository.getDashboardMetrics()
-                    todayRevenue = BigDecimal.valueOf(metrics.totalRevenueToday)
+                    todayRevenue = metrics.totalRevenueToday
                 }
             }
             if (cashReconciliationRepository != null) {

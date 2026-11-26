@@ -131,7 +131,8 @@ data class PurchaseRequestDto(
     @Serializable(with = BigDecimalStringSerializer::class) val amountPaid: BigDecimal,
     val notes: String? = null,
     val dueDays: Int = 30,
-    val items: List<PurchaseItemRequestDto>
+    val items: List<PurchaseItemRequestDto>,
+    val idempotencyKey: String? = null
 )
 
 @Serializable
@@ -145,7 +146,8 @@ data class PurchaseResponseDto(
     val notes: String?,
     val receivedAt: String,
     val createdAt: String,
-    val items: List<PurchaseItemResponseDto>
+    val items: List<PurchaseItemResponseDto>,
+    val idempotentReplay: Boolean = false
 )
 
 @Serializable
@@ -190,7 +192,8 @@ data class SupplierPaymentRequestDto(
     @Serializable(with = BigDecimalStringSerializer::class) val amount: BigDecimal,
     val method: String,
     val reference: String? = null,
-    val notes: String? = null
+    val notes: String? = null,
+    val idempotencyKey: String? = null
 )
 
 @Serializable
@@ -203,7 +206,8 @@ data class SupplierPaymentResponseDto(
     val notes: String?,
     val paidAt: String,
     val payableStatus: String,
-    @Serializable(with = BigDecimalStringSerializer::class) val payableRemainingAmount: BigDecimal
+    @Serializable(with = BigDecimalStringSerializer::class) val payableRemainingAmount: BigDecimal,
+    val idempotentReplay: Boolean = false
 )
 
 @Serializable

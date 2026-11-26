@@ -17,6 +17,7 @@ import com.tbterminal.app.data.local.entity.LocalTransactionEntity
 import com.tbterminal.app.data.local.entity.LocalTransactionItemEntity
 import com.tbterminal.app.data.local.entity.SyncQueueEntity
 import com.tbterminal.app.data.local.model.AppDataMode
+import com.tbterminal.app.data.local.model.ScaledDecimal2
 import com.tbterminal.app.data.local.model.SyncEntityType
 import com.tbterminal.app.data.local.model.SyncOperation
 import com.tbterminal.app.data.local.model.SyncStatus
@@ -246,7 +247,7 @@ class OfflineSyncResilienceTest {
                 deviceId = "android-dev-1",
                 cashierUserId = "kasir-1",
                 status = "OPEN",
-                startingCash = 100_000.0,
+                startingCash = ScaledDecimal2.ofWhole(100_000L),
                 syncStatus = SyncStatus.SYNCING,
                 updatedAt = staleTimestamp,
             )
@@ -268,7 +269,7 @@ class OfflineSyncResilienceTest {
                 deviceId = "android-dev-1",
                 cashierUserId = "kasir-1",
                 status = "OPEN",
-                startingCash = 100_000.0,
+                startingCash = ScaledDecimal2.ofWhole(100_000L),
                 syncStatus = SyncStatus.SYNCING,
                 updatedAt = freshTimestamp,
             )
@@ -281,7 +282,7 @@ class OfflineSyncResilienceTest {
                 cashSessionLocalId = freshSessionId,
                 cashSessionServerId = "srv-sess",
                 description = "Plastik",
-                amount = 10_000.0,
+                amount = ScaledDecimal2.ofWhole(10_000L),
                 syncStatus = SyncStatus.SYNCING,
                 updatedAt = staleTimestamp,
             )
@@ -306,10 +307,10 @@ class OfflineSyncResilienceTest {
                 cashSessionServerId = "srv-sess",
                 cashierUserId = "kasir-1",
                 status = "PAID",
-                subtotal = 10_000.0,
-                total = 10_000.0,
-                paidAmount = 10_000.0,
-                remainingAmount = 0.0,
+                subtotal = ScaledDecimal2.ofWhole(10_000L),
+                total = ScaledDecimal2.ofWhole(10_000L),
+                paidAmount = ScaledDecimal2.ofWhole(10_000L),
+                remainingAmount = ScaledDecimal2.ZERO,
                 syncStatus = SyncStatus.SYNCING,
                 updatedAt = staleTimestamp,
             )
@@ -352,10 +353,10 @@ class OfflineSyncResilienceTest {
                 status = "CLOSED",
                 openedAt = fakeClockMillis - 3_600_000L,
                 closedAt = fakeClockMillis - 60_000L,
-                startingCash = 100_000.0,
-                expectedCash = 200_000.0,
-                actualCash = 200_000.0,
-                difference = 0.0,
+                startingCash = ScaledDecimal2.ofWhole(100_000L),
+                expectedCash = ScaledDecimal2.ofWhole(200_000L),
+                actualCash = ScaledDecimal2.ofWhole(200_000L),
+                difference = ScaledDecimal2.ZERO,
                 syncStatus = SyncStatus.PENDING,
             )
         )
@@ -552,7 +553,7 @@ class OfflineSyncResilienceTest {
                 cashierUserId = "kasir-1",
                 status = "OPEN",
                 openedAt = fakeClockMillis - 60_000L,
-                startingCash = 100_000.0,
+                startingCash = ScaledDecimal2.ofWhole(100_000L),
                 syncStatus = SyncStatus.PENDING,
             )
         )
@@ -576,7 +577,7 @@ class OfflineSyncResilienceTest {
                 cashierUserId = "kasir-1",
                 status = "OPEN",
                 openedAt = fakeClockMillis - 3_600_000L,
-                startingCash = 100_000.0,
+                startingCash = ScaledDecimal2.ofWhole(100_000L),
                 syncStatus = SyncStatus.SYNCED,
             )
         )
@@ -596,7 +597,7 @@ class OfflineSyncResilienceTest {
                 cashSessionServerId = session?.serverId,
                 category = "CASH_OUT: OPERASIONAL",
                 description = "Beli plastik",
-                amount = 15_000.0,
+                amount = ScaledDecimal2.ofWhole(15_000L),
                 occurredAt = occurredAt,
                 syncStatus = SyncStatus.PENDING,
             )
@@ -627,10 +628,10 @@ class OfflineSyncResilienceTest {
                 cashSessionServerId = session?.serverId,
                 cashierUserId = "kasir-1",
                 status = "PAID",
-                subtotal = 50_000.0,
-                total = 50_000.0,
-                paidAmount = 50_000.0,
-                remainingAmount = 0.0,
+                subtotal = ScaledDecimal2.ofWhole(50_000L),
+                total = ScaledDecimal2.ofWhole(50_000L),
+                paidAmount = ScaledDecimal2.ofWhole(50_000L),
+                remainingAmount = ScaledDecimal2.ZERO,
                 occurredAt = occurredAt,
                 syncStatus = SyncStatus.PENDING,
             )
@@ -640,10 +641,10 @@ class OfflineSyncResilienceTest {
                 transactionLocalId = txId,
                 productServerId = "prod-1",
                 productNameSnapshot = "Semen 50kg",
-                quantity = 1.0,
-                priceAtTransaction = 50_000.0,
-                cogsAtTransaction = 40_000.0,
-                subtotal = 50_000.0,
+                quantity = ScaledDecimal2.ofWhole(1L),
+                priceAtTransaction = ScaledDecimal2.ofWhole(50_000L),
+                cogsAtTransaction = ScaledDecimal2.ofWhole(40_000L),
+                subtotal = ScaledDecimal2.ofWhole(50_000L),
             )
         )
         database.paymentDao().upsert(
@@ -651,7 +652,7 @@ class OfflineSyncResilienceTest {
                 clientGeneratedId = "pay-$clientId",
                 transactionLocalId = txId,
                 method = "tunai",
-                amount = 50_000.0,
+                amount = ScaledDecimal2.ofWhole(50_000L),
             )
         )
         database.syncQueueDao().enqueue(

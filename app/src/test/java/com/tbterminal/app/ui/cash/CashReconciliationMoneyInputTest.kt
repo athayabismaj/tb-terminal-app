@@ -9,6 +9,7 @@ import com.tbterminal.app.data.local.cashsession.LocalCashSessionService
 import com.tbterminal.app.data.local.database.CashSessionLocalDataSource
 import com.tbterminal.app.data.local.database.TbTerminalDatabase
 import com.tbterminal.app.data.local.entity.LocalCashSessionEntity
+import com.tbterminal.app.data.local.model.ScaledDecimal2
 import com.tbterminal.app.data.local.model.SyncStatus
 import com.tbterminal.app.data.model.CashExpense
 import com.tbterminal.app.data.model.CashExpensePage
@@ -133,7 +134,7 @@ class CashReconciliationMoneyInputTest {
                 cashierUserId = "kasir-1",
                 status = "OPEN",
                 openedAt = 1_700_000_000_000L,
-                startingCash = 500_000.0,
+                startingCash = ScaledDecimal2.ofWhole(500_000L),
                 syncStatus = SyncStatus.SYNCED
             )
         )
@@ -154,15 +155,15 @@ class CashReconciliationMoneyInputTest {
         val expenseSync = OfflineCashExpenseSyncService(database, salesApi, "android-dev-1", sessionSync)
 
         val cases = listOf(
-            Triple("20000", 20_000.0, "20000.00"),
-            Triple("20.000", 20_000.0, "20000.00"),
-            Triple("1.250.000", 1_250_000.0, "1250000.00"),
-            Triple("20000,00", 20_000.0, "20000.00"),
-            Triple("20.000,0", 20_000.0, "20000.00"),
-            Triple(applyPettyCashQuickChip("", 20_000L), 20_000.0, "20000.00"),
+            Triple("20000", ScaledDecimal2.ofWhole(20_000L), "20000.00"),
+            Triple("20.000", ScaledDecimal2.ofWhole(20_000L), "20000.00"),
+            Triple("1.250.000", ScaledDecimal2.ofWhole(1_250_000L), "1250000.00"),
+            Triple("20000,00", ScaledDecimal2.ofWhole(20_000L), "20000.00"),
+            Triple("20.000,0", ScaledDecimal2.ofWhole(20_000L), "20000.00"),
+            Triple(applyPettyCashQuickChip("", 20_000L), ScaledDecimal2.ofWhole(20_000L), "20000.00"),
         )
 
-        cases.forEachIndexed { index, (input, expectedDouble, expectedSyncAmount) ->
+        cases.forEachIndexed { index, (input, expectedScaled, expectedSyncAmount) ->
             vm.showPettyCashDialog(CashMovementType.CASH_OUT)
             vm.onPettyCashAmountChanged(input)
             vm.onPettyCashDescriptionChanged("Bensin $index")
@@ -174,7 +175,7 @@ class CashReconciliationMoneyInputTest {
             val savedExpenses = database.cashExpenseDao().getByCashSession(sessionLocalId)
             assertEquals(index + 1, savedExpenses.size)
             val saved = savedExpenses.maxBy { it.localId }
-            assertEquals("Wrong Room amount for input '$input'", expectedDouble, saved.amount, 0.001)
+            assertEquals("Wrong Room amount for input '$input'", expectedScaled, saved.amount)
 
             server.enqueue(
                 MockResponse()
@@ -274,16 +275,16 @@ class CashReconciliationMoneyInputTest {
         assertEquals("Modal awal wajib diisi dengan angka valid.", vm.uiState.value.errorMessage)
 
         val inputs = listOf(
-            "0" to 0.0,
-            "20000" to 20_000.0,
-            "20.000" to 20_000.0,
-            "1.250.000" to 1_250_000.0,
-            "20000,00" to 20_000.0,
-            "20.000,0" to 20_000.0,
-            applyPettyCashQuickChip("", 20_000L) to 20_000.0,
+            "0" to ScaledDecimal2.ZERO,
+            "20000" to ScaledDecimal2.ofWhole(20_000L),
+            "20.000" to ScaledDecimal2.ofWhole(20_000L),
+            "1.250.000" to ScaledDecimal2.ofWhole(1_250_000L),
+            "20000,00" to ScaledDecimal2.ofWhole(20_000L),
+            "20.000,0" to ScaledDecimal2.ofWhole(20_000L),
+            applyPettyCashQuickChip("", 20_000L) to ScaledDecimal2.ofWhole(20_000L),
         )
 
-        inputs.forEachIndexed { index, (input, expectedDouble) ->
+        inputs.forEachIndexed { index, (input, expectedScaled) ->
             vm.onOpeningCashChanged(input)
             vm.openSession()
             advanceUntilIdle()
@@ -291,7 +292,7 @@ class CashReconciliationMoneyInputTest {
             assertNull("Open session error for '$input': ${vm.uiState.value.errorMessage}", vm.uiState.value.errorMessage)
             val localId = vm.uiState.value.localCashSessionId!!
             val openedEntity = database.cashSessionDao().getByLocalId(localId)!!
-            assertEquals("Wrong startingCash for '$input'", expectedDouble, openedEntity.startingCash, 0.001)
+            assertEquals("Wrong startingCash for '$input'", expectedScaled, openedEntity.startingCash)
 
             vm.onClosingCashChanged("1.500,50")
             vm.closeSession()
@@ -305,7 +306,7 @@ class CashReconciliationMoneyInputTest {
 
             assertNull("Close session error for '$input': ${vm.uiState.value.errorMessage}", vm.uiState.value.errorMessage)
             val closedEntity = database.cashSessionDao().getByLocalId(localId)!!
-            assertEquals("Wrong actualCash for '$input'", expectedDouble, closedEntity.actualCash!!, 0.001)
+            assertEquals("Wrong actualCash for '$input'", expectedScaled, closedEntity.actualCash)
         }
     }
 

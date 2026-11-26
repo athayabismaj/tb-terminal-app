@@ -4,7 +4,7 @@ import java.math.BigDecimal
 
 data class LocalCheckoutPaymentLineCommand(
     val method: String,
-    val amount: Double,
+    val amount: BigDecimal,
     val reference: String? = null
 )
 
@@ -17,18 +17,18 @@ data class LocalCheckoutCommand(
     val customerName: String? = null,
     val paymentMethod: String,
     val payments: List<LocalCheckoutPaymentLineCommand>? = null,
-    val subtotal: Double,
-    val discount: Double = 0.0,
+    val subtotal: BigDecimal,
+    val discount: BigDecimal = BigDecimal.ZERO,
     val taxEnabled: Boolean = false,
     val taxMode: String? = null,
-    val taxRate: Double = 0.0,
+    val taxRate: BigDecimal = BigDecimal.ZERO,
     val taxLabel: String? = null,
-    val taxableBase: Double = 0.0,
-    val taxAmount: Double = 0.0,
-    val roundingAmount: Double = 0.0,
-    val total: Double,
-    val paidAmount: Double,
-    val remainingAmount: Double? = null,
+    val taxableBase: BigDecimal = BigDecimal.ZERO,
+    val taxAmount: BigDecimal = BigDecimal.ZERO,
+    val roundingAmount: BigDecimal = BigDecimal.ZERO,
+    val total: BigDecimal,
+    val paidAmount: BigDecimal,
+    val remainingAmount: BigDecimal? = null,
     val items: List<LocalCheckoutItemCommand>,
     val occurredAt: Long = System.currentTimeMillis(),
     val note: String? = null
@@ -40,21 +40,21 @@ data class LocalCheckoutItemCommand(
     val productNameSnapshot: String,
     val skuSnapshot: String? = null,
     val unitNameSnapshot: String? = null,
-    val quantity: Double,
-    val baseQuantity: Double = quantity,
-    val conversionFactor: Double = 1.0,
-    val priceAtTransaction: Double,
-    val cogsAtTransaction: Double = 0.0,
-    val discount: Double = 0.0,
-    val subtotal: Double,
+    val quantity: BigDecimal,
+    val baseQuantity: BigDecimal = quantity,
+    val conversionFactor: BigDecimal = BigDecimal.ONE,
+    val priceAtTransaction: BigDecimal,
+    val cogsAtTransaction: BigDecimal = BigDecimal.ZERO,
+    val discount: BigDecimal = BigDecimal.ZERO,
+    val subtotal: BigDecimal,
     val note: String? = null,
     val unitServerId: String? = null,
     val baseQuantityExact: BigDecimal? = null,
     val conversionFactorExact: BigDecimal? = null
 ) {
     val resolvedBaseQuantity: BigDecimal
-        get() = normalizeExactDecimal(baseQuantityExact ?: BigDecimal.valueOf(baseQuantity))
+        get() = normalizeExactDecimal(baseQuantityExact ?: baseQuantity)
 
     val resolvedConversionFactor: BigDecimal
-        get() = normalizeExactDecimal(conversionFactorExact ?: BigDecimal.valueOf(conversionFactor))
+        get() = normalizeExactDecimal(conversionFactorExact ?: conversionFactor)
 }

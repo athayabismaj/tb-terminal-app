@@ -12,12 +12,15 @@ import com.tbterminal.app.data.numbering.DocumentNumberType
 import com.tbterminal.app.data.repository.InventoryRepository
 import com.tbterminal.app.data.repository.PurchasingRepository
 import com.tbterminal.app.data.repository.RepositoryResult
+import com.tbterminal.app.ui.common.SubmissionIdempotencyTracker
 import com.tbterminal.app.ui.common.sanitizeIdrDecimalInput
 import com.tbterminal.app.ui.common.sanitizeWholeRupiahInput
 import com.tbterminal.app.ui.common.toIdrDecimalInputText
+import com.tbterminal.app.ui.common.toNormalizedIdempotencyNumber
 import com.tbterminal.app.ui.common.toWholeRupiahInputText
 import com.tbterminal.app.ui.common.viewModelFactory
 import java.math.BigDecimal
+import java.util.UUID
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -26,17 +29,38 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
+private data class PurchaseItemIntent(
+    val productId: String,
+    val normalizedQty: String,
+    val normalizedPrice: String
+)
+
+private data class PurchaseSubmissionIntent(
+    val supplierId: String,
+    val invoiceNo: String?,
+    val paymentMethod: String,
+    val normalizedAmountPaid: String,
+    val notes: String?,
+    val dueDays: Int,
+    val items: List<PurchaseItemIntent>
+)
+
 class IncomingGoodsViewModel(
     private val inventoryRepository: InventoryRepository,
     private val purchasingRepository: PurchasingRepository,
     private val documentNumberGenerator: DocumentNumberGenerator,
     private val initialProductId: String? = null,
-    private val autoSelectFirst: Boolean = true
+    private val autoSelectFirst: Boolean = true,
+    private val idempotencyKeyGenerator: () -> String = { UUID.randomUUID().toString() }
 ) : ViewModel() {
     private val _uiState = MutableStateFlow(IncomingGoodsUiState(isLoadingProducts = true))
     val uiState: StateFlow<IncomingGoodsUiState> = _uiState.asStateFlow()
     private var productSearchJob: Job? = null
     private var initialSelectionApplied = false
+    private val purchaseIdempotency = SubmissionIdempotencyTracker<PurchaseSubmissionIntent>(
+        prefix = "purchase",
+        keyGenerator = idempotencyKeyGenerator
+    )
 
     init {
         refresh()
@@ -254,24 +278,21 @@ class IncomingGoodsViewModel(
 
         viewModelScope.launch {
             _uiState.update { it.copy(isSubmitting = true, errorMessage = null, message = null) }
-            val command = CreatePurchaseCommand(
+            val command = buildPurchaseCommand(
                 supplierId = supplier.id,
-                invoiceNo = state.invoiceNoInput.trim().takeIf(String::isNotBlank),
-                paymentMethod = state.paymentMethod.apiValue,
+                productId = product.productId,
+                quantity = quantity,
+                buyPrice = buyPrice,
+                invoiceNo = state.invoiceNoInput,
+                paymentMethod = state.paymentMethod,
                 amountPaid = amountPaid,
-                notes = state.notesInput.trim().takeIf(String::isNotBlank),
                 dueDays = dueDays,
-                items = listOf(
-                    PurchaseItemCommand(
-                        productId = product.productId,
-                        qty = quantity,
-                        price = buyPrice
-                    )
-                )
+                notes = state.notesInput
             )
 
             when (val result = purchasingRepository.createPurchase(command)) {
                 is RepositoryResult.Success -> {
+                    purchaseIdempotency.onSuccess()
                     _uiState.update {
                         it.copy(
                             isSubmitting = false,
@@ -283,8 +304,14 @@ class IncomingGoodsViewModel(
                     }
                     loadProducts()
                 }
-                is RepositoryResult.Error -> setActionError(result.message)
-                is RepositoryResult.Exception -> setActionError("Barang masuk gagal dicatat karena koneksi bermasalah.")
+                is RepositoryResult.Error -> {
+                    purchaseIdempotency.onError(result.code, result.message)
+                    setActionError(result.message)
+                }
+                is RepositoryResult.Exception -> {
+                    purchaseIdempotency.onException()
+                    setActionError("Barang masuk gagal dicatat karena koneksi bermasalah.")
+                }
             }
         }
     }
@@ -313,31 +340,81 @@ class IncomingGoodsViewModel(
 
         viewModelScope.launch {
             _uiState.update { it.copy(isSubmitting = true, errorMessage = null, message = null) }
-            val command = CreatePurchaseCommand(
+            val command = buildPurchaseCommand(
                 supplierId = supplier.id,
-                invoiceNo = invoiceNo?.trim()?.takeIf(String::isNotBlank),
-                paymentMethod = paymentMethod.apiValue,
+                productId = product.productId,
+                quantity = quantity,
+                buyPrice = buyPrice,
+                invoiceNo = invoiceNo,
+                paymentMethod = paymentMethod,
                 amountPaid = amountPaid,
-                notes = notes?.trim()?.takeIf(String::isNotBlank),
                 dueDays = dueDays,
-                items = listOf(
-                    PurchaseItemCommand(
-                        productId = product.productId,
-                        qty = quantity,
-                        price = buyPrice
-                    )
-                )
+                notes = notes
             )
 
             when (val result = purchasingRepository.createPurchase(command)) {
                 is RepositoryResult.Success -> {
+                    purchaseIdempotency.onSuccess()
                     _uiState.update { it.copy(isSubmitting = false, errorMessage = null, message = null) }
                     onSuccess()
                 }
-                is RepositoryResult.Error -> setActionError(result.message)
-                is RepositoryResult.Exception -> setActionError("Barang masuk gagal dicatat karena koneksi bermasalah.")
+                is RepositoryResult.Error -> {
+                    purchaseIdempotency.onError(result.code, result.message)
+                    setActionError(result.message)
+                }
+                is RepositoryResult.Exception -> {
+                    purchaseIdempotency.onException()
+                    setActionError("Barang masuk gagal dicatat karena koneksi bermasalah.")
+                }
             }
         }
+    }
+
+    private fun buildPurchaseCommand(
+        supplierId: String,
+        productId: String,
+        quantity: BigDecimal,
+        buyPrice: BigDecimal,
+        invoiceNo: String?,
+        paymentMethod: IncomingPaymentMethod,
+        amountPaid: BigDecimal,
+        dueDays: Int,
+        notes: String?
+    ): CreatePurchaseCommand {
+        val normalizedInvoiceNo = invoiceNo?.trim()?.takeIf(String::isNotBlank)
+        val normalizedNotes = notes?.trim()?.takeIf(String::isNotBlank)
+        val intent = PurchaseSubmissionIntent(
+            supplierId = supplierId,
+            invoiceNo = normalizedInvoiceNo,
+            paymentMethod = paymentMethod.apiValue.uppercase(),
+            normalizedAmountPaid = amountPaid.toNormalizedIdempotencyNumber(),
+            notes = normalizedNotes,
+            dueDays = dueDays,
+            items = listOf(
+                PurchaseItemIntent(
+                    productId = productId,
+                    normalizedQty = quantity.toNormalizedIdempotencyNumber(),
+                    normalizedPrice = buyPrice.toNormalizedIdempotencyNumber()
+                )
+            )
+        )
+        val idempotencyKey = purchaseIdempotency.resolveKey(intent)
+        return CreatePurchaseCommand(
+            supplierId = supplierId,
+            invoiceNo = normalizedInvoiceNo,
+            paymentMethod = paymentMethod.apiValue,
+            amountPaid = amountPaid,
+            notes = normalizedNotes,
+            dueDays = dueDays,
+            items = listOf(
+                PurchaseItemCommand(
+                    productId = productId,
+                    qty = quantity,
+                    price = buyPrice
+                )
+            ),
+            idempotencyKey = idempotencyKey
+        )
     }
 
     fun clearMessage() {

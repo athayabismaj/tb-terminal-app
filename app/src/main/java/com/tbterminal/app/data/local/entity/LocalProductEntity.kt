@@ -3,6 +3,7 @@ package com.tbterminal.app.data.local.entity
 import androidx.room.Entity
 import androidx.room.Index
 import androidx.room.PrimaryKey
+import com.tbterminal.app.data.local.model.ScaledDecimal2
 import com.tbterminal.app.data.local.model.SyncStatus
 import java.math.BigDecimal
 
@@ -31,13 +32,13 @@ data class LocalProductEntity(
     val secondaryUnitServerId: String? = null,
     val secondaryUnitName: String? = null,
     val secondaryUnitFactor: BigDecimal? = null,
-    val priceSell: Double = 0.0,
-    val priceBuy: Double = 0.0,
-    val priceRetail: Double = 0.0,
-    val priceContractor: Double = 0.0,
-    val discount: Double = 0.0,
-    val stock: Double = 0.0,
-    val minimumStock: Double = 0.0,
+    val priceSell: ScaledDecimal2 = ScaledDecimal2.ZERO,
+    val priceBuy: ScaledDecimal2 = ScaledDecimal2.ZERO,
+    val priceRetail: ScaledDecimal2 = ScaledDecimal2.ZERO,
+    val priceContractor: ScaledDecimal2 = ScaledDecimal2.ZERO,
+    val discount: ScaledDecimal2 = ScaledDecimal2.ZERO,
+    val stock: ScaledDecimal2 = ScaledDecimal2.ZERO,
+    val minimumStock: ScaledDecimal2 = ScaledDecimal2.ZERO,
     val photoFilename: String? = null,
     val isActive: Boolean = true,
     val syncStatus: SyncStatus = SyncStatus.PENDING,

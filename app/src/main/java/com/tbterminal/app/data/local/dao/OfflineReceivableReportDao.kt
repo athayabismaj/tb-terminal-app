@@ -2,6 +2,7 @@ package com.tbterminal.app.data.local.dao
 
 import androidx.room.Dao
 import androidx.room.Query
+import com.tbterminal.app.data.local.model.ScaledDecimal2
 import com.tbterminal.app.data.local.model.SyncStatus
 import kotlinx.coroutines.flow.Flow
 
@@ -41,9 +42,9 @@ data class OfflineReceivableReportRow(
     val localId: Long,
     val customerName: String,
     val transactionCode: String,
-    val totalAmount: Double,
-    val paidAmount: Double,
-    val remainingAmount: Double,
+    val totalAmount: ScaledDecimal2,
+    val paidAmount: ScaledDecimal2,
+    val remainingAmount: ScaledDecimal2,
     val status: String,
     val dueDate: Long?,
     val occurredAt: Long,

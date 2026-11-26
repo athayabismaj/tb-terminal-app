@@ -5,6 +5,7 @@ import androidx.room.Insert
 import androidx.room.OnConflictStrategy
 import androidx.room.Query
 import com.tbterminal.app.data.local.entity.LocalProductEntity
+import com.tbterminal.app.data.local.model.ScaledDecimal2
 import com.tbterminal.app.data.local.model.SyncStatus
 import kotlinx.coroutines.flow.Flow
 
@@ -49,7 +50,7 @@ interface ProductDao {
     @Query(
         """
         SELECT * FROM local_products
-        WHERE deletedAt IS NULL AND isActive = 1 AND stock <= CASE WHEN minimumStock > 0 THEN minimumStock ELSE 5.0 END
+        WHERE deletedAt IS NULL AND isActive = 1 AND stock <= CASE WHEN minimumStock > 0 THEN minimumStock ELSE 500 END
         ORDER BY stock ASC
         """
     )
@@ -71,7 +72,7 @@ interface ProductDao {
     @Query("UPDATE local_products SET stock = stock - :quantity, syncStatus = :status, updatedAt = :updatedAt WHERE localId = :localId AND deletedAt IS NULL")
     suspend fun decrementStock(
         localId: Long,
-        quantity: Double,
+        quantity: ScaledDecimal2,
         status: SyncStatus,
         updatedAt: Long
     ): Unit

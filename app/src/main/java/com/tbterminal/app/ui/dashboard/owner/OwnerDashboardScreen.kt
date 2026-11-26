@@ -787,8 +787,9 @@ internal fun AdminDashboardUiState.toDashboardUiState(
         null
     }
 
+    // Display-only conversion for chart/UI state; never used for calculations, storage, or server submission (see docs/BACKLOG.md).
     val netSales = financialTotals?.netRevenue?.toDouble()
-        ?: metrics?.totalRevenueToday
+        ?: metrics?.totalRevenueToday?.toDouble()
         ?: 0.0
     val prevSales = previousPeriodNetRevenue
     val deltaPercent = if (prevSales != null && prevSales > 0.0) {
@@ -813,7 +814,8 @@ internal fun AdminDashboardUiState.toDashboardUiState(
         transactionCount = financialTotals?.transactionCount ?: 0L,
         estimatedProfit = financialTotals?.grossProfit?.toDouble() ?: 0.0,
         cashIn = financialTotals?.paidAmount?.toDouble() ?: 0.0,
-        receivables = metrics?.totalActiveReceivables ?: 0.0,
+        // Display-only conversion for UI state; never used for calculations, storage, or server submission (see docs/BACKLOG.md).
+        receivables = metrics?.totalActiveReceivables?.toDouble() ?: 0.0,
         stockStatus = stockStatus,
         chart = chartPoints,
         recent = recentUi,
@@ -829,7 +831,8 @@ private fun List<DailySalesSummaryDto>.toChartDayPoints(): List<DayPoint> {
     return lastFive.mapIndexed { index, summary ->
         DayPoint(
             dateLabel = formatChartDateLabel(summary.date),
-            revenue = summary.totalRevenue,
+            // Display-only conversion for chart bar height/label; never used for calculations, storage, or server submission (see docs/BACKLOG.md).
+            revenue = summary.totalRevenue.toDouble(),
             isToday = index == lastFive.lastIndex
         )
     }

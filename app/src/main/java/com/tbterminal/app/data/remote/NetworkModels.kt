@@ -99,15 +99,15 @@ data class StockLowSummaryDto(
     val productId: String,
     val sku: String,
     val productName: String,
-    val quantity: Double,
-    val minStock: Double
+    @Serializable(with = BigDecimalStringSerializer::class) val quantity: BigDecimal,
+    @Serializable(with = BigDecimalStringSerializer::class) val minStock: BigDecimal
 )
 
 @Serializable
 data class DashboardMetricsDto(
-    val totalRevenueToday: Double,
-    val totalRevenueThisMonth: Double,
-    val totalActiveReceivables: Double,
+    @Serializable(with = BigDecimalStringSerializer::class) val totalRevenueToday: BigDecimal,
+    @Serializable(with = BigDecimalStringSerializer::class) val totalRevenueThisMonth: BigDecimal,
+    @Serializable(with = BigDecimalStringSerializer::class) val totalActiveReceivables: BigDecimal,
     val activeReceivableCount: Long,
     val lowStockCount: Long,
     val lowStockItems: List<StockLowSummaryDto>
@@ -117,10 +117,10 @@ data class DashboardMetricsDto(
 data class DailySalesSummaryDto(
     val date: String,
     val transactionCount: Long,
-    val totalRevenue: Double,
-    val totalDp: Double,
+    @Serializable(with = BigDecimalStringSerializer::class) val totalRevenue: BigDecimal,
+    @Serializable(with = BigDecimalStringSerializer::class) val totalDp: BigDecimal,
     val voidedTransactionCount: Long = 0,
-    val voidedAmount: Double = 0.0
+    @Serializable(with = BigDecimalStringSerializer::class) val voidedAmount: BigDecimal = BigDecimal.ZERO
 )
 
 @Serializable

@@ -38,9 +38,9 @@ fun ReportSalesLayoutPreview() {
 
 private fun businessReportPreviewState() = AdminReportsUiState(
     dashboardMetrics = DashboardMetricsDto(
-        totalRevenueToday = 2_450_000.0,
-        totalRevenueThisMonth = 31_800_000.0,
-        totalActiveReceivables = 4_250_000.0,
+        totalRevenueToday = BigDecimal("2450000"),
+        totalRevenueThisMonth = BigDecimal("31800000"),
+        totalActiveReceivables = BigDecimal("4250000"),
         activeReceivableCount = 8,
         lowStockCount = 3,
         lowStockItems = emptyList(),

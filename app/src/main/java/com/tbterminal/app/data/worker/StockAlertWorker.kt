@@ -17,6 +17,7 @@ import androidx.work.WorkManager
 import androidx.work.WorkerParameters
 import com.tbterminal.app.MainActivity
 import com.tbterminal.app.data.local.database.TbTerminalDatabase
+import com.tbterminal.app.data.local.model.ScaledDecimal2
 import java.util.concurrent.TimeUnit
 import kotlinx.coroutines.CancellationException
 
@@ -69,7 +70,7 @@ class StockAlertWorker(
         }
     }
 
-    private fun sendStockNotification(count: Int, sampleName: String, sampleStock: Double) {
+    private fun sendStockNotification(count: Int, sampleName: String, sampleStock: ScaledDecimal2) {
         val intent = Intent(context, MainActivity::class.java).apply {
             flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
         }
@@ -80,7 +81,7 @@ class StockAlertWorker(
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
 
-        val stockDisplay = if (sampleStock % 1.0 == 0.0) sampleStock.toInt().toString() else "%.1f".format(sampleStock)
+        val stockDisplay = sampleStock.toBigDecimal().stripTrailingZeros().toPlainString()
         val contentText = if (count == 1) {
             "Produk \"$sampleName\" tersisa $stockDisplay. Segera lakukan restock!"
         } else {
