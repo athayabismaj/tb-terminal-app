@@ -1,5 +1,10 @@
 package com.tbterminal.app.ui.pricemanagement
 
+import com.tbterminal.app.ui.common.sanitizeIdrDecimalInput
+import com.tbterminal.app.ui.common.sanitizeWholeRupiahInput
+import com.tbterminal.app.ui.common.toIdrDecimalInputText
+import com.tbterminal.app.ui.common.toWholeRupiahInputText
+
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.expandVertically
 import androidx.compose.animation.shrinkVertically
@@ -968,16 +973,16 @@ internal fun PriceUpdateDialog(
 ) {
     val stock = state.selectedProductStock ?: return
     var priceBuyStr by remember(stock.productId, state.selectedProductDetail) {
-        mutableStateOf(state.selectedProductDetail?.priceBuy?.toPlainString() ?: stock.priceBuy.toPlainString())
+        mutableStateOf((state.selectedProductDetail?.priceBuy ?: stock.priceBuy).toIdrDecimalInputText())
     }
     var priceRetailStr by remember(stock.productId, state.selectedProductDetail) {
-        mutableStateOf(state.selectedProductDetail?.priceRetail?.toPlainString() ?: stock.priceRetail.toPlainString())
+        mutableStateOf((state.selectedProductDetail?.priceRetail ?: stock.priceRetail).toWholeRupiahInputText())
     }
     var priceContractorStr by remember(stock.productId, state.selectedProductDetail) {
-        mutableStateOf(state.selectedProductDetail?.priceContractor?.toPlainString() ?: stock.priceContractor.toPlainString())
+        mutableStateOf((state.selectedProductDetail?.priceContractor ?: stock.priceContractor).toWholeRupiahInputText())
     }
     var discountStr by remember(stock.productId, state.selectedProductDetail) {
-        mutableStateOf(state.selectedProductDetail?.discount?.toPlainString() ?: stock.discount.toPlainString())
+        mutableStateOf((state.selectedProductDetail?.discount ?: stock.discount).toWholeRupiahInputText())
     }
     var tierDrafts by remember(stock.productId, state.selectedProductDetail) {
         mutableStateOf(
@@ -987,7 +992,7 @@ internal fun PriceUpdateDialog(
                     PriceTierDraft(
                         id = it.id,
                         minQty = it.minQty.stripTrailingZeros().toPlainString(),
-                        unitPrice = it.unitPrice.stripTrailingZeros().toPlainString(),
+                        unitPrice = it.unitPrice.toWholeRupiahInputText(),
                     )
                 }
         )
@@ -999,7 +1004,7 @@ internal fun PriceUpdateDialog(
         val seenQty = mutableListOf<BigDecimal>()
         for ((idx, draft) in tierDrafts.withIndex()) {
             val qty = draft.minQty.trim().replace(',', '.').toBigDecimalOrNull()
-            val price = draft.unitPrice.trim().replace(',', '.').toBigDecimalOrNull()
+            val price = parseCatalogWholeRupiahInput(draft.unitPrice)
             when {
                 qty == null || qty <= BigDecimal.ZERO -> {
                     errorMsg = "Baris ${idx + 1}: Minimal qty harus > 0."
@@ -1028,8 +1033,11 @@ internal fun PriceUpdateDialog(
     val parsedTiers = tierValidation.first
     val tierError = tierValidation.second
 
-    val validInput = listOf(priceBuyStr, priceRetailStr, priceContractorStr, discountStr)
-        .all { it.toBigDecimalOrNull() != null } && tierError == null
+    val validInput = parseCatalogBuyPriceInput(priceBuyStr) != null &&
+        parseCatalogWholeRupiahInput(priceRetailStr) != null &&
+        parseCatalogWholeRupiahInput(priceContractorStr) != null &&
+        parseCatalogWholeRupiahInput(discountStr) != null &&
+        tierError == null
 
     ModalBottomSheet(
         onDismissRequest = { if (!state.isSaving) onDismiss() },
@@ -1071,18 +1079,18 @@ internal fun PriceUpdateDialog(
             } else if (state.selectedProductDetail != null) {
                 val isRetailError = state.error != null
                 Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                    PriceEditField("Harga beli", priceBuyStr, { priceBuyStr = it }, "price-edit-buy", !state.isSaving)
+                    PriceEditField("Harga beli", priceBuyStr, { priceBuyStr = sanitizeIdrDecimalInput(it) }, "price-edit-buy", !state.isSaving)
                     PriceEditField(
                         label = "Harga jual",
                         value = priceRetailStr,
-                        onValueChange = { priceRetailStr = it },
+                        onValueChange = { priceRetailStr = sanitizeWholeRupiahInput(it) },
                         testTag = "price-edit-retail",
                         enabled = !state.isSaving,
                         isError = isRetailError,
                         supportingText = if (isRetailError) state.error else null
                     )
-                    PriceEditField("Harga kontraktor", priceContractorStr, { priceContractorStr = it }, "price-edit-contractor", !state.isSaving)
-                    PriceEditField("Diskon", discountStr, { discountStr = it }, "price-edit-discount", !state.isSaving)
+                    PriceEditField("Harga kontraktor", priceContractorStr, { priceContractorStr = sanitizeWholeRupiahInput(it) }, "price-edit-contractor", !state.isSaving)
+                    PriceEditField("Diskon", discountStr, { discountStr = sanitizeWholeRupiahInput(it) }, "price-edit-discount", !state.isSaving)
 
                     Surface(
                         color = Color(0xFFF8FAFC),
@@ -1161,7 +1169,7 @@ internal fun PriceUpdateDialog(
                                             value = draft.unitPrice,
                                             onValueChange = { next ->
                                                 tierDrafts = tierDrafts.toMutableList().apply {
-                                                    this[index] = draft.copy(unitPrice = next)
+                                                    this[index] = draft.copy(unitPrice = sanitizeWholeRupiahInput(next))
                                                 }
                                             },
                                             label = { Text("Harga / ${stock.unitName}") },
@@ -1214,10 +1222,10 @@ internal fun PriceUpdateDialog(
                     ) { Text("Batal") }
                     Button(
                         onClick = {
-                            val buy = priceBuyStr.toBigDecimalOrNull() ?: return@Button
-                            val retail = priceRetailStr.toBigDecimalOrNull() ?: return@Button
-                            val contractor = priceContractorStr.toBigDecimalOrNull() ?: return@Button
-                            val discount = discountStr.toBigDecimalOrNull() ?: return@Button
+                            val buy = parseCatalogBuyPriceInput(priceBuyStr) ?: return@Button
+                            val retail = parseCatalogWholeRupiahInput(priceRetailStr) ?: return@Button
+                            val contractor = parseCatalogWholeRupiahInput(priceContractorStr) ?: return@Button
+                            val discount = parseCatalogWholeRupiahInput(discountStr) ?: return@Button
                             if (tierError != null) return@Button
                             onSave(buy, retail, contractor, discount, parsedTiers)
                         },

@@ -55,7 +55,7 @@ import com.tbterminal.app.data.local.entity.SyncQueueEntity
         SyncQueueEntity::class,
         AppSettingEntity::class
     ],
-    version = 6,
+    version = TbTerminalDatabase.DATABASE_VERSION,
     exportSchema = false
 )
 @TypeConverters(LocalConverters::class)
@@ -80,6 +80,7 @@ abstract class TbTerminalDatabase : RoomDatabase() {
     abstract fun offlineExpenseReportDao(): OfflineExpenseReportDao
 
     companion object {
+        const val DATABASE_VERSION = 6
         const val DATABASE_NAME = "tb_terminal_local.db"
 
         @Volatile

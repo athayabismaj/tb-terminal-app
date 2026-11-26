@@ -1,5 +1,7 @@
 package com.tbterminal.app.ui.customers
 
+import com.tbterminal.app.ui.common.sanitizeWholeRupiahInput
+
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.expandVertically
 import androidx.compose.animation.shrinkVertically
@@ -672,11 +674,11 @@ private fun CustomerFormContent(
                     )
                     if (compact) Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
                         CustomerField("NOMOR HP", input.phone, { onInputChanged(input.copy(phone = it)) }, "08xxxxxxxxxx", error = uiState.fieldErrors[CUSTOMER_FIELD_PHONE], keyboardType = KeyboardType.Phone)
-                        CustomerField("LIMIT KREDIT", input.creditLimit, { onInputChanged(input.copy(creditLimit = it.numericInput())) }, "0", error = uiState.fieldErrors[CUSTOMER_FIELD_CREDIT_LIMIT], keyboardType = KeyboardType.Decimal)
+                        CustomerField("LIMIT KREDIT", input.creditLimit, { onInputChanged(input.copy(creditLimit = sanitizeWholeRupiahInput(it))) }, "0", error = uiState.fieldErrors[CUSTOMER_FIELD_CREDIT_LIMIT], keyboardType = KeyboardType.Decimal)
                         CustomerField("TERMIN HARI", input.paymentTermDays, { onInputChanged(input.copy(paymentTermDays = it.filter(Char::isDigit))) }, "0", error = uiState.fieldErrors[CUSTOMER_FIELD_PAYMENT_TERM], keyboardType = KeyboardType.Number)
                     } else Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
                         CustomerField("NOMOR HP", input.phone, { onInputChanged(input.copy(phone = it)) }, "08xxxxxxxxxx", Modifier.weight(1f), error = uiState.fieldErrors[CUSTOMER_FIELD_PHONE], keyboardType = KeyboardType.Phone)
-                        CustomerField("LIMIT KREDIT", input.creditLimit, { onInputChanged(input.copy(creditLimit = it.numericInput())) }, "0", Modifier.weight(1f), error = uiState.fieldErrors[CUSTOMER_FIELD_CREDIT_LIMIT], keyboardType = KeyboardType.Decimal)
+                        CustomerField("LIMIT KREDIT", input.creditLimit, { onInputChanged(input.copy(creditLimit = sanitizeWholeRupiahInput(it))) }, "0", Modifier.weight(1f), error = uiState.fieldErrors[CUSTOMER_FIELD_CREDIT_LIMIT], keyboardType = KeyboardType.Decimal)
                         CustomerField("TERMIN HARI", input.paymentTermDays, { onInputChanged(input.copy(paymentTermDays = it.filter(Char::isDigit))) }, "0", Modifier.weight(1f), error = uiState.fieldErrors[CUSTOMER_FIELD_PAYMENT_TERM], keyboardType = KeyboardType.Number)
                     }
                     CustomerField(

@@ -71,7 +71,7 @@ class BackendHealthMonitor(
 
             lastCheckedAtMillis = lockedNow
             val response = withTimeoutOrNull(timeoutMillis) {
-                runCatching { healthApi.getReadiness() }.getOrNull()
+                runSuspendCatching { healthApi.getReadiness() }.getOrNull()
             }
             val nextStatus = response.toBackendStatus()
             _status.value = nextStatus

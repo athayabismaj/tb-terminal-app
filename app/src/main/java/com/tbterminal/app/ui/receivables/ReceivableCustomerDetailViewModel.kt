@@ -9,6 +9,7 @@ import com.tbterminal.app.data.model.ReceivablePaymentHistory
 import com.tbterminal.app.data.repository.CustomerRepository
 import com.tbterminal.app.data.repository.ReceivableRepository
 import com.tbterminal.app.data.repository.RepositoryResult
+import com.tbterminal.app.ui.common.parseWholeRupiahOrExactRemainingInput
 import com.tbterminal.app.ui.common.sanitizeWholeRupiahInput
 import com.tbterminal.app.ui.common.toWholeRupiahInputText
 import com.tbterminal.app.ui.common.viewModelFactory
@@ -19,6 +20,13 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+
+private data class ReceivablePaymentIntent(
+    val customerId: String,
+    val normalizedAmount: String,
+    val method: ReceivablePaymentMethod,
+    val invoiceIds: List<String>,
+)
 
 internal data class ReceivableCustomerDetailUiState(
     val isLoading: Boolean = true,
@@ -51,10 +59,15 @@ internal data class ReceivableCustomerDetailUiState(
 internal class ReceivableCustomerDetailViewModel(
     private val receivableRepository: ReceivableRepository,
     private val customerId: String,
-    private val customerRepository: CustomerRepository? = null
+    private val customerRepository: CustomerRepository? = null,
+    private val idempotencyKeyGenerator: () -> String = { UUID.randomUUID().toString() },
 ) : ViewModel() {
     private val _uiState = MutableStateFlow(ReceivableCustomerDetailUiState())
     val uiState: StateFlow<ReceivableCustomerDetailUiState> = _uiState.asStateFlow()
+
+    private var activePaymentIntent: ReceivablePaymentIntent? = null
+    private var activePaymentKeysByInvoice: MutableMap<String, String> = mutableMapOf()
+    private var isPaymentOutcomeAmbiguous: Boolean = false
 
     init {
         load()
@@ -220,10 +233,18 @@ internal class ReceivableCustomerDetailViewModel(
         }
 
         val receivable = state.selectedReceivableForPayment ?: return
+        val parsedAmount = parseWholeRupiahOrExactRemainingInput(state.paymentAmountInput, receivable.remainingAmount)
+        val intent = ReceivablePaymentIntent(
+            customerId = customerId,
+            normalizedAmount = parsedAmount?.stripTrailingZeros()?.toPlainString() ?: state.paymentAmountInput.trim(),
+            method = state.paymentMethod,
+            invoiceIds = listOf(receivable.id),
+        )
+        val idempotencyKey = resolveKeysForIntent(intent, prefix = "receivable-pay").getValue(receivable.id)
         val amount = validateReceivablePaymentInput(
             state.paymentAmountInput,
             receivable.remainingAmount,
-            "idempotency-check"
+            idempotencyKey
         ).getOrElse {
             _uiState.update { s -> s.copy(paymentErrorMessage = it.message ?: "Nominal pembayaran belum valid.") }
             return
@@ -237,10 +258,11 @@ internal class ReceivableCustomerDetailViewModel(
                 method = state.paymentMethod.apiValue,
                 reference = state.referenceInput.trim().takeIf(String::isNotBlank),
                 notes = state.notesInput.trim().takeIf(String::isNotBlank),
-                idempotencyKey = "receivable-pay-${UUID.randomUUID()}"
+                idempotencyKey = idempotencyKey
             )
             when (val result = receivableRepository.createReceivablePayment(command)) {
                 is RepositoryResult.Success -> {
+                    clearPaymentIdempotencyState()
                     _uiState.update {
                         it.copy(
                             selectedReceivableForPayment = null,
@@ -251,6 +273,7 @@ internal class ReceivableCustomerDetailViewModel(
                     load()
                 }
                 is RepositoryResult.Error -> {
+                    isPaymentOutcomeAmbiguous = isAmbiguousReceivablePaymentError(result.code)
                     _uiState.update {
                         it.copy(
                             isSubmittingPayment = false,
@@ -259,6 +282,7 @@ internal class ReceivableCustomerDetailViewModel(
                     }
                 }
                 is RepositoryResult.Exception -> {
+                    isPaymentOutcomeAmbiguous = true
                     _uiState.update {
                         it.copy(
                             isSubmittingPayment = false,
@@ -285,10 +309,20 @@ internal class ReceivableCustomerDetailViewModel(
         }
 
         val selectedTotalRemaining = selectedInvoices.fold(BigDecimal.ZERO) { sum, it -> sum + it.remainingAmount }
+        val sortedInvoiceIds = selectedInvoices.map { it.id }.sorted()
+        val parsedAmount = parseWholeRupiahOrExactRemainingInput(state.paymentAmountInput, selectedTotalRemaining)
+        val intent = ReceivablePaymentIntent(
+            customerId = customerId,
+            normalizedAmount = parsedAmount?.stripTrailingZeros()?.toPlainString() ?: state.paymentAmountInput.trim(),
+            method = state.paymentMethod,
+            invoiceIds = sortedInvoiceIds,
+        )
+        val keysByInvoice = resolveKeysForIntent(intent, prefix = "receivable-pay-all")
+        val validationKey = keysByInvoice.getValue(sortedInvoiceIds.first())
         val amount = validateReceivablePaymentInput(
             state.paymentAmountInput,
             selectedTotalRemaining,
-            "idempotency-check"
+            validationKey
         ).getOrElse {
             _uiState.update { s -> s.copy(paymentErrorMessage = it.message ?: "Nominal pembayaran belum valid.") }
             return
@@ -310,6 +344,7 @@ internal class ReceivableCustomerDetailViewModel(
 
             var successCount = 0
             var failureError: String? = null
+            var ambiguousFailure = false
 
             for (allocation in paymentsToMake) {
                 val receivable = allocation.receivable
@@ -321,7 +356,7 @@ internal class ReceivableCustomerDetailViewModel(
                     method = state.paymentMethod.apiValue,
                     reference = state.referenceInput.trim().takeIf(String::isNotBlank),
                     notes = state.notesInput.trim().takeIf(String::isNotBlank) ?: "Pelunasan bayar semua piutang",
-                    idempotencyKey = "receivable-pay-all-${UUID.randomUUID()}"
+                    idempotencyKey = keysByInvoice.getValue(receivable.id)
                 )
 
                 when (val result = receivableRepository.createReceivablePayment(command)) {
@@ -329,10 +364,12 @@ internal class ReceivableCustomerDetailViewModel(
                         successCount++
                     }
                     is RepositoryResult.Error -> {
+                        ambiguousFailure = isAmbiguousReceivablePaymentError(result.code)
                         failureError = "${receivable.mobileReference()}: ${result.message}"
                         break
                     }
                     is RepositoryResult.Exception -> {
+                        ambiguousFailure = true
                         failureError = "${receivable.mobileReference()}: Terjadi kendala koneksi saat memproses pembayaran"
                         break
                     }
@@ -340,6 +377,7 @@ internal class ReceivableCustomerDetailViewModel(
             }
 
             if (failureError == null) {
+                clearPaymentIdempotencyState()
                 _uiState.update {
                     it.copy(
                         isPayAllOpen = false,
@@ -353,6 +391,7 @@ internal class ReceivableCustomerDetailViewModel(
                 }
                 load()
             } else {
+                isPaymentOutcomeAmbiguous = ambiguousFailure
                 if (successCount > 0) {
                     _uiState.update {
                         it.copy(
@@ -373,8 +412,44 @@ internal class ReceivableCustomerDetailViewModel(
         }
     }
 
+    private fun resolveKeysForIntent(
+        intent: ReceivablePaymentIntent,
+        prefix: String,
+    ): Map<String, String> {
+        val existingIntent = activePaymentIntent
+        if (existingIntent == intent && activePaymentKeysByInvoice.keys.containsAll(intent.invoiceIds)) {
+            return activePaymentKeysByInvoice
+        }
+        val freshKeys = intent.invoiceIds.associateWith {
+            "$prefix-${idempotencyKeyGenerator()}"
+        }
+        activePaymentIntent = intent
+        activePaymentKeysByInvoice = freshKeys.toMutableMap()
+        isPaymentOutcomeAmbiguous = false
+        return activePaymentKeysByInvoice
+    }
+
+    private fun clearPaymentIdempotencyState() {
+        activePaymentIntent = null
+        activePaymentKeysByInvoice.clear()
+        isPaymentOutcomeAmbiguous = false
+    }
+
+    private fun isAmbiguousReceivablePaymentError(code: String): Boolean {
+        val normalized = code.trim().uppercase()
+        return normalized.startsWith("HTTP_5") || normalized in AMBIGUOUS_PAYMENT_ERROR_CODES
+    }
+
     companion object {
         private const val DETAIL_LIMIT = 100
+        private val AMBIGUOUS_PAYMENT_ERROR_CODES = setOf(
+            "NETWORK_TIMEOUT",
+            "NETWORK_UNAVAILABLE",
+            "CONNECTION_FAILED",
+            "CONNECTION_INTERRUPTED",
+            "INVALID_RESPONSE",
+            "EMPTY_BODY",
+        )
 
         fun factory(
             receivableRepository: ReceivableRepository,

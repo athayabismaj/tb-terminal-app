@@ -109,7 +109,7 @@ class SupplierDebtViewModel(
         _uiState.update {
             it.copy(
                 selectedPayable = payable,
-                paymentAmountInput = payable.remainingAmount.toInputText(),
+                paymentAmountInput = payable.remainingAmount.toWholeRupiahInputText(),
                 paymentMethod = SupplierPaymentMethod.Cash,
                 referenceInput = "",
                 notesInput = "",
@@ -124,7 +124,7 @@ class SupplierDebtViewModel(
     }
 
     fun onPaymentAmountChanged(value: String) {
-        _uiState.update { it.copy(paymentAmountInput = value.decimalInput()) }
+        _uiState.update { it.copy(paymentAmountInput = sanitizeWholeRupiahInput(value)) }
     }
 
     fun onPaymentMethodChanged(method: SupplierPaymentMethod) {
@@ -231,7 +231,7 @@ class SupplierDebtViewModel(
         state.copy(openingSupplierId = supplier.id, suppliers = updated)
     }
 
-    fun onOpeningAmountChanged(value: String) = _uiState.update { it.copy(openingAmountInput = value.decimalInput()) }
+    fun onOpeningAmountChanged(value: String) = _uiState.update { it.copy(openingAmountInput = sanitizeWholeRupiahInput(value)) }
     fun onOpeningDebtDateChanged(value: String) = _uiState.update { it.copy(openingDebtDateInput = value) }
     fun onOpeningDueDateChanged(value: String) = _uiState.update { it.copy(openingDueDateInput = value) }
     fun onOpeningLegacyInvoiceChanged(value: String) =
@@ -344,7 +344,7 @@ class SupplierDebtViewModel(
         _uiState.update { state ->
             state.copy(
                 adjustmentReferenceInput = debtRef,
-                adjustmentAmountInput = debt.remainingAmount.toInputText(),
+                adjustmentAmountInput = debt.remainingAmount.toWholeRupiahInputText(),
                 adjustmentPrefilledRemaining = debt.remainingAmount,
                 adjustmentDueDateInput = debt.dueDate.take(10).ifBlank { state.adjustmentDueDateInput }
             )
@@ -371,7 +371,7 @@ class SupplierDebtViewModel(
         }
     }
 
-    fun onAdjustmentAmountChanged(value: String) = _uiState.update { it.copy(adjustmentAmountInput = value.decimalInput()) }
+    fun onAdjustmentAmountChanged(value: String) = _uiState.update { it.copy(adjustmentAmountInput = sanitizeWholeRupiahInput(value)) }
     fun onAdjustmentDebtDateChanged(value: String) = _uiState.update { it.copy(adjustmentDebtDateInput = value) }
     fun onAdjustmentDueDateChanged(value: String) = _uiState.update { it.copy(adjustmentDueDateInput = value) }
     fun onAdjustmentReferenceChanged(value: String) = _uiState.update { it.copy(adjustmentReferenceInput = value.take(100)) }
@@ -471,10 +471,6 @@ class SupplierDebtViewModel(
     }
 }
 
-internal fun String.decimalInput(): String {
-    return sanitizeWholeRupiahInput(this)
-}
+internal fun BigDecimal.toInputText(): String = toWholeRupiahInputText()
 
-internal fun BigDecimal.toInputText(): String {
-    return toWholeRupiahInputText()
-}
+

@@ -99,6 +99,62 @@ interface CashSessionDao {
 
     @Query(
         """
+        SELECT COUNT(*) FROM local_cash_sessions
+        WHERE serverId IS NULL
+          AND deletedAt IS NULL
+          AND syncStatus = :pending
+        """
+    )
+    suspend fun countPendingOpenSessions(pending: SyncStatus = SyncStatus.PENDING): Int
+
+    @Query(
+        """
+        SELECT COUNT(*) FROM local_cash_sessions s
+        WHERE s.status = :closedStatus
+          AND s.serverId IS NOT NULL
+          AND s.deletedAt IS NULL
+          AND s.syncStatus = :pending
+          AND NOT EXISTS (
+              SELECT 1 FROM local_transactions t
+              WHERE t.cashSessionLocalId = s.localId
+                AND t.deletedAt IS NULL
+                AND t.syncStatus IN (:pending, :syncing, :failed, :conflict)
+          )
+          AND NOT EXISTS (
+              SELECT 1 FROM local_cash_expenses e
+              WHERE e.cashSessionLocalId = s.localId
+                AND e.deletedAt IS NULL
+                AND e.syncStatus IN (:pending, :syncing, :failed, :conflict)
+          )
+        """
+    )
+    suspend fun countActionablePendingCloseSessions(
+        closedStatus: String = "CLOSED",
+        pending: SyncStatus = SyncStatus.PENDING,
+        syncing: SyncStatus = SyncStatus.SYNCING,
+        failed: SyncStatus = SyncStatus.FAILED,
+        conflict: SyncStatus = SyncStatus.CONFLICT,
+    ): Int
+
+    @Query(
+        """
+        UPDATE local_cash_sessions
+        SET syncStatus = :targetStatus,
+            syncedAt = NULL,
+            updatedAt = :updatedAt
+        WHERE syncStatus = :syncing
+          AND updatedAt < :cutoffUpdatedAt
+        """
+    )
+    suspend fun recoverStaleSyncing(
+        syncing: SyncStatus,
+        targetStatus: SyncStatus,
+        cutoffUpdatedAt: Long,
+        updatedAt: Long,
+    ): Int
+
+    @Query(
+        """
         SELECT * FROM local_cash_sessions
         WHERE serverId IS NULL
           AND deletedAt IS NULL

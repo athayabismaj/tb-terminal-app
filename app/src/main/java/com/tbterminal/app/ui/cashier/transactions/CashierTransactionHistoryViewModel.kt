@@ -51,6 +51,7 @@ class CashierTransactionHistoryViewModel(
     val uiState: StateFlow<CashierTransactionHistoryUiState> = _uiState.asStateFlow()
 
     private var searchJob: Job? = null
+    private var lastSubmittedPayDebtFingerprint: String? = null
 
     init {
         observeLocalPendingTransactions()
@@ -471,12 +472,16 @@ class CashierTransactionHistoryViewModel(
         viewModelScope.launch {
             _uiState.update { state ->
                 val switchingReceipt = state.selectedTransaction?.id != null && state.selectedTransaction.id != transactionId
+                if (switchingReceipt) {
+                    lastSubmittedPayDebtFingerprint = null
+                }
                 state.copy(
                     isReceiptLoading = true,
                     errorMessage = null,
                     receiptMessage = if (preserveMessage) state.receiptMessage else null,
                     isPayDebtDialogOpen = if (switchingReceipt) false else state.isPayDebtDialogOpen,
                     payDebtIdempotencyKey = if (switchingReceipt) null else state.payDebtIdempotencyKey,
+                    isPayDebtOutcomeAmbiguous = if (switchingReceipt) false else state.isPayDebtOutcomeAmbiguous,
                     payDebtError = if (switchingReceipt) null else state.payDebtError,
                 )
             }
@@ -870,37 +875,68 @@ class CashierTransactionHistoryViewModel(
 
     fun showPayDebtDialog() {
         _uiState.update { state ->
-            val sisa = state.selectedTransaction?.remainingAmount()?.toWholeRupiahInputText() ?: ""
-            state.copy(
-                isPayDebtDialogOpen = true,
-                payDebtAmountInput = sisa,
-                payDebtMethodInput = "TUNAI",
-                payDebtIdempotencyKey = idempotencyKeyGenerator(),
-                payDebtError = null,
-            )
+            if (state.isPayDebtOutcomeAmbiguous && !state.payDebtIdempotencyKey.isNullOrBlank()) {
+                state.copy(
+                    isPayDebtDialogOpen = true,
+                    payDebtError = null,
+                )
+            } else {
+                lastSubmittedPayDebtFingerprint = null
+                val sisa = state.selectedTransaction?.remainingAmount()?.toWholeRupiahInputText() ?: ""
+                state.copy(
+                    isPayDebtDialogOpen = true,
+                    payDebtAmountInput = sisa,
+                    payDebtMethodInput = "TUNAI",
+                    payDebtIdempotencyKey = idempotencyKeyGenerator(),
+                    isPayDebtOutcomeAmbiguous = false,
+                    payDebtError = null,
+                )
+            }
         }
     }
 
     fun hidePayDebtDialog() {
         if (_uiState.value.isSubmittingDebt) return
         _uiState.update {
-            it.copy(
-                isPayDebtDialogOpen = false,
-                payDebtIdempotencyKey = null,
-                payDebtError = null,
-            )
+            if (it.isPayDebtOutcomeAmbiguous) {
+                it.copy(
+                    isPayDebtDialogOpen = false,
+                    payDebtError = null,
+                )
+            } else {
+                lastSubmittedPayDebtFingerprint = null
+                it.copy(
+                    isPayDebtDialogOpen = false,
+                    payDebtIdempotencyKey = null,
+                    payDebtError = null,
+                )
+            }
         }
     }
 
     fun onPayDebtAmountChanged(value: String) {
         if (_uiState.value.isSubmittingDebt) return
         val filtered = sanitizeWholeRupiahInput(value)
-        _uiState.update { it.copy(payDebtAmountInput = filtered, payDebtError = null) }
+        _uiState.update { state ->
+            val rotated = rotatePayDebtKeyIfIntentChanged(
+                state = state,
+                nextAmountInput = filtered,
+                nextMethod = state.payDebtMethodInput,
+            )
+            rotated.copy(payDebtAmountInput = filtered, payDebtError = null)
+        }
     }
 
     fun onPayDebtMethodChanged(method: String) {
         if (_uiState.value.isSubmittingDebt) return
-        _uiState.update { it.copy(payDebtMethodInput = method, payDebtError = null) }
+        _uiState.update { state ->
+            val rotated = rotatePayDebtKeyIfIntentChanged(
+                state = state,
+                nextAmountInput = state.payDebtAmountInput,
+                nextMethod = method,
+            )
+            rotated.copy(payDebtMethodInput = method, payDebtError = null)
+        }
     }
 
     fun payDebt() {
@@ -916,7 +952,15 @@ class CashierTransactionHistoryViewModel(
             _uiState.update { it.copy(payDebtError = "Nominal bayar tidak valid") }
             return
         }
-        val idempotencyKey = state.payDebtIdempotencyKey ?: idempotencyKeyGenerator()
+        val fingerprint = buildPayDebtFingerprint(transactionId, amount, state.payDebtMethodInput)
+        val idempotencyKey = if (
+            lastSubmittedPayDebtFingerprint != null && lastSubmittedPayDebtFingerprint != fingerprint
+        ) {
+            idempotencyKeyGenerator()
+        } else {
+            state.payDebtIdempotencyKey ?: idempotencyKeyGenerator()
+        }
+        lastSubmittedPayDebtFingerprint = fingerprint
 
         viewModelScope.launch {
             _uiState.update {
@@ -931,11 +975,13 @@ class CashierTransactionHistoryViewModel(
 
             when (val result = repository.payTransactionDebt(transactionId, amount, state.payDebtMethodInput, idempotencyKey)) {
                 is RepositoryResult.Success -> {
+                    lastSubmittedPayDebtFingerprint = null
                     _uiState.update {
                         it.copy(
                             isSubmittingDebt = false,
                             isPayDebtDialogOpen = false,
                             payDebtIdempotencyKey = null,
+                            isPayDebtOutcomeAmbiguous = false,
                             payDebtError = null,
                             selectedTransaction = result.data,
                             receiptMessage = "Pelunasan berhasil disimpan",
@@ -945,9 +991,11 @@ class CashierTransactionHistoryViewModel(
                     loadTransactions(_uiState.value.page)
                 }
                 is RepositoryResult.Error -> {
+                    val ambiguous = isAmbiguousTransactionActionError(result.code)
                     _uiState.update {
                         it.copy(
                             isSubmittingDebt = false,
+                            isPayDebtOutcomeAmbiguous = ambiguous,
                             payDebtError = result.message,
                             errorMessage = result.message,
                         )
@@ -958,6 +1006,7 @@ class CashierTransactionHistoryViewModel(
                     _uiState.update {
                         it.copy(
                             isSubmittingDebt = false,
+                            isPayDebtOutcomeAmbiguous = true,
                             payDebtError = fallback,
                             errorMessage = fallback,
                         )
@@ -965,6 +1014,38 @@ class CashierTransactionHistoryViewModel(
                 }
             }
         }
+    }
+
+    private fun rotatePayDebtKeyIfIntentChanged(
+        state: CashierTransactionHistoryUiState,
+        nextAmountInput: String,
+        nextMethod: String,
+    ): CashierTransactionHistoryUiState {
+        val previousFingerprint = lastSubmittedPayDebtFingerprint ?: return state
+        val selected = state.selectedTransaction ?: return state
+        val parsedAmount = parseWholeRupiahOrExactRemainingInput(nextAmountInput, selected.remainingAmount())
+        val nextFingerprint = if (parsedAmount != null) {
+            buildPayDebtFingerprint(selected.id, parsedAmount, nextMethod)
+        } else {
+            "${selected.id}|RAW:${nextAmountInput.trim()}|${nextMethod.trim().uppercase()}"
+        }
+        return if (nextFingerprint != previousFingerprint) {
+            lastSubmittedPayDebtFingerprint = null
+            state.copy(
+                payDebtIdempotencyKey = idempotencyKeyGenerator(),
+                isPayDebtOutcomeAmbiguous = false,
+            )
+        } else {
+            state
+        }
+    }
+
+    private fun buildPayDebtFingerprint(
+        transactionId: String,
+        amount: java.math.BigDecimal,
+        method: String,
+    ): String {
+        return "$transactionId|${amount.stripTrailingZeros().toPlainString()}|${method.trim().uppercase()}"
     }
 
     fun clearFeedback() {

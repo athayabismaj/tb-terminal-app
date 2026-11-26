@@ -12,7 +12,10 @@ import com.tbterminal.app.data.numbering.DocumentNumberType
 import com.tbterminal.app.data.repository.InventoryRepository
 import com.tbterminal.app.data.repository.PurchasingRepository
 import com.tbterminal.app.data.repository.RepositoryResult
+import com.tbterminal.app.ui.common.sanitizeIdrDecimalInput
 import com.tbterminal.app.ui.common.sanitizeWholeRupiahInput
+import com.tbterminal.app.ui.common.toIdrDecimalInputText
+import com.tbterminal.app.ui.common.toWholeRupiahInputText
 import com.tbterminal.app.ui.common.viewModelFactory
 import java.math.BigDecimal
 import kotlinx.coroutines.Job
@@ -128,7 +131,7 @@ class IncomingGoodsViewModel(
         _uiState.update { state ->
             val nextState = state.copy(
                 selectedProduct = product,
-                buyPriceInput = state.buyPriceInput.ifBlank { product.priceBuy.toInputText() },
+                buyPriceInput = state.buyPriceInput.ifBlank { product.priceBuy.toIdrDecimalInputText() },
                 errorMessage = null,
                 message = null
             )
@@ -201,7 +204,7 @@ class IncomingGoodsViewModel(
     }
 
     fun onBuyPriceChanged(value: String) {
-        _uiState.update { it.copy(buyPriceInput = value.decimalInput()).withSyncedCashPayment() }
+        _uiState.update { it.copy(buyPriceInput = sanitizeIdrDecimalInput(value)).withSyncedCashPayment() }
     }
 
     fun onAmountPaidChanged(value: String) {
@@ -221,8 +224,8 @@ class IncomingGoodsViewModel(
             val amountPaid = when (method) {
                 IncomingPaymentMethod.CASH,
                 IncomingPaymentMethod.TRANSFER,
-                IncomingPaymentMethod.QRIS -> state.total?.toInputText().orEmpty()
-                IncomingPaymentMethod.DEBT -> BigDecimal.ZERO.toInputText()
+                IncomingPaymentMethod.QRIS -> state.total?.toWholeRupiahInputText().orEmpty()
+                IncomingPaymentMethod.DEBT -> BigDecimal.ZERO.toWholeRupiahInputText()
                 IncomingPaymentMethod.DOWN_PAYMENT -> state.amountPaidInput
             }
             state.copy(paymentMethod = method, amountPaidInput = amountPaid)
@@ -351,7 +354,7 @@ class IncomingGoodsViewModel(
                 selectedProduct = selectedProduct,
                 categoryFilter = categoryFilter,
                 currentPage = state.currentPage.coerceAtLeast(1),
-                buyPriceInput = state.buyPriceInput.ifBlank { selectedProduct?.priceBuy?.toInputText().orEmpty() },
+                buyPriceInput = state.buyPriceInput.ifBlank { selectedProduct?.priceBuy?.toIdrDecimalInputText().orEmpty() },
                 isLoadingProducts = false,
                 errorMessage = null
             )

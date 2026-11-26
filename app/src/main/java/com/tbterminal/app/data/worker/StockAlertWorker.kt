@@ -18,6 +18,7 @@ import androidx.work.WorkerParameters
 import com.tbterminal.app.MainActivity
 import com.tbterminal.app.data.local.database.TbTerminalDatabase
 import java.util.concurrent.TimeUnit
+import kotlinx.coroutines.CancellationException
 
 /**
  * Background Worker (WorkManager) yang bertugas memeriksa stok produk di database lokal
@@ -46,7 +47,9 @@ class StockAlertWorker(
             }
 
             Result.success()
-        } catch (_: Throwable) {
+        } catch (cancellation: CancellationException) {
+            throw cancellation
+        } catch (_: Exception) {
             Result.retry()
         }
     }

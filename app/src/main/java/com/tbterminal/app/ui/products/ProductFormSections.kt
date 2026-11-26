@@ -1,5 +1,8 @@
 package com.tbterminal.app.ui.products
 
+import com.tbterminal.app.ui.common.sanitizeIdrDecimalInput
+import com.tbterminal.app.ui.common.sanitizeWholeRupiahInput
+
 import android.Manifest
 import android.content.pm.PackageManager
 import android.net.Uri
@@ -501,19 +504,19 @@ private fun PriceSection(
             placeholder = "0",
             prefix = "Rp",
             isNumber = true,
-            onValueChange = { value -> onInputChanged(input.copy(priceBuy = value.numericInput())) },
+            onValueChange = { value -> onInputChanged(input.copy(priceBuy = sanitizeIdrDecimalInput(value))) },
         )
         PriceInputWithMargin(
             label = "Harga jual retail",
             value = input.priceRetail,
             margin = input.priceRetail.marginText(input.priceBuy),
-            onValueChange = { value -> onInputChanged(input.copy(priceRetail = value.numericInput())) },
+            onValueChange = { value -> onInputChanged(input.copy(priceRetail = sanitizeWholeRupiahInput(value))) },
         )
         PriceInputWithMargin(
             label = "Harga jual kontraktor",
             value = input.priceContractor,
             margin = input.priceContractor.marginText(input.priceBuy),
-            onValueChange = { value -> onInputChanged(input.copy(priceContractor = value.numericInput())) },
+            onValueChange = { value -> onInputChanged(input.copy(priceContractor = sanitizeWholeRupiahInput(value))) },
         )
     }
 }

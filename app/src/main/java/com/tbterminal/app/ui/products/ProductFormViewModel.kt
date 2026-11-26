@@ -1,5 +1,10 @@
 package com.tbterminal.app.ui.products
 
+import com.tbterminal.app.ui.common.parseIdrDecimalInput
+import com.tbterminal.app.ui.common.parseWholeRupiahInput
+import com.tbterminal.app.ui.common.toIdrDecimalInputText
+import com.tbterminal.app.ui.common.toWholeRupiahInputText
+
 import android.net.Uri
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
@@ -118,9 +123,9 @@ class ProductFormViewModel(
         }
         val input = state.input
 
-        val priceBuy = input.priceBuy.toProductDecimalOrNull()
-        val priceRetail = input.priceRetail.toProductDecimalOrNull()
-        val priceContractor = input.priceContractor.toProductDecimalOrNull()
+        val priceBuy = parseIdrDecimalInput(input.priceBuy)
+        val priceRetail = parseWholeRupiahInput(input.priceRetail)
+        val priceContractor = parseWholeRupiahInput(input.priceContractor)
         val minStock = input.minStock.toProductDecimalOrNull()
         val secondaryUnitFactor = input.secondaryUnitFactor.toProductDecimalOrNull()
 
@@ -344,9 +349,9 @@ private fun Product.toFormInput(): ProductFormInput {
         usesSecondaryUnit = secondaryUnitId != null && secondaryUnitFactor != null,
         secondaryUnitId = secondaryUnitId.orEmpty(),
         secondaryUnitFactor = secondaryUnitFactor?.stripTrailingZeros()?.toPlainString().orEmpty(),
-        priceBuy = priceBuy.toPlainString(),
-        priceRetail = priceRetail.toPlainString(),
-        priceContractor = priceContractor.toPlainString(),
+        priceBuy = priceBuy.toIdrDecimalInputText(),
+        priceRetail = priceRetail.toWholeRupiahInputText(),
+        priceContractor = priceContractor.toWholeRupiahInputText(),
         minStock = minStock.toPlainString()
     )
 }

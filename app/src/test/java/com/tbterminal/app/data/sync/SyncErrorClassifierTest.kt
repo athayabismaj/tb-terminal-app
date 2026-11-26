@@ -81,5 +81,13 @@ class SyncErrorClassifierTest {
             SyncErrorCategory.NETWORK,
             SyncErrorClassifier.classify(throwable = UnknownHostException("offline")).category,
         )
+        assertEquals(
+            SyncErrorCategory.NETWORK,
+            SyncErrorClassifier.classify(httpCode = 429, message = "Too many requests", errorCode = "RATE_LIMITED").category,
+        )
+        assertEquals(
+            SyncErrorCategory.NETWORK,
+            SyncErrorClassifier.classify(httpCode = 503, message = "Service unavailable").category,
+        )
     }
 }

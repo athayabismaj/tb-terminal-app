@@ -46,7 +46,7 @@ class LocalBackupRepository(
         checkpointDatabase()
         val metadata = LocalBackupMetadata(
             appVersion = BuildConfig.VERSION_NAME,
-            databaseVersion = CURRENT_DATABASE_VERSION,
+            databaseVersion = TbTerminalDatabase.DATABASE_VERSION,
             createdAt = Instant.now().toString(),
             deviceId = deviceIdProvider.deviceId,
             pendingSyncCount = summary.pendingSyncCount,
@@ -82,7 +82,12 @@ class LocalBackupRepository(
         }.fold(
             onSuccess = { backup ->
                 when {
-                    backup.metadata.databaseVersion > CURRENT_DATABASE_VERSION -> {
+                    backup.metadata.databaseVersion <= 0 -> {
+                        LocalRestorePreviewResult.Invalid(
+                            "Versi database backup (${backup.metadata.databaseVersion}) tidak valid."
+                        )
+                    }
+                    backup.metadata.databaseVersion > TbTerminalDatabase.DATABASE_VERSION -> {
                         LocalRestorePreviewResult.Invalid(
                             "Versi database backup (${backup.metadata.databaseVersion}) lebih baru dari aplikasi ini."
                         )
@@ -114,7 +119,10 @@ class LocalBackupRepository(
         val backup = runCatching { readBackup(uri) }.getOrElse { error ->
             return@withContext LocalBackupResult.Failed(error.message ?: "File backup tidak valid.")
         }
-        if (backup.metadata.databaseVersion > CURRENT_DATABASE_VERSION || !backup.hasDatabase) {
+        if (backup.metadata.databaseVersion <= 0 ||
+            backup.metadata.databaseVersion > TbTerminalDatabase.DATABASE_VERSION ||
+            !backup.hasDatabase
+        ) {
             return@withContext LocalBackupResult.Failed("File backup tidak kompatibel.")
         }
 
@@ -197,7 +205,6 @@ class LocalBackupRepository(
     )
 
     companion object {
-        private const val CURRENT_DATABASE_VERSION = 3
         private const val BACKUP_TYPE = "tb-terminal-local-backup"
         private const val FORMAT_VERSION = 1
         private const val METADATA_ENTRY = "metadata.json"

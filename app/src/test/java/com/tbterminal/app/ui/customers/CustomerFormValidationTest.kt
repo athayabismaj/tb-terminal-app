@@ -13,12 +13,31 @@ class CustomerFormValidationTest {
                 name = "Toko Sejahtera",
                 phone = "+62 812-3456-7890",
                 address = "Jakarta",
-                creditLimit = "1250000.50",
+                creditLimit = "1.250.000",
                 paymentTermDays = "30",
             ),
         )
 
         assertTrue(errors.isEmpty())
+    }
+
+    @Test
+    fun `creditLimit rejects cents and dot decimals while allowing comma00`() {
+        assertTrue(
+            validateCustomerForm(
+                CustomerFormInput(name = "Pelanggan", creditLimit = "1250000,00", paymentTermDays = "30")
+            ).isEmpty()
+        )
+        assertTrue(
+            validateCustomerForm(
+                CustomerFormInput(name = "Pelanggan", creditLimit = "1250000.50", paymentTermDays = "30")
+            ).containsKey(CUSTOMER_FIELD_CREDIT_LIMIT)
+        )
+        assertTrue(
+            validateCustomerForm(
+                CustomerFormInput(name = "Pelanggan", creditLimit = "1.250.000,50", paymentTermDays = "30")
+            ).containsKey(CUSTOMER_FIELD_CREDIT_LIMIT)
+        )
     }
 
     @Test

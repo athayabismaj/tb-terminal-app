@@ -149,6 +149,33 @@ interface CashExpenseDao {
         updatedAt: Long
     )
 
+    @Query(
+        """
+        SELECT COUNT(*)
+        FROM local_cash_expenses
+        WHERE deletedAt IS NULL
+            AND syncStatus = :pending
+        """
+    )
+    suspend fun countPendingExpenses(pending: SyncStatus = SyncStatus.PENDING): Int
+
+    @Query(
+        """
+        UPDATE local_cash_expenses
+        SET syncStatus = :targetStatus,
+            syncedAt = NULL,
+            updatedAt = :updatedAt
+        WHERE syncStatus = :syncing
+          AND updatedAt < :cutoffUpdatedAt
+        """
+    )
+    suspend fun recoverStaleSyncing(
+        syncing: SyncStatus,
+        targetStatus: SyncStatus,
+        cutoffUpdatedAt: Long,
+        updatedAt: Long,
+    ): Int
+
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun upsert(expense: LocalCashExpenseEntity): Long
 

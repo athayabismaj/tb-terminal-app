@@ -2,7 +2,10 @@ package com.tbterminal.app.ui.incominggoods
 
 import com.tbterminal.app.data.model.ProductStock
 import com.tbterminal.app.data.model.Supplier
+import com.tbterminal.app.ui.common.parseIdrDecimalInput
 import com.tbterminal.app.ui.common.parseWholeRupiahInput
+import com.tbterminal.app.ui.common.toIdrDecimalInputText
+import com.tbterminal.app.ui.common.toWholeRupiahInputText
 import java.math.BigDecimal
 
 data class IncomingGoodsUiState(
@@ -34,7 +37,7 @@ data class IncomingGoodsUiState(
         get() = quantityInput.toBigDecimalOrNull()
 
     val buyPrice: BigDecimal?
-        get() = buyPriceInput.toBigDecimalOrNull()
+        get() = parseIdrDecimalInput(buyPriceInput)
 
     val total: BigDecimal?
         get() {
@@ -159,19 +162,13 @@ internal fun IncomingGoodsUiState.withSyncedCashPayment(): IncomingGoodsUiState 
     return when (paymentMethod) {
         IncomingPaymentMethod.CASH,
         IncomingPaymentMethod.TRANSFER,
-        IncomingPaymentMethod.QRIS -> copy(amountPaidInput = total?.toInputText().orEmpty())
+        IncomingPaymentMethod.QRIS -> copy(amountPaidInput = total?.toWholeRupiahInputText().orEmpty())
         IncomingPaymentMethod.DEBT,
         IncomingPaymentMethod.DOWN_PAYMENT -> this
     }
 }
 
-internal fun String.decimalInput(): String {
-    return filter { it.isDigit() || it == '.' || it == ',' }.replace(',', '.')
-}
-
-internal fun BigDecimal.toInputText(): String {
-    return stripTrailingZeros().toPlainString()
-}
+internal fun BigDecimal.toInputText(): String = toIdrDecimalInputText()
 
 
 enum class IncomingStockStatusFilter(val label: String) {

@@ -44,27 +44,24 @@ interface TransactionDao {
         FROM local_transactions
         WHERE deletedAt IS NULL
             AND syncStatus = :pending
-            AND COALESCE(
-                (
-                    SELECT q.retryCount
-                    FROM sync_queue q
-                    WHERE q.entityLocalId = local_transactions.localId
-                        AND q.entityType = :entityType
-                    ORDER BY q.createdAt DESC
-                    LIMIT 1
-                ),
-                0
-            ) < :maxRetryCount
         ORDER BY occurredAt ASC
         LIMIT :limit
         """
     )
     suspend fun getPendingLocalIdsForAutoSync(
         pending: SyncStatus,
-        entityType: SyncEntityType,
-        maxRetryCount: Int,
         limit: Int
     ): List<Long>
+
+    @Query(
+        """
+        SELECT COUNT(*)
+        FROM local_transactions
+        WHERE deletedAt IS NULL
+            AND syncStatus = :pending
+        """
+    )
+    suspend fun countPendingTransactions(pending: SyncStatus = SyncStatus.PENDING): Int
 
     @Query(
         """

@@ -37,4 +37,20 @@ class ProductInputValidationTest {
         assertNotNull(validateProductFormInput(withSecondary.copy(secondaryUnitFactor = "0"), false))
         assertNotNull(validateProductFormInput(withSecondary.copy(secondaryUnitFactor = "1.00001"), false))
     }
+
+    @Test
+    fun idrFormattingEnforcesDecimalBuyPriceAndWholeRupiahSellingPrices() {
+        assertNull(
+            validateProductFormInput(
+                valid.copy(priceBuy = "1.333,33", priceRetail = "60.000", priceContractor = "58000,00"),
+                isEditMode = false
+            )
+        )
+        assertEquals("33%", "20.000".marginText("15.000"))
+
+        assertNotNull(validateProductFormInput(valid.copy(priceBuy = "1333.33"), false))
+        assertNotNull(validateProductFormInput(valid.copy(priceBuy = "1.333,333"), false))
+        assertNotNull(validateProductFormInput(valid.copy(priceRetail = "60000,5"), false))
+        assertNotNull(validateProductFormInput(valid.copy(priceContractor = "58000.50"), false))
+    }
 }
