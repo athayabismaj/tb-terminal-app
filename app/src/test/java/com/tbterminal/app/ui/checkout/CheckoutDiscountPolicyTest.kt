@@ -115,6 +115,36 @@ class CheckoutDiscountPolicyTest {
         assertFalse(requiresFreshDiscountPreview("NETWORK_TIMEOUT"))
     }
 
+    @Test
+    fun discountInputDialogParsesWholeRupiahNominalAndDecimalPercentage() {
+        listOf("2000", "5000", "10000", "15000", "20000", "25000", "50000", "100000").forEach { preset ->
+            val parsed = parseDiscountInputValue(DiscountType.FIXED_AMOUNT, preset)
+            assertEquals(0, BigDecimal(preset).compareTo(parsed))
+        }
+        assertEquals(0, BigDecimal("15000").compareTo(parseDiscountInputValue(DiscountType.FIXED_AMOUNT, "15.000")))
+        assertEquals(0, BigDecimal("15000").compareTo(parseDiscountInputValue(DiscountType.FIXED_AMOUNT, "15000")))
+        assertEquals(0, BigDecimal("15000").compareTo(parseDiscountInputValue(DiscountType.FIXED_AMOUNT, "15000,00")))
+        assertNull(parseDiscountInputValue(DiscountType.FIXED_AMOUNT, "1.500,50"))
+        assertEquals("1.500,50", sanitizeDiscountInput(DiscountType.FIXED_AMOUNT, "1.500,50"))
+        assertEquals(
+            "15000",
+            formatInitialDiscountInput(CheckoutDiscount(DiscountType.FIXED_AMOUNT, BigDecimal("15000.00")))
+        )
+
+        listOf("5", "10", "15", "20").forEach { preset ->
+            val parsed = parseDiscountInputValue(DiscountType.PERCENTAGE, preset)
+            assertEquals(0, BigDecimal(preset).compareTo(parsed))
+        }
+        val decimalPercent = parseDiscountInputValue(DiscountType.PERCENTAGE, "2,5")
+        assertEquals(0, BigDecimal("2.5").compareTo(decimalPercent))
+        assertNull(
+            validateCheckoutDiscount(
+                BigDecimal("100000"),
+                CheckoutDiscount(DiscountType.PERCENTAGE, decimalPercent!!)
+            )
+        )
+    }
+
     private fun item(
         price: String,
         quantity: Int,
