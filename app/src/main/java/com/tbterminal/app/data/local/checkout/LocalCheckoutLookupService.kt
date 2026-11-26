@@ -17,8 +17,8 @@ class LocalCheckoutLookupService(
         return LocalCheckoutProductLookup(
             localId = product.localId,
             serverId = product.serverId,
-            cogsAtTransaction = product.priceBuy,
-            stock = product.stock,
+            cogsAtTransaction = product.priceBuy.toBigDecimal(),
+            stock = product.stock.toBigDecimal(),
             baseUnitServerId = product.unitServerId,
             secondaryUnitServerId = product.secondaryUnitServerId,
             secondaryUnitFactor = product.secondaryUnitFactor
@@ -51,8 +51,8 @@ class LocalCheckoutLookupService(
 data class LocalCheckoutProductLookup(
     val localId: Long,
     val serverId: String?,
-    val cogsAtTransaction: Double,
-    val stock: Double,
+    val cogsAtTransaction: BigDecimal,
+    val stock: BigDecimal,
     val baseUnitServerId: String? = null,
     val secondaryUnitServerId: String? = null,
     val secondaryUnitFactor: BigDecimal? = null

@@ -8,6 +8,7 @@ import com.tbterminal.app.data.local.database.ProductLocalDataSource
 import com.tbterminal.app.data.local.database.TbTerminalDatabase
 import com.tbterminal.app.data.local.database.UnitLocalDataSource
 import com.tbterminal.app.data.local.entity.LocalProductEntity
+import com.tbterminal.app.data.local.model.ScaledDecimal2
 import com.tbterminal.app.data.local.model.SyncStatus
 import com.tbterminal.app.data.remote.InventoryApi
 import java.math.BigDecimal
@@ -168,7 +169,7 @@ class InventoryOfflineUnitSourceTest {
         val cachedEntity = database.productDao().getByServerId("prod-1")
         assertNotNull(cachedEntity)
         cachedEntity!!
-        assertEquals(100.0, cachedEntity.stock, 0.001)
+        assertEquals(ScaledDecimal2.ofWhole(100L), cachedEntity.stock)
         assertEquals("unit-pcs", cachedEntity.unitServerId)
         assertEquals("Pcs", cachedEntity.unitName)
         assertEquals("unit-dus", cachedEntity.secondaryUnitServerId)
@@ -336,12 +337,12 @@ class InventoryOfflineUnitSourceTest {
                 secondaryUnitServerId = "unit-dus",
                 secondaryUnitName = "Dus",
                 secondaryUnitFactor = BigDecimal("12"),
-                priceSell = 10_000.0,
-                priceBuy = 8_000.0,
-                priceRetail = 10_000.0,
-                priceContractor = 9_500.0,
-                stock = 50.0,
-                minimumStock = 5.0,
+                priceSell = ScaledDecimal2.ofWhole(10_000L),
+                priceBuy = ScaledDecimal2.ofWhole(8_000L),
+                priceRetail = ScaledDecimal2.ofWhole(10_000L),
+                priceContractor = ScaledDecimal2.ofWhole(9_500L),
+                stock = ScaledDecimal2.ofWhole(50L),
+                minimumStock = ScaledDecimal2.ofWhole(5L),
                 syncStatus = SyncStatus.SYNCED
             )
         )

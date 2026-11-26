@@ -5,6 +5,7 @@ import androidx.room.Insert
 import androidx.room.OnConflictStrategy
 import androidx.room.Query
 import com.tbterminal.app.data.local.entity.LocalPaymentEntity
+import com.tbterminal.app.data.local.model.ScaledDecimal2
 import com.tbterminal.app.data.local.model.SyncStatus
 import kotlinx.coroutines.flow.Flow
 
@@ -27,7 +28,7 @@ interface PaymentDao {
             AND UPPER(p.method) IN ('TUNAI', 'CASH')
         """
     )
-    suspend fun sumCashPaymentsByCashSession(cashSessionLocalId: Long): Double
+    suspend fun sumCashPaymentsByCashSession(cashSessionLocalId: Long): ScaledDecimal2
 
     @Query("SELECT * FROM local_payments WHERE syncStatus = :status ORDER BY createdAt ASC LIMIT :limit")
     suspend fun getBySyncStatus(status: SyncStatus, limit: Int): List<LocalPaymentEntity>

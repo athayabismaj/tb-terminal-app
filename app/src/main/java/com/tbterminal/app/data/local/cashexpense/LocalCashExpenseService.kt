@@ -1,14 +1,17 @@
 package com.tbterminal.app.data.local.cashexpense
 
 import androidx.room.withTransaction
+import com.tbterminal.app.data.local.checkout.exceedsMaxBaseQuantityScale
 import com.tbterminal.app.data.local.database.TbTerminalDatabase
 import com.tbterminal.app.data.local.entity.LocalCashExpenseEntity
 import com.tbterminal.app.data.local.entity.LocalCashSessionEntity
 import com.tbterminal.app.data.local.entity.SyncQueueEntity
 import com.tbterminal.app.data.local.id.LocalIdGenerator
+import com.tbterminal.app.data.local.model.ScaledDecimal2
 import com.tbterminal.app.data.local.model.SyncEntityType
 import com.tbterminal.app.data.local.model.SyncOperation
 import com.tbterminal.app.data.local.model.SyncStatus
+import com.tbterminal.app.data.remote.BigDecimalStringSerializer
 import java.math.BigDecimal
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.encodeToString
@@ -46,6 +49,9 @@ class LocalCashExpenseService(
         if (amount <= BigDecimal.ZERO) {
             return LocalCashExpenseResult.Failed("Nominal $actionLabel harus lebih besar dari nol.")
         }
+        if (exceedsMaxBaseQuantityScale(amount)) {
+            return LocalCashExpenseResult.Failed("Nominal $actionLabel maksimal 2 angka desimal.")
+        }
         if (normalizedDescription.isBlank()) {
             return LocalCashExpenseResult.Failed("Keterangan $actionLabel wajib diisi.")
         }
@@ -67,7 +73,7 @@ class LocalCashExpenseService(
                     cashSessionServerId = session.serverId,
                     category = normalizedCategory,
                     description = normalizedDescription,
-                    amount = amount.toSafeDouble(),
+                    amount = ScaledDecimal2.ofExact(amount),
                     occurredAt = now,
                     syncStatus = SyncStatus.PENDING,
                     createdAt = now,
@@ -113,17 +119,13 @@ class LocalCashExpenseService(
         return database.cashExpenseDao().getByCashSession(cashSessionLocalId)
     }
 
-    private fun BigDecimal.toSafeDouble(): Double {
-        return runCatching { toDouble() }.getOrDefault(0.0)
-    }
-
     internal fun LocalCashExpenseEntity.toSyncPayloadJson(session: LocalCashSessionEntity): String {
         val payload = LocalCashExpenseSyncPayload(
             clientGeneratedId = clientGeneratedId,
             deviceId = (deviceId ?: this@LocalCashExpenseService.deviceId).orEmpty(),
             cashierUserId = session.cashierUserId,
             serverCashSessionId = cashSessionServerId.orEmpty(),
-            amount = amount,
+            amount = amount.toBigDecimal(),
             category = category ?: DEFAULT_CATEGORY,
             note = description.orEmpty(),
             occurredAt = occurredAt,
@@ -153,7 +155,7 @@ internal data class LocalCashExpenseSyncPayload(
     val deviceId: String,
     val cashierUserId: String,
     val serverCashSessionId: String,
-    val amount: Double,
+    @Serializable(with = BigDecimalStringSerializer::class) val amount: BigDecimal,
     val category: String,
     val note: String,
     val occurredAt: Long,

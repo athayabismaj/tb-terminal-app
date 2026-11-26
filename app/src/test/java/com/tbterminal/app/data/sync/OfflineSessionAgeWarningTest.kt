@@ -8,6 +8,7 @@ import androidx.test.core.app.ApplicationProvider
 import com.tbterminal.app.data.local.database.CashSessionLocalDataSource
 import com.tbterminal.app.data.local.database.TbTerminalDatabase
 import com.tbterminal.app.data.local.entity.LocalCashSessionEntity
+import com.tbterminal.app.data.local.model.ScaledDecimal2
 import com.tbterminal.app.data.local.model.SyncStatus
 import com.tbterminal.app.data.model.CashExpense
 import com.tbterminal.app.data.model.CashExpensePage
@@ -199,7 +200,7 @@ class OfflineSessionAgeWarningTest {
                 cashierUserId = "kasir-1",
                 status = "OPEN",
                 openedAt = openedAt,
-                startingCash = 100_000.0,
+                startingCash = ScaledDecimal2.ofWhole(100_000L),
                 syncStatus = SyncStatus.PENDING
             )
         )
@@ -245,7 +246,7 @@ class OfflineSessionAgeWarningTest {
                 cashierUserId = "kasir-1",
                 status = "OPEN",
                 openedAt = openedAt,
-                startingCash = 100_000.0,
+                startingCash = ScaledDecimal2.ofWhole(100_000L),
                 syncStatus = SyncStatus.SYNCED
             )
         )
@@ -274,7 +275,7 @@ class OfflineSessionAgeWarningTest {
                 cashierUserId = "kasir-1",
                 status = "OPEN",
                 openedAt = openedAt,
-                startingCash = 100_000.0,
+                startingCash = ScaledDecimal2.ofWhole(100_000L),
                 syncStatus = SyncStatus.PENDING
             )
         )

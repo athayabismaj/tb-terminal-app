@@ -2,9 +2,9 @@ package com.tbterminal.app.data.local.mapper
 
 import com.tbterminal.app.data.local.entity.LocalCashSessionEntity
 import com.tbterminal.app.data.local.id.LocalIdGenerator
+import com.tbterminal.app.data.local.model.ScaledDecimal2
 import com.tbterminal.app.data.local.model.SyncStatus
 import com.tbterminal.app.data.model.CashSession
-import java.math.BigDecimal
 import java.time.Instant
 import java.time.LocalDateTime
 import java.time.OffsetDateTime
@@ -23,10 +23,10 @@ fun CashSession.toLocalCashSessionEntity(
         status = status,
         openedAt = openedAt.toEpochMillisOrDefault(existing?.openedAt ?: now),
         closedAt = closedAt?.toEpochMillisOrNull(),
-        startingCash = openingCash.toSafeDouble(),
-        expectedCash = systemCash?.toSafeDouble(),
-        actualCash = closingCash?.toSafeDouble(),
-        difference = difference?.toSafeDouble(),
+        startingCash = ScaledDecimal2.ofExact(openingCash),
+        expectedCash = systemCash?.let(ScaledDecimal2::ofExact),
+        actualCash = closingCash?.let(ScaledDecimal2::ofExact),
+        difference = difference?.let(ScaledDecimal2::ofExact),
         openingNote = existing?.openingNote ?: notes,
         closingNote = if (closedAt != null) notes else existing?.closingNote,
         syncStatus = SyncStatus.SYNCED,
@@ -50,8 +50,4 @@ private fun String.toEpochMillisOrNull(): Long? {
                 .toInstant()
                 .toEpochMilli()
         }.getOrNull()
-}
-
-private fun BigDecimal.toSafeDouble(): Double {
-    return runCatching { toDouble() }.getOrDefault(0.0)
 }

@@ -3,6 +3,7 @@ package com.tbterminal.app.data.local.entity
 import androidx.room.Entity
 import androidx.room.Index
 import androidx.room.PrimaryKey
+import com.tbterminal.app.data.local.model.ScaledDecimal2
 import com.tbterminal.app.data.local.model.SyncStatus
 
 @Entity(
@@ -25,7 +26,7 @@ data class LocalPaymentEntity(
     val transactionLocalId: Long,
     val transactionServerId: String? = null,
     val method: String,
-    val amount: Double = 0.0,
+    val amount: ScaledDecimal2 = ScaledDecimal2.ZERO,
     val reference: String? = null,
     val paidAt: Long = System.currentTimeMillis(),
     val syncStatus: SyncStatus = SyncStatus.PENDING,

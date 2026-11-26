@@ -56,6 +56,7 @@ import com.tbterminal.app.data.local.dao.OfflineCashReportRow
 import com.tbterminal.app.data.local.dao.OfflineExpenseReportRow
 import com.tbterminal.app.data.local.dao.OfflineReceivableReportRow
 import com.tbterminal.app.data.local.dao.OfflineSalesReportRow
+import com.tbterminal.app.data.local.model.ScaledDecimal2
 import com.tbterminal.app.data.local.model.SyncStatus
 import com.tbterminal.app.ui.components.RefreshableContent
 import com.tbterminal.app.ui.components.SkeletonBox
@@ -878,7 +879,7 @@ private fun <T> List<T>.page(page: Int): List<T> {
 
 private const val OFFLINE_REPORT_PAGE_SIZE = 10
 
-private fun Double.formatCurrency(): String = NumberFormat.getCurrencyInstance(Locale.forLanguageTag("id-ID")).format(this)
+private fun ScaledDecimal2.formatCurrency(): String = NumberFormat.getCurrencyInstance(Locale.forLanguageTag("id-ID")).format(toBigDecimal())
 
 private fun Long.formatDateTime(): String = Instant.ofEpochMilli(this)
     .atZone(ZoneId.systemDefault())

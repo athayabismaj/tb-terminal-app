@@ -9,15 +9,16 @@ import com.tbterminal.app.data.local.entity.LocalTransactionEntity
 import com.tbterminal.app.data.local.entity.LocalTransactionItemEntity
 import com.tbterminal.app.data.local.entity.SyncQueueEntity
 import com.tbterminal.app.data.local.id.LocalIdGenerator
+import com.tbterminal.app.data.local.model.ScaledDecimal2
 import com.tbterminal.app.data.local.model.SyncEntityType
 import com.tbterminal.app.data.local.model.SyncOperation
 import com.tbterminal.app.data.local.model.SyncStatus
 import com.tbterminal.app.data.remote.BigDecimalStringSerializer
 import java.math.BigDecimal
+import java.math.RoundingMode
 import java.time.Instant
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
-import kotlin.math.max
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
@@ -37,7 +38,11 @@ class LocalCheckoutService(
         return runCatching {
             database.withTransaction {
                 val now = System.currentTimeMillis()
-                val remainingAmount = max(0.0, command.remainingAmount ?: (command.total - command.paidAmount))
+                val remainingAmount = (command.remainingAmount ?: command.total.subtract(command.paidAmount))
+                    .coerceAtLeast(BigDecimal.ZERO)
+                val remainingScaled = ScaledDecimal2.ofExact(remainingAmount)
+                val totalScaled = ScaledDecimal2.ofExact(command.total)
+                val paidScaled = ScaledDecimal2.ofExact(command.paidAmount)
                 val transactionClientId = LocalIdGenerator.clientGeneratedId("TRX")
                 val transactionCode = localTransactionCode(command.occurredAt)
 
@@ -51,19 +56,19 @@ class LocalCheckoutService(
                         cashSessionLocalId = command.cashSessionLocalId,
                         cashSessionServerId = command.cashSessionServerId,
                         cashierUserId = command.cashierUserId,
-                        status = transactionStatus(remainingAmount),
-                        subtotal = command.subtotal,
-                        discount = command.discount,
+                        status = transactionStatus(remainingScaled),
+                        subtotal = ScaledDecimal2.ofExact(command.subtotal),
+                        discount = ScaledDecimal2.ofExact(command.discount),
                         taxEnabled = command.taxEnabled,
                         taxMode = command.taxMode,
-                        taxRate = command.taxRate,
+                        taxRate = ScaledDecimal2.ofExact(command.taxRate),
                         taxLabel = command.taxLabel,
-                        taxableBase = command.taxableBase,
-                        taxAmount = command.taxAmount,
-                        roundingAmount = command.roundingAmount,
-                        total = command.total,
-                        paidAmount = command.paidAmount,
-                        remainingAmount = remainingAmount,
+                        taxableBase = ScaledDecimal2.ofExact(command.taxableBase),
+                        taxAmount = ScaledDecimal2.ofExact(command.taxAmount),
+                        roundingAmount = ScaledDecimal2.ofExact(command.roundingAmount),
+                        total = totalScaled,
+                        paidAmount = paidScaled,
+                        remainingAmount = remainingScaled,
                         syncStatus = SyncStatus.PENDING,
                         createdAt = now,
                         updatedAt = now,
@@ -76,14 +81,14 @@ class LocalCheckoutService(
                     item.productLocalId?.let { productLocalId ->
                         database.productDao().decrementStock(
                             localId = productLocalId,
-                            quantity = item.resolvedBaseQuantity.toDouble(),
+                            quantity = ScaledDecimal2.ofExact(item.resolvedBaseQuantity),
                             status = SyncStatus.PENDING,
                             updatedAt = now
                         )
                     }
                 }
 
-                val paymentLines = command.payments?.filter { it.amount > 0.0 }.orEmpty()
+                val paymentLines = command.payments?.filter { it.amount > BigDecimal.ZERO }.orEmpty()
                 val paymentLocalId = if (paymentLines.isNotEmpty()) {
                     var firstId: Long? = null
                     paymentLines.forEach { line ->
@@ -93,7 +98,7 @@ class LocalCheckoutService(
                                 deviceId = deviceId,
                                 transactionLocalId = transactionLocalId,
                                 method = line.method,
-                                amount = line.amount,
+                                amount = ScaledDecimal2.ofExact(line.amount),
                                 reference = line.reference,
                                 paidAt = command.occurredAt,
                                 syncStatus = SyncStatus.PENDING,
@@ -104,14 +109,14 @@ class LocalCheckoutService(
                         if (firstId == null) firstId = id
                     }
                     firstId
-                } else if (command.paidAmount > 0.0) {
+                } else if (command.paidAmount > BigDecimal.ZERO) {
                     database.paymentDao().upsert(command.toPaymentEntity(transactionLocalId, now))
                 } else {
                     null
                 }
 
-                val receivableLocalId = if (shouldCreateReceivable(command.paymentMethod, remainingAmount)) {
-                    database.receivableDao().upsert(command.toReceivableEntity(transactionLocalId, remainingAmount, now))
+                val receivableLocalId = if (shouldCreateReceivable(command.paymentMethod, remainingScaled)) {
+                    database.receivableDao().upsert(command.toReceivableEntity(transactionLocalId, remainingScaled, now))
                 } else {
                     null
                 }
@@ -144,7 +149,7 @@ class LocalCheckoutService(
                         description = "Checkout lokal dibuat",
                         metadataJson = buildJsonObject {
                             put("transactionCode", transactionCode)
-                            put("total", command.total)
+                            put("total", command.total.setScale(2, RoundingMode.HALF_UP).toPlainString())
                         }.toString(),
                         occurredAt = command.occurredAt,
                         syncStatus = SyncStatus.PENDING,
@@ -170,15 +175,33 @@ class LocalCheckoutService(
     private fun validate(command: LocalCheckoutCommand): String? {
         if (command.cashierUserId.isBlank()) return "Kasir wajib diisi"
         if (command.paymentMethod.isBlank()) return "Metode pembayaran wajib diisi"
-        if (command.total < 0.0) return "Total transaksi tidak boleh negatif"
-        if (command.subtotal < 0.0) return "Subtotal transaksi tidak boleh negatif"
-        if (command.discount < 0.0) return "Diskon tidak boleh negatif"
-        if (command.paidAmount < 0.0) return "Nominal bayar tidak boleh negatif"
+        if (command.total < BigDecimal.ZERO) return "Total transaksi tidak boleh negatif"
+        if (command.subtotal < BigDecimal.ZERO) return "Subtotal transaksi tidak boleh negatif"
+        if (command.discount < BigDecimal.ZERO) return "Diskon tidak boleh negatif"
+        if (command.paidAmount < BigDecimal.ZERO) return "Nominal bayar tidak boleh negatif"
+        if (exceedsMaxBaseQuantityScale(command.subtotal) ||
+            exceedsMaxBaseQuantityScale(command.discount) ||
+            exceedsMaxBaseQuantityScale(command.taxRate) ||
+            exceedsMaxBaseQuantityScale(command.taxableBase) ||
+            exceedsMaxBaseQuantityScale(command.taxAmount) ||
+            exceedsMaxBaseQuantityScale(command.roundingAmount) ||
+            exceedsMaxBaseQuantityScale(command.total) ||
+            exceedsMaxBaseQuantityScale(command.paidAmount) ||
+            command.remainingAmount?.let(::exceedsMaxBaseQuantityScale) == true
+        ) {
+            return "Nominal transaksi lokal melebihi 2 angka desimal"
+        }
+        if (command.payments?.any { it.amount < BigDecimal.ZERO || exceedsMaxBaseQuantityScale(it.amount) } == true) {
+            return "Nominal baris pembayaran tidak valid"
+        }
         if (command.items.isEmpty()) return "Item transaksi wajib diisi"
 
         command.items.forEach { item ->
             if (item.productNameSnapshot.isBlank()) return "Nama produk wajib diisi"
-            if (item.quantity <= 0.0) return "Qty item harus lebih dari 0"
+            if (item.quantity <= BigDecimal.ZERO) return "Qty item harus lebih dari 0"
+            if (exceedsMaxBaseQuantityScale(item.quantity)) {
+                return "Qty item ${item.productNameSnapshot} melebihi 2 angka desimal"
+            }
             if (item.resolvedBaseQuantity <= BigDecimal.ZERO) return "Qty satuan dasar harus lebih dari 0"
             if (item.resolvedConversionFactor <= BigDecimal.ZERO) return "Faktor konversi satuan harus lebih dari 0"
             if (item.resolvedConversionFactor.compareTo(BigDecimal.ONE) != 0 &&
@@ -186,10 +209,20 @@ class LocalCheckoutService(
             ) {
                 return "Jumlah satuan dasar ${item.productNameSnapshot} melebihi 2 angka desimal"
             }
-            if (item.priceAtTransaction < 0.0) return "Harga item tidak boleh negatif"
-            if (item.cogsAtTransaction < 0.0) return "HPP item tidak boleh negatif"
-            if (item.discount < 0.0) return "Diskon item tidak boleh negatif"
-            if (item.subtotal < 0.0) return "Subtotal item tidak boleh negatif"
+            if (exceedsMaxBaseQuantityScale(item.resolvedBaseQuantity)) {
+                return "Jumlah satuan dasar ${item.productNameSnapshot} melebihi 2 angka desimal"
+            }
+            if (item.priceAtTransaction < BigDecimal.ZERO) return "Harga item tidak boleh negatif"
+            if (item.cogsAtTransaction < BigDecimal.ZERO) return "HPP item tidak boleh negatif"
+            if (item.discount < BigDecimal.ZERO) return "Diskon item tidak boleh negatif"
+            if (item.subtotal < BigDecimal.ZERO) return "Subtotal item tidak boleh negatif"
+            if (exceedsMaxBaseQuantityScale(item.priceAtTransaction) ||
+                exceedsMaxBaseQuantityScale(item.cogsAtTransaction) ||
+                exceedsMaxBaseQuantityScale(item.discount) ||
+                exceedsMaxBaseQuantityScale(item.subtotal)
+            ) {
+                return "Nominal item ${item.productNameSnapshot} melebihi 2 angka desimal"
+            }
         }
 
         return null
@@ -207,13 +240,13 @@ class LocalCheckoutService(
             skuSnapshot = skuSnapshot,
             unitNameSnapshot = unitNameSnapshot,
             unitServerId = unitServerId?.trim()?.takeIf(String::isNotBlank),
-            quantity = quantity,
+            quantity = ScaledDecimal2.ofExact(quantity),
             baseQuantity = resolvedBaseQuantity,
             conversionFactor = resolvedConversionFactor,
-            priceAtTransaction = priceAtTransaction,
-            cogsAtTransaction = cogsAtTransaction,
-            discount = discount,
-            subtotal = subtotal,
+            priceAtTransaction = ScaledDecimal2.ofExact(priceAtTransaction),
+            cogsAtTransaction = ScaledDecimal2.ofExact(cogsAtTransaction),
+            discount = ScaledDecimal2.ofExact(discount),
+            subtotal = ScaledDecimal2.ofExact(subtotal),
             note = note,
             syncStatus = SyncStatus.PENDING,
             createdAt = now,
@@ -230,7 +263,7 @@ class LocalCheckoutService(
             deviceId = deviceId,
             transactionLocalId = transactionLocalId,
             method = paymentMethod,
-            amount = paidAmount,
+            amount = ScaledDecimal2.ofExact(paidAmount),
             paidAt = occurredAt,
             syncStatus = SyncStatus.PENDING,
             createdAt = now,
@@ -240,7 +273,7 @@ class LocalCheckoutService(
 
     private fun LocalCheckoutCommand.toReceivableEntity(
         transactionLocalId: Long,
-        remainingAmount: Double,
+        remainingAmount: ScaledDecimal2,
         now: Long
     ): LocalReceivableEntity {
         return LocalReceivableEntity(
@@ -249,10 +282,10 @@ class LocalCheckoutService(
             transactionLocalId = transactionLocalId,
             customerLocalId = customerLocalId,
             customerServerId = customerServerId,
-            totalAmount = total,
-            paidAmount = paidAmount,
+            totalAmount = ScaledDecimal2.ofExact(total),
+            paidAmount = ScaledDecimal2.ofExact(paidAmount),
             remainingAmount = remainingAmount,
-            status = if (remainingAmount <= 0.0) "PAID" else "UNPAID",
+            status = if (!remainingAmount.isPositive) "PAID" else "UNPAID",
             syncStatus = SyncStatus.PENDING,
             createdAt = now,
             updatedAt = now,
@@ -264,7 +297,7 @@ class LocalCheckoutService(
         transactionLocalId: Long,
         transactionClientGeneratedId: String,
         transactionCode: String,
-        remainingAmount: Double
+        remainingAmount: BigDecimal
     ): String {
         val payload = LocalCheckoutSyncPayload(
             transactionLocalId = transactionLocalId,
@@ -277,11 +310,11 @@ class LocalCheckoutService(
             customerServerId = customerServerId,
             customerName = customerName,
             paymentMethod = paymentMethod,
-            subtotal = subtotal,
-            discount = discount,
-            total = total,
-            paidAmount = paidAmount,
-            remainingAmount = remainingAmount,
+            subtotal = subtotal.setScale(2, RoundingMode.HALF_UP),
+            discount = discount.setScale(2, RoundingMode.HALF_UP),
+            total = total.setScale(2, RoundingMode.HALF_UP),
+            paidAmount = paidAmount.setScale(2, RoundingMode.HALF_UP),
+            remainingAmount = remainingAmount.setScale(2, RoundingMode.HALF_UP),
             occurredAt = occurredAt,
             note = note,
             items = items.map { it.toPayloadItem() }
@@ -297,23 +330,23 @@ class LocalCheckoutService(
             skuSnapshot = skuSnapshot,
             unitNameSnapshot = unitNameSnapshot,
             unitServerId = unitServerId?.trim()?.takeIf(String::isNotBlank),
-            quantity = quantity,
+            quantity = quantity.setScale(2, RoundingMode.HALF_UP),
             baseQuantity = resolvedBaseQuantity,
             conversionFactor = resolvedConversionFactor,
-            priceAtTransaction = priceAtTransaction,
-            cogsAtTransaction = cogsAtTransaction,
-            discount = discount,
-            subtotal = subtotal
+            priceAtTransaction = priceAtTransaction.setScale(2, RoundingMode.HALF_UP),
+            cogsAtTransaction = cogsAtTransaction.setScale(2, RoundingMode.HALF_UP),
+            discount = discount.setScale(2, RoundingMode.HALF_UP),
+            subtotal = subtotal.setScale(2, RoundingMode.HALF_UP)
         )
     }
 
-    private fun shouldCreateReceivable(paymentMethod: String, remainingAmount: Double): Boolean {
+    private fun shouldCreateReceivable(paymentMethod: String, remainingAmount: ScaledDecimal2): Boolean {
         val normalizedMethod = paymentMethod.trim().uppercase()
-        return remainingAmount > 0.0 || normalizedMethod == "HUTANG" || normalizedMethod == "DP"
+        return remainingAmount.isPositive || normalizedMethod == "HUTANG" || normalizedMethod == "DP"
     }
 
-    private fun transactionStatus(remainingAmount: Double): String {
-        return if (remainingAmount > 0.0) "UNPAID" else "PAID"
+    private fun transactionStatus(remainingAmount: ScaledDecimal2): String {
+        return if (remainingAmount.isPositive) "UNPAID" else "PAID"
     }
 
     private fun localTransactionCode(occurredAt: Long): String {
@@ -350,11 +383,11 @@ internal data class LocalCheckoutSyncPayload(
     val customerServerId: String? = null,
     val customerName: String? = null,
     val paymentMethod: String,
-    val subtotal: Double,
-    val discount: Double,
-    val total: Double,
-    val paidAmount: Double,
-    val remainingAmount: Double,
+    @Serializable(with = BigDecimalStringSerializer::class) val subtotal: BigDecimal,
+    @Serializable(with = BigDecimalStringSerializer::class) val discount: BigDecimal,
+    @Serializable(with = BigDecimalStringSerializer::class) val total: BigDecimal,
+    @Serializable(with = BigDecimalStringSerializer::class) val paidAmount: BigDecimal,
+    @Serializable(with = BigDecimalStringSerializer::class) val remainingAmount: BigDecimal,
     val occurredAt: Long,
     val note: String? = null,
     val items: List<LocalCheckoutSyncItemPayload>
@@ -368,11 +401,11 @@ internal data class LocalCheckoutSyncItemPayload(
     val skuSnapshot: String? = null,
     val unitNameSnapshot: String? = null,
     val unitServerId: String? = null,
-    val quantity: Double,
+    @Serializable(with = BigDecimalStringSerializer::class) val quantity: BigDecimal,
     @Serializable(with = BigDecimalStringSerializer::class) val baseQuantity: BigDecimal,
     @Serializable(with = BigDecimalStringSerializer::class) val conversionFactor: BigDecimal,
-    val priceAtTransaction: Double,
-    val cogsAtTransaction: Double,
-    val discount: Double,
-    val subtotal: Double
+    @Serializable(with = BigDecimalStringSerializer::class) val priceAtTransaction: BigDecimal,
+    @Serializable(with = BigDecimalStringSerializer::class) val cogsAtTransaction: BigDecimal,
+    @Serializable(with = BigDecimalStringSerializer::class) val discount: BigDecimal,
+    @Serializable(with = BigDecimalStringSerializer::class) val subtotal: BigDecimal
 )

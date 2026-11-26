@@ -3,6 +3,7 @@ package com.tbterminal.app.data.local.entity
 import androidx.room.Entity
 import androidx.room.Index
 import androidx.room.PrimaryKey
+import com.tbterminal.app.data.local.model.ScaledDecimal2
 import com.tbterminal.app.data.local.model.SyncStatus
 import java.math.BigDecimal
 
@@ -25,13 +26,13 @@ data class LocalTransactionItemEntity(
     val skuSnapshot: String? = null,
     val unitNameSnapshot: String? = null,
     val unitServerId: String? = null,
-    val quantity: Double = 0.0,
+    val quantity: ScaledDecimal2 = ScaledDecimal2.ZERO,
     val baseQuantity: BigDecimal? = null,
     val conversionFactor: BigDecimal? = null,
-    val priceAtTransaction: Double = 0.0,
-    val cogsAtTransaction: Double = 0.0,
-    val discount: Double = 0.0,
-    val subtotal: Double = 0.0,
+    val priceAtTransaction: ScaledDecimal2 = ScaledDecimal2.ZERO,
+    val cogsAtTransaction: ScaledDecimal2 = ScaledDecimal2.ZERO,
+    val discount: ScaledDecimal2 = ScaledDecimal2.ZERO,
+    val subtotal: ScaledDecimal2 = ScaledDecimal2.ZERO,
     val note: String? = null,
     val syncStatus: SyncStatus = SyncStatus.PENDING,
     val createdAt: Long = System.currentTimeMillis(),

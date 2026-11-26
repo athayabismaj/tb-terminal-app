@@ -37,6 +37,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import java.math.BigDecimal
 import java.text.NumberFormat
 import java.time.Instant
 import java.time.ZoneId
@@ -309,7 +310,7 @@ private fun LocalCompactCard(
     }
 }
 
-private fun Double.asCurrency(): String {
+private fun BigDecimal.asCurrency(): String {
     return NumberFormat.getCurrencyInstance(Locale.forLanguageTag("id-ID")).format(this)
 }
 

@@ -414,11 +414,11 @@ class OfflineCheckoutSyncService(
             OfflineCheckoutSyncItemRequestDto(
                 productId = productServerId,
                 productNameSnapshot = item.productNameSnapshot,
-                quantity = item.quantity.toMoney(),
-                priceAtTransaction = item.priceAtTransaction.toMoney(),
-                cogsAtTransaction = item.cogsAtTransaction.toMoney(),
-                discount = item.discount.toMoney(),
-                subtotal = item.subtotal.toMoney(),
+                quantity = item.quantity.toBigDecimal(),
+                priceAtTransaction = item.priceAtTransaction.toBigDecimal(),
+                cogsAtTransaction = item.cogsAtTransaction.toBigDecimal(),
+                discount = item.discount.toBigDecimal(),
+                subtotal = item.subtotal.toBigDecimal(),
                 note = item.note,
                 unitId = if (sendUnitPair) resolvedUnitId else null,
                 baseQuantity = if (sendUnitPair) resolvedBaseQuantity else null
@@ -430,7 +430,7 @@ class OfflineCheckoutSyncService(
             localPayments.map { payment ->
                 CheckoutPaymentLineRequestDto(
                     method = payment.method.trim().lowercase(),
-                    amount = payment.amount.toMoney().toPlainString(),
+                    amount = payment.amount.toBigDecimal().toPlainString(),
                     reference = payment.reference
                 )
             }
@@ -438,7 +438,7 @@ class OfflineCheckoutSyncService(
             null
         }
         val syncMethod = if (useSplitLines) {
-            if (transaction.remainingAmount > 0.0) "dp" else ""
+            if (transaction.remainingAmount.isPositive) "dp" else ""
         } else {
             paymentMethodForSync(transaction)
         }
@@ -452,22 +452,22 @@ class OfflineCheckoutSyncService(
                 cashSessionId = cashSessionId,
                 customerId = transaction.customerServerId,
                 paymentMethod = syncMethod,
-                subtotal = transaction.subtotal.toMoney(),
-                discount = transaction.discount.toMoney(),
-                total = transaction.total.toMoney(),
-                paidAmount = transaction.paidAmount.toMoney(),
-                remainingAmount = transaction.remainingAmount.toMoney(),
+                subtotal = transaction.subtotal.toBigDecimal(),
+                discount = transaction.discount.toBigDecimal(),
+                total = transaction.total.toBigDecimal(),
+                paidAmount = transaction.paidAmount.toBigDecimal(),
+                remainingAmount = transaction.remainingAmount.toBigDecimal(),
                 occurredAt = transaction.occurredAt.toOffsetDateTimeString(),
                 note = null,
                 items = items,
                 payments = syncPayments,
                 taxEnabled = transaction.taxEnabled,
                 taxMode = transaction.taxMode,
-                taxRate = transaction.taxRate.toMoney(),
+                taxRate = transaction.taxRate.toBigDecimal(),
                 taxLabel = transaction.taxLabel,
-                taxableBase = transaction.taxableBase.toMoney(),
-                taxAmount = transaction.taxAmount.toMoney(),
-                roundingAmount = transaction.roundingAmount.toMoney()
+                taxableBase = transaction.taxableBase.toBigDecimal(),
+                taxAmount = transaction.taxAmount.toBigDecimal(),
+                roundingAmount = transaction.roundingAmount.toBigDecimal()
             )
         )
     }
@@ -582,16 +582,14 @@ class OfflineCheckoutSyncService(
     }
 
     private fun requiresCustomer(transaction: LocalTransactionEntity): Boolean {
-        return transaction.remainingAmount > 0.0 || transaction.status.equals("UNPAID", ignoreCase = true)
+        return transaction.remainingAmount.isPositive || transaction.status.equals("UNPAID", ignoreCase = true)
     }
 
     private suspend fun paymentMethodForSync(transaction: LocalTransactionEntity): String {
         val payment = database.paymentDao().getByTransaction(transaction.localId).firstOrNull()
         return payment?.method?.trim()?.lowercase()?.takeIf { it.isNotBlank() }
-            ?: if (transaction.remainingAmount > 0.0) "hutang" else "tunai"
+            ?: if (transaction.remainingAmount.isPositive) "hutang" else "tunai"
     }
-
-    private fun Double.toMoney(): BigDecimal = BigDecimal.valueOf(this).setScale(2, RoundingMode.HALF_UP)
 
     private fun Long.toOffsetDateTimeString(): String =
         Instant.ofEpochMilli(this)

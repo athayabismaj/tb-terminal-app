@@ -13,6 +13,7 @@ import com.tbterminal.app.data.local.cashsession.LocalCashSessionResult
 import com.tbterminal.app.data.local.cashsession.LocalCashSessionService
 import com.tbterminal.app.data.local.database.TbTerminalDatabase
 import com.tbterminal.app.data.local.entity.LocalCashSessionEntity
+import com.tbterminal.app.data.local.model.ScaledDecimal2
 import com.tbterminal.app.data.local.model.SyncEntityType
 import com.tbterminal.app.data.local.model.SyncOperation
 import com.tbterminal.app.data.local.model.SyncStatus
@@ -66,7 +67,7 @@ class LocalCashSyncPayloadSerializationTest {
                 cashierUserId = "kasir-1",
                 status = "OPEN",
                 openedAt = 1_700_000_000_000L,
-                startingCash = 200_000.0,
+                startingCash = ScaledDecimal2.ofWhole(200_000L),
                 syncStatus = SyncStatus.SYNCED,
             )
         )
@@ -105,7 +106,7 @@ class LocalCashSyncPayloadSerializationTest {
         assertEquals("srv-sess-\"1\"\\a", decoded.serverCashSessionId)
         assertEquals("CASH_OUT: $specialCategory", decoded.category)
         assertEquals(specialDescription, decoded.note)
-        assertEquals(45000.50, decoded.amount, 0.001)
+        assertEquals(0, BigDecimal("45000.50").compareTo(decoded.amount))
     }
 
     @Test
@@ -128,7 +129,7 @@ class LocalCashSyncPayloadSerializationTest {
         assertEquals("EXPENSE-LEGACY-1", decoded.clientGeneratedId)
         assertEquals("CASH_OUT: OPERASIONAL", decoded.category)
         assertEquals("Beli \"Paku\"\\box", decoded.note)
-        assertEquals(125000.0, decoded.amount, 0.001)
+        assertEquals(0, BigDecimal("125000.0").compareTo(decoded.amount))
         assertEquals(1700000001000L, decoded.occurredAt)
     }
 
@@ -157,7 +158,7 @@ class LocalCashSyncPayloadSerializationTest {
         assertEquals(opened.clientGeneratedId, decodedOpen.clientGeneratedId)
         assertEquals("device-\"pos\"\\1", decodedOpen.deviceId)
         assertEquals("kasir-\"1\"\\a", decodedOpen.cashierUserId)
-        assertEquals(150000.0, decodedOpen.startingCash, 0.001)
+        assertEquals(0, BigDecimal("150000.00").compareTo(decodedOpen.startingCash))
         assertEquals(specialOpeningNote, decodedOpen.openingNote)
 
         val specialClosingNote = "Tutup \"Shift\"\\Selisih 0\nSetor\tBrankas\r\nOK\u0007"
@@ -180,9 +181,9 @@ class LocalCashSyncPayloadSerializationTest {
         val decodedClose = LocalCashSessionService.SYNC_PAYLOAD_JSON
             .decodeFromString<LocalCashSessionCloseSyncPayload>(closeQueue.payloadJson)
         assertEquals(opened.clientGeneratedId, decodedClose.clientGeneratedId)
-        assertEquals(150000.0, decodedClose.actualCash, 0.001)
-        assertEquals(150000.0, decodedClose.expectedCash, 0.001)
-        assertEquals(0.0, decodedClose.difference, 0.001)
+        assertEquals(0, BigDecimal("150000.00").compareTo(decodedClose.actualCash))
+        assertEquals(0, BigDecimal("150000.00").compareTo(decodedClose.expectedCash))
+        assertEquals(0, BigDecimal.ZERO.compareTo(decodedClose.difference))
         assertEquals(specialClosingNote, decodedClose.closingNote)
     }
 
@@ -231,7 +232,7 @@ class LocalCashSyncPayloadSerializationTest {
         val decodedLegacyOpen = LocalCashSessionService.SYNC_PAYLOAD_JSON
             .decodeFromString<LocalCashSessionOpenSyncPayload>(legacyOpenWithoutNote)
         assertNull(decodedLegacyOpen.openingNote)
-        assertEquals(50000.0, decodedLegacyOpen.startingCash, 0.001)
+        assertEquals(0, BigDecimal("50000.0").compareTo(decodedLegacyOpen.startingCash))
 
         val legacyCloseWithNullNote = """
             {"clientGeneratedId":"S-1","deviceId":"d-1","cashierUserId":"kasir-2","serverId":"srv-s-1","closedAt":1700003600000,"actualCash":50000.0,"expectedCash":50000.0,"difference":0.0,"closingNote":null}

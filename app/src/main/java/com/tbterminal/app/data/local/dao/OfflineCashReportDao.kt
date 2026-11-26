@@ -2,6 +2,7 @@ package com.tbterminal.app.data.local.dao
 
 import androidx.room.Dao
 import androidx.room.Query
+import com.tbterminal.app.data.local.model.ScaledDecimal2
 import com.tbterminal.app.data.local.model.SyncStatus
 import kotlinx.coroutines.flow.Flow
 
@@ -17,7 +18,7 @@ interface OfflineCashReportDao {
             s.closedAt AS closedAt,
             s.startingCash AS startingCash,
             (
-                SELECT COALESCE(SUM(p.amount), 0.0)
+                SELECT COALESCE(SUM(p.amount), 0)
                 FROM local_payments p
                 INNER JOIN local_transactions t ON t.localId = p.transactionLocalId
                 WHERE t.cashSessionLocalId = s.localId
@@ -26,7 +27,7 @@ interface OfflineCashReportDao {
                     AND UPPER(p.method) IN ('TUNAI', 'CASH')
             ) AS totalCashSales,
             (
-                SELECT COALESCE(SUM(e.amount), 0.0)
+                SELECT COALESCE(SUM(e.amount), 0)
                 FROM local_cash_expenses e
                 WHERE e.cashSessionLocalId = s.localId
                     AND e.deletedAt IS NULL
@@ -35,7 +36,7 @@ interface OfflineCashReportDao {
                 s.actualCash,
                 s.startingCash
                     + (
-                        SELECT COALESCE(SUM(p.amount), 0.0)
+                        SELECT COALESCE(SUM(p.amount), 0)
                         FROM local_payments p
                         INNER JOIN local_transactions t ON t.localId = p.transactionLocalId
                         WHERE t.cashSessionLocalId = s.localId
@@ -44,7 +45,7 @@ interface OfflineCashReportDao {
                             AND UPPER(p.method) IN ('TUNAI', 'CASH')
                     )
                     - (
-                        SELECT COALESCE(SUM(e.amount), 0.0)
+                        SELECT COALESCE(SUM(e.amount), 0)
                         FROM local_cash_expenses e
                         WHERE e.cashSessionLocalId = s.localId
                             AND e.deletedAt IS NULL
@@ -72,9 +73,9 @@ data class OfflineCashReportRow(
     val status: String,
     val openedAt: Long,
     val closedAt: Long?,
-    val startingCash: Double,
-    val totalCashSales: Double,
-    val totalExpense: Double,
-    val endingCash: Double,
+    val startingCash: ScaledDecimal2,
+    val totalCashSales: ScaledDecimal2,
+    val totalExpense: ScaledDecimal2,
+    val endingCash: ScaledDecimal2,
     val syncStatus: SyncStatus
 )

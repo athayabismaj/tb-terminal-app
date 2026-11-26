@@ -2,12 +2,19 @@ package com.tbterminal.app.data.local.database
 
 import androidx.room.TypeConverter
 import com.tbterminal.app.data.local.model.AppDataMode
+import com.tbterminal.app.data.local.model.ScaledDecimal2
 import com.tbterminal.app.data.local.model.SyncEntityType
 import com.tbterminal.app.data.local.model.SyncOperation
 import com.tbterminal.app.data.local.model.SyncStatus
 import java.math.BigDecimal
 
 class LocalConverters {
+    @TypeConverter
+    fun fromScaledDecimal2(value: ScaledDecimal2?): Long? = value?.minorUnits
+
+    @TypeConverter
+    fun toScaledDecimal2(value: Long?): ScaledDecimal2? = value?.let(ScaledDecimal2::ofMinorUnits)
+
     @TypeConverter
     fun fromBigDecimal(value: BigDecimal?): String? {
         if (value == null) return null

@@ -1217,12 +1217,12 @@ private fun LocalProductEntity.toCachedProductStock(
         productName = name,
         categoryName = "",
         unitName = resolvedUnitName,
-        quantity = stock.toBigDecimalSafe(),
-        minStock = minimumStock.toBigDecimalSafe(),
-        priceBuy = priceBuy.toBigDecimalSafe(),
-        priceRetail = priceRetail.toBigDecimalSafe(),
-        priceContractor = priceContractor.toBigDecimalSafe(),
-        discount = discount.toBigDecimalSafe(),
+        quantity = stock.toBigDecimal(),
+        minStock = minimumStock.toBigDecimal(),
+        priceBuy = priceBuy.toBigDecimal(),
+        priceRetail = priceRetail.toBigDecimal(),
+        priceContractor = priceContractor.toBigDecimal(),
+        discount = discount.toBigDecimal(),
         isActive = isActive,
         secondaryUnitId = resolvedSecondaryUnitId,
         secondaryUnitName = resolvedSecondaryUnitName,
@@ -1230,8 +1230,4 @@ private fun LocalProductEntity.toCachedProductStock(
         photoUrl = photoFilename,
         baseUnitId = resolvedBaseUnitId
     )
-}
-
-private fun Double.toBigDecimalSafe(): BigDecimal {
-    return runCatching { BigDecimal.valueOf(this) }.getOrDefault(BigDecimal.ZERO)
 }

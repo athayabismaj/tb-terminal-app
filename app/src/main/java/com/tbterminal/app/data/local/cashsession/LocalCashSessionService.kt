@@ -1,13 +1,16 @@
 package com.tbterminal.app.data.local.cashsession
 
 import androidx.room.withTransaction
+import com.tbterminal.app.data.local.checkout.exceedsMaxBaseQuantityScale
 import com.tbterminal.app.data.local.database.TbTerminalDatabase
 import com.tbterminal.app.data.local.entity.LocalCashSessionEntity
 import com.tbterminal.app.data.local.entity.SyncQueueEntity
 import com.tbterminal.app.data.local.id.LocalIdGenerator
+import com.tbterminal.app.data.local.model.ScaledDecimal2
 import com.tbterminal.app.data.local.model.SyncEntityType
 import com.tbterminal.app.data.local.model.SyncOperation
 import com.tbterminal.app.data.local.model.SyncStatus
+import com.tbterminal.app.data.remote.BigDecimalStringSerializer
 import com.tbterminal.app.navigation.AppAccessPolicy
 import java.math.BigDecimal
 import kotlinx.serialization.Serializable
@@ -36,6 +39,7 @@ class LocalCashSessionService(
         return runCatching {
             database.withTransaction {
                 val now = System.currentTimeMillis()
+                val startingScaled = ScaledDecimal2.ofExact(startingCash)
                 val localId = database.cashSessionDao().upsert(
                     LocalCashSessionEntity(
                         serverId = null,
@@ -45,8 +49,8 @@ class LocalCashSessionService(
                         status = CASH_SESSION_OPEN,
                         openedAt = now,
                         closedAt = null,
-                        startingCash = startingCash.toSafeDouble(),
-                        expectedCash = startingCash.toSafeDouble(),
+                        startingCash = startingScaled,
+                        expectedCash = startingScaled,
                         actualCash = null,
                         difference = null,
                         openingNote = openingNote?.trim()?.takeIf(String::isNotBlank),
@@ -87,6 +91,9 @@ class LocalCashSessionService(
         if (closingCash < BigDecimal.ZERO) {
             return LocalCashSessionResult.Failed("Kas fisik akhir tidak boleh kurang dari nol.")
         }
+        if (exceedsMaxBaseQuantityScale(closingCash)) {
+            return LocalCashSessionResult.Failed("Kas fisik akhir maksimal 2 angka desimal.")
+        }
 
         return runCatching {
             database.withTransaction {
@@ -101,7 +108,7 @@ class LocalCashSessionService(
                 val cashIn = database.cashExpenseDao().sumCashInByCashSession(localId)
                 val cashOut = database.cashExpenseDao().sumCashOutByCashSession(localId)
                 val expectedCash = session.startingCash + cashSales + cashIn - cashOut
-                val actualCash = closingCash.toSafeDouble()
+                val actualCash = ScaledDecimal2.ofExact(closingCash)
                 database.cashSessionDao().closeSession(
                     localId = localId,
                     status = CASH_SESSION_CLOSED,
@@ -164,11 +171,8 @@ class LocalCashSessionService(
     private fun validateOpenInput(cashierUserId: String, startingCash: BigDecimal): String? {
         if (cashierUserId.isBlank()) return "Kasir sesi lokal belum valid."
         if (startingCash < BigDecimal.ZERO) return "Modal awal tidak boleh kurang dari nol."
+        if (exceedsMaxBaseQuantityScale(startingCash)) return "Modal awal maksimal 2 angka desimal."
         return null
-    }
-
-    private fun BigDecimal.toSafeDouble(): Double {
-        return runCatching { toDouble() }.getOrDefault(0.0)
     }
 
     internal fun LocalCashSessionEntity.toOpenSyncPayloadJson(): String {
@@ -177,7 +181,7 @@ class LocalCashSessionService(
             deviceId = deviceId.orEmpty(),
             cashierUserId = cashierUserId,
             openedAt = openedAt,
-            startingCash = startingCash,
+            startingCash = startingCash.toBigDecimal(),
             openingNote = openingNote,
         )
         return SYNC_PAYLOAD_JSON.encodeToString(payload)
@@ -190,9 +194,9 @@ class LocalCashSessionService(
             cashierUserId = cashierUserId,
             serverId = serverId.orEmpty(),
             closedAt = closedAt ?: 0L,
-            actualCash = actualCash ?: 0.0,
-            expectedCash = expectedCash ?: 0.0,
-            difference = difference ?: 0.0,
+            actualCash = (actualCash ?: ScaledDecimal2.ZERO).toBigDecimal(),
+            expectedCash = (expectedCash ?: ScaledDecimal2.ZERO).toBigDecimal(),
+            difference = (difference ?: ScaledDecimal2.ZERO).toBigDecimal(),
             closingNote = closingNote,
         )
         return SYNC_PAYLOAD_JSON.encodeToString(payload)
@@ -220,7 +224,7 @@ internal data class LocalCashSessionOpenSyncPayload(
     val deviceId: String,
     val cashierUserId: String,
     val openedAt: Long,
-    val startingCash: Double,
+    @Serializable(with = BigDecimalStringSerializer::class) val startingCash: BigDecimal,
     val openingNote: String? = null,
 )
 
@@ -231,8 +235,8 @@ internal data class LocalCashSessionCloseSyncPayload(
     val cashierUserId: String,
     val serverId: String,
     val closedAt: Long,
-    val actualCash: Double,
-    val expectedCash: Double,
-    val difference: Double,
+    @Serializable(with = BigDecimalStringSerializer::class) val actualCash: BigDecimal,
+    @Serializable(with = BigDecimalStringSerializer::class) val expectedCash: BigDecimal,
+    @Serializable(with = BigDecimalStringSerializer::class) val difference: BigDecimal,
     val closingNote: String? = null,
 )

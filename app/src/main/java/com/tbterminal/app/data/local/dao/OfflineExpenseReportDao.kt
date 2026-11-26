@@ -2,6 +2,7 @@ package com.tbterminal.app.data.local.dao
 
 import androidx.room.Dao
 import androidx.room.Query
+import com.tbterminal.app.data.local.model.ScaledDecimal2
 import com.tbterminal.app.data.local.model.SyncStatus
 import kotlinx.coroutines.flow.Flow
 
@@ -35,7 +36,7 @@ data class OfflineExpenseReportRow(
     val localId: Long,
     val occurredAt: Long,
     val category: String,
-    val amount: Double,
+    val amount: ScaledDecimal2,
     val description: String?,
     val syncStatus: SyncStatus
 )

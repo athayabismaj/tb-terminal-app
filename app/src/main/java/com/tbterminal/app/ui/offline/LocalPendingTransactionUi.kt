@@ -21,9 +21,9 @@ fun LocalTransactionEntity.toLocalPendingTransactionUi(): LocalPendingTransactio
         localId = localId,
         transactionCode = transactionCode,
         occurredAt = occurredAt,
-        total = BigDecimal.valueOf(total),
-        paidAmount = BigDecimal.valueOf(paidAmount),
-        remainingAmount = BigDecimal.valueOf(remainingAmount),
+        total = total.toBigDecimal(),
+        paidAmount = paidAmount.toBigDecimal(),
+        remainingAmount = remainingAmount.toBigDecimal(),
         syncStatus = syncStatus
     )
 
@@ -32,9 +32,9 @@ fun LocalPendingTransactionWithError.toLocalPendingTransactionUi(): LocalPending
         localId = localId,
         transactionCode = transactionCode,
         occurredAt = occurredAt,
-        total = BigDecimal.valueOf(total),
-        paidAmount = BigDecimal.valueOf(paidAmount),
-        remainingAmount = BigDecimal.valueOf(remainingAmount),
+        total = total.toBigDecimal(),
+        paidAmount = paidAmount.toBigDecimal(),
+        remainingAmount = remainingAmount.toBigDecimal(),
         syncStatus = syncStatus,
         lastError = lastError
     )

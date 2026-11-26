@@ -5,6 +5,7 @@ import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import com.tbterminal.app.data.repository.OfflineDashboardRepository
 import com.tbterminal.app.ui.common.viewModelFactory
+import java.math.BigDecimal
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -48,10 +49,10 @@ class OfflineDashboardViewModel(
 }
 
 data class OfflineDashboardUiState(
-    val localRevenueToday: Double = 0.0,
-    val localCollectedToday: Double = 0.0,
-    val localReceivableOutstanding: Double = 0.0,
-    val localExpenseToday: Double = 0.0,
+    val localRevenueToday: BigDecimal = BigDecimal.ZERO,
+    val localCollectedToday: BigDecimal = BigDecimal.ZERO,
+    val localReceivableOutstanding: BigDecimal = BigDecimal.ZERO,
+    val localExpenseToday: BigDecimal = BigDecimal.ZERO,
     val localTransactionCount: Int = 0,
     val pendingSyncCount: Int = 0,
     val failedSyncCount: Int = 0,

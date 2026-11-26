@@ -17,6 +17,7 @@ import com.tbterminal.app.data.local.entity.LocalPaymentEntity
 import com.tbterminal.app.data.local.entity.LocalTransactionEntity
 import com.tbterminal.app.data.local.entity.LocalTransactionItemEntity
 import com.tbterminal.app.data.local.entity.SyncQueueEntity
+import com.tbterminal.app.data.local.model.ScaledDecimal2
 import com.tbterminal.app.data.local.model.SyncEntityType
 import com.tbterminal.app.data.local.model.SyncOperation
 import com.tbterminal.app.data.local.model.SyncStatus
@@ -109,7 +110,7 @@ class LegacyRoomPayloadCompatibilitySyncTest {
                 cashierUserId = "kasir-1",
                 status = "OPEN",
                 openedAt = 1_700_000_000_000L,
-                startingCash = 100_000.0,
+                startingCash = ScaledDecimal2.ofWhole(100_000L),
                 syncStatus = SyncStatus.SYNCED,
             )
         )
@@ -124,10 +125,10 @@ class LegacyRoomPayloadCompatibilitySyncTest {
                 cashSessionServerId = "srv-sess-checkout-1",
                 cashierUserId = "kasir-1",
                 status = "PAID",
-                subtotal = 75_000.0,
-                total = 75_000.0,
-                paidAmount = 75_000.0,
-                remainingAmount = 0.0,
+                subtotal = ScaledDecimal2.ofWhole(75_000L),
+                total = ScaledDecimal2.ofWhole(75_000L),
+                paidAmount = ScaledDecimal2.ofWhole(75_000L),
+                remainingAmount = ScaledDecimal2.ZERO,
                 occurredAt = 1_700_000_100_000L,
                 syncStatus = SyncStatus.PENDING,
             )
@@ -140,12 +141,12 @@ class LegacyRoomPayloadCompatibilitySyncTest {
                 skuSnapshot = "SMN-1",
                 unitNameSnapshot = "Sak",
                 unitServerId = null,
-                quantity = 3.0,
+                quantity = ScaledDecimal2.ofWhole(3L),
                 baseQuantity = null,
                 conversionFactor = null,
-                priceAtTransaction = 25_000.0,
-                cogsAtTransaction = 21_000.0,
-                subtotal = 75_000.0,
+                priceAtTransaction = ScaledDecimal2.ofWhole(25_000L),
+                cogsAtTransaction = ScaledDecimal2.ofWhole(21_000L),
+                subtotal = ScaledDecimal2.ofWhole(75_000L),
             )
         )
         database.paymentDao().upsert(
@@ -153,7 +154,7 @@ class LegacyRoomPayloadCompatibilitySyncTest {
                 clientGeneratedId = "PAY-PREB1B-1",
                 transactionLocalId = preB1bTxId,
                 method = "tunai",
-                amount = 75_000.0,
+                amount = ScaledDecimal2.ofWhole(75_000L),
             )
         )
         val preB1bPayloadJson = """
@@ -233,10 +234,10 @@ class LegacyRoomPayloadCompatibilitySyncTest {
                 cashSessionServerId = "srv-sess-checkout-1",
                 cashierUserId = "kasir-1",
                 status = "PAID",
-                subtotal = 150_000.0,
-                total = 150_000.0,
-                paidAmount = 150_000.0,
-                remainingAmount = 0.0,
+                subtotal = ScaledDecimal2.ofWhole(150_000L),
+                total = ScaledDecimal2.ofWhole(150_000L),
+                paidAmount = ScaledDecimal2.ofWhole(150_000L),
+                remainingAmount = ScaledDecimal2.ZERO,
                 occurredAt = 1_700_000_200_000L,
                 syncStatus = SyncStatus.PENDING,
             )
@@ -249,12 +250,12 @@ class LegacyRoomPayloadCompatibilitySyncTest {
                 skuSnapshot = "CAT-1",
                 unitNameSnapshot = "Kaleng",
                 unitServerId = "unit-kaleng",
-                quantity = 3.0,
+                quantity = ScaledDecimal2.ofWhole(3L),
                 baseQuantity = BigDecimal("7.5"),
                 conversionFactor = BigDecimal("2.5"),
-                priceAtTransaction = 50_000.0,
-                cogsAtTransaction = 40_000.0,
-                subtotal = 150_000.0,
+                priceAtTransaction = ScaledDecimal2.ofWhole(50_000L),
+                cogsAtTransaction = ScaledDecimal2.ofWhole(40_000L),
+                subtotal = ScaledDecimal2.ofWhole(150_000L),
             )
         )
         database.paymentDao().upsert(
@@ -262,7 +263,7 @@ class LegacyRoomPayloadCompatibilitySyncTest {
                 clientGeneratedId = "PAY-B1B-1",
                 transactionLocalId = b1bTxId,
                 method = "tunai",
-                amount = 150_000.0,
+                amount = ScaledDecimal2.ofWhole(150_000L),
             )
         )
         val b1bPayloadJson = """
@@ -342,10 +343,10 @@ class LegacyRoomPayloadCompatibilitySyncTest {
                 status = "CLOSED",
                 openedAt = 1_700_000_000_000L,
                 closedAt = 1_700_003_600_000L,
-                startingCash = 100_000.0,
-                expectedCash = 150_000.0,
-                actualCash = 150_000.0,
-                difference = 0.0,
+                startingCash = ScaledDecimal2.ofWhole(100_000L),
+                expectedCash = ScaledDecimal2.ofWhole(150_000L),
+                actualCash = ScaledDecimal2.ofWhole(150_000L),
+                difference = ScaledDecimal2.ZERO,
                 openingNote = null,
                 closingNote = "Tutup \"Shift\"\\1",
                 syncStatus = SyncStatus.PENDING,
@@ -376,7 +377,7 @@ class LegacyRoomPayloadCompatibilitySyncTest {
         val decodedClose = LocalCashSessionService.SYNC_PAYLOAD_JSON
             .decodeFromString<LocalCashSessionCloseSyncPayload>(storedClose.payloadJson)
         assertEquals("SESSION-LEGACY-1", decodedOpen.clientGeneratedId)
-        assertEquals(100_000.0, decodedOpen.startingCash, 0.001)
+        assertEquals(0, BigDecimal("100000.0").compareTo(decodedOpen.startingCash))
         assertNull(decodedOpen.openingNote)
         assertEquals("Tutup \"Shift\"\\1", decodedClose.closingNote)
 
@@ -445,7 +446,7 @@ class LegacyRoomPayloadCompatibilitySyncTest {
                 cashierUserId = "kasir-1",
                 status = "OPEN",
                 openedAt = 1_700_000_000_000L,
-                startingCash = 100_000.0,
+                startingCash = ScaledDecimal2.ofWhole(100_000L),
                 syncStatus = SyncStatus.SYNCED,
             )
         )
@@ -457,7 +458,7 @@ class LegacyRoomPayloadCompatibilitySyncTest {
                 cashSessionServerId = "srv-sess-exp-1",
                 category = "CASH_OUT: OPERASIONAL",
                 description = "Beli \"Paku\"\\box",
-                amount = 45_000.0,
+                amount = ScaledDecimal2.ofWhole(45_000L),
                 occurredAt = 1_700_001_200_000L,
                 syncStatus = SyncStatus.PENDING,
             )
@@ -478,7 +479,7 @@ class LegacyRoomPayloadCompatibilitySyncTest {
         assertEquals("srv-sess-exp-1", decoded.serverCashSessionId)
         assertEquals("CASH_OUT: OPERASIONAL", decoded.category)
         assertEquals("Beli \"Paku\"\\box", decoded.note)
-        assertEquals(45_000.0, decoded.amount, 0.001)
+        assertEquals(0, BigDecimal("45000.0").compareTo(decoded.amount))
 
         server.enqueue(
             MockResponse().setResponseCode(200).setBody(
@@ -522,7 +523,7 @@ class LegacyRoomPayloadCompatibilitySyncTest {
                 cashierUserId = "kasir-1",
                 status = "OPEN",
                 openedAt = 1_700_000_000_000L,
-                startingCash = 100_000.0,
+                startingCash = ScaledDecimal2.ofWhole(100_000L),
                 openingNote = "Shift pagi\nLaci 1",
                 syncStatus = SyncStatus.PENDING,
             )
@@ -544,7 +545,7 @@ class LegacyRoomPayloadCompatibilitySyncTest {
                 cashSessionServerId = null,
                 category = "CASH_OUT: OPERASIONAL",
                 description = "Ongkir\nTrucking",
-                amount = 30_000.0,
+                amount = ScaledDecimal2.ofWhole(30_000L),
                 occurredAt = 1_700_000_500_000L,
                 syncStatus = SyncStatus.PENDING,
             )
@@ -567,10 +568,10 @@ class LegacyRoomPayloadCompatibilitySyncTest {
                 cashSessionServerId = null,
                 cashierUserId = "kasir-1",
                 status = "PAID",
-                subtotal = 50_000.0,
-                total = 50_000.0,
-                paidAmount = 50_000.0,
-                remainingAmount = 0.0,
+                subtotal = ScaledDecimal2.ofWhole(50_000L),
+                total = ScaledDecimal2.ofWhole(50_000L),
+                paidAmount = ScaledDecimal2.ofWhole(50_000L),
+                remainingAmount = ScaledDecimal2.ZERO,
                 occurredAt = 1_700_000_600_000L,
                 syncStatus = SyncStatus.PENDING,
             )
@@ -580,10 +581,10 @@ class LegacyRoomPayloadCompatibilitySyncTest {
                 transactionLocalId = txId,
                 productServerId = "prod-kawat",
                 productNameSnapshot = "Kawat\nSuper",
-                quantity = 2.0,
-                priceAtTransaction = 25_000.0,
-                cogsAtTransaction = 20_000.0,
-                subtotal = 50_000.0,
+                quantity = ScaledDecimal2.ofWhole(2L),
+                priceAtTransaction = ScaledDecimal2.ofWhole(25_000L),
+                cogsAtTransaction = ScaledDecimal2.ofWhole(20_000L),
+                subtotal = ScaledDecimal2.ofWhole(50_000L),
                 note = "Baris 1\nBaris 2",
             )
         )
@@ -592,7 +593,7 @@ class LegacyRoomPayloadCompatibilitySyncTest {
                 clientGeneratedId = "PAY-RAW-NL-1",
                 transactionLocalId = txId,
                 method = "tunai",
-                amount = 50_000.0,
+                amount = ScaledDecimal2.ofWhole(50_000L),
             )
         )
         val txQueueId = database.syncQueueDao().enqueue(

@@ -692,17 +692,17 @@ private fun LocalCashSessionEntity.toCashSession(
     totalExpenses: BigDecimal = BigDecimal.ZERO,
     totalCashIn: BigDecimal = BigDecimal.ZERO
 ): CashSession {
-    val baseSystemCash = expectedCash?.let(BigDecimal::valueOf) ?: BigDecimal.valueOf(startingCash)
+    val baseSystemCash = expectedCash?.toBigDecimal() ?: startingCash.toBigDecimal()
     return CashSession(
         id = serverId ?: "LOCAL-$localId",
         userId = cashierUserId,
         userName = null,
         openedAt = openedAt.toOffsetDateTimeString(),
         closedAt = closedAt?.toOffsetDateTimeString(),
-        openingCash = BigDecimal.valueOf(startingCash),
-        closingCash = actualCash?.let(BigDecimal::valueOf),
+        openingCash = startingCash.toBigDecimal(),
+        closingCash = actualCash?.toBigDecimal(),
         systemCash = baseSystemCash.subtract(totalExpenses).add(totalCashIn),
-        difference = difference?.let(BigDecimal::valueOf),
+        difference = difference?.toBigDecimal(),
         totalExpenses = totalExpenses,
         totalCashIn = totalCashIn,
         notes = openingNote,
@@ -712,12 +712,12 @@ private fun LocalCashSessionEntity.toCashSession(
 
 private fun List<LocalCashExpenseEntity>.totalExpenses(): BigDecimal {
     return filter { !it.category.orEmpty().startsWith("CASH_IN", ignoreCase = true) && !it.category.orEmpty().startsWith("KAS_MASUK", ignoreCase = true) }
-        .fold(BigDecimal.ZERO) { acc, expense -> acc.add(BigDecimal.valueOf(expense.amount)) }
+        .fold(BigDecimal.ZERO) { acc, expense -> acc.add(expense.amount.toBigDecimal()) }
 }
 
 private fun List<LocalCashExpenseEntity>.totalCashIn(): BigDecimal {
     return filter { it.category.orEmpty().startsWith("CASH_IN", ignoreCase = true) || it.category.orEmpty().startsWith("KAS_MASUK", ignoreCase = true) }
-        .fold(BigDecimal.ZERO) { acc, expense -> acc.add(BigDecimal.valueOf(expense.amount)) }
+        .fold(BigDecimal.ZERO) { acc, expense -> acc.add(expense.amount.toBigDecimal()) }
 }
 
 private fun LocalCashExpenseEntity.toCashTransaction(session: LocalCashSessionEntity): CashTransaction {
@@ -730,8 +730,8 @@ private fun LocalCashExpenseEntity.toCashTransaction(session: LocalCashSessionEn
         customerName = null,
         type = if (isCashIn) "CASH_IN" else "EXPENSE",
         status = syncStatus.name,
-        total = BigDecimal.valueOf(amount),
-        paidAmount = BigDecimal.valueOf(amount),
+        total = amount.toBigDecimal(),
+        paidAmount = amount.toBigDecimal(),
         remainingAmount = BigDecimal.ZERO,
         createdAt = occurredAt.toOffsetDateTimeString()
     )

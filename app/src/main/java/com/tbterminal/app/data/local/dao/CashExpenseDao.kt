@@ -5,6 +5,7 @@ import androidx.room.Insert
 import androidx.room.OnConflictStrategy
 import androidx.room.Query
 import com.tbterminal.app.data.local.entity.LocalCashExpenseEntity
+import com.tbterminal.app.data.local.model.ScaledDecimal2
 import com.tbterminal.app.data.local.model.SyncStatus
 import kotlinx.coroutines.flow.Flow
 
@@ -71,14 +72,14 @@ interface CashExpenseDao {
         conflict: SyncStatus
     ): Int
 
-    @Query("SELECT COALESCE(SUM(amount), 0.0) FROM local_cash_expenses WHERE cashSessionLocalId = :cashSessionLocalId AND deletedAt IS NULL")
-    suspend fun sumExpensesByCashSession(cashSessionLocalId: Long): Double
+    @Query("SELECT COALESCE(SUM(amount), 0) FROM local_cash_expenses WHERE cashSessionLocalId = :cashSessionLocalId AND deletedAt IS NULL")
+    suspend fun sumExpensesByCashSession(cashSessionLocalId: Long): ScaledDecimal2
 
-    @Query("SELECT COALESCE(SUM(amount), 0.0) FROM local_cash_expenses WHERE cashSessionLocalId = :cashSessionLocalId AND deletedAt IS NULL AND (category LIKE 'CASH_IN%' OR category LIKE 'KAS_MASUK%')")
-    suspend fun sumCashInByCashSession(cashSessionLocalId: Long): Double
+    @Query("SELECT COALESCE(SUM(amount), 0) FROM local_cash_expenses WHERE cashSessionLocalId = :cashSessionLocalId AND deletedAt IS NULL AND (category LIKE 'CASH_IN%' OR category LIKE 'KAS_MASUK%')")
+    suspend fun sumCashInByCashSession(cashSessionLocalId: Long): ScaledDecimal2
 
-    @Query("SELECT COALESCE(SUM(amount), 0.0) FROM local_cash_expenses WHERE cashSessionLocalId = :cashSessionLocalId AND deletedAt IS NULL AND (category NOT LIKE 'CASH_IN%' AND category NOT LIKE 'KAS_MASUK%')")
-    suspend fun sumCashOutByCashSession(cashSessionLocalId: Long): Double
+    @Query("SELECT COALESCE(SUM(amount), 0) FROM local_cash_expenses WHERE cashSessionLocalId = :cashSessionLocalId AND deletedAt IS NULL AND (category NOT LIKE 'CASH_IN%' AND category NOT LIKE 'KAS_MASUK%')")
+    suspend fun sumCashOutByCashSession(cashSessionLocalId: Long): ScaledDecimal2
 
     @Query(
         """
