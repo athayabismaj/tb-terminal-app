@@ -730,7 +730,11 @@ class CashierTransactionHistoryViewModel(
                 else -> it.copy(
                     isVoidDialogOpen = true,
                     voidReasonInput = "",
-                    voidIdempotencyKey = "void-mobile-${idempotencyKeyGenerator()}",
+                    voidIdempotencyKey = if (pendingActionsRestoreJob.isCompleted) {
+                        "void-mobile-${idempotencyKeyGenerator()}"
+                    } else {
+                        null
+                    },
                     voidErrorMessage = null,
                 )
             }
@@ -752,13 +756,17 @@ class CashierTransactionHistoryViewModel(
     fun onVoidReasonChanged(value: String) {
         if (_uiState.value.isVoidOutcomeAmbiguous) return
         if (value.length <= 1000) {
-            if (restoredVoid != null || restoredVoidKey != null) {
+            if (pendingActionsRestoreJob.isCompleted && (restoredVoid != null || restoredVoidKey != null)) {
                 viewModelScope.launch { clearPersistedVoidState() }
             }
             _uiState.update {
                 it.copy(
                     voidReasonInput = value,
-                    voidIdempotencyKey = "void-mobile-${idempotencyKeyGenerator()}",
+                    voidIdempotencyKey = if (pendingActionsRestoreJob.isCompleted) {
+                        "void-mobile-${idempotencyKeyGenerator()}"
+                    } else {
+                        null
+                    },
                     voidErrorMessage = null,
                 )
             }
@@ -789,14 +797,13 @@ class CashierTransactionHistoryViewModel(
             }
             return
         }
-        val key = state.voidIdempotencyKey ?: "void-mobile-${idempotencyKeyGenerator()}"
-        executeVoid(transaction.id, reason, key, state.voidManagerApprovalId)
+        executeVoid(transaction.id, reason, state.voidIdempotencyKey, state.voidManagerApprovalId)
     }
 
     private fun executeVoid(
         transactionId: String,
         reason: String,
-        idempotencyKey: String,
+        requestedIdempotencyKey: String?,
         managerApprovalId: String?,
     ) {
         if (_uiState.value.isSubmittingVoid) return
@@ -804,7 +811,6 @@ class CashierTransactionHistoryViewModel(
             it.copy(
                 isSubmittingVoid = true,
                 voidErrorMessage = null,
-                voidIdempotencyKey = idempotencyKey,
                 pendingManagerApprovalAction = null,
             )
         }
@@ -813,18 +819,28 @@ class CashierTransactionHistoryViewModel(
             val pendingMatches = restoredVoid?.let {
                 it.transactionId == transactionId && it.reason == reason && !restoredVoidKey.isNullOrBlank()
             } == true
-            val resolvedKey = if (pendingMatches && _uiState.value.voidIdempotencyKey == restoredVoidKey) {
+            val resolvedKey = if (pendingMatches) {
                 activeVoidCreatedAt = restoredVoidCreatedAt
                 restoredVoidKey!!
             } else {
-                idempotencyKey
+                val candidate = requestedIdempotencyKey ?: "void-mobile-${idempotencyKeyGenerator()}"
+                if (candidate != restoredVoidKey) {
+                    activeVoidCreatedAt = null
+                }
+                candidate
             }
+            val resolvedApprovalId = managerApprovalId ?: restoredVoid?.takeIf { pendingMatches }?.managerApprovalId
             val pendingDto = PersistedCashierVoidPending(
                 transactionId = transactionId,
                 reason = reason,
-                managerApprovalId = managerApprovalId,
+                managerApprovalId = resolvedApprovalId,
             )
-            _uiState.update { it.copy(voidIdempotencyKey = resolvedKey) }
+            _uiState.update {
+                it.copy(
+                    voidIdempotencyKey = resolvedKey,
+                    voidManagerApprovalId = resolvedApprovalId,
+                )
+            }
             persistPendingVoid(pendingDto, resolvedKey, PendingSubmissionStatus.IN_FLIGHT)
 
             when (
@@ -832,7 +848,7 @@ class CashierTransactionHistoryViewModel(
                     transactionId,
                     reason,
                     resolvedKey,
-                    managerApprovalId,
+                    resolvedApprovalId,
                 )
             ) {
                 is RepositoryResult.Success -> {
@@ -922,7 +938,11 @@ class CashierTransactionHistoryViewModel(
                     isRefundDialogOpen = true,
                     refundReasonInput = "",
                     refundDisposition = RefundDisposition.RETURN_TO_STOCK,
-                    refundIdempotencyKey = "refund-mobile-${idempotencyKeyGenerator()}",
+                    refundIdempotencyKey = if (pendingActionsRestoreJob.isCompleted) {
+                        "refund-mobile-${idempotencyKeyGenerator()}"
+                    } else {
+                        null
+                    },
                     refundErrorMessage = null,
                 )
             }
@@ -944,13 +964,17 @@ class CashierTransactionHistoryViewModel(
     fun onRefundReasonChanged(value: String) {
         if (_uiState.value.isRefundOutcomeAmbiguous) return
         if (value.length <= 1000) {
-            if (restoredRefund != null || restoredRefundKey != null) {
+            if (pendingActionsRestoreJob.isCompleted && (restoredRefund != null || restoredRefundKey != null)) {
                 viewModelScope.launch { clearPersistedRefundState() }
             }
             _uiState.update {
                 it.copy(
                     refundReasonInput = value,
-                    refundIdempotencyKey = "refund-mobile-${idempotencyKeyGenerator()}",
+                    refundIdempotencyKey = if (pendingActionsRestoreJob.isCompleted) {
+                        "refund-mobile-${idempotencyKeyGenerator()}"
+                    } else {
+                        null
+                    },
                     refundErrorMessage = null,
                 )
             }
@@ -959,13 +983,17 @@ class CashierTransactionHistoryViewModel(
 
     fun onRefundDispositionChanged(disposition: RefundDisposition) {
         if (_uiState.value.isRefundOutcomeAmbiguous) return
-        if (restoredRefund != null || restoredRefundKey != null) {
+        if (pendingActionsRestoreJob.isCompleted && (restoredRefund != null || restoredRefundKey != null)) {
             viewModelScope.launch { clearPersistedRefundState() }
         }
         _uiState.update {
             it.copy(
                 refundDisposition = disposition,
-                refundIdempotencyKey = "refund-mobile-${idempotencyKeyGenerator()}",
+                refundIdempotencyKey = if (pendingActionsRestoreJob.isCompleted) {
+                    "refund-mobile-${idempotencyKeyGenerator()}"
+                } else {
+                    null
+                },
                 refundErrorMessage = null,
             )
         }
@@ -999,7 +1027,7 @@ class CashierTransactionHistoryViewModel(
             transactionId = transaction.id,
             reason = reason,
             disposition = state.refundDisposition,
-            idempotencyKey = state.refundIdempotencyKey ?: "refund-mobile-${idempotencyKeyGenerator()}",
+            requestedIdempotencyKey = state.refundIdempotencyKey,
             managerApprovalId = state.refundManagerApprovalId,
         )
     }
@@ -1008,7 +1036,7 @@ class CashierTransactionHistoryViewModel(
         transactionId: String,
         reason: String,
         disposition: RefundDisposition,
-        idempotencyKey: String,
+        requestedIdempotencyKey: String?,
         managerApprovalId: String?,
     ) {
         if (_uiState.value.isSubmittingRefund) return
@@ -1016,7 +1044,6 @@ class CashierTransactionHistoryViewModel(
             it.copy(
                 isSubmittingRefund = true,
                 refundErrorMessage = null,
-                refundIdempotencyKey = idempotencyKey,
                 pendingManagerApprovalAction = null,
             )
         }
@@ -1028,19 +1055,29 @@ class CashierTransactionHistoryViewModel(
                     it.dispositionName.equals(disposition.name, ignoreCase = true) &&
                     !restoredRefundKey.isNullOrBlank()
             } == true
-            val resolvedKey = if (pendingMatches && _uiState.value.refundIdempotencyKey == restoredRefundKey) {
+            val resolvedKey = if (pendingMatches) {
                 activeRefundCreatedAt = restoredRefundCreatedAt
                 restoredRefundKey!!
             } else {
-                idempotencyKey
+                val candidate = requestedIdempotencyKey ?: "refund-mobile-${idempotencyKeyGenerator()}"
+                if (candidate != restoredRefundKey) {
+                    activeRefundCreatedAt = null
+                }
+                candidate
             }
+            val resolvedApprovalId = managerApprovalId ?: restoredRefund?.takeIf { pendingMatches }?.managerApprovalId
             val pendingDto = PersistedCashierRefundPending(
                 transactionId = transactionId,
                 reason = reason,
                 dispositionName = disposition.name,
-                managerApprovalId = managerApprovalId,
+                managerApprovalId = resolvedApprovalId,
             )
-            _uiState.update { it.copy(refundIdempotencyKey = resolvedKey) }
+            _uiState.update {
+                it.copy(
+                    refundIdempotencyKey = resolvedKey,
+                    refundManagerApprovalId = resolvedApprovalId,
+                )
+            }
             persistPendingRefund(pendingDto, resolvedKey, PendingSubmissionStatus.IN_FLIGHT)
 
             when (
@@ -1049,7 +1086,7 @@ class CashierTransactionHistoryViewModel(
                     reason = reason,
                     disposition = disposition,
                     idempotencyKey = resolvedKey,
-                    managerApprovalId = managerApprovalId,
+                    managerApprovalId = resolvedApprovalId,
                 )
             ) {
                 is RepositoryResult.Success -> {

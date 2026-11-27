@@ -68,11 +68,13 @@ import com.tbterminal.app.ui.receivables.ReceivablePaymentMethod
 import java.io.IOException
 import java.math.BigDecimal
 import java.time.LocalDate
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.resetMain
+import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.test.setMain
 import kotlinx.serialization.Serializable
@@ -576,6 +578,107 @@ class SubmissionIdempotencyPersistenceTest {
         assertFalse(vm3.uiState.value.isRefundOutcomeAmbiguous)
         assertNull(store.records[PendingSubmissionScopes.CASHIER_VOID])
         assertNull(store.records[PendingSubmissionScopes.CASHIER_REFUND])
+    }
+
+    @Test
+    fun cashierTransactionHistoryViewModel_fastVoidAndRefundAfterRestart_awaitsRestoreAndReusesOldKey() = runTest(dispatcher) {
+        val backingStore = FakePendingSubmissionStore()
+        val cashRepo = FakeCashRepo(initialStatus = "LUNAS")
+        var seq = 0
+
+        // Seed ambiguous void & refund keys from previous session
+        val vm1 = CashierTransactionHistoryViewModel(
+            repository = cashRepo,
+            actorRole = "OWNER",
+            idempotencyKeyGenerator = { "seed-${++seq}" },
+            pendingSubmissionStore = backingStore,
+        )
+        vm1.loadReceipt("tx-debt-1")
+        advanceUntilIdle()
+        vm1.showVoidDialog()
+        vm1.onVoidReasonChanged("Salah input barang")
+        cashRepo.nextVoidResult = RepositoryResult.Exception(IOException("timeout"))
+        vm1.submitVoid()
+        advanceUntilIdle()
+        val oldVoidKey = cashRepo.recordedVoidKeys.single()
+
+        vm1.showRefundDialog()
+        vm1.onRefundDispositionChanged(RefundDisposition.DAMAGED)
+        vm1.onRefundReasonChanged("Barang rusak")
+        cashRepo.nextRefundResult = RepositoryResult.Error("HTTP_504", "Gateway timeout")
+        vm1.submitRefund()
+        advanceUntilIdle()
+        val oldRefundKey = cashRepo.recordedRefundKeys.single()
+
+        // Restart with a gated store so restore stays suspended while loadReceipt + dialog + submit are queued right away
+        val gate = CompletableDeferred<Unit>()
+        val gatedStore = object : PendingSubmissionStore {
+            override suspend fun load(scope: String): PendingSubmissionRecord? {
+                gate.await()
+                return backingStore.load(scope)
+            }
+            override suspend fun save(record: PendingSubmissionRecord) = backingStore.save(record)
+            override suspend fun clear(scope: String) = backingStore.clear(scope)
+            override suspend fun purgeExpired() = backingStore.purgeExpired()
+        }
+
+        val vm2 = CashierTransactionHistoryViewModel(
+            repository = cashRepo,
+            actorRole = "OWNER",
+            idempotencyKeyGenerator = { "fresh-${++seq}" },
+            pendingSubmissionStore = gatedStore,
+        )
+        vm2.loadReceipt("tx-debt-1")
+        runCurrent()
+        // While restore is still blocked, showVoidDialog / submitVoid must not mint or persist a fresh key
+        vm2.showVoidDialog()
+        vm2.submitVoid()
+        assertEquals(0, cashRepo.recordedVoidKeys.size - 1)
+
+        // Release store restore and let queued receipt/restore/submit complete
+        gate.complete(Unit)
+        advanceUntilIdle()
+
+        assertEquals(oldVoidKey, vm2.uiState.value.voidIdempotencyKey)
+        vm2.showVoidDialog()
+        vm2.submitVoid()
+        advanceUntilIdle()
+        assertEquals(2, cashRepo.recordedVoidKeys.size)
+        assertEquals(oldVoidKey, cashRepo.recordedVoidKeys[1])
+
+        // Reset transaction status to LUNAS and test gated restore for refund after restart
+        cashRepo.detail = cashRepo.detail.copy(status = "LUNAS")
+        val refundGate = CompletableDeferred<Unit>()
+        val gatedRefundStore = object : PendingSubmissionStore {
+            override suspend fun load(scope: String): PendingSubmissionRecord? {
+                refundGate.await()
+                return backingStore.load(scope)
+            }
+            override suspend fun save(record: PendingSubmissionRecord) = backingStore.save(record)
+            override suspend fun clear(scope: String) = backingStore.clear(scope)
+            override suspend fun purgeExpired() = backingStore.purgeExpired()
+        }
+        val vm3 = CashierTransactionHistoryViewModel(
+            repository = cashRepo,
+            actorRole = "OWNER",
+            idempotencyKeyGenerator = { "fresh-${++seq}" },
+            pendingSubmissionStore = gatedRefundStore,
+        )
+        vm3.loadReceipt("tx-debt-1")
+        runCurrent()
+        vm3.showRefundDialog()
+        vm3.submitRefund()
+        assertEquals(1, cashRepo.recordedRefundKeys.size)
+
+        refundGate.complete(Unit)
+        advanceUntilIdle()
+
+        assertEquals(oldRefundKey, vm3.uiState.value.refundIdempotencyKey)
+        vm3.showRefundDialog()
+        vm3.submitRefund()
+        advanceUntilIdle()
+        assertEquals(2, cashRepo.recordedRefundKeys.size)
+        assertEquals(oldRefundKey, cashRepo.recordedRefundKeys[1])
     }
 
     private class FakePendingSubmissionStore(
