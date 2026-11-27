@@ -6,7 +6,10 @@ import androidx.room.OnConflictStrategy
 import androidx.room.Query
 import com.tbterminal.app.data.local.entity.LocalCashSessionEntity
 import com.tbterminal.app.data.local.model.ScaledDecimal2
+import com.tbterminal.app.data.local.model.SyncEntityType
+import com.tbterminal.app.data.local.model.SyncOperation
 import com.tbterminal.app.data.local.model.SyncStatus
+import com.tbterminal.app.data.sync.CashSessionActiveBlockingMatcher
 import kotlinx.coroutines.flow.Flow
 
 @Dao
@@ -187,6 +190,78 @@ interface CashSessionDao {
         failed: SyncStatus,
         limit: Int
     ): List<LocalCashSessionEntity>
+
+    @Query(
+        """
+        SELECT * FROM local_cash_sessions s
+        WHERE s.deletedAt IS NULL
+          AND (
+              (s.serverId IS NULL AND s.syncStatus IN (:pending, :failed))
+              OR (s.status = :closedStatus AND s.serverId IS NOT NULL AND s.syncStatus IN (:pending, :failed))
+              OR EXISTS (
+                  SELECT 1 FROM local_transactions t
+                  WHERE t.cashSessionLocalId = s.localId
+                    AND t.deletedAt IS NULL
+                    AND t.syncStatus = :pending
+              )
+              OR EXISTS (
+                  SELECT 1 FROM local_cash_expenses e
+                  WHERE e.cashSessionLocalId = s.localId
+                    AND e.deletedAt IS NULL
+                    AND e.syncStatus = :pending
+              )
+          )
+        ORDER BY s.openedAt ASC, s.localId ASC
+        LIMIT :limit
+        """
+    )
+    suspend fun getSessionsNeedingSync(
+        closedStatus: String = "CLOSED",
+        pending: SyncStatus = SyncStatus.PENDING,
+        failed: SyncStatus = SyncStatus.FAILED,
+        limit: Int = 50,
+    ): List<LocalCashSessionEntity>
+
+    @Query(
+        """
+        SELECT localId FROM local_cash_sessions
+        WHERE deletedAt IS NULL
+          AND serverId IS NULL
+          AND cashierUserId = :cashierUserId
+          AND (
+              syncStatus IN (:failed, :conflict)
+              OR localId IN (
+                  SELECT entityLocalId FROM sync_queue
+                  WHERE entityType = :entityType
+                    AND operation = :createOperation
+                    AND lastErrorCode = :blockedErrorCode
+              )
+          )
+        """
+    )
+    suspend fun getBlockedOpenSessionIdsForCashier(
+        cashierUserId: String,
+        blockedErrorCode: String = CashSessionActiveBlockingMatcher.ERROR_CODE_ACTIVE_SESSION_BLOCKING_OPEN,
+        failed: SyncStatus = SyncStatus.FAILED,
+        conflict: SyncStatus = SyncStatus.CONFLICT,
+        entityType: SyncEntityType = SyncEntityType.CASH_SESSION,
+        createOperation: SyncOperation = SyncOperation.CREATE,
+    ): List<Long>
+
+    @Query(
+        """
+        UPDATE local_cash_sessions
+        SET syncStatus = :pendingStatus,
+            updatedAt = :updatedAt
+        WHERE localId IN (:localIds)
+          AND serverId IS NULL
+        """
+    )
+    suspend fun resetSessionsToPending(
+        localIds: List<Long>,
+        updatedAt: Long,
+        pendingStatus: SyncStatus = SyncStatus.PENDING,
+    ): Int
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun upsert(session: LocalCashSessionEntity): Long

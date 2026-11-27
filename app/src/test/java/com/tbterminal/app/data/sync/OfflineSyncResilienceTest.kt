@@ -152,58 +152,70 @@ class OfflineSyncResilienceTest {
 
     @Test
     fun transientFailuresOnSessionExpenseAndCheckoutStayPendingPastRetryCount3AndSyncOnRetry() = runBlocking {
-        val openSessionId = insertOpenSession("sess-open-retry")
-        val expenseSessionId = insertSyncedOpenSession("srv-sess-exp")
-        val expenseId = insertExpense(expenseSessionId, "exp-retry")
-        val txId = insertCheckout(expenseSessionId, "tx-retry")
-
+        // 1. Offline open session: 4 consecutive 503 transient failures (> old limit of 3) stay PENDING and then sync
+        val openSessionId = insertOpenSession("sess-open-retry", openedAt = fakeClockMillis - 4_000_000L)
         val openQueue = database.syncQueueDao().getLatestForEntityAndOperation(
             openSessionId,
             SyncEntityType.CASH_SESSION,
             SyncOperation.CREATE,
         )!!
+        repeat(4) {
+            server.enqueue(MockResponse().setResponseCode(503).setBody("""{"message":"Service down"}"""))
+            val result = syncManager.runOnce()
+            assertTrue("Expected SyncResult.Retry on transient open failure", result is SyncResult.Retry)
+        }
+        assertEquals(SyncStatus.PENDING, database.cashSessionDao().getByLocalId(openSessionId)!!.syncStatus)
+        assertEquals(SyncStatus.PENDING, database.syncQueueDao().getById(openQueue.id)!!.status)
+        assertEquals(4, database.syncQueueDao().getById(openQueue.id)!!.retryCount)
+
+        enqueueOpenSessionSuccess("srv-sess-open-retry")
+        val openSuccess = syncManager.runOnce()
+        assertTrue(openSuccess is SyncResult.Success)
+        assertEquals(SyncStatus.SYNCED, database.cashSessionDao().getByLocalId(openSessionId)!!.syncStatus)
+
+        // 2. Offline checkout on synced session: 4 consecutive 503 transient failures stay PENDING and then sync
+        val expenseSessionId = insertSyncedOpenSession("srv-sess-exp")
+        val txId = insertCheckout(expenseSessionId, "tx-retry")
+        val txQueue = database.syncQueueDao().getLatestForEntity(txId, SyncEntityType.TRANSACTION)!!
+        repeat(4) {
+            server.enqueue(MockResponse().setResponseCode(503).setBody("""{"message":"Service down"}"""))
+            val result = syncManager.runOnce()
+            assertTrue("Expected SyncResult.Retry on transient checkout failure", result is SyncResult.Retry)
+        }
+        assertEquals(SyncStatus.PENDING, database.transactionDao().getByLocalId(txId)!!.syncStatus)
+        assertEquals(SyncStatus.PENDING, database.syncQueueDao().getById(txQueue.id)!!.status)
+        assertEquals(4, database.syncQueueDao().getById(txQueue.id)!!.retryCount)
+
+        enqueueCheckoutSuccess("srv-tx-retry")
+        val txSuccess = syncManager.runOnce()
+        assertTrue(txSuccess is SyncResult.Success)
+        assertEquals(SyncStatus.SYNCED, database.transactionDao().getByLocalId(txId)!!.syncStatus)
+
+        // 3. Offline expense on synced session: 4 consecutive 503 transient failures stay PENDING and then sync
+        val expenseId = insertExpense(expenseSessionId, "exp-retry")
         val expQueue = database.syncQueueDao().getLatestForEntityAndOperation(
             expenseId,
             SyncEntityType.CASH_EXPENSE,
             SyncOperation.CREATE,
         )!!
-        val txQueue = database.syncQueueDao().getLatestForEntity(txId, SyncEntityType.TRANSACTION)!!
-
-        // 4 consecutive 503 transient errors (> old limit of 3) must NOT mark items FAILED
         repeat(4) {
             server.enqueue(MockResponse().setResponseCode(503).setBody("""{"message":"Service down"}"""))
-            server.enqueue(MockResponse().setResponseCode(503).setBody("""{"message":"Service down"}"""))
-            server.enqueue(MockResponse().setResponseCode(503).setBody("""{"message":"Service down"}"""))
-
             val result = syncManager.runOnce()
-            assertTrue("Expected SyncResult.Retry on transient failure", result is SyncResult.Retry)
+            assertTrue("Expected SyncResult.Retry on transient expense failure", result is SyncResult.Retry)
         }
-
-        assertEquals(SyncStatus.PENDING, database.cashSessionDao().getByLocalId(openSessionId)!!.syncStatus)
         assertEquals(SyncStatus.PENDING, database.cashExpenseDao().getByLocalId(expenseId)!!.syncStatus)
-        assertEquals(SyncStatus.PENDING, database.transactionDao().getByLocalId(txId)!!.syncStatus)
-        assertEquals(SyncStatus.PENDING, database.syncQueueDao().getById(openQueue.id)!!.status)
         assertEquals(SyncStatus.PENDING, database.syncQueueDao().getById(expQueue.id)!!.status)
-        assertEquals(SyncStatus.PENDING, database.syncQueueDao().getById(txQueue.id)!!.status)
-        assertEquals(4, database.syncQueueDao().getById(openQueue.id)!!.retryCount)
         assertEquals(4, database.syncQueueDao().getById(expQueue.id)!!.retryCount)
-        assertEquals(4, database.syncQueueDao().getById(txQueue.id)!!.retryCount)
 
-        // Next run succeeds for all 3 even though retryCount == 4
-        enqueueOpenSessionSuccess("srv-sess-open-retry")
-        enqueueCheckoutSuccess("srv-tx-retry")
         enqueueExpenseSuccess("srv-exp-retry")
-
-        val success = syncManager.runOnce()
-        assertTrue(success is SyncResult.Success)
-        assertEquals(SyncStatus.SYNCED, database.cashSessionDao().getByLocalId(openSessionId)!!.syncStatus)
+        val expSuccess = syncManager.runOnce()
+        assertTrue(expSuccess is SyncResult.Success)
         assertEquals(SyncStatus.SYNCED, database.cashExpenseDao().getByLocalId(expenseId)!!.syncStatus)
-        assertEquals(SyncStatus.SYNCED, database.transactionDao().getByLocalId(txId)!!.syncStatus)
     }
 
     @Test
     fun permanentValidation400MarksFailedWhile429WithRetryAfterStaysPendingAndPropagatesDelay() = runBlocking {
-        val badSessionId = insertOpenSession("sess-bad-400")
+        val badSessionId = insertOpenSession("sess-bad-400", openedAt = fakeClockMillis - 4_000_000L)
         val rateLimitedSessionId = insertSyncedOpenSession("srv-sess-rl")
         val rateLimitedTxId = insertCheckout(rateLimitedSessionId, "tx-429")
 
@@ -545,14 +557,17 @@ class OfflineSyncResilienceTest {
         assertEquals(SyncStatus.SYNCED, database.transactionDao().getByLocalId(txId)!!.syncStatus)
     }
 
-    private suspend fun insertOpenSession(clientId: String): Long {
+    private suspend fun insertOpenSession(
+        clientId: String,
+        openedAt: Long = fakeClockMillis - 60_000L,
+    ): Long {
         val id = database.cashSessionDao().upsert(
             LocalCashSessionEntity(
                 clientGeneratedId = clientId,
                 deviceId = "android-dev-1",
                 cashierUserId = "kasir-1",
                 status = "OPEN",
-                openedAt = fakeClockMillis - 60_000L,
+                openedAt = openedAt,
                 startingCash = ScaledDecimal2.ofWhole(100_000L),
                 syncStatus = SyncStatus.PENDING,
             )
@@ -696,6 +711,145 @@ class OfflineSyncResilienceTest {
                 """{"success":true,"data":{"syncStatus":"CREATED","serverTransactionId":"$serverTxId","receiptId":"RCP-$serverTxId","serverPaymentIds":["pay-1"],"syncedAt":"2026-11-24T10:20:00+07:00"}}"""
             )
         )
+    }
+
+    @Test
+    fun chronologicalSync_openS1Online_closeS1Offline_openS2Offline_syncsInStrictPerSessionOrder() = runBlocking {
+        // S1 dibuka online (openedAt lebih awal) + transaksi & expense offline + tutup S1 offline
+        val s1Id = insertSyncedOpenSession("srv-s1")
+        val tx1Id = insertCheckout(s1Id, "tx-s1", occurredAt = fakeClockMillis - 3_500_000L)
+        val exp1Id = insertExpense(s1Id, "exp-s1", occurredAt = fakeClockMillis - 3_400_000L)
+        database.cashSessionDao().closeSession(
+            localId = s1Id,
+            status = "CLOSED",
+            closedAt = fakeClockMillis - 2_000_000L,
+            expectedCash = ScaledDecimal2.ofWhole(135_000L),
+            actualCash = ScaledDecimal2.ofWhole(135_000L),
+            difference = ScaledDecimal2.ZERO,
+            closingNote = "tutup S1 offline",
+            syncStatus = SyncStatus.PENDING,
+            updatedAt = fakeClockMillis - 2_000_000L,
+        )
+        database.syncQueueDao().enqueue(
+            SyncQueueEntity(
+                entityType = SyncEntityType.CASH_SESSION,
+                entityLocalId = s1Id,
+                operation = SyncOperation.UPDATE,
+                payloadJson = "{}",
+                createdAt = fakeClockMillis - 2_000_000L,
+                updatedAt = fakeClockMillis - 2_000_000L,
+            )
+        )
+
+        // S2 dibuka offline setelah S1 ditutup + transaksi di S2
+        val s2Id = insertOpenSession("sess-s2-offline")
+        val tx2Id = insertCheckout(s2Id, "tx-s2", occurredAt = fakeClockMillis - 30_000L)
+
+        var txCounter = 0
+        server.dispatcher = object : okhttp3.mockwebserver.Dispatcher() {
+            override fun dispatch(request: okhttp3.mockwebserver.RecordedRequest): MockResponse {
+                return when (request.path) {
+                    "/api/sales/checkout/sync" -> {
+                        val id = ++txCounter
+                        MockResponse().setResponseCode(200).setBody(
+                            """{"success":true,"data":{"syncStatus":"CREATED","serverTransactionId":"srv-tx-$id","receiptId":"RCP-$id","serverPaymentIds":["pay-$id"],"syncedAt":"2026-11-24T10:20:00+07:00"}}"""
+                        )
+                    }
+                    "/api/sales/cash-expenses/sync" -> MockResponse().setResponseCode(200).setBody(
+                        """{"success":true,"data":{"syncStatus":"CREATED","serverExpenseId":"srv-exp-1","syncedAt":"2026-11-24T10:21:00+07:00"}}"""
+                    )
+                    "/api/sales/sessions/sync/close" -> MockResponse().setResponseCode(200).setBody(
+                        """{"success":true,"data":{"syncStatus":"UPDATED","serverCashSessionId":"srv-s1","closedAt":"2026-11-24T12:00:00+07:00","syncedAt":"2026-11-24T12:00:05+07:00"}}"""
+                    )
+                    "/api/sales/sessions/sync/open" -> MockResponse().setResponseCode(200).setBody(
+                        """{"success":true,"data":{"syncStatus":"CREATED","serverCashSessionId":"srv-s2","openedAt":"2026-11-24T13:00:00+07:00","syncedAt":"2026-11-24T13:00:05+07:00"}}"""
+                    )
+                    else -> MockResponse().setResponseCode(404)
+                }
+            }
+        }
+
+        val result = syncManager.runOnce()
+        assertTrue(result is SyncResult.Success)
+        result as SyncResult.Success
+        assertFalse(result.hasMorePending)
+
+        val recordedPaths = (0 until server.requestCount).map { server.takeRequest().path!! }
+        assertEquals(
+            listOf(
+                "/api/sales/checkout/sync",
+                "/api/sales/cash-expenses/sync",
+                "/api/sales/sessions/sync/close",
+                "/api/sales/sessions/sync/open",
+                "/api/sales/checkout/sync",
+            ),
+            recordedPaths,
+        )
+
+        assertEquals(SyncStatus.SYNCED, database.transactionDao().getByLocalId(tx1Id)!!.syncStatus)
+        assertEquals(SyncStatus.SYNCED, database.cashExpenseDao().getByLocalId(exp1Id)!!.syncStatus)
+        assertEquals(SyncStatus.SYNCED, database.cashSessionDao().getByLocalId(s1Id)!!.syncStatus)
+        assertEquals(SyncStatus.SYNCED, database.cashSessionDao().getByLocalId(s2Id)!!.syncStatus)
+        assertEquals(SyncStatus.SYNCED, database.transactionDao().getByLocalId(tx2Id)!!.syncStatus)
+    }
+
+    @Test
+    fun blockedOpenSession_staysPendingAndAutoRecoversAfterOlderSessionCloses() = runBlocking {
+        // S2 dibuka offline ketika server masih menolak karena ada sesi lama belum ditutup
+        val s2Id = insertOpenSession("sess-s2-blocked")
+        server.enqueue(
+            MockResponse().setResponseCode(400).setBody(
+                """{"success":false,"code":"VALIDATION_ERROR","message":"Anda masih memiliki sesi kasir yang belum ditutup (ID: srv-s1-block). Tutup sesi tersebut sebelum sinkronisasi sesi lokal."}"""
+            )
+        )
+
+        val firstRun = syncManager.runOnce()
+        assertTrue(firstRun is SyncResult.Success)
+
+        val s2AfterReject = database.cashSessionDao().getByLocalId(s2Id)!!
+        assertEquals(SyncStatus.PENDING, s2AfterReject.syncStatus)
+        val s2Queue = database.syncQueueDao().getLatestForEntityAndOperation(
+            entityLocalId = s2Id,
+            entityType = SyncEntityType.CASH_SESSION,
+            operation = SyncOperation.CREATE,
+        )!!
+        assertEquals(SyncStatus.PENDING, s2Queue.status)
+        assertEquals(CashSessionActiveBlockingMatcher.ERROR_CODE_ACTIVE_SESSION_BLOCKING_OPEN, s2Queue.lastErrorCode)
+        assertEquals(0, s2Queue.retryCount)
+
+        // S1 (dibuka lebih awal dari S2) sekarang punya tutup offline yang siap disinkronkan
+        val s1Id = insertSyncedOpenSession("srv-s1-block")
+        database.cashSessionDao().closeSession(
+            localId = s1Id,
+            status = "CLOSED",
+            closedAt = fakeClockMillis - 100_000L,
+            expectedCash = ScaledDecimal2.ofWhole(100_000L),
+            actualCash = ScaledDecimal2.ofWhole(100_000L),
+            difference = ScaledDecimal2.ZERO,
+            closingNote = "tutup s1",
+            syncStatus = SyncStatus.PENDING,
+            updatedAt = fakeClockMillis - 100_000L,
+        )
+        database.syncQueueDao().enqueue(
+            SyncQueueEntity(
+                entityType = SyncEntityType.CASH_SESSION,
+                entityLocalId = s1Id,
+                operation = SyncOperation.UPDATE,
+                payloadJson = "{}",
+                createdAt = fakeClockMillis - 100_000L,
+                updatedAt = fakeClockMillis - 100_000L,
+            )
+        )
+
+        enqueueCloseSessionSuccess("srv-s1-block")
+        enqueueOpenSessionSuccess("srv-s2-recovered")
+
+        val secondRun = syncManager.runOnce()
+        assertTrue(secondRun is SyncResult.Success)
+        assertEquals(SyncStatus.SYNCED, database.cashSessionDao().getByLocalId(s1Id)!!.syncStatus)
+        val s2Recovered = database.cashSessionDao().getByLocalId(s2Id)!!
+        assertEquals(SyncStatus.SYNCED, s2Recovered.syncStatus)
+        assertEquals("srv-s2-recovered", s2Recovered.serverId)
     }
 }
 

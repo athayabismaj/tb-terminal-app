@@ -1,7 +1,9 @@
 package com.tbterminal.app.data.repository
 
+import com.tbterminal.app.data.local.dao.CashExpenseDao
 import com.tbterminal.app.data.local.dao.CashSessionDao
 import com.tbterminal.app.data.local.dao.SyncQueueDao
+import com.tbterminal.app.data.local.dao.TransactionDao
 import com.tbterminal.app.data.local.entity.LocalCashSessionEntity
 import com.tbterminal.app.data.local.entity.SyncQueueEntity
 import com.tbterminal.app.data.local.model.SyncEntityType
@@ -30,6 +32,8 @@ class SyncMonitoringRepository(
     private val offlineCheckoutSyncService: OfflineCheckoutSyncService,
     private val offlineCashExpenseSyncService: OfflineCashExpenseSyncService,
     private val cashSessionDao: CashSessionDao? = null,
+    private val transactionDao: TransactionDao? = null,
+    private val cashExpenseDao: CashExpenseDao? = null,
     private val clockMillis: () -> Long = { System.currentTimeMillis() }
 ) {
     fun observeSnapshot(): Flow<SyncMonitoringSnapshot> {
@@ -139,17 +143,40 @@ class SyncMonitoringRepository(
         return SyncBatchRetryResult(total = items.size, successCount = successCount, failedCount = failedCount)
     }
 
-    private fun orderedForSync(items: List<SyncQueueEntity>): List<SyncQueueEntity> {
+    private suspend fun orderedForSync(items: List<SyncQueueEntity>): List<SyncQueueEntity> {
+        val sessionOpenedAtById = mutableMapOf<Long, Long>()
+        val itemSessionIdByQueueId = mutableMapOf<Long, Long?>()
+        items.forEach { item ->
+            val sessionLocalId = when (item.entityType) {
+                SyncEntityType.CASH_SESSION -> item.entityLocalId
+                SyncEntityType.TRANSACTION -> transactionDao?.getByLocalId(item.entityLocalId)?.cashSessionLocalId
+                SyncEntityType.CASH_EXPENSE -> cashExpenseDao?.getByLocalId(item.entityLocalId)?.cashSessionLocalId
+                else -> null
+            }
+            itemSessionIdByQueueId[item.id] = sessionLocalId
+            if (sessionLocalId != null && !sessionOpenedAtById.containsKey(sessionLocalId)) {
+                val openedAt = cashSessionDao?.getByLocalId(sessionLocalId)?.openedAt ?: Long.MAX_VALUE
+                sessionOpenedAtById[sessionLocalId] = openedAt
+            }
+        }
         return items.sortedWith(
-            compareBy<SyncQueueEntity> { item ->
-                when {
-                    item.entityType == SyncEntityType.CASH_SESSION && item.operation == SyncOperation.CREATE -> 0
-                    item.entityType == SyncEntityType.TRANSACTION -> 1
-                    item.entityType == SyncEntityType.CASH_EXPENSE -> 2
-                    item.entityType == SyncEntityType.CASH_SESSION && item.operation == SyncOperation.UPDATE -> 3
-                    else -> 4
-                }
-            }.thenBy { it.createdAt }
+            compareBy<SyncQueueEntity>(
+                { item ->
+                    val sid = itemSessionIdByQueueId[item.id]
+                    if (sid == null) Long.MAX_VALUE else sessionOpenedAtById[sid] ?: Long.MAX_VALUE
+                },
+                { item -> itemSessionIdByQueueId[item.id] ?: Long.MAX_VALUE },
+                { item ->
+                    when {
+                        item.entityType == SyncEntityType.CASH_SESSION && item.operation == SyncOperation.CREATE -> 0
+                        item.entityType == SyncEntityType.TRANSACTION -> 1
+                        item.entityType == SyncEntityType.CASH_EXPENSE -> 2
+                        item.entityType == SyncEntityType.CASH_SESSION && item.operation == SyncOperation.UPDATE -> 3
+                        else -> 4
+                    }
+                },
+                { item -> item.createdAt }
+            )
         )
     }
 
@@ -172,6 +199,7 @@ class SyncMonitoringRepository(
                     is OfflineCashSessionSyncResult.Success -> SyncRetryResult.Success("Sesi kas tersinkron.")
                     is OfflineCashSessionSyncResult.Failed -> SyncRetryResult.Failed(result.message)
                     is OfflineCashSessionSyncResult.Skipped -> SyncRetryResult.Failed(result.message)
+                    is OfflineCashSessionSyncResult.Deferred -> SyncRetryResult.Failed(result.message)
                 }
             }
 

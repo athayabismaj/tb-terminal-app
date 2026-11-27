@@ -182,6 +182,20 @@ class OfflineCashExpenseSyncService(
         return syncBatch(expenses)
     }
 
+    internal suspend fun syncPendingWithoutLocalSessionUnlocked(
+        limit: Int = DEFAULT_AUTO_SYNC_LIMIT,
+        includeFailed: Boolean = false,
+    ): OfflineCashExpenseBulkSyncResult {
+        recoverStaleSyncingUnlocked()
+        val failedStatus = if (includeFailed) SyncStatus.FAILED else SyncStatus.PENDING
+        val expenses = database.cashExpenseDao().getSyncCandidatesWithoutLocalSession(
+            pending = SyncStatus.PENDING,
+            failed = failedStatus,
+            limit = limit,
+        )
+        return syncBatch(expenses)
+    }
+
     suspend fun syncPendingExpensesForSession(
         cashSessionLocalId: Long,
         limit: Int = DEFAULT_AUTO_SYNC_LIMIT,
@@ -299,6 +313,10 @@ class OfflineCashExpenseSyncService(
             is OfflineCashSessionSyncResult.Failed ->
                 EnsureExpenseSessionResult.Error(result.message, result.kind, result.retryAfterSeconds)
             is OfflineCashSessionSyncResult.Skipped -> EnsureExpenseSessionResult.Error(
+                message = result.message,
+                kind = OfflineCheckoutSyncFailureKind.VALIDATION
+            )
+            is OfflineCashSessionSyncResult.Deferred -> EnsureExpenseSessionResult.Error(
                 message = result.message,
                 kind = OfflineCheckoutSyncFailureKind.VALIDATION
             )

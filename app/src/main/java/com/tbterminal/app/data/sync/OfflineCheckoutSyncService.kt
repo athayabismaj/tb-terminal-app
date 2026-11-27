@@ -282,6 +282,12 @@ class OfflineCheckoutSyncService(
                     kind = OfflineCheckoutSyncFailureKind.VALIDATION
                 )
             }
+            is OfflineCashSessionSyncResult.Deferred -> {
+                EnsureCashSessionResult.Error(
+                    message = result.message,
+                    kind = OfflineCheckoutSyncFailureKind.VALIDATION
+                )
+            }
         }
     }
 
@@ -322,6 +328,38 @@ class OfflineCheckoutSyncService(
         return syncBatch(
             localIds = localIds,
             onProgress = onProgress
+        )
+    }
+
+    internal suspend fun syncPendingForSessionUnlocked(
+        cashSessionLocalId: Long,
+        limit: Int = DEFAULT_AUTO_SYNC_LIMIT,
+        onProgress: ((current: Int, total: Int) -> Unit)? = null,
+    ): OfflineCheckoutBulkSyncResult {
+        recoverStaleSyncingUnlocked()
+        val localIds = database.transactionDao().getPendingLocalIdsForSession(
+            cashSessionLocalId = cashSessionLocalId,
+            pending = SyncStatus.PENDING,
+            limit = limit,
+        )
+        return syncBatch(
+            localIds = localIds,
+            onProgress = onProgress,
+        )
+    }
+
+    internal suspend fun syncPendingWithoutLocalSessionUnlocked(
+        limit: Int = DEFAULT_AUTO_SYNC_LIMIT,
+        onProgress: ((current: Int, total: Int) -> Unit)? = null,
+    ): OfflineCheckoutBulkSyncResult {
+        recoverStaleSyncingUnlocked()
+        val localIds = database.transactionDao().getPendingLocalIdsWithoutLocalSession(
+            pending = SyncStatus.PENDING,
+            limit = limit,
+        )
+        return syncBatch(
+            localIds = localIds,
+            onProgress = onProgress,
         )
     }
 

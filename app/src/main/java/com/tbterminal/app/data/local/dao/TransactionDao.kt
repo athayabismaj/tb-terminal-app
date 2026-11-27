@@ -55,6 +55,39 @@ interface TransactionDao {
 
     @Query(
         """
+        SELECT localId
+        FROM local_transactions
+        WHERE cashSessionLocalId = :cashSessionLocalId
+          AND deletedAt IS NULL
+          AND syncStatus = :pending
+        ORDER BY occurredAt ASC, localId ASC
+        LIMIT :limit
+        """
+    )
+    suspend fun getPendingLocalIdsForSession(
+        cashSessionLocalId: Long,
+        pending: SyncStatus = SyncStatus.PENDING,
+        limit: Int,
+    ): List<Long>
+
+    @Query(
+        """
+        SELECT localId
+        FROM local_transactions
+        WHERE cashSessionLocalId IS NULL
+          AND deletedAt IS NULL
+          AND syncStatus = :pending
+        ORDER BY occurredAt ASC, localId ASC
+        LIMIT :limit
+        """
+    )
+    suspend fun getPendingLocalIdsWithoutLocalSession(
+        pending: SyncStatus = SyncStatus.PENDING,
+        limit: Int,
+    ): List<Long>
+
+    @Query(
+        """
         SELECT COUNT(*)
         FROM local_transactions
         WHERE deletedAt IS NULL

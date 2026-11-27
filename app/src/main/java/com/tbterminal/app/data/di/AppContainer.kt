@@ -268,7 +268,9 @@ class DefaultAppContainer(
             offlineCashSessionSyncService = offlineCashSessionSyncService,
             offlineCheckoutSyncService = offlineCheckoutSyncService,
             offlineCashExpenseSyncService = offlineCashExpenseSyncService,
-            cashSessionDao = localDatabase.cashSessionDao()
+            cashSessionDao = localDatabase.cashSessionDao(),
+            transactionDao = localDatabase.transactionDao(),
+            cashExpenseDao = localDatabase.cashExpenseDao(),
         )
     }
 

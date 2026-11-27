@@ -57,6 +57,22 @@ interface CashExpenseDao {
 
     @Query(
         """
+        SELECT * FROM local_cash_expenses
+        WHERE cashSessionLocalId IS NULL
+          AND deletedAt IS NULL
+          AND (syncStatus = :pending OR syncStatus = :failed)
+        ORDER BY occurredAt ASC, localId ASC
+        LIMIT :limit
+        """
+    )
+    suspend fun getSyncCandidatesWithoutLocalSession(
+        pending: SyncStatus,
+        failed: SyncStatus,
+        limit: Int,
+    ): List<LocalCashExpenseEntity>
+
+    @Query(
+        """
         SELECT COUNT(*)
         FROM local_cash_expenses
         WHERE cashSessionLocalId = :cashSessionLocalId
