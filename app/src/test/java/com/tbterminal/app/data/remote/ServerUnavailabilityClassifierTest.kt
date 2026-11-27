@@ -6,6 +6,7 @@ import java.net.ConnectException
 import java.net.NoRouteToHostException
 import java.net.SocketTimeoutException
 import java.net.UnknownHostException
+import kotlinx.serialization.SerializationException
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -128,6 +129,27 @@ class ServerUnavailabilityClassifierTest {
         assertFalse(
             ServerUnavailabilityClassifier.isDefinitelyUnprocessedServerUnavailable(
                 RepositoryResult.Exception(IOException("reset after send"))
+            )
+        )
+    }
+
+    @Test
+    fun repositoryResultException_isServerUnavailableOnlyForIoExceptionCauses() {
+        assertTrue(ServerUnavailabilityClassifier.isServerUnavailable(RepositoryResult.Exception(IOException("io"))))
+        assertTrue(ServerUnavailabilityClassifier.isServerUnavailable(RepositoryResult.Exception(SocketTimeoutException("timeout"))))
+        assertTrue(ServerUnavailabilityClassifier.isServerUnavailable(RepositoryResult.Exception(ConnectException("refused"))))
+        assertTrue(
+            ServerUnavailabilityClassifier.isServerUnavailable(
+                RepositoryResult.Exception(RuntimeException("wrapped", IOException("nested io")))
+            )
+        )
+
+        assertFalse(ServerUnavailabilityClassifier.isServerUnavailable(RepositoryResult.Exception(IllegalStateException("local state"))))
+        assertFalse(ServerUnavailabilityClassifier.isServerUnavailable(RepositoryResult.Exception(SecurityException("perm"))))
+        assertFalse(ServerUnavailabilityClassifier.isServerUnavailable(RepositoryResult.Exception(SerializationException("json"))))
+        assertFalse(
+            ServerUnavailabilityClassifier.isServerUnavailable(
+                RepositoryResult.Exception(RuntimeException("wrapped", IllegalStateException("nested local")))
             )
         )
     }

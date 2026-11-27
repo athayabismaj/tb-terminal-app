@@ -536,6 +536,51 @@ class CashReconciliationViewModelOfflineTest {
         assertNotNull(cashSessionLocalDataSource.getLatestOpenSession("kasir-1"))
     }
 
+    @Test
+    fun nonIoExceptions_neverMarkBackendUnreachableOrFallbackLocally() = runTest(dispatcher) {
+        backendHealthMonitor.refresh(force = true)
+        assertEquals(BackendStatus.CONNECTED, backendHealthMonitor.status.value)
+
+        val openSession = CashSession(
+            id = "srv-cash-local-ex",
+            userId = "kasir-1",
+            userName = "Kasir Satu",
+            openedAt = "2026-11-27T08:00:00+07:00",
+            closedAt = null,
+            openingCash = BigDecimal("250000"),
+            closingCash = null,
+            systemCash = BigDecimal("250000"),
+            difference = null,
+            totalExpenses = BigDecimal.ZERO,
+            notes = null,
+            status = "OPEN",
+        )
+        val repo = FakeCashReconciliationOfflineRepo().apply {
+            activeSessionResult = RepositoryResult.Success(openSession)
+            addExpenseResult = RepositoryResult.Exception(IllegalStateException("Local state bug"))
+            closeSessionResult = RepositoryResult.Exception(SecurityException("Permission error"))
+        }
+        val vm = buildVm(repo)
+        advanceUntilIdle()
+        val mirroredLocalId = vm.uiState.value.localCashSessionId!!
+
+        vm.showPettyCashDialog(CashMovementType.CASH_OUT)
+        vm.onPettyCashAmountChanged("10000")
+        vm.onPettyCashDescriptionChanged("Tes")
+        vm.addPettyCash()
+        advanceUntilIdle()
+
+        assertEquals(BackendStatus.CONNECTED, backendHealthMonitor.status.value)
+        assertTrue(localCashExpenseService.getLocalExpenses(mirroredLocalId).isEmpty())
+
+        vm.onClosingCashChanged("250000")
+        vm.closeSession()
+        advanceUntilIdle()
+
+        assertEquals(BackendStatus.CONNECTED, backendHealthMonitor.status.value)
+        assertEquals("OPEN", cashSessionLocalDataSource.getCachedCashSessionByServerId("srv-cash-local-ex")?.status)
+    }
+
     private fun buildVm(repository: CashReconciliationRepository): CashReconciliationViewModel {
         return CashReconciliationViewModel(
             repository = repository,

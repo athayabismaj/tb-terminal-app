@@ -1,6 +1,7 @@
 package com.tbterminal.app.data.remote
 
 import com.tbterminal.app.data.repository.RepositoryResult
+import java.io.IOException
 import java.net.ConnectException
 import java.net.NoRouteToHostException
 import java.net.UnknownHostException
@@ -55,7 +56,7 @@ object ServerUnavailabilityClassifier {
     fun isServerUnavailable(result: RepositoryResult<*>): Boolean {
         return when (result) {
             is RepositoryResult.Success -> false
-            is RepositoryResult.Exception -> true
+            is RepositoryResult.Exception -> isServerUnavailableThrowable(result.throwable)
             is RepositoryResult.Error -> !isAuthError(result) && isServerUnavailableCode(result.code)
         }
     }
@@ -73,15 +74,27 @@ object ServerUnavailabilityClassifier {
         }
     }
 
+    private fun isServerUnavailableThrowable(throwable: Throwable?): Boolean {
+        return hasCauseMatching(throwable) { it is IOException }
+    }
+
     private fun isDefinitelyUnprocessedThrowable(throwable: Throwable?): Boolean {
+        return hasCauseMatching(throwable) {
+            it is ConnectException ||
+                it is UnknownHostException ||
+                it is NoRouteToHostException
+        }
+    }
+
+    private fun hasCauseMatching(
+        throwable: Throwable?,
+        predicate: (Throwable) -> Boolean,
+    ): Boolean {
         val visited = Collections.newSetFromMap(IdentityHashMap<Throwable, Boolean>())
         var current = throwable
         var depth = 0
         while (current != null && depth < MAX_CAUSE_DEPTH && visited.add(current)) {
-            if (current is ConnectException ||
-                current is UnknownHostException ||
-                current is NoRouteToHostException
-            ) {
+            if (predicate(current)) {
                 return true
             }
             current = current.cause

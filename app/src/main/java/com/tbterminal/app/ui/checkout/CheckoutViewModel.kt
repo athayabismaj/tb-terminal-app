@@ -400,8 +400,11 @@ class CheckoutViewModel(
                         }
                     }
                     is RepositoryResult.Exception -> {
-                        markBackendUnreachableAndSyncState()
-                        if (!restoreLocalOpenCashSessionIfAvailable()) {
+                        val serverUnavailable = ServerUnavailabilityClassifier.isServerUnavailable(result)
+                        if (serverUnavailable) {
+                            markBackendUnreachableAndSyncState()
+                        }
+                        if (!serverUnavailable || !restoreLocalOpenCashSessionIfAvailable()) {
                             _uiState.update { state ->
                                 state.copy(
                                     activeCashSession = null,
@@ -2274,11 +2277,22 @@ class CheckoutViewModel(
                     }
                 }
                 is RepositoryResult.Exception -> {
-                    handlePreviewServerUnavailable(
-                        UiText.DynamicString(
-                            "Preview checkout gagal karena koneksi bermasalah. Coba lagi.",
+                    if (ServerUnavailabilityClassifier.isServerUnavailable(result)) {
+                        handlePreviewServerUnavailable(
+                            UiText.DynamicString(
+                                "Preview checkout gagal karena koneksi bermasalah. Coba lagi.",
+                            )
                         )
-                    )
+                    } else {
+                        invalidatePendingCheckout()
+                        _uiState.update {
+                            it.copy(
+                                isLoading = false,
+                                isPreviewLoading = false,
+                                errorEvent = UiText.DynamicString(UserFacingErrorMapper.message()),
+                            )
+                        }
+                    }
                 }
             }
         }
@@ -2530,21 +2544,35 @@ class CheckoutViewModel(
                 }
             }
             is RepositoryResult.Exception -> {
-                markBackendUnreachableAndSyncState()
-                pendingSubmissionPersistence?.markAmbiguous(
-                    command = command,
-                    fingerprint = pendingOnlineCheckout?.fingerprint.orEmpty(),
-                    state = _uiState.value,
-                )
-                _uiState.update {
-                    it.copy(
-                        isLoading = false,
-                        isPreviewLoading = false,
-                        hasAmbiguousCheckout = true,
-                        errorEvent = UiText.DynamicString(
-                            "Hasil checkout belum dapat dipastikan. Tekan checkout lagi untuk memeriksa transaksi yang sama.",
-                        ),
+                if (ServerUnavailabilityClassifier.isServerUnavailable(result)) {
+                    markBackendUnreachableAndSyncState()
+                    pendingSubmissionPersistence?.markAmbiguous(
+                        command = command,
+                        fingerprint = pendingOnlineCheckout?.fingerprint.orEmpty(),
+                        state = _uiState.value,
                     )
+                    _uiState.update {
+                        it.copy(
+                            isLoading = false,
+                            isPreviewLoading = false,
+                            hasAmbiguousCheckout = true,
+                            errorEvent = UiText.DynamicString(
+                                "Hasil checkout belum dapat dipastikan. Tekan checkout lagi untuk memeriksa transaksi yang sama.",
+                            ),
+                        )
+                    }
+                } else {
+                    pendingOnlineCheckout = null
+                    ambiguousOnlineCheckout = null
+                    pendingSubmissionPersistence?.clear()
+                    _uiState.update {
+                        it.copy(
+                            isLoading = false,
+                            isPreviewLoading = false,
+                            hasAmbiguousCheckout = false,
+                            errorEvent = UiText.DynamicString(UserFacingErrorMapper.message()),
+                        )
+                    }
                 }
             }
         }

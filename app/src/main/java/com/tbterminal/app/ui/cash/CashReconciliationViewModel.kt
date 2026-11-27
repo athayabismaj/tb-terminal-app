@@ -178,8 +178,11 @@ class CashReconciliationViewModel(
                     }
                 }
                 is RepositoryResult.Exception -> {
-                    markBackendUnreachableAndSyncState()
-                    if (!restoreLocalOpenCashSessionIfAvailable(page)) {
+                    val serverUnavailable = ServerUnavailabilityClassifier.isServerUnavailable(sessionResult)
+                    if (serverUnavailable) {
+                        markBackendUnreachableAndSyncState()
+                    }
+                    if (!serverUnavailable || !restoreLocalOpenCashSessionIfAvailable(page)) {
                         setLoadError(
                             "Server kas tidak tersambung. Kas harian online belum dapat dimuat.",
                             resolveOfflineSessionAgeAlert()
@@ -327,8 +330,12 @@ class CashReconciliationViewModel(
                     }
                 }
                 is RepositoryResult.Exception -> {
-                    markBackendUnreachableAndSyncState()
-                    closeLocalSession(closingCash)
+                    if (ServerUnavailabilityClassifier.isServerUnavailable(result)) {
+                        markBackendUnreachableAndSyncState()
+                        closeLocalSession(closingCash)
+                    } else {
+                        setActionError(UserFacingErrorMapper.message())
+                    }
                 }
             }
         }

@@ -575,6 +575,38 @@ class CheckoutViewModelOfflineFallbackTest {
         assertNotNull(vm.uiState.value.errorEvent)
     }
 
+    @Test
+    fun nonIoExceptionsOnPreviewAndSubmit_neverMarkBackendUnreachableOrFallbackLocally() = runTest(dispatcher) {
+        seedProductAndOpenSession(serverSessionId = "srv-sess-1")
+        backendHealthMonitor.refresh(force = true)
+        assertEquals(BackendStatus.CONNECTED, backendHealthMonitor.status.value)
+
+        val checkoutRepo = FakeOfflineFallbackCheckoutRepo().apply {
+            previewResult = RepositoryResult.Exception(IllegalStateException("local serialization/state bug"))
+        }
+        val vm = buildVm(checkoutRepo = checkoutRepo)
+        advanceUntilIdle()
+
+        vm.addProduct(sampleProduct())
+        advanceUntilIdle()
+        vm.prepareCheckout(PaymentMethod.TUNAI, BigDecimal("70000"))
+        advanceUntilIdle()
+
+        assertEquals(BackendStatus.CONNECTED, backendHealthMonitor.status.value)
+        assertEquals(0, database.transactionDao().getPendingLocalIdsForAutoSync(SyncStatus.PENDING, 100).size)
+        assertNotNull(vm.uiState.value.errorEvent)
+
+        // Non-IO exception on submitCheckout also keeps backend CONNECTED and does not mark ambiguous
+        checkoutRepo.previewResult = null
+        checkoutRepo.submitResult = RepositoryResult.Exception(SecurityException("local security exception"))
+        vm.prepareCheckout(PaymentMethod.TUNAI, BigDecimal("70000"))
+        advanceUntilIdle()
+
+        assertEquals(BackendStatus.CONNECTED, backendHealthMonitor.status.value)
+        assertFalse(vm.uiState.value.hasAmbiguousCheckout)
+        assertNull(pendingSubmissionStore.load(PendingSubmissionScopes.CHECKOUT))
+    }
+
     private suspend fun seedProductAndOpenSession(serverSessionId: String) {
         database.productDao().upsert(
             LocalProductEntity(
