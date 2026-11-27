@@ -96,6 +96,8 @@ class OfflineStatusRepository(
 
     fun isOnline(): Boolean = networkMonitor.isOnline()
 
+    fun currentBackendStatus(): BackendStatus = backendHealthMonitor.status.value
+
     suspend fun refreshBackendHealth(force: Boolean = false): BackendStatus {
         return backendHealthMonitor.refresh(force = force)
     }

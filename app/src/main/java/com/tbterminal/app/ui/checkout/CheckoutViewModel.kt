@@ -2522,7 +2522,7 @@ class CheckoutViewModel(
             return true
         }
 
-        return when (status.backendStatus) {
+        return when (repository.currentBackendStatus()) {
             BackendStatus.CONNECTED -> {
                 if (repository.isBackendHealthStale()) {
                     val refreshedStatus = repository.refreshBackendHealth(force = false)
