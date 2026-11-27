@@ -14,8 +14,11 @@ import com.tbterminal.app.data.local.checkout.OfflineItemUnitResolution
 import com.tbterminal.app.data.local.checkout.normalizeExactDecimal
 import com.tbterminal.app.data.local.checkout.resolveOfflineCheckoutItemUnit
 import com.tbterminal.app.data.local.database.CashSessionLocalDataSource
+import com.tbterminal.app.data.local.database.CheckoutDraftStore
+import com.tbterminal.app.data.local.database.CustomerLocalDataSource
 import com.tbterminal.app.data.local.database.LocalAppSettingsDataSource
 import com.tbterminal.app.data.local.database.PendingSubmissionStore
+import com.tbterminal.app.data.local.database.ProductLocalDataSource
 import com.tbterminal.app.data.local.entity.LocalCashSessionEntity
 import com.tbterminal.app.data.local.model.AppDataMode
 import com.tbterminal.app.data.model.CheckoutPaymentLine
@@ -89,6 +92,10 @@ class CheckoutViewModel(
     private val clockMillis: () -> Long = { System.currentTimeMillis() },
     private val lockoutTickIntervalMillis: Long = 1_000L,
     private val pendingSubmissionStore: PendingSubmissionStore? = null,
+    private val checkoutDraftStore: CheckoutDraftStore? = null,
+    private val productLocalDataSource: ProductLocalDataSource? = null,
+    private val customerLocalDataSource: CustomerLocalDataSource? = null,
+    private val cartDraftSaveDebounceMs: Long = CheckoutCartDraftCoordinator.DEFAULT_DEBOUNCE_MILLIS,
 ) : ViewModel() {
     private val _uiState = MutableStateFlow(
         CheckoutUiState(canOpenCashSession = AppAccessPolicy.canOpenCashSession(actorRole))
@@ -112,17 +119,74 @@ class CheckoutViewModel(
     private var reorderedProductsCache: Map<String, ReorderResolvedProduct> = emptyMap()
     private val pendingSubmissionPersistence: CheckoutPendingSubmissionPersistence? =
         pendingSubmissionStore?.let { CheckoutPendingSubmissionPersistence(it, clockMillis) }
+    private val cartDraftCoordinator: CheckoutCartDraftCoordinator? = checkoutDraftStore?.let { store ->
+        CheckoutCartDraftCoordinator(
+            store = store,
+            restorer = CheckoutCartDraftRestorer(
+                productLocalDataSource = productLocalDataSource,
+                customerLocalDataSource = customerLocalDataSource,
+                inventoryRepository = inventoryRepository,
+                customerRepository = customerRepository,
+            ),
+            debounceMillis = cartDraftSaveDebounceMs,
+        )
+    }
     private var pendingSubmissionRestoreJob: Job? = null
 
     init {
         pendingSubmissionRestoreJob = viewModelScope.launch {
-            restorePendingOnlineCheckout()
+            restorePersistedCheckoutState()
         }
         observeOfflineStatus()
         loadStoreConfig()
         loadCashSession()
         loadProducts()
         loadCustomers()
+    }
+
+    private suspend fun restorePersistedCheckoutState() {
+        restoreCartDraftIfAvailable()
+        restorePendingOnlineCheckout()
+        cartDraftCoordinator?.startObserving(viewModelScope, _uiState)
+    }
+
+    private suspend fun restoreCartDraftIfAvailable() {
+        val restored = cartDraftCoordinator?.restore() ?: return
+        _uiState.update { state ->
+            val userModifiedActive = state.cartItems.isNotEmpty() ||
+                state.selectedCustomer != null ||
+                state.transactionDiscount != null ||
+                state.isDeliveryEnabled ||
+                !state.activeQuotationId.isNullOrBlank()
+            val mergedHeldCarts = if (state.heldCarts.isEmpty()) restored.heldCarts else state.heldCarts
+            if (userModifiedActive) {
+                state.copy(heldCarts = mergedHeldCarts)
+            } else {
+                val deliveryFeeAmount = if (restored.isDeliveryEnabled) restored.deliveryFee else BigDecimal.ZERO
+                state.copy(
+                    heldCarts = mergedHeldCarts,
+                    selectedCustomer = restored.selectedCustomer,
+                    customerSearchQuery = restored.customerSearchQuery,
+                    selectedPaymentMethod = restored.selectedPaymentMethod,
+                    isDeliveryEnabled = restored.isDeliveryEnabled,
+                    deliveryFee = restored.deliveryFee,
+                    deliveryFeeInput = restored.deliveryFeeInput,
+                    deliveryAddress = restored.deliveryAddress,
+                    deliveryCourier = restored.deliveryCourier,
+                    deliveryFleet = restored.deliveryFleet,
+                    deliveryRecipientPhone = restored.deliveryRecipientPhone,
+                    deliveryVehiclePlate = restored.deliveryVehiclePlate,
+                    deliverySpecialInstructions = restored.deliverySpecialInstructions,
+                    activeQuotationId = restored.activeQuotationId,
+                    activeQuotationNumber = restored.activeQuotationNumber,
+                ).recalculateCheckoutState(
+                    items = restored.activeItems,
+                    discount = restored.transactionDiscount,
+                    deliveryFeeAmount = deliveryFeeAmount,
+                    preserveAmbiguousCheckout = true,
+                )
+            }
+        }
     }
 
     private suspend fun restorePendingOnlineCheckout() {
@@ -1366,6 +1430,9 @@ class CheckoutViewModel(
                 deliverySpecialInstructions = "",
             )
         }
+        cartDraftCoordinator?.let { coordinator ->
+            viewModelScope.launch { coordinator.flushNow(_uiState.value) }
+        }
     }
 
     fun openHeldCartsSheet() {
@@ -1520,6 +1587,9 @@ class CheckoutViewModel(
                 deliveryFeeAmount = if (target.isDeliveryEnabled) target.deliveryFee else BigDecimal.ZERO
             )
         }
+        cartDraftCoordinator?.let { coordinator ->
+            viewModelScope.launch { coordinator.flushNow(_uiState.value) }
+        }
     }
 
     fun deleteHeldCart(heldCartId: String) {
@@ -1528,6 +1598,9 @@ class CheckoutViewModel(
                 heldCarts = current.heldCarts.filterNot { it.id == heldCartId },
                 quickFeedbackMessage = "Pesanan terparkir dihapus."
             )
+        }
+        cartDraftCoordinator?.let { coordinator ->
+            viewModelScope.launch { coordinator.flushNow(_uiState.value) }
         }
     }
 
@@ -1760,6 +1833,7 @@ class CheckoutViewModel(
 
     override fun onCleared() {
         lockScreenCountdownJob?.cancel()
+        cartDraftCoordinator?.stop()
         super.onCleared()
     }
 
@@ -2216,6 +2290,7 @@ class CheckoutViewModel(
                 }
                 _checkoutEvents.tryEmit(CheckoutEvent.NavigateToReceipt(result.data.transactionId))
                 _uiState.update { current -> current.resetAfterSuccessfulCheckout() }
+                cartDraftCoordinator?.flushNow(_uiState.value)
             }
             is RepositoryResult.Error -> {
                 val ambiguous = result.isAmbiguousCheckoutFailure()
@@ -2295,6 +2370,7 @@ class CheckoutViewModel(
                                 )
                             )
                         }
+                        cartDraftCoordinator?.flushNow(_uiState.value)
                     }
                     is LocalCheckoutResult.Failed -> {
                         _uiState.update { state ->
@@ -2769,6 +2845,9 @@ class CheckoutViewModel(
             actorRole: String = "KASIR",
             pinUnlockService: PinUnlockService? = null,
             pendingSubmissionStore: PendingSubmissionStore? = null,
+            checkoutDraftStore: CheckoutDraftStore? = null,
+            productLocalDataSource: ProductLocalDataSource? = null,
+            customerLocalDataSource: CustomerLocalDataSource? = null,
         ): ViewModelProvider.Factory {
             return viewModelFactory {
                 CheckoutViewModel(
@@ -2788,6 +2867,9 @@ class CheckoutViewModel(
                     actorRole = actorRole,
                     pinUnlockService = pinUnlockService,
                     pendingSubmissionStore = pendingSubmissionStore,
+                    checkoutDraftStore = checkoutDraftStore,
+                    productLocalDataSource = productLocalDataSource,
+                    customerLocalDataSource = customerLocalDataSource,
                 )
             }
         }
