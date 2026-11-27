@@ -240,6 +240,44 @@ class SupplierDebtIdempotencyViewModelTest {
         assertNotEquals(conflictKey, repo.recordedPayments[3].idempotencyKey)
     }
 
+    @Test
+    fun supplierDebtVm_openingAndClosingPayableB_preservesAmbiguousKeyAndDraftOfPayableA() = runTest(dispatcher) {
+        val payableA = payable("pay-A", remaining = BigDecimal("200000"))
+        val payableB = payable("pay-B", remaining = BigDecimal("150000"))
+        val repo = FakePurchasingPaymentRepository(payables = listOf(payableA, payableB))
+        var seq = 0
+        val vm = SupplierDebtViewModel(
+            purchasingRepository = repo,
+            idempotencyKeyGenerator = { "multi-${++seq}" }
+        )
+        advanceUntilIdle()
+
+        // 1. Timeout on payable A
+        vm.openPayment(payableA)
+        vm.onPaymentAmountChanged("90000")
+        vm.onReferenceChanged("TRF-A")
+        repo.nextPaymentResult = RepositoryResult.Error("NETWORK_TIMEOUT", "Timeout")
+        vm.submitPayment()
+        advanceUntilIdle()
+        val keyA = repo.recordedPayments[0].idempotencyKey
+
+        // 2. Dismiss A, open B, dismiss B without paying
+        vm.closePayment()
+        vm.openPayment(payableB)
+        assertEquals("150000", vm.uiState.value.paymentAmountInput)
+        vm.closePayment()
+
+        // 3. Reopen A -> draft & keyA are still preserved
+        vm.openPayment(payableA)
+        assertEquals("90000", vm.uiState.value.paymentAmountInput)
+        assertEquals("TRF-A", vm.uiState.value.referenceInput)
+        vm.submitPayment()
+        advanceUntilIdle()
+
+        assertEquals(2, repo.recordedPayments.size)
+        assertEquals(keyA, repo.recordedPayments[1].idempotencyKey)
+    }
+
     private fun payable(id: String, remaining: BigDecimal) = SupplierPayable(
         id = id,
         supplierId = "sup-1",

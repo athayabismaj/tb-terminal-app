@@ -3,7 +3,6 @@ package com.tbterminal.app.ui.payables
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
-import com.tbterminal.app.data.local.database.PendingSubmissionScopes
 import com.tbterminal.app.data.local.database.PendingSubmissionStore
 import com.tbterminal.app.data.model.CreateOpeningPayableCommand
 import com.tbterminal.app.data.model.CreatePayableAdjustmentCommand
@@ -13,7 +12,6 @@ import com.tbterminal.app.data.model.SupplierPayable
 import com.tbterminal.app.data.repository.PurchasingRepository
 import com.tbterminal.app.data.repository.RepositoryResult
 import com.tbterminal.app.data.sync.runSuspendCatching
-import com.tbterminal.app.ui.common.SubmissionIdempotencyTracker
 import com.tbterminal.app.ui.common.parseWholeRupiahOrExactRemainingInput
 import com.tbterminal.app.ui.common.sanitizeWholeRupiahInput
 import com.tbterminal.app.ui.common.toNormalizedIdempotencyNumber
@@ -107,37 +105,21 @@ class SupplierDebtViewModel(
     private val _uiState = MutableStateFlow(SupplierDebtUiState(isLoading = true))
     val uiState: StateFlow<SupplierDebtUiState> = _uiState.asStateFlow()
 
-    private val paymentIdempotency = SubmissionIdempotencyTracker<SupplierPaymentIntent>(
-        prefix = "supplier-pay",
+    private val paymentCoordinator = SupplierPaymentIdempotencyCoordinator(
         keyGenerator = idempotencyKeyGenerator,
         store = pendingSubmissionStore,
-        scope = PendingSubmissionScopes.SUPPLIER_PAYMENT_LIST,
-        intentSerializer = SupplierPaymentIntent.serializer(),
-        clockMillis = clockMillis
+        clockMillis = clockMillis,
     )
-    private var pendingAmbiguousDraft: SupplierPaymentDraft? = null
+    private var hasEditedCurrentPaymentDialog = false
+    private val syncJobsByPayable = mutableMapOf<String, Job>()
     private val restoreJob: Job
 
     init {
         restoreJob = viewModelScope.launch {
-            restorePendingPayment()
+            paymentCoordinator.restoreAll()
         }
         loadPayables()
         loadSuppliers()
-    }
-
-    private suspend fun restorePendingPayment() {
-        val payloadJson = paymentIdempotency.restore() ?: return
-        val draft = decodeSupplierPaymentDraft(payloadJson)
-        if (draft == null) {
-            paymentIdempotency.clearAndPersist()
-            return
-        }
-        if (pendingAmbiguousDraft == null &&
-            (_uiState.value.selectedPayable == null || _uiState.value.selectedPayable?.id == draft.payableId)
-        ) {
-            pendingAmbiguousDraft = draft
-        }
     }
 
     fun loadPayables(page: Int = _uiState.value.page) {
@@ -213,22 +195,8 @@ class SupplierDebtViewModel(
     }
 
     fun openPayment(payable: SupplierPayable) {
-        val pendingDraft = pendingAmbiguousDraft
-        val restoreDraft = if (
-            pendingDraft != null &&
-            pendingDraft.payableId == payable.id &&
-            paymentIdempotency.hasPendingAmbiguousIntent { it.payableId == payable.id }
-        ) {
-            pendingDraft
-        } else {
-            pendingAmbiguousDraft = null
-            if (restoreJob.isCompleted) {
-                viewModelScope.launch { paymentIdempotency.clearAndPersist() }
-            } else {
-                paymentIdempotency.clear()
-            }
-            null
-        }
+        hasEditedCurrentPaymentDialog = false
+        val restoreDraft = paymentCoordinator.getRestorableDraft(payable.id)
         _uiState.update {
             it.copy(
                 selectedPayable = payable,
@@ -240,30 +208,53 @@ class SupplierDebtViewModel(
                 message = null
             )
         }
+        if (pendingSubmissionStore != null) {
+            syncJobsByPayable[payable.id] = viewModelScope.launch {
+                restoreJob.join()
+                val syncedDraft = paymentCoordinator.syncPayableFromStore(payable.id)
+                if (_uiState.value.selectedPayable?.id == payable.id && !hasEditedCurrentPaymentDialog) {
+                    _uiState.update {
+                        it.copy(
+                            paymentAmountInput = syncedDraft?.amountInput ?: payable.remainingAmount.toWholeRupiahInputText(),
+                            paymentMethod = syncedDraft?.method ?: SupplierPaymentMethod.Cash,
+                            referenceInput = syncedDraft?.referenceInput.orEmpty(),
+                            notesInput = syncedDraft?.notesInput.orEmpty(),
+                        )
+                    }
+                }
+            }
+        }
     }
 
     fun closePayment() {
-        paymentIdempotency.onDialogDismissed()
-        if (!paymentIdempotency.isOutcomeAmbiguous) {
-            pendingAmbiguousDraft = null
-            viewModelScope.launch { paymentIdempotency.clearAndPersist() }
+        val closingPayableId = _uiState.value.selectedPayable?.id
+        if (closingPayableId != null) {
+            paymentCoordinator.onDialogDismissedInMemory(closingPayableId)
+            viewModelScope.launch {
+                syncJobsByPayable[closingPayableId]?.join()
+                paymentCoordinator.persistDismissalIfNotAmbiguous(closingPayableId)
+            }
         }
         _uiState.update { it.copy(selectedPayable = null, isSubmittingPayment = false) }
     }
 
     fun onPaymentAmountChanged(value: String) {
+        hasEditedCurrentPaymentDialog = true
         _uiState.update { it.copy(paymentAmountInput = sanitizeWholeRupiahInput(value)) }
     }
 
     fun onPaymentMethodChanged(method: SupplierPaymentMethod) {
+        hasEditedCurrentPaymentDialog = true
         _uiState.update { it.copy(paymentMethod = method) }
     }
 
     fun onReferenceChanged(value: String) {
+        hasEditedCurrentPaymentDialog = true
         _uiState.update { it.copy(referenceInput = value) }
     }
 
     fun onNotesChanged(value: String) {
+        hasEditedCurrentPaymentDialog = true
         _uiState.update { it.copy(notesInput = value) }
     }
 
@@ -280,6 +271,7 @@ class SupplierDebtViewModel(
         viewModelScope.launch {
             _uiState.update { it.copy(isSubmittingPayment = true, errorMessage = null, message = null) }
             restoreJob.join()
+            syncJobsByPayable[payable.id]?.join()
             val normalizedReference = state.referenceInput.trim().takeIf(String::isNotBlank)
             val normalizedNotes = state.notesInput.trim().takeIf(String::isNotBlank)
             val intent = SupplierPaymentIntent(
@@ -297,7 +289,7 @@ class SupplierDebtViewModel(
                 notesInput = state.notesInput
             )
             val draftJson = draft.toPersistedJson()
-            val idempotencyKey = paymentIdempotency.resolveKeyForSubmission(intent, draftJson)
+            val idempotencyKey = paymentCoordinator.resolveKeyForSubmission(payable.id, intent, draftJson)
             val command = CreateSupplierPaymentCommand(
                 payableId = payable.id,
                 amount = amount,
@@ -309,8 +301,7 @@ class SupplierDebtViewModel(
 
             when (val result = purchasingRepository.createSupplierPayment(command)) {
                 is RepositoryResult.Success -> {
-                    paymentIdempotency.onSuccessAndPersist()
-                    pendingAmbiguousDraft = null
+                    paymentCoordinator.onSuccess(payable.id)
                     _uiState.update {
                         it.copy(
                             selectedPayable = null,
@@ -322,14 +313,12 @@ class SupplierDebtViewModel(
                 }
 
                 is RepositoryResult.Error -> {
-                    paymentIdempotency.onErrorAndPersist(result.code, result.message, draftJson)
-                    pendingAmbiguousDraft = if (paymentIdempotency.isOutcomeAmbiguous) draft else null
+                    paymentCoordinator.onError(payable.id, result.code, result.message, draft, draftJson)
                     setActionError(result.message)
                 }
 
                 is RepositoryResult.Exception -> {
-                    paymentIdempotency.onExceptionAndPersist(draftJson)
-                    pendingAmbiguousDraft = draft
+                    paymentCoordinator.onException(payable.id, draft, draftJson)
                     setActionError("Pembayaran gagal dicatat karena koneksi bermasalah.")
                 }
             }

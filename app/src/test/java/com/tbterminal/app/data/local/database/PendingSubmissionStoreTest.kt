@@ -128,4 +128,42 @@ class PendingSubmissionStoreTest {
         assertNull(store.load(PendingSubmissionScopes.CASHIER_PAY_DEBT))
         assertNull(dao.get("kasir-1", PendingSubmissionScopes.CASHIER_PAY_DEBT))
     }
+
+    @Test
+    fun loadByScopePrefix_returnsOnlyMatchingOwnerValidRecords() = runTest {
+        store.save(
+            PendingSubmissionRecord(
+                scope = PendingSubmissionScopes.supplierPayment("pay-1"),
+                idempotencyKey = "k-1",
+                intentJson = """{"p":"1"}""",
+                status = PendingSubmissionStatus.AMBIGUOUS,
+                createdAt = nowMillis,
+                updatedAt = nowMillis
+            )
+        )
+        store.save(
+            PendingSubmissionRecord(
+                scope = PendingSubmissionScopes.supplierPayment("pay-2"),
+                idempotencyKey = "k-2",
+                intentJson = """{"p":"2"}""",
+                status = PendingSubmissionStatus.IN_FLIGHT,
+                createdAt = nowMillis,
+                updatedAt = nowMillis
+            )
+        )
+        store.save(
+            PendingSubmissionRecord(
+                scope = PendingSubmissionScopes.PURCHASE,
+                idempotencyKey = "k-pur",
+                intentJson = """{"p":"3"}""",
+                status = PendingSubmissionStatus.AMBIGUOUS,
+                createdAt = nowMillis,
+                updatedAt = nowMillis
+            )
+        )
+
+        val records = store.loadByScopePrefix(PendingSubmissionScopes.SUPPLIER_PAYMENT_PREFIX)
+        assertEquals(2, records.size)
+        assertEquals(setOf("k-1", "k-2"), records.map { it.idempotencyKey }.toSet())
+    }
 }

@@ -182,7 +182,7 @@ class SubmissionIdempotencyPersistenceTest {
         vm1.submitPayment()
         advanceUntilIdle()
         val firstKey = repo.recordedPayments[0].idempotencyKey!!
-        assertNotNull(store.records[PendingSubmissionScopes.SUPPLIER_PAYMENT_LIST])
+        assertNotNull(store.records[PendingSubmissionScopes.supplierPayment("pay-1")])
 
         // Simulate restart -> new ViewModel with same store
         val vm2 = SupplierDebtViewModel(
@@ -199,7 +199,7 @@ class SubmissionIdempotencyPersistenceTest {
         vm2.submitPayment()
         advanceUntilIdle()
         assertEquals(firstKey, repo.recordedPayments[1].idempotencyKey)
-        assertNull(store.records[PendingSubmissionScopes.SUPPLIER_PAYMENT_LIST])
+        assertNull(store.records[PendingSubmissionScopes.supplierPayment("pay-1")])
 
         // 2. SupplierDebtDetailViewModel survives restart too
         val detail1 = SupplierDebtDetailViewModel(
@@ -228,7 +228,75 @@ class SubmissionIdempotencyPersistenceTest {
         detail2.submitPayment()
         advanceUntilIdle()
         assertEquals(detailKey, repo.recordedPayments[3].idempotencyKey)
-        assertNull(store.records[PendingSubmissionScopes.supplierPaymentDetail("sup-1")])
+        assertNull(store.records[PendingSubmissionScopes.supplierPayment("pay-1")])
+    }
+
+    @Test
+    fun supplierDebtListAndDetail_shareSameKeyPerPayable_andOpeningPayableBDoesNotErasePayableA() = runTest(dispatcher) {
+        val store = FakePendingSubmissionStore()
+        val payableA = SupplierPayable(
+            id = "pay-A",
+            supplierId = "sup-1",
+            supplierName = "PT Semen",
+            purchaseId = "pur-A",
+            amount = BigDecimal("200000"),
+            paidAmount = BigDecimal.ZERO,
+            remainingAmount = BigDecimal("200000"),
+            dueDate = "2026-12-31",
+            status = "belum_lunas",
+            createdAt = "2026-11-20T10:00:00Z"
+        )
+        val payableB = payableA.copy(id = "pay-B", purchaseId = "pur-B", amount = BigDecimal("150000"), remainingAmount = BigDecimal("150000"))
+        val repo = FakePurchasingRepo(listOf(payableA, payableB))
+        var seq = 0
+
+        // 1. Ambiguous payment for payable A on List screen
+        val listVm = SupplierDebtViewModel(
+            purchasingRepository = repo,
+            idempotencyKeyGenerator = { "list-${++seq}" },
+            pendingSubmissionStore = store
+        )
+        advanceUntilIdle()
+        listVm.openPayment(payableA)
+        listVm.onPaymentAmountChanged("80000")
+        listVm.onReferenceChanged("TRF-A")
+        repo.nextPaymentResult = RepositoryResult.Error("NETWORK_TIMEOUT", "Timeout")
+        listVm.submitPayment()
+        advanceUntilIdle()
+
+        val keyA = repo.recordedPayments[0].idempotencyKey!!
+        assertNotNull(store.records[PendingSubmissionScopes.supplierPayment("pay-A")])
+
+        // 2. Open and close dialog for payable B on List screen -> must NOT remove payable A's ambiguous key
+        listVm.closePayment()
+        listVm.openPayment(payableB)
+        listVm.closePayment()
+        assertNotNull(store.records[PendingSubmissionScopes.supplierPayment("pay-A")])
+
+        // 3. Pay payable B in full -> must NOT remove payable A's ambiguous key
+        listVm.openPayment(payableB)
+        listVm.submitPayment()
+        advanceUntilIdle()
+        assertNotEquals(keyA, repo.recordedPayments[1].idempotencyKey)
+        assertNotNull(store.records[PendingSubmissionScopes.supplierPayment("pay-A")])
+
+        // 4. Open payable A in Detail screen (even without restart) -> restores draft & reuses exact keyA
+        val detailVm = SupplierDebtDetailViewModel(
+            purchasingRepository = repo,
+            supplierId = "sup-1",
+            idempotencyKeyGenerator = { "det-${++seq}" },
+            pendingSubmissionStore = store
+        )
+        advanceUntilIdle()
+        detailVm.openPayment(payableA)
+        advanceUntilIdle()
+        assertEquals("80000", detailVm.uiState.value.paymentAmountInput)
+        assertEquals("TRF-A", detailVm.uiState.value.referenceInput)
+
+        detailVm.submitPayment()
+        advanceUntilIdle()
+        assertEquals(keyA, repo.recordedPayments[2].idempotencyKey)
+        assertNull(store.records[PendingSubmissionScopes.supplierPayment("pay-A")])
     }
 
     @Test
@@ -521,6 +589,12 @@ class SubmissionIdempotencyPersistenceTest {
                 return null
             }
             return existing
+        }
+        override suspend fun loadByScopePrefix(scopePrefix: String): List<PendingSubmissionRecord> {
+            return records.keys
+                .filter { it.startsWith(scopePrefix) }
+                .toList()
+                .mapNotNull { load(it) }
         }
         override suspend fun save(record: PendingSubmissionRecord) {
             records[record.scope] = record

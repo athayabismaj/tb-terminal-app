@@ -7,12 +7,12 @@ import com.tbterminal.app.data.sync.runSuspendCatching
 object PendingSubmissionScopes {
     const val CHECKOUT = "checkout"
     const val PURCHASE = "purchase"
-    const val SUPPLIER_PAYMENT_LIST = "supplier-pay"
+    const val SUPPLIER_PAYMENT_PREFIX = "supplier-pay:payable:"
     const val CASHIER_PAY_DEBT = "cashier-pay-debt"
     const val CASHIER_VOID = "cashier-void"
     const val CASHIER_REFUND = "cashier-refund"
 
-    fun supplierPaymentDetail(supplierId: String): String = "supplier-pay:${supplierId.trim()}"
+    fun supplierPayment(payableId: String): String = "$SUPPLIER_PAYMENT_PREFIX${payableId.trim()}"
 
     fun receivablePayment(customerId: String): String = "receivable-pay:${customerId.trim()}"
 }
@@ -45,6 +45,7 @@ data class PendingSubmissionRecord(
 
 interface PendingSubmissionStore {
     suspend fun load(scope: String): PendingSubmissionRecord?
+    suspend fun loadByScopePrefix(scopePrefix: String): List<PendingSubmissionRecord> = emptyList()
     suspend fun save(record: PendingSubmissionRecord)
     suspend fun saveForOwner(ownerUserId: String, record: PendingSubmissionRecord) {
         save(record)
@@ -65,7 +66,20 @@ class RoomPendingSubmissionStore(
         val ownerUserId = resolveOwnerUserIdOrNull() ?: return null
         val entity = runSuspendCatching { dao.get(ownerUserId, scope) }.getOrElse { return null }
             ?: return null
+        return validateOrDeleteEntity(ownerUserId, entity)
+    }
 
+    override suspend fun loadByScopePrefix(scopePrefix: String): List<PendingSubmissionRecord> {
+        val ownerUserId = resolveOwnerUserIdOrNull() ?: return emptyList()
+        val entities = runSuspendCatching { dao.getByScopePrefix(ownerUserId, scopePrefix) }
+            .getOrElse { return emptyList() }
+        return entities.mapNotNull { entity -> validateOrDeleteEntity(ownerUserId, entity) }
+    }
+
+    private suspend fun validateOrDeleteEntity(
+        ownerUserId: String,
+        entity: PendingSubmissionEntity
+    ): PendingSubmissionRecord? {
         val status = PendingSubmissionStatus.fromRaw(entity.status)
         val now = clockMillis()
         val isExpired = entity.createdAt <= 0L || now - entity.createdAt > ttlMillis
@@ -76,7 +90,7 @@ class RoomPendingSubmissionStore(
             isExpired
 
         if (isInvalid) {
-            runSuspendCatching { dao.delete(ownerUserId, scope) }
+            runSuspendCatching { dao.delete(ownerUserId, entity.scope) }
             return null
         }
 
