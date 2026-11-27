@@ -9,6 +9,8 @@ object PendingSubmissionScopes {
     const val PURCHASE = "purchase"
     const val SUPPLIER_PAYMENT_LIST = "supplier-pay"
     const val CASHIER_PAY_DEBT = "cashier-pay-debt"
+    const val CASHIER_VOID = "cashier-void"
+    const val CASHIER_REFUND = "cashier-refund"
 
     fun supplierPaymentDetail(supplierId: String): String = "supplier-pay:${supplierId.trim()}"
 

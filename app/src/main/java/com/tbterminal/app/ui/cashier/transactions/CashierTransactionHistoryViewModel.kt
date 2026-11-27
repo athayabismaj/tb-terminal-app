@@ -62,6 +62,21 @@ private data class PersistedCashierPayDebtPending(
     val fingerprint: String
 )
 
+@Serializable
+private data class PersistedCashierVoidPending(
+    val transactionId: String,
+    val reason: String,
+    val managerApprovalId: String? = null
+)
+
+@Serializable
+private data class PersistedCashierRefundPending(
+    val transactionId: String,
+    val reason: String,
+    val dispositionName: String,
+    val managerApprovalId: String? = null
+)
+
 class CashierTransactionHistoryViewModel(
     private val repository: CashReconciliationRepository,
     private val transactionDao: TransactionDao? = null,
@@ -80,11 +95,21 @@ class CashierTransactionHistoryViewModel(
     private var restoredPayDebtKey: String? = null
     private var restoredPayDebtCreatedAt: Long? = null
     private var activePayDebtCreatedAt: Long? = null
-    private val payDebtRestoreJob: Job
+    private var restoredVoid: PersistedCashierVoidPending? = null
+    private var restoredVoidKey: String? = null
+    private var restoredVoidCreatedAt: Long? = null
+    private var activeVoidCreatedAt: Long? = null
+    private var restoredRefund: PersistedCashierRefundPending? = null
+    private var restoredRefundKey: String? = null
+    private var restoredRefundCreatedAt: Long? = null
+    private var activeRefundCreatedAt: Long? = null
+    private val pendingActionsRestoreJob: Job
 
     init {
-        payDebtRestoreJob = viewModelScope.launch {
+        pendingActionsRestoreJob = viewModelScope.launch {
             restorePendingPayDebt()
+            restorePendingVoid()
+            restorePendingRefund()
         }
         observeLocalPendingTransactions()
         loadTransactions()
@@ -117,6 +142,72 @@ class CashierTransactionHistoryViewModel(
                     payDebtMethodInput = dto.method,
                     payDebtIdempotencyKey = record.idempotencyKey,
                     isPayDebtOutcomeAmbiguous = true,
+                )
+            }
+        }
+    }
+
+    private suspend fun restorePendingVoid() {
+        val store = pendingSubmissionStore ?: return
+        val record = store.load(PendingSubmissionScopes.CASHIER_VOID) ?: return
+        val dto = runSuspendCatching {
+            CashierPayDebtPersistenceJson.decodeFromString<PersistedCashierVoidPending>(record.intentJson)
+        }.getOrElse {
+            store.clear(PendingSubmissionScopes.CASHIER_VOID)
+            return
+        }
+        if (dto.transactionId.isBlank() || dto.reason.isBlank() || record.idempotencyKey.isBlank()) {
+            store.clear(PendingSubmissionScopes.CASHIER_VOID)
+            return
+        }
+        restoredVoid = dto
+        restoredVoidKey = record.idempotencyKey
+        restoredVoidCreatedAt = record.createdAt
+
+        val selected = _uiState.value.selectedTransaction
+        if (selected != null && selected.id == dto.transactionId && !_uiState.value.isSubmittingVoid) {
+            activeVoidCreatedAt = record.createdAt
+            _uiState.update { state ->
+                state.copy(
+                    voidReasonInput = dto.reason,
+                    voidIdempotencyKey = record.idempotencyKey,
+                    voidManagerApprovalId = dto.managerApprovalId,
+                    isVoidOutcomeAmbiguous = true,
+                )
+            }
+        }
+    }
+
+    private suspend fun restorePendingRefund() {
+        val store = pendingSubmissionStore ?: return
+        val record = store.load(PendingSubmissionScopes.CASHIER_REFUND) ?: return
+        val dto = runSuspendCatching {
+            CashierPayDebtPersistenceJson.decodeFromString<PersistedCashierRefundPending>(record.intentJson)
+        }.getOrElse {
+            store.clear(PendingSubmissionScopes.CASHIER_REFUND)
+            return
+        }
+        val disposition = RefundDisposition.entries.firstOrNull {
+            it.name.equals(dto.dispositionName.trim(), ignoreCase = true)
+        }
+        if (dto.transactionId.isBlank() || dto.reason.isBlank() || disposition == null || record.idempotencyKey.isBlank()) {
+            store.clear(PendingSubmissionScopes.CASHIER_REFUND)
+            return
+        }
+        restoredRefund = dto
+        restoredRefundKey = record.idempotencyKey
+        restoredRefundCreatedAt = record.createdAt
+
+        val selected = _uiState.value.selectedTransaction
+        if (selected != null && selected.id == dto.transactionId && !_uiState.value.isSubmittingRefund) {
+            activeRefundCreatedAt = record.createdAt
+            _uiState.update { state ->
+                state.copy(
+                    refundReasonInput = dto.reason,
+                    refundDisposition = disposition,
+                    refundIdempotencyKey = record.idempotencyKey,
+                    refundManagerApprovalId = dto.managerApprovalId,
+                    isRefundOutcomeAmbiguous = true,
                 )
             }
         }
@@ -547,17 +638,44 @@ class CashierTransactionHistoryViewModel(
                     payDebtIdempotencyKey = if (switchingReceipt) null else state.payDebtIdempotencyKey,
                     isPayDebtOutcomeAmbiguous = if (switchingReceipt) false else state.isPayDebtOutcomeAmbiguous,
                     payDebtError = if (switchingReceipt) null else state.payDebtError,
+                    isVoidDialogOpen = if (switchingReceipt) false else state.isVoidDialogOpen,
+                    voidReasonInput = if (switchingReceipt) "" else state.voidReasonInput,
+                    voidIdempotencyKey = if (switchingReceipt) null else state.voidIdempotencyKey,
+                    voidManagerApprovalId = if (switchingReceipt) null else state.voidManagerApprovalId,
+                    isVoidOutcomeAmbiguous = if (switchingReceipt) false else state.isVoidOutcomeAmbiguous,
+                    voidErrorMessage = if (switchingReceipt) null else state.voidErrorMessage,
+                    isRefundDialogOpen = if (switchingReceipt) false else state.isRefundDialogOpen,
+                    refundReasonInput = if (switchingReceipt) "" else state.refundReasonInput,
+                    refundIdempotencyKey = if (switchingReceipt) null else state.refundIdempotencyKey,
+                    refundManagerApprovalId = if (switchingReceipt) null else state.refundManagerApprovalId,
+                    isRefundOutcomeAmbiguous = if (switchingReceipt) false else state.isRefundOutcomeAmbiguous,
+                    refundErrorMessage = if (switchingReceipt) null else state.refundErrorMessage,
                 )
             }
 
             when (val result = repository.getTransactionById(transactionId)) {
                 is RepositoryResult.Success -> {
-                    payDebtRestoreJob.join()
+                    pendingActionsRestoreJob.join()
                     val pendingForReceipt = restoredPayDebt?.takeIf { it.transactionId == result.data.id }
                     val pendingKey = restoredPayDebtKey?.takeIf { pendingForReceipt != null && it.isNotBlank() }
                     if (pendingForReceipt != null && pendingKey != null) {
                         lastSubmittedPayDebtFingerprint = pendingForReceipt.fingerprint
                         activePayDebtCreatedAt = restoredPayDebtCreatedAt
+                    }
+                    val pendingVoid = restoredVoid?.takeIf { it.transactionId == result.data.id }
+                    val pendingVoidKey = restoredVoidKey?.takeIf { pendingVoid != null && it.isNotBlank() }
+                    if (pendingVoid != null && pendingVoidKey != null) {
+                        activeVoidCreatedAt = restoredVoidCreatedAt
+                    }
+                    val pendingRefund = restoredRefund?.takeIf { it.transactionId == result.data.id }
+                    val pendingRefundKey = restoredRefundKey?.takeIf { pendingRefund != null && it.isNotBlank() }
+                    val pendingRefundDisposition = pendingRefund?.let { dto ->
+                        RefundDisposition.entries.firstOrNull {
+                            it.name.equals(dto.dispositionName.trim(), ignoreCase = true)
+                        }
+                    }
+                    if (pendingRefund != null && pendingRefundKey != null && pendingRefundDisposition != null) {
+                        activeRefundCreatedAt = restoredRefundCreatedAt
                     }
                     _uiState.update { state ->
                         state.copy(
@@ -568,6 +686,15 @@ class CashierTransactionHistoryViewModel(
                             payDebtMethodInput = pendingForReceipt?.method ?: state.payDebtMethodInput,
                             payDebtIdempotencyKey = pendingKey ?: state.payDebtIdempotencyKey,
                             isPayDebtOutcomeAmbiguous = if (pendingKey != null) true else state.isPayDebtOutcomeAmbiguous,
+                            voidReasonInput = pendingVoid?.takeIf { pendingVoidKey != null }?.reason ?: state.voidReasonInput,
+                            voidIdempotencyKey = pendingVoidKey ?: state.voidIdempotencyKey,
+                            voidManagerApprovalId = pendingVoid?.takeIf { pendingVoidKey != null }?.managerApprovalId ?: state.voidManagerApprovalId,
+                            isVoidOutcomeAmbiguous = if (pendingVoidKey != null) true else state.isVoidOutcomeAmbiguous,
+                            refundReasonInput = pendingRefund?.takeIf { pendingRefundKey != null && pendingRefundDisposition != null }?.reason ?: state.refundReasonInput,
+                            refundDisposition = pendingRefundDisposition?.takeIf { pendingRefundKey != null } ?: state.refundDisposition,
+                            refundIdempotencyKey = pendingRefundKey?.takeIf { pendingRefundDisposition != null } ?: state.refundIdempotencyKey,
+                            refundManagerApprovalId = pendingRefund?.takeIf { pendingRefundKey != null && pendingRefundDisposition != null }?.managerApprovalId ?: state.refundManagerApprovalId,
+                            isRefundOutcomeAmbiguous = if (pendingRefundKey != null && pendingRefundDisposition != null) true else state.isRefundOutcomeAmbiguous,
                         )
                     }
                 }
@@ -581,14 +708,32 @@ class CashierTransactionHistoryViewModel(
         val transaction = _uiState.value.selectedTransaction ?: return
         if (!transactionActionAccess(actorRole, transaction.status, transaction.type).canVoid) return
         _uiState.update {
-            it.copy(
-                isVoidDialogOpen = true,
-                voidReasonInput = if (it.isVoidOutcomeAmbiguous) it.voidReasonInput else "",
-                voidIdempotencyKey = it.voidIdempotencyKey
-                    ?.takeIf { _ -> it.isVoidOutcomeAmbiguous }
-                    ?: "void-mobile-${UUID.randomUUID()}",
-                voidErrorMessage = null,
-            )
+            val pendingForSelected = restoredVoid?.takeIf { dto ->
+                dto.transactionId == transaction.id && !restoredVoidKey.isNullOrBlank()
+            }
+            when {
+                it.isVoidOutcomeAmbiguous && !it.voidIdempotencyKey.isNullOrBlank() -> it.copy(
+                    isVoidDialogOpen = true,
+                    voidErrorMessage = null,
+                )
+                pendingForSelected != null -> {
+                    activeVoidCreatedAt = restoredVoidCreatedAt
+                    it.copy(
+                        isVoidDialogOpen = true,
+                        voidReasonInput = pendingForSelected.reason,
+                        voidIdempotencyKey = restoredVoidKey,
+                        voidManagerApprovalId = pendingForSelected.managerApprovalId,
+                        isVoidOutcomeAmbiguous = true,
+                        voidErrorMessage = null,
+                    )
+                }
+                else -> it.copy(
+                    isVoidDialogOpen = true,
+                    voidReasonInput = "",
+                    voidIdempotencyKey = "void-mobile-${idempotencyKeyGenerator()}",
+                    voidErrorMessage = null,
+                )
+            }
         }
     }
 
@@ -607,10 +752,13 @@ class CashierTransactionHistoryViewModel(
     fun onVoidReasonChanged(value: String) {
         if (_uiState.value.isVoidOutcomeAmbiguous) return
         if (value.length <= 1000) {
+            if (restoredVoid != null || restoredVoidKey != null) {
+                viewModelScope.launch { clearPersistedVoidState() }
+            }
             _uiState.update {
                 it.copy(
                     voidReasonInput = value,
-                    voidIdempotencyKey = "void-mobile-${UUID.randomUUID()}",
+                    voidIdempotencyKey = "void-mobile-${idempotencyKeyGenerator()}",
                     voidErrorMessage = null,
                 )
             }
@@ -641,7 +789,7 @@ class CashierTransactionHistoryViewModel(
             }
             return
         }
-        val key = state.voidIdempotencyKey ?: "void-mobile-${UUID.randomUUID()}"
+        val key = state.voidIdempotencyKey ?: "void-mobile-${idempotencyKeyGenerator()}"
         executeVoid(transaction.id, reason, key, state.voidManagerApprovalId)
     }
 
@@ -661,15 +809,34 @@ class CashierTransactionHistoryViewModel(
             )
         }
         viewModelScope.launch {
+            pendingActionsRestoreJob.join()
+            val pendingMatches = restoredVoid?.let {
+                it.transactionId == transactionId && it.reason == reason && !restoredVoidKey.isNullOrBlank()
+            } == true
+            val resolvedKey = if (pendingMatches && _uiState.value.voidIdempotencyKey == restoredVoidKey) {
+                activeVoidCreatedAt = restoredVoidCreatedAt
+                restoredVoidKey!!
+            } else {
+                idempotencyKey
+            }
+            val pendingDto = PersistedCashierVoidPending(
+                transactionId = transactionId,
+                reason = reason,
+                managerApprovalId = managerApprovalId,
+            )
+            _uiState.update { it.copy(voidIdempotencyKey = resolvedKey) }
+            persistPendingVoid(pendingDto, resolvedKey, PendingSubmissionStatus.IN_FLIGHT)
+
             when (
                 val result = repository.voidTransaction(
                     transactionId,
                     reason,
-                    idempotencyKey,
+                    resolvedKey,
                     managerApprovalId,
                 )
             ) {
                 is RepositoryResult.Success -> {
+                    clearPersistedVoidState()
                     _uiState.update {
                         it.copy(
                             isSubmittingVoid = false,
@@ -689,6 +856,14 @@ class CashierTransactionHistoryViewModel(
                 is RepositoryResult.Error -> {
                     val approvalInvalid = requiresNewActionApproval(result.code)
                     val ambiguous = isAmbiguousTransactionActionError(result.code)
+                    if (ambiguous) {
+                        val dtoToSave = pendingDto.copy(
+                            managerApprovalId = if (approvalInvalid) null else managerApprovalId
+                        )
+                        persistPendingVoid(dtoToSave, resolvedKey, PendingSubmissionStatus.AMBIGUOUS)
+                    } else {
+                        clearPersistedVoidState()
+                    }
                     _uiState.update {
                         it.copy(
                             isSubmittingVoid = false,
@@ -699,13 +874,16 @@ class CashierTransactionHistoryViewModel(
                         )
                     }
                 }
-                is RepositoryResult.Exception -> _uiState.update {
-                    it.copy(
-                        isSubmittingVoid = false,
-                        isVoidDialogOpen = true,
-                        isVoidOutcomeAmbiguous = true,
-                        voidErrorMessage = "Status void belum dapat dipastikan. Tekan konfirmasi lagi untuk memeriksa request yang sama.",
-                    )
+                is RepositoryResult.Exception -> {
+                    persistPendingVoid(pendingDto, resolvedKey, PendingSubmissionStatus.AMBIGUOUS)
+                    _uiState.update {
+                        it.copy(
+                            isSubmittingVoid = false,
+                            isVoidDialogOpen = true,
+                            isVoidOutcomeAmbiguous = true,
+                            voidErrorMessage = "Status void belum dapat dipastikan. Tekan konfirmasi lagi untuk memeriksa request yang sama.",
+                        )
+                    }
                 }
             }
         }
@@ -715,19 +893,39 @@ class CashierTransactionHistoryViewModel(
         val transaction = _uiState.value.selectedTransaction ?: return
         if (!transactionActionAccess(actorRole, transaction.status, transaction.type).canRefund) return
         _uiState.update {
-            it.copy(
-                isRefundDialogOpen = true,
-                refundReasonInput = if (it.isRefundOutcomeAmbiguous) it.refundReasonInput else "",
-                refundDisposition = if (it.isRefundOutcomeAmbiguous) {
-                    it.refundDisposition
-                } else {
-                    RefundDisposition.RETURN_TO_STOCK
-                },
-                refundIdempotencyKey = it.refundIdempotencyKey
-                    ?.takeIf { _ -> it.isRefundOutcomeAmbiguous }
-                    ?: "refund-mobile-${UUID.randomUUID()}",
-                refundErrorMessage = null,
-            )
+            val pendingForSelected = restoredRefund?.takeIf { dto ->
+                dto.transactionId == transaction.id && !restoredRefundKey.isNullOrBlank()
+            }
+            val restoredDisposition = pendingForSelected?.let { dto ->
+                RefundDisposition.entries.firstOrNull { d ->
+                    d.name.equals(dto.dispositionName.trim(), ignoreCase = true)
+                }
+            }
+            when {
+                it.isRefundOutcomeAmbiguous && !it.refundIdempotencyKey.isNullOrBlank() -> it.copy(
+                    isRefundDialogOpen = true,
+                    refundErrorMessage = null,
+                )
+                pendingForSelected != null && restoredDisposition != null -> {
+                    activeRefundCreatedAt = restoredRefundCreatedAt
+                    it.copy(
+                        isRefundDialogOpen = true,
+                        refundReasonInput = pendingForSelected.reason,
+                        refundDisposition = restoredDisposition,
+                        refundIdempotencyKey = restoredRefundKey,
+                        refundManagerApprovalId = pendingForSelected.managerApprovalId,
+                        isRefundOutcomeAmbiguous = true,
+                        refundErrorMessage = null,
+                    )
+                }
+                else -> it.copy(
+                    isRefundDialogOpen = true,
+                    refundReasonInput = "",
+                    refundDisposition = RefundDisposition.RETURN_TO_STOCK,
+                    refundIdempotencyKey = "refund-mobile-${idempotencyKeyGenerator()}",
+                    refundErrorMessage = null,
+                )
+            }
         }
     }
 
@@ -746,10 +944,13 @@ class CashierTransactionHistoryViewModel(
     fun onRefundReasonChanged(value: String) {
         if (_uiState.value.isRefundOutcomeAmbiguous) return
         if (value.length <= 1000) {
+            if (restoredRefund != null || restoredRefundKey != null) {
+                viewModelScope.launch { clearPersistedRefundState() }
+            }
             _uiState.update {
                 it.copy(
                     refundReasonInput = value,
-                    refundIdempotencyKey = "refund-mobile-${UUID.randomUUID()}",
+                    refundIdempotencyKey = "refund-mobile-${idempotencyKeyGenerator()}",
                     refundErrorMessage = null,
                 )
             }
@@ -758,10 +959,13 @@ class CashierTransactionHistoryViewModel(
 
     fun onRefundDispositionChanged(disposition: RefundDisposition) {
         if (_uiState.value.isRefundOutcomeAmbiguous) return
+        if (restoredRefund != null || restoredRefundKey != null) {
+            viewModelScope.launch { clearPersistedRefundState() }
+        }
         _uiState.update {
             it.copy(
                 refundDisposition = disposition,
-                refundIdempotencyKey = "refund-mobile-${UUID.randomUUID()}",
+                refundIdempotencyKey = "refund-mobile-${idempotencyKeyGenerator()}",
                 refundErrorMessage = null,
             )
         }
@@ -795,7 +999,7 @@ class CashierTransactionHistoryViewModel(
             transactionId = transaction.id,
             reason = reason,
             disposition = state.refundDisposition,
-            idempotencyKey = state.refundIdempotencyKey ?: "refund-mobile-${UUID.randomUUID()}",
+            idempotencyKey = state.refundIdempotencyKey ?: "refund-mobile-${idempotencyKeyGenerator()}",
             managerApprovalId = state.refundManagerApprovalId,
         )
     }
@@ -817,16 +1021,39 @@ class CashierTransactionHistoryViewModel(
             )
         }
         viewModelScope.launch {
+            pendingActionsRestoreJob.join()
+            val pendingMatches = restoredRefund?.let {
+                it.transactionId == transactionId &&
+                    it.reason == reason &&
+                    it.dispositionName.equals(disposition.name, ignoreCase = true) &&
+                    !restoredRefundKey.isNullOrBlank()
+            } == true
+            val resolvedKey = if (pendingMatches && _uiState.value.refundIdempotencyKey == restoredRefundKey) {
+                activeRefundCreatedAt = restoredRefundCreatedAt
+                restoredRefundKey!!
+            } else {
+                idempotencyKey
+            }
+            val pendingDto = PersistedCashierRefundPending(
+                transactionId = transactionId,
+                reason = reason,
+                dispositionName = disposition.name,
+                managerApprovalId = managerApprovalId,
+            )
+            _uiState.update { it.copy(refundIdempotencyKey = resolvedKey) }
+            persistPendingRefund(pendingDto, resolvedKey, PendingSubmissionStatus.IN_FLIGHT)
+
             when (
                 val result = repository.refundTransaction(
                     id = transactionId,
                     reason = reason,
                     disposition = disposition,
-                    idempotencyKey = idempotencyKey,
+                    idempotencyKey = resolvedKey,
                     managerApprovalId = managerApprovalId,
                 )
             ) {
                 is RepositoryResult.Success -> {
+                    clearPersistedRefundState()
                     _uiState.update {
                         it.copy(
                             isSubmittingRefund = false,
@@ -847,6 +1074,14 @@ class CashierTransactionHistoryViewModel(
                 is RepositoryResult.Error -> {
                     val approvalInvalid = requiresNewActionApproval(result.code)
                     val ambiguous = isAmbiguousTransactionActionError(result.code)
+                    if (ambiguous) {
+                        val dtoToSave = pendingDto.copy(
+                            managerApprovalId = if (approvalInvalid) null else managerApprovalId
+                        )
+                        persistPendingRefund(dtoToSave, resolvedKey, PendingSubmissionStatus.AMBIGUOUS)
+                    } else {
+                        clearPersistedRefundState()
+                    }
                     _uiState.update {
                         it.copy(
                             isSubmittingRefund = false,
@@ -857,16 +1092,93 @@ class CashierTransactionHistoryViewModel(
                         )
                     }
                 }
-                is RepositoryResult.Exception -> _uiState.update {
-                    it.copy(
-                        isSubmittingRefund = false,
-                        isRefundDialogOpen = true,
-                        isRefundOutcomeAmbiguous = true,
-                        refundErrorMessage = "Status refund belum dapat dipastikan. Tekan konfirmasi lagi untuk memeriksa request yang sama.",
-                    )
+                is RepositoryResult.Exception -> {
+                    persistPendingRefund(pendingDto, resolvedKey, PendingSubmissionStatus.AMBIGUOUS)
+                    _uiState.update {
+                        it.copy(
+                            isSubmittingRefund = false,
+                            isRefundDialogOpen = true,
+                            isRefundOutcomeAmbiguous = true,
+                            refundErrorMessage = "Status refund belum dapat dipastikan. Tekan konfirmasi lagi untuk memeriksa request yang sama.",
+                        )
+                    }
                 }
             }
         }
+    }
+
+    private suspend fun persistPendingVoid(
+        dto: PersistedCashierVoidPending,
+        idempotencyKey: String,
+        status: PendingSubmissionStatus
+    ) {
+        val store = pendingSubmissionStore ?: return
+        val now = clockMillis()
+        val createdAt = if (restoredVoidKey == idempotencyKey || activeVoidCreatedAt != null) {
+            activeVoidCreatedAt ?: now
+        } else {
+            now
+        }
+        activeVoidCreatedAt = createdAt
+        restoredVoid = dto
+        restoredVoidKey = idempotencyKey
+        restoredVoidCreatedAt = createdAt
+        store.save(
+            PendingSubmissionRecord(
+                scope = PendingSubmissionScopes.CASHIER_VOID,
+                idempotencyKey = idempotencyKey,
+                intentJson = CashierPayDebtPersistenceJson.encodeToString(dto),
+                payloadJson = null,
+                status = status,
+                createdAt = createdAt,
+                updatedAt = now
+            )
+        )
+    }
+
+    private suspend fun clearPersistedVoidState() {
+        restoredVoid = null
+        restoredVoidKey = null
+        restoredVoidCreatedAt = null
+        activeVoidCreatedAt = null
+        pendingSubmissionStore?.clear(PendingSubmissionScopes.CASHIER_VOID)
+    }
+
+    private suspend fun persistPendingRefund(
+        dto: PersistedCashierRefundPending,
+        idempotencyKey: String,
+        status: PendingSubmissionStatus
+    ) {
+        val store = pendingSubmissionStore ?: return
+        val now = clockMillis()
+        val createdAt = if (restoredRefundKey == idempotencyKey || activeRefundCreatedAt != null) {
+            activeRefundCreatedAt ?: now
+        } else {
+            now
+        }
+        activeRefundCreatedAt = createdAt
+        restoredRefund = dto
+        restoredRefundKey = idempotencyKey
+        restoredRefundCreatedAt = createdAt
+        store.save(
+            PendingSubmissionRecord(
+                scope = PendingSubmissionScopes.CASHIER_REFUND,
+                idempotencyKey = idempotencyKey,
+                intentJson = CashierPayDebtPersistenceJson.encodeToString(dto),
+                payloadJson = null,
+                status = status,
+                createdAt = createdAt,
+                updatedAt = now
+            )
+        )
+    }
+
+    private suspend fun clearPersistedRefundState() {
+        restoredRefund = null
+        restoredRefundKey = null
+        restoredRefundCreatedAt = null
+        activeRefundCreatedAt = null
+        pendingSubmissionStore?.clear(PendingSubmissionScopes.CASHIER_REFUND)
     }
 
     fun onManagerApprovalGranted(grant: ManagerApprovalGrant) {
@@ -1053,7 +1365,7 @@ class CashierTransactionHistoryViewModel(
                     receiptMessage = null,
                 )
             }
-            payDebtRestoreJob.join()
+            pendingActionsRestoreJob.join()
             val pendingMatches = restoredPayDebt?.let {
                 it.transactionId == transactionId && it.fingerprint == fingerprint && !restoredPayDebtKey.isNullOrBlank()
             } == true

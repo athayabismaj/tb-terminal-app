@@ -4,6 +4,7 @@ import com.tbterminal.app.data.local.database.PendingSubmissionRecord
 import com.tbterminal.app.data.local.database.PendingSubmissionScopes
 import com.tbterminal.app.data.local.database.PendingSubmissionStatus
 import com.tbterminal.app.data.local.database.PendingSubmissionStore
+import com.tbterminal.app.data.local.database.RoomPendingSubmissionStore
 import com.tbterminal.app.data.model.CashExpense
 import com.tbterminal.app.data.model.CashExpensePage
 import com.tbterminal.app.data.model.CashSession
@@ -100,7 +101,7 @@ class SubmissionIdempotencyPersistenceTest {
 
     @Test
     fun tracker_restoresInFlightAndAmbiguousKeys_clearsOnSuccessChangeOrCorrupt() = runTest(dispatcher) {
-        val store = FakePendingSubmissionStore()
+        val store = FakePendingSubmissionStore(clockMillis = { 20_000L })
         var seq = 0
         val tracker1 = SubmissionIdempotencyTracker(
             prefix = "test",
@@ -360,9 +361,167 @@ class SubmissionIdempotencyPersistenceTest {
         assertFalse(vm2.uiState.value.isPayDebtOutcomeAmbiguous)
     }
 
-    private class FakePendingSubmissionStore : PendingSubmissionStore {
+    @Test
+    fun cashierTransactionHistoryViewModel_voidSurvivesRestartWithSameKey_andClearsOnSuccessOrNonAmbiguousError() = runTest(dispatcher) {
+        var nowMillis = 1_000_000L
+        val store = FakePendingSubmissionStore(clockMillis = { nowMillis })
+        val cashRepo = FakeCashRepo(initialStatus = "LUNAS")
+        var seq = 0
+
+        val vm1 = CashierTransactionHistoryViewModel(
+            repository = cashRepo,
+            actorRole = "OWNER",
+            idempotencyKeyGenerator = { "void-${++seq}" },
+            pendingSubmissionStore = store,
+            clockMillis = { nowMillis }
+        )
+        vm1.loadReceipt("tx-debt-1")
+        advanceUntilIdle()
+        vm1.showVoidDialog()
+        vm1.onVoidReasonChanged("Salah input barang")
+        cashRepo.nextVoidResult = RepositoryResult.Exception(IOException("Socket timeout"))
+        vm1.submitVoid()
+        advanceUntilIdle()
+
+        assertEquals(1, cashRepo.recordedVoidKeys.size)
+        val firstKey = cashRepo.recordedVoidKeys[0]
+        assertTrue(firstKey.startsWith("void-mobile-"))
+        assertEquals(PendingSubmissionStatus.AMBIGUOUS, store.records[PendingSubmissionScopes.CASHIER_VOID]?.status)
+
+        // Simulate restart within 72h -> new ViewModel loads same receipt and reuses exact same key
+        nowMillis += 60_000L
+        val vm2 = CashierTransactionHistoryViewModel(
+            repository = cashRepo,
+            actorRole = "OWNER",
+            idempotencyKeyGenerator = { "void-${++seq}" },
+            pendingSubmissionStore = store,
+            clockMillis = { nowMillis }
+        )
+        vm2.loadReceipt("tx-debt-1")
+        advanceUntilIdle()
+        assertTrue(vm2.uiState.value.isVoidOutcomeAmbiguous)
+        assertEquals(firstKey, vm2.uiState.value.voidIdempotencyKey)
+        assertEquals("Salah input barang", vm2.uiState.value.voidReasonInput)
+
+        vm2.showVoidDialog()
+        vm2.submitVoid()
+        advanceUntilIdle()
+
+        assertEquals(2, cashRepo.recordedVoidKeys.size)
+        assertEquals(firstKey, cashRepo.recordedVoidKeys[1])
+        assertNull(store.records[PendingSubmissionScopes.CASHIER_VOID])
+        assertFalse(vm2.uiState.value.isVoidOutcomeAmbiguous)
+
+        // Non-ambiguous 400 error clears persisted void key
+        cashRepo.detail = cashRepo.detail.copy(status = "LUNAS")
+        vm2.loadReceipt("tx-debt-1")
+        advanceUntilIdle()
+        vm2.showVoidDialog()
+        vm2.onVoidReasonChanged("Salah harga lagi")
+        cashRepo.nextVoidResult = RepositoryResult.Error("VALIDATION_ERROR", "Sudah lewat batas")
+        vm2.submitVoid()
+        advanceUntilIdle()
+        assertNull(store.records[PendingSubmissionScopes.CASHIER_VOID])
+        assertFalse(vm2.uiState.value.isVoidOutcomeAmbiguous)
+    }
+
+    @Test
+    fun cashierTransactionHistoryViewModel_refundSurvivesRestartWithSameKeyAndDisposition_andHandlesCorruptOrExpired() = runTest(dispatcher) {
+        var nowMillis = 2_000_000L
+        val store = FakePendingSubmissionStore(clockMillis = { nowMillis })
+        val cashRepo = FakeCashRepo(initialStatus = "LUNAS")
+        var seq = 0
+
+        val vm1 = CashierTransactionHistoryViewModel(
+            repository = cashRepo,
+            actorRole = "ADMIN",
+            idempotencyKeyGenerator = { "ref-${++seq}" },
+            pendingSubmissionStore = store,
+            clockMillis = { nowMillis }
+        )
+        vm1.loadReceipt("tx-debt-1")
+        advanceUntilIdle()
+        vm1.showRefundDialog()
+        vm1.onRefundDispositionChanged(RefundDisposition.DAMAGED)
+        vm1.onRefundReasonChanged("Kemasan pecah di gudang")
+        cashRepo.nextRefundResult = RepositoryResult.Error("HTTP_503", "Service Unavailable")
+        vm1.submitRefund()
+        advanceUntilIdle()
+
+        assertEquals(1, cashRepo.recordedRefundKeys.size)
+        val firstKey = cashRepo.recordedRefundKeys[0]
+        assertEquals(PendingSubmissionStatus.AMBIGUOUS, store.records[PendingSubmissionScopes.CASHIER_REFUND]?.status)
+
+        // Simulate restart -> recreate VM with same store
+        val vm2 = CashierTransactionHistoryViewModel(
+            repository = cashRepo,
+            actorRole = "ADMIN",
+            idempotencyKeyGenerator = { "ref-${++seq}" },
+            pendingSubmissionStore = store,
+            clockMillis = { nowMillis }
+        )
+        vm2.loadReceipt("tx-debt-1")
+        advanceUntilIdle()
+        assertTrue(vm2.uiState.value.isRefundOutcomeAmbiguous)
+        assertEquals(firstKey, vm2.uiState.value.refundIdempotencyKey)
+        assertEquals(RefundDisposition.DAMAGED, vm2.uiState.value.refundDisposition)
+        assertEquals("Kemasan pecah di gudang", vm2.uiState.value.refundReasonInput)
+
+        vm2.showRefundDialog()
+        vm2.submitRefund()
+        advanceUntilIdle()
+        assertEquals(2, cashRepo.recordedRefundKeys.size)
+        assertEquals(firstKey, cashRepo.recordedRefundKeys[1])
+        assertNull(store.records[PendingSubmissionScopes.CASHIER_REFUND])
+
+        // Corrupt JSON & expired (>72h) records do not crash and get cleaned up
+        store.records[PendingSubmissionScopes.CASHIER_VOID] = PendingSubmissionRecord(
+            scope = PendingSubmissionScopes.CASHIER_VOID,
+            idempotencyKey = "broken-void",
+            intentJson = "{not-valid-json",
+            status = PendingSubmissionStatus.AMBIGUOUS,
+            createdAt = nowMillis,
+            updatedAt = nowMillis
+        )
+        store.records[PendingSubmissionScopes.CASHIER_REFUND] = PendingSubmissionRecord(
+            scope = PendingSubmissionScopes.CASHIER_REFUND,
+            idempotencyKey = "expired-refund",
+            intentJson = """{"transactionId":"tx-debt-1","reason":"expired","dispositionName":"RETURN_TO_STOCK"}""",
+            status = PendingSubmissionStatus.AMBIGUOUS,
+            createdAt = nowMillis,
+            updatedAt = nowMillis
+        )
+        nowMillis += RoomPendingSubmissionStore.DEFAULT_TTL_MILLIS + 1L
+        cashRepo.detail = cashRepo.detail.copy(status = "LUNAS")
+
+        val vm3 = CashierTransactionHistoryViewModel(
+            repository = cashRepo,
+            actorRole = "ADMIN",
+            idempotencyKeyGenerator = { "ref-${++seq}" },
+            pendingSubmissionStore = store,
+            clockMillis = { nowMillis }
+        )
+        vm3.loadReceipt("tx-debt-1")
+        advanceUntilIdle()
+
+        assertFalse(vm3.uiState.value.isVoidOutcomeAmbiguous)
+        assertFalse(vm3.uiState.value.isRefundOutcomeAmbiguous)
+        assertNull(store.records[PendingSubmissionScopes.CASHIER_VOID])
+        assertNull(store.records[PendingSubmissionScopes.CASHIER_REFUND])
+    }
+
+    private class FakePendingSubmissionStore(
+        private val clockMillis: () -> Long = { System.currentTimeMillis() }
+    ) : PendingSubmissionStore {
         val records = mutableMapOf<String, PendingSubmissionRecord>()
-        override suspend fun load(scope: String): PendingSubmissionRecord? = records[scope]
+        override suspend fun load(scope: String): PendingSubmissionRecord? {
+            val existing = records[scope] ?: return null
+            if (existing.createdAt <= 0L || clockMillis() - existing.createdAt > RoomPendingSubmissionStore.DEFAULT_TTL_MILLIS) {
+                records.remove(scope)
+                return null
+            }
+            return existing
+        }
         override suspend fun save(record: PendingSubmissionRecord) {
             records[record.scope] = record
         }
@@ -471,14 +630,20 @@ class SubmissionIdempotencyPersistenceTest {
         override suspend fun reverseReceivablePayment(command: ReverseReceivablePaymentCommand) = error("unused")
     }
 
-    private class FakeCashRepo : CashReconciliationRepository {
+    private class FakeCashRepo(initialStatus: String = "HUTANG") : CashReconciliationRepository {
         val recordedPayDebtKeys = mutableListOf<String>()
+        val recordedVoidKeys = mutableListOf<String>()
+        val recordedRefundKeys = mutableListOf<String>()
         var nextPayDebtError: RepositoryResult<CashTransactionDetail>? = null
-        private var detail = CashTransactionDetail(
+        var nextVoidResult: RepositoryResult<TransactionVoidResult>? = null
+        var nextRefundResult: RepositoryResult<TransactionRefundResult>? = null
+        var detail = CashTransactionDetail(
             id = "tx-debt-1", receiptId = "TRX-100", sessionId = "s1", customerId = "cust-1",
-            customerName = "Budi", type = "PENJUALAN", status = "HUTANG",
-            total = BigDecimal("100000"), paidAmount = BigDecimal("20000"),
-            amountTendered = BigDecimal("20000"), changeAmount = BigDecimal.ZERO,
+            customerName = "Budi", type = "PENJUALAN", status = initialStatus,
+            total = BigDecimal("100000"),
+            paidAmount = if (initialStatus == "LUNAS") BigDecimal("100000") else BigDecimal("20000"),
+            amountTendered = if (initialStatus == "LUNAS") BigDecimal("100000") else BigDecimal("20000"),
+            changeAmount = BigDecimal.ZERO,
             createdAt = "2026-11-26T10:00:00Z", items = emptyList()
         )
         override suspend fun getTransactionById(id: String) = RepositoryResult.Success(detail)
@@ -496,8 +661,33 @@ class SubmissionIdempotencyPersistenceTest {
         override suspend fun forceCloseSession(sessionId: String, endingCashPhysical: BigDecimal, notes: String?): RepositoryResult<CashSession> = error("unused")
         override suspend fun getTransactions(page: Int, limit: Int, sessionId: String?, search: String?, receiptNumber: String?, cashierId: String?, customerId: String?, paymentMethod: String?, status: String?, startDate: String?, endDate: String?) =
             RepositoryResult.Success(CashTransactionPage(emptyList(), 0, 1, limit, 1))
-        override suspend fun voidTransaction(id: String, reason: String, idempotencyKey: String, managerApprovalId: String?): RepositoryResult<TransactionVoidResult> = error("unused")
-        override suspend fun refundTransaction(id: String, reason: String, disposition: RefundDisposition, idempotencyKey: String, managerApprovalId: String?): RepositoryResult<TransactionRefundResult> = error("unused")
+        override suspend fun voidTransaction(id: String, reason: String, idempotencyKey: String, managerApprovalId: String?): RepositoryResult<TransactionVoidResult> {
+            recordedVoidKeys += idempotencyKey
+            nextVoidResult?.let { nextVoidResult = null; return it }
+            detail = detail.copy(status = "VOIDED", voidReason = reason, voidedAt = "2026-11-26T11:00:00Z")
+            return RepositoryResult.Success(
+                TransactionVoidResult("void-1", id, detail.receiptId, reason, detail.voidedAt!!, false)
+            )
+        }
+        override suspend fun refundTransaction(id: String, reason: String, disposition: RefundDisposition, idempotencyKey: String, managerApprovalId: String?): RepositoryResult<TransactionRefundResult> {
+            recordedRefundKeys += idempotencyKey
+            nextRefundResult?.let { nextRefundResult = null; return it }
+            detail = detail.copy(status = "REFUNDED")
+            return RepositoryResult.Success(
+                TransactionRefundResult(
+                    refundId = "refund-1",
+                    refundNumber = "RF-001",
+                    transactionId = id,
+                    status = "COMPLETED",
+                    transactionAmount = BigDecimal("100000"),
+                    refundedAmount = BigDecimal("100000"),
+                    returnDisposition = disposition,
+                    reason = reason,
+                    createdAt = "2026-11-26T11:00:00Z",
+                    idempotentReplay = false
+                )
+            )
+        }
         override suspend fun addExpense(amount: BigDecimal, description: String): RepositoryResult<CashExpense> = error("unused")
         override suspend fun getExpenses(sessionId: String): RepositoryResult<List<CashExpense>> = error("unused")
         override suspend fun getExpenseHistory(page: Int, limit: Int, sessionId: String?, startDate: String?, endDate: String?): RepositoryResult<CashExpensePage> = error("unused")
