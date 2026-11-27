@@ -41,6 +41,8 @@ internal class CheckoutCartDraftCoordinator(
 ) {
     private var lastSavedPair: Pair<String?, String?>? = null
     private var observeJob: Job? = null
+    @Volatile
+    private var stoppedForLogout: Boolean = false
 
     suspend fun restore(): RestoredCheckoutDraft? {
         val record = store.load() ?: run {
@@ -94,6 +96,7 @@ internal class CheckoutCartDraftCoordinator(
     }
 
     fun startObserving(scope: CoroutineScope, uiState: StateFlow<CheckoutUiState>) {
+        stoppedForLogout = false
         lastSavedPair = encodePair(uiState.value)
         observeJob?.cancel()
         observeJob = scope.launch {
@@ -115,6 +118,16 @@ internal class CheckoutCartDraftCoordinator(
         persistIfChanged(encodePair(state))
     }
 
+    suspend fun flushAndStopForOwner(ownerUserId: String?, state: CheckoutUiState) {
+        stoppedForLogout = true
+        observeJob?.cancel()
+        observeJob = null
+        val resolvedOwner = ownerUserId?.trim()?.takeIf(String::isNotBlank) ?: return
+        val pair = encodePair(state)
+        lastSavedPair = pair
+        store.saveForOwner(resolvedOwner, pair.first, pair.second)
+    }
+
     fun stop() {
         observeJob?.cancel()
         observeJob = null
@@ -126,6 +139,7 @@ internal class CheckoutCartDraftCoordinator(
     }
 
     private suspend fun persistIfChanged(pair: Pair<String?, String?>) {
+        if (stoppedForLogout) return
         if (lastSavedPair == pair) return
         lastSavedPair = pair
         store.save(pair.first, pair.second)

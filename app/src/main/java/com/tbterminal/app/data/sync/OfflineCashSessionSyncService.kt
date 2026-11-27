@@ -21,6 +21,7 @@ class OfflineCashSessionSyncService(
     private val salesApi: SalesApi,
     private val deviceId: String,
     private val clockMillis: () -> Long = { System.currentTimeMillis() },
+    private val activeUserIdProvider: (() -> String?)? = null,
     private val roleProvider: () -> String? = { "KASIR" },
 ) {
     suspend fun recoverStaleSyncing(nowMillis: Long = clockMillis()) {
@@ -60,6 +61,9 @@ class OfflineCashSessionSyncService(
         recoverStaleSyncingUnlocked()
         val session = database.cashSessionDao().getByLocalId(localSessionId)
             ?: return OfflineCashSessionSyncResult.Failed("Sesi kas lokal tidak ditemukan.")
+        if (!matchesActiveUser(session.cashierUserId)) {
+            return OfflineCashSessionSyncResult.Skipped("Sesi kas milik kasir lain menunggu login akun terkait.")
+        }
 
         session.serverId?.takeIf { it.isNotBlank() }?.let { serverId ->
             updateTransactionsCashSessionServerId(session.localId, serverId)
@@ -111,6 +115,18 @@ class OfflineCashSessionSyncService(
                     parsedError.message
                 }
                 val errorCode = if (response.code() >= 500) null else parsedError.code
+                if (
+                    CashSessionActiveBlockingMatcher.isActiveSessionBlockingOpen(
+                        httpCode = response.code(),
+                        errorCode = errorCode,
+                        errorMessage = message,
+                    )
+                ) {
+                    return@runSuspendCatching deferBlockingOpen(
+                        localSessionId = localSessionId,
+                        message = message,
+                    )
+                }
                 return@runSuspendCatching fail(
                     localSessionId = localSessionId,
                     message = message,
@@ -177,14 +193,16 @@ class OfflineCashSessionSyncService(
 
     internal suspend fun syncPendingOpenSessionsUnlocked(
         limit: Int = DEFAULT_AUTO_SYNC_LIMIT,
-        includeFailed: Boolean = false
+        includeFailed: Boolean = false,
+        cashierUserId: String? = resolvedActiveUserIdFilter(),
     ): OfflineCashSessionBulkSyncResult {
         recoverStaleSyncingUnlocked()
         val failedStatus = if (includeFailed) SyncStatus.FAILED else SyncStatus.PENDING
         val sessions = database.cashSessionDao().getOpenSyncCandidates(
             pending = SyncStatus.PENDING,
             failed = failedStatus,
-            limit = limit
+            limit = limit,
+            cashierUserId = cashierUserId,
         )
         if (sessions.isEmpty()) {
             return OfflineCashSessionBulkSyncResult(total = 0, successCount = 0, failedCount = 0)
@@ -222,6 +240,7 @@ class OfflineCashSessionSyncService(
                     }
                 }
                 is OfflineCashSessionSyncResult.Skipped -> Unit
+                is OfflineCashSessionSyncResult.Deferred -> Unit
             }
         }
 
@@ -246,6 +265,9 @@ class OfflineCashSessionSyncService(
         recoverStaleSyncingUnlocked()
         var session = database.cashSessionDao().getByLocalId(localSessionId)
             ?: return OfflineCashSessionSyncResult.Failed("Sesi kas lokal tidak ditemukan.")
+        if (!matchesActiveUser(session.cashierUserId)) {
+            return OfflineCashSessionSyncResult.Skipped("Sesi kas milik kasir lain menunggu login akun terkait.")
+        }
         if (!session.status.equals(CASH_SESSION_CLOSED, ignoreCase = true)) {
             return OfflineCashSessionSyncResult.Skipped("Sesi kas lokal belum ditutup.")
         }
@@ -255,6 +277,7 @@ class OfflineCashSessionSyncService(
                 is OfflineCashSessionSyncResult.Success -> Unit
                 is OfflineCashSessionSyncResult.Failed -> return openResult
                 is OfflineCashSessionSyncResult.Skipped -> return openResult
+                is OfflineCashSessionSyncResult.Deferred -> return openResult
             }
             session = database.cashSessionDao().getByLocalId(localSessionId)
                 ?: return OfflineCashSessionSyncResult.Failed("Sesi kas lokal tidak ditemukan setelah sync open.")
@@ -381,7 +404,8 @@ class OfflineCashSessionSyncService(
 
     internal suspend fun syncPendingCloseSessionsUnlocked(
         limit: Int = DEFAULT_AUTO_SYNC_LIMIT,
-        includeFailed: Boolean = false
+        includeFailed: Boolean = false,
+        cashierUserId: String? = resolvedActiveUserIdFilter(),
     ): OfflineCashSessionBulkSyncResult {
         recoverStaleSyncingUnlocked()
         val failedStatus = if (includeFailed) SyncStatus.FAILED else SyncStatus.PENDING
@@ -389,7 +413,8 @@ class OfflineCashSessionSyncService(
             closedStatus = CASH_SESSION_CLOSED,
             pending = SyncStatus.PENDING,
             failed = failedStatus,
-            limit = limit
+            limit = limit,
+            cashierUserId = cashierUserId,
         )
         if (sessions.isEmpty()) {
             return OfflineCashSessionBulkSyncResult(total = 0, successCount = 0, failedCount = 0)
@@ -405,7 +430,8 @@ class OfflineCashSessionSyncService(
         sessions.forEach { session ->
             when (val result = syncCloseSessionIfReadyUnlocked(session.localId)) {
                 is OfflineCashSessionSyncResult.Success -> successCount += 1
-                is OfflineCashSessionSyncResult.Skipped -> skippedCount += 1
+                is OfflineCashSessionSyncResult.Skipped,
+                is OfflineCashSessionSyncResult.Deferred -> skippedCount += 1
                 is OfflineCashSessionSyncResult.Failed -> {
                     failedCount += 1
                     maxRetryAfterSeconds = maxNullableSeconds(maxRetryAfterSeconds, result.retryAfterSeconds)
@@ -552,9 +578,70 @@ class OfflineCashSessionSyncService(
         }
     }
 
-    private suspend fun markCloseSynced(localSessionId: Long) {
-        val now = System.currentTimeMillis()
+    suspend fun requeueBlockedOpenSessionsForCashier(cashierUserId: String?): Int {
+        return OfflineSyncCoordinator.withSyncLock {
+            database.withTransaction {
+                requeueBlockedOpenSessionsForCashierUnlocked(cashierUserId, clockMillis())
+            }
+        }
+    }
+
+    private suspend fun requeueBlockedOpenSessionsForCashierUnlocked(
+        cashierUserId: String?,
+        now: Long,
+    ): Int {
+        val normalizedCashierId = cashierUserId?.trim()?.takeIf(String::isNotBlank) ?: return 0
+        val blockedIds = database.cashSessionDao().getBlockedOpenSessionIdsForCashier(
+            cashierUserId = normalizedCashierId,
+        )
+        if (blockedIds.isEmpty()) return 0
+        database.cashSessionDao().resetSessionsToPending(
+            localIds = blockedIds,
+            updatedAt = now,
+        )
+        database.syncQueueDao().resetToPendingForEntities(
+            entityType = SyncEntityType.CASH_SESSION,
+            operation = SyncOperation.CREATE,
+            entityLocalIds = blockedIds,
+            updatedAt = now,
+        )
+        return blockedIds.size
+    }
+
+    private suspend fun deferBlockingOpen(
+        localSessionId: Long,
+        message: String,
+    ): OfflineCashSessionSyncResult.Deferred {
+        val now = clockMillis()
         database.withTransaction {
+            database.cashSessionDao().updateSyncStatus(
+                localId = localSessionId,
+                syncStatus = SyncStatus.PENDING,
+                syncedAt = null,
+                updatedAt = now,
+            )
+            database.syncQueueDao().getLatestForEntityAndOperation(
+                entityLocalId = localSessionId,
+                entityType = SyncEntityType.CASH_SESSION,
+                operation = SyncOperation.CREATE,
+            )?.let { queue ->
+                database.syncQueueDao().updateStatus(
+                    id = queue.id,
+                    status = SyncStatus.PENDING,
+                    lastError = message,
+                    lastErrorCode = CashSessionActiveBlockingMatcher.ERROR_CODE_ACTIVE_SESSION_BLOCKING_OPEN,
+                    retryIncrement = 0,
+                    updatedAt = now,
+                )
+            }
+        }
+        return OfflineCashSessionSyncResult.Deferred(message)
+    }
+
+    private suspend fun markCloseSynced(localSessionId: Long) {
+        val now = clockMillis()
+        database.withTransaction {
+            val closedSession = database.cashSessionDao().getByLocalId(localSessionId)
             database.cashSessionDao().markCloseSynced(
                 localId = localSessionId,
                 syncStatus = SyncStatus.SYNCED,
@@ -575,6 +662,10 @@ class OfflineCashSessionSyncService(
                     updatedAt = now
                 )
             }
+            requeueBlockedOpenSessionsForCashierUnlocked(
+                cashierUserId = closedSession?.cashierUserId,
+                now = now,
+            )
         }
     }
 
@@ -756,6 +847,17 @@ class OfflineCashSessionSyncService(
         data class Error(val message: String) : BuildCloseSessionRequestResult
     }
 
+    private fun resolvedActiveUserIdFilter(): String? {
+        return activeUserIdProvider?.invoke()?.trim()?.takeIf(String::isNotBlank)
+    }
+
+    private fun matchesActiveUser(sessionCashierUserId: String?): Boolean {
+        val provider = activeUserIdProvider ?: return true
+        val activeUserId = provider()?.trim()?.takeIf(String::isNotBlank) ?: return false
+        val owner = sessionCashierUserId?.trim()?.takeIf(String::isNotBlank) ?: return true
+        return owner == activeUserId
+    }
+
     private companion object {
         const val DEFAULT_AUTO_SYNC_LIMIT = 10
         const val CASH_SESSION_CLOSED = "CLOSED"
@@ -775,6 +877,10 @@ sealed interface OfflineCashSessionSyncResult {
     ) : OfflineCashSessionSyncResult
 
     data class Skipped(
+        val message: String
+    ) : OfflineCashSessionSyncResult
+
+    data class Deferred(
         val message: String
     ) : OfflineCashSessionSyncResult
 }

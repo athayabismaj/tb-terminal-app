@@ -151,20 +151,6 @@ class LocalCashSessionService(
         )
         if (openByCashier != null) return "Masih ada sesi kas lokal yang terbuka."
 
-        val openByDevice = deviceId
-            ?.trim()
-            ?.takeIf(String::isNotBlank)
-            ?.let { device ->
-                database.cashSessionDao().getLatestByStatusAndDevice(
-                    status = CASH_SESSION_OPEN,
-                    deviceId = device
-                )
-            }
-        if (openByDevice != null) return "Device ini masih memiliki sesi kas terbuka."
-
-        val anyOpen = database.cashSessionDao().getLatestByStatus(CASH_SESSION_OPEN)
-        if (anyOpen != null) return "Masih ada sesi kas terbuka di device ini."
-
         return null
     }
 

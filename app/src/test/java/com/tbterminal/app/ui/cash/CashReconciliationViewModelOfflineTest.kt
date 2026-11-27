@@ -10,6 +10,9 @@ import com.tbterminal.app.data.local.cashsession.LocalCashSessionService
 import com.tbterminal.app.data.local.database.CashSessionLocalDataSource
 import com.tbterminal.app.data.local.database.LocalAppSettingsDataSource
 import com.tbterminal.app.data.local.database.TbTerminalDatabase
+import com.tbterminal.app.data.local.entity.LocalCashSessionEntity
+import com.tbterminal.app.data.local.mapper.toLocalCashSessionEntity
+import com.tbterminal.app.data.local.model.ScaledDecimal2
 import com.tbterminal.app.data.local.model.SyncEntityType
 import com.tbterminal.app.data.local.model.SyncOperation
 import com.tbterminal.app.data.local.model.SyncStatus
@@ -223,6 +226,203 @@ class CashReconciliationViewModelOfflineTest {
 
         assertEquals(created!!.localId, vm2.uiState.value.localCashSessionId)
         assertEquals(1, database.cashSessionDao().getUnsyncedOfflineSessions().size)
+    }
+
+    @Test
+    fun mirrorRemoteSession_doesNotOverwriteUnsyncedClosedLocalSession() = runTest(dispatcher) {
+        val repo = FakeCashReconciliationOfflineRepo().apply {
+            activeSessionResult = RepositoryResult.Success(
+                CashSession(
+                    id = "srv-close-protect",
+                    userId = "kasir-1",
+                    openedAt = "2026-04-08T01:00:00Z",
+                    closedAt = null,
+                    openingCash = BigDecimal("100000"),
+                    closingCash = null,
+                    systemCash = null,
+                    difference = null,
+                    totalExpenses = BigDecimal.ZERO,
+                    notes = "shift pagi",
+                    status = "OPEN"
+                )
+            )
+        }
+        val vm = buildVm(repo)
+        advanceUntilIdle()
+
+        val mirroredLocalId = vm.uiState.value.localCashSessionId!!
+        database.cashSessionDao().closeSession(
+            localId = mirroredLocalId,
+            status = "CLOSED",
+            closedAt = nowMillis + 1_000L,
+            expectedCash = ScaledDecimal2.ofExact(BigDecimal("100000")),
+            actualCash = ScaledDecimal2.ofExact(BigDecimal("100000")),
+            difference = ScaledDecimal2.ZERO,
+            closingNote = "tutup offline",
+            syncStatus = SyncStatus.PENDING,
+            updatedAt = nowMillis + 1_000L,
+        )
+
+        val remoteOpen = (repo.activeSessionResult as RepositoryResult.Success).data!!
+        val existingBefore = database.cashSessionDao().getByLocalId(mirroredLocalId)!!
+        val mapped = remoteOpen.toLocalCashSessionEntity(existingBefore)
+        assertEquals("CLOSED", mapped.status)
+        assertEquals(SyncStatus.PENDING, mapped.syncStatus)
+
+        cashSessionLocalDataSource.mirrorRemoteSession(remoteOpen)
+        val afterDirectMirror = database.cashSessionDao().getByLocalId(mirroredLocalId)!!
+        assertEquals("CLOSED", afterDirectMirror.status)
+        assertEquals(SyncStatus.PENDING, afterDirectMirror.syncStatus)
+
+        vm.loadCash()
+        advanceUntilIdle()
+        val afterVmLoad = database.cashSessionDao().getByLocalId(mirroredLocalId)!!
+        assertEquals("CLOSED", afterVmLoad.status)
+        assertEquals(SyncStatus.PENDING, afterVmLoad.syncStatus)
+        assertFalse(vm.uiState.value.hasActiveSession)
+    }
+
+    @Test
+    fun closeSessionOnline_marksMirroredLocalSessionClosedAndSynced_soOfflineDoesNotRestoreOpen() = runTest(dispatcher) {
+        val openRemote = CashSession(
+            id = "srv-close-online",
+            userId = "kasir-1",
+            openedAt = "2026-04-08T01:00:00Z",
+            closedAt = null,
+            openingCash = BigDecimal("100000"),
+            closingCash = null,
+            systemCash = null,
+            difference = null,
+            totalExpenses = BigDecimal.ZERO,
+            notes = null,
+            status = "OPEN"
+        )
+        val closedRemote = openRemote.copy(
+            closedAt = "2026-04-08T09:00:00Z",
+            closingCash = BigDecimal("125000"),
+            systemCash = BigDecimal("125000"),
+            difference = BigDecimal.ZERO,
+            notes = "selesai",
+            status = "CLOSED"
+        )
+        val repo = FakeCashReconciliationOfflineRepo().apply {
+            activeSessionResult = RepositoryResult.Success(openRemote)
+            closeSessionResult = RepositoryResult.Success(closedRemote)
+        }
+        val vm = buildVm(repo)
+        advanceUntilIdle()
+        val mirroredLocalId = vm.uiState.value.localCashSessionId!!
+
+        repo.activeSessionResult = RepositoryResult.Success(null)
+        vm.onClosingCashChanged("125000")
+        vm.onClosingNotesChanged("selesai")
+        vm.closeSession()
+        advanceUntilIdle()
+
+        val localAfterOnlineClose = database.cashSessionDao().getByLocalId(mirroredLocalId)!!
+        assertEquals("CLOSED", localAfterOnlineClose.status)
+        assertEquals(SyncStatus.SYNCED, localAfterOnlineClose.syncStatus)
+
+        repo.activeSessionResult = RepositoryResult.Error("CONNECTION_FAILED", "offline")
+        vm.loadCash()
+        advanceUntilIdle()
+
+        assertFalse(vm.uiState.value.hasActiveSession)
+        assertFalse(vm.uiState.value.isUsingLocalActiveSession)
+    }
+
+    @Test
+    fun reconcileNoActiveRemoteSession_closesSyncedMirrorButPreservesUnsyncedOfflineOpenSession() = runTest(dispatcher) {
+        val repo = FakeCashReconciliationOfflineRepo().apply {
+            activeSessionResult = RepositoryResult.Success(
+                CashSession(
+                    id = "srv-stale-mirror",
+                    userId = "kasir-1",
+                    openedAt = "2026-04-08T01:00:00Z",
+                    closedAt = null,
+                    openingCash = BigDecimal("50000"),
+                    closingCash = null,
+                    systemCash = null,
+                    difference = null,
+                    totalExpenses = BigDecimal.ZERO,
+                    notes = null,
+                    status = "OPEN"
+                )
+            )
+        }
+        val vm = buildVm(repo)
+        advanceUntilIdle()
+        val syncedMirrorId = vm.uiState.value.localCashSessionId!!
+
+        val offlineOpenId = database.cashSessionDao().upsert(
+            LocalCashSessionEntity(
+                clientGeneratedId = "offline-unsynced-open",
+                cashierUserId = "kasir-1",
+                status = "OPEN",
+                openedAt = nowMillis + 2_000L,
+                startingCash = ScaledDecimal2.ofExact(BigDecimal("75000")),
+                syncStatus = SyncStatus.PENDING,
+                createdAt = nowMillis + 2_000L,
+                updatedAt = nowMillis + 2_000L,
+            )
+        )
+
+        repo.activeSessionResult = RepositoryResult.Success(null)
+        vm.loadCash()
+        advanceUntilIdle()
+
+        val mirrorAfter = database.cashSessionDao().getByLocalId(syncedMirrorId)!!
+        val offlineAfter = database.cashSessionDao().getByLocalId(offlineOpenId)!!
+        assertEquals("CLOSED", mirrorAfter.status)
+        assertEquals(SyncStatus.SYNCED, mirrorAfter.syncStatus)
+        assertEquals("OPEN", offlineAfter.status)
+        assertEquals(SyncStatus.PENDING, offlineAfter.syncStatus)
+    }
+
+    @Test
+    fun sharedDevice_isolatesLocalOpenSessionAndAgeAlertByCashierUserId() = runTest(dispatcher) {
+        val expiredOpenedAt = nowMillis - 73L * 60L * 60L * 1000L
+        val sessionKasirA = database.cashSessionDao().upsert(
+            LocalCashSessionEntity(
+                clientGeneratedId = "sess-kasir-a-expired",
+                deviceId = "android-dev-1",
+                cashierUserId = "kasir-a",
+                status = "OPEN",
+                openedAt = expiredOpenedAt,
+                startingCash = ScaledDecimal2.ofWhole(100_000L),
+                syncStatus = SyncStatus.PENDING,
+                createdAt = expiredOpenedAt,
+                updatedAt = expiredOpenedAt,
+            )
+        )
+
+        val offlineRepo = FakeCashReconciliationOfflineRepo().apply {
+            activeSessionResult = RepositoryResult.Error("CONNECTION_FAILED", "offline")
+        }
+        val vmKasirB = CashReconciliationViewModel(
+            repository = offlineRepo,
+            cashSessionLocalDataSource = cashSessionLocalDataSource,
+            localCashSessionService = localCashSessionService,
+            localCashExpenseService = localCashExpenseService,
+            offlineStatusRepository = offlineStatusRepository,
+            cashierUserId = "kasir-b",
+            cashierNameFallback = "Kasir B",
+            actorRole = "KASIR",
+            clockMillis = { nowMillis },
+        )
+        advanceUntilIdle()
+
+        // Kasir B tidak boleh melihat sesi kas lokal Kasir A ataupun peringatan umur sesi Kasir A
+        assertFalse(vmKasirB.uiState.value.hasActiveSession)
+        assertEquals(null, vmKasirB.uiState.value.offlineSessionAgeAlert)
+
+        // Kasir B dapat membuka sesi kas lokalnya sendiri walaupun Kasir A masih punya sesi OPEN
+        vmKasirB.onOpeningCashChanged("150000")
+        vmKasirB.openSession()
+        advanceUntilIdle()
+        assertTrue(vmKasirB.uiState.value.hasActiveSession)
+        assertTrue(vmKasirB.uiState.value.localCashSessionId != sessionKasirA)
+        assertEquals("kasir-b", vmKasirB.uiState.value.activeSession?.userId)
     }
 
     private fun buildVm(repository: CashReconciliationRepository): CashReconciliationViewModel {

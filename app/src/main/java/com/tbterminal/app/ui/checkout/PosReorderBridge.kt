@@ -39,4 +39,9 @@ class PosReorderBridge {
         }
         return captured
     }
+
+    fun clear() {
+        _pendingReorder.value = null
+        _pendingQuotation.value = null
+    }
 }

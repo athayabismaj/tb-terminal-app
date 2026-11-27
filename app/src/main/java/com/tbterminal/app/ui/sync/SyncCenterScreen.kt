@@ -284,7 +284,11 @@ private fun SyncStatusOverviewCard(
                         }
                     }
                     Text(
-                        text = "Terakhir sinkron: Baru saja",
+                        text = if (uiState.otherUsersPendingSyncCount > 0) {
+                            "Terakhir sinkron: Baru saja · ${uiState.otherUsersPendingSyncCount} data kasir lain menunggu login akun terkait"
+                        } else {
+                            "Terakhir sinkron: Baru saja"
+                        },
                         fontSize = 12.sp,
                         color = Slate500,
                     )

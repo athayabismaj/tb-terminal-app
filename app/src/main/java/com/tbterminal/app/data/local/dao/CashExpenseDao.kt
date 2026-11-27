@@ -28,6 +28,14 @@ interface CashExpenseDao {
         SELECT * FROM local_cash_expenses
         WHERE deletedAt IS NULL
             AND (syncStatus = :pending OR syncStatus = :failed)
+            AND (
+                :cashierUserId IS NULL
+                OR EXISTS (
+                    SELECT 1 FROM local_cash_sessions s
+                    WHERE s.localId = local_cash_expenses.cashSessionLocalId
+                      AND s.cashierUserId = :cashierUserId
+                )
+            )
         ORDER BY occurredAt ASC
         LIMIT :limit
         """
@@ -35,7 +43,8 @@ interface CashExpenseDao {
     suspend fun getSyncCandidates(
         pending: SyncStatus,
         failed: SyncStatus,
-        limit: Int
+        limit: Int,
+        cashierUserId: String? = null,
     ): List<LocalCashExpenseEntity>
 
     @Query(
@@ -44,6 +53,14 @@ interface CashExpenseDao {
         WHERE cashSessionLocalId = :cashSessionLocalId
             AND deletedAt IS NULL
             AND (syncStatus = :pending OR syncStatus = :failed)
+            AND (
+                :cashierUserId IS NULL
+                OR EXISTS (
+                    SELECT 1 FROM local_cash_sessions s
+                    WHERE s.localId = local_cash_expenses.cashSessionLocalId
+                      AND s.cashierUserId = :cashierUserId
+                )
+            )
         ORDER BY occurredAt ASC
         LIMIT :limit
         """
@@ -52,7 +69,26 @@ interface CashExpenseDao {
         cashSessionLocalId: Long,
         pending: SyncStatus,
         failed: SyncStatus,
-        limit: Int
+        limit: Int,
+        cashierUserId: String? = null,
+    ): List<LocalCashExpenseEntity>
+
+    @Query(
+        """
+        SELECT * FROM local_cash_expenses
+        WHERE cashSessionLocalId IS NULL
+          AND deletedAt IS NULL
+          AND (syncStatus = :pending OR syncStatus = :failed)
+          AND :cashierUserId IS NULL
+        ORDER BY occurredAt ASC, localId ASC
+        LIMIT :limit
+        """
+    )
+    suspend fun getSyncCandidatesWithoutLocalSession(
+        pending: SyncStatus,
+        failed: SyncStatus,
+        limit: Int,
+        cashierUserId: String? = null,
     ): List<LocalCashExpenseEntity>
 
     @Query(
@@ -156,9 +192,20 @@ interface CashExpenseDao {
         FROM local_cash_expenses
         WHERE deletedAt IS NULL
             AND syncStatus = :pending
+            AND (
+                :cashierUserId IS NULL
+                OR EXISTS (
+                    SELECT 1 FROM local_cash_sessions s
+                    WHERE s.localId = local_cash_expenses.cashSessionLocalId
+                      AND s.cashierUserId = :cashierUserId
+                )
+            )
         """
     )
-    suspend fun countPendingExpenses(pending: SyncStatus = SyncStatus.PENDING): Int
+    suspend fun countPendingExpenses(
+        pending: SyncStatus = SyncStatus.PENDING,
+        cashierUserId: String? = null,
+    ): Int
 
     @Query(
         """

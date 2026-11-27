@@ -135,17 +135,23 @@ fun BackofficeGlobalStatusBanner(
     val isOnline = offlineStatus.isInternetOnline && offlineStatus.backendStatus == BackendStatus.CONNECTED
     val hasPending = offlineStatus.pendingSyncCount > 0
     val hasFailed = offlineStatus.failedSyncCount > 0
-    val hasIssue = !isOnline || hasPending || hasFailed
+    val hasOtherUsersPending = offlineStatus.otherUsersPendingSyncCount > 0
+    val hasIssue = !isOnline || hasPending || hasFailed || hasOtherUsersPending
 
     if (!hasIssue) return
 
+    val otherUsersNote = if (hasOtherUsersPending) {
+        " · ${offlineStatus.otherUsersPendingSyncCount} data kasir lain menunggu login akun terkait"
+    } else {
+        ""
+    }
     val (bgColor, contentColor, icon, message) = when {
         !offlineStatus.isInternetOnline -> {
             BannerState(
                 bgColor = TbAmberLight,
                 contentColor = TbAmber,
                 icon = Icons.Outlined.CloudOff,
-                message = "Mode Offline — Periksa koneksi internet"
+                message = "Mode Offline — Periksa koneksi internet$otherUsersNote"
             )
         }
         offlineStatus.backendStatus != BackendStatus.CONNECTED -> {
@@ -153,7 +159,7 @@ fun BackofficeGlobalStatusBanner(
                 bgColor = TbAmberLight,
                 contentColor = TbAmber,
                 icon = Icons.Outlined.CloudOff,
-                message = "Server Terputus — Data tersimpan aman di lokal"
+                message = "Server Terputus — Data tersimpan aman di lokal$otherUsersNote"
             )
         }
         hasFailed -> {
@@ -161,15 +167,23 @@ fun BackofficeGlobalStatusBanner(
                 bgColor = TbError.copy(alpha = 0.12f),
                 contentColor = TbError,
                 icon = Icons.Outlined.SyncProblem,
-                message = "${offlineStatus.failedSyncCount} transaksi gagal sinkron — Ketuk untuk periksa"
+                message = "${offlineStatus.failedSyncCount} transaksi gagal sinkron — Ketuk untuk periksa$otherUsersNote"
             )
         }
-        else -> {
+        hasPending -> {
             BannerState(
                 bgColor = TbGreenLight,
                 contentColor = TbGreenDark,
                 icon = Icons.Outlined.Sync,
-                message = "${offlineStatus.pendingSyncCount} data dalam antrean sinkronisasi"
+                message = "${offlineStatus.pendingSyncCount} data dalam antrean sinkronisasi$otherUsersNote"
+            )
+        }
+        else -> {
+            BannerState(
+                bgColor = TbAmberLight,
+                contentColor = TbAmber,
+                icon = Icons.Outlined.Sync,
+                message = "${offlineStatus.otherUsersPendingSyncCount} data kasir lain menunggu login akun terkait"
             )
         }
     }

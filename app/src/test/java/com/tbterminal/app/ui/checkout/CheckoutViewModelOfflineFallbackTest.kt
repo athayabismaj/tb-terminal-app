@@ -375,6 +375,109 @@ class CheckoutViewModelOfflineFallbackTest {
         assertEquals("Hanya kasir yang dapat membuka sesi kas.", err?.value)
     }
 
+    @Test
+    fun loadCashSession_reconcilesClosedRemoteAndProtectsUnsyncedClosedMirror() = runTest(dispatcher) {
+        val cashRepo = FakeOfflineFallbackCashRepo().apply {
+            activeSessionResult = RepositoryResult.Success(null)
+        }
+        seedProductAndOpenSession(serverSessionId = "sess-mirrored-1")
+
+        val vm = buildVm(cashRepo = cashRepo)
+        advanceUntilIdle()
+
+        val closedMirror = database.cashSessionDao().getByServerId("sess-mirrored-1")!!
+        assertEquals("CLOSED", closedMirror.status)
+        assertEquals(SyncStatus.SYNCED, closedMirror.syncStatus)
+        assertFalse(vm.uiState.value.hasActiveCashSession)
+
+        val reopenedMirror = cashSessionLocalDataSource.mirrorRemoteSession(
+            CashSession(
+                id = "sess-mirrored-2",
+                userId = "kasir-1",
+                openedAt = "2026-04-08T02:00:00Z",
+                closedAt = null,
+                openingCash = BigDecimal("100000"),
+                closingCash = null,
+                systemCash = null,
+                difference = null,
+                totalExpenses = BigDecimal.ZERO,
+                notes = null,
+                status = "OPEN",
+            )
+        )
+        database.cashSessionDao().closeSession(
+            localId = reopenedMirror.localId,
+            status = "CLOSED",
+            closedAt = nowMillis + 500L,
+            expectedCash = null,
+            actualCash = com.tbterminal.app.data.local.model.ScaledDecimal2.ofExact(BigDecimal("100000")),
+            difference = null,
+            closingNote = "tutup offline",
+            syncStatus = SyncStatus.PENDING,
+            updatedAt = nowMillis + 500L,
+        )
+        cashRepo.activeSessionResult = RepositoryResult.Success(
+            CashSession(
+                id = "sess-mirrored-2",
+                userId = "kasir-1",
+                openedAt = "2026-04-08T02:00:00Z",
+                closedAt = null,
+                openingCash = BigDecimal("100000"),
+                closingCash = null,
+                systemCash = null,
+                difference = null,
+                totalExpenses = BigDecimal.ZERO,
+                notes = null,
+                status = "OPEN",
+            )
+        )
+
+        vm.loadCashSession()
+        advanceUntilIdle()
+
+        val protectedRow = database.cashSessionDao().getByServerId("sess-mirrored-2")!!
+        assertEquals("CLOSED", protectedRow.status)
+        assertEquals(SyncStatus.PENDING, protectedRow.syncStatus)
+        assertFalse(vm.uiState.value.hasActiveCashSession)
+    }
+
+    @Test
+    fun refreshCashSessionOnResume_updatesUiAfterSessionOpenedOrClosedExternally() = runTest(dispatcher) {
+        val cashRepo = FakeOfflineFallbackCashRepo().apply {
+            activeSessionResult = RepositoryResult.Success(null)
+        }
+        val vm = buildVm(cashRepo = cashRepo)
+        advanceUntilIdle()
+        assertFalse(vm.uiState.value.hasActiveCashSession)
+
+        // Kasir membuka sesi di layar Cash Reconciliation, lalu kembali ke POS (ON_RESUME)
+        cashRepo.activeSessionResult = RepositoryResult.Success(
+            CashSession(
+                id = "sess-opened-elsewhere",
+                userId = "kasir-1",
+                openedAt = "2026-04-08T03:00:00Z",
+                closedAt = null,
+                openingCash = BigDecimal("150000"),
+                closingCash = null,
+                systemCash = null,
+                difference = null,
+                totalExpenses = BigDecimal.ZERO,
+                notes = null,
+                status = "OPEN",
+            )
+        )
+        vm.refreshCashSessionOnResume()
+        advanceUntilIdle()
+        assertTrue(vm.uiState.value.hasActiveCashSession)
+        assertEquals("sess-opened-elsewhere", vm.uiState.value.activeCashSession?.serverId)
+
+        // Kasir menutup sesi di layar Cash Reconciliation, lalu kembali ke POS (ON_RESUME)
+        cashRepo.activeSessionResult = RepositoryResult.Success(null)
+        vm.refreshCashSessionOnResume()
+        advanceUntilIdle()
+        assertFalse(vm.uiState.value.hasActiveCashSession)
+    }
+
     private suspend fun seedProductAndOpenSession(serverSessionId: String) {
         database.productDao().upsert(
             LocalProductEntity(

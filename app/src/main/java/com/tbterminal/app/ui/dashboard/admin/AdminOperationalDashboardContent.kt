@@ -41,6 +41,7 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -51,6 +52,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.font.FontWeight
@@ -59,10 +61,12 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.tbterminal.app.TbTerminalApplication
 import com.tbterminal.app.data.model.CashSession
 import com.tbterminal.app.data.model.CashTransaction
 import com.tbterminal.app.data.remote.DashboardMetricsDto
 import com.tbterminal.app.data.remote.StockLowSummaryDto
+import com.tbterminal.app.data.sync.OfflineStatus
 import com.tbterminal.app.ui.components.SkeletonBox
 import com.tbterminal.app.ui.components.TbAdaptiveBox
 import com.tbterminal.app.ui.dashboard.BackofficeAvatarButton
@@ -128,6 +132,11 @@ fun AdminOperationalDashboardContent(
     modifier: Modifier = Modifier
 ) {
     var isPrivacyHidden by rememberSaveable { mutableStateOf(false) }
+    val context = LocalContext.current
+    val appContainer = (context.applicationContext as? TbTerminalApplication)?.appContainer
+    val offlineStatusFlow = remember(appContainer) { appContainer?.offlineStatusRepository?.status }
+    val offlineStatus by (offlineStatusFlow?.collectAsState(initial = OfflineStatus()) ?: remember { mutableStateOf(OfflineStatus()) })
+    val otherUsersPendingCount = maxOf(offlineUiState.otherUsersPendingSyncCount, offlineStatus.otherUsersPendingSyncCount)
 
     TbAdaptiveBox(
         modifier = modifier
@@ -152,6 +161,7 @@ fun AdminOperationalDashboardContent(
                     adminName = adminName,
                     activeSession = activeCashierSession,
                     offlineUiState = offlineUiState,
+                    otherUsersPendingCount = otherUsersPendingCount,
                     onCashClick = onCashClick
                 )
 
@@ -266,6 +276,7 @@ private fun AdminOperationalHeader(
     adminName: String,
     activeSession: CashSession?,
     offlineUiState: OfflineDashboardUiState,
+    otherUsersPendingCount: Int = offlineUiState.otherUsersPendingSyncCount,
     onCashClick: () -> Unit
 ) {
     val displayName = remember(adminName) {
@@ -364,9 +375,16 @@ private fun AdminOperationalHeader(
             }
         }
 
-        val hasPending = offlineUiState.pendingSyncCount > 0 || offlineUiState.failedSyncCount > 0
+        val hasPending = offlineUiState.pendingSyncCount > 0 ||
+            offlineUiState.failedSyncCount > 0 ||
+            otherUsersPendingCount > 0
         if (hasPending) {
             val syncTimeStr = remember(offlineUiState.lastRefresh) { formatTime(offlineUiState.lastRefresh) }
+            val otherUsersNote = if (otherUsersPendingCount > 0) {
+                " · $otherUsersPendingCount data kasir lain menunggu login akun terkait"
+            } else {
+                ""
+            }
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -380,10 +398,13 @@ private fun AdminOperationalHeader(
                         .background(if (offlineUiState.failedSyncCount > 0) RoseText else AmberText, CircleShape)
                 )
                 Text(
-                    text = if (offlineUiState.failedSyncCount > 0) {
-                        "${offlineUiState.failedSyncCount} sinkronisasi gagal · Ketuk Pusat Sync untuk periksa"
-                    } else {
-                        "${offlineUiState.pendingSyncCount} antrean offline · Sinkron terakhir $syncTimeStr"
+                    text = when {
+                        offlineUiState.failedSyncCount > 0 ->
+                            "${offlineUiState.failedSyncCount} sinkronisasi gagal · Ketuk Pusat Sync untuk periksa$otherUsersNote"
+                        offlineUiState.pendingSyncCount > 0 ->
+                            "${offlineUiState.pendingSyncCount} antrean offline · Sinkron terakhir $syncTimeStr$otherUsersNote"
+                        else ->
+                            "$otherUsersPendingCount data kasir lain menunggu login akun terkait"
                     },
                     fontSize = 11.sp,
                     color = if (offlineUiState.failedSyncCount > 0) RoseText else AmberText,

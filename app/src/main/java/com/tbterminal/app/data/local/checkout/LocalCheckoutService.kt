@@ -14,6 +14,8 @@ import com.tbterminal.app.data.local.model.SyncEntityType
 import com.tbterminal.app.data.local.model.SyncOperation
 import com.tbterminal.app.data.local.model.SyncStatus
 import com.tbterminal.app.data.remote.BigDecimalStringSerializer
+import com.tbterminal.app.data.sync.OfflineSessionAgePolicy
+import com.tbterminal.app.data.sync.runSuspendCatching
 import java.math.BigDecimal
 import java.math.RoundingMode
 import java.time.Instant
@@ -27,7 +29,8 @@ import kotlinx.serialization.json.put
 
 class LocalCheckoutService(
     private val database: TbTerminalDatabase,
-    private val deviceId: String? = null
+    private val deviceId: String? = null,
+    private val clockMillis: () -> Long = { System.currentTimeMillis() },
 ) {
     suspend fun saveCheckout(command: LocalCheckoutCommand): LocalCheckoutResult {
         val validationError = validate(command)
@@ -35,9 +38,26 @@ class LocalCheckoutService(
             return LocalCheckoutResult.Failed(validationError)
         }
 
-        return runCatching {
+        return runSuspendCatching {
             database.withTransaction {
-                val now = System.currentTimeMillis()
+                val now = clockMillis()
+                val cashSessionLocalId = command.cashSessionLocalId
+                if (cashSessionLocalId != null) {
+                    val session = database.cashSessionDao().getByLocalId(cashSessionLocalId)
+                        ?: return@withTransaction LocalCheckoutResult.Failed("Sesi kas lokal tidak ditemukan.")
+                    if (!session.status.equals(CASH_SESSION_OPEN, ignoreCase = true)) {
+                        return@withTransaction LocalCheckoutResult.Failed("Sesi kas lokal sudah ditutup.")
+                    }
+                    if (session.serverId.isNullOrBlank()) {
+                        val ageAlert = OfflineSessionAgePolicy.evaluateOpenedAt(
+                            openedAtMillis = session.openedAt,
+                            nowMillis = now,
+                        )
+                        if (ageAlert?.isExpired == true) {
+                            return@withTransaction LocalCheckoutResult.Failed(ageAlert.message)
+                        }
+                    }
+                }
                 val remainingAmount = (command.remainingAmount ?: command.total.subtract(command.paidAmount))
                     .coerceAtLeast(BigDecimal.ZERO)
                 val remainingScaled = ScaledDecimal2.ofExact(remainingAmount)
@@ -362,6 +382,7 @@ class LocalCheckoutService(
     }
 
     internal companion object {
+        private const val CASH_SESSION_OPEN = "OPEN"
         val DATE_FORMATTER: DateTimeFormatter = DateTimeFormatter.ofPattern("yyyyMMdd")
         val SYNC_PAYLOAD_JSON: Json = Json {
             encodeDefaults = true

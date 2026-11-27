@@ -123,6 +123,7 @@ class DefaultAppContainer(
     init {
         sessionManager.addSessionClearedListener {
             offlinePinVerifierStore.clearAll()
+            posReorderBridge.clear()
         }
     }
 
@@ -133,23 +134,21 @@ class DefaultAppContainer(
     override val pendingSubmissionStore: PendingSubmissionStore by lazy {
         RoomPendingSubmissionStore(
             dao = localDatabase.pendingSubmissionDao(),
-            ownerUserIdProvider = ::resolveActiveOwnerUserId
+            ownerUserIdProvider = { sessionManager.resolveOwnerUserId().orEmpty() },
+            skipWhenOwnerBlank = true,
         )
     }
 
     override val checkoutDraftStore: CheckoutDraftStore by lazy {
         RoomCheckoutDraftStore(
             dao = localDatabase.checkoutDraftDao(),
-            ownerUserIdProvider = ::resolveActiveOwnerUserId
+            ownerUserIdProvider = { sessionManager.resolveOwnerUserId().orEmpty() },
+            skipWhenOwnerBlank = true,
         )
     }
 
     private fun resolveActiveOwnerUserId(): String {
-        val user = sessionManager.readSessionUser()
-        return user?.userId?.takeIf(String::isNotBlank)
-            ?: user?.username?.takeIf(String::isNotBlank)
-            ?: user?.name?.takeIf(String::isNotBlank)
-            ?: RoomPendingSubmissionStore.DEFAULT_OWNER_USER_ID
+        return sessionManager.resolveOwnerUserId() ?: RoomPendingSubmissionStore.DEFAULT_OWNER_USER_ID
     }
 
     override val localAppSettingsDataSource: LocalAppSettingsDataSource by lazy {
@@ -220,6 +219,7 @@ class DefaultAppContainer(
             salesApi = networkModule.salesApi,
             deviceId = deviceIdProvider.deviceId,
             roleProvider = { sessionManager.readSessionUser()?.role },
+            activeUserIdProvider = { sessionManager.resolveOwnerUserId() },
         )
     }
 
@@ -228,7 +228,8 @@ class DefaultAppContainer(
             database = localDatabase,
             salesApi = networkModule.salesApi,
             deviceId = deviceIdProvider.deviceId,
-            cashSessionSyncService = offlineCashSessionSyncService
+            cashSessionSyncService = offlineCashSessionSyncService,
+            activeUserIdProvider = { sessionManager.resolveOwnerUserId() },
         )
     }
 
@@ -238,7 +239,8 @@ class DefaultAppContainer(
             salesApi = networkModule.salesApi,
             deviceId = deviceIdProvider.deviceId,
             cashSessionSyncService = offlineCashSessionSyncService,
-            cashExpenseSyncService = offlineCashExpenseSyncService
+            cashExpenseSyncService = offlineCashExpenseSyncService,
+            activeUserIdProvider = { sessionManager.resolveOwnerUserId() },
         )
     }
 
@@ -258,7 +260,11 @@ class DefaultAppContainer(
             networkMonitor = networkMonitor,
             backendHealthMonitor = backendHealthMonitor,
             localAppSettingsDataSource = localAppSettingsDataSource,
-            syncQueueDao = localDatabase.syncQueueDao()
+            syncQueueDao = localDatabase.syncQueueDao(),
+            cashSessionDao = localDatabase.cashSessionDao(),
+            transactionDao = localDatabase.transactionDao(),
+            cashExpenseDao = localDatabase.cashExpenseDao(),
+            activeUserIdFlow = sessionManager.activeUserIdFlow,
         )
     }
 
@@ -268,7 +274,11 @@ class DefaultAppContainer(
             offlineCashSessionSyncService = offlineCashSessionSyncService,
             offlineCheckoutSyncService = offlineCheckoutSyncService,
             offlineCashExpenseSyncService = offlineCashExpenseSyncService,
-            cashSessionDao = localDatabase.cashSessionDao()
+            cashSessionDao = localDatabase.cashSessionDao(),
+            transactionDao = localDatabase.transactionDao(),
+            cashExpenseDao = localDatabase.cashExpenseDao(),
+            activeUserIdFlow = sessionManager.activeUserIdFlow,
+            activeUserIdProvider = { sessionManager.resolveOwnerUserId() },
         )
     }
 

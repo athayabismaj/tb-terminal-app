@@ -7,6 +7,7 @@ import androidx.room.Query
 import androidx.room.Update
 import com.tbterminal.app.data.local.entity.SyncQueueEntity
 import com.tbterminal.app.data.local.model.SyncEntityType
+import com.tbterminal.app.data.local.model.SyncOperation
 import com.tbterminal.app.data.local.model.SyncStatus
 import kotlinx.coroutines.flow.Flow
 
@@ -88,6 +89,28 @@ interface SyncQueueDao {
         retryIncrement: Int,
         updatedAt: Long
     ): Unit
+
+    @Query(
+        """
+        UPDATE sync_queue
+        SET status = :pendingStatus,
+            lastError = NULL,
+            lastErrorCode = NULL,
+            updatedAt = :updatedAt
+        WHERE entityType = :entityType
+          AND operation = :operation
+          AND entityLocalId IN (:entityLocalIds)
+          AND status != :syncedStatus
+        """
+    )
+    suspend fun resetToPendingForEntities(
+        entityType: SyncEntityType,
+        operation: SyncOperation,
+        entityLocalIds: List<Long>,
+        updatedAt: Long,
+        pendingStatus: SyncStatus = SyncStatus.PENDING,
+        syncedStatus: SyncStatus = SyncStatus.SYNCED,
+    ): Int
 
     @Query(
         """

@@ -18,17 +18,21 @@ data class CheckoutDraftRecord(
 interface CheckoutDraftStore {
     suspend fun load(): CheckoutDraftRecord?
     suspend fun save(activeCartJson: String?, heldCartsJson: String?)
+    suspend fun saveForOwner(ownerUserId: String, activeCartJson: String?, heldCartsJson: String?) {
+        save(activeCartJson, heldCartsJson)
+    }
     suspend fun clearAll()
 }
 
 class RoomCheckoutDraftStore(
     private val dao: CheckoutDraftDao,
     private val ownerUserIdProvider: () -> String,
-    private val clockMillis: () -> Long = { System.currentTimeMillis() }
+    private val clockMillis: () -> Long = { System.currentTimeMillis() },
+    private val skipWhenOwnerBlank: Boolean = false,
 ) : CheckoutDraftStore {
 
     override suspend fun load(): CheckoutDraftRecord? {
-        val ownerUserId = resolveOwnerUserId()
+        val ownerUserId = resolveOwnerUserIdOrNull() ?: return null
         val entity = runSuspendCatching { dao.get(ownerUserId) }.getOrElse { return null }
             ?: return null
 
@@ -46,13 +50,22 @@ class RoomCheckoutDraftStore(
     }
 
     override suspend fun save(activeCartJson: String?, heldCartsJson: String?) {
-        val ownerUserId = resolveOwnerUserId()
+        val ownerUserId = resolveOwnerUserIdOrNull() ?: return
+        saveForOwner(ownerUserId, activeCartJson, heldCartsJson)
+    }
+
+    override suspend fun saveForOwner(
+        ownerUserId: String,
+        activeCartJson: String?,
+        heldCartsJson: String?
+    ) {
+        val resolvedOwner = ownerUserId.trim().takeIf(String::isNotBlank) ?: return
         if (activeCartJson == null && heldCartsJson == null) {
-            runSuspendCatching { dao.delete(ownerUserId) }
+            runSuspendCatching { dao.delete(resolvedOwner) }
             return
         }
         val entity = CheckoutDraftEntity(
-            ownerUserId = ownerUserId,
+            ownerUserId = resolvedOwner,
             activeCartJson = activeCartJson,
             heldCartsJson = heldCartsJson,
             schemaVersion = CheckoutDraftRecord.CURRENT_SCHEMA_VERSION,
@@ -62,12 +75,14 @@ class RoomCheckoutDraftStore(
     }
 
     override suspend fun clearAll() {
-        val ownerUserId = resolveOwnerUserId()
+        val ownerUserId = resolveOwnerUserIdOrNull() ?: return
         runSuspendCatching { dao.delete(ownerUserId) }
     }
 
-    private fun resolveOwnerUserId(): String {
-        return ownerUserIdProvider().trim().ifBlank { DEFAULT_OWNER_USER_ID }
+    private fun resolveOwnerUserIdOrNull(): String? {
+        val trimmed = ownerUserIdProvider().trim()
+        if (trimmed.isNotBlank()) return trimmed
+        return if (skipWhenOwnerBlank) null else DEFAULT_OWNER_USER_ID
     }
 
     companion object {

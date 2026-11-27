@@ -19,9 +19,12 @@ import com.tbterminal.app.data.local.database.CashSessionLocalDataSource
 import com.tbterminal.app.data.local.database.CheckoutDraftStore
 import com.tbterminal.app.data.local.database.CustomerLocalDataSource
 import com.tbterminal.app.data.local.database.LocalAppSettingsDataSource
+import com.tbterminal.app.data.local.database.PendingSubmissionStatus
 import com.tbterminal.app.data.local.database.PendingSubmissionStore
+import com.tbterminal.app.data.session.SessionManager
 import com.tbterminal.app.data.local.database.ProductLocalDataSource
 import com.tbterminal.app.data.local.entity.LocalCashSessionEntity
+import com.tbterminal.app.data.local.mapper.hasUnsyncedLocalChanges
 import com.tbterminal.app.data.local.model.AppDataMode
 import com.tbterminal.app.data.model.CheckoutPaymentLine
 import com.tbterminal.app.data.model.CheckoutSubmitCommand
@@ -43,6 +46,7 @@ import com.tbterminal.app.data.repository.SystemRepository
 import com.tbterminal.app.data.sync.BackendStatus
 import com.tbterminal.app.data.sync.InternetStatus
 import com.tbterminal.app.data.sync.OfflineSyncScheduler
+import com.tbterminal.app.data.sync.runSuspendCatching
 import com.tbterminal.app.data.sync.OfflineStatus
 import com.tbterminal.app.data.sync.OfflineStatusRepository
 import com.tbterminal.app.data.validation.CredentialValidator
@@ -57,6 +61,8 @@ import java.math.BigDecimal
 import java.time.Instant
 import java.time.ZoneId
 import java.util.UUID
+import kotlinx.coroutines.CoroutineDispatcher
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.channels.BufferOverflow
 import kotlinx.coroutines.delay
@@ -71,6 +77,7 @@ import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.runBlocking
 
 sealed interface CheckoutEvent {
     data class NavigateToReceipt(val transactionId: String) : CheckoutEvent
@@ -101,6 +108,8 @@ class CheckoutViewModel(
     private val cartDraftSaveDebounceMs: Long = CheckoutCartDraftCoordinator.DEFAULT_DEBOUNCE_MILLIS,
     private val localCashSessionService: LocalCashSessionService? = null,
     private val cashierUserId: String? = null,
+    private val sessionManager: SessionManager? = null,
+    private val logoutFlushDispatcher: CoroutineDispatcher = Dispatchers.IO,
 ) : ViewModel() {
     private val _uiState = MutableStateFlow(
         CheckoutUiState(canOpenCashSession = AppAccessPolicy.canOpenCashSession(actorRole))
@@ -137,8 +146,35 @@ class CheckoutViewModel(
         )
     }
     private var pendingSubmissionRestoreJob: Job? = null
+    private var cashSessionLoadJob: Job? = null
+    private var hasCompletedInitialCashSessionLoad = false
+    private var beforeSessionClearedListener: (() -> Unit)? = null
 
     init {
+        sessionManager?.let { manager ->
+            val listener = {
+                val outgoingOwner = manager.resolveOwnerUserId()
+                    ?: cashierUserId?.trim()?.takeIf(String::isNotBlank)
+                val snapshotState = _uiState.value
+                val pendingKey = pendingOnlineCheckout
+                val pendingCmd = ambiguousOnlineCheckout
+                runBlocking(logoutFlushDispatcher) {
+                    cartDraftCoordinator?.flushAndStopForOwner(outgoingOwner, snapshotState)
+                    if (outgoingOwner != null && pendingKey != null && pendingCmd != null) {
+                        pendingSubmissionPersistence?.saveForOwner(
+                            ownerUserId = outgoingOwner,
+                            command = pendingCmd,
+                            fingerprint = pendingKey.fingerprint,
+                            state = snapshotState,
+                            status = PendingSubmissionStatus.AMBIGUOUS,
+                        )
+                    }
+                }
+                Unit
+            }
+            manager.addBeforeSessionClearedListener(listener)
+            beforeSessionClearedListener = listener
+        }
         pendingSubmissionRestoreJob = viewModelScope.launch {
             restorePersistedCheckoutState()
         }
@@ -298,67 +334,84 @@ class CheckoutViewModel(
         }
     }
 
+    fun refreshCashSessionOnResume() {
+        if (!hasCompletedInitialCashSessionLoad) return
+        if (cashSessionLoadJob?.isActive == true) return
+        loadCashSession()
+    }
+
     fun loadCashSession() {
-        viewModelScope.launch {
-            _uiState.update { state ->
-                state.copy(isCashSessionLoading = true, cashSessionError = null)
-            }
+        cashSessionLoadJob?.cancel()
+        cashSessionLoadJob = viewModelScope.launch {
+            try {
+                _uiState.update { state ->
+                    state.copy(isCashSessionLoading = true, cashSessionError = null)
+                }
 
-            if (shouldUseLocalCheckout()) {
-                if (!restoreLocalOpenCashSessionIfAvailable()) {
-                    _uiState.update { state ->
-                        state.copy(
-                            activeCashSession = null,
-                            hasActiveCashSession = false,
-                            isCashSessionLoading = false,
-                            cashSessionError = null
-                        )
-                    }
-                }
-                return@launch
-            }
-
-            when (val result = cashReconciliationRepository.getActiveSession()) {
-                is RepositoryResult.Success -> {
-                    val activeCashSession = result.data?.toMirroredActiveCashSessionUi()
-                    _uiState.update { state ->
-                        state.copy(
-                            activeCashSession = activeCashSession,
-                            hasActiveCashSession = activeCashSession != null,
-                            isCashSessionLoading = false,
-                            cashSessionError = null
-                        )
-                    }
-                }
-                is RepositoryResult.Error -> {
-                    val serverUnavailable = ServerUnavailabilityClassifier.isServerUnavailable(result)
-                    if (serverUnavailable) {
-                        markBackendUnreachableAndSyncState()
-                    }
-                    if (!serverUnavailable || !restoreLocalOpenCashSessionIfAvailable()) {
-                        _uiState.update { state ->
-                            state.copy(
-                                activeCashSession = null,
-                                hasActiveCashSession = false,
-                                isCashSessionLoading = false,
-                                cashSessionError = UiText.DynamicString(result.message)
-                            )
-                        }
-                    }
-                }
-                is RepositoryResult.Exception -> {
-                    markBackendUnreachableAndSyncState()
+                if (shouldUseLocalCheckout()) {
                     if (!restoreLocalOpenCashSessionIfAvailable()) {
                         _uiState.update { state ->
                             state.copy(
                                 activeCashSession = null,
                                 hasActiveCashSession = false,
                                 isCashSessionLoading = false,
-                                cashSessionError = UiText.DynamicString("Sesi kasir gagal dicek.")
+                                cashSessionError = null
                             )
                         }
                     }
+                    return@launch
                 }
+
+                when (val result = cashReconciliationRepository.getActiveSession()) {
+                    is RepositoryResult.Success -> {
+                        val remoteSession = result.data
+                        val activeCashSession = if (remoteSession == null) {
+                            reconcileNoActiveRemoteSessionSafely()
+                            null
+                        } else {
+                            remoteSession.toResolvedRemoteActiveCashSessionUi()
+                        }
+                        _uiState.update { state ->
+                            state.copy(
+                                activeCashSession = activeCashSession,
+                                hasActiveCashSession = activeCashSession != null,
+                                isCashSessionLoading = false,
+                                cashSessionError = null
+                            )
+                        }
+                    }
+                    is RepositoryResult.Error -> {
+                        val serverUnavailable = ServerUnavailabilityClassifier.isServerUnavailable(result)
+                        if (serverUnavailable) {
+                            markBackendUnreachableAndSyncState()
+                        }
+                        if (!serverUnavailable || !restoreLocalOpenCashSessionIfAvailable()) {
+                            _uiState.update { state ->
+                                state.copy(
+                                    activeCashSession = null,
+                                    hasActiveCashSession = false,
+                                    isCashSessionLoading = false,
+                                    cashSessionError = UiText.DynamicString(result.message)
+                                )
+                            }
+                        }
+                    }
+                    is RepositoryResult.Exception -> {
+                        markBackendUnreachableAndSyncState()
+                        if (!restoreLocalOpenCashSessionIfAvailable()) {
+                            _uiState.update { state ->
+                                state.copy(
+                                    activeCashSession = null,
+                                    hasActiveCashSession = false,
+                                    isCashSessionLoading = false,
+                                    cashSessionError = UiText.DynamicString("Sesi kasir gagal dicek.")
+                                )
+                            }
+                        }
+                    }
+                }
+            } finally {
+                hasCompletedInitialCashSessionLoad = true
             }
         }
     }
@@ -1922,6 +1975,10 @@ class CheckoutViewModel(
     }
 
     override fun onCleared() {
+        beforeSessionClearedListener?.let { listener ->
+            sessionManager?.removeBeforeSessionClearedListener(listener)
+        }
+        beforeSessionClearedListener = null
         lockScreenCountdownJob?.cancel()
         cartDraftCoordinator?.stop()
         super.onCleared()
@@ -2966,6 +3023,7 @@ class CheckoutViewModel(
             customerLocalDataSource: CustomerLocalDataSource? = null,
             localCashSessionService: LocalCashSessionService? = null,
             cashierUserId: String? = null,
+            sessionManager: SessionManager? = null,
         ): ViewModelProvider.Factory {
             return viewModelFactory {
                 CheckoutViewModel(
@@ -2990,6 +3048,7 @@ class CheckoutViewModel(
                     customerLocalDataSource = customerLocalDataSource,
                     localCashSessionService = localCashSessionService,
                     cashierUserId = cashierUserId,
+                    sessionManager = sessionManager,
                 )
             }
         }
@@ -3007,16 +3066,39 @@ class CheckoutViewModel(
         return this == PaymentMethod.HUTANG || this == PaymentMethod.DP
     }
 
+    private suspend fun CashSession.toResolvedRemoteActiveCashSessionUi(): ActiveCashSessionUi? {
+        val mirroredEntity = mirrorCashSessionEntitySafely(this)
+        if (mirroredEntity != null &&
+            mirroredEntity.hasUnsyncedLocalChanges() &&
+            !mirroredEntity.status.equals("OPEN", ignoreCase = true)
+        ) {
+            return runSuspendCatching {
+                cashSessionLocalDataSource?.getLatestOpenSession(resolveCashierUserId())
+            }.getOrNull()?.toActiveCashSessionUi()
+        }
+        return toActiveCashSessionUi(localId = mirroredEntity?.localId)
+    }
+
     private suspend fun CashSession.toMirroredActiveCashSessionUi(): ActiveCashSessionUi {
         val localId = mirrorCashSessionSafely(this)
         return toActiveCashSessionUi(localId = localId)
     }
 
     private suspend fun mirrorCashSessionSafely(session: CashSession): Long? {
-        return try {
-            cashSessionLocalDataSource?.mirrorRemoteSession(session)?.localId
-        } catch (_: Exception) {
-            null
+        return mirrorCashSessionEntitySafely(session)?.localId
+    }
+
+    private suspend fun mirrorCashSessionEntitySafely(session: CashSession): LocalCashSessionEntity? {
+        return runSuspendCatching {
+            cashSessionLocalDataSource?.mirrorRemoteSession(session)
+        }.getOrNull()
+    }
+
+    private suspend fun reconcileNoActiveRemoteSessionSafely() {
+        runSuspendCatching {
+            cashSessionLocalDataSource?.reconcileNoActiveRemoteSession(
+                cashierUserId = resolveCashierUserId()
+            )
         }
     }
 }
