@@ -3,29 +3,53 @@ package com.tbterminal.app.ui.receivables
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
+import com.tbterminal.app.data.local.database.PendingSubmissionRecord
+import com.tbterminal.app.data.local.database.PendingSubmissionScopes
+import com.tbterminal.app.data.local.database.PendingSubmissionStatus
+import com.tbterminal.app.data.local.database.PendingSubmissionStore
 import com.tbterminal.app.data.model.CreateReceivablePaymentCommand
 import com.tbterminal.app.data.model.Receivable
 import com.tbterminal.app.data.model.ReceivablePaymentHistory
 import com.tbterminal.app.data.repository.CustomerRepository
 import com.tbterminal.app.data.repository.ReceivableRepository
 import com.tbterminal.app.data.repository.RepositoryResult
+import com.tbterminal.app.data.sync.runSuspendCatching
 import com.tbterminal.app.ui.common.parseWholeRupiahOrExactRemainingInput
 import com.tbterminal.app.ui.common.sanitizeWholeRupiahInput
 import com.tbterminal.app.ui.common.toWholeRupiahInputText
 import com.tbterminal.app.ui.common.viewModelFactory
 import java.math.BigDecimal
 import java.util.UUID
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import kotlinx.serialization.Serializable
+import kotlinx.serialization.encodeToString
+import kotlinx.serialization.json.Json
+
+private val ReceivablePersistenceJson = Json {
+    ignoreUnknownKeys = true
+    encodeDefaults = true
+    explicitNulls = false
+}
 
 private data class ReceivablePaymentIntent(
     val customerId: String,
     val normalizedAmount: String,
     val method: ReceivablePaymentMethod,
     val invoiceIds: List<String>,
+)
+
+@Serializable
+private data class PersistedReceivablePendingPayment(
+    val customerId: String,
+    val normalizedAmount: String,
+    val methodName: String,
+    val invoiceIds: List<String>,
+    val keysByInvoice: Map<String, String>
 )
 
 internal data class ReceivableCustomerDetailUiState(
@@ -61,16 +85,58 @@ internal class ReceivableCustomerDetailViewModel(
     private val customerId: String,
     private val customerRepository: CustomerRepository? = null,
     private val idempotencyKeyGenerator: () -> String = { UUID.randomUUID().toString() },
+    private val pendingSubmissionStore: PendingSubmissionStore? = null,
+    private val clockMillis: () -> Long = { System.currentTimeMillis() },
 ) : ViewModel() {
     private val _uiState = MutableStateFlow(ReceivableCustomerDetailUiState())
     val uiState: StateFlow<ReceivableCustomerDetailUiState> = _uiState.asStateFlow()
 
+    private val pendingScope = PendingSubmissionScopes.receivablePayment(customerId)
     private var activePaymentIntent: ReceivablePaymentIntent? = null
     private var activePaymentKeysByInvoice: MutableMap<String, String> = mutableMapOf()
+    private var activePaymentCreatedAt: Long? = null
     private var isPaymentOutcomeAmbiguous: Boolean = false
+    private val restoreJob: Job
 
     init {
+        restoreJob = viewModelScope.launch {
+            restorePendingPayment()
+        }
         load()
+    }
+
+    private suspend fun restorePendingPayment() {
+        val store = pendingSubmissionStore ?: return
+        val record = store.load(pendingScope) ?: return
+        val dto = runSuspendCatching {
+            ReceivablePersistenceJson.decodeFromString<PersistedReceivablePendingPayment>(record.intentJson)
+        }.getOrElse {
+            store.clear(pendingScope)
+            return
+        }
+        val method = ReceivablePaymentMethod.entries.firstOrNull { it.name == dto.methodName }
+        val valid = dto.customerId == customerId &&
+            method != null &&
+            dto.invoiceIds.isNotEmpty() &&
+            dto.keysByInvoice.keys.containsAll(dto.invoiceIds) &&
+            dto.keysByInvoice.values.all { it.isNotBlank() }
+
+        if (!valid) {
+            store.clear(pendingScope)
+            return
+        }
+
+        if (activePaymentIntent == null) {
+            activePaymentIntent = ReceivablePaymentIntent(
+                customerId = dto.customerId,
+                normalizedAmount = dto.normalizedAmount,
+                method = method!!,
+                invoiceIds = dto.invoiceIds,
+            )
+            activePaymentKeysByInvoice = dto.keysByInvoice.toMutableMap()
+            activePaymentCreatedAt = record.createdAt
+            isPaymentOutcomeAmbiguous = true
+        }
     }
 
     fun load() {
@@ -240,11 +306,10 @@ internal class ReceivableCustomerDetailViewModel(
             method = state.paymentMethod,
             invoiceIds = listOf(receivable.id),
         )
-        val idempotencyKey = resolveKeysForIntent(intent, prefix = "receivable-pay").getValue(receivable.id)
-        val amount = validateReceivablePaymentInput(
+        validateReceivablePaymentInput(
             state.paymentAmountInput,
             receivable.remainingAmount,
-            idempotencyKey
+            activePaymentKeysByInvoice[receivable.id] ?: "receivable-pending-key"
         ).getOrElse {
             _uiState.update { s -> s.copy(paymentErrorMessage = it.message ?: "Nominal pembayaran belum valid.") }
             return
@@ -252,6 +317,22 @@ internal class ReceivableCustomerDetailViewModel(
 
         viewModelScope.launch {
             _uiState.update { it.copy(isSubmittingPayment = true, paymentErrorMessage = null) }
+            restoreJob.join()
+            val idempotencyKey = resolveKeysForIntent(intent, prefix = "receivable-pay").getValue(receivable.id)
+            val amount = validateReceivablePaymentInput(
+                state.paymentAmountInput,
+                receivable.remainingAmount,
+                idempotencyKey
+            ).getOrElse {
+                _uiState.update { s ->
+                    s.copy(
+                        isSubmittingPayment = false,
+                        paymentErrorMessage = it.message ?: "Nominal pembayaran belum valid."
+                    )
+                }
+                return@launch
+            }
+            persistPendingPayment(PendingSubmissionStatus.IN_FLIGHT)
             val command = CreateReceivablePaymentCommand(
                 receivableId = receivable.id,
                 amount = amount,
@@ -263,6 +344,7 @@ internal class ReceivableCustomerDetailViewModel(
             when (val result = receivableRepository.createReceivablePayment(command)) {
                 is RepositoryResult.Success -> {
                     clearPaymentIdempotencyState()
+                    pendingSubmissionStore?.clear(pendingScope)
                     _uiState.update {
                         it.copy(
                             selectedReceivableForPayment = null,
@@ -273,7 +355,13 @@ internal class ReceivableCustomerDetailViewModel(
                     load()
                 }
                 is RepositoryResult.Error -> {
-                    isPaymentOutcomeAmbiguous = isAmbiguousReceivablePaymentError(result.code)
+                    val ambiguous = isAmbiguousReceivablePaymentError(result.code)
+                    isPaymentOutcomeAmbiguous = ambiguous
+                    if (ambiguous) {
+                        persistPendingPayment(PendingSubmissionStatus.AMBIGUOUS)
+                    } else {
+                        pendingSubmissionStore?.clear(pendingScope)
+                    }
                     _uiState.update {
                         it.copy(
                             isSubmittingPayment = false,
@@ -283,6 +371,7 @@ internal class ReceivableCustomerDetailViewModel(
                 }
                 is RepositoryResult.Exception -> {
                     isPaymentOutcomeAmbiguous = true
+                    persistPendingPayment(PendingSubmissionStatus.AMBIGUOUS)
                     _uiState.update {
                         it.copy(
                             isSubmittingPayment = false,
@@ -317,30 +406,59 @@ internal class ReceivableCustomerDetailViewModel(
             method = state.paymentMethod,
             invoiceIds = sortedInvoiceIds,
         )
-        val keysByInvoice = resolveKeysForIntent(intent, prefix = "receivable-pay-all")
-        val validationKey = keysByInvoice.getValue(sortedInvoiceIds.first())
-        val amount = validateReceivablePaymentInput(
+        val syncAmount = validateReceivablePaymentInput(
             state.paymentAmountInput,
             selectedTotalRemaining,
-            validationKey
+            activePaymentKeysByInvoice[sortedInvoiceIds.first()] ?: "receivable-pending-key"
         ).getOrElse {
             _uiState.update { s -> s.copy(paymentErrorMessage = it.message ?: "Nominal pembayaran belum valid.") }
             return
         }
 
-        val allocations = calculateFifoAllocations(
+        val syncAllocations = calculateFifoAllocations(
             invoices = unpaid,
             selectedIds = state.selectedPayAllInvoiceIds,
-            totalPaymentAmount = amount
+            totalPaymentAmount = syncAmount
         )
-        val paymentsToMake = allocations.filter { it.isSelected && it.allocatedAmount > BigDecimal.ZERO }
-        if (paymentsToMake.isEmpty()) {
+        val syncPaymentsToMake = syncAllocations.filter { it.isSelected && it.allocatedAmount > BigDecimal.ZERO }
+        if (syncPaymentsToMake.isEmpty()) {
             _uiState.update { it.copy(paymentErrorMessage = "Nominal pembayaran belum mencukupi untuk dialokasikan ke nota terpilih.") }
             return
         }
 
         viewModelScope.launch {
             _uiState.update { it.copy(isSubmittingPayment = true, paymentErrorMessage = null) }
+            restoreJob.join()
+            val keysByInvoice = resolveKeysForIntent(intent, prefix = "receivable-pay-all")
+            val validationKey = keysByInvoice.getValue(sortedInvoiceIds.first())
+            val amount = validateReceivablePaymentInput(
+                state.paymentAmountInput,
+                selectedTotalRemaining,
+                validationKey
+            ).getOrElse {
+                _uiState.update { s ->
+                    s.copy(
+                        isSubmittingPayment = false,
+                        paymentErrorMessage = it.message ?: "Nominal pembayaran belum valid."
+                    )
+                }
+                return@launch
+            }
+            val paymentsToMake = calculateFifoAllocations(
+                invoices = unpaid,
+                selectedIds = state.selectedPayAllInvoiceIds,
+                totalPaymentAmount = amount
+            ).filter { it.isSelected && it.allocatedAmount > BigDecimal.ZERO }
+            if (paymentsToMake.isEmpty()) {
+                _uiState.update {
+                    it.copy(
+                        isSubmittingPayment = false,
+                        paymentErrorMessage = "Nominal pembayaran belum mencukupi untuk dialokasikan ke nota terpilih."
+                    )
+                }
+                return@launch
+            }
+            persistPendingPayment(PendingSubmissionStatus.IN_FLIGHT)
 
             var successCount = 0
             var failureError: String? = null
@@ -378,6 +496,7 @@ internal class ReceivableCustomerDetailViewModel(
 
             if (failureError == null) {
                 clearPaymentIdempotencyState()
+                pendingSubmissionStore?.clear(pendingScope)
                 _uiState.update {
                     it.copy(
                         isPayAllOpen = false,
@@ -392,6 +511,11 @@ internal class ReceivableCustomerDetailViewModel(
                 load()
             } else {
                 isPaymentOutcomeAmbiguous = ambiguousFailure
+                if (ambiguousFailure) {
+                    persistPendingPayment(PendingSubmissionStatus.AMBIGUOUS)
+                } else {
+                    pendingSubmissionStore?.clear(pendingScope)
+                }
                 if (successCount > 0) {
                     _uiState.update {
                         it.copy(
@@ -425,13 +549,45 @@ internal class ReceivableCustomerDetailViewModel(
         }
         activePaymentIntent = intent
         activePaymentKeysByInvoice = freshKeys.toMutableMap()
+        activePaymentCreatedAt = null
         isPaymentOutcomeAmbiguous = false
         return activePaymentKeysByInvoice
+    }
+
+    private suspend fun persistPendingPayment(status: PendingSubmissionStatus) {
+        val store = pendingSubmissionStore ?: return
+        val intent = activePaymentIntent ?: return
+        val primaryKey = intent.invoiceIds.firstOrNull()?.let { activePaymentKeysByInvoice[it] } ?: return
+        val now = clockMillis()
+        val createdAt = activePaymentCreatedAt ?: now
+        activePaymentCreatedAt = createdAt
+
+        val intentJson = ReceivablePersistenceJson.encodeToString(
+            PersistedReceivablePendingPayment(
+                customerId = intent.customerId,
+                normalizedAmount = intent.normalizedAmount,
+                methodName = intent.method.name,
+                invoiceIds = intent.invoiceIds,
+                keysByInvoice = activePaymentKeysByInvoice.toMap()
+            )
+        )
+        store.save(
+            PendingSubmissionRecord(
+                scope = pendingScope,
+                idempotencyKey = primaryKey,
+                intentJson = intentJson,
+                payloadJson = null,
+                status = status,
+                createdAt = createdAt,
+                updatedAt = now
+            )
+        )
     }
 
     private fun clearPaymentIdempotencyState() {
         activePaymentIntent = null
         activePaymentKeysByInvoice.clear()
+        activePaymentCreatedAt = null
         isPaymentOutcomeAmbiguous = false
     }
 
@@ -454,13 +610,15 @@ internal class ReceivableCustomerDetailViewModel(
         fun factory(
             receivableRepository: ReceivableRepository,
             customerId: String,
-            customerRepository: CustomerRepository? = null
+            customerRepository: CustomerRepository? = null,
+            pendingSubmissionStore: PendingSubmissionStore? = null
         ): ViewModelProvider.Factory =
             viewModelFactory {
                 ReceivableCustomerDetailViewModel(
-                    receivableRepository,
-                    customerId,
-                    customerRepository
+                    receivableRepository = receivableRepository,
+                    customerId = customerId,
+                    customerRepository = customerRepository,
+                    pendingSubmissionStore = pendingSubmissionStore
                 )
             }
     }

@@ -4,6 +4,10 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import com.tbterminal.app.data.local.dao.TransactionDao
+import com.tbterminal.app.data.local.database.PendingSubmissionRecord
+import com.tbterminal.app.data.local.database.PendingSubmissionScopes
+import com.tbterminal.app.data.local.database.PendingSubmissionStatus
+import com.tbterminal.app.data.local.database.PendingSubmissionStore
 import com.tbterminal.app.data.local.model.SyncEntityType
 import com.tbterminal.app.data.local.model.SyncStatus
 import com.tbterminal.app.data.model.CashTransaction
@@ -15,6 +19,7 @@ import com.tbterminal.app.data.repository.CashReconciliationRepository
 import com.tbterminal.app.data.repository.RepositoryResult
 import com.tbterminal.app.data.sync.OfflineCheckoutSyncResult
 import com.tbterminal.app.data.sync.OfflineCheckoutSyncService
+import com.tbterminal.app.data.sync.runSuspendCatching
 import com.tbterminal.app.ui.common.parseWholeRupiahOrExactRemainingInput
 import com.tbterminal.app.ui.common.sanitizeWholeRupiahInput
 import com.tbterminal.app.ui.common.toWholeRupiahInputText
@@ -29,6 +34,9 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import kotlinx.serialization.Serializable
+import kotlinx.serialization.encodeToString
+import kotlinx.serialization.json.Json
 import java.time.Instant
 import java.time.LocalDate
 import java.time.LocalDateTime
@@ -40,22 +48,78 @@ import java.util.UUID
 
 private val WIB_ZONE = ZoneId.of("Asia/Jakarta")
 
+private val CashierPayDebtPersistenceJson = Json {
+    ignoreUnknownKeys = true
+    encodeDefaults = true
+    explicitNulls = false
+}
+
+@Serializable
+private data class PersistedCashierPayDebtPending(
+    val transactionId: String,
+    val amountInput: String,
+    val method: String,
+    val fingerprint: String
+)
+
 class CashierTransactionHistoryViewModel(
     private val repository: CashReconciliationRepository,
     private val transactionDao: TransactionDao? = null,
     private val offlineCheckoutSyncService: OfflineCheckoutSyncService? = null,
     private val actorRole: String = "KASIR",
     private val idempotencyKeyGenerator: () -> String = { UUID.randomUUID().toString() },
+    private val pendingSubmissionStore: PendingSubmissionStore? = null,
+    private val clockMillis: () -> Long = { System.currentTimeMillis() },
 ) : ViewModel() {
     private val _uiState = MutableStateFlow(CashierTransactionHistoryUiState(isLoading = true))
     val uiState: StateFlow<CashierTransactionHistoryUiState> = _uiState.asStateFlow()
 
     private var searchJob: Job? = null
     private var lastSubmittedPayDebtFingerprint: String? = null
+    private var restoredPayDebt: PersistedCashierPayDebtPending? = null
+    private var restoredPayDebtKey: String? = null
+    private var restoredPayDebtCreatedAt: Long? = null
+    private var activePayDebtCreatedAt: Long? = null
+    private val payDebtRestoreJob: Job
 
     init {
+        payDebtRestoreJob = viewModelScope.launch {
+            restorePendingPayDebt()
+        }
         observeLocalPendingTransactions()
         loadTransactions()
+    }
+
+    private suspend fun restorePendingPayDebt() {
+        val store = pendingSubmissionStore ?: return
+        val record = store.load(PendingSubmissionScopes.CASHIER_PAY_DEBT) ?: return
+        val dto = runSuspendCatching {
+            CashierPayDebtPersistenceJson.decodeFromString<PersistedCashierPayDebtPending>(record.intentJson)
+        }.getOrElse {
+            store.clear(PendingSubmissionScopes.CASHIER_PAY_DEBT)
+            return
+        }
+        if (dto.transactionId.isBlank() || dto.fingerprint.isBlank() || record.idempotencyKey.isBlank()) {
+            store.clear(PendingSubmissionScopes.CASHIER_PAY_DEBT)
+            return
+        }
+        restoredPayDebt = dto
+        restoredPayDebtKey = record.idempotencyKey
+        restoredPayDebtCreatedAt = record.createdAt
+
+        val selected = _uiState.value.selectedTransaction
+        if (selected != null && selected.id == dto.transactionId && !_uiState.value.isSubmittingDebt) {
+            lastSubmittedPayDebtFingerprint = dto.fingerprint
+            activePayDebtCreatedAt = record.createdAt
+            _uiState.update { state ->
+                state.copy(
+                    payDebtAmountInput = dto.amountInput,
+                    payDebtMethodInput = dto.method,
+                    payDebtIdempotencyKey = record.idempotencyKey,
+                    isPayDebtOutcomeAmbiguous = true,
+                )
+            }
+        }
     }
 
     private fun observeLocalPendingTransactions() {
@@ -488,11 +552,22 @@ class CashierTransactionHistoryViewModel(
 
             when (val result = repository.getTransactionById(transactionId)) {
                 is RepositoryResult.Success -> {
+                    payDebtRestoreJob.join()
+                    val pendingForReceipt = restoredPayDebt?.takeIf { it.transactionId == result.data.id }
+                    val pendingKey = restoredPayDebtKey?.takeIf { pendingForReceipt != null && it.isNotBlank() }
+                    if (pendingForReceipt != null && pendingKey != null) {
+                        lastSubmittedPayDebtFingerprint = pendingForReceipt.fingerprint
+                        activePayDebtCreatedAt = restoredPayDebtCreatedAt
+                    }
                     _uiState.update { state ->
                         state.copy(
                             selectedTransaction = result.data,
                             isReceiptLoading = false,
                             receiptMessage = if (preserveMessage) state.receiptMessage else null,
+                            payDebtAmountInput = pendingForReceipt?.amountInput ?: state.payDebtAmountInput,
+                            payDebtMethodInput = pendingForReceipt?.method ?: state.payDebtMethodInput,
+                            payDebtIdempotencyKey = pendingKey ?: state.payDebtIdempotencyKey,
+                            isPayDebtOutcomeAmbiguous = if (pendingKey != null) true else state.isPayDebtOutcomeAmbiguous,
                         )
                     }
                 }
@@ -875,9 +950,24 @@ class CashierTransactionHistoryViewModel(
 
     fun showPayDebtDialog() {
         _uiState.update { state ->
+            val selectedId = state.selectedTransaction?.id
+            val pendingForSelected = restoredPayDebt?.takeIf {
+                selectedId != null && it.transactionId == selectedId && !restoredPayDebtKey.isNullOrBlank()
+            }
             if (state.isPayDebtOutcomeAmbiguous && !state.payDebtIdempotencyKey.isNullOrBlank()) {
                 state.copy(
                     isPayDebtDialogOpen = true,
+                    payDebtError = null,
+                )
+            } else if (pendingForSelected != null) {
+                lastSubmittedPayDebtFingerprint = pendingForSelected.fingerprint
+                activePayDebtCreatedAt = restoredPayDebtCreatedAt
+                state.copy(
+                    isPayDebtDialogOpen = true,
+                    payDebtAmountInput = pendingForSelected.amountInput,
+                    payDebtMethodInput = pendingForSelected.method,
+                    payDebtIdempotencyKey = restoredPayDebtKey,
+                    isPayDebtOutcomeAmbiguous = true,
                     payDebtError = null,
                 )
             } else {
@@ -953,28 +1043,44 @@ class CashierTransactionHistoryViewModel(
             return
         }
         val fingerprint = buildPayDebtFingerprint(transactionId, amount, state.payDebtMethodInput)
-        val idempotencyKey = if (
-            lastSubmittedPayDebtFingerprint != null && lastSubmittedPayDebtFingerprint != fingerprint
-        ) {
-            idempotencyKeyGenerator()
-        } else {
-            state.payDebtIdempotencyKey ?: idempotencyKeyGenerator()
-        }
-        lastSubmittedPayDebtFingerprint = fingerprint
 
         viewModelScope.launch {
             _uiState.update {
                 it.copy(
                     isSubmittingDebt = true,
-                    payDebtIdempotencyKey = idempotencyKey,
                     payDebtError = null,
                     errorMessage = null,
                     receiptMessage = null,
                 )
             }
+            payDebtRestoreJob.join()
+            val pendingMatches = restoredPayDebt?.let {
+                it.transactionId == transactionId && it.fingerprint == fingerprint && !restoredPayDebtKey.isNullOrBlank()
+            } == true
+            val idempotencyKey = when {
+                lastSubmittedPayDebtFingerprint != null && lastSubmittedPayDebtFingerprint != fingerprint -> {
+                    activePayDebtCreatedAt = null
+                    idempotencyKeyGenerator()
+                }
+                pendingMatches && (state.payDebtIdempotencyKey == null || lastSubmittedPayDebtFingerprint == null) -> {
+                    activePayDebtCreatedAt = restoredPayDebtCreatedAt
+                    restoredPayDebtKey!!
+                }
+                else -> state.payDebtIdempotencyKey ?: idempotencyKeyGenerator()
+            }
+            lastSubmittedPayDebtFingerprint = fingerprint
+            val pendingDto = PersistedCashierPayDebtPending(
+                transactionId = transactionId,
+                amountInput = state.payDebtAmountInput,
+                method = state.payDebtMethodInput,
+                fingerprint = fingerprint
+            )
+            _uiState.update { it.copy(payDebtIdempotencyKey = idempotencyKey) }
+            persistPendingPayDebt(pendingDto, idempotencyKey, PendingSubmissionStatus.IN_FLIGHT)
 
             when (val result = repository.payTransactionDebt(transactionId, amount, state.payDebtMethodInput, idempotencyKey)) {
                 is RepositoryResult.Success -> {
+                    clearPersistedPayDebtState()
                     lastSubmittedPayDebtFingerprint = null
                     _uiState.update {
                         it.copy(
@@ -992,6 +1098,11 @@ class CashierTransactionHistoryViewModel(
                 }
                 is RepositoryResult.Error -> {
                     val ambiguous = isAmbiguousTransactionActionError(result.code)
+                    if (ambiguous) {
+                        persistPendingPayDebt(pendingDto, idempotencyKey, PendingSubmissionStatus.AMBIGUOUS)
+                    } else {
+                        clearPersistedPayDebtState()
+                    }
                     _uiState.update {
                         it.copy(
                             isSubmittingDebt = false,
@@ -1002,6 +1113,7 @@ class CashierTransactionHistoryViewModel(
                     }
                 }
                 is RepositoryResult.Exception -> {
+                    persistPendingPayDebt(pendingDto, idempotencyKey, PendingSubmissionStatus.AMBIGUOUS)
                     val fallback = "Gagal memproses pelunasan"
                     _uiState.update {
                         it.copy(
@@ -1014,6 +1126,43 @@ class CashierTransactionHistoryViewModel(
                 }
             }
         }
+    }
+
+    private suspend fun persistPendingPayDebt(
+        dto: PersistedCashierPayDebtPending,
+        idempotencyKey: String,
+        status: PendingSubmissionStatus
+    ) {
+        val store = pendingSubmissionStore ?: return
+        val now = clockMillis()
+        val createdAt = if (restoredPayDebtKey == idempotencyKey || activePayDebtCreatedAt != null) {
+            activePayDebtCreatedAt ?: now
+        } else {
+            now
+        }
+        activePayDebtCreatedAt = createdAt
+        restoredPayDebt = dto
+        restoredPayDebtKey = idempotencyKey
+        restoredPayDebtCreatedAt = createdAt
+        store.save(
+            PendingSubmissionRecord(
+                scope = PendingSubmissionScopes.CASHIER_PAY_DEBT,
+                idempotencyKey = idempotencyKey,
+                intentJson = CashierPayDebtPersistenceJson.encodeToString(dto),
+                payloadJson = null,
+                status = status,
+                createdAt = createdAt,
+                updatedAt = now
+            )
+        )
+    }
+
+    private suspend fun clearPersistedPayDebtState() {
+        restoredPayDebt = null
+        restoredPayDebtKey = null
+        restoredPayDebtCreatedAt = null
+        activePayDebtCreatedAt = null
+        pendingSubmissionStore?.clear(PendingSubmissionScopes.CASHIER_PAY_DEBT)
     }
 
     private fun rotatePayDebtKeyIfIntentChanged(
@@ -1031,6 +1180,13 @@ class CashierTransactionHistoryViewModel(
         }
         return if (nextFingerprint != previousFingerprint) {
             lastSubmittedPayDebtFingerprint = null
+            restoredPayDebt = null
+            restoredPayDebtKey = null
+            restoredPayDebtCreatedAt = null
+            activePayDebtCreatedAt = null
+            pendingSubmissionStore?.let { store ->
+                viewModelScope.launch { store.clear(PendingSubmissionScopes.CASHIER_PAY_DEBT) }
+            }
             state.copy(
                 payDebtIdempotencyKey = idempotencyKeyGenerator(),
                 isPayDebtOutcomeAmbiguous = false,
@@ -1058,13 +1214,15 @@ class CashierTransactionHistoryViewModel(
             transactionDao: TransactionDao? = null,
             offlineCheckoutSyncService: OfflineCheckoutSyncService? = null,
             actorRole: String = "KASIR",
+            pendingSubmissionStore: PendingSubmissionStore? = null,
         ): ViewModelProvider.Factory {
             return viewModelFactory {
                 CashierTransactionHistoryViewModel(
-                    repository,
-                    transactionDao,
-                    offlineCheckoutSyncService,
-                    actorRole,
+                    repository = repository,
+                    transactionDao = transactionDao,
+                    offlineCheckoutSyncService = offlineCheckoutSyncService,
+                    actorRole = actorRole,
+                    pendingSubmissionStore = pendingSubmissionStore,
                 )
             }
         }

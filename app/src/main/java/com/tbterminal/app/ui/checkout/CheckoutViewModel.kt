@@ -15,6 +15,7 @@ import com.tbterminal.app.data.local.checkout.normalizeExactDecimal
 import com.tbterminal.app.data.local.checkout.resolveOfflineCheckoutItemUnit
 import com.tbterminal.app.data.local.database.CashSessionLocalDataSource
 import com.tbterminal.app.data.local.database.LocalAppSettingsDataSource
+import com.tbterminal.app.data.local.database.PendingSubmissionStore
 import com.tbterminal.app.data.local.entity.LocalCashSessionEntity
 import com.tbterminal.app.data.local.model.AppDataMode
 import com.tbterminal.app.data.model.CheckoutPaymentLine
@@ -87,6 +88,7 @@ class CheckoutViewModel(
     private val pinUnlockService: PinUnlockService? = null,
     private val clockMillis: () -> Long = { System.currentTimeMillis() },
     private val lockoutTickIntervalMillis: Long = 1_000L,
+    private val pendingSubmissionStore: PendingSubmissionStore? = null,
 ) : ViewModel() {
     private val _uiState = MutableStateFlow(
         CheckoutUiState(canOpenCashSession = AppAccessPolicy.canOpenCashSession(actorRole))
@@ -108,13 +110,63 @@ class CheckoutViewModel(
     private var pendingOnlineCheckout: PendingOnlineCheckout? = null
     private var ambiguousOnlineCheckout: CheckoutSubmitCommand? = null
     private var reorderedProductsCache: Map<String, ReorderResolvedProduct> = emptyMap()
+    private val pendingSubmissionPersistence: CheckoutPendingSubmissionPersistence? =
+        pendingSubmissionStore?.let { CheckoutPendingSubmissionPersistence(it, clockMillis) }
+    private var pendingSubmissionRestoreJob: Job? = null
 
     init {
+        pendingSubmissionRestoreJob = viewModelScope.launch {
+            restorePendingOnlineCheckout()
+        }
         observeOfflineStatus()
         loadStoreConfig()
         loadCashSession()
         loadProducts()
         loadCustomers()
+    }
+
+    private suspend fun restorePendingOnlineCheckout() {
+        val restored = pendingSubmissionPersistence?.load() ?: return
+        pendingOnlineCheckout = PendingOnlineCheckout(
+            idempotencyKey = restored.idempotencyKey,
+            fingerprint = restored.fingerprint
+        )
+        ambiguousOnlineCheckout = restored.command
+        _uiState.update { state ->
+            if (state.cartItems.isNotEmpty()) {
+                state.copy(hasAmbiguousCheckout = true)
+            } else {
+                val deliveryFeeAmount = if (restored.isDeliveryEnabled) restored.deliveryFee else BigDecimal.ZERO
+                val recalculated = state.copy(
+                    selectedCustomer = restored.customer,
+                    customerSearchQuery = restored.customerSearchQuery,
+                    selectedPaymentMethod = restored.selectedPaymentMethod,
+                    isSplitPaymentEnabled = restored.isSplitPaymentEnabled,
+                    isSplitDpMode = restored.isSplitDpMode,
+                    splitPaymentLines = restored.splitPaymentLines,
+                    isDeliveryEnabled = restored.isDeliveryEnabled,
+                    deliveryFee = restored.deliveryFee,
+                    deliveryFeeInput = restored.deliveryFeeInput,
+                    deliveryAddress = restored.deliveryAddress,
+                    deliveryCourier = restored.deliveryCourier,
+                    deliveryFleet = restored.deliveryFleet,
+                    deliveryRecipientPhone = restored.deliveryRecipientPhone,
+                    deliveryVehiclePlate = restored.deliveryVehiclePlate,
+                    deliverySpecialInstructions = restored.deliverySpecialInstructions,
+                    activeQuotationId = restored.activeQuotationId,
+                    activeQuotationNumber = restored.activeQuotationNumber,
+                ).recalculateCheckoutState(
+                    items = restored.cartItems,
+                    discount = restored.transactionDiscount,
+                    deliveryFeeAmount = deliveryFeeAmount,
+                    preserveAmbiguousCheckout = true,
+                )
+                recalculated.copy(
+                    hasAmbiguousCheckout = true,
+                    amountPaidInput = restored.amountPaidInput.ifBlank { recalculated.amountPaidInput },
+                )
+            }
+        }
     }
 
     fun loadStoreConfig() {
@@ -131,7 +183,11 @@ class CheckoutViewModel(
                             taxLabel = cached.taxLabel,
                             cashRoundingUnit = cached.cashRoundingUnit,
                             cashRoundingRule = cached.cashRoundingRule,
-                        ).recalculateCheckoutState(state.cartItems, state.transactionDiscount)
+                        ).recalculateCheckoutState(
+                            state.cartItems,
+                            state.transactionDiscount,
+                            preserveAmbiguousCheckout = true,
+                        )
                     }
                 }
             }
@@ -151,7 +207,11 @@ class CheckoutViewModel(
                                 taxLabel = settings.taxLabel,
                                 cashRoundingUnit = settings.cashRoundingUnit,
                                 cashRoundingRule = settings.cashRoundingRule,
-                            ).recalculateCheckoutState(state.cartItems, state.transactionDiscount)
+                            ).recalculateCheckoutState(
+                                state.cartItems,
+                                state.transactionDiscount,
+                                preserveAmbiguousCheckout = true,
+                            )
                         }
                     }
                 }
@@ -1896,6 +1956,7 @@ class CheckoutViewModel(
         // Set before launching so two taps in the same frame cannot start two requests.
         _uiState.update { it.copy(isLoading = true, isPreviewLoading = true, errorEvent = null) }
         viewModelScope.launch {
+            pendingSubmissionRestoreJob?.join()
             ambiguousOnlineCheckout?.let { command ->
                 _uiState.update { it.copy(isPreviewLoading = false) }
                 executeOnlineCheckout(command)
@@ -2127,6 +2188,11 @@ class CheckoutViewModel(
         )
 
         ambiguousOnlineCheckout = command
+        pendingSubmissionPersistence?.saveInFlight(
+            command = command,
+            fingerprint = pendingOnlineCheckout?.fingerprint.orEmpty(),
+            state = _uiState.value,
+        )
         executeOnlineCheckout(command)
     }
 
@@ -2135,6 +2201,7 @@ class CheckoutViewModel(
             is RepositoryResult.Success -> {
                 pendingOnlineCheckout = null
                 ambiguousOnlineCheckout = null
+                pendingSubmissionPersistence?.clear()
                 val convertedQuotationId = _uiState.value.activeQuotationId
                 if (!convertedQuotationId.isNullOrBlank()) {
                     viewModelScope.launch {
@@ -2155,6 +2222,13 @@ class CheckoutViewModel(
                 if (!ambiguous) {
                     pendingOnlineCheckout = null
                     ambiguousOnlineCheckout = null
+                    pendingSubmissionPersistence?.clear()
+                } else {
+                    pendingSubmissionPersistence?.markAmbiguous(
+                        command = command,
+                        fingerprint = pendingOnlineCheckout?.fingerprint.orEmpty(),
+                        state = _uiState.value,
+                    )
                 }
                 val refreshRequired = result.requiresFreshDiscountPreview()
                 _uiState.update {
@@ -2169,6 +2243,11 @@ class CheckoutViewModel(
                 }
             }
             is RepositoryResult.Exception -> {
+                pendingSubmissionPersistence?.markAmbiguous(
+                    command = command,
+                    fingerprint = pendingOnlineCheckout?.fingerprint.orEmpty(),
+                    state = _uiState.value,
+                )
                 _uiState.update {
                     it.copy(
                         isLoading = false,
@@ -2353,6 +2432,9 @@ class CheckoutViewModel(
     private fun invalidatePendingCheckout() {
         pendingOnlineCheckout = null
         ambiguousOnlineCheckout = null
+        pendingSubmissionPersistence?.let { persistence ->
+            viewModelScope.launch { persistence.clear() }
+        }
     }
 
     private fun allowCheckoutIntentMutation(): Boolean {
@@ -2686,6 +2768,7 @@ class CheckoutViewModel(
             quotationRepository: com.tbterminal.app.data.repository.QuotationRepository? = null,
             actorRole: String = "KASIR",
             pinUnlockService: PinUnlockService? = null,
+            pendingSubmissionStore: PendingSubmissionStore? = null,
         ): ViewModelProvider.Factory {
             return viewModelFactory {
                 CheckoutViewModel(
@@ -2704,6 +2787,7 @@ class CheckoutViewModel(
                     quotationRepository = quotationRepository,
                     actorRole = actorRole,
                     pinUnlockService = pinUnlockService,
+                    pendingSubmissionStore = pendingSubmissionStore,
                 )
             }
         }
@@ -2752,6 +2836,7 @@ internal fun CheckoutUiState.recalculateCheckoutState(
     items: List<CartItem>,
     discount: CheckoutDiscount?,
     deliveryFeeAmount: BigDecimal = if (isDeliveryEnabled) deliveryFee else BigDecimal.ZERO,
+    preserveAmbiguousCheckout: Boolean = false,
 ): CheckoutUiState {
     val repricedItems = repriceCartItemsForCheckout(
         items = items,
@@ -2794,7 +2879,7 @@ internal fun CheckoutUiState.recalculateCheckoutState(
         finalTotal = calculatedFinalTotal,
         checkoutPreview = null,
         approvedManagerApprovalId = null,
-        hasAmbiguousCheckout = false,
+        hasAmbiguousCheckout = if (preserveAmbiguousCheckout) hasAmbiguousCheckout else false,
         isPreviewLoading = false,
         amountPaidInput = when (selectedPaymentMethod) {
             PaymentMethod.HUTANG -> "0"

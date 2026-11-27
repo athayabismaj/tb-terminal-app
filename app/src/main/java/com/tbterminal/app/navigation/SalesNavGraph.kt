@@ -22,6 +22,7 @@ import com.tbterminal.app.ui.cashier.session.CashierCloseShiftScreen
 import com.tbterminal.app.ui.cashier.stock.CashierStockCheckScreen
 import com.tbterminal.app.ui.cashier.transactions.CashierReceiptDetailScreen
 import com.tbterminal.app.ui.cashier.transactions.CashierTransactionHistoryScreen
+import com.tbterminal.app.ui.cashier.transactions.CashierTransactionHistoryViewModel
 import com.tbterminal.app.ui.checkout.CashierCartScreen
 import com.tbterminal.app.ui.checkout.CashierPosScreen
 import com.tbterminal.app.ui.checkout.CheckoutViewModel
@@ -144,12 +145,21 @@ internal fun NavGraphBuilder.salesGraph(navController: NavHostController, sessio
                     }
                 }
 
+                val historyViewModel: CashierTransactionHistoryViewModel = viewModel(
+                    factory = CashierTransactionHistoryViewModel.factory(
+                        repository = appContainer.cashReconciliationRepository,
+                        transactionDao = appContainer.localDatabase.transactionDao(),
+                        offlineCheckoutSyncService = appContainer.offlineCheckoutSyncService,
+                        pendingSubmissionStore = appContainer.pendingSubmissionStore,
+                    )
+                )
                 CashierTransactionHistoryScreen(
                     name = sessionUser.name,
                     role = sessionUser.role,
                     cashReconciliationRepository = appContainer.cashReconciliationRepository,
                     transactionDao = appContainer.localDatabase.transactionDao(),
                     offlineCheckoutSyncService = appContainer.offlineCheckoutSyncService,
+                    viewModel = historyViewModel,
                     onDashboardClick = {
                         navController.navigate(AppRoute.Dashboard.route) {
                             popUpTo(AppRoute.Dashboard.route)
@@ -227,12 +237,20 @@ internal fun NavGraphBuilder.salesGraph(navController: NavHostController, sessio
                     }
                 }
 
+                val cashierReceiptViewModel: CashierTransactionHistoryViewModel = viewModel(
+                    factory = CashierTransactionHistoryViewModel.factory(
+                        repository = appContainer.cashReconciliationRepository,
+                        actorRole = sessionUser.role,
+                        pendingSubmissionStore = appContainer.pendingSubmissionStore,
+                    )
+                )
                 CashierReceiptDetailScreen(
                     name = sessionUser.name,
                     role = sessionUser.role,
                     transactionId = transactionId,
                     cashReconciliationRepository = appContainer.cashReconciliationRepository,
                     managerApprovalRepository = appContainer.managerApprovalRepository,
+                    viewModel = cashierReceiptViewModel,
                     onBackClick = { navController.popBackStack() },
                     onDashboardClick = {
                         navController.navigate(AppRoute.Dashboard.route) {
@@ -619,12 +637,20 @@ internal fun NavGraphBuilder.salesGraph(navController: NavHostController, sessio
                     }
                 }
             } else {
+                val adminReceiptViewModel: CashierTransactionHistoryViewModel = viewModel(
+                    factory = CashierTransactionHistoryViewModel.factory(
+                        repository = appContainer.cashReconciliationRepository,
+                        actorRole = sessionUser.role,
+                        pendingSubmissionStore = appContainer.pendingSubmissionStore,
+                    )
+                )
                 AdminReceiptDetailScreen(
                     name = sessionUser.name,
                     role = sessionUser.role,
                     transactionId = transactionId,
                     cashReconciliationRepository = appContainer.cashReconciliationRepository,
                     managerApprovalRepository = appContainer.managerApprovalRepository,
+                    viewModel = adminReceiptViewModel,
                     onBackClick = { navController.popBackStack() },
                     onDashboardClick = {
                         navController.navigate(AppRoute.Dashboard.route) {

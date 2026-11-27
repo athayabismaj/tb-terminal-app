@@ -3,6 +3,8 @@ package com.tbterminal.app.ui.incominggoods
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
+import com.tbterminal.app.data.local.database.PendingSubmissionScopes
+import com.tbterminal.app.data.local.database.PendingSubmissionStore
 import com.tbterminal.app.data.model.CreatePurchaseCommand
 import com.tbterminal.app.data.model.ProductStock
 import com.tbterminal.app.data.model.PurchaseItemCommand
@@ -28,13 +30,16 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import kotlinx.serialization.Serializable
 
+@Serializable
 private data class PurchaseItemIntent(
     val productId: String,
     val normalizedQty: String,
     val normalizedPrice: String
 )
 
+@Serializable
 private data class PurchaseSubmissionIntent(
     val supplierId: String,
     val invoiceNo: String?,
@@ -51,7 +56,9 @@ class IncomingGoodsViewModel(
     private val documentNumberGenerator: DocumentNumberGenerator,
     private val initialProductId: String? = null,
     private val autoSelectFirst: Boolean = true,
-    private val idempotencyKeyGenerator: () -> String = { UUID.randomUUID().toString() }
+    private val idempotencyKeyGenerator: () -> String = { UUID.randomUUID().toString() },
+    private val pendingSubmissionStore: PendingSubmissionStore? = null,
+    private val clockMillis: () -> Long = { System.currentTimeMillis() }
 ) : ViewModel() {
     private val _uiState = MutableStateFlow(IncomingGoodsUiState(isLoadingProducts = true))
     val uiState: StateFlow<IncomingGoodsUiState> = _uiState.asStateFlow()
@@ -59,10 +66,18 @@ class IncomingGoodsViewModel(
     private var initialSelectionApplied = false
     private val purchaseIdempotency = SubmissionIdempotencyTracker<PurchaseSubmissionIntent>(
         prefix = "purchase",
-        keyGenerator = idempotencyKeyGenerator
+        keyGenerator = idempotencyKeyGenerator,
+        store = pendingSubmissionStore,
+        scope = PendingSubmissionScopes.PURCHASE,
+        intentSerializer = PurchaseSubmissionIntent.serializer(),
+        clockMillis = clockMillis
     )
+    private val restoreJob: Job
 
     init {
+        restoreJob = viewModelScope.launch {
+            purchaseIdempotency.restore()
+        }
         refresh()
     }
 
@@ -292,7 +307,7 @@ class IncomingGoodsViewModel(
 
             when (val result = purchasingRepository.createPurchase(command)) {
                 is RepositoryResult.Success -> {
-                    purchaseIdempotency.onSuccess()
+                    purchaseIdempotency.onSuccessAndPersist()
                     _uiState.update {
                         it.copy(
                             isSubmitting = false,
@@ -305,11 +320,11 @@ class IncomingGoodsViewModel(
                     loadProducts()
                 }
                 is RepositoryResult.Error -> {
-                    purchaseIdempotency.onError(result.code, result.message)
+                    purchaseIdempotency.onErrorAndPersist(result.code, result.message)
                     setActionError(result.message)
                 }
                 is RepositoryResult.Exception -> {
-                    purchaseIdempotency.onException()
+                    purchaseIdempotency.onExceptionAndPersist()
                     setActionError("Barang masuk gagal dicatat karena koneksi bermasalah.")
                 }
             }
@@ -354,23 +369,23 @@ class IncomingGoodsViewModel(
 
             when (val result = purchasingRepository.createPurchase(command)) {
                 is RepositoryResult.Success -> {
-                    purchaseIdempotency.onSuccess()
+                    purchaseIdempotency.onSuccessAndPersist()
                     _uiState.update { it.copy(isSubmitting = false, errorMessage = null, message = null) }
                     onSuccess()
                 }
                 is RepositoryResult.Error -> {
-                    purchaseIdempotency.onError(result.code, result.message)
+                    purchaseIdempotency.onErrorAndPersist(result.code, result.message)
                     setActionError(result.message)
                 }
                 is RepositoryResult.Exception -> {
-                    purchaseIdempotency.onException()
+                    purchaseIdempotency.onExceptionAndPersist()
                     setActionError("Barang masuk gagal dicatat karena koneksi bermasalah.")
                 }
             }
         }
     }
 
-    private fun buildPurchaseCommand(
+    private suspend fun buildPurchaseCommand(
         supplierId: String,
         productId: String,
         quantity: BigDecimal,
@@ -381,6 +396,7 @@ class IncomingGoodsViewModel(
         dueDays: Int,
         notes: String?
     ): CreatePurchaseCommand {
+        restoreJob.join()
         val normalizedInvoiceNo = invoiceNo?.trim()?.takeIf(String::isNotBlank)
         val normalizedNotes = notes?.trim()?.takeIf(String::isNotBlank)
         val intent = PurchaseSubmissionIntent(
@@ -398,7 +414,7 @@ class IncomingGoodsViewModel(
                 )
             )
         )
-        val idempotencyKey = purchaseIdempotency.resolveKey(intent)
+        val idempotencyKey = purchaseIdempotency.resolveKeyForSubmission(intent)
         return CreatePurchaseCommand(
             supplierId = supplierId,
             invoiceNo = normalizedInvoiceNo,
@@ -489,7 +505,8 @@ class IncomingGoodsViewModel(
             purchasingRepository: PurchasingRepository,
             documentNumberGenerator: DocumentNumberGenerator,
             initialProductId: String? = null,
-            autoSelectFirst: Boolean = true
+            autoSelectFirst: Boolean = true,
+            pendingSubmissionStore: PendingSubmissionStore? = null
         ): ViewModelProvider.Factory {
             return viewModelFactory {
                 IncomingGoodsViewModel(
@@ -497,7 +514,8 @@ class IncomingGoodsViewModel(
                     purchasingRepository = purchasingRepository,
                     documentNumberGenerator = documentNumberGenerator,
                     initialProductId = initialProductId,
-                    autoSelectFirst = autoSelectFirst
+                    autoSelectFirst = autoSelectFirst,
+                    pendingSubmissionStore = pendingSubmissionStore
                 )
             }
         }

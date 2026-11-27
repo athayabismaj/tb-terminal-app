@@ -34,10 +34,12 @@ import com.tbterminal.app.ui.dashboard.cashier.CashierDashboardScreen
 import com.tbterminal.app.ui.dashboard.owner.OwnerDashboardScreen
 import com.tbterminal.app.ui.incominggoods.AdminIncomingGoodsFormScreen
 import com.tbterminal.app.ui.incominggoods.AdminIncomingGoodsScreen
+import com.tbterminal.app.ui.incominggoods.IncomingGoodsViewModel
 import com.tbterminal.app.ui.payables.AdminSupplierDebtDetailScreen
 import com.tbterminal.app.ui.payables.AdminSupplierDebtScreen
 import com.tbterminal.app.ui.payables.AdminOpeningSupplierDebtScreen
 import com.tbterminal.app.ui.payables.AdminAdjustmentSupplierDebtScreen
+import com.tbterminal.app.ui.payables.SupplierDebtDetailViewModel
 import com.tbterminal.app.ui.payables.SupplierDebtViewModel
 import com.tbterminal.app.ui.pricemanagement.AdminPriceManagementScreen
 import com.tbterminal.app.ui.products.AdminProductCategoriesScreen
@@ -73,12 +75,22 @@ internal fun NavGraphBuilder.purchasingGraph(navController: NavHostController, s
                     }
                 }
             } else {
+                val incomingViewModel: IncomingGoodsViewModel = viewModel(
+                    factory = IncomingGoodsViewModel.factory(
+                        inventoryRepository = appContainer.inventoryRepository,
+                        purchasingRepository = appContainer.purchasingRepository,
+                        documentNumberGenerator = appContainer.documentNumberGenerator,
+                        autoSelectFirst = false,
+                        pendingSubmissionStore = appContainer.pendingSubmissionStore
+                    )
+                )
                 AdminIncomingGoodsScreen(
                     name = sessionUser.name,
                     role = sessionUser.role,
                     inventoryRepository = appContainer.inventoryRepository,
                     purchasingRepository = appContainer.purchasingRepository,
                     documentNumberGenerator = appContainer.documentNumberGenerator,
+                    viewModel = incomingViewModel,
                     onDashboardClick = {
                         navController.navigate(AppRoute.Dashboard.route) {
                             launchSingleTop = true
@@ -212,6 +224,16 @@ internal fun NavGraphBuilder.purchasingGraph(navController: NavHostController, s
                     }
                 }
             } else {
+                val incomingFormViewModel: IncomingGoodsViewModel = viewModel(
+                    factory = IncomingGoodsViewModel.factory(
+                        inventoryRepository = appContainer.inventoryRepository,
+                        purchasingRepository = appContainer.purchasingRepository,
+                        documentNumberGenerator = appContainer.documentNumberGenerator,
+                        initialProductId = productId,
+                        autoSelectFirst = true,
+                        pendingSubmissionStore = appContainer.pendingSubmissionStore
+                    )
+                )
                 AdminIncomingGoodsFormScreen(
                     name = sessionUser.name,
                     role = sessionUser.role,
@@ -219,6 +241,7 @@ internal fun NavGraphBuilder.purchasingGraph(navController: NavHostController, s
                     purchasingRepository = appContainer.purchasingRepository,
                     documentNumberGenerator = appContainer.documentNumberGenerator,
                     productId = productId,
+                    viewModel = incomingFormViewModel,
                     onDashboardClick = {
                         navController.navigate(AppRoute.Dashboard.route) {
                             launchSingleTop = true
@@ -348,10 +371,17 @@ internal fun NavGraphBuilder.purchasingGraph(navController: NavHostController, s
                     }
                 }
             } else {
+                val supplierDebtViewModel: SupplierDebtViewModel = viewModel(
+                    factory = SupplierDebtViewModel.factory(
+                        purchasingRepository = appContainer.purchasingRepository,
+                        pendingSubmissionStore = appContainer.pendingSubmissionStore
+                    )
+                )
                 AdminSupplierDebtScreen(
                     name = sessionUser.name,
                     role = sessionUser.role,
                     purchasingRepository = appContainer.purchasingRepository,
+                    viewModel = supplierDebtViewModel,
                     onDashboardClick = {
                         navController.navigate(AppRoute.Dashboard.route) {
                             launchSingleTop = true
@@ -494,11 +524,19 @@ internal fun NavGraphBuilder.purchasingGraph(navController: NavHostController, s
                     }
                 }
             } else {
+                val supplierDebtDetailViewModel: SupplierDebtDetailViewModel = viewModel(
+                    factory = SupplierDebtDetailViewModel.factory(
+                        purchasingRepository = appContainer.purchasingRepository,
+                        supplierId = supplierId,
+                        pendingSubmissionStore = appContainer.pendingSubmissionStore
+                    )
+                )
                 AdminSupplierDebtDetailScreen(
                     name = sessionUser.name,
                     role = sessionUser.role,
                     supplierId = supplierId,
                     purchasingRepository = appContainer.purchasingRepository,
+                    viewModel = supplierDebtDetailViewModel,
                     onDashboardClick = { navController.navigate(AppRoute.Dashboard.route) { launchSingleTop = true } },
                     onProductsClick = { navController.navigate(AppRoute.Products.route) { launchSingleTop = true } },
                     onStockOpnameClick = { navController.navigate(AppRoute.StockOpname.route) { launchSingleTop = true } },
@@ -548,7 +586,10 @@ internal fun NavGraphBuilder.purchasingGraph(navController: NavHostController, s
                 }
             } else {
                 val viewModel: SupplierDebtViewModel = viewModel(
-                    factory = SupplierDebtViewModel.factory(appContainer.purchasingRepository)
+                    factory = SupplierDebtViewModel.factory(
+                        purchasingRepository = appContainer.purchasingRepository,
+                        pendingSubmissionStore = appContainer.pendingSubmissionStore
+                    )
                 )
 
                 AdminOpeningSupplierDebtScreen(
@@ -609,7 +650,10 @@ internal fun NavGraphBuilder.purchasingGraph(navController: NavHostController, s
                 }
             } else {
                 val viewModel: SupplierDebtViewModel = viewModel(
-                    factory = SupplierDebtViewModel.factory(appContainer.purchasingRepository)
+                    factory = SupplierDebtViewModel.factory(
+                        purchasingRepository = appContainer.purchasingRepository,
+                        pendingSubmissionStore = appContainer.pendingSubmissionStore
+                    )
                 )
 
                 AdminAdjustmentSupplierDebtScreen(

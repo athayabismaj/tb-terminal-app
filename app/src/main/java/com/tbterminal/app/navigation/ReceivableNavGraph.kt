@@ -45,6 +45,7 @@ import com.tbterminal.app.ui.receivables.AdminReceivableCustomerDetailScreen
 import com.tbterminal.app.ui.receivables.AdminReceivableScreen
 import com.tbterminal.app.ui.receivables.AdminOpeningReceivableScreen
 import com.tbterminal.app.ui.receivables.AdminAdjustmentReceivableScreen
+import com.tbterminal.app.ui.receivables.ReceivableCustomerDetailViewModel
 import com.tbterminal.app.ui.receivables.ReceivableViewModel
 import com.tbterminal.app.ui.reports.AdminReportsScreen
 import com.tbterminal.app.ui.reports.AdminReportsViewModel
@@ -224,12 +225,21 @@ internal fun NavGraphBuilder.receivableGraph(navController: NavHostController, s
                     }
                 }
             } else {
+                val detailViewModel: ReceivableCustomerDetailViewModel = viewModel(
+                    factory = ReceivableCustomerDetailViewModel.factory(
+                        receivableRepository = appContainer.receivableRepository,
+                        customerId = customerId,
+                        customerRepository = appContainer.customerRepository,
+                        pendingSubmissionStore = appContainer.pendingSubmissionStore
+                    )
+                )
                 AdminReceivableCustomerDetailScreen(
                     name = sessionUser.name,
                     role = sessionUser.role,
                     customerId = customerId,
                     receivableRepository = appContainer.receivableRepository,
                     customerRepository = appContainer.customerRepository,
+                    viewModel = detailViewModel,
                     onDashboardClick = { navController.navigate(AppRoute.Dashboard.route) { launchSingleTop = true } },
                     onProductsClick = { navController.navigate(AppRoute.Products.route) { launchSingleTop = true } },
                     onStockOpnameClick = { navController.navigate(AppRoute.StockOpname.route) { launchSingleTop = true } },

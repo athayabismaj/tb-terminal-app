@@ -3,6 +3,8 @@ package com.tbterminal.app.ui.payables
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
+import com.tbterminal.app.data.local.database.PendingSubmissionScopes
+import com.tbterminal.app.data.local.database.PendingSubmissionStore
 import com.tbterminal.app.data.model.CreateSupplierPaymentCommand
 import com.tbterminal.app.data.model.SupplierPayable
 import com.tbterminal.app.data.repository.PurchasingRepository
@@ -15,6 +17,7 @@ import com.tbterminal.app.ui.common.toWholeRupiahInputText
 import com.tbterminal.app.ui.common.viewModelFactory
 import java.math.BigDecimal
 import java.util.UUID
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -61,19 +64,43 @@ internal data class SupplierDebtDetailUiState(
 internal class SupplierDebtDetailViewModel(
     private val purchasingRepository: PurchasingRepository,
     private val supplierId: String,
-    private val idempotencyKeyGenerator: () -> String = { UUID.randomUUID().toString() }
+    private val idempotencyKeyGenerator: () -> String = { UUID.randomUUID().toString() },
+    private val pendingSubmissionStore: PendingSubmissionStore? = null,
+    private val clockMillis: () -> Long = { System.currentTimeMillis() }
 ) : ViewModel() {
     private val _uiState = MutableStateFlow(SupplierDebtDetailUiState())
     val uiState: StateFlow<SupplierDebtDetailUiState> = _uiState.asStateFlow()
 
     private val paymentIdempotency = SubmissionIdempotencyTracker<SupplierPaymentIntent>(
         prefix = "supplier-pay",
-        keyGenerator = idempotencyKeyGenerator
+        keyGenerator = idempotencyKeyGenerator,
+        store = pendingSubmissionStore,
+        scope = PendingSubmissionScopes.supplierPaymentDetail(supplierId),
+        intentSerializer = SupplierPaymentIntent.serializer(),
+        clockMillis = clockMillis
     )
     private var pendingAmbiguousDraft: SupplierPaymentDraft? = null
+    private val restoreJob: Job
 
     init {
+        restoreJob = viewModelScope.launch {
+            restorePendingPayment()
+        }
         load()
+    }
+
+    private suspend fun restorePendingPayment() {
+        val payloadJson = paymentIdempotency.restore() ?: return
+        val draft = decodeSupplierPaymentDraft(payloadJson)
+        if (draft == null) {
+            paymentIdempotency.clearAndPersist()
+            return
+        }
+        if (pendingAmbiguousDraft == null &&
+            (_uiState.value.selectedPayable == null || _uiState.value.selectedPayable?.id == draft.payableId)
+        ) {
+            pendingAmbiguousDraft = draft
+        }
     }
 
     fun load() {
@@ -148,7 +175,11 @@ internal class SupplierDebtDetailViewModel(
             pendingDraft
         } else {
             pendingAmbiguousDraft = null
-            paymentIdempotency.clear()
+            if (restoreJob.isCompleted) {
+                viewModelScope.launch { paymentIdempotency.clearAndPersist() }
+            } else {
+                paymentIdempotency.clear()
+            }
             null
         }
         _uiState.update {
@@ -168,6 +199,7 @@ internal class SupplierDebtDetailViewModel(
         paymentIdempotency.onDialogDismissed()
         if (!paymentIdempotency.isOutcomeAmbiguous) {
             pendingAmbiguousDraft = null
+            viewModelScope.launch { paymentIdempotency.clearAndPersist() }
         }
         _uiState.update { it.copy(selectedPayable = null, isSubmittingPayment = false) }
     }
@@ -200,6 +232,7 @@ internal class SupplierDebtDetailViewModel(
 
         viewModelScope.launch {
             _uiState.update { it.copy(isSubmittingPayment = true, errorMessage = null, message = null) }
+            restoreJob.join()
             val normalizedReference = state.referenceInput.trim().takeIf(String::isNotBlank)
             val normalizedNotes = state.notesInput.trim().takeIf(String::isNotBlank)
             val intent = SupplierPaymentIntent(
@@ -209,7 +242,15 @@ internal class SupplierDebtDetailViewModel(
                 reference = normalizedReference,
                 notes = normalizedNotes
             )
-            val idempotencyKey = paymentIdempotency.resolveKey(intent)
+            val draft = SupplierPaymentDraft(
+                payableId = payable.id,
+                amountInput = state.paymentAmountInput,
+                method = state.paymentMethod,
+                referenceInput = state.referenceInput,
+                notesInput = state.notesInput
+            )
+            val draftJson = draft.toPersistedJson()
+            val idempotencyKey = paymentIdempotency.resolveKeyForSubmission(intent, draftJson)
             val command = CreateSupplierPaymentCommand(
                 payableId = payable.id,
                 amount = amount,
@@ -221,7 +262,7 @@ internal class SupplierDebtDetailViewModel(
 
             when (val result = purchasingRepository.createSupplierPayment(command)) {
                 is RepositoryResult.Success -> {
-                    paymentIdempotency.onSuccess()
+                    paymentIdempotency.onSuccessAndPersist()
                     pendingAmbiguousDraft = null
                     _uiState.update {
                         it.copy(
@@ -234,30 +275,14 @@ internal class SupplierDebtDetailViewModel(
                 }
 
                 is RepositoryResult.Error -> {
-                    paymentIdempotency.onError(result.code, result.message)
-                    pendingAmbiguousDraft = if (paymentIdempotency.isOutcomeAmbiguous) {
-                        SupplierPaymentDraft(
-                            payableId = payable.id,
-                            amountInput = state.paymentAmountInput,
-                            method = state.paymentMethod,
-                            referenceInput = state.referenceInput,
-                            notesInput = state.notesInput
-                        )
-                    } else {
-                        null
-                    }
+                    paymentIdempotency.onErrorAndPersist(result.code, result.message, draftJson)
+                    pendingAmbiguousDraft = if (paymentIdempotency.isOutcomeAmbiguous) draft else null
                     setActionError(result.message)
                 }
 
                 is RepositoryResult.Exception -> {
-                    paymentIdempotency.onException()
-                    pendingAmbiguousDraft = SupplierPaymentDraft(
-                        payableId = payable.id,
-                        amountInput = state.paymentAmountInput,
-                        method = state.paymentMethod,
-                        referenceInput = state.referenceInput,
-                        notesInput = state.notesInput
-                    )
+                    paymentIdempotency.onExceptionAndPersist(draftJson)
+                    pendingAmbiguousDraft = draft
                     setActionError("Pembayaran gagal dicatat karena koneksi bermasalah.")
                 }
             }
@@ -277,9 +302,14 @@ internal class SupplierDebtDetailViewModel(
 
         fun factory(
             purchasingRepository: PurchasingRepository,
-            supplierId: String
+            supplierId: String,
+            pendingSubmissionStore: PendingSubmissionStore? = null
         ): ViewModelProvider.Factory = viewModelFactory {
-            SupplierDebtDetailViewModel(purchasingRepository, supplierId)
+            SupplierDebtDetailViewModel(
+                purchasingRepository = purchasingRepository,
+                supplierId = supplierId,
+                pendingSubmissionStore = pendingSubmissionStore
+            )
         }
     }
 }
