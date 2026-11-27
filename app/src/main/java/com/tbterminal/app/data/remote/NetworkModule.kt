@@ -30,11 +30,11 @@ class NetworkModule(
 
     private val normalizedBaseUrl = baseUrl.asRetrofitBaseUrl()
 
+    @Volatile
+    private var activeDevHost: String? = null
+
     private val devAutoHostInterceptor: okhttp3.Interceptor by lazy {
         object : okhttp3.Interceptor {
-            @Volatile
-            private var activeHost: String? = null
-
             override fun intercept(chain: okhttp3.Interceptor.Chain): okhttp3.Response {
                 val originalRequest = chain.request()
                 if (!BuildConfig.DEBUG) {
@@ -46,7 +46,7 @@ class NetworkModule(
                 val port = currentUrl.port
 
                 val candidates = linkedSetOf<String>().apply {
-                    activeHost?.let { add(it) }
+                    activeDevHost?.let { add(it) }
                     add(primaryHost)
                     add("127.0.0.1")
                     add("10.0.2.2")
@@ -64,8 +64,8 @@ class NetworkModule(
 
                     try {
                         val response = chain.proceed(candidateRequest)
-                        if (activeHost != host) {
-                            activeHost = host
+                        if (activeDevHost != host) {
+                            activeDevHost = host
                         }
                         return response
                     } catch (e: java.io.IOException) {
@@ -82,6 +82,29 @@ class NetworkModule(
                 }
 
                 throw lastException ?: java.io.IOException("Gagal terhubung ke host backend: $candidates")
+            }
+        }
+    }
+
+    private val devActiveHostOnlyInterceptor: okhttp3.Interceptor by lazy {
+        object : okhttp3.Interceptor {
+            override fun intercept(chain: okhttp3.Interceptor.Chain): okhttp3.Response {
+                val originalRequest = chain.request()
+                if (!BuildConfig.DEBUG) {
+                    return chain.proceed(originalRequest)
+                }
+                val targetHost = activeDevHost ?: originalRequest.url.host
+                if (targetHost == originalRequest.url.host) {
+                    return chain.proceed(originalRequest)
+                }
+                val targetUrl = originalRequest.url.newBuilder()
+                    .host(targetHost)
+                    .port(originalRequest.url.port)
+                    .build()
+                val targetRequest = originalRequest.newBuilder()
+                    .url(targetUrl)
+                    .build()
+                return chain.proceed(targetRequest)
             }
         }
     }
@@ -122,10 +145,32 @@ class NetworkModule(
             .build()
     }
 
+    private val checkoutPreviewOkHttpClient: OkHttpClient by lazy {
+        OkHttpClient.Builder()
+            .connectTimeout(PREVIEW_CONNECT_TIMEOUT_SECONDS, TimeUnit.SECONDS)
+            .readTimeout(PREVIEW_READ_TIMEOUT_SECONDS, TimeUnit.SECONDS)
+            .writeTimeout(PREVIEW_WRITE_TIMEOUT_SECONDS, TimeUnit.SECONDS)
+            .callTimeout(PREVIEW_CALL_TIMEOUT_SECONDS, TimeUnit.SECONDS)
+            .retryOnConnectionFailure(false)
+            .addInterceptor(devActiveHostOnlyInterceptor)
+            .addInterceptor(AuthInterceptor(tokenStore))
+            .authenticator(RefreshTokenAuthenticator(tokenStore, sessionManager, refreshApi))
+            .addInterceptor(UnauthorizedInterceptor(sessionManager))
+            .build()
+    }
+
     val retrofit: Retrofit by lazy {
         Retrofit.Builder()
             .baseUrl(normalizedBaseUrl)
             .client(okHttpClient)
+            .addConverterFactory(json.asConverterFactory(JSON_MEDIA_TYPE))
+            .build()
+    }
+
+    private val checkoutPreviewRetrofit: Retrofit by lazy {
+        Retrofit.Builder()
+            .baseUrl(normalizedBaseUrl)
+            .client(checkoutPreviewOkHttpClient)
             .addConverterFactory(json.asConverterFactory(JSON_MEDIA_TYPE))
             .build()
     }
@@ -177,6 +222,10 @@ class NetworkModule(
         retrofit.create(CheckoutApi::class.java)
     }
 
+    val checkoutPreviewApi: CheckoutApi by lazy {
+        checkoutPreviewRetrofit.create(CheckoutApi::class.java)
+    }
+
     val salesApi: SalesApi by lazy {
         retrofit.create(SalesApi::class.java)
     }
@@ -224,6 +273,10 @@ class NetworkModule(
     private companion object {
         val JSON_MEDIA_TYPE = "application/json".toMediaType()
         const val HEALTH_TIMEOUT_SECONDS = 2L
+        const val PREVIEW_CONNECT_TIMEOUT_SECONDS = 3L
+        const val PREVIEW_READ_TIMEOUT_SECONDS = 5L
+        const val PREVIEW_WRITE_TIMEOUT_SECONDS = 5L
+        const val PREVIEW_CALL_TIMEOUT_SECONDS = 7L
         const val CONNECT_TIMEOUT_SECONDS = 10L
         const val READ_TIMEOUT_SECONDS = 30L
         const val WRITE_TIMEOUT_SECONDS = 30L

@@ -14,6 +14,7 @@ import com.tbterminal.app.data.local.model.AppDataMode
 import com.tbterminal.app.data.local.model.SyncStatus
 import com.tbterminal.app.data.model.CashSession
 import com.tbterminal.app.data.model.CashTransaction
+import com.tbterminal.app.data.remote.ServerUnavailabilityClassifier
 import com.tbterminal.app.data.repository.CashReconciliationRepository
 import com.tbterminal.app.data.repository.RepositoryResult
 import com.tbterminal.app.data.sync.BackendStatus
@@ -100,12 +101,13 @@ class CashReconciliationViewModel(
             when (val sessionResult = repository.getActiveSession()) {
                 is RepositoryResult.Success -> {
                     val session = sessionResult.data
+                    val mirroredLocalId = session?.let { mirrorRemoteSessionSafely(it) }
                     val ageAlert = resolveOfflineSessionAgeAlert()
                     _uiState.update {
                         it.copy(
                             activeSession = session,
                             isUsingLocalActiveSession = false,
-                            localCashSessionId = null,
+                            localCashSessionId = mirroredLocalId,
                             localCashSessionSyncStatus = null,
                             offlineSessionAgeAlert = ageAlert,
                             page = page,
@@ -123,13 +125,16 @@ class CashReconciliationViewModel(
                 }
 
                 is RepositoryResult.Error -> {
-                    if (sessionResult.isAuthFailure() || !sessionResult.isServerFailure()) {
-                        setLoadError(sessionResult.message, resolveOfflineSessionAgeAlert())
-                    } else if (!restoreLocalOpenCashSessionIfAvailable(page, allowAnyCashier = true)) {
+                    val serverUnavailable = ServerUnavailabilityClassifier.isServerUnavailable(sessionResult)
+                    if (serverUnavailable) {
+                        markBackendUnreachableAndSyncState()
+                    }
+                    if (!serverUnavailable || !restoreLocalOpenCashSessionIfAvailable(page, allowAnyCashier = true)) {
                         setLoadError(sessionResult.message, resolveOfflineSessionAgeAlert())
                     }
                 }
                 is RepositoryResult.Exception -> {
+                    markBackendUnreachableAndSyncState()
                     if (!restoreLocalOpenCashSessionIfAvailable(page, allowAnyCashier = true)) {
                         setLoadError(
                             "Server kas tidak tersambung. Kas harian online belum dapat dimuat.",
@@ -184,13 +189,14 @@ class CashReconciliationViewModel(
 
             when (val result = repository.openSession(startingCash)) {
                 is RepositoryResult.Success -> {
+                    val mirroredLocalId = mirrorRemoteSessionSafely(result.data)
                     _uiState.update {
                         it.copy(
                             activeSession = result.data,
                             openingCashInput = "",
                             isSubmitting = false,
                             isUsingLocalActiveSession = false,
-                            localCashSessionId = null,
+                            localCashSessionId = mirroredLocalId,
                             localCashSessionSyncStatus = null,
                             message = "Sesi kas berhasil dibuka."
                         )
@@ -198,8 +204,18 @@ class CashReconciliationViewModel(
                     loadCash(page = 1)
                 }
 
-                is RepositoryResult.Error -> setActionError(result.message)
-                is RepositoryResult.Exception -> openLocalSession(startingCash)
+                is RepositoryResult.Error -> {
+                    if (ServerUnavailabilityClassifier.isServerUnavailable(result)) {
+                        markBackendUnreachableAndSyncState()
+                        openLocalSession(startingCash)
+                    } else {
+                        setActionError(result.message)
+                    }
+                }
+                is RepositoryResult.Exception -> {
+                    markBackendUnreachableAndSyncState()
+                    openLocalSession(startingCash)
+                }
             }
         }
     }
@@ -241,17 +257,55 @@ class CashReconciliationViewModel(
                     loadCash(page = 1)
                 }
 
-                is RepositoryResult.Error -> setActionError(result.message)
-                is RepositoryResult.Exception -> closeLocalSession(closingCash)
+                is RepositoryResult.Error -> {
+                    if (ServerUnavailabilityClassifier.isServerUnavailable(result)) {
+                        markBackendUnreachableAndSyncState()
+                        closeLocalSession(closingCash)
+                    } else {
+                        setActionError(result.message)
+                    }
+                }
+                is RepositoryResult.Exception -> {
+                    markBackendUnreachableAndSyncState()
+                    closeLocalSession(closingCash)
+                }
             }
         }
     }
 
     private suspend fun openLocalSession(startingCash: BigDecimal) {
-        val service = localCashSessionService ?: return setActionError("Service sesi kas lokal belum tersedia.")
         val localCashierId = resolveCashierUserId()
             ?: return setActionError("Kasir sesi lokal belum valid.")
 
+        val existingOpenSession = findExistingOpenSessionForCashier(
+            cashierId = localCashierId,
+            allowAnyCashier = false,
+        )
+        if (existingOpenSession != null) {
+            val localExpenses = localCashExpenseService?.getLocalExpenses(existingOpenSession.localId).orEmpty()
+            val totalExpenses = localExpenses.totalExpenses()
+            val totalCashIn = localExpenses.totalCashIn()
+            val ageAlert = resolveOfflineSessionAgeAlert(existingOpenSession)
+            _uiState.update {
+                it.copy(
+                    activeSession = existingOpenSession.toCashSession(totalExpenses = totalExpenses, totalCashIn = totalCashIn),
+                    transactions = localExpenses.map { expense -> expense.toCashTransaction(existingOpenSession) },
+                    totalCashIn = totalCashIn,
+                    totalCashOut = totalExpenses,
+                    openingCashInput = "",
+                    isSubmitting = false,
+                    isUsingLocalActiveSession = true,
+                    localCashSessionId = existingOpenSession.localId,
+                    localCashSessionSyncStatus = existingOpenSession.syncStatus.name,
+                    offlineSessionAgeAlert = ageAlert,
+                    errorMessage = null,
+                    message = "Sesi kas aktif dari data lokal.\nServer tidak tersambung. Transaksi akan disimpan lokal."
+                )
+            }
+            return
+        }
+
+        val service = localCashSessionService ?: return setActionError("Service sesi kas lokal belum tersedia.")
         when (
             val result = service.openLocalSession(
                 cashierUserId = localCashierId,
@@ -280,8 +334,7 @@ class CashReconciliationViewModel(
 
     private suspend fun closeLocalSession(closingCash: BigDecimal) {
         val service = localCashSessionService ?: return setActionError("Service sesi kas lokal belum tersedia.")
-        val localId = _uiState.value.localCashSessionId
-            ?: _uiState.value.activeSession?.id?.removePrefix("LOCAL-")?.toLongOrNull()
+        val localId = resolveLocalSessionId()
             ?: return setActionError("Sesi kas lokal belum valid.")
 
         when (
@@ -424,8 +477,18 @@ class CashReconciliationViewModel(
                     }
                     loadCash(page = 1)
                 }
-                is RepositoryResult.Error -> setActionError(result.message)
-                is RepositoryResult.Exception -> addLocalCashMovement(type, amount, cat, desc)
+                is RepositoryResult.Error -> {
+                    if (ServerUnavailabilityClassifier.isServerUnavailable(result)) {
+                        markBackendUnreachableAndSyncState()
+                        addLocalCashMovement(type, amount, cat, desc)
+                    } else {
+                        setActionError(result.message)
+                    }
+                }
+                is RepositoryResult.Exception -> {
+                    markBackendUnreachableAndSyncState()
+                    addLocalCashMovement(type, amount, cat, desc)
+                }
             }
         }
     }
@@ -437,8 +500,7 @@ class CashReconciliationViewModel(
         description: String
     ) {
         val service = localCashExpenseService ?: return setActionError("Service mutasi kas lokal belum tersedia.")
-        val localSessionId = _uiState.value.localCashSessionId
-            ?: _uiState.value.activeSession?.id?.removePrefix("LOCAL-")?.toLongOrNull()
+        val localSessionId = resolveLocalSessionId()
             ?: return setActionError("Sesi kas lokal belum valid.")
 
         val actionLabel = if (type == com.tbterminal.app.data.local.cashexpense.CashMovementType.CASH_IN) "Kas masuk" else "Pengeluaran"
@@ -536,25 +598,57 @@ class CashReconciliationViewModel(
         _uiState.update { it.copy(isSubmitting = false, errorMessage = message) }
     }
 
-    private suspend fun restoreLocalOpenCashSessionIfAvailable(
-        page: Int,
-        allowAnyCashier: Boolean = false
-    ): Boolean {
-        val dataSource = cashSessionLocalDataSource ?: return false
-        val currentCashierUserId = resolveCashierUserId()
-            ?: _uiState.value.activeSession?.userId?.takeIf(String::isNotBlank)
-            ?: if (allowAnyCashier) null else return false
-        val localSession = runCatching {
-            dataSource.getLatestOpenSession(currentCashierUserId)
+    private suspend fun findExistingOpenSessionForCashier(
+        cashierId: String?,
+        allowAnyCashier: Boolean,
+    ): LocalCashSessionEntity? {
+        val dataSource = cashSessionLocalDataSource ?: return null
+        val effectiveCashierId = cashierId?.trim()?.takeIf(String::isNotBlank)
+            ?: if (allowAnyCashier) null else return null
+        return runCatching {
+            dataSource.getLatestOpenSession(effectiveCashierId)
                 ?: resolveCashierNameFallback()?.let { fallbackCashierId ->
-                    if (fallbackCashierId == currentCashierUserId) {
+                    if (fallbackCashierId == effectiveCashierId) {
                         null
                     } else {
                         dataSource.getLatestOpenSession(fallbackCashierId)
                     }
                 }
                 ?: if (allowAnyCashier) dataSource.getLatestOpenSession(null) else null
-        }.getOrNull() ?: return false
+        }.getOrNull()
+    }
+
+    private suspend fun mirrorRemoteSessionSafely(session: CashSession): Long? {
+        return runCatching {
+            cashSessionLocalDataSource?.mirrorRemoteSession(session)?.localId
+        }.getOrNull()
+    }
+
+    private suspend fun resolveLocalSessionId(): Long? {
+        _uiState.value.localCashSessionId?.takeIf { it > 0L }?.let { return it }
+        val activeId = _uiState.value.activeSession?.id?.trim()?.takeIf(String::isNotBlank)
+        activeId?.removePrefix("LOCAL-")?.toLongOrNull()?.let { return it }
+        if (activeId != null) {
+            runCatching { cashSessionLocalDataSource?.getCachedCashSessionByServerId(activeId)?.localId }
+                .getOrNull()
+                ?.let { return it }
+        }
+        return findExistingOpenSessionForCashier(
+            cashierId = resolveCashierUserId(),
+            allowAnyCashier = false,
+        )?.localId
+    }
+
+    private suspend fun restoreLocalOpenCashSessionIfAvailable(
+        page: Int,
+        allowAnyCashier: Boolean = false
+    ): Boolean {
+        val currentCashierUserId = resolveCashierUserId()
+            ?: _uiState.value.activeSession?.userId?.takeIf(String::isNotBlank)
+        val localSession = findExistingOpenSessionForCashier(
+            cashierId = currentCashierUserId,
+            allowAnyCashier = allowAnyCashier,
+        ) ?: return false
         val localExpenses = localCashExpenseService?.getLocalExpenses(localSession.localId).orEmpty()
         val totalExpenses = localExpenses.totalExpenses()
         val totalCashIn = localExpenses.totalCashIn()
@@ -612,15 +706,39 @@ class CashReconciliationViewModel(
         val repository = offlineStatusRepository ?: return false
         val status = latestOfflineStatus
         if (status.appDataMode == AppDataMode.OFFLINE_ONLY) return true
-        if (!status.isInternetOnline) return true
+        if (!repository.isOnline()) return true
 
-        return when (status.backendStatus) {
-            BackendStatus.CONNECTED -> false
+        return when (repository.currentBackendStatus()) {
+            BackendStatus.CONNECTED -> {
+                if (repository.isBackendHealthStale()) {
+                    val refreshed = repository.refreshBackendHealth(force = false)
+                    latestOfflineStatus = status.copy(
+                        backendStatus = refreshed,
+                        isServerReachable = refreshed == BackendStatus.CONNECTED,
+                    )
+                    refreshed != BackendStatus.CONNECTED
+                } else {
+                    false
+                }
+            }
             BackendStatus.UNREACHABLE -> true
             BackendStatus.UNKNOWN -> {
-                repository.refreshBackendHealth(force = true) != BackendStatus.CONNECTED
+                val refreshed = repository.refreshBackendHealth(force = true)
+                latestOfflineStatus = status.copy(
+                    backendStatus = refreshed,
+                    isServerReachable = refreshed == BackendStatus.CONNECTED,
+                )
+                refreshed != BackendStatus.CONNECTED
             }
         }
+    }
+
+    private fun markBackendUnreachableAndSyncState() {
+        offlineStatusRepository?.markBackendUnreachable()
+        latestOfflineStatus = latestOfflineStatus.copy(
+            backendStatus = if (latestOfflineStatus.isInternetOnline) BackendStatus.UNREACHABLE else BackendStatus.UNKNOWN,
+            isServerReachable = false,
+        )
     }
 
     private fun resolveCashierUserId(): String? {
@@ -634,29 +752,6 @@ class CashReconciliationViewModel(
         return cashierNameFallback
             ?.trim()
             ?.takeIf(String::isNotBlank)
-    }
-
-    private fun RepositoryResult.Error.isAuthFailure(): Boolean {
-        val normalizedCode = code.lowercase()
-        val normalizedMessage = message.lowercase()
-        return normalizedCode == "http_401" ||
-            normalizedCode == "http_403" ||
-            normalizedCode.contains("unauthorized") ||
-            normalizedCode.contains("forbidden") ||
-            normalizedMessage.contains("unauthorized") ||
-            normalizedMessage.contains("forbidden")
-    }
-
-    private fun RepositoryResult.Error.isServerFailure(): Boolean {
-        val normalizedCode = code.lowercase()
-        val normalizedMessage = message.lowercase()
-        return normalizedCode.startsWith("http_5") ||
-            normalizedCode.contains("internal_server_error") ||
-            normalizedCode.contains("service_unavailable") ||
-            normalizedCode.contains("gateway") ||
-            normalizedCode.contains("timeout") ||
-            normalizedMessage.contains("server tidak tersambung") ||
-            normalizedMessage.contains("server kas tidak tersambung")
     }
 
     companion object {

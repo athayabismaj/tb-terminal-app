@@ -17,6 +17,7 @@ import com.tbterminal.app.data.remote.OpenSessionRequestDto
 import com.tbterminal.app.data.remote.PaginatedResponse
 import com.tbterminal.app.data.remote.SalesApi
 import com.tbterminal.app.data.remote.SalesTransactionSummaryDto
+import com.tbterminal.app.data.remote.ServerUnavailabilityClassifier
 import com.tbterminal.app.data.remote.TransactionDetailDto
 import com.tbterminal.app.data.remote.TransactionItemDto
 import com.tbterminal.app.data.remote.safeApiCall
@@ -114,10 +115,9 @@ class RemoteCashReconciliationRepository(
                         message = response.message ?: response.error ?: "Sesi kas gagal dimuat."
                     )
                 } else {
-                    backendHealthMonitor?.markConnected()
                     RepositoryResult.Success(response.data?.toCashSession())
                 }
-            }
+            }.updateBackendHealth()
     }
 
     override suspend fun getSessionById(id: String): RepositoryResult<CashSession> {
@@ -147,7 +147,7 @@ class RemoteCashReconciliationRepository(
                 } else {
                     RepositoryResult.Success(session.toCashSession())
                 }
-            }
+            }.updateBackendHealth()
     }
 
     override suspend fun closeSession(
@@ -169,7 +169,7 @@ class RemoteCashReconciliationRepository(
                 } else {
                     RepositoryResult.Success(session.toCashSession())
                 }
-            }
+            }.updateBackendHealth()
     }
 
     override suspend fun forceCloseSession(
@@ -192,7 +192,7 @@ class RemoteCashReconciliationRepository(
                 } else {
                     RepositoryResult.Success(session.toCashSession())
                 }
-            }
+            }.updateBackendHealth()
     }
 
     override suspend fun getTransactions(
@@ -230,10 +230,9 @@ class RemoteCashReconciliationRepository(
                     message = response.message ?: response.error ?: "Transaksi kas gagal dimuat."
                 )
             } else {
-                backendHealthMonitor?.markConnected()
                 RepositoryResult.Success(transactionPage.toCashTransactionPage())
             }
-        }
+        }.updateBackendHealth()
     }
 
     override suspend fun voidTransaction(
@@ -339,7 +338,15 @@ class RemoteCashReconciliationRepository(
                 } else {
                     RepositoryResult.Success(expense.toCashExpense())
                 }
-            }
+            }.updateBackendHealth()
+    }
+
+    private fun <T> RepositoryResult<T>.updateBackendHealth(): RepositoryResult<T> {
+        when {
+            this is RepositoryResult.Success -> backendHealthMonitor?.markConnected()
+            ServerUnavailabilityClassifier.isServerUnavailable(this) -> backendHealthMonitor?.markUnreachable()
+        }
+        return this
     }
 
     override suspend fun getExpenses(sessionId: String): RepositoryResult<List<CashExpense>> {
