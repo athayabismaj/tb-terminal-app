@@ -390,6 +390,84 @@ class PinUnlockServiceTest {
     }
 
     @Test
+    fun gateway502_503_504FallbackToOfflineVerifier_enforceTtlAndLockoutAcrossRestarts() = runTest(testDispatcher) {
+        var nowMillis = 1_800_000_000_000L
+        val kvStore = InMemoryKvStore()
+        val crypto = AesGcmJvmTestCrypto()
+        val verifierStore = EncryptedOfflinePinVerifierStore(kvStore, crypto, pbkdf2Iterations = 1_000)
+
+        // Missing verifier on 503 -> requires connection
+        listOf(502, 503, 504).forEach { httpCode ->
+            val session = seededSessionManager(userId = "usr-gw", role = "KASIR")
+            val api = StubUnlockAuthApi {
+                Response.error(httpCode, """{"message":"gateway unavailable"}""".toResponseBody("application/json".toMediaType()))
+            }
+            val service = DefaultPinUnlockService({ api }, session, { "android-dev" }, verifierStore, testDispatcher) { nowMillis }
+            val res = service.unlock("123456") as RepositoryResult.Error
+            assertEquals("Butuh koneksi untuk membuka kunci", res.message)
+            assertTrue(session.requiresPinUnlock())
+        }
+
+        // Valid verifier unlocks on 502/503/504
+        verifierStore.saveVerifier("usr-gw", "123456", nowMillis)
+        listOf(502, 503, 504).forEach { httpCode ->
+            val session = seededSessionManager(userId = "usr-gw", role = "KASIR")
+            val api = StubUnlockAuthApi {
+                Response.error(httpCode, """{"message":"gateway unavailable"}""".toResponseBody("application/json".toMediaType()))
+            }
+            val service = DefaultPinUnlockService({ api }, session, { "android-dev" }, verifierStore, testDispatcher) { nowMillis }
+            assertEquals(RepositoryResult.Success(PinUnlockResult.Unlocked), service.unlock("123456"))
+            assertFalse(session.requiresPinUnlock())
+        }
+
+        // Wrong PIN on 503 increments offline lockout identically (KASIR 5 -> 30s lock)
+        val gw503Api = StubUnlockAuthApi {
+            Response.error(503, """{"message":"service unavailable"}""".toResponseBody("application/json".toMediaType()))
+        }
+        for (attempt in 1..4) {
+            val session = seededSessionManager(userId = "usr-gw", role = "KASIR")
+            val service = DefaultPinUnlockService(
+                { gw503Api },
+                session,
+                { "android-dev" },
+                EncryptedOfflinePinVerifierStore(kvStore, crypto, 1_000),
+                testDispatcher,
+            ) { nowMillis }
+            val res = (service.unlock("000000") as RepositoryResult.Success).data as PinUnlockResult.Failed
+            assertFalse(res.isLocked)
+            assertEquals(5 - attempt, res.attemptsLeft)
+        }
+        val lockSession = seededSessionManager(userId = "usr-gw", role = "KASIR")
+        val lockService = DefaultPinUnlockService(
+            { gw503Api },
+            lockSession,
+            { "android-dev" },
+            EncryptedOfflinePinVerifierStore(kvStore, crypto, 1_000),
+            testDispatcher,
+        ) { nowMillis }
+        val locked = (lockService.unlock("000000") as RepositoryResult.Success).data as PinUnlockResult.Failed
+        assertTrue(locked.isLocked)
+        assertEquals(nowMillis + 30_000L, locked.lockedUntilEpochMillis)
+
+        // Past 72h verifier expiry on 504 -> rejected even after lock window passes
+        nowMillis += OfflinePinVerifierStore.VERIFIER_TTL_MILLIS + 1L
+        val gw504Api = StubUnlockAuthApi {
+            Response.error(504, """{"message":"gateway timeout"}""".toResponseBody("application/json".toMediaType()))
+        }
+        val expiredSession = seededSessionManager(userId = "usr-gw", role = "KASIR")
+        val expiredService = DefaultPinUnlockService(
+            { gw504Api },
+            expiredSession,
+            { "android-dev" },
+            EncryptedOfflinePinVerifierStore(kvStore, crypto, 1_000),
+            testDispatcher,
+        ) { nowMillis }
+        val expiredRes = expiredService.unlock("123456") as RepositoryResult.Error
+        assertEquals("Butuh koneksi untuk membuka kunci", expiredRes.message)
+        assertTrue(expiredSession.requiresPinUnlock())
+    }
+
+    @Test
     fun tamperedCiphertextFailsClosedAndWipesCorruptRecord() {
         val kvStore = InMemoryKvStore()
         val store = EncryptedOfflinePinVerifierStore(kvStore, AesGcmJvmTestCrypto(), pbkdf2Iterations = 1_000)

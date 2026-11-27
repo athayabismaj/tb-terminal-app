@@ -3,6 +3,7 @@ package com.tbterminal.app.data.auth
 import com.tbterminal.app.data.remote.ApiResponse
 import com.tbterminal.app.data.remote.AuthApi
 import com.tbterminal.app.data.remote.PinUnlockResponse
+import com.tbterminal.app.data.remote.ServerUnavailabilityClassifier
 import com.tbterminal.app.data.remote.UnlockRequest
 import com.tbterminal.app.data.remote.UserFacingErrorMapper
 import com.tbterminal.app.data.remote.parseRetryAfterSeconds
@@ -113,6 +114,10 @@ class DefaultPinUnlockService(
                 code = payload?.code ?: "UNLOCK_FAILED",
                 message = payload?.message ?: payload?.error ?: "PIN salah",
             )
+        }
+
+        if (ServerUnavailabilityClassifier.isServerUnavailableHttpStatus(response.code())) {
+            return unlockOffline(submittedPin)
         }
 
         val rawError = try {
