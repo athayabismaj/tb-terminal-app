@@ -10,6 +10,7 @@ import com.tbterminal.app.data.remote.CustomerRequestDto
 import com.tbterminal.app.data.remote.CustomerResponseDto
 import com.tbterminal.app.data.remote.PaginatedResponse
 import com.tbterminal.app.data.remote.ReceivableApi
+import com.tbterminal.app.data.remote.ServerUnavailabilityClassifier
 import com.tbterminal.app.data.remote.safeApiCall
 import kotlinx.coroutines.CancellationException
 
@@ -273,29 +274,8 @@ class RemoteCustomerRepository(
     }
 }
 
-private fun RepositoryResult<*>.shouldFallbackToCustomerCache(): Boolean {
-    return when (this) {
-        is RepositoryResult.Success -> false
-        is RepositoryResult.Exception -> true
-        is RepositoryResult.Error -> {
-            val normalizedCode = code.uppercase()
-            val normalizedMessage = message.uppercase()
-            val isAuthError = normalizedCode.contains("401") ||
-                normalizedCode.contains("403") ||
-                normalizedCode.contains("UNAUTHORIZED") ||
-                normalizedCode.contains("FORBIDDEN") ||
-                normalizedMessage.contains("UNAUTHORIZED") ||
-                normalizedMessage.contains("FORBIDDEN")
-            !isAuthError && (
-                normalizedCode.startsWith("HTTP_5") ||
-                    normalizedCode == "EMPTY_BODY" ||
-                    normalizedCode.contains("TIMEOUT") ||
-                    normalizedCode.contains("NETWORK") ||
-                    normalizedCode.contains("SERVER")
-                )
-        }
-    }
-}
+private fun RepositoryResult<*>.shouldFallbackToCustomerCache(): Boolean =
+    ServerUnavailabilityClassifier.isServerUnavailable(this)
 
 private fun CustomerCommand.toRequestDto(): CustomerRequestDto {
     return CustomerRequestDto(

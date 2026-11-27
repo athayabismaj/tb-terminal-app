@@ -45,6 +45,7 @@ import com.tbterminal.app.data.remote.UnitResponseDto
 import com.tbterminal.app.data.remote.ProductCsvImportRequestDto
 import com.tbterminal.app.data.remote.OpeningStockRequestDto
 import com.tbterminal.app.data.remote.NetworkResult
+import com.tbterminal.app.data.remote.ServerUnavailabilityClassifier
 import com.tbterminal.app.data.remote.safeApiCall
 import com.tbterminal.app.data.remote.safeUnitApiCall
 import okhttp3.MediaType.Companion.toMediaType
@@ -1177,29 +1178,8 @@ class RemoteInventoryRepository(
     }
 }
 
-private fun RepositoryResult<*>.shouldFallbackToCache(): Boolean {
-    return when (this) {
-        is RepositoryResult.Success -> false
-        is RepositoryResult.Exception -> true
-        is RepositoryResult.Error -> {
-            val normalizedCode = code.uppercase()
-            val normalizedMessage = message.uppercase()
-            val isAuthError = normalizedCode.contains("401") ||
-                normalizedCode.contains("403") ||
-                normalizedCode.contains("UNAUTHORIZED") ||
-                normalizedCode.contains("FORBIDDEN") ||
-                normalizedMessage.contains("UNAUTHORIZED") ||
-                normalizedMessage.contains("FORBIDDEN")
-            !isAuthError && (
-                normalizedCode.startsWith("HTTP_5") ||
-                    normalizedCode == "EMPTY_BODY" ||
-                    normalizedCode.contains("TIMEOUT") ||
-                    normalizedCode.contains("NETWORK") ||
-                    normalizedCode.contains("SERVER")
-                )
-        }
-    }
-}
+private fun RepositoryResult<*>.shouldFallbackToCache(): Boolean =
+    ServerUnavailabilityClassifier.isServerUnavailable(this)
 
 private fun LocalProductEntity.toCachedProductStock(
     unitNameById: Map<String, String> = emptyMap()
