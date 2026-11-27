@@ -11,6 +11,7 @@ import com.tbterminal.app.data.repository.PinUnlockResult
 import com.tbterminal.app.data.repository.RepositoryResult
 import com.tbterminal.app.data.session.SessionManager
 import com.tbterminal.app.data.session.SessionUser
+import com.tbterminal.app.data.sync.isSameBootSession
 import com.tbterminal.app.data.validation.CredentialValidator
 import java.io.IOException
 import java.net.ProtocolException
@@ -43,8 +44,11 @@ class DefaultPinUnlockService(
     private val deviceIdProvider: () -> String = { "android-unknown" },
     private val verifierStore: OfflinePinVerifierStore,
     private val ioDispatcher: CoroutineDispatcher = Dispatchers.IO,
+    private val elapsedRealtimeMillis: (() -> Long)? = null,
+    private val bootCountProvider: () -> Long? = { 1L },
     private val clockMillis: () -> Long = { System.currentTimeMillis() },
 ) : PinUnlockService {
+    private val resolvedElapsedRealtimeMillis: () -> Long = elapsedRealtimeMillis ?: clockMillis
 
     private val authApi: AuthApi by lazy(authApiProvider)
     private val offlineMutex = Mutex()
@@ -85,6 +89,8 @@ class DefaultPinUnlockService(
                     userId = userKey,
                     pin = pin,
                     verifiedAtMillis = clockMillis(),
+                    verifiedAtElapsedMillis = resolvedElapsedRealtimeMillis(),
+                    verifiedAtBootCount = bootCountProvider(),
                 )
                 verifierStore.clearLockout(userKey)
             }
@@ -268,31 +274,128 @@ class DefaultPinUnlockService(
                         message = OFFLINE_VERIFIER_REQUIRED_MESSAGE,
                     )
 
-                val now = clockMillis()
-                val ageMillis = now - verifier.lastOnlineVerifiedAtMillis
-                if (ageMillis < 0L || ageMillis > OfflinePinVerifierStore.VERIFIER_TTL_MILLIS) {
+                val verifiedAtElapsed = verifier.verifiedAtElapsedMillis
+                val lastHighWaterWall = verifier.highWaterWallClockMillis
+                if (verifiedAtElapsed == null || lastHighWaterWall == null) {
                     return@withContext RepositoryResult.Error(
                         code = OFFLINE_VERIFIER_EXPIRED_CODE,
                         message = OFFLINE_VERIFIER_REQUIRED_MESSAGE,
                     )
                 }
 
-                val existingLockout = verifierStore.readLockout(userKey)
-                val lockedUntilExisting = existingLockout?.lockedUntilEpochMillis
-                if (lockedUntilExisting != null && lockedUntilExisting > now) {
-                    val remainingSeconds = ((lockedUntilExisting - now) + 999L) / 1000L
-                    return@withContext RepositoryResult.Success(
-                        PinUnlockResult.Failed(
-                            message = UserFacingErrorMapper.message(
-                                httpStatus = 423,
-                                code = "PIN_LOCKED",
-                                retryAfterSeconds = remainingSeconds,
-                            ),
-                            attemptsLeft = 0,
-                            lockedUntilEpochMillis = lockedUntilExisting,
-                            isLocked = true,
-                        )
+                val wallNow = clockMillis()
+                val elapsedNow = resolvedElapsedRealtimeMillis()
+                val bootNow = bootCountProvider()
+                val sameBootAsVerified = isSameBootSession(verifier.verifiedAtBootCount, bootNow) &&
+                    elapsedNow >= verifiedAtElapsed
+                val highWaterElapsed = verifier.highWaterElapsedMillis
+                val sameBootAsHighWater = highWaterElapsed != null &&
+                    isSameBootSession(verifier.highWaterBootCount, bootNow) &&
+                    elapsedNow >= highWaterElapsed
+
+                val wallAge = wallNow - verifier.lastOnlineVerifiedAtMillis
+                val monotonicAgeFromVerified = if (sameBootAsVerified) elapsedNow - verifiedAtElapsed else null
+                val highWaterWallDelta = wallNow - lastHighWaterWall
+                val highWaterMonotonicDelta = if (sameBootAsHighWater) elapsedNow - highWaterElapsed!! else null
+
+                val backwardTampered =
+                    wallNow < verifier.lastOnlineVerifiedAtMillis - CLOCK_BACKWARD_TOLERANCE_MILLIS ||
+                    wallNow < lastHighWaterWall - CLOCK_BACKWARD_TOLERANCE_MILLIS ||
+                    (monotonicAgeFromVerified != null &&
+                        wallAge + CLOCK_BACKWARD_TOLERANCE_MILLIS < monotonicAgeFromVerified) ||
+                    (highWaterMonotonicDelta != null &&
+                        highWaterWallDelta + CLOCK_BACKWARD_TOLERANCE_MILLIS < highWaterMonotonicDelta)
+
+                if (backwardTampered) {
+                    verifierStore.clearAll()
+                    return@withContext RepositoryResult.Error(
+                        code = OFFLINE_VERIFIER_EXPIRED_CODE,
+                        message = OFFLINE_VERIFIER_REQUIRED_MESSAGE,
                     )
+                }
+
+                val segmentElapsed = if (sameBootAsHighWater) {
+                    highWaterMonotonicDelta!!
+                } else {
+                    elapsedNow.coerceAtLeast(0L)
+                }
+                val effectiveElapsedAge = verifier.accumulatedOfflineElapsedMillis + segmentElapsed
+                val expired = wallAge > OfflinePinVerifierStore.VERIFIER_TTL_MILLIS ||
+                    (monotonicAgeFromVerified != null && monotonicAgeFromVerified > OfflinePinVerifierStore.VERIFIER_TTL_MILLIS) ||
+                    effectiveElapsedAge > OfflinePinVerifierStore.VERIFIER_TTL_MILLIS
+                if (expired) {
+                    return@withContext RepositoryResult.Error(
+                        code = OFFLINE_VERIFIER_EXPIRED_CODE,
+                        message = OFFLINE_VERIFIER_REQUIRED_MESSAGE,
+                    )
+                }
+
+                verifierStore.updateVerifierRecord(
+                    verifier.copy(
+                        highWaterWallClockMillis = maxOf(lastHighWaterWall, wallNow),
+                        highWaterElapsedMillis = elapsedNow,
+                        highWaterBootCount = bootNow,
+                        accumulatedOfflineElapsedMillis = effectiveElapsedAge,
+                    )
+                )
+
+                val policy = offlineLockoutPolicyForRole(sessionUser?.role)
+                val existingLockout = verifierStore.readLockout(userKey)
+                val hasPersistedLock = existingLockout != null &&
+                    (existingLockout.lockedUntilElapsedMillis != null || existingLockout.lockedUntilEpochMillis != null)
+                if (hasPersistedLock) {
+                    val lockedUntilElapsed = existingLockout!!.lockedUntilElapsedMillis
+                    val lockDuration = existingLockout.lockDurationMillis?.takeIf { it > 0L }
+                    val fallbackDurationMillis = lockDuration
+                        ?: policyDurationMillisForFailures(policy, existingLockout.failedAttempts)
+                    val sameBootLock = lockedUntilElapsed != null &&
+                        lockDuration != null &&
+                        isSameBootSession(existingLockout.lockBootCount, bootNow) &&
+                        elapsedNow >= (lockedUntilElapsed - lockDuration)
+                    if (sameBootLock) {
+                        val remainingMillis = lockedUntilElapsed!! - elapsedNow
+                        if (remainingMillis > 0L) {
+                            val remainingSeconds = (remainingMillis + 999L) / 1000L
+                            val displayLockedUntilWall = wallNow + remainingMillis
+                            return@withContext RepositoryResult.Success(
+                                PinUnlockResult.Failed(
+                                    message = UserFacingErrorMapper.message(
+                                        httpStatus = 423,
+                                        code = "PIN_LOCKED",
+                                        retryAfterSeconds = remainingSeconds,
+                                    ),
+                                    attemptsLeft = 0,
+                                    lockedUntilEpochMillis = displayLockedUntilWall,
+                                    isLocked = true,
+                                )
+                            )
+                        }
+                    } else {
+                        // Opsi B: reboot during active lockout or legacy lockout without monotonic anchor -> re-arm full duration on current boot.
+                        val rearmedUntilElapsed = elapsedNow + fallbackDurationMillis
+                        val rearmedUntilWall = wallNow + fallbackDurationMillis
+                        val rearmedSeconds = (fallbackDurationMillis + 999L) / 1000L
+                        verifierStore.saveLockout(
+                            existingLockout.copy(
+                                lockedUntilEpochMillis = rearmedUntilWall,
+                                lockedUntilElapsedMillis = rearmedUntilElapsed,
+                                lockDurationMillis = fallbackDurationMillis,
+                                lockBootCount = bootNow,
+                            )
+                        )
+                        return@withContext RepositoryResult.Success(
+                            PinUnlockResult.Failed(
+                                message = UserFacingErrorMapper.message(
+                                    httpStatus = 423,
+                                    code = "PIN_LOCKED",
+                                    retryAfterSeconds = rearmedSeconds,
+                                ),
+                                attemptsLeft = 0,
+                                lockedUntilEpochMillis = rearmedUntilWall,
+                                isLocked = true,
+                            )
+                        )
+                    }
                 }
 
                 if (verifierStore.verifyPin(verifier, pin)) {
@@ -310,17 +413,19 @@ class DefaultPinUnlockService(
                     )
                 }
 
-                val policy = offlineLockoutPolicyForRole(sessionUser?.role)
                 if (nextFailures >= policy.threshold) {
-                    val lockIndex = (nextFailures - policy.threshold)
-                        .coerceAtMost(policy.lockoutSeconds.lastIndex)
-                    val durationSeconds = policy.lockoutSeconds[lockIndex]
-                    val lockedUntil = now + durationSeconds * 1000L
+                    val durationMillis = policyDurationMillisForFailures(policy, nextFailures)
+                    val durationSeconds = durationMillis / 1000L
+                    val lockedUntilWall = wallNow + durationMillis
+                    val lockedUntilElapsed = elapsedNow + durationMillis
                     verifierStore.saveLockout(
                         OfflinePinLockoutRecord(
                             userId = userKey,
                             failedAttempts = nextFailures,
-                            lockedUntilEpochMillis = lockedUntil,
+                            lockedUntilEpochMillis = lockedUntilWall,
+                            lockedUntilElapsedMillis = lockedUntilElapsed,
+                            lockDurationMillis = durationMillis,
+                            lockBootCount = bootNow,
                         )
                     )
                     return@withContext RepositoryResult.Success(
@@ -331,7 +436,7 @@ class DefaultPinUnlockService(
                                 retryAfterSeconds = durationSeconds,
                             ),
                             attemptsLeft = 0,
-                            lockedUntilEpochMillis = lockedUntil,
+                            lockedUntilEpochMillis = lockedUntilWall,
                             isLocked = true,
                         )
                     )
@@ -342,6 +447,9 @@ class DefaultPinUnlockService(
                         userId = userKey,
                         failedAttempts = nextFailures,
                         lockedUntilEpochMillis = null,
+                        lockedUntilElapsedMillis = null,
+                        lockDurationMillis = null,
+                        lockBootCount = null,
                     )
                 )
                 return@withContext RepositoryResult.Success(
@@ -367,6 +475,16 @@ class DefaultPinUnlockService(
         }
     }
 
+    private fun policyDurationMillisForFailures(
+        policy: OfflineRoleLockoutPolicy,
+        failedAttempts: Int,
+    ): Long {
+        val lockIndex = (failedAttempts - policy.threshold)
+            .coerceAtLeast(0)
+            .coerceAtMost(policy.lockoutSeconds.lastIndex)
+        return policy.lockoutSeconds[lockIndex] * 1000L
+    }
+
     private fun parseIsoEpochMillis(rawTimestamp: String): Long? {
         return runCatching { OffsetDateTime.parse(rawTimestamp).toInstant().toEpochMilli() }.getOrNull()
             ?: runCatching { Instant.parse(rawTimestamp).toEpochMilli() }.getOrNull()
@@ -380,6 +498,7 @@ class DefaultPinUnlockService(
     companion object {
         const val OFFLINE_VERIFIER_REQUIRED_MESSAGE = "Butuh koneksi untuk membuka kunci"
         const val OFFLINE_MAX_FAILED_ATTEMPTS = 10
+        const val CLOCK_BACKWARD_TOLERANCE_MILLIS = 5L * 60L * 1000L
         private const val OFFLINE_VERIFIER_UNAVAILABLE_CODE = "OFFLINE_VERIFIER_UNAVAILABLE"
         private const val OFFLINE_VERIFIER_EXPIRED_CODE = "OFFLINE_VERIFIER_EXPIRED"
         private const val OFFLINE_MAX_ATTEMPTS_CODE = "OFFLINE_MAX_ATTEMPTS"

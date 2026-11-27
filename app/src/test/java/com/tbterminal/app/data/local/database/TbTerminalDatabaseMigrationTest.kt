@@ -310,6 +310,63 @@ class TbTerminalDatabaseMigrationTest {
         }
     }
 
+    @Test
+    fun migration8To9AddsMonotonicColumnsAndPreservesPendingSubmissions() {
+        val dbName = newDbName("mig_8_to_9.db")
+        val helper = FrameworkSQLiteOpenHelperFactory().create(
+            SupportSQLiteOpenHelper.Configuration.builder(context)
+                .name(dbName)
+                .callback(
+                    object : SupportSQLiteOpenHelper.Callback(8) {
+                        override fun onCreate(db: SupportSQLiteDatabase) {
+                            db.execSQL(
+                                """
+                                CREATE TABLE IF NOT EXISTS pending_submissions (
+                                    ownerUserId TEXT NOT NULL,
+                                    scope TEXT NOT NULL,
+                                    idempotencyKey TEXT NOT NULL,
+                                    intentJson TEXT NOT NULL,
+                                    payloadJson TEXT,
+                                    status TEXT NOT NULL,
+                                    schemaVersion INTEGER NOT NULL,
+                                    createdAt INTEGER NOT NULL,
+                                    updatedAt INTEGER NOT NULL,
+                                    PRIMARY KEY(ownerUserId, scope)
+                                )
+                                """.trimIndent()
+                            )
+                            db.execSQL("CREATE INDEX IF NOT EXISTS index_pending_submissions_createdAt ON pending_submissions (createdAt)")
+                            db.execSQL("CREATE INDEX IF NOT EXISTS index_pending_submissions_updatedAt ON pending_submissions (updatedAt)")
+                            db.execSQL(
+                                """
+                                INSERT INTO pending_submissions (
+                                    ownerUserId, scope, idempotencyKey, intentJson, payloadJson, status, schemaVersion, createdAt, updatedAt
+                                )
+                                VALUES ('kasir-1', 'checkout', 'k-v8', '{"fp":"1"}', NULL, 'AMBIGUOUS', 1, 1000, 2000)
+                                """.trimIndent()
+                            )
+                        }
+
+                        override fun onUpgrade(db: SupportSQLiteDatabase, oldVersion: Int, newVersion: Int) = Unit
+                    }
+                )
+                .build()
+        )
+        helper.use {
+            val db = it.writableDatabase
+            TbTerminalDatabase.MIGRATION_8_9.migrate(db)
+            val columns = tableColumns(db, "pending_submissions")
+            assertTrue("createdAtElapsedMillis" in columns)
+            assertTrue("bootCount" in columns)
+            db.query("SELECT idempotencyKey, createdAtElapsedMillis, bootCount FROM pending_submissions WHERE ownerUserId = 'kasir-1'").use { cursor ->
+                assertTrue(cursor.moveToFirst())
+                assertEquals("k-v8", cursor.getString(0))
+                assertTrue(cursor.isNull(1))
+                assertTrue(cursor.isNull(2))
+            }
+        }
+    }
+
     private fun newDbName(name: String): String {
         context.deleteDatabase(name)
         createdDbNames += name
@@ -322,7 +379,8 @@ class TbTerminalDatabaseMigrationTest {
                 TbTerminalDatabase.MIGRATION_4_5,
                 TbTerminalDatabase.MIGRATION_5_6,
                 TbTerminalDatabase.MIGRATION_6_7,
-                TbTerminalDatabase.MIGRATION_7_8
+                TbTerminalDatabase.MIGRATION_7_8,
+                TbTerminalDatabase.MIGRATION_8_9
             )
             .allowMainThreadQueries()
             .build()

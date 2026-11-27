@@ -55,7 +55,7 @@ interface TransactionItemDao {
             SELECT localId
             FROM local_transactions
             WHERE syncStatus = :syncing
-                AND updatedAt < :cutoffUpdatedAt
+                AND (updatedAt < :cutoffUpdatedAt OR updatedAt > :updatedAt)
         )
             AND syncStatus != :syncedStatus
         """

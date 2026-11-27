@@ -56,14 +56,14 @@ class LocalBackupRepositoryTest {
 
     @Test
     fun createBackup_usesRoomDatabaseVersionEightInMetadata() = runTest {
-        assertEquals(8, TbTerminalDatabase.DATABASE_VERSION)
+        assertEquals(9, TbTerminalDatabase.DATABASE_VERSION)
         val dbFile = context.getDatabasePath(TbTerminalDatabase.DATABASE_NAME).apply {
             parentFile?.mkdirs()
             writeText("sqlite-placeholder")
         }
         assertTrue(dbFile.exists())
 
-        val outFile = File(context.cacheDir, "backup-v8.zip").apply { delete() }
+        val outFile = File(context.cacheDir, "backup-v9.zip").apply { delete() }
         val result = repository.createBackup(Uri.fromFile(outFile))
         assertTrue(result is LocalBackupResult.Success)
 
@@ -84,14 +84,14 @@ class LocalBackupRepositoryTest {
             }
         }
         val parsed = LocalBackupMetadata.fromJson(requireNotNull(metadataJson))
-        assertEquals(8, parsed.databaseVersion)
+        assertEquals(9, parsed.databaseVersion)
     }
 
     @Test
     fun inspectBackup_and_stageRestore_rejectNewerAndNonPositiveDatabaseVersions() = runTest {
-        val currentFile = createSyntheticBackup(File(context.cacheDir, "backup-current.zip"), version = 8)
+        val currentFile = createSyntheticBackup(File(context.cacheDir, "backup-current.zip"), version = 9)
         val olderV6File = createSyntheticBackup(File(context.cacheDir, "backup-old-v6.zip"), version = 6)
-        val newerFile = createSyntheticBackup(File(context.cacheDir, "backup-newer.zip"), version = 9)
+        val newerFile = createSyntheticBackup(File(context.cacheDir, "backup-newer.zip"), version = 10)
         val zeroFile = createSyntheticBackup(File(context.cacheDir, "backup-zero.zip"), version = 0)
 
         assertTrue(repository.inspectBackup(Uri.fromFile(currentFile)) is LocalRestorePreviewResult.Valid)
@@ -148,7 +148,8 @@ class LocalBackupRepositoryTest {
                 TbTerminalDatabase.MIGRATION_4_5,
                 TbTerminalDatabase.MIGRATION_5_6,
                 TbTerminalDatabase.MIGRATION_6_7,
-                TbTerminalDatabase.MIGRATION_7_8
+                TbTerminalDatabase.MIGRATION_7_8,
+                TbTerminalDatabase.MIGRATION_8_9
             )
             .allowMainThreadQueries()
             .build()

@@ -24,6 +24,12 @@ data class OfflinePinVerifierRecord(
     val hashBase64: String,
     val iterations: Int,
     val lastOnlineVerifiedAtMillis: Long,
+    val verifiedAtElapsedMillis: Long? = null,
+    val verifiedAtBootCount: Long? = null,
+    val highWaterWallClockMillis: Long? = null,
+    val highWaterElapsedMillis: Long? = null,
+    val highWaterBootCount: Long? = null,
+    val accumulatedOfflineElapsedMillis: Long = 0L,
 )
 
 @Serializable
@@ -31,6 +37,9 @@ data class OfflinePinLockoutRecord(
     val userId: String,
     val failedAttempts: Int,
     val lockedUntilEpochMillis: Long? = null,
+    val lockedUntilElapsedMillis: Long? = null,
+    val lockDurationMillis: Long? = null,
+    val lockBootCount: Long? = null,
 )
 
 interface PinVerifierKeyValueStore {
@@ -46,7 +55,14 @@ interface PinVerifierCrypto {
 }
 
 interface OfflinePinVerifierStore {
-    fun saveVerifier(userId: String, pin: String, verifiedAtMillis: Long)
+    fun saveVerifier(
+        userId: String,
+        pin: String,
+        verifiedAtMillis: Long,
+        verifiedAtElapsedMillis: Long? = null,
+        verifiedAtBootCount: Long? = null,
+    )
+    fun updateVerifierRecord(record: OfflinePinVerifierRecord)
     fun readVerifier(userId: String): OfflinePinVerifierRecord?
     fun verifyPin(record: OfflinePinVerifierRecord, pin: String): Boolean
     fun readLockout(userId: String): OfflinePinLockoutRecord?
@@ -165,7 +181,13 @@ class EncryptedOfflinePinVerifierStore(
         require(pbkdf2Iterations > 0) { "pbkdf2Iterations must be positive" }
     }
 
-    override fun saveVerifier(userId: String, pin: String, verifiedAtMillis: Long) {
+    override fun saveVerifier(
+        userId: String,
+        pin: String,
+        verifiedAtMillis: Long,
+        verifiedAtElapsedMillis: Long?,
+        verifiedAtBootCount: Long?,
+    ) {
         if (userId.isBlank()) return
         val salt = ByteArray(OfflinePinVerifierStore.SALT_LENGTH_BYTES).also(secureRandom::nextBytes)
         val hash = derivePinHash(pin, salt, pbkdf2Iterations)
@@ -176,11 +198,22 @@ class EncryptedOfflinePinVerifierStore(
                 hashBase64 = Base64.getEncoder().encodeToString(hash),
                 iterations = pbkdf2Iterations,
                 lastOnlineVerifiedAtMillis = verifiedAtMillis,
+                verifiedAtElapsedMillis = verifiedAtElapsedMillis,
+                verifiedAtBootCount = verifiedAtBootCount,
+                highWaterWallClockMillis = if (verifiedAtElapsedMillis != null) verifiedAtMillis else null,
+                highWaterElapsedMillis = verifiedAtElapsedMillis,
+                highWaterBootCount = verifiedAtBootCount,
+                accumulatedOfflineElapsedMillis = 0L,
             )
         } finally {
             salt.fill(0)
             hash.fill(0)
         }
+        updateVerifierRecord(record)
+    }
+
+    override fun updateVerifierRecord(record: OfflinePinVerifierRecord) {
+        if (record.userId.isBlank()) return
         val encoded = json.encodeToString(record)
         val encrypted = crypto.encrypt(encoded)
         synchronized(lock) {
@@ -304,8 +337,17 @@ internal class InMemoryOfflinePinVerifierStore(
         pbkdf2Iterations = pbkdf2Iterations,
     )
 
-    override fun saveVerifier(userId: String, pin: String, verifiedAtMillis: Long) =
-        delegate.saveVerifier(userId, pin, verifiedAtMillis)
+    override fun saveVerifier(
+        userId: String,
+        pin: String,
+        verifiedAtMillis: Long,
+        verifiedAtElapsedMillis: Long?,
+        verifiedAtBootCount: Long?,
+    ) =
+        delegate.saveVerifier(userId, pin, verifiedAtMillis, verifiedAtElapsedMillis, verifiedAtBootCount)
+
+    override fun updateVerifierRecord(record: OfflinePinVerifierRecord) =
+        delegate.updateVerifierRecord(record)
 
     override fun readVerifier(userId: String): OfflinePinVerifierRecord? =
         delegate.readVerifier(userId)

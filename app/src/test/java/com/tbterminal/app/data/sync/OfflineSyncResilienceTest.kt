@@ -979,6 +979,152 @@ class OfflineSyncResilienceTest {
         assertEquals(SyncStatus.SYNCED, database.transactionDao().getByLocalId(txA)!!.syncStatus)
         assertEquals(SyncStatus.SYNCED, database.cashExpenseDao().getByLocalId(expA)!!.syncStatus)
     }
+
+    @Test
+    fun syncManager_forcesHealthRefreshWhenUnreachableWithinThrottleWindow() = runBlocking {
+        var monotonicMillis = 100_000L
+        var readinessStatus = 503
+        val healthMonitorWithThrottle = BackendHealthMonitor(
+            healthApi = object : HealthApi {
+                override suspend fun getReadiness(): Response<HealthResponseDto> {
+                    return if (readinessStatus == 200) {
+                        Response.success(HealthResponseDto(status = "ready", database = "up"))
+                    } else {
+                        Response.error(readinessStatus, okhttp3.ResponseBody.Companion.create(null, "down"))
+                    }
+                }
+            },
+            networkMonitor = AlwaysOnlineConnectivity,
+            throttleMillis = 30_000L,
+            timeoutMillis = 1_000L,
+            clockMillis = { monotonicMillis },
+        )
+        val manager = SyncManager(
+            database = database,
+            networkMonitor = AlwaysOnlineConnectivity,
+            backendHealthMonitor = healthMonitorWithThrottle,
+            localAppSettingsDataSource = settings,
+            sessionManager = sessionManager,
+            offlineCashSessionSyncService = cashSessionSync,
+            offlineCheckoutSyncService = checkoutSync,
+            offlineCashExpenseSyncService = cashExpenseSync,
+        )
+
+        healthMonitorWithThrottle.markUnreachable()
+        assertEquals(BackendStatus.UNREACHABLE, healthMonitorWithThrottle.status.value)
+
+        // Server recovers only 2 seconds later (< 30s throttle); SyncManager must force refresh
+        monotonicMillis += 2_000L
+        readinessStatus = 200
+        val result = manager.runOnce()
+
+        assertTrue(result is SyncResult.Success)
+        assertEquals(BackendStatus.CONNECTED, healthMonitorWithThrottle.status.value)
+    }
+
+    @Test
+    fun recoverStaleSyncing_recoversRowsEvenWhenDeviceClockMovesBackward_whilePreservingFreshRows() = runBlocking {
+        // Rows became SYNCING at t = 1_800_000_000_000L
+        val futureUpdatedAt = fakeClockMillis + 2L * 60L * 60L * 1000L
+        val freshUpdatedAt = fakeClockMillis
+
+        val staleSessId = database.cashSessionDao().upsert(
+            LocalCashSessionEntity(
+                clientGeneratedId = "sess-back-1",
+                cashierUserId = "kasir-1",
+                status = "OPEN",
+                openedAt = fakeClockMillis,
+                startingCash = ScaledDecimal2.ofWhole(100_000L),
+                syncStatus = SyncStatus.SYNCING,
+                createdAt = futureUpdatedAt,
+                updatedAt = futureUpdatedAt,
+            )
+        )
+        val freshSessId = database.cashSessionDao().upsert(
+            LocalCashSessionEntity(
+                clientGeneratedId = "sess-fresh-1",
+                cashierUserId = "kasir-1",
+                status = "OPEN",
+                openedAt = fakeClockMillis,
+                startingCash = ScaledDecimal2.ofWhole(100_000L),
+                syncStatus = SyncStatus.SYNCING,
+                createdAt = freshUpdatedAt,
+                updatedAt = freshUpdatedAt,
+            )
+        )
+        val staleExpId = database.cashExpenseDao().upsert(
+            LocalCashExpenseEntity(
+                clientGeneratedId = "exp-back-1",
+                cashSessionLocalId = staleSessId,
+                category = "CASH_OUT",
+                description = "Parkir",
+                amount = ScaledDecimal2.ofWhole(5_000L),
+                occurredAt = fakeClockMillis,
+                syncStatus = SyncStatus.SYNCING,
+                createdAt = futureUpdatedAt,
+                updatedAt = futureUpdatedAt,
+            )
+        )
+        val staleTxId = database.transactionDao().upsert(
+            LocalTransactionEntity(
+                clientGeneratedId = "tx-back-1",
+                transactionCode = "LOCAL-BACK-1",
+                cashSessionLocalId = staleSessId,
+                cashierUserId = "kasir-1",
+                status = "PAID",
+                subtotal = ScaledDecimal2.ofWhole(50_000L),
+                total = ScaledDecimal2.ofWhole(50_000L),
+                paidAmount = ScaledDecimal2.ofWhole(50_000L),
+                remainingAmount = ScaledDecimal2.ZERO,
+                syncStatus = SyncStatus.SYNCING,
+                createdAt = futureUpdatedAt,
+                updatedAt = futureUpdatedAt,
+                occurredAt = fakeClockMillis,
+            )
+        )
+        database.syncQueueDao().enqueue(
+            SyncQueueEntity(
+                entityType = SyncEntityType.CASH_SESSION,
+                entityLocalId = staleSessId,
+                operation = SyncOperation.CREATE,
+                payloadJson = "{}",
+                status = SyncStatus.SYNCING,
+                createdAt = futureUpdatedAt,
+                updatedAt = futureUpdatedAt,
+            )
+        )
+        database.syncQueueDao().enqueue(
+            SyncQueueEntity(
+                entityType = SyncEntityType.CASH_EXPENSE,
+                entityLocalId = staleExpId,
+                operation = SyncOperation.CREATE,
+                payloadJson = "{}",
+                status = SyncStatus.SYNCING,
+                createdAt = futureUpdatedAt,
+                updatedAt = futureUpdatedAt,
+            )
+        )
+        database.syncQueueDao().enqueue(
+            SyncQueueEntity(
+                entityType = SyncEntityType.TRANSACTION,
+                entityLocalId = staleTxId,
+                operation = SyncOperation.CREATE,
+                payloadJson = "{}",
+                status = SyncStatus.SYNCING,
+                createdAt = futureUpdatedAt,
+                updatedAt = futureUpdatedAt,
+            )
+        )
+
+        cashSessionSync.recoverStaleSyncing(nowMillis = fakeClockMillis)
+        cashExpenseSync.recoverStaleSyncing(nowMillis = fakeClockMillis)
+        checkoutSync.recoverStaleSyncing(nowMillis = fakeClockMillis)
+
+        assertEquals(SyncStatus.PENDING, database.cashSessionDao().getByLocalId(staleSessId)!!.syncStatus)
+        assertEquals(SyncStatus.SYNCING, database.cashSessionDao().getByLocalId(freshSessId)!!.syncStatus)
+        assertEquals(SyncStatus.PENDING, database.cashExpenseDao().getByLocalId(staleExpId)!!.syncStatus)
+        assertEquals(SyncStatus.PENDING, database.transactionDao().getByLocalId(staleTxId)!!.syncStatus)
+    }
 }
 
 private object AlwaysOnlineConnectivity : NetworkConnectivity {

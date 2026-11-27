@@ -224,7 +224,7 @@ interface TransactionDao {
             syncedAt = NULL,
             updatedAt = :updatedAt
         WHERE syncStatus = :syncing
-            AND updatedAt < :cutoffUpdatedAt
+            AND (updatedAt < :cutoffUpdatedAt OR updatedAt > :updatedAt)
         """
     )
     suspend fun recoverStaleSyncing(

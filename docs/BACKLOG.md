@@ -89,3 +89,8 @@ Temuan berikut diidentifikasi saat pengerjaan Fase B2c-min namun tidak diubah pa
 - [RENDAH] Penghapusan/pemangkasan retensi baris `sync_queue` berstatus `SYNCED` dan arsip transaksi lama (`SYNC_RETENTION`) tetap ditangani terpisah sesuai backlog reliabilitas disk/performa.
 - [RENDAH] Pembersihan atau pengecualian tabel `pending_submissions` dan `checkout_drafts` saat restore backup lokal lintas perangkat tetap mengikuti item backlog B2c-min.
 
+## Catatan Go-Live (Fase B2e-2)
+
+- **[WAJIB OPERASIONAL]** Setelah update APK B2e-2, verifier PIN offline lama yang belum memiliki anchor jam monotonik (`verifiedAtElapsedMillis` & `highWaterWallClockMillis`) ditolak secara *fail closed* (`"Butuh koneksi untuk membuka kunci"`). Setiap kasir/user wajib login atau verifikasi PIN secara **online sekali** setelah update sebelum fitur unlock PIN offline kembali aktif di perangkat tersebut.
+
+

@@ -88,7 +88,7 @@ class PinUnlockServiceTest {
         var nowMillis = 1_800_000_000_000L
         val kvStore = InMemoryKvStore()
         val verifierStore = EncryptedOfflinePinVerifierStore(kvStore, AesGcmJvmTestCrypto(), pbkdf2Iterations = 1_000)
-        verifierStore.saveVerifier("usr-1", "123456", nowMillis)
+        verifierStore.saveVerifier("usr-1", "123456", nowMillis, verifiedAtElapsedMillis = nowMillis, verifiedAtBootCount = 1L)
 
         // 1. Server returns INVALID_PIN (422) even if entered PIN matches stale offline verifier
         val session1 = seededSessionManager(userId = "usr-1", role = "KASIR")
@@ -172,7 +172,7 @@ class PinUnlockServiceTest {
         }
 
         // Seed verifier at t=0
-        verifierStore.saveVerifier("usr-1", "123456", nowMillis)
+        verifierStore.saveVerifier("usr-1", "123456", nowMillis, verifiedAtElapsedMillis = nowMillis, verifiedAtBootCount = 1L)
 
         // Wrong user cannot use usr-1's verifier
         val otherSession = seededSessionManager(userId = "usr-other", role = "KASIR")
@@ -204,7 +204,7 @@ class PinUnlockServiceTest {
         val crypto = AesGcmJvmTestCrypto()
         val verifiedAt = nowMillis
         EncryptedOfflinePinVerifierStore(kvStore, crypto, pbkdf2Iterations = 1_000)
-            .saveVerifier("kasir-1", "654321", verifiedAt)
+            .saveVerifier("kasir-1", "654321", verifiedAt, verifiedAtElapsedMillis = verifiedAt, verifiedAtBootCount = 1L)
 
         fun newServiceAfterRestart(session: SessionManager): DefaultPinUnlockService {
             val freshStore = EncryptedOfflinePinVerifierStore(kvStore, crypto, pbkdf2Iterations = 1_000)
@@ -262,7 +262,7 @@ class PinUnlockServiceTest {
             val crypto = AesGcmJvmTestCrypto()
             val userId = "user-${role.lowercase()}"
             EncryptedOfflinePinVerifierStore(kvStore, crypto, pbkdf2Iterations = 1_000)
-                .saveVerifier(userId, "112233", nowMillis)
+                .saveVerifier(userId, "112233", nowMillis, verifiedAtElapsedMillis = nowMillis, verifiedAtBootCount = 1L)
 
             fun newService(): DefaultPinUnlockService {
                 val store = EncryptedOfflinePinVerifierStore(kvStore, crypto, pbkdf2Iterations = 1_000)
@@ -409,7 +409,7 @@ class PinUnlockServiceTest {
         }
 
         // Valid verifier unlocks on 502/503/504
-        verifierStore.saveVerifier("usr-gw", "123456", nowMillis)
+        verifierStore.saveVerifier("usr-gw", "123456", nowMillis, verifiedAtElapsedMillis = nowMillis, verifiedAtBootCount = 1L)
         listOf(502, 503, 504).forEach { httpCode ->
             val session = seededSessionManager(userId = "usr-gw", role = "KASIR")
             val api = StubUnlockAuthApi {
@@ -477,6 +477,180 @@ class PinUnlockServiceTest {
         kvStore.putString("offline_pin_verifier", "v1:tampered:ciphertext")
         assertNull(store.readVerifier("u1"))
         assertNull(kvStore.getString("offline_pin_verifier"))
+    }
+
+    @Test
+    fun offlineLockout_ignoresForwardWallClockJump_andRearmsFullDurationOnRebootOrLegacyLockout() = runTest(testDispatcher) {
+        var wallMillis = 1_800_000_000_000L
+        var elapsedMillis = 100_000L
+        var bootCount = 10L
+        val kvStore = InMemoryKvStore()
+        val crypto = AesGcmJvmTestCrypto()
+        val store = EncryptedOfflinePinVerifierStore(kvStore, crypto, pbkdf2Iterations = 1_000)
+        val offlineApi = StubUnlockAuthApi { throw ConnectException("offline") }
+        val service = DefaultPinUnlockService(
+            authApiProvider = { offlineApi },
+            sessionManager = seededSessionManager("kasir-clk", "KASIR"),
+            deviceIdProvider = { "android-dev" },
+            verifierStore = store,
+            ioDispatcher = testDispatcher,
+            clockMillis = { wallMillis },
+            elapsedRealtimeMillis = { elapsedMillis },
+            bootCountProvider = { bootCount },
+        )
+        store.saveVerifier("kasir-clk", "123456", wallMillis, verifiedAtElapsedMillis = elapsedMillis, verifiedAtBootCount = bootCount)
+
+        // Trigger 30s offline lockout on 5th wrong attempt
+        repeat(5) {
+            service.unlock("000000")
+        }
+        val lockedBeforeJump = (service.unlock("123456") as RepositoryResult.Success).data as PinUnlockResult.Failed
+        assertTrue(lockedBeforeJump.isLocked)
+
+        // User advances wall-clock by +5 hours without monotonic time passing -> MUST remain locked!
+        wallMillis += 5L * 60L * 60L * 1000L
+        val stillLockedAfterForwardJump = (service.unlock("123456") as RepositoryResult.Success).data as PinUnlockResult.Failed
+        assertTrue(stillLockedAfterForwardJump.isLocked)
+
+        // Device reboots during active lockout (bootCount increments, elapsed resets to 5_000L) -> Opsi B re-arms FULL 30s, verifier preserved
+        bootCount = 11L
+        elapsedMillis = 5_000L
+        val lockedAfterReboot = (service.unlock("123456") as RepositoryResult.Success).data as PinUnlockResult.Failed
+        assertTrue(lockedAfterReboot.isLocked)
+        assertNotNull(store.readVerifier("kasir-clk"))
+
+        // Still locked at +29s on new boot, unlocked at +30s + 1ms
+        elapsedMillis += 29_000L
+        val stillLockedAt29s = (service.unlock("123456") as RepositoryResult.Success).data as PinUnlockResult.Failed
+        assertTrue(stillLockedAt29s.isLocked)
+
+        elapsedMillis += 1_001L
+        assertEquals(RepositoryResult.Success(PinUnlockResult.Unlocked), service.unlock("123456"))
+
+        // Legacy lockout record without monotonic anchor also re-arms full duration instead of bypassing
+        store.saveLockout(
+            OfflinePinLockoutRecord(
+                userId = "kasir-clk",
+                failedAttempts = 5,
+                lockedUntilEpochMillis = wallMillis - 10_000L,
+            )
+        )
+        val rearmedLegacy = (service.unlock("123456") as RepositoryResult.Success).data as PinUnlockResult.Failed
+        assertTrue(rearmedLegacy.isLocked)
+        assertNotNull(store.readVerifier("kasir-clk"))
+    }
+
+    @Test
+    fun offlineVerifier_rejectsBackwardClockOver5Minutes_toleratesWithin5Minutes_andEnforces72hMonotonic() = runTest(testDispatcher) {
+        val offlineApi = StubUnlockAuthApi { throw UnknownHostException("offline") }
+        val crypto = AesGcmJvmTestCrypto()
+
+        // 1. Legacy verifier without monotonic anchor fails closed
+        run {
+            val store = EncryptedOfflinePinVerifierStore(InMemoryKvStore(), crypto, 1_000)
+            val wall = 1_800_000_000_000L
+            store.saveVerifier("kasir-leg", "123456", wall)
+            val svc = DefaultPinUnlockService(
+                { offlineApi },
+                seededSessionManager("kasir-leg", "KASIR"),
+                { "dev" },
+                store,
+                testDispatcher,
+                clockMillis = { wall },
+                elapsedRealtimeMillis = { 10_000L },
+                bootCountProvider = { 1L },
+            )
+            val res = svc.unlock("123456") as RepositoryResult.Error
+            assertEquals(DefaultPinUnlockService.OFFLINE_VERIFIER_REQUIRED_MESSAGE, res.message)
+        }
+
+        // 2. Backward jump <= 5 min is tolerated; > 5 min wipes verifier and cannot be bypassed by moving clock forward again
+        run {
+            var wall = 1_800_000_000_000L
+            var elapsed = 10_000L
+            val store = EncryptedOfflinePinVerifierStore(InMemoryKvStore(), crypto, 1_000)
+            store.saveVerifier("kasir-bw", "123456", wall, verifiedAtElapsedMillis = elapsed, verifiedAtBootCount = 1L)
+            val svc = DefaultPinUnlockService(
+                { offlineApi },
+                seededSessionManager("kasir-bw", "KASIR"),
+                { "dev" },
+                store,
+                testDispatcher,
+                clockMillis = { wall },
+                elapsedRealtimeMillis = { elapsed },
+                bootCountProvider = { 1L },
+            )
+
+            // Minor 4-minute NTP backward adjustment -> still unlocks
+            wall -= 4L * 60L * 1000L
+            assertEquals(RepositoryResult.Success(PinUnlockResult.Unlocked), svc.unlock("123456"))
+
+            // Roll clock backward by 6 minutes (> 5-min tolerance) -> wipes verifier & requires online
+            wall -= 6L * 60L * 1000L
+            val tampered = svc.unlock("123456") as RepositoryResult.Error
+            assertEquals(DefaultPinUnlockService.OFFLINE_VERIFIER_REQUIRED_MESSAGE, tampered.message)
+            assertNull(store.readVerifier("kasir-bw"))
+
+            // Restoring wall-clock forward does NOT revive wiped verifier
+            wall += 10L * 60L * 1000L
+            val afterRestore = svc.unlock("123456") as RepositoryResult.Error
+            assertEquals(DefaultPinUnlockService.OFFLINE_VERIFIER_REQUIRED_MESSAGE, afterRestore.message)
+        }
+
+        // 3. Backward clock before first offline attempt relative to monotonic elapsed time (> 5 min skew) -> wipes verifier
+        run {
+            var wall = 1_800_000_000_000L
+            var elapsed = 10_000L
+            val store = EncryptedOfflinePinVerifierStore(InMemoryKvStore(), crypto, 1_000)
+            store.saveVerifier("kasir-pre", "123456", wall, verifiedAtElapsedMillis = elapsed, verifiedAtBootCount = 1L)
+            val svc = DefaultPinUnlockService(
+                { offlineApi },
+                seededSessionManager("kasir-pre", "KASIR"),
+                { "dev" },
+                store,
+                testDispatcher,
+                clockMillis = { wall },
+                elapsedRealtimeMillis = { elapsed },
+                bootCountProvider = { 1L },
+            )
+
+            // Real time passes 1 hour, user rolls wall clock back so wallAge is only 10s -> delta > 5 min -> fail closed
+            elapsed += 60L * 60L * 1000L
+            wall += 10_000L
+            val res = svc.unlock("123456") as RepositoryResult.Error
+            assertEquals(DefaultPinUnlockService.OFFLINE_VERIFIER_REQUIRED_MESSAGE, res.message)
+            assertNull(store.readVerifier("kasir-pre"))
+        }
+
+        // 4. Monotonic TTL > 72h expires even if wall clock stays within 72h (within 5m skew or across reboot)
+        run {
+            var wall = 1_800_000_000_000L
+            var elapsed = 10_000L
+            var boot = 1L
+            val store = EncryptedOfflinePinVerifierStore(InMemoryKvStore(), crypto, 1_000)
+            store.saveVerifier("kasir-ttl", "123456", wall, verifiedAtElapsedMillis = elapsed, verifiedAtBootCount = boot)
+            val svc = DefaultPinUnlockService(
+                { offlineApi },
+                seededSessionManager("kasir-ttl", "KASIR"),
+                { "dev" },
+                store,
+                testDispatcher,
+                clockMillis = { wall },
+                elapsedRealtimeMillis = { elapsed },
+                bootCountProvider = { boot },
+            )
+            // Advance 50h on boot 1
+            wall += 50L * 60L * 60L * 1000L
+            elapsed += 50L * 60L * 60L * 1000L
+            assertEquals(RepositoryResult.Success(PinUnlockResult.Unlocked), svc.unlock("123456"))
+
+            // Reboot to boot 2, run 22h + 1ms offline (total accumulated = 72h + 1ms) while wall clock only moved 20h (< 72h total wall)
+            boot = 2L
+            elapsed = 22L * 60L * 60L * 1000L + 1L
+            wall += 20L * 60L * 60L * 1000L
+            val expired = svc.unlock("123456") as RepositoryResult.Error
+            assertEquals(DefaultPinUnlockService.OFFLINE_VERIFIER_REQUIRED_MESSAGE, expired.message)
+        }
     }
 
     private fun seededSessionManager(userId: String, role: String): SessionManager {

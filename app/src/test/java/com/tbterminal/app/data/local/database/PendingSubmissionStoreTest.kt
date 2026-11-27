@@ -209,4 +209,45 @@ class PendingSubmissionStoreTest {
             )
         )
     }
+
+    @Test
+    fun forwardAndBackwardWallClockJumps_doNotDeleteActiveAmbiguousKeys_untilMonotonicTtlExpires() = runTest {
+        var wallMillis = 1_800_000_000_000L
+        var elapsedMillis = 50_000L
+        val monotonicStore = RoomPendingSubmissionStore(
+            dao = database.pendingSubmissionDao(),
+            ownerUserIdProvider = { currentOwner },
+            clockMillis = { wallMillis },
+            monotonicClockMillis = { elapsedMillis },
+            bootCountProvider = { 7L },
+        )
+
+        monotonicStore.save(
+            PendingSubmissionRecord(
+                scope = PendingSubmissionScopes.CHECKOUT,
+                idempotencyKey = "idem-jump-1",
+                intentJson = """{"fp":"v1"}""",
+                status = PendingSubmissionStatus.AMBIGUOUS,
+                createdAt = wallMillis,
+                updatedAt = wallMillis,
+            )
+        )
+
+        // Device wall clock jumps +10 days forward, while monotonic elapsed is only +5 minutes -> MUST NOT expire!
+        wallMillis += 10L * 24L * 60L * 60L * 1000L
+        elapsedMillis += 5L * 60L * 1000L
+        monotonicStore.purgeExpired()
+        assertNotNull(monotonicStore.load(PendingSubmissionScopes.CHECKOUT))
+
+        // Device wall clock jumps backward -> MUST NOT expire!
+        wallMillis -= 20L * 24L * 60L * 60L * 1000L
+        monotonicStore.purgeExpired()
+        assertNotNull(monotonicStore.load(PendingSubmissionScopes.CHECKOUT))
+
+        // Once monotonic elapsed exceeds 72h -> expires and is deleted on purgeExpired/load
+        elapsedMillis += RoomPendingSubmissionStore.DEFAULT_TTL_MILLIS + 1L
+        monotonicStore.purgeExpired()
+        assertNull(monotonicStore.load(PendingSubmissionScopes.CHECKOUT))
+        assertNull(database.pendingSubmissionDao().get("kasir-1", PendingSubmissionScopes.CHECKOUT))
+    }
 }

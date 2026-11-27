@@ -54,7 +54,8 @@ class SyncManager(
             return SyncResult.Retry("Perangkat sedang offline.")
         }
 
-        if (backendHealthMonitor.refresh() != BackendStatus.CONNECTED) {
+        val forceHealthRefresh = backendHealthMonitor.status.value == BackendStatus.UNREACHABLE
+        if (backendHealthMonitor.refresh(force = forceHealthRefresh) != BackendStatus.CONNECTED) {
             return SyncResult.Retry("Server belum tersambung.")
         }
 

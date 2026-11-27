@@ -88,7 +88,7 @@ abstract class TbTerminalDatabase : RoomDatabase() {
     abstract fun offlineExpenseReportDao(): OfflineExpenseReportDao
 
     companion object {
-        const val DATABASE_VERSION = 8
+        const val DATABASE_VERSION = 9
         const val DATABASE_NAME = "tb_terminal_local.db"
 
         @Volatile
@@ -108,7 +108,8 @@ abstract class TbTerminalDatabase : RoomDatabase() {
                         MIGRATION_4_5,
                         MIGRATION_5_6,
                         MIGRATION_6_7,
-                        MIGRATION_7_8
+                        MIGRATION_7_8,
+                        MIGRATION_8_9
                     )
                     .build()
                     .also { instance = it }
@@ -213,6 +214,13 @@ abstract class TbTerminalDatabase : RoomDatabase() {
                     """.trimIndent()
                 )
                 createIndex(db, "checkout_drafts", "updatedAt")
+            }
+        }
+
+        internal val MIGRATION_8_9 = object : Migration(8, 9) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE pending_submissions ADD COLUMN createdAtElapsedMillis INTEGER")
+                db.execSQL("ALTER TABLE pending_submissions ADD COLUMN bootCount INTEGER")
             }
         }
 

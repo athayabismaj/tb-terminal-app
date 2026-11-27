@@ -19,12 +19,12 @@ class BackendHealthMonitor(
     private val networkMonitor: NetworkConnectivity,
     private val throttleMillis: Long = DEFAULT_THROTTLE_MILLIS,
     private val timeoutMillis: Long = DEFAULT_TIMEOUT_MILLIS,
-    private val clockMillis: () -> Long = { System.currentTimeMillis() },
+    private val clockMillis: () -> Long = { defaultElapsedRealtimeMillis() },
 ) {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private val refreshMutex = Mutex()
     private val _status = MutableStateFlow(BackendStatus.UNKNOWN)
-    private var lastCheckedAtMillis: Long = 0L
+    private var lastCheckedAtMillis: Long? = null
 
     val status: StateFlow<BackendStatus> = _status.asStateFlow()
 
@@ -63,7 +63,9 @@ class BackendHealthMonitor(
     }
 
     fun isStale(nowMillis: Long = clockMillis()): Boolean {
-        return lastCheckedAtMillis <= 0L || (nowMillis - lastCheckedAtMillis) >= throttleMillis
+        val last = lastCheckedAtMillis ?: return true
+        val elapsed = nowMillis - last
+        return elapsed < 0L || elapsed >= throttleMillis
     }
 
     suspend fun refresh(force: Boolean = false): BackendStatus {
@@ -73,13 +75,27 @@ class BackendHealthMonitor(
         }
 
         val now = clockMillis()
-        if (!force && _status.value != BackendStatus.UNKNOWN && now - lastCheckedAtMillis < throttleMillis) {
+        val lastBeforeLock = lastCheckedAtMillis
+        val elapsedBeforeLock = if (lastBeforeLock == null) null else now - lastBeforeLock
+        if (!force &&
+            _status.value != BackendStatus.UNKNOWN &&
+            elapsedBeforeLock != null &&
+            elapsedBeforeLock >= 0L &&
+            elapsedBeforeLock < throttleMillis
+        ) {
             return _status.value
         }
 
         return refreshMutex.withLock {
             val lockedNow = clockMillis()
-            if (!force && _status.value != BackendStatus.UNKNOWN && lockedNow - lastCheckedAtMillis < throttleMillis) {
+            val lastLocked = lastCheckedAtMillis
+            val elapsedLocked = if (lastLocked == null) null else lockedNow - lastLocked
+            if (!force &&
+                _status.value != BackendStatus.UNKNOWN &&
+                elapsedLocked != null &&
+                elapsedLocked >= 0L &&
+                elapsedLocked < throttleMillis
+            ) {
                 return@withLock _status.value
             }
 

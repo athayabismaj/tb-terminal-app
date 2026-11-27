@@ -20,5 +20,7 @@ data class PendingSubmissionEntity(
     val status: String,
     val schemaVersion: Int = 1,
     val createdAt: Long,
-    val updatedAt: Long
+    val updatedAt: Long,
+    val createdAtElapsedMillis: Long? = null,
+    val bootCount: Long? = null,
 )

@@ -89,6 +89,39 @@ class BackendHealthMonitorTest {
         assertEquals(BackendStatus.CONNECTED, monitor.refresh(force = true))
         assertEquals(BackendStatus.CONNECTED, monitor.status.value)
     }
+
+    @Test
+    fun monotonicThrottle_ignoresNegativeOrBackwardJumpAndCachesWithin30Seconds() = runBlocking {
+        var monotonicMillis = 50_000L
+        val api = FakeHealthApi(Response.success(HealthResponseDto(status = "ready", database = "up")))
+        val monitor = BackendHealthMonitor(
+            healthApi = api,
+            networkMonitor = FakeConnectivity(true),
+            throttleMillis = 30_000L,
+            timeoutMillis = 1_000L,
+            clockMillis = { monotonicMillis },
+        )
+
+        assertEquals(BackendStatus.CONNECTED, monitor.refresh())
+        val callsAfterFirst = api.calls.get()
+        assertTrue(callsAfterFirst >= 1)
+
+        // Within 30s on monotonic clock -> throttled (no extra API call)
+        monotonicMillis += 29_999L
+        assertEquals(BackendStatus.CONNECTED, monitor.refresh())
+        assertEquals(callsAfterFirst, api.calls.get())
+
+        // Past 30s -> refreshes again
+        monotonicMillis += 1L
+        assertEquals(BackendStatus.CONNECTED, monitor.refresh())
+        assertEquals(callsAfterFirst + 1, api.calls.get())
+
+        // If clock delta ever went negative -> treated as stale and refreshed
+        monotonicMillis -= 5_000L
+        assertTrue(monitor.isStale())
+        assertEquals(BackendStatus.CONNECTED, monitor.refresh())
+        assertEquals(callsAfterFirst + 2, api.calls.get())
+    }
 }
 
 private class FakeHealthApi(initialResponse: Response<HealthResponseDto>) : HealthApi {

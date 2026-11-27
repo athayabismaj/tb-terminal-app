@@ -2,6 +2,7 @@ package com.tbterminal.app.data.local.database
 
 import com.tbterminal.app.data.local.dao.PendingSubmissionDao
 import com.tbterminal.app.data.local.entity.PendingSubmissionEntity
+import com.tbterminal.app.data.sync.isSameBootSession
 import com.tbterminal.app.data.sync.runSuspendCatching
 
 object PendingSubmissionScopes {
@@ -36,7 +37,9 @@ data class PendingSubmissionRecord(
     val status: PendingSubmissionStatus,
     val schemaVersion: Int = CURRENT_SCHEMA_VERSION,
     val createdAt: Long,
-    val updatedAt: Long
+    val updatedAt: Long,
+    val createdAtElapsedMillis: Long? = null,
+    val bootCount: Long? = null,
 ) {
     companion object {
         const val CURRENT_SCHEMA_VERSION = 1
@@ -60,6 +63,8 @@ class RoomPendingSubmissionStore(
     private val clockMillis: () -> Long = { System.currentTimeMillis() },
     private val ttlMillis: Long = DEFAULT_TTL_MILLIS,
     private val skipWhenOwnerBlank: Boolean = false,
+    private val monotonicClockMillis: () -> Long = clockMillis,
+    private val bootCountProvider: () -> Long? = { 1L },
 ) : PendingSubmissionStore {
 
     override suspend fun load(scope: String): PendingSubmissionRecord? {
@@ -81,8 +86,12 @@ class RoomPendingSubmissionStore(
         entity: PendingSubmissionEntity
     ): PendingSubmissionRecord? {
         val status = PendingSubmissionStatus.fromRaw(entity.status)
-        val now = clockMillis()
-        val isExpired = entity.createdAt <= 0L || now - entity.createdAt > ttlMillis
+        val isExpired = isEntityExpired(
+            entity = entity,
+            wallNow = clockMillis(),
+            elapsedNow = monotonicClockMillis(),
+            bootNow = bootCountProvider(),
+        )
         val isInvalid = entity.schemaVersion != PendingSubmissionRecord.CURRENT_SCHEMA_VERSION ||
             entity.idempotencyKey.isBlank() ||
             entity.intentJson.isBlank() ||
@@ -102,7 +111,9 @@ class RoomPendingSubmissionStore(
             status = status!!,
             schemaVersion = entity.schemaVersion,
             createdAt = entity.createdAt,
-            updatedAt = entity.updatedAt
+            updatedAt = entity.updatedAt,
+            createdAtElapsedMillis = entity.createdAtElapsedMillis,
+            bootCount = entity.bootCount,
         )
     }
 
@@ -113,6 +124,14 @@ class RoomPendingSubmissionStore(
 
     override suspend fun saveForOwner(ownerUserId: String, record: PendingSubmissionRecord): Boolean {
         val resolvedOwner = ownerUserId.trim().takeIf(String::isNotBlank) ?: return false
+        val existing = runSuspendCatching { dao.get(resolvedOwner, record.scope) }.getOrNull()
+        val sameKeyExisting = existing?.takeIf { it.idempotencyKey == record.idempotencyKey }
+        val resolvedElapsed = record.createdAtElapsedMillis
+            ?: sameKeyExisting?.createdAtElapsedMillis
+            ?: monotonicClockMillis()
+        val resolvedBootCount = record.bootCount
+            ?: sameKeyExisting?.bootCount
+            ?: bootCountProvider()
         val entity = PendingSubmissionEntity(
             ownerUserId = resolvedOwner,
             scope = record.scope,
@@ -122,7 +141,9 @@ class RoomPendingSubmissionStore(
             status = record.status.name,
             schemaVersion = record.schemaVersion,
             createdAt = record.createdAt,
-            updatedAt = record.updatedAt
+            updatedAt = record.updatedAt,
+            createdAtElapsedMillis = resolvedElapsed,
+            bootCount = resolvedBootCount,
         )
         return runSuspendCatching { dao.upsert(entity) }.isSuccess
     }
@@ -133,8 +154,34 @@ class RoomPendingSubmissionStore(
     }
 
     override suspend fun purgeExpired() {
-        val cutoff = clockMillis() - ttlMillis
-        runSuspendCatching { dao.deleteExpired(cutoff) }
+        val wallNow = clockMillis()
+        val elapsedNow = monotonicClockMillis()
+        val bootNow = bootCountProvider()
+        val allEntities = runSuspendCatching { dao.getAll() }.getOrElse { return }
+        for (entity in allEntities) {
+            if (isEntityExpired(entity, wallNow, elapsedNow, bootNow)) {
+                runSuspendCatching { dao.delete(entity.ownerUserId, entity.scope) }
+            }
+        }
+    }
+
+    private fun isEntityExpired(
+        entity: PendingSubmissionEntity,
+        wallNow: Long,
+        elapsedNow: Long,
+        bootNow: Long?,
+    ): Boolean {
+        if (entity.createdAt <= 0L) return true
+        val createdElapsed = entity.createdAtElapsedMillis
+        if (createdElapsed != null &&
+            isSameBootSession(entity.bootCount, bootNow) &&
+            elapsedNow >= createdElapsed
+        ) {
+            return (elapsedNow - createdElapsed) > ttlMillis
+        }
+        val wallAge = wallNow - entity.createdAt
+        if (wallAge < 0L) return false
+        return wallAge > ttlMillis
     }
 
     private fun resolveOwnerUserIdOrNull(): String? {

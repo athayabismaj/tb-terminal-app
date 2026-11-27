@@ -1,6 +1,7 @@
 package com.tbterminal.app.data.di
 
 import android.content.Context
+import android.os.SystemClock
 import com.tbterminal.app.data.auth.DefaultPinUnlockService
 import com.tbterminal.app.data.auth.EncryptedOfflinePinVerifierStore
 import com.tbterminal.app.data.auth.OfflinePinVerifierStore
@@ -60,6 +61,7 @@ import com.tbterminal.app.data.sync.OfflineCheckoutSyncService
 import com.tbterminal.app.data.sync.OfflineSyncScheduler
 import com.tbterminal.app.data.sync.OfflineStatusRepository
 import com.tbterminal.app.data.sync.SyncManager
+import com.tbterminal.app.data.sync.readDeviceBootCount
 
 interface AppContainer {
     val sessionManager: SessionManager
@@ -136,6 +138,8 @@ class DefaultAppContainer(
             dao = localDatabase.pendingSubmissionDao(),
             ownerUserIdProvider = { sessionManager.resolveOwnerUserId().orEmpty() },
             skipWhenOwnerBlank = true,
+            monotonicClockMillis = { SystemClock.elapsedRealtime() },
+            bootCountProvider = { readDeviceBootCount(appContext) },
         )
     }
 
@@ -251,7 +255,8 @@ class DefaultAppContainer(
     override val backendHealthMonitor: BackendHealthMonitor by lazy {
         BackendHealthMonitor(
             healthApi = networkModule.healthApi,
-            networkMonitor = networkMonitor
+            networkMonitor = networkMonitor,
+            clockMillis = { SystemClock.elapsedRealtime() },
         )
     }
 
@@ -340,6 +345,8 @@ class DefaultAppContainer(
             sessionManager = networkModule.sessionManager,
             deviceIdProvider = { deviceIdProvider.deviceId },
             verifierStore = offlinePinVerifierStore,
+            elapsedRealtimeMillis = { SystemClock.elapsedRealtime() },
+            bootCountProvider = { readDeviceBootCount(appContext) },
         )
     }
 
