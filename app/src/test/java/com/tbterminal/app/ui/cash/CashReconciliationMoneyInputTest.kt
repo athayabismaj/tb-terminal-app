@@ -59,6 +59,7 @@ import com.tbterminal.app.ui.checkout.validateSplitCheckoutPayment
 import org.junit.Assert.assertNotNull
 import java.io.IOException
 import java.math.BigDecimal
+import java.net.ConnectException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.StandardTestDispatcher
@@ -430,7 +431,7 @@ private class OfflineCashRepo : CashReconciliationRepository {
     override suspend fun getActiveSession(): RepositoryResult<CashSession?> =
         RepositoryResult.Exception(IOException("offline"))
     override suspend fun openSession(startingCash: BigDecimal): RepositoryResult<CashSession> =
-        RepositoryResult.Exception(IOException("offline"))
+        RepositoryResult.Exception(ConnectException("offline"))
     override suspend fun getSessions(page: Int, limit: Int, status: String?, startDate: String?, endDate: String?): RepositoryResult<CashSessionPage> =
         RepositoryResult.Exception(IOException("offline"))
     override suspend fun getSessionById(id: String): RepositoryResult<CashSession> =
@@ -444,7 +445,7 @@ private class OfflineCashRepo : CashReconciliationRepository {
     override suspend fun voidTransaction(id: String, reason: String, idempotencyKey: String, managerApprovalId: String?): RepositoryResult<TransactionVoidResult> = error("unused")
     override suspend fun refundTransaction(id: String, reason: String, disposition: RefundDisposition, idempotencyKey: String, managerApprovalId: String?): RepositoryResult<TransactionRefundResult> = error("unused")
     override suspend fun addExpense(amount: BigDecimal, description: String): RepositoryResult<CashExpense> =
-        RepositoryResult.Exception(IOException("offline"))
+        RepositoryResult.Exception(ConnectException("offline"))
     override suspend fun getExpenses(sessionId: String): RepositoryResult<List<CashExpense>> =
         RepositoryResult.Exception(IOException("offline"))
     override suspend fun getExpenseHistory(page: Int, limit: Int, sessionId: String?, startDate: String?, endDate: String?): RepositoryResult<CashExpensePage> =
