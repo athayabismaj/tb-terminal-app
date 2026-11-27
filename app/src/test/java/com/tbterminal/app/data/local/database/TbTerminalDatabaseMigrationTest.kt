@@ -7,6 +7,8 @@ import androidx.sqlite.db.SupportSQLiteDatabase
 import androidx.sqlite.db.SupportSQLiteOpenHelper
 import androidx.sqlite.db.framework.FrameworkSQLiteOpenHelperFactory
 import androidx.test.core.app.ApplicationProvider
+import com.tbterminal.app.data.local.entity.CheckoutDraftEntity
+import com.tbterminal.app.data.local.entity.PendingSubmissionEntity
 import com.tbterminal.app.data.local.model.ScaledDecimal2
 import com.tbterminal.app.data.local.model.SyncStatus
 import com.tbterminal.app.data.remote.SalesApi
@@ -235,7 +237,7 @@ class TbTerminalDatabaseMigrationTest {
             seedLegacyBusinessData(db, version = 4)
         }
 
-        val migratedDb = openRoomDatabaseV7(dbName)
+        val migratedDb = openRoomDatabaseV8(dbName)
         try {
             assertMigratedDataAndSchemaIntegrity(migratedDb, hasUnitColumns = false)
             assertPendingRowsSyncCleanly(migratedDb, expectSecondaryUnitPair = false)
@@ -251,7 +253,7 @@ class TbTerminalDatabaseMigrationTest {
             seedLegacyBusinessData(db, version = 5)
         }
 
-        val migratedDb = openRoomDatabaseV7(dbName)
+        val migratedDb = openRoomDatabaseV8(dbName)
         try {
             assertMigratedDataAndSchemaIntegrity(migratedDb, hasUnitColumns = false)
             assertPendingRowsSyncCleanly(migratedDb, expectSecondaryUnitPair = false)
@@ -267,9 +269,41 @@ class TbTerminalDatabaseMigrationTest {
             seedLegacyBusinessData(db, version = 6)
         }
 
-        val migratedDb = openRoomDatabaseV7(dbName)
+        val migratedDb = openRoomDatabaseV8(dbName)
         try {
             assertMigratedDataAndSchemaIntegrity(migratedDb, hasUnitColumns = true)
+            assertPendingRowsSyncCleanly(migratedDb, expectSecondaryUnitPair = true)
+        } finally {
+            migratedDb.close()
+        }
+    }
+
+    @Test
+    fun migration6To8_migratesMoneyPreservesSyncQueueAndCreatesStateSurvivalTables() = runBlocking {
+        val dbName = newDbName("mig_6_to_8.db")
+        createLegacyDatabase(dbName, version = 6) { db ->
+            seedLegacyBusinessData(db, version = 6)
+        }
+
+        val migratedDb = openRoomDatabaseV8(dbName)
+        try {
+            assertMigratedDataAndSchemaIntegrity(migratedDb, hasUnitColumns = true)
+            assertV8TablesAndIndicesReady(migratedDb)
+            assertPendingRowsSyncCleanly(migratedDb, expectSecondaryUnitPair = true)
+        } finally {
+            migratedDb.close()
+        }
+    }
+
+    @Test
+    fun migration7To8_preservesExistingV7DataAndCreatesPendingSubmissionsAndCheckoutDraftsTables() = runBlocking {
+        val dbName = newDbName("mig_7_to_8.db")
+        createLegacyV7Database(dbName)
+
+        val migratedDb = openRoomDatabaseV8(dbName)
+        try {
+            assertMigratedDataAndSchemaIntegrity(migratedDb, hasUnitColumns = true)
+            assertV8TablesAndIndicesReady(migratedDb)
             assertPendingRowsSyncCleanly(migratedDb, expectSecondaryUnitPair = true)
         } finally {
             migratedDb.close()
@@ -282,15 +316,83 @@ class TbTerminalDatabaseMigrationTest {
         return name
     }
 
-    private fun openRoomDatabaseV7(dbName: String): TbTerminalDatabase {
+    private fun openRoomDatabaseV8(dbName: String): TbTerminalDatabase {
         return Room.databaseBuilder(context, TbTerminalDatabase::class.java, dbName)
             .addMigrations(
                 TbTerminalDatabase.MIGRATION_4_5,
                 TbTerminalDatabase.MIGRATION_5_6,
-                TbTerminalDatabase.MIGRATION_6_7
+                TbTerminalDatabase.MIGRATION_6_7,
+                TbTerminalDatabase.MIGRATION_7_8
             )
             .allowMainThreadQueries()
             .build()
+    }
+
+    private suspend fun assertV8TablesAndIndicesReady(db: TbTerminalDatabase) {
+        val sqlite = db.openHelper.writableDatabase
+        assertIndicesExist(
+            sqlite,
+            "pending_submissions",
+            listOf(
+                "index_pending_submissions_createdAt",
+                "index_pending_submissions_updatedAt"
+            )
+        )
+        assertIndicesExist(
+            sqlite,
+            "checkout_drafts",
+            listOf(
+                "index_checkout_drafts_updatedAt"
+            )
+        )
+
+        db.pendingSubmissionDao().upsert(
+            PendingSubmissionEntity(
+                ownerUserId = "kasir-1",
+                scope = "checkout",
+                idempotencyKey = "key-mig-1",
+                intentJson = """{"fp":"abc"}""",
+                payloadJson = """{"cmd":1}""",
+                status = "AMBIGUOUS",
+                schemaVersion = 1,
+                createdAt = 1000L,
+                updatedAt = 2000L
+            )
+        )
+        val loadedPending = db.pendingSubmissionDao().get("kasir-1", "checkout")
+        assertEquals("key-mig-1", loadedPending?.idempotencyKey)
+
+        db.checkoutDraftDao().upsert(
+            CheckoutDraftEntity(
+                ownerUserId = "kasir-1",
+                activeCartJson = """{"items":[]}""",
+                heldCartsJson = """{"carts":[]}""",
+                schemaVersion = 1,
+                updatedAt = 2000L
+            )
+        )
+        val loadedDraft = db.checkoutDraftDao().get("kasir-1")
+        assertEquals("""{"items":[]}""", loadedDraft?.activeCartJson)
+    }
+
+    private fun createLegacyV7Database(dbName: String) {
+        val helper = FrameworkSQLiteOpenHelperFactory().create(
+            SupportSQLiteOpenHelper.Configuration.builder(context)
+                .name(dbName)
+                .callback(
+                    object : SupportSQLiteOpenHelper.Callback(7) {
+                        override fun onCreate(db: SupportSQLiteDatabase) {
+                            createAllLegacyTables(db, version = 6)
+                            seedLegacyBusinessData(db, version = 6)
+                            RoomMigration6To7.migrate(db)
+                        }
+
+                        override fun onUpgrade(db: SupportSQLiteDatabase, oldVersion: Int, newVersion: Int) = Unit
+                    }
+                )
+                .build()
+        )
+        helper.use { it.writableDatabase }
     }
 
     private suspend fun assertMigratedDataAndSchemaIntegrity(

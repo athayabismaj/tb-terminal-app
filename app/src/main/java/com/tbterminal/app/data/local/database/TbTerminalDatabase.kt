@@ -11,6 +11,7 @@ import com.tbterminal.app.data.local.dao.AppSettingDao
 import com.tbterminal.app.data.local.dao.CashExpenseDao
 import com.tbterminal.app.data.local.dao.CashSessionDao
 import com.tbterminal.app.data.local.dao.CategoryDao
+import com.tbterminal.app.data.local.dao.CheckoutDraftDao
 import com.tbterminal.app.data.local.dao.CustomerDao
 import com.tbterminal.app.data.local.dao.LocalAuditLogDao
 import com.tbterminal.app.data.local.dao.OfflineDashboardDao
@@ -19,6 +20,7 @@ import com.tbterminal.app.data.local.dao.OfflineExpenseReportDao
 import com.tbterminal.app.data.local.dao.OfflineReceivableReportDao
 import com.tbterminal.app.data.local.dao.OfflineSalesReportDao
 import com.tbterminal.app.data.local.dao.PaymentDao
+import com.tbterminal.app.data.local.dao.PendingSubmissionDao
 import com.tbterminal.app.data.local.dao.ProductDao
 import com.tbterminal.app.data.local.dao.ReceivableDao
 import com.tbterminal.app.data.local.dao.SyncQueueDao
@@ -26,6 +28,7 @@ import com.tbterminal.app.data.local.dao.TransactionDao
 import com.tbterminal.app.data.local.dao.TransactionItemDao
 import com.tbterminal.app.data.local.dao.UnitDao
 import com.tbterminal.app.data.local.entity.AppSettingEntity
+import com.tbterminal.app.data.local.entity.CheckoutDraftEntity
 import com.tbterminal.app.data.local.entity.LocalAuditLogEntity
 import com.tbterminal.app.data.local.entity.LocalCashExpenseEntity
 import com.tbterminal.app.data.local.entity.LocalCashSessionEntity
@@ -37,6 +40,7 @@ import com.tbterminal.app.data.local.entity.LocalReceivableEntity
 import com.tbterminal.app.data.local.entity.LocalTransactionEntity
 import com.tbterminal.app.data.local.entity.LocalTransactionItemEntity
 import com.tbterminal.app.data.local.entity.LocalUnitEntity
+import com.tbterminal.app.data.local.entity.PendingSubmissionEntity
 import com.tbterminal.app.data.local.entity.SyncQueueEntity
 
 @Database(
@@ -53,7 +57,9 @@ import com.tbterminal.app.data.local.entity.SyncQueueEntity
         LocalCashExpenseEntity::class,
         LocalAuditLogEntity::class,
         SyncQueueEntity::class,
-        AppSettingEntity::class
+        AppSettingEntity::class,
+        PendingSubmissionEntity::class,
+        CheckoutDraftEntity::class
     ],
     version = TbTerminalDatabase.DATABASE_VERSION,
     exportSchema = true
@@ -73,6 +79,8 @@ abstract class TbTerminalDatabase : RoomDatabase() {
     abstract fun localAuditLogDao(): LocalAuditLogDao
     abstract fun syncQueueDao(): SyncQueueDao
     abstract fun appSettingDao(): AppSettingDao
+    abstract fun pendingSubmissionDao(): PendingSubmissionDao
+    abstract fun checkoutDraftDao(): CheckoutDraftDao
     abstract fun offlineDashboardDao(): OfflineDashboardDao
     abstract fun offlineSalesReportDao(): OfflineSalesReportDao
     abstract fun offlineCashReportDao(): OfflineCashReportDao
@@ -80,7 +88,7 @@ abstract class TbTerminalDatabase : RoomDatabase() {
     abstract fun offlineExpenseReportDao(): OfflineExpenseReportDao
 
     companion object {
-        const val DATABASE_VERSION = 7
+        const val DATABASE_VERSION = 8
         const val DATABASE_NAME = "tb_terminal_local.db"
 
         @Volatile
@@ -99,7 +107,8 @@ abstract class TbTerminalDatabase : RoomDatabase() {
                         MIGRATION_3_4,
                         MIGRATION_4_5,
                         MIGRATION_5_6,
-                        MIGRATION_6_7
+                        MIGRATION_6_7,
+                        MIGRATION_7_8
                     )
                     .build()
                     .also { instance = it }
@@ -167,6 +176,43 @@ abstract class TbTerminalDatabase : RoomDatabase() {
         internal val MIGRATION_6_7 = object : Migration(6, 7) {
             override fun migrate(db: SupportSQLiteDatabase) {
                 RoomMigration6To7.migrate(db)
+            }
+        }
+
+        internal val MIGRATION_7_8 = object : Migration(7, 8) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL(
+                    """
+                    CREATE TABLE IF NOT EXISTS pending_submissions (
+                        ownerUserId TEXT NOT NULL,
+                        scope TEXT NOT NULL,
+                        idempotencyKey TEXT NOT NULL,
+                        intentJson TEXT NOT NULL,
+                        payloadJson TEXT,
+                        status TEXT NOT NULL,
+                        schemaVersion INTEGER NOT NULL,
+                        createdAt INTEGER NOT NULL,
+                        updatedAt INTEGER NOT NULL,
+                        PRIMARY KEY(ownerUserId, scope)
+                    )
+                    """.trimIndent()
+                )
+                createIndex(db, "pending_submissions", "createdAt")
+                createIndex(db, "pending_submissions", "updatedAt")
+
+                db.execSQL(
+                    """
+                    CREATE TABLE IF NOT EXISTS checkout_drafts (
+                        ownerUserId TEXT NOT NULL,
+                        activeCartJson TEXT,
+                        heldCartsJson TEXT,
+                        schemaVersion INTEGER NOT NULL,
+                        updatedAt INTEGER NOT NULL,
+                        PRIMARY KEY(ownerUserId)
+                    )
+                    """.trimIndent()
+                )
+                createIndex(db, "checkout_drafts", "updatedAt")
             }
         }
 
