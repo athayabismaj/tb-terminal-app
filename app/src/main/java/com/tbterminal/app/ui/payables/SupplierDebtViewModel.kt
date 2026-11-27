@@ -9,6 +9,7 @@ import com.tbterminal.app.data.model.CreatePayableAdjustmentCommand
 import com.tbterminal.app.data.model.CreateSupplierPaymentCommand
 import com.tbterminal.app.data.model.Supplier
 import com.tbterminal.app.data.model.SupplierPayable
+import com.tbterminal.app.data.remote.UserFacingErrorMapper
 import com.tbterminal.app.data.repository.PurchasingRepository
 import com.tbterminal.app.data.repository.RepositoryResult
 import com.tbterminal.app.data.sync.runSuspendCatching
@@ -290,6 +291,10 @@ class SupplierDebtViewModel(
             )
             val draftJson = draft.toPersistedJson()
             val idempotencyKey = paymentCoordinator.resolveKeyForSubmission(payable.id, intent, draftJson)
+            if (idempotencyKey == null) {
+                setActionError(UserFacingErrorMapper.message())
+                return@launch
+            }
             val command = CreateSupplierPaymentCommand(
                 payableId = payable.id,
                 amount = amount,

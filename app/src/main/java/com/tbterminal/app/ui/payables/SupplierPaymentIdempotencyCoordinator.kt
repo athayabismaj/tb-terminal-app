@@ -111,7 +111,7 @@ internal class SupplierPaymentIdempotencyCoordinator(
         payableId: String,
         intent: SupplierPaymentIntent,
         draftJson: String,
-    ): String {
+    ): String? {
         return trackerFor(payableId).resolveKeyForSubmission(intent, draftJson)
     }
 

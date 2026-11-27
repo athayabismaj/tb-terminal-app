@@ -6,6 +6,7 @@ import androidx.lifecycle.viewModelScope
 import com.tbterminal.app.data.local.database.PendingSubmissionStore
 import com.tbterminal.app.data.model.CreateSupplierPaymentCommand
 import com.tbterminal.app.data.model.SupplierPayable
+import com.tbterminal.app.data.remote.UserFacingErrorMapper
 import com.tbterminal.app.data.repository.PurchasingRepository
 import com.tbterminal.app.data.repository.RepositoryResult
 import com.tbterminal.app.ui.common.parseWholeRupiahOrExactRemainingInput
@@ -243,6 +244,10 @@ internal class SupplierDebtDetailViewModel(
             )
             val draftJson = draft.toPersistedJson()
             val idempotencyKey = paymentCoordinator.resolveKeyForSubmission(payable.id, intent, draftJson)
+            if (idempotencyKey == null) {
+                setActionError(UserFacingErrorMapper.message())
+                return@launch
+            }
             val command = CreateSupplierPaymentCommand(
                 payableId = payable.id,
                 amount = amount,

@@ -169,16 +169,16 @@ internal class CheckoutPendingSubmissionPersistence(
         command: CheckoutSubmitCommand,
         fingerprint: String,
         state: CheckoutUiState
-    ) {
-        save(command, fingerprint, state, PendingSubmissionStatus.IN_FLIGHT)
+    ): Boolean {
+        return save(command, fingerprint, state, PendingSubmissionStatus.IN_FLIGHT)
     }
 
     suspend fun markAmbiguous(
         command: CheckoutSubmitCommand,
         fingerprint: String,
         state: CheckoutUiState
-    ) {
-        save(command, fingerprint, state, PendingSubmissionStatus.AMBIGUOUS)
+    ): Boolean {
+        return save(command, fingerprint, state, PendingSubmissionStatus.AMBIGUOUS)
     }
 
     suspend fun saveForOwner(
@@ -187,10 +187,17 @@ internal class CheckoutPendingSubmissionPersistence(
         fingerprint: String,
         state: CheckoutUiState,
         status: PendingSubmissionStatus = PendingSubmissionStatus.AMBIGUOUS,
-    ) {
-        val resolvedOwner = ownerUserId.trim().takeIf(String::isNotBlank) ?: return
+    ): Boolean {
+        val resolvedOwner = ownerUserId.trim().takeIf(String::isNotBlank) ?: return false
+        val prevKey = activeKey
+        val prevCreatedAt = activeCreatedAt
         val record = buildRecord(command, fingerprint, state, status)
-        store.saveForOwner(resolvedOwner, record)
+        val saved = store.saveForOwner(resolvedOwner, record)
+        if (!saved) {
+            activeKey = prevKey
+            activeCreatedAt = prevCreatedAt
+        }
+        return saved
     }
 
     suspend fun clear() {
@@ -204,8 +211,16 @@ internal class CheckoutPendingSubmissionPersistence(
         fingerprint: String,
         state: CheckoutUiState,
         status: PendingSubmissionStatus
-    ) {
-        store.save(buildRecord(command, fingerprint, state, status))
+    ): Boolean {
+        val prevKey = activeKey
+        val prevCreatedAt = activeCreatedAt
+        val record = buildRecord(command, fingerprint, state, status)
+        val saved = store.save(record)
+        if (!saved) {
+            activeKey = prevKey
+            activeCreatedAt = prevCreatedAt
+        }
+        return saved
     }
 
     private fun buildRecord(

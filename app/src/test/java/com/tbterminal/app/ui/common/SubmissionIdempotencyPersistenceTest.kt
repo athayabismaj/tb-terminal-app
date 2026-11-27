@@ -617,7 +617,7 @@ class SubmissionIdempotencyPersistenceTest {
                 gate.await()
                 return backingStore.load(scope)
             }
-            override suspend fun save(record: PendingSubmissionRecord) = backingStore.save(record)
+            override suspend fun save(record: PendingSubmissionRecord): Boolean = backingStore.save(record)
             override suspend fun clear(scope: String) = backingStore.clear(scope)
             override suspend fun purgeExpired() = backingStore.purgeExpired()
         }
@@ -654,7 +654,7 @@ class SubmissionIdempotencyPersistenceTest {
                 refundGate.await()
                 return backingStore.load(scope)
             }
-            override suspend fun save(record: PendingSubmissionRecord) = backingStore.save(record)
+            override suspend fun save(record: PendingSubmissionRecord): Boolean = backingStore.save(record)
             override suspend fun clear(scope: String) = backingStore.clear(scope)
             override suspend fun purgeExpired() = backingStore.purgeExpired()
         }
@@ -681,6 +681,143 @@ class SubmissionIdempotencyPersistenceTest {
         assertEquals(oldRefundKey, cashRepo.recordedRefundKeys[1])
     }
 
+    @Test
+    fun diskFull_whenSavingInFlight_abortsRequestsAcrossAllPendingStoreCallers() = runTest(dispatcher) {
+        val failingStore = object : PendingSubmissionStore {
+            override suspend fun load(scope: String): PendingSubmissionRecord? = null
+            override suspend fun save(record: PendingSubmissionRecord): Boolean = false
+            override suspend fun clear(scope: String) = Unit
+            override suspend fun purgeExpired() = Unit
+        }
+
+        // 1. SupplierDebtViewModel
+        val payable = SupplierPayable(
+            id = "pay-disk-1",
+            supplierId = "sup-1",
+            supplierName = "PT Semen",
+            purchaseId = "pur-1",
+            amount = BigDecimal("200000"),
+            paidAmount = BigDecimal.ZERO,
+            remainingAmount = BigDecimal("200000"),
+            dueDate = "2026-12-31",
+            status = "belum_lunas",
+            createdAt = "2026-11-20T10:00:00Z"
+        )
+        val purRepo = FakePurchasingRepo(listOf(payable))
+        val supplierListVm = SupplierDebtViewModel(purRepo, pendingSubmissionStore = failingStore)
+        advanceUntilIdle()
+        supplierListVm.openPayment(payable)
+        supplierListVm.onPaymentAmountChanged("50000")
+        supplierListVm.submitPayment()
+        advanceUntilIdle()
+        assertTrue(purRepo.recordedPayments.isEmpty())
+        assertNotNull(supplierListVm.uiState.value.errorMessage)
+        assertFalse(supplierListVm.uiState.value.isSubmittingPayment)
+
+        // 2. SupplierDebtDetailViewModel
+        val supplierDetailVm = SupplierDebtDetailViewModel(purRepo, "sup-1", pendingSubmissionStore = failingStore)
+        advanceUntilIdle()
+        supplierDetailVm.openPayment(payable)
+        supplierDetailVm.onPaymentAmountChanged("50000")
+        supplierDetailVm.submitPayment()
+        advanceUntilIdle()
+        assertTrue(purRepo.recordedPayments.isEmpty())
+        assertNotNull(supplierDetailVm.uiState.value.errorMessage)
+        assertFalse(supplierDetailVm.uiState.value.isSubmittingPayment)
+
+        // 3. IncomingGoodsViewModel
+        val incomingVm = IncomingGoodsViewModel(
+            inventoryRepository = FakeInventoryRepo(),
+            purchasingRepository = purRepo,
+            documentNumberGenerator = FakeDocNumGen(),
+            pendingSubmissionStore = failingStore,
+        )
+        advanceUntilIdle()
+        incomingVm.onQuantityChanged("5")
+        incomingVm.onBuyPriceChanged("45000")
+        incomingVm.onInvoiceChanged("BM-DISK")
+        incomingVm.submitIncomingGoods()
+        advanceUntilIdle()
+        assertTrue(purRepo.recordedPurchases.isEmpty())
+        assertNotNull(incomingVm.uiState.value.errorMessage)
+        assertFalse(incomingVm.uiState.value.isSubmitting)
+
+        // 4. ReceivableCustomerDetailViewModel (single + payAll)
+        val rcv = Receivable(
+            id = "rcv-1", customerId = "cust-1", customerName = "Budi", transactionId = "tx-1",
+            source = "POS", amount = BigDecimal("100000"), paidAmount = BigDecimal.ZERO,
+            remainingAmount = BigDecimal("100000"), debtDate = "2026-11-01", dueDate = "2026-11-30",
+            status = "UNPAID", legacyInvoiceNumber = null, notes = null, createdBy = "k1",
+            isActive = true, createdAt = "2026-11-01T00:00:00Z"
+        )
+        val rcvRepo = FakeReceivableRepo(listOf(rcv))
+        val rcvVm = ReceivableCustomerDetailViewModel(
+            receivableRepository = rcvRepo,
+            customerId = "cust-1",
+            pendingSubmissionStore = failingStore,
+        )
+        advanceUntilIdle()
+        rcvVm.openPayment(rcv)
+        rcvVm.onPaymentAmountChanged("50000")
+        rcvVm.submitPayment()
+        advanceUntilIdle()
+        assertTrue(rcvRepo.recordedCommands.isEmpty())
+        assertNotNull(rcvVm.uiState.value.paymentErrorMessage)
+        assertFalse(rcvVm.uiState.value.isSubmittingPayment)
+
+        rcvVm.closePayment()
+        rcvVm.openPayAll()
+        rcvVm.onPaymentAmountChanged("50000")
+        rcvVm.submitPayment()
+        advanceUntilIdle()
+        assertTrue(rcvRepo.recordedCommands.isEmpty())
+        assertNotNull(rcvVm.uiState.value.paymentErrorMessage)
+        assertFalse(rcvVm.uiState.value.isSubmittingPayment)
+
+        // 5. CashierTransactionHistoryViewModel (payDebt, void, refund)
+        val cashRepoDebt = FakeCashRepo(initialStatus = "HUTANG")
+        val debtVm = CashierTransactionHistoryViewModel(
+            repository = cashRepoDebt,
+            actorRole = "KASIR",
+            pendingSubmissionStore = failingStore,
+        )
+        debtVm.loadReceipt("tx-debt-1")
+        advanceUntilIdle()
+        debtVm.showPayDebtDialog()
+        debtVm.onPayDebtAmountChanged("30000")
+        debtVm.payDebt()
+        advanceUntilIdle()
+        assertTrue(cashRepoDebt.recordedPayDebtKeys.isEmpty())
+        assertNotNull(debtVm.uiState.value.payDebtError)
+        assertFalse(debtVm.uiState.value.isSubmittingDebt)
+
+        val cashRepoPaid = FakeCashRepo(initialStatus = "LUNAS")
+        val actionVm = CashierTransactionHistoryViewModel(
+            repository = cashRepoPaid,
+            actorRole = "OWNER",
+            pendingSubmissionStore = failingStore,
+        )
+        actionVm.loadReceipt("tx-debt-1")
+        advanceUntilIdle()
+
+        actionVm.showVoidDialog()
+        actionVm.onVoidReasonChanged("Salah barang")
+        actionVm.submitVoid()
+        advanceUntilIdle()
+        assertTrue(cashRepoPaid.recordedVoidKeys.isEmpty())
+        assertNotNull(actionVm.uiState.value.voidErrorMessage)
+        assertFalse(actionVm.uiState.value.isSubmittingVoid)
+
+        actionVm.hideVoidDialog()
+        actionVm.showRefundDialog()
+        actionVm.onRefundReasonChanged("Barang rusak")
+        actionVm.submitRefund()
+        advanceUntilIdle()
+        assertTrue(cashRepoPaid.recordedRefundKeys.isEmpty())
+        assertNotNull(actionVm.uiState.value.refundErrorMessage)
+        assertFalse(actionVm.uiState.value.isSubmittingRefund)
+    }
+
     private class FakePendingSubmissionStore(
         private val clockMillis: () -> Long = { System.currentTimeMillis() }
     ) : PendingSubmissionStore {
@@ -699,8 +836,9 @@ class SubmissionIdempotencyPersistenceTest {
                 .toList()
                 .mapNotNull { load(it) }
         }
-        override suspend fun save(record: PendingSubmissionRecord) {
+        override suspend fun save(record: PendingSubmissionRecord): Boolean {
             records[record.scope] = record
+            return true
         }
         override suspend fun clear(scope: String) {
             records.remove(scope)

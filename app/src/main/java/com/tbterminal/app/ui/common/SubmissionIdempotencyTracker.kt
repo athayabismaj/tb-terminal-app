@@ -72,9 +72,19 @@ internal class SubmissionIdempotencyTracker<Intent : Any>(
         return record.payloadJson
     }
 
-    suspend fun resolveKeyForSubmission(intent: Intent, payloadJson: String? = null): String {
+    suspend fun resolveKeyForSubmission(intent: Intent, payloadJson: String? = null): String? {
+        val prevIntent = activeIntent
+        val prevKey = activeKey
+        val prevCreatedAt = activeCreatedAt
+        val prevAmbiguous = isOutcomeAmbiguous
         val key = resolveKey(intent)
-        persist(PendingSubmissionStatus.IN_FLIGHT, payloadJson)
+        if (!persist(PendingSubmissionStatus.IN_FLIGHT, payloadJson)) {
+            activeIntent = prevIntent
+            activeKey = prevKey
+            activeCreatedAt = prevCreatedAt
+            isOutcomeAmbiguous = prevAmbiguous
+            return null
+        }
         return key
     }
 
@@ -147,22 +157,26 @@ internal class SubmissionIdempotencyTracker<Intent : Any>(
         clearStore()
     }
 
-    private suspend fun persist(status: PendingSubmissionStatus, payloadJson: String?) {
-        val backingStore = store ?: return
-        val targetScope = scope ?: return
-        val serializer = intentSerializer ?: return
-        val intent = activeIntent ?: return
-        val key = activeKey ?: return
+    private suspend fun persist(status: PendingSubmissionStatus, payloadJson: String?): Boolean {
+        val backingStore = store ?: return true
+        val targetScope = scope ?: return true
+        val serializer = intentSerializer ?: return true
+        val intent = activeIntent ?: return false
+        val key = activeKey ?: return false
 
         val now = clockMillis()
-        val createdAt = activeCreatedAt ?: now
+        val prevCreatedAt = activeCreatedAt
+        val createdAt = prevCreatedAt ?: now
         activeCreatedAt = createdAt
 
         val intentJson = runSuspendCatching {
             TrackerPersistenceJson.encodeToString(serializer, intent)
-        }.getOrElse { return }
+        }.getOrElse {
+            activeCreatedAt = prevCreatedAt
+            return false
+        }
 
-        backingStore.save(
+        val saved = backingStore.save(
             PendingSubmissionRecord(
                 scope = targetScope,
                 idempotencyKey = key,
@@ -173,6 +187,10 @@ internal class SubmissionIdempotencyTracker<Intent : Any>(
                 updatedAt = now
             )
         )
+        if (!saved) {
+            activeCreatedAt = prevCreatedAt
+        }
+        return saved
     }
 
     private suspend fun clearStore() {

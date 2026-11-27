@@ -46,9 +46,9 @@ data class PendingSubmissionRecord(
 interface PendingSubmissionStore {
     suspend fun load(scope: String): PendingSubmissionRecord?
     suspend fun loadByScopePrefix(scopePrefix: String): List<PendingSubmissionRecord> = emptyList()
-    suspend fun save(record: PendingSubmissionRecord)
-    suspend fun saveForOwner(ownerUserId: String, record: PendingSubmissionRecord) {
-        save(record)
+    suspend fun save(record: PendingSubmissionRecord): Boolean
+    suspend fun saveForOwner(ownerUserId: String, record: PendingSubmissionRecord): Boolean {
+        return save(record)
     }
     suspend fun clear(scope: String)
     suspend fun purgeExpired()
@@ -106,13 +106,13 @@ class RoomPendingSubmissionStore(
         )
     }
 
-    override suspend fun save(record: PendingSubmissionRecord) {
-        val ownerUserId = resolveOwnerUserIdOrNull() ?: return
-        saveForOwner(ownerUserId, record)
+    override suspend fun save(record: PendingSubmissionRecord): Boolean {
+        val ownerUserId = resolveOwnerUserIdOrNull() ?: return false
+        return saveForOwner(ownerUserId, record)
     }
 
-    override suspend fun saveForOwner(ownerUserId: String, record: PendingSubmissionRecord) {
-        val resolvedOwner = ownerUserId.trim().takeIf(String::isNotBlank) ?: return
+    override suspend fun saveForOwner(ownerUserId: String, record: PendingSubmissionRecord): Boolean {
+        val resolvedOwner = ownerUserId.trim().takeIf(String::isNotBlank) ?: return false
         val entity = PendingSubmissionEntity(
             ownerUserId = resolvedOwner,
             scope = record.scope,
@@ -124,7 +124,7 @@ class RoomPendingSubmissionStore(
             createdAt = record.createdAt,
             updatedAt = record.updatedAt
         )
-        runSuspendCatching { dao.upsert(entity) }
+        return runSuspendCatching { dao.upsert(entity) }.isSuccess
     }
 
     override suspend fun clear(scope: String) {

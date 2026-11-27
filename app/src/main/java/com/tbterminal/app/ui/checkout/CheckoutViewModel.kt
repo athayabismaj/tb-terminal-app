@@ -36,6 +36,7 @@ import com.tbterminal.app.data.model.CashSession
 import com.tbterminal.app.data.model.Customer
 import com.tbterminal.app.data.remote.NetworkResult
 import com.tbterminal.app.data.remote.ServerUnavailabilityClassifier
+import com.tbterminal.app.data.remote.UserFacingErrorMapper
 import com.tbterminal.app.data.repository.CheckoutRepository
 import com.tbterminal.app.data.repository.CashReconciliationRepository
 import com.tbterminal.app.data.repository.CustomerRepository
@@ -2459,12 +2460,22 @@ class CheckoutViewModel(
             managerApprovalId = managerApprovalId,
         )
 
-        ambiguousOnlineCheckout = command
-        pendingSubmissionPersistence?.saveInFlight(
+        val persistedInFlight = pendingSubmissionPersistence?.saveInFlight(
             command = command,
             fingerprint = pendingOnlineCheckout?.fingerprint.orEmpty(),
             state = _uiState.value,
-        )
+        ) ?: true
+        if (!persistedInFlight) {
+            _uiState.update {
+                it.copy(
+                    isLoading = false,
+                    isPreviewLoading = false,
+                    errorEvent = UiText.DynamicString(UserFacingErrorMapper.message()),
+                )
+            }
+            return
+        }
+        ambiguousOnlineCheckout = command
         executeOnlineCheckout(command)
     }
 

@@ -10,6 +10,7 @@ import com.tbterminal.app.data.local.database.PendingSubmissionStore
 import com.tbterminal.app.data.model.CreateReceivablePaymentCommand
 import com.tbterminal.app.data.model.Receivable
 import com.tbterminal.app.data.model.ReceivablePaymentHistory
+import com.tbterminal.app.data.remote.UserFacingErrorMapper
 import com.tbterminal.app.data.repository.CustomerRepository
 import com.tbterminal.app.data.repository.ReceivableRepository
 import com.tbterminal.app.data.repository.RepositoryResult
@@ -318,6 +319,10 @@ internal class ReceivableCustomerDetailViewModel(
         viewModelScope.launch {
             _uiState.update { it.copy(isSubmittingPayment = true, paymentErrorMessage = null) }
             restoreJob.join()
+            val prevIntent = activePaymentIntent
+            val prevKeys = activePaymentKeysByInvoice.toMutableMap()
+            val prevCreatedAt = activePaymentCreatedAt
+            val prevAmbiguous = isPaymentOutcomeAmbiguous
             val idempotencyKey = resolveKeysForIntent(intent, prefix = "receivable-pay").getValue(receivable.id)
             val amount = validateReceivablePaymentInput(
                 state.paymentAmountInput,
@@ -332,7 +337,19 @@ internal class ReceivableCustomerDetailViewModel(
                 }
                 return@launch
             }
-            persistPendingPayment(PendingSubmissionStatus.IN_FLIGHT)
+            if (!persistPendingPayment(PendingSubmissionStatus.IN_FLIGHT)) {
+                activePaymentIntent = prevIntent
+                activePaymentKeysByInvoice = prevKeys
+                activePaymentCreatedAt = prevCreatedAt
+                isPaymentOutcomeAmbiguous = prevAmbiguous
+                _uiState.update {
+                    it.copy(
+                        isSubmittingPayment = false,
+                        paymentErrorMessage = UserFacingErrorMapper.message()
+                    )
+                }
+                return@launch
+            }
             val command = CreateReceivablePaymentCommand(
                 receivableId = receivable.id,
                 amount = amount,
@@ -429,6 +446,10 @@ internal class ReceivableCustomerDetailViewModel(
         viewModelScope.launch {
             _uiState.update { it.copy(isSubmittingPayment = true, paymentErrorMessage = null) }
             restoreJob.join()
+            val prevIntent = activePaymentIntent
+            val prevKeys = activePaymentKeysByInvoice.toMutableMap()
+            val prevCreatedAt = activePaymentCreatedAt
+            val prevAmbiguous = isPaymentOutcomeAmbiguous
             val keysByInvoice = resolveKeysForIntent(intent, prefix = "receivable-pay-all")
             val validationKey = keysByInvoice.getValue(sortedInvoiceIds.first())
             val amount = validateReceivablePaymentInput(
@@ -458,7 +479,19 @@ internal class ReceivableCustomerDetailViewModel(
                 }
                 return@launch
             }
-            persistPendingPayment(PendingSubmissionStatus.IN_FLIGHT)
+            if (!persistPendingPayment(PendingSubmissionStatus.IN_FLIGHT)) {
+                activePaymentIntent = prevIntent
+                activePaymentKeysByInvoice = prevKeys
+                activePaymentCreatedAt = prevCreatedAt
+                isPaymentOutcomeAmbiguous = prevAmbiguous
+                _uiState.update {
+                    it.copy(
+                        isSubmittingPayment = false,
+                        paymentErrorMessage = UserFacingErrorMapper.message()
+                    )
+                }
+                return@launch
+            }
 
             var successCount = 0
             var failureError: String? = null
@@ -554,12 +587,13 @@ internal class ReceivableCustomerDetailViewModel(
         return activePaymentKeysByInvoice
     }
 
-    private suspend fun persistPendingPayment(status: PendingSubmissionStatus) {
-        val store = pendingSubmissionStore ?: return
-        val intent = activePaymentIntent ?: return
-        val primaryKey = intent.invoiceIds.firstOrNull()?.let { activePaymentKeysByInvoice[it] } ?: return
+    private suspend fun persistPendingPayment(status: PendingSubmissionStatus): Boolean {
+        val store = pendingSubmissionStore ?: return true
+        val intent = activePaymentIntent ?: return false
+        val primaryKey = intent.invoiceIds.firstOrNull()?.let { activePaymentKeysByInvoice[it] } ?: return false
         val now = clockMillis()
-        val createdAt = activePaymentCreatedAt ?: now
+        val prevCreatedAt = activePaymentCreatedAt
+        val createdAt = prevCreatedAt ?: now
         activePaymentCreatedAt = createdAt
 
         val intentJson = ReceivablePersistenceJson.encodeToString(
@@ -571,7 +605,7 @@ internal class ReceivableCustomerDetailViewModel(
                 keysByInvoice = activePaymentKeysByInvoice.toMap()
             )
         )
-        store.save(
+        val saved = store.save(
             PendingSubmissionRecord(
                 scope = pendingScope,
                 idempotencyKey = primaryKey,
@@ -582,6 +616,10 @@ internal class ReceivableCustomerDetailViewModel(
                 updatedAt = now
             )
         )
+        if (!saved) {
+            activePaymentCreatedAt = prevCreatedAt
+        }
+        return saved
     }
 
     private fun clearPaymentIdempotencyState() {

@@ -2,14 +2,18 @@ package com.tbterminal.app.data.local.database
 
 import android.app.Application
 import android.content.Context
+import android.database.sqlite.SQLiteFullException
 import androidx.room.Room
 import androidx.test.core.app.ApplicationProvider
+import com.tbterminal.app.data.local.dao.PendingSubmissionDao
 import com.tbterminal.app.data.local.entity.PendingSubmissionEntity
 import kotlinx.coroutines.test.runTest
 import org.junit.After
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
+import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -165,5 +169,44 @@ class PendingSubmissionStoreTest {
         val records = store.loadByScopePrefix(PendingSubmissionScopes.SUPPLIER_PAYMENT_PREFIX)
         assertEquals(2, records.size)
         assertEquals(setOf("k-1", "k-2"), records.map { it.idempotencyKey }.toSet())
+    }
+
+    @Test
+    fun save_returnsFalseWhenDaoThrowsSqliteFullException() = runTest {
+        val delegate = database.pendingSubmissionDao()
+        val fullDiskDao = object : PendingSubmissionDao by delegate {
+            override suspend fun upsert(entity: PendingSubmissionEntity) {
+                throw SQLiteFullException("database or disk is full (code 13)")
+            }
+        }
+        val failingStore = RoomPendingSubmissionStore(
+            dao = fullDiskDao,
+            ownerUserIdProvider = { currentOwner },
+            clockMillis = { nowMillis },
+        )
+
+        val saved = failingStore.save(
+            PendingSubmissionRecord(
+                scope = PendingSubmissionScopes.CHECKOUT,
+                idempotencyKey = "k-full",
+                intentJson = """{"fp":"v1"}""",
+                status = PendingSubmissionStatus.IN_FLIGHT,
+                createdAt = nowMillis,
+                updatedAt = nowMillis,
+            )
+        )
+        assertFalse(saved)
+        assertTrue(
+            store.save(
+                PendingSubmissionRecord(
+                    scope = PendingSubmissionScopes.CHECKOUT,
+                    idempotencyKey = "k-ok",
+                    intentJson = """{"fp":"v1"}""",
+                    status = PendingSubmissionStatus.IN_FLIGHT,
+                    createdAt = nowMillis,
+                    updatedAt = nowMillis,
+                )
+            )
+        )
     }
 }

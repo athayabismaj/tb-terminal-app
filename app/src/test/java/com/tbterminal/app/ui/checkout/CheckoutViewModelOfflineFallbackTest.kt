@@ -10,8 +10,10 @@ import com.tbterminal.app.data.local.checkout.LocalCheckoutService
 import com.tbterminal.app.data.local.database.CashSessionLocalDataSource
 import com.tbterminal.app.data.local.database.CustomerLocalDataSource
 import com.tbterminal.app.data.local.database.LocalAppSettingsDataSource
+import com.tbterminal.app.data.local.database.PendingSubmissionRecord
 import com.tbterminal.app.data.local.database.PendingSubmissionScopes
 import com.tbterminal.app.data.local.database.PendingSubmissionStatus
+import com.tbterminal.app.data.local.database.PendingSubmissionStore
 import com.tbterminal.app.data.local.database.ProductLocalDataSource
 import com.tbterminal.app.data.local.database.RoomCheckoutDraftStore
 import com.tbterminal.app.data.local.database.RoomPendingSubmissionStore
@@ -521,6 +523,56 @@ class CheckoutViewModelOfflineFallbackTest {
         vm.refreshCashSessionOnResume()
         advanceUntilIdle()
         assertFalse(vm.uiState.value.hasActiveCashSession)
+    }
+
+    @Test
+    fun diskFull_whenSavingInFlightCheckout_abortsSubmitRequestAndShowsError() = runTest(dispatcher) {
+        seedProductAndOpenSession(serverSessionId = "srv-sess-1")
+        backendHealthMonitor.refresh(force = true)
+
+        val failingStore = object : PendingSubmissionStore {
+            override suspend fun load(scope: String): PendingSubmissionRecord? = null
+            override suspend fun save(record: PendingSubmissionRecord): Boolean = false
+            override suspend fun clear(scope: String) = Unit
+            override suspend fun purgeExpired() = Unit
+        }
+        val checkoutRepo = FakeOfflineFallbackCheckoutRepo()
+        val lookup = LocalCheckoutLookupService(
+            productLocalDataSource = productLocalDataSource,
+            customerLocalDataSource = customerLocalDataSource,
+            cashSessionDao = database.cashSessionDao(),
+        )
+        val vm = CheckoutViewModel(
+            checkoutRepository = checkoutRepo,
+            inventoryRepository = FakeEmptyInventoryRepo(),
+            customerRepository = FakeEmptyCustomerRepo(),
+            cashReconciliationRepository = FakeOfflineFallbackCashRepo(),
+            cashSessionLocalDataSource = cashSessionLocalDataSource,
+            localCheckoutLookupService = lookup,
+            localCheckoutService = LocalCheckoutService(database, "device-test"),
+            offlineStatusRepository = offlineStatusRepository,
+            actorRole = "KASIR",
+            clockMillis = { nowMillis },
+            pendingSubmissionStore = failingStore,
+            checkoutDraftStore = checkoutDraftStore,
+            productLocalDataSource = productLocalDataSource,
+            customerLocalDataSource = customerLocalDataSource,
+            cartDraftSaveDebounceMs = 0L,
+            localCashSessionService = localCashSessionService,
+            cashierUserId = "kasir-1",
+        )
+        advanceUntilIdle()
+
+        vm.addProduct(sampleProduct())
+        advanceUntilIdle()
+        vm.prepareCheckout(PaymentMethod.TUNAI, BigDecimal("70000"))
+        advanceUntilIdle()
+
+        assertEquals(1, checkoutRepo.previewCalls)
+        assertEquals(0, checkoutRepo.submittedCommands.size)
+        assertFalse(vm.uiState.value.hasAmbiguousCheckout)
+        assertFalse(vm.uiState.value.isLoading)
+        assertNotNull(vm.uiState.value.errorEvent)
     }
 
     private suspend fun seedProductAndOpenSession(serverSessionId: String) {

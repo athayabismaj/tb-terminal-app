@@ -15,6 +15,7 @@ import com.tbterminal.app.data.model.remainingAmount
 import com.tbterminal.app.data.model.ManagerApprovalAction
 import com.tbterminal.app.data.model.ManagerApprovalGrant
 import com.tbterminal.app.data.model.RefundDisposition
+import com.tbterminal.app.data.remote.UserFacingErrorMapper
 import com.tbterminal.app.data.repository.CashReconciliationRepository
 import com.tbterminal.app.data.repository.RepositoryResult
 import com.tbterminal.app.data.sync.OfflineCheckoutSyncResult
@@ -841,7 +842,17 @@ class CashierTransactionHistoryViewModel(
                     voidManagerApprovalId = resolvedApprovalId,
                 )
             }
-            persistPendingVoid(pendingDto, resolvedKey, PendingSubmissionStatus.IN_FLIGHT)
+            val persistedInFlight = persistPendingVoid(pendingDto, resolvedKey, PendingSubmissionStatus.IN_FLIGHT)
+            if (!persistedInFlight) {
+                _uiState.update {
+                    it.copy(
+                        isSubmittingVoid = false,
+                        isVoidDialogOpen = true,
+                        voidErrorMessage = UserFacingErrorMapper.message(),
+                    )
+                }
+                return@launch
+            }
 
             when (
                 val result = repository.voidTransaction(
@@ -1078,7 +1089,17 @@ class CashierTransactionHistoryViewModel(
                     refundManagerApprovalId = resolvedApprovalId,
                 )
             }
-            persistPendingRefund(pendingDto, resolvedKey, PendingSubmissionStatus.IN_FLIGHT)
+            val persistedInFlight = persistPendingRefund(pendingDto, resolvedKey, PendingSubmissionStatus.IN_FLIGHT)
+            if (!persistedInFlight) {
+                _uiState.update {
+                    it.copy(
+                        isSubmittingRefund = false,
+                        isRefundDialogOpen = true,
+                        refundErrorMessage = UserFacingErrorMapper.message(),
+                    )
+                }
+                return@launch
+            }
 
             when (
                 val result = repository.refundTransaction(
@@ -1148,19 +1169,15 @@ class CashierTransactionHistoryViewModel(
         dto: PersistedCashierVoidPending,
         idempotencyKey: String,
         status: PendingSubmissionStatus
-    ) {
-        val store = pendingSubmissionStore ?: return
+    ): Boolean {
+        val store = pendingSubmissionStore ?: return true
         val now = clockMillis()
         val createdAt = if (restoredVoidKey == idempotencyKey || activeVoidCreatedAt != null) {
             activeVoidCreatedAt ?: now
         } else {
             now
         }
-        activeVoidCreatedAt = createdAt
-        restoredVoid = dto
-        restoredVoidKey = idempotencyKey
-        restoredVoidCreatedAt = createdAt
-        store.save(
+        val saved = store.save(
             PendingSubmissionRecord(
                 scope = PendingSubmissionScopes.CASHIER_VOID,
                 idempotencyKey = idempotencyKey,
@@ -1171,6 +1188,13 @@ class CashierTransactionHistoryViewModel(
                 updatedAt = now
             )
         )
+        if (saved) {
+            activeVoidCreatedAt = createdAt
+            restoredVoid = dto
+            restoredVoidKey = idempotencyKey
+            restoredVoidCreatedAt = createdAt
+        }
+        return saved
     }
 
     private suspend fun clearPersistedVoidState() {
@@ -1185,19 +1209,15 @@ class CashierTransactionHistoryViewModel(
         dto: PersistedCashierRefundPending,
         idempotencyKey: String,
         status: PendingSubmissionStatus
-    ) {
-        val store = pendingSubmissionStore ?: return
+    ): Boolean {
+        val store = pendingSubmissionStore ?: return true
         val now = clockMillis()
         val createdAt = if (restoredRefundKey == idempotencyKey || activeRefundCreatedAt != null) {
             activeRefundCreatedAt ?: now
         } else {
             now
         }
-        activeRefundCreatedAt = createdAt
-        restoredRefund = dto
-        restoredRefundKey = idempotencyKey
-        restoredRefundCreatedAt = createdAt
-        store.save(
+        val saved = store.save(
             PendingSubmissionRecord(
                 scope = PendingSubmissionScopes.CASHIER_REFUND,
                 idempotencyKey = idempotencyKey,
@@ -1208,6 +1228,13 @@ class CashierTransactionHistoryViewModel(
                 updatedAt = now
             )
         )
+        if (saved) {
+            activeRefundCreatedAt = createdAt
+            restoredRefund = dto
+            restoredRefundKey = idempotencyKey
+            restoredRefundCreatedAt = createdAt
+        }
+        return saved
     }
 
     private suspend fun clearPersistedRefundState() {
@@ -1417,6 +1444,8 @@ class CashierTransactionHistoryViewModel(
                 }
                 else -> state.payDebtIdempotencyKey ?: idempotencyKeyGenerator()
             }
+            val prevLastFingerprint = lastSubmittedPayDebtFingerprint
+            val prevActiveCreatedAt = activePayDebtCreatedAt
             lastSubmittedPayDebtFingerprint = fingerprint
             val pendingDto = PersistedCashierPayDebtPending(
                 transactionId = transactionId,
@@ -1425,7 +1454,19 @@ class CashierTransactionHistoryViewModel(
                 fingerprint = fingerprint
             )
             _uiState.update { it.copy(payDebtIdempotencyKey = idempotencyKey) }
-            persistPendingPayDebt(pendingDto, idempotencyKey, PendingSubmissionStatus.IN_FLIGHT)
+            val persistedInFlight = persistPendingPayDebt(pendingDto, idempotencyKey, PendingSubmissionStatus.IN_FLIGHT)
+            if (!persistedInFlight) {
+                lastSubmittedPayDebtFingerprint = prevLastFingerprint
+                activePayDebtCreatedAt = prevActiveCreatedAt
+                _uiState.update {
+                    it.copy(
+                        isSubmittingDebt = false,
+                        payDebtError = UserFacingErrorMapper.message(),
+                        errorMessage = UserFacingErrorMapper.message(),
+                    )
+                }
+                return@launch
+            }
 
             when (val result = repository.payTransactionDebt(transactionId, amount, state.payDebtMethodInput, idempotencyKey)) {
                 is RepositoryResult.Success -> {
@@ -1481,19 +1522,15 @@ class CashierTransactionHistoryViewModel(
         dto: PersistedCashierPayDebtPending,
         idempotencyKey: String,
         status: PendingSubmissionStatus
-    ) {
-        val store = pendingSubmissionStore ?: return
+    ): Boolean {
+        val store = pendingSubmissionStore ?: return true
         val now = clockMillis()
         val createdAt = if (restoredPayDebtKey == idempotencyKey || activePayDebtCreatedAt != null) {
             activePayDebtCreatedAt ?: now
         } else {
             now
         }
-        activePayDebtCreatedAt = createdAt
-        restoredPayDebt = dto
-        restoredPayDebtKey = idempotencyKey
-        restoredPayDebtCreatedAt = createdAt
-        store.save(
+        val saved = store.save(
             PendingSubmissionRecord(
                 scope = PendingSubmissionScopes.CASHIER_PAY_DEBT,
                 idempotencyKey = idempotencyKey,
@@ -1504,6 +1541,13 @@ class CashierTransactionHistoryViewModel(
                 updatedAt = now
             )
         )
+        if (saved) {
+            activePayDebtCreatedAt = createdAt
+            restoredPayDebt = dto
+            restoredPayDebtKey = idempotencyKey
+            restoredPayDebtCreatedAt = createdAt
+        }
+        return saved
     }
 
     private suspend fun clearPersistedPayDebtState() {

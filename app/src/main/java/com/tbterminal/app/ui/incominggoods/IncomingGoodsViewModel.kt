@@ -11,6 +11,7 @@ import com.tbterminal.app.data.model.PurchaseItemCommand
 import com.tbterminal.app.data.model.Supplier
 import com.tbterminal.app.data.numbering.DocumentNumberGenerator
 import com.tbterminal.app.data.numbering.DocumentNumberType
+import com.tbterminal.app.data.remote.UserFacingErrorMapper
 import com.tbterminal.app.data.repository.InventoryRepository
 import com.tbterminal.app.data.repository.PurchasingRepository
 import com.tbterminal.app.data.repository.RepositoryResult
@@ -303,7 +304,10 @@ class IncomingGoodsViewModel(
                 amountPaid = amountPaid,
                 dueDays = dueDays,
                 notes = state.notesInput
-            )
+            ) ?: run {
+                setActionError(UserFacingErrorMapper.message())
+                return@launch
+            }
 
             when (val result = purchasingRepository.createPurchase(command)) {
                 is RepositoryResult.Success -> {
@@ -365,7 +369,10 @@ class IncomingGoodsViewModel(
                 amountPaid = amountPaid,
                 dueDays = dueDays,
                 notes = notes
-            )
+            ) ?: run {
+                setActionError(UserFacingErrorMapper.message())
+                return@launch
+            }
 
             when (val result = purchasingRepository.createPurchase(command)) {
                 is RepositoryResult.Success -> {
@@ -395,7 +402,7 @@ class IncomingGoodsViewModel(
         amountPaid: BigDecimal,
         dueDays: Int,
         notes: String?
-    ): CreatePurchaseCommand {
+    ): CreatePurchaseCommand? {
         restoreJob.join()
         val normalizedInvoiceNo = invoiceNo?.trim()?.takeIf(String::isNotBlank)
         val normalizedNotes = notes?.trim()?.takeIf(String::isNotBlank)
@@ -414,7 +421,7 @@ class IncomingGoodsViewModel(
                 )
             )
         )
-        val idempotencyKey = purchaseIdempotency.resolveKeyForSubmission(intent)
+        val idempotencyKey = purchaseIdempotency.resolveKeyForSubmission(intent) ?: return null
         return CreatePurchaseCommand(
             supplierId = supplierId,
             invoiceNo = normalizedInvoiceNo,
