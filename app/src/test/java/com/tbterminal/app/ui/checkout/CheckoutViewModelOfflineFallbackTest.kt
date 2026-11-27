@@ -67,6 +67,8 @@ import com.tbterminal.app.data.sync.OfflineStatusRepository
 import com.tbterminal.app.ui.common.UiText
 import java.io.IOException
 import java.math.BigDecimal
+import java.net.ConnectException
+import java.net.SocketTimeoutException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.Flow
@@ -373,6 +375,49 @@ class CheckoutViewModelOfflineFallbackTest {
         advanceUntilIdle()
         val err = vmAdmin.uiState.value.cashSessionError as? UiText.DynamicString
         assertEquals("Hanya kasir yang dapat membuka sesi kas.", err?.value)
+    }
+
+    @Test
+    fun openCashSession_ambiguousErrorsDoNotFallbackLocally_while502AndRefusedDo() = runTest(dispatcher) {
+        backendHealthMonitor.refresh(force = true)
+        val cashRepo = FakeOfflineFallbackCashRepo().apply {
+            activeSessionResult = RepositoryResult.Success(null)
+        }
+        val vm = buildVm(cashRepo = cashRepo, actorRole = "KASIR")
+        advanceUntilIdle()
+
+        // Ambiguous errors (NETWORK_TIMEOUT, CONNECTION_INTERRUPTED, HTTP_504, SocketTimeoutException) -> NO local session
+        listOf(
+            RepositoryResult.Error("NETWORK_TIMEOUT", "Timeout"),
+            RepositoryResult.Error("CONNECTION_INTERRUPTED", "Interrupted"),
+            RepositoryResult.Error("HTTP_504", "Gateway timeout"),
+            RepositoryResult.Exception(SocketTimeoutException("read timeout")),
+        ).forEach { ambiguous ->
+            backendHealthMonitor.markConnected()
+            cashRepo.openSessionResult = ambiguous
+            vm.onStartingCashChanged("150000")
+            vm.openCashSession()
+            advanceUntilIdle()
+
+            assertFalse(vm.uiState.value.hasActiveCashSession)
+            assertNull(cashSessionLocalDataSource.getLatestOpenSession("kasir-1"))
+            assertNotNull(vm.uiState.value.cashSessionError)
+
+            // Immediate retry does not silently open local session
+            vm.openCashSession()
+            advanceUntilIdle()
+            assertNull(cashSessionLocalDataSource.getLatestOpenSession("kasir-1"))
+        }
+
+        // Definitely unprocessed errors (HTTP_502, NETWORK_UNAVAILABLE, ConnectException) -> DO fallback locally
+        backendHealthMonitor.markConnected()
+        cashRepo.openSessionResult = RepositoryResult.Exception(ConnectException("Connection refused"))
+        vm.onStartingCashChanged("150000")
+        vm.openCashSession()
+        advanceUntilIdle()
+
+        assertTrue(vm.uiState.value.hasActiveCashSession)
+        assertNotNull(cashSessionLocalDataSource.getLatestOpenSession("kasir-1"))
     }
 
     @Test

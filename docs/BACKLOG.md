@@ -82,6 +82,7 @@ Temuan berikut diidentifikasi saat pengerjaan Fase B2c-min namun tidak diubah pa
 ## Spesifikasi Backend Go (Wajib untuk Migrasi Backend)
 
 - **[WAJIB / KONTRAK API]** Endpoint `POST /api/sales/sessions/sync/open` pada backend Go baru **wajib** mengembalikan **kode error terstruktur khusus** (mis. `code: "ACTIVE_CASH_SESSION_EXISTS"`; lihat daftar kode pada `CashSessionActiveBlockingMatcher.BACKEND_ERROR_CODES` di Android) bersama status HTTP 4xx (disarankan 409 atau 400) ketika pembukaan sesi kasir baru terblokir oleh sesi kasir lain yang masih `OPEN` di server untuk akun tersebut. Android saat ini memiliki fallback pencocokan teks pesan berbahasa Indonesia di satu konstanta terpusat (`CashSessionActiveBlockingMatcher`), namun kontrak backend final tidak boleh bergantung pada redaksi kalimat error.
+- **[WAJIB / KONTRAK API]** Endpoint pengeluaran kas `POST /api/sales/sessions/expenses` pada backend Go **wajib** mendukung `idempotencyKey` (8–100 karakter `[A-Za-z0-9._:-]`), mengembalikan hasil transaksi pertama dengan `idempotentReplay: true` bila key + payload (`amount`, `description` yang dinormalisasi) sama, serta menjawab HTTP 400 `VALIDATION_ERROR` bila key yang sama dipakai untuk payload berbeda (pola sama dengan `/api/sales/transactions/{id}/pay` dan `/api/purchasing/payables/payments`). Disarankan dukungan `idempotencyKey` yang sama juga untuk `POST /api/sales/sessions/open` agar retry setelah timeout/504 aman dari duplikasi.
 
 ## Temuan di Luar Scope (Fase B2e1)
 

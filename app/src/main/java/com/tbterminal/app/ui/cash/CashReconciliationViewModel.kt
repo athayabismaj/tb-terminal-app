@@ -16,6 +16,7 @@ import com.tbterminal.app.data.local.model.SyncStatus
 import com.tbterminal.app.data.model.CashSession
 import com.tbterminal.app.data.model.CashTransaction
 import com.tbterminal.app.data.remote.ServerUnavailabilityClassifier
+import com.tbterminal.app.data.remote.UserFacingErrorMapper
 import com.tbterminal.app.data.repository.CashReconciliationRepository
 import com.tbterminal.app.data.repository.RepositoryResult
 import com.tbterminal.app.data.sync.BackendStatus
@@ -57,6 +58,8 @@ class CashReconciliationViewModel(
     )
     val uiState: StateFlow<CashReconciliationUiState> = _uiState.asStateFlow()
     private var latestOfflineStatus = OfflineStatus()
+    private var hasAmbiguousOpenSessionSubmit = false
+    private var hasAmbiguousPettyCashSubmit = false
 
     init {
         observeOfflineStatus()
@@ -102,6 +105,8 @@ class CashReconciliationViewModel(
 
             when (val sessionResult = repository.getActiveSession()) {
                 is RepositoryResult.Success -> {
+                    hasAmbiguousOpenSessionSubmit = false
+                    hasAmbiguousPettyCashSubmit = false
                     val session = sessionResult.data
                     if (session == null) {
                         reconcileNoActiveRemoteSessionSafely()
@@ -199,6 +204,7 @@ class CashReconciliationViewModel(
     }
 
     fun onOpeningCashChanged(value: String) {
+        hasAmbiguousOpenSessionSubmit = false
         _uiState.update { it.copy(openingCashInput = sanitizeWholeRupiahInput(value), errorMessage = null) }
     }
 
@@ -221,13 +227,14 @@ class CashReconciliationViewModel(
         viewModelScope.launch {
             _uiState.update { it.copy(isSubmitting = true, errorMessage = null, message = null) }
 
-            if (shouldUseLocalCashSession()) {
+            if (!hasAmbiguousOpenSessionSubmit && shouldUseLocalCashSession()) {
                 openLocalSession(startingCash)
                 return@launch
             }
 
             when (val result = repository.openSession(startingCash)) {
                 is RepositoryResult.Success -> {
+                    hasAmbiguousOpenSessionSubmit = false
                     val mirroredLocalId = mirrorRemoteSessionSafely(result.data)
                     _uiState.update {
                         it.copy(
@@ -244,16 +251,30 @@ class CashReconciliationViewModel(
                 }
 
                 is RepositoryResult.Error -> {
-                    if (ServerUnavailabilityClassifier.isServerUnavailable(result)) {
+                    if (ServerUnavailabilityClassifier.isDefinitelyUnprocessedServerUnavailable(result)) {
+                        hasAmbiguousOpenSessionSubmit = false
                         markBackendUnreachableAndSyncState()
                         openLocalSession(startingCash)
                     } else {
+                        if (ServerUnavailabilityClassifier.isServerUnavailable(result)) {
+                            hasAmbiguousOpenSessionSubmit = true
+                            markBackendUnreachableAndSyncState()
+                        }
                         setActionError(result.message)
                     }
                 }
                 is RepositoryResult.Exception -> {
-                    markBackendUnreachableAndSyncState()
-                    openLocalSession(startingCash)
+                    if (ServerUnavailabilityClassifier.isDefinitelyUnprocessedServerUnavailable(result)) {
+                        hasAmbiguousOpenSessionSubmit = false
+                        markBackendUnreachableAndSyncState()
+                        openLocalSession(startingCash)
+                    } else {
+                        if (ServerUnavailabilityClassifier.isServerUnavailable(result)) {
+                            hasAmbiguousOpenSessionSubmit = true
+                            markBackendUnreachableAndSyncState()
+                        }
+                        setActionError(UserFacingErrorMapper.message(code = "CONNECTION_INTERRUPTED"))
+                    }
                 }
             }
         }
@@ -427,6 +448,7 @@ class CashReconciliationViewModel(
     }
 
     fun showPettyCashDialog(type: com.tbterminal.app.data.local.cashexpense.CashMovementType = com.tbterminal.app.data.local.cashexpense.CashMovementType.CASH_OUT) {
+        hasAmbiguousPettyCashSubmit = false
         _uiState.update {
             it.copy(
                 isPettyCashDialogOpen = true,
@@ -441,6 +463,7 @@ class CashReconciliationViewModel(
     }
 
     fun hidePettyCashDialog() {
+        hasAmbiguousPettyCashSubmit = false
         _uiState.update {
             it.copy(isPettyCashDialogOpen = false, isExpenseDialogOpen = false)
         }
@@ -495,7 +518,7 @@ class CashReconciliationViewModel(
         viewModelScope.launch {
             _uiState.update { it.copy(isSubmitting = true, errorMessage = null, message = null) }
 
-            if (_uiState.value.isUsingLocalActiveSession || shouldUseLocalCashSession()) {
+            if (_uiState.value.isUsingLocalActiveSession || (!hasAmbiguousPettyCashSubmit && shouldUseLocalCashSession())) {
                 addLocalCashMovement(type, amount, cat, desc)
                 return@launch
             }
@@ -506,6 +529,7 @@ class CashReconciliationViewModel(
                 repository.addExpense(amount, "$desc ($cat)")
             }) {
                 is RepositoryResult.Success -> {
+                    hasAmbiguousPettyCashSubmit = false
                     _uiState.update {
                         it.copy(
                             isPettyCashDialogOpen = false,
@@ -517,16 +541,30 @@ class CashReconciliationViewModel(
                     loadCash(page = 1)
                 }
                 is RepositoryResult.Error -> {
-                    if (ServerUnavailabilityClassifier.isServerUnavailable(result)) {
+                    if (ServerUnavailabilityClassifier.isDefinitelyUnprocessedServerUnavailable(result)) {
+                        hasAmbiguousPettyCashSubmit = false
                         markBackendUnreachableAndSyncState()
                         addLocalCashMovement(type, amount, cat, desc)
                     } else {
+                        if (ServerUnavailabilityClassifier.isServerUnavailable(result)) {
+                            hasAmbiguousPettyCashSubmit = true
+                            markBackendUnreachableAndSyncState()
+                        }
                         setActionError(result.message)
                     }
                 }
                 is RepositoryResult.Exception -> {
-                    markBackendUnreachableAndSyncState()
-                    addLocalCashMovement(type, amount, cat, desc)
+                    if (ServerUnavailabilityClassifier.isDefinitelyUnprocessedServerUnavailable(result)) {
+                        hasAmbiguousPettyCashSubmit = false
+                        markBackendUnreachableAndSyncState()
+                        addLocalCashMovement(type, amount, cat, desc)
+                    } else {
+                        if (ServerUnavailabilityClassifier.isServerUnavailable(result)) {
+                            hasAmbiguousPettyCashSubmit = true
+                            markBackendUnreachableAndSyncState()
+                        }
+                        setActionError(UserFacingErrorMapper.message(code = "CONNECTION_INTERRUPTED"))
+                    }
                 }
             }
         }

@@ -33,7 +33,10 @@ import com.tbterminal.app.data.sync.BackendHealthMonitor
 import com.tbterminal.app.data.sync.BackendStatus
 import com.tbterminal.app.data.sync.NetworkConnectivity
 import com.tbterminal.app.data.sync.OfflineStatusRepository
+import java.io.IOException
 import java.math.BigDecimal
+import java.net.ConnectException
+import java.net.SocketTimeoutException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.Flow
@@ -423,6 +426,114 @@ class CashReconciliationViewModelOfflineTest {
         assertTrue(vmKasirB.uiState.value.hasActiveSession)
         assertTrue(vmKasirB.uiState.value.localCashSessionId != sessionKasirA)
         assertEquals("kasir-b", vmKasirB.uiState.value.activeSession?.userId)
+    }
+
+    @Test
+    fun ambiguousErrorsOnExpenseAndOpenSession_doNotFallbackLocally_while502AndRefusedDo() = runTest(dispatcher) {
+        backendHealthMonitor.refresh(force = true)
+        val openSession = CashSession(
+            id = "srv-cash-ambig-1",
+            userId = "kasir-1",
+            userName = "Kasir Satu",
+            openedAt = "2026-11-27T08:00:00+07:00",
+            closedAt = null,
+            openingCash = BigDecimal("250000"),
+            closingCash = null,
+            systemCash = BigDecimal("250000"),
+            difference = null,
+            totalExpenses = BigDecimal.ZERO,
+            notes = null,
+            status = "OPEN",
+        )
+        val repo = FakeCashReconciliationOfflineRepo().apply {
+            activeSessionResult = RepositoryResult.Success(openSession)
+        }
+        val vm = buildVm(repo)
+        advanceUntilIdle()
+        val mirroredLocalId = vm.uiState.value.localCashSessionId!!
+
+        // 1. Ambiguous errors on addPettyCash -> NO local expense created, existing error shown
+        listOf(
+            RepositoryResult.Error("NETWORK_TIMEOUT", "Request terlalu lama. Periksa koneksi lalu coba lagi."),
+            RepositoryResult.Error("CONNECTION_INTERRUPTED", "Koneksi bermasalah. Periksa jaringan dan status server."),
+            RepositoryResult.Error("HTTP_504", "Gateway timeout"),
+            RepositoryResult.Exception(SocketTimeoutException("read timed out")),
+            RepositoryResult.Exception(IOException("stream reset")),
+        ).forEach { ambiguousResult ->
+            backendHealthMonitor.markConnected()
+            repo.addExpenseResult = ambiguousResult
+            vm.showPettyCashDialog(CashMovementType.CASH_OUT)
+            vm.onPettyCashAmountChanged("20000")
+            vm.onPettyCashDescriptionChanged("Bensin")
+            vm.addPettyCash()
+            advanceUntilIdle()
+
+            assertTrue(localCashExpenseService.getLocalExpenses(mirroredLocalId).isEmpty())
+            assertTrue(vm.uiState.value.isPettyCashDialogOpen)
+            assertNotNull(vm.uiState.value.errorMessage)
+
+            // Retrying inside same ambiguous dialog does NOT auto-fallback locally even though health became UNREACHABLE
+            vm.addPettyCash()
+            advanceUntilIdle()
+            assertTrue(localCashExpenseService.getLocalExpenses(mirroredLocalId).isEmpty())
+        }
+
+        // 2. Definitely unprocessed errors on addPettyCash (HTTP_502, NETWORK_UNAVAILABLE, ConnectException) -> DO fallback locally
+        backendHealthMonitor.markConnected()
+        repo.addExpenseResult = RepositoryResult.Error("HTTP_502", "Bad Gateway")
+        vm.showPettyCashDialog(CashMovementType.CASH_OUT)
+        vm.onPettyCashAmountChanged("15000")
+        vm.onPettyCashDescriptionChanged("Tol")
+        vm.addPettyCash()
+        advanceUntilIdle()
+        assertEquals(1, localCashExpenseService.getLocalExpenses(mirroredLocalId).size)
+
+        backendHealthMonitor.markConnected()
+        repo.addExpenseResult = RepositoryResult.Exception(ConnectException("Connection refused"))
+        vm.showPettyCashDialog(CashMovementType.CASH_OUT)
+        vm.onPettyCashAmountChanged("10000")
+        vm.onPettyCashDescriptionChanged("Parkir")
+        vm.addPettyCash()
+        advanceUntilIdle()
+        assertEquals(2, localCashExpenseService.getLocalExpenses(mirroredLocalId).size)
+
+        // 3. Ambiguous errors on openSession -> NO local session opened
+        val openRepo = FakeCashReconciliationOfflineRepo().apply {
+            activeSessionResult = RepositoryResult.Success(null)
+        }
+        val openVm = buildVm(openRepo)
+        advanceUntilIdle()
+
+        listOf(
+            RepositoryResult.Error("NETWORK_TIMEOUT", "Timeout"),
+            RepositoryResult.Error("CONNECTION_INTERRUPTED", "Interrupted"),
+            RepositoryResult.Error("HTTP_504", "Gateway timeout"),
+            RepositoryResult.Exception(SocketTimeoutException("read timed out")),
+        ).forEach { ambiguousResult ->
+            backendHealthMonitor.markConnected()
+            openRepo.openSessionResult = ambiguousResult
+            openVm.onOpeningCashChanged("100000")
+            openVm.openSession()
+            advanceUntilIdle()
+
+            assertFalse(openVm.uiState.value.hasActiveSession)
+            assertEquals(null, cashSessionLocalDataSource.getLatestOpenSession("kasir-1"))
+            assertNotNull(openVm.uiState.value.errorMessage)
+
+            // Immediate retry without changing amount does not bypass online into local openSession
+            openVm.openSession()
+            advanceUntilIdle()
+            assertEquals(null, cashSessionLocalDataSource.getLatestOpenSession("kasir-1"))
+        }
+
+        // 4. HTTP_502 / ConnectException on openSession -> DO fallback locally
+        backendHealthMonitor.markConnected()
+        openRepo.openSessionResult = RepositoryResult.Error("HTTP_502", "Bad Gateway")
+        openVm.onOpeningCashChanged("100000")
+        openVm.openSession()
+        advanceUntilIdle()
+        assertTrue(openVm.uiState.value.hasActiveSession)
+        assertNotNull(cashSessionLocalDataSource.getLatestOpenSession("kasir-1"))
     }
 
     private fun buildVm(repository: CashReconciliationRepository): CashReconciliationViewModel {

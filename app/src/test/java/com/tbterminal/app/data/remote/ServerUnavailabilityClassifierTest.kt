@@ -2,6 +2,10 @@ package com.tbterminal.app.data.remote
 
 import com.tbterminal.app.data.repository.RepositoryResult
 import java.io.IOException
+import java.net.ConnectException
+import java.net.NoRouteToHostException
+import java.net.SocketTimeoutException
+import java.net.UnknownHostException
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -65,5 +69,66 @@ class ServerUnavailabilityClassifierTest {
         assertFalse(ServerUnavailabilityClassifier.isServerUnavailableHttpStatus(403))
         assertFalse(ServerUnavailabilityClassifier.isServerUnavailableHttpStatus(422))
         assertFalse(ServerUnavailabilityClassifier.isServerUnavailableHttpStatus(423))
+    }
+
+    @Test
+    fun definitelyUnprocessedServerUnavailable_excludesAmbiguousTimeoutsAnd504() {
+        listOf(
+            "CONNECTION_FAILED",
+            "NETWORK_UNAVAILABLE",
+            "HTTP_502",
+            "HTTP_503",
+            "BAD_GATEWAY",
+            "SERVICE_UNAVAILABLE",
+        ).forEach { code ->
+            assertTrue(
+                "Expected $code to be definitely unprocessed",
+                ServerUnavailabilityClassifier.isDefinitelyUnprocessedServerUnavailable(
+                    RepositoryResult.Error(code = code, message = "err")
+                )
+            )
+        }
+
+        listOf(
+            "NETWORK_TIMEOUT",
+            "CONNECTION_INTERRUPTED",
+            "HTTP_504",
+            "GATEWAY_TIMEOUT",
+            "HTTP_500",
+            "HTTP_400",
+        ).forEach { code ->
+            assertFalse(
+                "Expected $code NOT to be definitely unprocessed",
+                ServerUnavailabilityClassifier.isDefinitelyUnprocessedServerUnavailable(
+                    RepositoryResult.Error(code = code, message = "err")
+                )
+            )
+        }
+
+        assertTrue(
+            ServerUnavailabilityClassifier.isDefinitelyUnprocessedServerUnavailable(
+                RepositoryResult.Exception(ConnectException("refused"))
+            )
+        )
+        assertTrue(
+            ServerUnavailabilityClassifier.isDefinitelyUnprocessedServerUnavailable(
+                RepositoryResult.Exception(UnknownHostException("offline"))
+            )
+        )
+        assertTrue(
+            ServerUnavailabilityClassifier.isDefinitelyUnprocessedServerUnavailable(
+                RepositoryResult.Exception(NoRouteToHostException("no route"))
+            )
+        )
+        assertFalse(
+            ServerUnavailabilityClassifier.isDefinitelyUnprocessedServerUnavailable(
+                RepositoryResult.Exception(SocketTimeoutException("timeout"))
+            )
+        )
+        assertFalse(
+            ServerUnavailabilityClassifier.isDefinitelyUnprocessedServerUnavailable(
+                RepositoryResult.Exception(IOException("reset after send"))
+            )
+        )
     }
 }

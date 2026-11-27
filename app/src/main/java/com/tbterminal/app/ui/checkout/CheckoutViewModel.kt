@@ -148,6 +148,7 @@ class CheckoutViewModel(
     private var pendingSubmissionRestoreJob: Job? = null
     private var cashSessionLoadJob: Job? = null
     private var hasCompletedInitialCashSessionLoad = false
+    private var hasAmbiguousOpenCashSession = false
     private var beforeSessionClearedListener: (() -> Unit)? = null
 
     init {
@@ -364,6 +365,7 @@ class CheckoutViewModel(
 
                 when (val result = cashReconciliationRepository.getActiveSession()) {
                     is RepositoryResult.Success -> {
+                        hasAmbiguousOpenCashSession = false
                         val remoteSession = result.data
                         val activeCashSession = if (remoteSession == null) {
                             reconcileNoActiveRemoteSessionSafely()
@@ -417,6 +419,7 @@ class CheckoutViewModel(
     }
 
     fun onStartingCashChanged(value: String) {
+        hasAmbiguousOpenCashSession = false
         val sanitized = sanitizeWholeRupiahInput(value, MAX_CASH_INPUT_LENGTH)
         _uiState.update { state ->
             state.copy(startingCashInput = sanitized, cashSessionError = null)
@@ -443,13 +446,14 @@ class CheckoutViewModel(
                 state.copy(isOpeningCashSession = true, cashSessionError = null)
             }
 
-            if (shouldUseLocalCheckout()) {
+            if (!hasAmbiguousOpenCashSession && shouldUseLocalCheckout()) {
                 openOrReuseLocalCashSession(startingCash)
                 return@launch
             }
 
             when (val result = cashReconciliationRepository.openSession(startingCash)) {
                 is RepositoryResult.Success -> {
+                    hasAmbiguousOpenCashSession = false
                     val activeCashSession = result.data.toMirroredActiveCashSessionUi()
                     _uiState.update { state ->
                         state.copy(
@@ -463,10 +467,15 @@ class CheckoutViewModel(
                     }
                 }
                 is RepositoryResult.Error -> {
-                    if (ServerUnavailabilityClassifier.isServerUnavailable(result)) {
+                    if (ServerUnavailabilityClassifier.isDefinitelyUnprocessedServerUnavailable(result)) {
+                        hasAmbiguousOpenCashSession = false
                         markBackendUnreachableAndSyncState()
                         openOrReuseLocalCashSession(startingCash)
                     } else {
+                        if (ServerUnavailabilityClassifier.isServerUnavailable(result)) {
+                            hasAmbiguousOpenCashSession = true
+                            markBackendUnreachableAndSyncState()
+                        }
                         _uiState.update { state ->
                             state.copy(
                                 isOpeningCashSession = false,
@@ -476,8 +485,22 @@ class CheckoutViewModel(
                     }
                 }
                 is RepositoryResult.Exception -> {
-                    markBackendUnreachableAndSyncState()
-                    openOrReuseLocalCashSession(startingCash)
+                    if (ServerUnavailabilityClassifier.isDefinitelyUnprocessedServerUnavailable(result)) {
+                        hasAmbiguousOpenCashSession = false
+                        markBackendUnreachableAndSyncState()
+                        openOrReuseLocalCashSession(startingCash)
+                    } else {
+                        if (ServerUnavailabilityClassifier.isServerUnavailable(result)) {
+                            hasAmbiguousOpenCashSession = true
+                            markBackendUnreachableAndSyncState()
+                        }
+                        _uiState.update { state ->
+                            state.copy(
+                                isOpeningCashSession = false,
+                                cashSessionError = UiText.DynamicString("Koneksi bermasalah. Sesi kasir gagal dibuka.")
+                            )
+                        }
+                    }
                 }
             }
         }
