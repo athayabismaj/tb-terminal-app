@@ -24,6 +24,7 @@ import androidx.lifecycle.repeatOnLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.compose.rememberNavController
 import com.tbterminal.app.data.session.SessionEvent
+import com.tbterminal.app.data.sync.BackendStatus
 import com.tbterminal.app.navigation.AppNavGraph
 import com.tbterminal.app.navigation.AppRoute
 import com.tbterminal.app.navigation.AppRouteAccessPolicy
@@ -32,6 +33,10 @@ import com.tbterminal.app.ui.auth.AuthViewModel
 import com.tbterminal.app.ui.auth.SplashScreen
 import com.tbterminal.app.ui.theme.TbterminalappTheme
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.collectLatest
+import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.launch
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -106,10 +111,37 @@ class MainActivity : ComponentActivity() {
 
                     LaunchedEffect(appContainer) {
                         lifecycle.repeatOnLifecycle(Lifecycle.State.STARTED) {
-                            appContainer.networkMonitor.observeOnline().collect { isOnline ->
-                                if (isOnline) {
-                                    appContainer.offlineSyncScheduler.scheduleIfEnabled()
+                            appContainer.backendHealthMonitor.refreshAsync(force = true)
+                            launch {
+                                appContainer.networkMonitor.observeOnline().collect { isOnline ->
+                                    if (isOnline) {
+                                        appContainer.offlineSyncScheduler.scheduleIfEnabled()
+                                    }
                                 }
+                            }
+                            launch {
+                                appContainer.backendHealthMonitor.status.collect { backendStatus ->
+                                    if (backendStatus == BackendStatus.CONNECTED) {
+                                        appContainer.offlineSyncScheduler.scheduleIfEnabled()
+                                    }
+                                }
+                            }
+                            launch {
+                                combine(
+                                    appContainer.networkMonitor.observeOnline(),
+                                    appContainer.backendHealthMonitor.status,
+                                ) { online, backendStatus ->
+                                    online && backendStatus == BackendStatus.UNREACHABLE
+                                }
+                                    .distinctUntilChanged()
+                                    .collectLatest { shouldPoll ->
+                                        if (shouldPoll) {
+                                            while (true) {
+                                                delay(30_000L)
+                                                appContainer.backendHealthMonitor.refresh(force = true)
+                                            }
+                                        }
+                                    }
                             }
                         }
                     }

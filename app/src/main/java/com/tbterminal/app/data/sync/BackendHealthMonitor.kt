@@ -18,7 +18,8 @@ class BackendHealthMonitor(
     private val healthApi: HealthApi,
     private val networkMonitor: NetworkConnectivity,
     private val throttleMillis: Long = DEFAULT_THROTTLE_MILLIS,
-    private val timeoutMillis: Long = DEFAULT_TIMEOUT_MILLIS
+    private val timeoutMillis: Long = DEFAULT_TIMEOUT_MILLIS,
+    private val clockMillis: () -> Long = { System.currentTimeMillis() },
 ) {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private val refreshMutex = Mutex()
@@ -48,8 +49,21 @@ class BackendHealthMonitor(
     }
 
     fun markConnected() {
-        lastCheckedAtMillis = System.currentTimeMillis()
+        lastCheckedAtMillis = clockMillis()
         _status.value = BackendStatus.CONNECTED
+    }
+
+    fun markUnreachable() {
+        if (!networkMonitor.isOnline()) {
+            _status.value = BackendStatus.UNKNOWN
+            return
+        }
+        lastCheckedAtMillis = clockMillis()
+        _status.value = BackendStatus.UNREACHABLE
+    }
+
+    fun isStale(nowMillis: Long = clockMillis()): Boolean {
+        return lastCheckedAtMillis <= 0L || (nowMillis - lastCheckedAtMillis) >= throttleMillis
     }
 
     suspend fun refresh(force: Boolean = false): BackendStatus {
@@ -58,13 +72,13 @@ class BackendHealthMonitor(
             return _status.value
         }
 
-        val now = System.currentTimeMillis()
+        val now = clockMillis()
         if (!force && _status.value != BackendStatus.UNKNOWN && now - lastCheckedAtMillis < throttleMillis) {
             return _status.value
         }
 
         return refreshMutex.withLock {
-            val lockedNow = System.currentTimeMillis()
+            val lockedNow = clockMillis()
             if (!force && _status.value != BackendStatus.UNKNOWN && lockedNow - lastCheckedAtMillis < throttleMillis) {
                 return@withLock _status.value
             }

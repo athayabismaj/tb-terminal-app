@@ -30,7 +30,7 @@ data class OfflineStatus(
 )
 
 class OfflineStatusRepository(
-    private val networkMonitor: NetworkMonitor,
+    private val networkMonitor: NetworkConnectivity,
     private val backendHealthMonitor: BackendHealthMonitor,
     localAppSettingsDataSource: LocalAppSettingsDataSource,
     syncQueueDao: SyncQueueDao
@@ -102,6 +102,18 @@ class OfflineStatusRepository(
 
     fun refreshBackendHealthAsync(force: Boolean = false) {
         backendHealthMonitor.refreshAsync(force = force)
+    }
+
+    fun markBackendConnected() {
+        backendHealthMonitor.markConnected()
+    }
+
+    fun markBackendUnreachable() {
+        backendHealthMonitor.markUnreachable()
+    }
+
+    fun isBackendHealthStale(): Boolean {
+        return backendHealthMonitor.isStale()
     }
 }
 
