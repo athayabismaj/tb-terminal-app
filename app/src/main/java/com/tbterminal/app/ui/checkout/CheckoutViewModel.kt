@@ -4,6 +4,8 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import com.tbterminal.app.data.auth.PinUnlockService
+import com.tbterminal.app.data.local.cashsession.LocalCashSessionResult
+import com.tbterminal.app.data.local.cashsession.LocalCashSessionService
 import com.tbterminal.app.data.local.checkout.LocalCheckoutCommand
 import com.tbterminal.app.data.local.checkout.LocalCheckoutItemCommand
 import com.tbterminal.app.data.local.checkout.LocalCheckoutLookupService
@@ -30,6 +32,7 @@ import com.tbterminal.app.data.model.CheckoutPreviewCommand
 import com.tbterminal.app.data.model.CashSession
 import com.tbterminal.app.data.model.Customer
 import com.tbterminal.app.data.remote.NetworkResult
+import com.tbterminal.app.data.remote.ServerUnavailabilityClassifier
 import com.tbterminal.app.data.repository.CheckoutRepository
 import com.tbterminal.app.data.repository.CashReconciliationRepository
 import com.tbterminal.app.data.repository.CustomerRepository
@@ -96,6 +99,8 @@ class CheckoutViewModel(
     private val productLocalDataSource: ProductLocalDataSource? = null,
     private val customerLocalDataSource: CustomerLocalDataSource? = null,
     private val cartDraftSaveDebounceMs: Long = CheckoutCartDraftCoordinator.DEFAULT_DEBOUNCE_MILLIS,
+    private val localCashSessionService: LocalCashSessionService? = null,
+    private val cashierUserId: String? = null,
 ) : ViewModel() {
     private val _uiState = MutableStateFlow(
         CheckoutUiState(canOpenCashSession = AppAccessPolicy.canOpenCashSession(actorRole))
@@ -299,6 +304,20 @@ class CheckoutViewModel(
                 state.copy(isCashSessionLoading = true, cashSessionError = null)
             }
 
+            if (shouldUseLocalCheckout()) {
+                if (!restoreLocalOpenCashSessionIfAvailable()) {
+                    _uiState.update { state ->
+                        state.copy(
+                            activeCashSession = null,
+                            hasActiveCashSession = false,
+                            isCashSessionLoading = false,
+                            cashSessionError = null
+                        )
+                    }
+                }
+                return@launch
+            }
+
             when (val result = cashReconciliationRepository.getActiveSession()) {
                 is RepositoryResult.Success -> {
                     val activeCashSession = result.data?.toMirroredActiveCashSessionUi()
@@ -312,16 +331,11 @@ class CheckoutViewModel(
                     }
                 }
                 is RepositoryResult.Error -> {
-                    if (result.isAuthFailure() || !result.isServerFailure()) {
-                        _uiState.update { state ->
-                            state.copy(
-                                activeCashSession = null,
-                                hasActiveCashSession = false,
-                                isCashSessionLoading = false,
-                                cashSessionError = UiText.DynamicString(result.message)
-                            )
-                        }
-                    } else if (!restoreLocalOpenCashSessionIfAvailable()) {
+                    val serverUnavailable = ServerUnavailabilityClassifier.isServerUnavailable(result)
+                    if (serverUnavailable) {
+                        markBackendUnreachableAndSyncState()
+                    }
+                    if (!serverUnavailable || !restoreLocalOpenCashSessionIfAvailable()) {
                         _uiState.update { state ->
                             state.copy(
                                 activeCashSession = null,
@@ -333,6 +347,7 @@ class CheckoutViewModel(
                     }
                 }
                 is RepositoryResult.Exception -> {
+                    markBackendUnreachableAndSyncState()
                     if (!restoreLocalOpenCashSessionIfAvailable()) {
                         _uiState.update { state ->
                             state.copy(
@@ -375,6 +390,11 @@ class CheckoutViewModel(
                 state.copy(isOpeningCashSession = true, cashSessionError = null)
             }
 
+            if (shouldUseLocalCheckout()) {
+                openOrReuseLocalCashSession(startingCash)
+                return@launch
+            }
+
             when (val result = cashReconciliationRepository.openSession(startingCash)) {
                 is RepositoryResult.Success -> {
                     val activeCashSession = result.data.toMirroredActiveCashSessionUi()
@@ -390,23 +410,93 @@ class CheckoutViewModel(
                     }
                 }
                 is RepositoryResult.Error -> {
-                    _uiState.update { state ->
-                        state.copy(
-                            isOpeningCashSession = false,
-                            cashSessionError = UiText.DynamicString(result.message)
-                        )
+                    if (ServerUnavailabilityClassifier.isServerUnavailable(result)) {
+                        markBackendUnreachableAndSyncState()
+                        openOrReuseLocalCashSession(startingCash)
+                    } else {
+                        _uiState.update { state ->
+                            state.copy(
+                                isOpeningCashSession = false,
+                                cashSessionError = UiText.DynamicString(result.message)
+                            )
+                        }
                     }
                 }
                 is RepositoryResult.Exception -> {
-                    _uiState.update { state ->
-                        state.copy(
-                            isOpeningCashSession = false,
-                            cashSessionError = UiText.DynamicString("Koneksi bermasalah. Sesi kasir gagal dibuka.")
-                        )
-                    }
+                    markBackendUnreachableAndSyncState()
+                    openOrReuseLocalCashSession(startingCash)
                 }
             }
         }
+    }
+
+    private suspend fun openOrReuseLocalCashSession(startingCash: BigDecimal) {
+        val resolvedCashierId = resolveCashierUserId()
+        val existingOpenSession = runCatching {
+            cashSessionLocalDataSource?.getLatestOpenSession(resolvedCashierId)
+        }.getOrNull()
+        if (existingOpenSession != null) {
+            _uiState.update { state ->
+                state.copy(
+                    activeCashSession = existingOpenSession.toActiveCashSessionUi(),
+                    hasActiveCashSession = true,
+                    isOpeningCashSession = false,
+                    startingCashInput = "",
+                    cashSessionError = null,
+                    errorEvent = UiText.DynamicString(
+                        "Sesi kas aktif dari data lokal. Server tidak tersambung; transaksi akan disimpan lokal."
+                    )
+                )
+            }
+            return
+        }
+
+        val service = localCashSessionService
+        if (service == null || resolvedCashierId == null) {
+            _uiState.update { state ->
+                state.copy(
+                    isOpeningCashSession = false,
+                    cashSessionError = UiText.DynamicString("Koneksi bermasalah. Sesi kasir gagal dibuka.")
+                )
+            }
+            return
+        }
+
+        when (
+            val result = service.openLocalSession(
+                cashierUserId = resolvedCashierId,
+                startingCash = startingCash
+            )
+        ) {
+            is LocalCashSessionResult.Success -> {
+                offlineSyncScheduler?.scheduleIfEnabled()
+                _uiState.update { state ->
+                    state.copy(
+                        activeCashSession = result.session.toActiveCashSessionUi(),
+                        hasActiveCashSession = true,
+                        isOpeningCashSession = false,
+                        startingCashInput = "",
+                        cashSessionError = null,
+                        errorEvent = UiText.DynamicString("Sesi kasir berhasil dibuka.")
+                    )
+                }
+            }
+            is LocalCashSessionResult.Failed -> {
+                _uiState.update { state ->
+                    state.copy(
+                        isOpeningCashSession = false,
+                        cashSessionError = UiText.DynamicString(result.message)
+                    )
+                }
+            }
+        }
+    }
+
+    private fun resolveCashierUserId(): String? {
+        return cashierUserId
+            ?.trim()
+            ?.takeIf(String::isNotBlank)
+            ?: _uiState.value.activeCashSession?.cashierUserId?.takeIf(String::isNotBlank)
     }
 
     fun replaceProducts(products: List<Product>) {
@@ -2089,29 +2179,57 @@ class CheckoutViewModel(
                     }
                 }
                 is RepositoryResult.Error -> {
-                    invalidatePendingCheckout()
-                    _uiState.update {
-                        it.copy(
-                            isLoading = false,
-                            isPreviewLoading = false,
-                            errorEvent = result.toUiText(),
-                        )
+                    if (ServerUnavailabilityClassifier.isServerUnavailable(result)) {
+                        handlePreviewServerUnavailable(result.toUiText())
+                    } else {
+                        invalidatePendingCheckout()
+                        _uiState.update {
+                            it.copy(
+                                isLoading = false,
+                                isPreviewLoading = false,
+                                errorEvent = result.toUiText(),
+                            )
+                        }
                     }
                 }
                 is RepositoryResult.Exception -> {
-                    invalidatePendingCheckout()
-                    _uiState.update {
-                        it.copy(
-                            isLoading = false,
-                            isPreviewLoading = false,
-                            errorEvent = UiText.DynamicString(
-                                "Preview checkout gagal karena koneksi bermasalah. Coba lagi.",
-                            ),
+                    handlePreviewServerUnavailable(
+                        UiText.DynamicString(
+                            "Preview checkout gagal karena koneksi bermasalah. Coba lagi.",
                         )
-                    }
+                    )
                 }
             }
         }
+    }
+
+    private suspend fun handlePreviewServerUnavailable(fallbackError: UiText) {
+        markBackendUnreachableAndSyncState()
+        // Never create an offline transaction if an ambiguous online checkout already exists.
+        if (ambiguousOnlineCheckout != null) {
+            _uiState.update {
+                it.copy(
+                    isLoading = false,
+                    isPreviewLoading = false,
+                    errorEvent = fallbackError,
+                )
+            }
+            return
+        }
+        if (_uiState.value.hasDiscountRequest()) {
+            _uiState.update {
+                it.copy(
+                    isLoading = false,
+                    isPreviewLoading = false,
+                    errorEvent = UiText.DynamicString(
+                        "Diskon memerlukan koneksi ke server dan tidak tersedia saat offline.",
+                    ),
+                )
+            }
+            return
+        }
+        _uiState.update { it.copy(isPreviewLoading = false) }
+        submitLocalCheckout()
     }
 
     fun continueCheckoutWithApproval(
@@ -2293,6 +2411,9 @@ class CheckoutViewModel(
                 cartDraftCoordinator?.flushNow(_uiState.value)
             }
             is RepositoryResult.Error -> {
+                if (ServerUnavailabilityClassifier.isServerUnavailable(result)) {
+                    markBackendUnreachableAndSyncState()
+                }
                 val ambiguous = result.isAmbiguousCheckoutFailure()
                 if (!ambiguous) {
                     pendingOnlineCheckout = null
@@ -2318,6 +2439,7 @@ class CheckoutViewModel(
                 }
             }
             is RepositoryResult.Exception -> {
+                markBackendUnreachableAndSyncState()
                 pendingSubmissionPersistence?.markAmbiguous(
                     command = command,
                     fingerprint = pendingOnlineCheckout?.fingerprint.orEmpty(),
@@ -2401,7 +2523,18 @@ class CheckoutViewModel(
         }
 
         return when (status.backendStatus) {
-            BackendStatus.CONNECTED -> false
+            BackendStatus.CONNECTED -> {
+                if (repository.isBackendHealthStale()) {
+                    val refreshedStatus = repository.refreshBackendHealth(force = false)
+                    latestOfflineStatus = status.copy(
+                        backendStatus = refreshedStatus,
+                        isServerReachable = refreshedStatus == BackendStatus.CONNECTED
+                    )
+                    refreshedStatus != BackendStatus.CONNECTED
+                } else {
+                    false
+                }
+            }
             BackendStatus.UNREACHABLE -> true
             BackendStatus.UNKNOWN -> {
                 val refreshedStatus = repository.refreshBackendHealth(force = true)
@@ -2412,6 +2545,14 @@ class CheckoutViewModel(
                 refreshedStatus != BackendStatus.CONNECTED
             }
         }
+    }
+
+    private fun markBackendUnreachableAndSyncState() {
+        offlineStatusRepository?.markBackendUnreachable()
+        latestOfflineStatus = latestOfflineStatus.copy(
+            backendStatus = if (latestOfflineStatus.isInternetOnline) BackendStatus.UNREACHABLE else BackendStatus.UNKNOWN,
+            isServerReachable = false,
+        )
     }
 
     private fun resolveCustomerIdBeforeCheckout(): String? {
@@ -2585,29 +2726,6 @@ class CheckoutViewModel(
             normalizedMessage.contains("admin atau owner")
     }
 
-    private fun RepositoryResult.Error.isAuthFailure(): Boolean {
-        val normalizedCode = code.lowercase()
-        val normalizedMessage = message.lowercase()
-        return normalizedCode == "http_401" ||
-            normalizedCode == "http_403" ||
-            normalizedCode.contains("unauthorized") ||
-            normalizedCode.contains("forbidden") ||
-            normalizedMessage.contains("unauthorized") ||
-            normalizedMessage.contains("forbidden")
-    }
-
-    private fun RepositoryResult.Error.isServerFailure(): Boolean {
-        val normalizedCode = code.lowercase()
-        val normalizedMessage = message.lowercase()
-        return normalizedCode.startsWith("http_5") ||
-            normalizedCode.contains("internal_server_error") ||
-            normalizedCode.contains("service_unavailable") ||
-            normalizedCode.contains("gateway") ||
-            normalizedCode.contains("timeout") ||
-            normalizedMessage.contains("server tidak tersambung") ||
-            normalizedMessage.contains("sesi kasir gagal dicek")
-    }
-
     private fun RepositoryResult.Error.isAmbiguousCheckoutFailure(): Boolean {
         val normalized = code.uppercase()
         return normalized.startsWith("HTTP_5") || normalized in setOf(
@@ -2618,9 +2736,7 @@ class CheckoutViewModel(
 
     private suspend fun restoreLocalOpenCashSessionIfAvailable(): Boolean {
         val dataSource = cashSessionLocalDataSource ?: return false
-        val currentCashierUserId = _uiState.value.activeCashSession
-            ?.cashierUserId
-            ?.takeIf(String::isNotBlank)
+        val currentCashierUserId = resolveCashierUserId()
         val localSession = runCatching {
             dataSource.getLatestOpenSession(currentCashierUserId)
         }.getOrNull() ?: return false
@@ -2848,6 +2964,8 @@ class CheckoutViewModel(
             checkoutDraftStore: CheckoutDraftStore? = null,
             productLocalDataSource: ProductLocalDataSource? = null,
             customerLocalDataSource: CustomerLocalDataSource? = null,
+            localCashSessionService: LocalCashSessionService? = null,
+            cashierUserId: String? = null,
         ): ViewModelProvider.Factory {
             return viewModelFactory {
                 CheckoutViewModel(
@@ -2870,6 +2988,8 @@ class CheckoutViewModel(
                     checkoutDraftStore = checkoutDraftStore,
                     productLocalDataSource = productLocalDataSource,
                     customerLocalDataSource = customerLocalDataSource,
+                    localCashSessionService = localCashSessionService,
+                    cashierUserId = cashierUserId,
                 )
             }
         }

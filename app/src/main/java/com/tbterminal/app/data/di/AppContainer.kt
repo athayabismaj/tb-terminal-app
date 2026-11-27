@@ -344,7 +344,11 @@ class DefaultAppContainer(
     }
 
     override val checkoutRepository: CheckoutRepository by lazy {
-        RemoteCheckoutRepository(networkModule.checkoutApi)
+        RemoteCheckoutRepository(
+            checkoutApi = networkModule.checkoutApi,
+            previewApi = networkModule.checkoutPreviewApi,
+            backendHealthMonitor = backendHealthMonitor,
+        )
     }
 
     override val cashReconciliationRepository: CashReconciliationRepository by lazy {

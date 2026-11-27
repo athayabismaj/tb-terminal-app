@@ -14,7 +14,9 @@ import com.tbterminal.app.data.remote.CheckoutPreviewRequest
 import com.tbterminal.app.data.remote.CheckoutLineItemRequest
 import com.tbterminal.app.data.remote.CheckoutRequest
 import com.tbterminal.app.data.remote.DiscountRequestDto
+import com.tbterminal.app.data.remote.ServerUnavailabilityClassifier
 import com.tbterminal.app.data.remote.safeApiCall
+import com.tbterminal.app.data.sync.BackendHealthMonitor
 
 interface CheckoutRepository {
     suspend fun previewCheckout(command: CheckoutPreviewCommand): RepositoryResult<CheckoutPreview>
@@ -22,7 +24,9 @@ interface CheckoutRepository {
 }
 
 class RemoteCheckoutRepository(
-    private val checkoutApi: CheckoutApi
+    private val checkoutApi: CheckoutApi,
+    private val previewApi: CheckoutApi = checkoutApi,
+    private val backendHealthMonitor: BackendHealthMonitor? = null,
 ) : CheckoutRepository {
     override suspend fun previewCheckout(
         command: CheckoutPreviewCommand,
@@ -39,7 +43,7 @@ class RemoteCheckoutRepository(
             transactionDiscount = command.transactionDiscount.toDto(),
             customerId = command.customerId,
         )
-        return safeApiCall { checkoutApi.previewCheckout(request) }
+        return safeApiCall { previewApi.previewCheckout(request) }
             .toRepositoryResult { response ->
                 val preview = response.data
                 if (!response.success || preview == null) {
@@ -95,7 +99,7 @@ class RemoteCheckoutRepository(
                         },
                     )
                 }
-            }
+            }.updateBackendHealth()
     }
 
     override suspend fun submitCheckout(
@@ -148,7 +152,15 @@ class RemoteCheckoutRepository(
                         )
                     )
                 }
-            }
+            }.updateBackendHealth()
+    }
+
+    private fun <T> RepositoryResult<T>.updateBackendHealth(): RepositoryResult<T> {
+        when {
+            this is RepositoryResult.Success -> backendHealthMonitor?.markConnected()
+            ServerUnavailabilityClassifier.isServerUnavailable(this) -> backendHealthMonitor?.markUnreachable()
+        }
+        return this
     }
 }
 

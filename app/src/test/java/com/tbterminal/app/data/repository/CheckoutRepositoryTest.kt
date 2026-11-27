@@ -12,8 +12,19 @@ import com.tbterminal.app.data.remote.CheckoutPreviewRequest
 import com.tbterminal.app.data.remote.CheckoutPreviewResponse
 import com.tbterminal.app.data.remote.CheckoutRequest
 import com.tbterminal.app.data.remote.CheckoutResponse
+import com.tbterminal.app.data.remote.HealthApi
+import com.tbterminal.app.data.remote.HealthResponseDto
+import com.tbterminal.app.data.sync.BackendHealthMonitor
+import com.tbterminal.app.data.sync.BackendStatus
+import com.tbterminal.app.data.sync.NetworkConnectivity
+import java.io.IOException
 import java.math.BigDecimal
+import java.net.ConnectException
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.test.runTest
+import okhttp3.MediaType.Companion.toMediaType
+import okhttp3.ResponseBody.Companion.toResponseBody
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -112,6 +123,103 @@ class CheckoutRepositoryTest {
         assertTrue(submitResult is RepositoryResult.Success)
         assertEquals("7.5", api.checkoutRequest?.items?.get(0)?.qty)
         assertEquals("10", api.checkoutRequest?.items?.get(1)?.qty)
+    }
+
+    @Test
+    fun previewUsesPreviewApiSubmitUsesCheckoutApiAndHealthMonitorOnlyMarksUnreachableOnTransportOrGateway502_503_504() = runTest {
+        val healthApi = object : HealthApi {
+            override suspend fun getReadiness(): Response<HealthResponseDto> =
+                Response.success(HealthResponseDto(status = "ready", database = "up"))
+        }
+        val monitor = BackendHealthMonitor(
+            healthApi = healthApi,
+            networkMonitor = object : NetworkConnectivity {
+                private val flow = MutableStateFlow(true)
+                override fun isOnline(): Boolean = true
+                override fun observeOnline(): Flow<Boolean> = flow
+            },
+            throttleMillis = 30_000L,
+            timeoutMillis = 1_000L,
+        )
+        monitor.markConnected()
+
+        var previewCalls = 0
+        var submitCalls = 0
+        var previewResponder: () -> Response<ApiResponse<CheckoutPreviewResponse>> = {
+            Response.error(500, """{"code":"HTTP_500","message":"Internal server error"}""".toResponseBody("application/json".toMediaType()))
+        }
+        var submitResponder: () -> Response<ApiResponse<CheckoutResponse>> = {
+            Response.success(ApiResponse(success = true, data = CheckoutResponse(id = "tx-1", receiptId = "R-1", amountTendered = "10000")))
+        }
+        val previewApi = object : CheckoutApi {
+            override suspend fun previewCheckout(request: CheckoutPreviewRequest): Response<ApiResponse<CheckoutPreviewResponse>> {
+                previewCalls += 1
+                return previewResponder()
+            }
+            override suspend fun submitCheckout(request: CheckoutRequest): Response<ApiResponse<CheckoutResponse>> =
+                error("previewApi must not handle submitCheckout")
+        }
+        val submitApi = object : CheckoutApi {
+            override suspend fun previewCheckout(request: CheckoutPreviewRequest): Response<ApiResponse<CheckoutPreviewResponse>> =
+                error("submitApi must not handle previewCheckout")
+            override suspend fun submitCheckout(request: CheckoutRequest): Response<ApiResponse<CheckoutResponse>> {
+                submitCalls += 1
+                return submitResponder()
+            }
+        }
+        val repository = RemoteCheckoutRepository(
+            checkoutApi = submitApi,
+            previewApi = previewApi,
+            backendHealthMonitor = monitor,
+        )
+
+        // HTTP 500 keeps CONNECTED
+        repository.previewCheckout(CheckoutPreviewCommand(listOf(CheckoutSubmitItem("p-1", 1))))
+        assertEquals(1, previewCalls)
+        assertEquals(BackendStatus.CONNECTED, monitor.status.value)
+
+        // HTTP 400 keeps CONNECTED
+        previewResponder = {
+            Response.error(400, """{"code":"BAD_REQUEST","message":"bad"}""".toResponseBody("application/json".toMediaType()))
+        }
+        repository.previewCheckout(CheckoutPreviewCommand(listOf(CheckoutSubmitItem("p-1", 1))))
+        assertEquals(BackendStatus.CONNECTED, monitor.status.value)
+
+        // ConnectException marks UNREACHABLE
+        previewResponder = { throw ConnectException("refused") }
+        repository.previewCheckout(CheckoutPreviewCommand(listOf(CheckoutSubmitItem("p-1", 1))))
+        assertEquals(BackendStatus.UNREACHABLE, monitor.status.value)
+
+        // Successful submit marks CONNECTED again
+        repository.submitCheckout(
+            CheckoutSubmitCommand(
+                idempotencyKey = "k-1",
+                items = listOf(CheckoutSubmitItem("p-1", 1)),
+                paymentMethod = "tunai",
+                amountPaid = "10000",
+            )
+        )
+        assertEquals(1, submitCalls)
+        assertEquals(BackendStatus.CONNECTED, monitor.status.value)
+
+        // HTTP 503 on submit marks UNREACHABLE; IOException also marks UNREACHABLE
+        submitResponder = {
+            Response.error(503, """{"message":"down"}""".toResponseBody("application/json".toMediaType()))
+        }
+        repository.submitCheckout(
+            CheckoutSubmitCommand(
+                idempotencyKey = "k-2",
+                items = listOf(CheckoutSubmitItem("p-1", 1)),
+                paymentMethod = "tunai",
+                amountPaid = "10000",
+            )
+        )
+        assertEquals(BackendStatus.UNREACHABLE, monitor.status.value)
+
+        monitor.markConnected()
+        previewResponder = { throw IOException("reset") }
+        repository.previewCheckout(CheckoutPreviewCommand(listOf(CheckoutSubmitItem("p-1", 1))))
+        assertEquals(BackendStatus.UNREACHABLE, monitor.status.value)
     }
 
     private fun validPreview() = CheckoutPreviewResponse(

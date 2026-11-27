@@ -374,6 +374,9 @@ private fun cashierCheckoutViewModel(
             checkoutDraftStore = appContainer.checkoutDraftStore,
             productLocalDataSource = appContainer.productLocalDataSource,
             customerLocalDataSource = appContainer.customerLocalDataSource,
+            localCashSessionService = appContainer.localCashSessionService,
+            cashierUserId = appContainer.sessionManager.readSessionUser()?.userId
+                ?: appContainer.sessionManager.readSessionUser()?.name,
         )
     )
 }
