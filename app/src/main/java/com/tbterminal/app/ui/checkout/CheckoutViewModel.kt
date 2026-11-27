@@ -139,6 +139,8 @@ class CheckoutViewModel(
         )
     }
     private var pendingSubmissionRestoreJob: Job? = null
+    private var cashSessionLoadJob: Job? = null
+    private var hasCompletedInitialCashSessionLoad = false
 
     init {
         pendingSubmissionRestoreJob = viewModelScope.launch {
@@ -300,73 +302,84 @@ class CheckoutViewModel(
         }
     }
 
+    fun refreshCashSessionOnResume() {
+        if (!hasCompletedInitialCashSessionLoad) return
+        if (cashSessionLoadJob?.isActive == true) return
+        loadCashSession()
+    }
+
     fun loadCashSession() {
-        viewModelScope.launch {
-            _uiState.update { state ->
-                state.copy(isCashSessionLoading = true, cashSessionError = null)
-            }
+        cashSessionLoadJob?.cancel()
+        cashSessionLoadJob = viewModelScope.launch {
+            try {
+                _uiState.update { state ->
+                    state.copy(isCashSessionLoading = true, cashSessionError = null)
+                }
 
-            if (shouldUseLocalCheckout()) {
-                if (!restoreLocalOpenCashSessionIfAvailable()) {
-                    _uiState.update { state ->
-                        state.copy(
-                            activeCashSession = null,
-                            hasActiveCashSession = false,
-                            isCashSessionLoading = false,
-                            cashSessionError = null
-                        )
-                    }
-                }
-                return@launch
-            }
-
-            when (val result = cashReconciliationRepository.getActiveSession()) {
-                is RepositoryResult.Success -> {
-                    val remoteSession = result.data
-                    val activeCashSession = if (remoteSession == null) {
-                        reconcileNoActiveRemoteSessionSafely()
-                        null
-                    } else {
-                        remoteSession.toResolvedRemoteActiveCashSessionUi()
-                    }
-                    _uiState.update { state ->
-                        state.copy(
-                            activeCashSession = activeCashSession,
-                            hasActiveCashSession = activeCashSession != null,
-                            isCashSessionLoading = false,
-                            cashSessionError = null
-                        )
-                    }
-                }
-                is RepositoryResult.Error -> {
-                    val serverUnavailable = ServerUnavailabilityClassifier.isServerUnavailable(result)
-                    if (serverUnavailable) {
-                        markBackendUnreachableAndSyncState()
-                    }
-                    if (!serverUnavailable || !restoreLocalOpenCashSessionIfAvailable()) {
-                        _uiState.update { state ->
-                            state.copy(
-                                activeCashSession = null,
-                                hasActiveCashSession = false,
-                                isCashSessionLoading = false,
-                                cashSessionError = UiText.DynamicString(result.message)
-                            )
-                        }
-                    }
-                }
-                is RepositoryResult.Exception -> {
-                    markBackendUnreachableAndSyncState()
+                if (shouldUseLocalCheckout()) {
                     if (!restoreLocalOpenCashSessionIfAvailable()) {
                         _uiState.update { state ->
                             state.copy(
                                 activeCashSession = null,
                                 hasActiveCashSession = false,
                                 isCashSessionLoading = false,
-                                cashSessionError = UiText.DynamicString("Sesi kasir gagal dicek.")
+                                cashSessionError = null
                             )
                         }
                     }
+                    return@launch
                 }
+
+                when (val result = cashReconciliationRepository.getActiveSession()) {
+                    is RepositoryResult.Success -> {
+                        val remoteSession = result.data
+                        val activeCashSession = if (remoteSession == null) {
+                            reconcileNoActiveRemoteSessionSafely()
+                            null
+                        } else {
+                            remoteSession.toResolvedRemoteActiveCashSessionUi()
+                        }
+                        _uiState.update { state ->
+                            state.copy(
+                                activeCashSession = activeCashSession,
+                                hasActiveCashSession = activeCashSession != null,
+                                isCashSessionLoading = false,
+                                cashSessionError = null
+                            )
+                        }
+                    }
+                    is RepositoryResult.Error -> {
+                        val serverUnavailable = ServerUnavailabilityClassifier.isServerUnavailable(result)
+                        if (serverUnavailable) {
+                            markBackendUnreachableAndSyncState()
+                        }
+                        if (!serverUnavailable || !restoreLocalOpenCashSessionIfAvailable()) {
+                            _uiState.update { state ->
+                                state.copy(
+                                    activeCashSession = null,
+                                    hasActiveCashSession = false,
+                                    isCashSessionLoading = false,
+                                    cashSessionError = UiText.DynamicString(result.message)
+                                )
+                            }
+                        }
+                    }
+                    is RepositoryResult.Exception -> {
+                        markBackendUnreachableAndSyncState()
+                        if (!restoreLocalOpenCashSessionIfAvailable()) {
+                            _uiState.update { state ->
+                                state.copy(
+                                    activeCashSession = null,
+                                    hasActiveCashSession = false,
+                                    isCashSessionLoading = false,
+                                    cashSessionError = UiText.DynamicString("Sesi kasir gagal dicek.")
+                                )
+                            }
+                        }
+                    }
+                }
+            } finally {
+                hasCompletedInitialCashSessionLoad = true
             }
         }
     }

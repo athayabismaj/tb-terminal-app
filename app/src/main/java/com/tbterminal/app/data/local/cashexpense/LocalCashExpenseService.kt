@@ -12,6 +12,8 @@ import com.tbterminal.app.data.local.model.SyncEntityType
 import com.tbterminal.app.data.local.model.SyncOperation
 import com.tbterminal.app.data.local.model.SyncStatus
 import com.tbterminal.app.data.remote.BigDecimalStringSerializer
+import com.tbterminal.app.data.sync.OfflineSessionAgePolicy
+import com.tbterminal.app.data.sync.runSuspendCatching
 import java.math.BigDecimal
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.encodeToString
@@ -24,7 +26,8 @@ enum class CashMovementType {
 
 class LocalCashExpenseService(
     private val database: TbTerminalDatabase,
-    private val deviceId: String? = null
+    private val deviceId: String? = null,
+    private val clockMillis: () -> Long = { System.currentTimeMillis() },
 ) {
     suspend fun addLocalCashMovement(
         cashSessionLocalId: Long,
@@ -56,7 +59,7 @@ class LocalCashExpenseService(
             return LocalCashExpenseResult.Failed("Keterangan $actionLabel wajib diisi.")
         }
 
-        return runCatching {
+        return runSuspendCatching {
             database.withTransaction {
                 val session = database.cashSessionDao().getByLocalId(cashSessionLocalId)
                     ?: return@withTransaction LocalCashExpenseResult.Failed("Sesi kas lokal tidak ditemukan.")
@@ -64,7 +67,16 @@ class LocalCashExpenseService(
                     return@withTransaction LocalCashExpenseResult.Failed("Mutasi kas hanya bisa dicatat pada sesi kas lokal terbuka.")
                 }
 
-                val now = System.currentTimeMillis()
+                val now = clockMillis()
+                if (session.serverId.isNullOrBlank()) {
+                    val ageAlert = OfflineSessionAgePolicy.evaluateOpenedAt(
+                        openedAtMillis = session.openedAt,
+                        nowMillis = now,
+                    )
+                    if (ageAlert?.isExpired == true) {
+                        return@withTransaction LocalCashExpenseResult.Failed(ageAlert.message)
+                    }
+                }
                 val expense = LocalCashExpenseEntity(
                     serverId = null,
                     clientGeneratedId = LocalIdGenerator.clientGeneratedId(prefix),

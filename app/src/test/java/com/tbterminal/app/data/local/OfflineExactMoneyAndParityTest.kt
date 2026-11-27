@@ -262,4 +262,109 @@ class OfflineExactMoneyAndParityTest {
         assertEquals("-999.99", roundDown.roundingAmount.toPlainString())
         assertEquals("10000.00", roundDown.finalTotal.toPlainString())
     }
+
+    @Test
+    fun localCheckoutAndCashExpense_rejectClosedSessionAndUnsyncedSessionOver72Hours() = runBlocking {
+        var fakeNowMillis = System.currentTimeMillis()
+        val sessionService = LocalCashSessionService(
+            database = database,
+            deviceId = "android-dev-1",
+        )
+        val checkoutService = LocalCheckoutService(
+            database = database,
+            deviceId = "android-dev-1",
+            clockMillis = { fakeNowMillis },
+        )
+        val expenseService = LocalCashExpenseService(
+            database = database,
+            deviceId = "android-dev-1",
+            clockMillis = { fakeNowMillis },
+        )
+
+        val openResult = sessionService.openLocalSession(
+            cashierUserId = "kasir-1",
+            startingCash = BigDecimal("100000.00"),
+        ) as LocalCashSessionResult.Success
+        val openSessionId = openResult.session.localId
+
+        // 1. Melebihi 72 jam pada sesi offline belum tersinkron (serverId == null) -> ditolak
+        fakeNowMillis = openResult.session.openedAt + 72L * 60L * 60L * 1000L + 1_000L
+
+        val expiredCheckout = checkoutService.saveCheckout(
+            LocalCheckoutCommand(
+                cashierUserId = "kasir-1",
+                cashSessionLocalId = openSessionId,
+                paymentMethod = "tunai",
+                payments = listOf(LocalCheckoutPaymentLineCommand(method = "tunai", amount = BigDecimal("10000.00"))),
+                subtotal = BigDecimal("10000.00"),
+                total = BigDecimal("10000.00"),
+                paidAmount = BigDecimal("10000.00"),
+                items = listOf(
+                    LocalCheckoutItemCommand(
+                        productServerId = "prod-1",
+                        productNameSnapshot = "Produk 1",
+                        quantity = BigDecimal.ONE,
+                        baseQuantity = BigDecimal.ONE,
+                        conversionFactor = BigDecimal.ONE,
+                        priceAtTransaction = BigDecimal("10000.00"),
+                        subtotal = BigDecimal("10000.00"),
+                    )
+                ),
+            )
+        )
+        assertTrue(expiredCheckout is LocalCheckoutResult.Failed)
+        assertTrue((expiredCheckout as LocalCheckoutResult.Failed).reason.contains("72 jam"))
+
+        val expiredExpense = expenseService.addLocalCashMovement(
+            cashSessionLocalId = openSessionId,
+            type = CashMovementType.CASH_OUT,
+            amount = BigDecimal("5000.00"),
+            description = "Beli lakban",
+        )
+        assertTrue(expiredExpense is LocalCashExpenseResult.Failed)
+        assertTrue((expiredExpense as LocalCashExpenseResult.Failed).message.contains("72 jam"))
+
+        // 2. Sesi yang sudah ditutup -> ditolak untuk checkout lokal & pengeluaran kas lokal
+        fakeNowMillis = openResult.session.openedAt + 1_000L
+        val closeResult = sessionService.closeLocalSession(
+            localId = openSessionId,
+            closingCash = BigDecimal("100000.00"),
+        )
+        assertTrue(closeResult is LocalCashSessionResult.Success)
+
+        val closedCheckout = checkoutService.saveCheckout(
+            LocalCheckoutCommand(
+                cashierUserId = "kasir-1",
+                cashSessionLocalId = openSessionId,
+                paymentMethod = "tunai",
+                payments = listOf(LocalCheckoutPaymentLineCommand(method = "tunai", amount = BigDecimal("10000.00"))),
+                subtotal = BigDecimal("10000.00"),
+                total = BigDecimal("10000.00"),
+                paidAmount = BigDecimal("10000.00"),
+                items = listOf(
+                    LocalCheckoutItemCommand(
+                        productServerId = "prod-1",
+                        productNameSnapshot = "Produk 1",
+                        quantity = BigDecimal.ONE,
+                        baseQuantity = BigDecimal.ONE,
+                        conversionFactor = BigDecimal.ONE,
+                        priceAtTransaction = BigDecimal("10000.00"),
+                        subtotal = BigDecimal("10000.00"),
+                    )
+                ),
+            )
+        )
+        assertEquals(LocalCheckoutResult.Failed("Sesi kas lokal sudah ditutup."), closedCheckout)
+
+        val closedExpense = expenseService.addLocalCashMovement(
+            cashSessionLocalId = openSessionId,
+            type = CashMovementType.CASH_OUT,
+            amount = BigDecimal("5000.00"),
+            description = "Beli lakban",
+        )
+        assertEquals(
+            LocalCashExpenseResult.Failed("Mutasi kas hanya bisa dicatat pada sesi kas lokal terbuka."),
+            closedExpense,
+        )
+    }
 }
