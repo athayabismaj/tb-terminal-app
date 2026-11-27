@@ -32,6 +32,7 @@ import com.tbterminal.app.data.remote.OfflineCashSessionOpenSyncResponseDto
 import com.tbterminal.app.data.remote.OfflineCheckoutSyncRequestDto
 import com.tbterminal.app.data.remote.OfflineCheckoutSyncResponseDto
 import com.tbterminal.app.data.remote.SalesApi
+import com.tbterminal.app.data.repository.SyncMonitoringRepository
 import com.tbterminal.app.data.session.SessionManager
 import com.tbterminal.app.data.session.SessionUser
 import com.tbterminal.app.data.session.TokenStore
@@ -40,6 +41,7 @@ import java.util.concurrent.Executors
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.json.Json
 import okhttp3.MediaType.Companion.toMediaType
@@ -116,6 +118,8 @@ class OfflineSyncResilienceTest {
             salesApi = salesApi,
             deviceId = "android-dev-1",
             clockMillis = { fakeClockMillis },
+            roleProvider = { sessionManager.readSessionUser()?.role },
+            activeUserIdProvider = { sessionManager.resolveOwnerUserId() },
         )
         cashExpenseSync = OfflineCashExpenseSyncService(
             database = database,
@@ -123,6 +127,7 @@ class OfflineSyncResilienceTest {
             deviceId = "android-dev-1",
             cashSessionSyncService = cashSessionSync,
             clockMillis = { fakeClockMillis },
+            activeUserIdProvider = { sessionManager.resolveOwnerUserId() },
         )
         checkoutSync = OfflineCheckoutSyncService(
             database = database,
@@ -131,6 +136,7 @@ class OfflineSyncResilienceTest {
             cashSessionSyncService = cashSessionSync,
             cashExpenseSyncService = cashExpenseSync,
             clockMillis = { fakeClockMillis },
+            activeUserIdProvider = { sessionManager.resolveOwnerUserId() },
         )
         syncManager = SyncManager(
             database = database,
@@ -560,12 +566,13 @@ class OfflineSyncResilienceTest {
     private suspend fun insertOpenSession(
         clientId: String,
         openedAt: Long = fakeClockMillis - 60_000L,
+        cashierUserId: String = "kasir-1",
     ): Long {
         val id = database.cashSessionDao().upsert(
             LocalCashSessionEntity(
                 clientGeneratedId = clientId,
                 deviceId = "android-dev-1",
-                cashierUserId = "kasir-1",
+                cashierUserId = cashierUserId,
                 status = "OPEN",
                 openedAt = openedAt,
                 startingCash = ScaledDecimal2.ofWhole(100_000L),
@@ -641,7 +648,7 @@ class OfflineSyncResilienceTest {
                 transactionCode = "TRX-$clientId",
                 cashSessionLocalId = sessionLocalId,
                 cashSessionServerId = session?.serverId,
-                cashierUserId = "kasir-1",
+                cashierUserId = session?.cashierUserId ?: "kasir-1",
                 status = "PAID",
                 subtotal = ScaledDecimal2.ofWhole(50_000L),
                 total = ScaledDecimal2.ofWhole(50_000L),
@@ -851,6 +858,127 @@ class OfflineSyncResilienceTest {
         assertEquals(SyncStatus.SYNCED, s2Recovered.syncStatus)
         assertEquals("srv-s2-recovered", s2Recovered.serverId)
     }
+
+    @Test
+    fun multiUserSharedDevice_otherUserQueueUntouchedHiddenAndCounted_thenSyncedOnRelogin() = runBlocking {
+        // Kasir A membuat sesi lokal + transaksi + pengeluaran saat login
+        sessionManager.saveAuthenticatedSession(
+            token = "token-a",
+            refreshToken = "refresh-a",
+            user = SessionUser(
+                name = "Kasir A",
+                role = "KASIR",
+                isActive = true,
+                joinedAt = "2026-01-01",
+                lastLoginAt = null,
+                userId = "kasir-a",
+            ),
+        )
+        val sA = insertOpenSession("sess-kasir-a", cashierUserId = "kasir-a")
+        val txA = insertCheckout(sA, "tx-kasir-a")
+        val expA = insertExpense(sA, "exp-kasir-a")
+
+        val monitoringRepo = SyncMonitoringRepository(
+            syncQueueDao = database.syncQueueDao(),
+            offlineCashSessionSyncService = cashSessionSync,
+            offlineCheckoutSyncService = checkoutSync,
+            offlineCashExpenseSyncService = cashExpenseSync,
+            cashSessionDao = database.cashSessionDao(),
+            transactionDao = database.transactionDao(),
+            cashExpenseDao = database.cashExpenseDao(),
+            clockMillis = { fakeClockMillis },
+            activeUserIdFlow = sessionManager.activeUserIdFlow,
+            activeUserIdProvider = { sessionManager.resolveOwnerUserId() },
+        )
+        val statusRepo = OfflineStatusRepository(
+            networkMonitor = AlwaysOnlineConnectivity,
+            backendHealthMonitor = healthMonitor,
+            localAppSettingsDataSource = settings,
+            syncQueueDao = database.syncQueueDao(),
+            cashSessionDao = database.cashSessionDao(),
+            transactionDao = database.transactionDao(),
+            cashExpenseDao = database.cashExpenseDao(),
+            activeUserIdFlow = sessionManager.activeUserIdFlow,
+        )
+
+        // Kasir A logout -> Kasir B login
+        sessionManager.clearSession()
+        sessionManager.saveAuthenticatedSession(
+            token = "token-b",
+            refreshToken = "refresh-b",
+            user = SessionUser(
+                name = "Kasir B",
+                role = "KASIR",
+                isActive = true,
+                joinedAt = "2026-01-01",
+                lastLoginAt = null,
+                userId = "kasir-b",
+            ),
+        )
+
+        val kasirBRun = syncManager.runOnce()
+        assertTrue(kasirBRun is SyncResult.Success)
+        assertEquals(0, server.requestCount)
+        assertEquals(SyncStatus.PENDING, database.cashSessionDao().getByLocalId(sA)!!.syncStatus)
+        assertEquals(SyncStatus.PENDING, database.transactionDao().getByLocalId(txA)!!.syncStatus)
+        assertEquals(SyncStatus.PENDING, database.cashExpenseDao().getByLocalId(expA)!!.syncStatus)
+
+        val kasirBSnapshot = monitoringRepo.refresh()
+        assertTrue(kasirBSnapshot.queueItems.isEmpty())
+        assertEquals(0, kasirBSnapshot.totalPending)
+        assertEquals(3, kasirBSnapshot.otherUsersPendingSyncCount)
+        val kasirBStatus = statusRepo.status.first()
+        assertEquals(0, kasirBStatus.pendingSyncCount)
+        assertEquals(3, kasirBStatus.otherUsersPendingSyncCount)
+
+        // Ganti ke Owner -> data Kasir A tetap PENDING, tidak terlihat di queue, hanya jumlah ringkas
+        sessionManager.saveAuthenticatedSession(
+            token = "token-owner",
+            refreshToken = "refresh-owner",
+            user = SessionUser(
+                name = "Owner",
+                role = "OWNER",
+                isActive = true,
+                joinedAt = "2026-01-01",
+                lastLoginAt = null,
+                userId = "owner-1",
+            ),
+        )
+        val ownerRun = syncManager.runOnce()
+        assertTrue(ownerRun is SyncResult.Success)
+        assertEquals(0, server.requestCount)
+        val ownerSnapshot = monitoringRepo.refresh()
+        assertTrue(ownerSnapshot.queueItems.isEmpty())
+        assertEquals(3, ownerSnapshot.otherUsersPendingSyncCount)
+        assertEquals(3, statusRepo.status.first().otherUsersPendingSyncCount)
+
+        // Kasir A login lagi -> seluruh antrean Kasir A disinkronkan bersih
+        sessionManager.saveAuthenticatedSession(
+            token = "token-a-2",
+            refreshToken = "refresh-a-2",
+            user = SessionUser(
+                name = "Kasir A",
+                role = "KASIR",
+                isActive = true,
+                joinedAt = "2026-01-01",
+                lastLoginAt = null,
+                userId = "kasir-a",
+            ),
+        )
+        val kasirASnapshotBefore = monitoringRepo.refresh()
+        assertEquals(3, kasirASnapshotBefore.queueItems.size)
+        assertEquals(0, kasirASnapshotBefore.otherUsersPendingSyncCount)
+
+        enqueueOpenSessionSuccess("srv-kasir-a")
+        enqueueCheckoutSuccess("srv-tx-kasir-a")
+        enqueueExpenseSuccess("srv-exp-kasir-a")
+        val kasirARun = syncManager.runOnce()
+        assertTrue(kasirARun is SyncResult.Success)
+        assertEquals(3, server.requestCount)
+        assertEquals(SyncStatus.SYNCED, database.cashSessionDao().getByLocalId(sA)!!.syncStatus)
+        assertEquals(SyncStatus.SYNCED, database.transactionDao().getByLocalId(txA)!!.syncStatus)
+        assertEquals(SyncStatus.SYNCED, database.cashExpenseDao().getByLocalId(expA)!!.syncStatus)
+    }
 }
 
 private object AlwaysOnlineConnectivity : NetworkConnectivity {
@@ -862,6 +990,14 @@ private object AlwaysOnlineConnectivity : NetworkConnectivity {
 private class FakeTokenStore(
     private var accessToken: String?,
     private var refreshToken: String?,
+    private var sessionUser: SessionUser? = SessionUser(
+        name = "Kasir Satu",
+        role = "KASIR",
+        isActive = true,
+        joinedAt = "2026-01-01",
+        lastLoginAt = null,
+        userId = "kasir-1",
+    ),
 ) : TokenStore {
     override fun readAccessToken(): String? = accessToken
     override fun readRefreshToken(): String? = refreshToken
@@ -870,11 +1006,12 @@ private class FakeTokenStore(
         this.accessToken = accessToken
         this.refreshToken = refreshToken
     }
-    override fun readSessionUser(): SessionUser? = null
-    override fun saveSessionUser(user: SessionUser) = Unit
+    override fun readSessionUser(): SessionUser? = sessionUser
+    override fun saveSessionUser(user: SessionUser) { sessionUser = user }
     override fun clearAccessToken() {
         accessToken = null
         refreshToken = null
+        sessionUser = null
     }
 }
 

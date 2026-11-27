@@ -23,6 +23,7 @@ class OfflineCheckoutSyncService(
     private val cashSessionSyncService: OfflineCashSessionSyncService? = null,
     private val cashExpenseSyncService: OfflineCashExpenseSyncService? = null,
     private val clockMillis: () -> Long = { System.currentTimeMillis() },
+    private val activeUserIdProvider: (() -> String?)? = null,
 ) {
     suspend fun recoverStaleSyncing(nowMillis: Long = clockMillis()) {
         OfflineSyncCoordinator.withSyncLock {
@@ -82,6 +83,13 @@ class OfflineCheckoutSyncService(
         transactionLocalId: Long,
     ): OfflineCheckoutSyncResult {
         recoverStaleSyncingUnlocked()
+        val preflightTx = database.transactionDao().getByLocalId(transactionLocalId)
+        if (preflightTx != null && !matchesActiveUser(preflightTx.cashierUserId)) {
+            return OfflineCheckoutSyncResult.Failed(
+                message = "Transaksi milik kasir lain menunggu login akun terkait.",
+                kind = OfflineCheckoutSyncFailureKind.VALIDATION,
+            )
+        }
         if (!markSyncingIfAllowed(transactionLocalId)) {
             return OfflineCheckoutSyncResult.Failed("Transaksi sedang disinkronkan atau sudah selesai.")
         }
@@ -318,12 +326,17 @@ class OfflineCheckoutSyncService(
 
     internal suspend fun syncPendingOnlyUnlocked(
         limit: Int = DEFAULT_AUTO_SYNC_LIMIT,
-        onProgress: ((current: Int, total: Int) -> Unit)? = null
+        cashierUserId: String? = resolvedActiveUserIdFilter(),
+        onProgress: ((current: Int, total: Int) -> Unit)? = null,
     ): OfflineCheckoutBulkSyncResult {
+        if (activeUserIdProvider != null && cashierUserId == null) {
+            return OfflineCheckoutBulkSyncResult(total = 0, successCount = 0, failedCount = 0)
+        }
         recoverStaleSyncingUnlocked()
         val localIds = database.transactionDao().getPendingLocalIdsForAutoSync(
             pending = SyncStatus.PENDING,
-            limit = limit
+            limit = limit,
+            cashierUserId = cashierUserId,
         )
         return syncBatch(
             localIds = localIds,
@@ -334,13 +347,18 @@ class OfflineCheckoutSyncService(
     internal suspend fun syncPendingForSessionUnlocked(
         cashSessionLocalId: Long,
         limit: Int = DEFAULT_AUTO_SYNC_LIMIT,
+        cashierUserId: String? = resolvedActiveUserIdFilter(),
         onProgress: ((current: Int, total: Int) -> Unit)? = null,
     ): OfflineCheckoutBulkSyncResult {
+        if (activeUserIdProvider != null && cashierUserId == null) {
+            return OfflineCheckoutBulkSyncResult(total = 0, successCount = 0, failedCount = 0)
+        }
         recoverStaleSyncingUnlocked()
         val localIds = database.transactionDao().getPendingLocalIdsForSession(
             cashSessionLocalId = cashSessionLocalId,
             pending = SyncStatus.PENDING,
             limit = limit,
+            cashierUserId = cashierUserId,
         )
         return syncBatch(
             localIds = localIds,
@@ -350,17 +368,33 @@ class OfflineCheckoutSyncService(
 
     internal suspend fun syncPendingWithoutLocalSessionUnlocked(
         limit: Int = DEFAULT_AUTO_SYNC_LIMIT,
+        cashierUserId: String? = resolvedActiveUserIdFilter(),
         onProgress: ((current: Int, total: Int) -> Unit)? = null,
     ): OfflineCheckoutBulkSyncResult {
+        if (activeUserIdProvider != null && cashierUserId == null) {
+            return OfflineCheckoutBulkSyncResult(total = 0, successCount = 0, failedCount = 0)
+        }
         recoverStaleSyncingUnlocked()
         val localIds = database.transactionDao().getPendingLocalIdsWithoutLocalSession(
             pending = SyncStatus.PENDING,
             limit = limit,
+            cashierUserId = cashierUserId,
         )
         return syncBatch(
             localIds = localIds,
             onProgress = onProgress,
         )
+    }
+
+    private fun resolvedActiveUserIdFilter(): String? {
+        return activeUserIdProvider?.invoke()?.trim()?.takeIf(String::isNotBlank)
+    }
+
+    private fun matchesActiveUser(transactionCashierUserId: String?): Boolean {
+        val provider = activeUserIdProvider ?: return true
+        val activeUserId = provider()?.trim()?.takeIf(String::isNotBlank) ?: return false
+        val owner = transactionCashierUserId?.trim()?.takeIf(String::isNotBlank) ?: return true
+        return owner == activeUserId
     }
 
     private suspend fun syncBatch(

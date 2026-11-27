@@ -77,7 +77,7 @@ class CashReconciliationViewModel(
             _uiState.update { it.copy(isLoading = true, errorMessage = null) }
 
             if (shouldUseLocalCashSession()) {
-                if (!restoreLocalOpenCashSessionIfAvailable(page, allowAnyCashier = true)) {
+                if (!restoreLocalOpenCashSessionIfAvailable(page)) {
                     val ageAlert = resolveOfflineSessionAgeAlert()
                     _uiState.update {
                         it.copy(
@@ -126,7 +126,7 @@ class CashReconciliationViewModel(
                             mirroredSession.hasUnsyncedLocalChanges() &&
                             !mirroredSession.status.equals("OPEN", ignoreCase = true)
                         if (locallyClosedPending) {
-                            if (!restoreLocalOpenCashSessionIfAvailable(page, allowAnyCashier = false)) {
+                            if (!restoreLocalOpenCashSessionIfAvailable(page)) {
                                 val ageAlert = resolveOfflineSessionAgeAlert()
                                 _uiState.update {
                                     it.copy(
@@ -168,13 +168,13 @@ class CashReconciliationViewModel(
                     if (serverUnavailable) {
                         markBackendUnreachableAndSyncState()
                     }
-                    if (!serverUnavailable || !restoreLocalOpenCashSessionIfAvailable(page, allowAnyCashier = true)) {
+                    if (!serverUnavailable || !restoreLocalOpenCashSessionIfAvailable(page)) {
                         setLoadError(sessionResult.message, resolveOfflineSessionAgeAlert())
                     }
                 }
                 is RepositoryResult.Exception -> {
                     markBackendUnreachableAndSyncState()
-                    if (!restoreLocalOpenCashSessionIfAvailable(page, allowAnyCashier = true)) {
+                    if (!restoreLocalOpenCashSessionIfAvailable(page)) {
                         setLoadError(
                             "Server kas tidak tersambung. Kas harian online belum dapat dimuat.",
                             resolveOfflineSessionAgeAlert()
@@ -319,7 +319,6 @@ class CashReconciliationViewModel(
 
         val existingOpenSession = findExistingOpenSessionForCashier(
             cashierId = localCashierId,
-            allowAnyCashier = false,
         )
         if (existingOpenSession != null) {
             val localExpenses = localCashExpenseService?.getLocalExpenses(existingOpenSession.localId).orEmpty()
@@ -640,11 +639,10 @@ class CashReconciliationViewModel(
 
     private suspend fun findExistingOpenSessionForCashier(
         cashierId: String?,
-        allowAnyCashier: Boolean,
     ): LocalCashSessionEntity? {
         val dataSource = cashSessionLocalDataSource ?: return null
         val effectiveCashierId = cashierId?.trim()?.takeIf(String::isNotBlank)
-            ?: if (allowAnyCashier) null else return null
+            ?: return null
         return runCatching {
             dataSource.getLatestOpenSession(effectiveCashierId)
                 ?: resolveCashierNameFallback()?.let { fallbackCashierId ->
@@ -654,7 +652,6 @@ class CashReconciliationViewModel(
                         dataSource.getLatestOpenSession(fallbackCashierId)
                     }
                 }
-                ?: if (allowAnyCashier) dataSource.getLatestOpenSession(null) else null
         }.getOrNull()
     }
 
@@ -687,19 +684,16 @@ class CashReconciliationViewModel(
         }
         return findExistingOpenSessionForCashier(
             cashierId = resolveCashierUserId(),
-            allowAnyCashier = false,
         )?.localId
     }
 
     private suspend fun restoreLocalOpenCashSessionIfAvailable(
         page: Int,
-        allowAnyCashier: Boolean = false
     ): Boolean {
         val currentCashierUserId = resolveCashierUserId()
             ?: _uiState.value.activeSession?.userId?.takeIf(String::isNotBlank)
         val localSession = findExistingOpenSessionForCashier(
             cashierId = currentCashierUserId,
-            allowAnyCashier = allowAnyCashier,
         ) ?: return false
         val localExpenses = localCashExpenseService?.getLocalExpenses(localSession.localId).orEmpty()
         val totalExpenses = localExpenses.totalExpenses()
@@ -732,6 +726,8 @@ class CashReconciliationViewModel(
         activeLocalSession: LocalCashSessionEntity? = null
     ): OfflineSessionAgeAlert? {
         val now = clockMillis()
+        val activeCashierId = resolveCashierUserId()
+        val fallbackName = resolveCashierNameFallback()
         val activeAlert = activeLocalSession
             ?.takeIf {
                 it.deletedAt == null &&
@@ -739,9 +735,14 @@ class CashReconciliationViewModel(
                     it.syncStatus != SyncStatus.SYNCED
             }
             ?.let { OfflineSessionAgePolicy.evaluateOpenedAt(it.openedAt, nowMillis = now) }
-        val unsyncedSessions = runCatching {
+        val unsyncedSessions = runSuspendCatching {
             cashSessionLocalDataSource?.getUnsyncedOfflineSessions().orEmpty()
-        }.getOrDefault(emptyList())
+        }.getOrDefault(emptyList()).filter { session ->
+            activeCashierId != null && (
+                session.cashierUserId == activeCashierId ||
+                    (fallbackName != null && session.cashierUserId == fallbackName)
+                )
+        }
         val daoAlert = OfflineSessionAgePolicy.evaluateUnsyncedSessions(
             sessions = unsyncedSessions,
             nowMillis = now

@@ -56,6 +56,7 @@ data class OfflineDashboardUiState(
     val localTransactionCount: Int = 0,
     val pendingSyncCount: Int = 0,
     val failedSyncCount: Int = 0,
+    val otherUsersPendingSyncCount: Int = 0,
     val lastRefresh: Long = System.currentTimeMillis(),
     val isLoading: Boolean = true,
     val error: String? = null

@@ -193,8 +193,9 @@ fun CashierPosScreen(
 
     val isOnline = offlineStatus.isInternetOnline && offlineStatus.backendStatus == BackendStatus.CONNECTED
     val hasPending = offlineStatus.pendingSyncCount > 0
+    val hasOtherUsersPending = offlineStatus.otherUsersPendingSyncCount > 0
     val isPrinterReady = devicePreferences.printerBluetoothAddress.isNotBlank()
-    val hasSystemIssue = !isOnline || hasPending || !isPrinterReady
+    val hasSystemIssue = !isOnline || hasPending || hasOtherUsersPending || !isPrinterReady
 
     val allCategory = "Semua Kategori"
     val categories = remember(state.products) {
@@ -245,6 +246,7 @@ fun CashierPosScreen(
                         PosThinAlertBanner(
                             isOnline = isOnline,
                             pendingSyncCount = offlineStatus.pendingSyncCount,
+                            otherUsersPendingSyncCount = offlineStatus.otherUsersPendingSyncCount,
                             isPrinterReady = isPrinterReady
                         )
                         Spacer(modifier = Modifier.height(4.dp))
@@ -442,9 +444,15 @@ fun CashierPosScreen(
 private fun PosThinAlertBanner(
     isOnline: Boolean,
     pendingSyncCount: Int,
+    otherUsersPendingSyncCount: Int = 0,
     isPrinterReady: Boolean,
     modifier: Modifier = Modifier
 ) {
+    val otherInfo = if (otherUsersPendingSyncCount > 0) {
+        " • $otherUsersPendingSyncCount data kasir lain menunggu login akun terkait"
+    } else {
+        ""
+    }
     val style = when {
         !isOnline -> {
             val pendingInfo = if (pendingSyncCount > 0) " • $pendingSyncCount belum sinkron" else ""
@@ -453,7 +461,7 @@ private fun PosThinAlertBanner(
                 border = Color(0xFFFDE68A),
                 text = Color(0xFFB45309),
                 icon = Icons.Outlined.WifiOff,
-                msg = "Mode Offline$pendingInfo"
+                msg = "Mode Offline$pendingInfo$otherInfo"
             )
         }
         pendingSyncCount > 0 -> {
@@ -462,7 +470,16 @@ private fun PosThinAlertBanner(
                 border = Color(0xFFBFDBFE),
                 text = Color(0xFF1D4ED8),
                 icon = Icons.Outlined.Sync,
-                msg = "$pendingSyncCount transaksi menunggu sinkronisasi"
+                msg = "$pendingSyncCount transaksi menunggu sinkronisasi$otherInfo"
+            )
+        }
+        otherUsersPendingSyncCount > 0 -> {
+            AlertBannerStyle(
+                bg = Color(0xFFEFF6FF),
+                border = Color(0xFFBFDBFE),
+                text = Color(0xFF1D4ED8),
+                icon = Icons.Outlined.Sync,
+                msg = "$otherUsersPendingSyncCount data kasir lain menunggu login akun terkait"
             )
         }
         else -> {

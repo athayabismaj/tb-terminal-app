@@ -11,8 +11,10 @@ import com.tbterminal.app.data.local.database.CheckoutDraftRecord
 import com.tbterminal.app.data.local.database.CheckoutDraftStore
 import com.tbterminal.app.data.local.database.CustomerLocalDataSource
 import com.tbterminal.app.data.local.database.LocalAppSettingsDataSource
+import com.tbterminal.app.data.local.database.PendingSubmissionScopes
 import com.tbterminal.app.data.local.database.ProductLocalDataSource
 import com.tbterminal.app.data.local.database.RoomCheckoutDraftStore
+import com.tbterminal.app.data.local.database.RoomPendingSubmissionStore
 import com.tbterminal.app.data.local.database.TbTerminalDatabase
 import com.tbterminal.app.data.local.entity.CheckoutDraftEntity
 import com.tbterminal.app.data.local.entity.LocalCustomerEntity
@@ -432,6 +434,187 @@ class CheckoutCartDraftSurvivalTest {
         assertNull(database.checkoutDraftDao().get("kasir-1"))
     }
 
+    @Test
+    fun logout_flushesDraftAndAmbiguousPendingBeforeTokenClear_neverWritesAnonymous_andClearsReorderBridge() = runTest(dispatcher) {
+        val semen = Product(
+            productId = "prod-logout",
+            name = "Semen Tiga Roda",
+            unitPrice = BigDecimal("70000"),
+            sku = "SMN-1",
+            unitName = "Sak",
+            stockQty = BigDecimal("50"),
+        )
+        cacheProduct(semen)
+
+        var storedAccess: String? = "token-a"
+        var storedRefresh: String? = "refresh-a"
+        var storedUser: com.tbterminal.app.data.session.SessionUser? = com.tbterminal.app.data.session.SessionUser(
+            name = "Kasir A",
+            role = "KASIR",
+            isActive = true,
+            joinedAt = "2026-01-01",
+            lastLoginAt = null,
+            userId = "kasir-a",
+        )
+        val tokenStore = object : com.tbterminal.app.data.session.TokenStore {
+            override fun readAccessToken(): String? = storedAccess
+            override fun readRefreshToken(): String? = storedRefresh
+            override fun saveAccessToken(token: String) { storedAccess = token }
+            override fun saveTokens(accessToken: String, refreshToken: String) {
+                storedAccess = accessToken
+                storedRefresh = refreshToken
+            }
+            override fun readSessionUser() = storedUser
+            override fun saveSessionUser(user: com.tbterminal.app.data.session.SessionUser) { storedUser = user }
+            override fun clearAccessToken() {
+                storedAccess = null
+                storedRefresh = null
+                storedUser = null
+            }
+        }
+        val sessionManager = com.tbterminal.app.data.session.SessionManager(tokenStore)
+        val reorderBridge = PosReorderBridge()
+        sessionManager.addSessionClearedListener { reorderBridge.clear() }
+        reorderBridge.enqueue(
+            CashTransactionDetail(
+                id = "tx-old",
+                receiptId = "RCP-OLD",
+                sessionId = "sess-old",
+                customerId = null,
+                customerName = null,
+                type = "SALE",
+                status = "completed",
+                total = BigDecimal("70000"),
+                paidAmount = BigDecimal("70000"),
+                amountTendered = BigDecimal("70000"),
+                changeAmount = BigDecimal.ZERO,
+                createdAt = "2026-04-08T01:00:00Z",
+                items = emptyList(),
+            )
+        )
+
+        val strictDraftStore = RoomCheckoutDraftStore(
+            dao = database.checkoutDraftDao(),
+            ownerUserIdProvider = { sessionManager.resolveOwnerUserId().orEmpty() },
+            skipWhenOwnerBlank = true,
+        )
+        val strictPendingStore = RoomPendingSubmissionStore(
+            dao = database.pendingSubmissionDao(),
+            ownerUserIdProvider = { sessionManager.resolveOwnerUserId().orEmpty() },
+            skipWhenOwnerBlank = true,
+        )
+        val vm = CheckoutViewModel(
+            checkoutRepository = object : FakeDraftCheckoutRepository() {
+                override suspend fun submitCheckout(command: CheckoutSubmitCommand): RepositoryResult<CheckoutReceipt> {
+                    return RepositoryResult.Exception(java.io.IOException("timeout"))
+                }
+            },
+            inventoryRepository = FailingInventoryRepository(),
+            customerRepository = FailingCustomerRepository(),
+            cashReconciliationRepository = FakeDraftCashRepository(),
+            pendingSubmissionStore = strictPendingStore,
+            checkoutDraftStore = strictDraftStore,
+            productLocalDataSource = productLocalDataSource,
+            customerLocalDataSource = customerLocalDataSource,
+            cartDraftSaveDebounceMs = 60_000L, // Belum sempat ter-debounce saat logout terjadi
+            cashierUserId = "kasir-a",
+            sessionManager = sessionManager,
+            logoutFlushDispatcher = Dispatchers.Unconfined,
+        )
+        advanceUntilIdle()
+
+        vm.addProduct(semen)
+        assertNull(database.checkoutDraftDao().get("kasir-a"))
+
+        // Logout terjadi saat ada draft belum ter-debounce
+        sessionManager.clearSession()
+        advanceUntilIdle()
+
+        // Reorder bridge direset
+        assertNull(reorderBridge.consume())
+        // Draft di-flush ke pemilik keluar (kasir-a), BUKAN anonymous
+        assertNotNull(database.checkoutDraftDao().get("kasir-a"))
+        assertNull(database.checkoutDraftDao().get(RoomCheckoutDraftStore.DEFAULT_OWNER_USER_ID))
+        assertNull(database.pendingSubmissionDao().get(RoomPendingSubmissionStore.DEFAULT_OWNER_USER_ID, PendingSubmissionScopes.CHECKOUT))
+
+        // Mutasi setelah logout juga tidak pernah menulis row "anonymous"
+        vm.addProduct(semen)
+        advanceUntilIdle()
+        assertNull(database.checkoutDraftDao().get(RoomCheckoutDraftStore.DEFAULT_OWNER_USER_ID))
+
+        // Uji juga flush pending submission saat logout terjadi ketika checkout online sedang in-flight
+        val session2 = com.tbterminal.app.data.session.SessionManager(tokenStore)
+        session2.saveAuthenticatedSession(
+            token = "token-a2",
+            refreshToken = "refresh-a2",
+            user = com.tbterminal.app.data.session.SessionUser(
+                name = "Kasir A",
+                role = "KASIR",
+                isActive = true,
+                joinedAt = "2026-01-01",
+                lastLoginAt = null,
+                userId = "kasir-a",
+            ),
+        )
+        val inFlightGate = kotlinx.coroutines.CompletableDeferred<Unit>()
+        val vmInFlight = CheckoutViewModel(
+            checkoutRepository = object : FakeDraftCheckoutRepository() {
+                override suspend fun submitCheckout(command: CheckoutSubmitCommand): RepositoryResult<CheckoutReceipt> {
+                    inFlightGate.await()
+                    return RepositoryResult.Exception(java.io.IOException("cancelled"))
+                }
+            },
+            inventoryRepository = FailingInventoryRepository(),
+            customerRepository = FailingCustomerRepository(),
+            cashReconciliationRepository = object : FakeDraftCashRepository() {
+                override suspend fun getActiveSession(): RepositoryResult<CashSession?> {
+                    return RepositoryResult.Success(
+                        CashSession(
+                            id = "srv-sess-a",
+                            userId = "kasir-a",
+                            openedAt = "2026-04-08T01:00:00Z",
+                            closedAt = null,
+                            openingCash = BigDecimal("100000"),
+                            closingCash = null,
+                            systemCash = null,
+                            difference = null,
+                            totalExpenses = BigDecimal.ZERO,
+                            notes = null,
+                            status = "OPEN",
+                        )
+                    )
+                }
+            },
+            pendingSubmissionStore = RoomPendingSubmissionStore(
+                dao = database.pendingSubmissionDao(),
+                ownerUserIdProvider = { session2.resolveOwnerUserId().orEmpty() },
+                skipWhenOwnerBlank = true,
+            ),
+            checkoutDraftStore = RoomCheckoutDraftStore(
+                dao = database.checkoutDraftDao(),
+                ownerUserIdProvider = { session2.resolveOwnerUserId().orEmpty() },
+                skipWhenOwnerBlank = true,
+            ),
+            productLocalDataSource = productLocalDataSource,
+            customerLocalDataSource = customerLocalDataSource,
+            cashierUserId = "kasir-a",
+            sessionManager = session2,
+            logoutFlushDispatcher = Dispatchers.Unconfined,
+        )
+        advanceUntilIdle()
+        vmInFlight.addProduct(semen)
+        vmInFlight.prepareCheckout(PaymentMethod.TUNAI, BigDecimal("70000"))
+        runCurrent()
+
+        session2.clearSession()
+        inFlightGate.complete(Unit)
+        advanceUntilIdle()
+
+        val savedPendingKasirA = database.pendingSubmissionDao().get("kasir-a", PendingSubmissionScopes.CHECKOUT)
+        assertNotNull(savedPendingKasirA)
+        assertNull(database.pendingSubmissionDao().get(RoomPendingSubmissionStore.DEFAULT_OWNER_USER_ID, PendingSubmissionScopes.CHECKOUT))
+    }
+
     private fun buildVm(
         inventoryRepo: InventoryRepository = FailingInventoryRepository(),
         customerRepo: CustomerRepository = FailingCustomerRepository(),
@@ -506,7 +689,7 @@ class CheckoutCartDraftSurvivalTest {
         override suspend fun clearAll() = delegate.clearAll()
     }
 
-    private class FakeDraftCheckoutRepository : CheckoutRepository {
+    private open class FakeDraftCheckoutRepository : CheckoutRepository {
         override suspend fun previewCheckout(command: CheckoutPreviewCommand): RepositoryResult<CheckoutPreview> {
             val total = command.items.fold(BigDecimal.ZERO) { acc, item ->
                 acc.add(item.quantity.multiply(BigDecimal("70000")))

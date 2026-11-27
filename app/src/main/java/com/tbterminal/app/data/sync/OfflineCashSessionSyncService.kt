@@ -21,6 +21,7 @@ class OfflineCashSessionSyncService(
     private val salesApi: SalesApi,
     private val deviceId: String,
     private val clockMillis: () -> Long = { System.currentTimeMillis() },
+    private val activeUserIdProvider: (() -> String?)? = null,
     private val roleProvider: () -> String? = { "KASIR" },
 ) {
     suspend fun recoverStaleSyncing(nowMillis: Long = clockMillis()) {
@@ -60,6 +61,9 @@ class OfflineCashSessionSyncService(
         recoverStaleSyncingUnlocked()
         val session = database.cashSessionDao().getByLocalId(localSessionId)
             ?: return OfflineCashSessionSyncResult.Failed("Sesi kas lokal tidak ditemukan.")
+        if (!matchesActiveUser(session.cashierUserId)) {
+            return OfflineCashSessionSyncResult.Skipped("Sesi kas milik kasir lain menunggu login akun terkait.")
+        }
 
         session.serverId?.takeIf { it.isNotBlank() }?.let { serverId ->
             updateTransactionsCashSessionServerId(session.localId, serverId)
@@ -189,14 +193,16 @@ class OfflineCashSessionSyncService(
 
     internal suspend fun syncPendingOpenSessionsUnlocked(
         limit: Int = DEFAULT_AUTO_SYNC_LIMIT,
-        includeFailed: Boolean = false
+        includeFailed: Boolean = false,
+        cashierUserId: String? = resolvedActiveUserIdFilter(),
     ): OfflineCashSessionBulkSyncResult {
         recoverStaleSyncingUnlocked()
         val failedStatus = if (includeFailed) SyncStatus.FAILED else SyncStatus.PENDING
         val sessions = database.cashSessionDao().getOpenSyncCandidates(
             pending = SyncStatus.PENDING,
             failed = failedStatus,
-            limit = limit
+            limit = limit,
+            cashierUserId = cashierUserId,
         )
         if (sessions.isEmpty()) {
             return OfflineCashSessionBulkSyncResult(total = 0, successCount = 0, failedCount = 0)
@@ -259,6 +265,9 @@ class OfflineCashSessionSyncService(
         recoverStaleSyncingUnlocked()
         var session = database.cashSessionDao().getByLocalId(localSessionId)
             ?: return OfflineCashSessionSyncResult.Failed("Sesi kas lokal tidak ditemukan.")
+        if (!matchesActiveUser(session.cashierUserId)) {
+            return OfflineCashSessionSyncResult.Skipped("Sesi kas milik kasir lain menunggu login akun terkait.")
+        }
         if (!session.status.equals(CASH_SESSION_CLOSED, ignoreCase = true)) {
             return OfflineCashSessionSyncResult.Skipped("Sesi kas lokal belum ditutup.")
         }
@@ -395,7 +404,8 @@ class OfflineCashSessionSyncService(
 
     internal suspend fun syncPendingCloseSessionsUnlocked(
         limit: Int = DEFAULT_AUTO_SYNC_LIMIT,
-        includeFailed: Boolean = false
+        includeFailed: Boolean = false,
+        cashierUserId: String? = resolvedActiveUserIdFilter(),
     ): OfflineCashSessionBulkSyncResult {
         recoverStaleSyncingUnlocked()
         val failedStatus = if (includeFailed) SyncStatus.FAILED else SyncStatus.PENDING
@@ -403,7 +413,8 @@ class OfflineCashSessionSyncService(
             closedStatus = CASH_SESSION_CLOSED,
             pending = SyncStatus.PENDING,
             failed = failedStatus,
-            limit = limit
+            limit = limit,
+            cashierUserId = cashierUserId,
         )
         if (sessions.isEmpty()) {
             return OfflineCashSessionBulkSyncResult(total = 0, successCount = 0, failedCount = 0)
@@ -834,6 +845,17 @@ class OfflineCashSessionSyncService(
     private sealed interface BuildCloseSessionRequestResult {
         data class Success(val request: OfflineCashSessionCloseSyncRequestDto) : BuildCloseSessionRequestResult
         data class Error(val message: String) : BuildCloseSessionRequestResult
+    }
+
+    private fun resolvedActiveUserIdFilter(): String? {
+        return activeUserIdProvider?.invoke()?.trim()?.takeIf(String::isNotBlank)
+    }
+
+    private fun matchesActiveUser(sessionCashierUserId: String?): Boolean {
+        val provider = activeUserIdProvider ?: return true
+        val activeUserId = provider()?.trim()?.takeIf(String::isNotBlank) ?: return false
+        val owner = sessionCashierUserId?.trim()?.takeIf(String::isNotBlank) ?: return true
+        return owner == activeUserId
     }
 
     private companion object {

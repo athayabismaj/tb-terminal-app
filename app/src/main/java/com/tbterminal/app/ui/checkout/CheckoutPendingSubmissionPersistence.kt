@@ -181,6 +181,18 @@ internal class CheckoutPendingSubmissionPersistence(
         save(command, fingerprint, state, PendingSubmissionStatus.AMBIGUOUS)
     }
 
+    suspend fun saveForOwner(
+        ownerUserId: String,
+        command: CheckoutSubmitCommand,
+        fingerprint: String,
+        state: CheckoutUiState,
+        status: PendingSubmissionStatus = PendingSubmissionStatus.AMBIGUOUS,
+    ) {
+        val resolvedOwner = ownerUserId.trim().takeIf(String::isNotBlank) ?: return
+        val record = buildRecord(command, fingerprint, state, status)
+        store.saveForOwner(resolvedOwner, record)
+    }
+
     suspend fun clear() {
         activeKey = null
         activeCreatedAt = null
@@ -193,6 +205,15 @@ internal class CheckoutPendingSubmissionPersistence(
         state: CheckoutUiState,
         status: PendingSubmissionStatus
     ) {
+        store.save(buildRecord(command, fingerprint, state, status))
+    }
+
+    private fun buildRecord(
+        command: CheckoutSubmitCommand,
+        fingerprint: String,
+        state: CheckoutUiState,
+        status: PendingSubmissionStatus,
+    ): PendingSubmissionRecord {
         val now = clockMillis()
         val createdAt = if (activeKey == command.idempotencyKey) {
             activeCreatedAt ?: now
@@ -228,16 +249,14 @@ internal class CheckoutPendingSubmissionPersistence(
         )
 
         val payloadJson = CheckoutPersistenceJson.encodeToString(payload)
-        store.save(
-            PendingSubmissionRecord(
-                scope = PendingSubmissionScopes.CHECKOUT,
-                idempotencyKey = command.idempotencyKey,
-                intentJson = fingerprint,
-                payloadJson = payloadJson,
-                status = status,
-                createdAt = createdAt,
-                updatedAt = now
-            )
+        return PendingSubmissionRecord(
+            scope = PendingSubmissionScopes.CHECKOUT,
+            idempotencyKey = command.idempotencyKey,
+            intentJson = fingerprint,
+            payloadJson = payloadJson,
+            status = status,
+            createdAt = createdAt,
+            updatedAt = now
         )
     }
 }

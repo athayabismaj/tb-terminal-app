@@ -19,12 +19,14 @@ import com.tbterminal.app.data.sync.OfflineSessionAgePolicy
 import com.tbterminal.app.data.sync.SyncErrorCategory
 import com.tbterminal.app.data.sync.SyncErrorClassification
 import com.tbterminal.app.data.sync.SyncErrorClassifier
+import com.tbterminal.app.data.sync.partitionSyncQueueByUser
+import com.tbterminal.app.data.sync.resolveSyncQueueOwnerUserId
 import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneId
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.combine
-import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.flowOf
 
 class SyncMonitoringRepository(
     private val syncQueueDao: SyncQueueDao,
@@ -34,18 +36,22 @@ class SyncMonitoringRepository(
     private val cashSessionDao: CashSessionDao? = null,
     private val transactionDao: TransactionDao? = null,
     private val cashExpenseDao: CashExpenseDao? = null,
-    private val clockMillis: () -> Long = { System.currentTimeMillis() }
+    private val clockMillis: () -> Long = { System.currentTimeMillis() },
+    private val activeUserIdFlow: Flow<String?>? = null,
+    private val activeUserIdProvider: (() -> String?)? = null,
 ) {
+    private val applyIsolationFilter: Boolean
+        get() = activeUserIdFlow != null || activeUserIdProvider != null
+
     fun observeSnapshot(): Flow<SyncMonitoringSnapshot> {
-        val dao = cashSessionDao
-        return if (dao == null) {
-            syncQueueDao.observeQueue().map { queue ->
-                buildSnapshot(queue = queue, sessions = emptyList())
-            }
-        } else {
-            combine(syncQueueDao.observeQueue(), dao.observeSessions()) { queue, sessions ->
-                buildSnapshot(queue = queue, sessions = sessions)
-            }
+        val sessionsFlow = cashSessionDao?.observeSessions() ?: flowOf(emptyList())
+        val userIdFlow = activeUserIdFlow ?: flowOf(activeUserIdProvider?.invoke())
+        return combine(syncQueueDao.observeQueue(), sessionsFlow, userIdFlow) { queue, sessions, activeUserId ->
+            buildSnapshot(
+                queue = queue,
+                sessions = sessions,
+                activeUserId = activeUserId ?: activeUserIdProvider?.invoke(),
+            )
         }
     }
 
@@ -58,51 +64,99 @@ class SyncMonitoringRepository(
         val sessions = cashSessionDao?.getUnsyncedOfflineSessions().orEmpty()
         return buildSnapshot(
             queue = queue.distinctBy { it.id }.sortedByDescending { it.updatedAt },
-            sessions = sessions
+            sessions = sessions,
+            activeUserId = activeUserIdProvider?.invoke(),
         )
     }
 
-    private fun buildSnapshot(
+    private suspend fun buildSnapshot(
         queue: List<SyncQueueEntity>,
-        sessions: List<LocalCashSessionEntity>
+        sessions: List<LocalCashSessionEntity>,
+        activeUserId: String?,
     ): SyncMonitoringSnapshot {
         val startOfToday = LocalDate.now()
             .atStartOfDay(ZoneId.systemDefault())
             .toInstant()
             .toEpochMilli()
-        val ageAlert = if (sessions.isEmpty()) {
+        val partitioned = partitionSyncQueueByUser(
+            queue = queue,
+            activeUserId = activeUserId,
+            sessions = sessions,
+            cashSessionDao = cashSessionDao,
+            transactionDao = transactionDao,
+            cashExpenseDao = cashExpenseDao,
+            applyIsolationFilter = applyIsolationFilter,
+        )
+        val ownQueue = partitioned.ownItems
+        val normalizedActiveId = activeUserId?.trim()?.takeIf(String::isNotBlank)
+        val ownUnsyncedSessions = sessions.filter { session ->
+            val unsyncedOffline = session.deletedAt == null &&
+                session.serverId.isNullOrBlank() &&
+                session.syncStatus != SyncStatus.SYNCED
+            if (!unsyncedOffline) return@filter false
+            if (!applyIsolationFilter) return@filter true
+            normalizedActiveId != null && session.cashierUserId?.trim() == normalizedActiveId
+        }
+        val ageAlert = if (ownUnsyncedSessions.isEmpty()) {
             null
         } else {
             OfflineSessionAgePolicy.evaluateUnsyncedSessions(
-                sessions = sessions,
+                sessions = ownUnsyncedSessions,
                 nowMillis = clockMillis()
             )
         }
         return SyncMonitoringSnapshot(
-            totalPending = queue.count { it.status == SyncStatus.PENDING },
-            totalSyncing = queue.count { it.status == SyncStatus.SYNCING },
-            totalFailed = queue.count { it.status == SyncStatus.FAILED },
-            totalConflict = queue.count { it.status == SyncStatus.CONFLICT },
-            totalSyncedToday = queue.count { it.status == SyncStatus.SYNCED && it.updatedAt >= startOfToday },
-            queueItems = queue.map { it.toUiModel() },
-            offlineSessionAgeAlert = ageAlert
+            totalPending = ownQueue.count { it.status == SyncStatus.PENDING },
+            totalSyncing = ownQueue.count { it.status == SyncStatus.SYNCING },
+            totalFailed = ownQueue.count { it.status == SyncStatus.FAILED },
+            totalConflict = ownQueue.count { it.status == SyncStatus.CONFLICT },
+            totalSyncedToday = ownQueue.count { it.status == SyncStatus.SYNCED && it.updatedAt >= startOfToday },
+            queueItems = ownQueue.map { it.toUiModel() },
+            offlineSessionAgeAlert = ageAlert,
+            otherUsersPendingSyncCount = partitioned.otherUsersPendingSyncCount,
         )
     }
 
     suspend fun retryItem(queueId: Long): SyncRetryResult {
         val item = syncQueueDao.getById(queueId)
             ?: return SyncRetryResult.Failed("Item sync tidak ditemukan.")
+        if (applyIsolationFilter) {
+            val activeUserId = activeUserIdProvider?.invoke()?.trim()?.takeIf(String::isNotBlank)
+            val owner = resolveSyncQueueOwnerUserId(
+                item = item,
+                sessionsById = emptyMap(),
+                cashSessionDao = cashSessionDao,
+                transactionDao = transactionDao,
+                cashExpenseDao = cashExpenseDao,
+            )
+            if (owner != null && owner != activeUserId) {
+                return SyncRetryResult.Failed("Data milik akun lain menunggu login akun terkait.")
+            }
+        }
         return retryQueueItem(item)
     }
 
     suspend fun retryAllPending(): SyncBatchRetryResult {
-        val items = syncQueueDao.getByStatus(SyncStatus.PENDING, MAX_QUEUE_READ)
+        val items = filterItemsForActiveUser(syncQueueDao.getByStatus(SyncStatus.PENDING, MAX_QUEUE_READ))
         return retryQueueItemsInSafeOrder(items)
     }
 
     suspend fun retryAllFailed(): SyncBatchRetryResult {
-        val items = syncQueueDao.getByStatus(SyncStatus.FAILED, MAX_QUEUE_READ)
+        val items = filterItemsForActiveUser(syncQueueDao.getByStatus(SyncStatus.FAILED, MAX_QUEUE_READ))
         return retryQueueItemsInSafeOrder(items)
+    }
+
+    private suspend fun filterItemsForActiveUser(items: List<SyncQueueEntity>): List<SyncQueueEntity> {
+        if (!applyIsolationFilter || items.isEmpty()) return items
+        return partitionSyncQueueByUser(
+            queue = items,
+            activeUserId = activeUserIdProvider?.invoke(),
+            sessions = emptyList(),
+            cashSessionDao = cashSessionDao,
+            transactionDao = transactionDao,
+            cashExpenseDao = cashExpenseDao,
+            applyIsolationFilter = true,
+        ).ownItems
     }
 
     suspend fun markConflictReviewed(queueId: Long): SyncRetryResult {
@@ -266,7 +320,8 @@ data class SyncMonitoringSnapshot(
     val totalConflict: Int = 0,
     val totalSyncedToday: Int = 0,
     val queueItems: List<SyncQueueUiModel> = emptyList(),
-    val offlineSessionAgeAlert: OfflineSessionAgeAlert? = null
+    val offlineSessionAgeAlert: OfflineSessionAgeAlert? = null,
+    val otherUsersPendingSyncCount: Int = 0,
 )
 
 data class SyncQueueUiModel(

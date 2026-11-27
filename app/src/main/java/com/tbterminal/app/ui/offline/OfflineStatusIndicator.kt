@@ -71,7 +71,8 @@ fun OfflineStatusIndicatorHost(
         status.dataSourceStatus != DataSourceStatus.LOCAL_ONLY &&
         status.connectionStatus == OfflineConnectionStatus.ONLINE &&
         status.pendingSyncCount == 0 &&
-        status.failedSyncCount == 0
+        status.failedSyncCount == 0 &&
+        status.otherUsersPendingSyncCount == 0
 
     val shouldShow = alwaysShow || !isNormalConnected
 
@@ -104,7 +105,8 @@ fun OfflineStatusMiniDot(
         status.dataSourceStatus != DataSourceStatus.LOCAL_ONLY &&
         status.connectionStatus == OfflineConnectionStatus.ONLINE &&
         status.pendingSyncCount == 0 &&
-        status.failedSyncCount == 0
+        status.failedSyncCount == 0 &&
+        status.otherUsersPendingSyncCount == 0
 
     val isWarning = !status.isInternetOnline || status.backendStatus == BackendStatus.UNREACHABLE
     val isSyncing = status.connectionStatus == OfflineConnectionStatus.SYNCING || status.pendingSyncCount > 0
@@ -284,10 +286,13 @@ private fun offlineStatusDetail(status: OfflineStatus): String {
 
         !status.isInternetOnline -> "Data lokal digunakan jika tersedia"
         status.backendStatus == BackendStatus.CONNECTED -> {
-            if (status.pendingSyncCount > 0) {
-                "${status.pendingSyncCount} antrean belum sync"
-            } else {
-                "Server aktif"
+            when {
+                status.pendingSyncCount > 0 && status.otherUsersPendingSyncCount > 0 ->
+                    "${status.pendingSyncCount} antrean belum sync · ${status.otherUsersPendingSyncCount} data kasir lain menunggu login akun terkait"
+                status.pendingSyncCount > 0 -> "${status.pendingSyncCount} antrean belum sync"
+                status.otherUsersPendingSyncCount > 0 ->
+                    "${status.otherUsersPendingSyncCount} data kasir lain menunggu login akun terkait"
+                else -> "Server aktif"
             }
         }
 

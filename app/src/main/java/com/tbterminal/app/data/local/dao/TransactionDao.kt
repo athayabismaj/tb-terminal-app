@@ -44,13 +44,15 @@ interface TransactionDao {
         FROM local_transactions
         WHERE deletedAt IS NULL
             AND syncStatus = :pending
+            AND (:cashierUserId IS NULL OR cashierUserId = :cashierUserId)
         ORDER BY occurredAt ASC
         LIMIT :limit
         """
     )
     suspend fun getPendingLocalIdsForAutoSync(
         pending: SyncStatus,
-        limit: Int
+        limit: Int,
+        cashierUserId: String? = null,
     ): List<Long>
 
     @Query(
@@ -60,6 +62,7 @@ interface TransactionDao {
         WHERE cashSessionLocalId = :cashSessionLocalId
           AND deletedAt IS NULL
           AND syncStatus = :pending
+          AND (:cashierUserId IS NULL OR cashierUserId = :cashierUserId)
         ORDER BY occurredAt ASC, localId ASC
         LIMIT :limit
         """
@@ -68,6 +71,7 @@ interface TransactionDao {
         cashSessionLocalId: Long,
         pending: SyncStatus = SyncStatus.PENDING,
         limit: Int,
+        cashierUserId: String? = null,
     ): List<Long>
 
     @Query(
@@ -77,6 +81,7 @@ interface TransactionDao {
         WHERE cashSessionLocalId IS NULL
           AND deletedAt IS NULL
           AND syncStatus = :pending
+          AND (:cashierUserId IS NULL OR cashierUserId = :cashierUserId)
         ORDER BY occurredAt ASC, localId ASC
         LIMIT :limit
         """
@@ -84,6 +89,7 @@ interface TransactionDao {
     suspend fun getPendingLocalIdsWithoutLocalSession(
         pending: SyncStatus = SyncStatus.PENDING,
         limit: Int,
+        cashierUserId: String? = null,
     ): List<Long>
 
     @Query(
@@ -92,9 +98,13 @@ interface TransactionDao {
         FROM local_transactions
         WHERE deletedAt IS NULL
             AND syncStatus = :pending
+            AND (:cashierUserId IS NULL OR cashierUserId = :cashierUserId)
         """
     )
-    suspend fun countPendingTransactions(pending: SyncStatus = SyncStatus.PENDING): Int
+    suspend fun countPendingTransactions(
+        pending: SyncStatus = SyncStatus.PENDING,
+        cashierUserId: String? = null,
+    ): Int
 
     @Query(
         """

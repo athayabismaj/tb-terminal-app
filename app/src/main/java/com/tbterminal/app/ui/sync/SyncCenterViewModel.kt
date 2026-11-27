@@ -36,6 +36,7 @@ class SyncCenterViewModel(
                         queueItems = snapshot.queueItems,
                         groupedItems = snapshot.queueItems.groupBy { item -> item.entityType },
                         offlineSessionAgeAlert = snapshot.offlineSessionAgeAlert,
+                        otherUsersPendingSyncCount = snapshot.otherUsersPendingSyncCount,
                         isInitialLoading = false,
                     )
                 }
@@ -58,6 +59,7 @@ class SyncCenterViewModel(
                             queueItems = snapshot.queueItems,
                             groupedItems = snapshot.queueItems.groupBy { item -> item.entityType },
                             offlineSessionAgeAlert = snapshot.offlineSessionAgeAlert,
+                            otherUsersPendingSyncCount = snapshot.otherUsersPendingSyncCount,
                             isRefreshing = false,
                             isInitialLoading = false,
                         )
@@ -176,6 +178,7 @@ data class SyncCenterUiState(
     val queueItems: List<SyncQueueUiModel> = emptyList(),
     val groupedItems: Map<SyncEntityType, List<SyncQueueUiModel>> = emptyMap(),
     val offlineSessionAgeAlert: OfflineSessionAgeAlert? = null,
+    val otherUsersPendingSyncCount: Int = 0,
     val isInitialLoading: Boolean = true,
     val isRefreshing: Boolean = false,
     val isRetrying: Boolean = false,

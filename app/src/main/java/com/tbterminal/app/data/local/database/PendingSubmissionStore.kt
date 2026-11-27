@@ -46,6 +46,9 @@ data class PendingSubmissionRecord(
 interface PendingSubmissionStore {
     suspend fun load(scope: String): PendingSubmissionRecord?
     suspend fun save(record: PendingSubmissionRecord)
+    suspend fun saveForOwner(ownerUserId: String, record: PendingSubmissionRecord) {
+        save(record)
+    }
     suspend fun clear(scope: String)
     suspend fun purgeExpired()
 }
@@ -54,11 +57,12 @@ class RoomPendingSubmissionStore(
     private val dao: PendingSubmissionDao,
     private val ownerUserIdProvider: () -> String,
     private val clockMillis: () -> Long = { System.currentTimeMillis() },
-    private val ttlMillis: Long = DEFAULT_TTL_MILLIS
+    private val ttlMillis: Long = DEFAULT_TTL_MILLIS,
+    private val skipWhenOwnerBlank: Boolean = false,
 ) : PendingSubmissionStore {
 
     override suspend fun load(scope: String): PendingSubmissionRecord? {
-        val ownerUserId = resolveOwnerUserId()
+        val ownerUserId = resolveOwnerUserIdOrNull() ?: return null
         val entity = runSuspendCatching { dao.get(ownerUserId, scope) }.getOrElse { return null }
             ?: return null
 
@@ -89,9 +93,14 @@ class RoomPendingSubmissionStore(
     }
 
     override suspend fun save(record: PendingSubmissionRecord) {
-        val ownerUserId = resolveOwnerUserId()
+        val ownerUserId = resolveOwnerUserIdOrNull() ?: return
+        saveForOwner(ownerUserId, record)
+    }
+
+    override suspend fun saveForOwner(ownerUserId: String, record: PendingSubmissionRecord) {
+        val resolvedOwner = ownerUserId.trim().takeIf(String::isNotBlank) ?: return
         val entity = PendingSubmissionEntity(
-            ownerUserId = ownerUserId,
+            ownerUserId = resolvedOwner,
             scope = record.scope,
             idempotencyKey = record.idempotencyKey,
             intentJson = record.intentJson,
@@ -105,7 +114,7 @@ class RoomPendingSubmissionStore(
     }
 
     override suspend fun clear(scope: String) {
-        val ownerUserId = resolveOwnerUserId()
+        val ownerUserId = resolveOwnerUserIdOrNull() ?: return
         runSuspendCatching { dao.delete(ownerUserId, scope) }
     }
 
@@ -114,8 +123,10 @@ class RoomPendingSubmissionStore(
         runSuspendCatching { dao.deleteExpired(cutoff) }
     }
 
-    private fun resolveOwnerUserId(): String {
-        return ownerUserIdProvider().trim().ifBlank { DEFAULT_OWNER_USER_ID }
+    private fun resolveOwnerUserIdOrNull(): String? {
+        val trimmed = ownerUserIdProvider().trim()
+        if (trimmed.isNotBlank()) return trimmed
+        return if (skipWhenOwnerBlank) null else DEFAULT_OWNER_USER_ID
     }
 
     companion object {

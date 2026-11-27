@@ -7,8 +7,11 @@ import android.util.Base64
 import java.util.concurrent.CopyOnWriteArrayList
 import kotlinx.coroutines.channels.BufferOverflow
 import kotlinx.coroutines.flow.MutableSharedFlow
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharedFlow
+import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asSharedFlow
+import kotlinx.coroutines.flow.asStateFlow
 import java.security.KeyStore
 import javax.crypto.Cipher
 import javax.crypto.KeyGenerator
@@ -218,6 +221,9 @@ class SessionManager(
     private var remoteLogout: ((String) -> Unit)? = null
     private var requiresPinUnlock = hasAccessToken()
     private val sessionClearedListeners = CopyOnWriteArrayList<() -> Unit>()
+    private val beforeSessionClearedListeners = CopyOnWriteArrayList<() -> Unit>()
+    private val _activeUserIdFlow = MutableStateFlow(resolveOwnerUserId())
+    val activeUserIdFlow: StateFlow<String?> = _activeUserIdFlow.asStateFlow()
 
     private val _events = MutableSharedFlow<SessionEvent>(
         replay = 0,
@@ -230,6 +236,22 @@ class SessionManager(
         sessionClearedListeners.addIfAbsent(listener)
     }
 
+    fun removeSessionClearedListener(listener: () -> Unit) {
+        sessionClearedListeners.remove(listener)
+    }
+
+    fun addBeforeSessionClearedListener(listener: () -> Unit) {
+        beforeSessionClearedListeners.addIfAbsent(listener)
+    }
+
+    fun removeBeforeSessionClearedListener(listener: () -> Unit) {
+        beforeSessionClearedListeners.remove(listener)
+    }
+
+    fun resolveOwnerUserId(): String? {
+        return resolveSessionIdentity(tokenStore.readSessionUser())
+    }
+
     fun saveAccessToken(token: String) {
         tokenStore.saveAccessToken(token)
     }
@@ -238,10 +260,12 @@ class SessionManager(
         val previousIdentity = resolveSessionIdentity(tokenStore.readSessionUser())
         val nextIdentity = resolveSessionIdentity(user)
         if (previousIdentity != null && nextIdentity != null && previousIdentity != nextIdentity) {
+            notifyBeforeSessionClearedListeners()
             notifySessionClearedListeners()
         }
         tokenStore.saveTokens(token, refreshToken)
         tokenStore.saveSessionUser(user)
+        _activeUserIdFlow.value = nextIdentity
         requiresPinUnlock = false
     }
 
@@ -255,6 +279,7 @@ class SessionManager(
 
     fun updateSessionUser(user: SessionUser) {
         tokenStore.saveSessionUser(user)
+        _activeUserIdFlow.value = resolveSessionIdentity(user)
     }
 
     fun hasAccessToken(): Boolean {
@@ -278,9 +303,17 @@ class SessionManager(
     }
 
     fun clearSession() {
+        notifyBeforeSessionClearedListeners()
         tokenStore.clearAccessToken()
         requiresPinUnlock = false
+        _activeUserIdFlow.value = null
         notifySessionClearedListeners()
+    }
+
+    private fun notifyBeforeSessionClearedListeners() {
+        beforeSessionClearedListeners.forEach { listener ->
+            runCatching { listener() }
+        }
     }
 
     private fun notifySessionClearedListeners() {

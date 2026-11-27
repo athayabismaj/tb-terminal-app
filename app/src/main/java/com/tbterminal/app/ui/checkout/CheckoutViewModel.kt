@@ -19,7 +19,9 @@ import com.tbterminal.app.data.local.database.CashSessionLocalDataSource
 import com.tbterminal.app.data.local.database.CheckoutDraftStore
 import com.tbterminal.app.data.local.database.CustomerLocalDataSource
 import com.tbterminal.app.data.local.database.LocalAppSettingsDataSource
+import com.tbterminal.app.data.local.database.PendingSubmissionStatus
 import com.tbterminal.app.data.local.database.PendingSubmissionStore
+import com.tbterminal.app.data.session.SessionManager
 import com.tbterminal.app.data.local.database.ProductLocalDataSource
 import com.tbterminal.app.data.local.entity.LocalCashSessionEntity
 import com.tbterminal.app.data.local.mapper.hasUnsyncedLocalChanges
@@ -59,6 +61,8 @@ import java.math.BigDecimal
 import java.time.Instant
 import java.time.ZoneId
 import java.util.UUID
+import kotlinx.coroutines.CoroutineDispatcher
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.channels.BufferOverflow
 import kotlinx.coroutines.delay
@@ -73,6 +77,7 @@ import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.runBlocking
 
 sealed interface CheckoutEvent {
     data class NavigateToReceipt(val transactionId: String) : CheckoutEvent
@@ -103,6 +108,8 @@ class CheckoutViewModel(
     private val cartDraftSaveDebounceMs: Long = CheckoutCartDraftCoordinator.DEFAULT_DEBOUNCE_MILLIS,
     private val localCashSessionService: LocalCashSessionService? = null,
     private val cashierUserId: String? = null,
+    private val sessionManager: SessionManager? = null,
+    private val logoutFlushDispatcher: CoroutineDispatcher = Dispatchers.IO,
 ) : ViewModel() {
     private val _uiState = MutableStateFlow(
         CheckoutUiState(canOpenCashSession = AppAccessPolicy.canOpenCashSession(actorRole))
@@ -141,8 +148,33 @@ class CheckoutViewModel(
     private var pendingSubmissionRestoreJob: Job? = null
     private var cashSessionLoadJob: Job? = null
     private var hasCompletedInitialCashSessionLoad = false
+    private var beforeSessionClearedListener: (() -> Unit)? = null
 
     init {
+        sessionManager?.let { manager ->
+            val listener = {
+                val outgoingOwner = manager.resolveOwnerUserId()
+                    ?: cashierUserId?.trim()?.takeIf(String::isNotBlank)
+                val snapshotState = _uiState.value
+                val pendingKey = pendingOnlineCheckout
+                val pendingCmd = ambiguousOnlineCheckout
+                runBlocking(logoutFlushDispatcher) {
+                    cartDraftCoordinator?.flushAndStopForOwner(outgoingOwner, snapshotState)
+                    if (outgoingOwner != null && pendingKey != null && pendingCmd != null) {
+                        pendingSubmissionPersistence?.saveForOwner(
+                            ownerUserId = outgoingOwner,
+                            command = pendingCmd,
+                            fingerprint = pendingKey.fingerprint,
+                            state = snapshotState,
+                            status = PendingSubmissionStatus.AMBIGUOUS,
+                        )
+                    }
+                }
+                Unit
+            }
+            manager.addBeforeSessionClearedListener(listener)
+            beforeSessionClearedListener = listener
+        }
         pendingSubmissionRestoreJob = viewModelScope.launch {
             restorePersistedCheckoutState()
         }
@@ -1943,6 +1975,10 @@ class CheckoutViewModel(
     }
 
     override fun onCleared() {
+        beforeSessionClearedListener?.let { listener ->
+            sessionManager?.removeBeforeSessionClearedListener(listener)
+        }
+        beforeSessionClearedListener = null
         lockScreenCountdownJob?.cancel()
         cartDraftCoordinator?.stop()
         super.onCleared()
@@ -2987,6 +3023,7 @@ class CheckoutViewModel(
             customerLocalDataSource: CustomerLocalDataSource? = null,
             localCashSessionService: LocalCashSessionService? = null,
             cashierUserId: String? = null,
+            sessionManager: SessionManager? = null,
         ): ViewModelProvider.Factory {
             return viewModelFactory {
                 CheckoutViewModel(
@@ -3011,6 +3048,7 @@ class CheckoutViewModel(
                     customerLocalDataSource = customerLocalDataSource,
                     localCashSessionService = localCashSessionService,
                     cashierUserId = cashierUserId,
+                    sessionManager = sessionManager,
                 )
             }
         }

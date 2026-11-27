@@ -47,6 +47,9 @@ class SyncManager(
             return SyncResult.AuthRequired("Login ulang sebelum sinkronisasi.")
         }
 
+        val activeUserId = sessionManager.resolveOwnerUserId()
+            ?: return SyncResult.AuthRequired("Login ulang sebelum sinkronisasi.")
+
         if (!networkMonitor.isOnline()) {
             return SyncResult.Retry("Perangkat sedang offline.")
         }
@@ -72,6 +75,7 @@ class SyncManager(
                         pending = SyncStatus.PENDING,
                         failed = SyncStatus.PENDING,
                         limit = MAX_SESSION_SCAN_LIMIT,
+                        cashierUserId = activeUserId,
                     ).filterNot { it.localId in deferredSessionIds }
 
                     for (session in candidateSessions) {
@@ -112,6 +116,7 @@ class SyncManager(
                         if (!sessionDeferred && !currentSession.serverId.isNullOrBlank()) {
                             val txResult = offlineCheckoutSyncService.syncPendingForSessionUnlocked(
                                 cashSessionLocalId = currentSession.localId,
+                                cashierUserId = activeUserId,
                             )
                             if (txResult.hasAuthFailure) {
                                 return@withSyncLock SyncResult.AuthRequired("Sesi login tidak valid. Login ulang sebelum sinkronisasi.")
@@ -126,6 +131,7 @@ class SyncManager(
 
                             val expResult = offlineCashExpenseSyncService.syncPendingExpensesForSessionUnlocked(
                                 cashSessionLocalId = currentSession.localId,
+                                cashierUserId = activeUserId,
                             )
                             if (expResult.hasAuthFailure) {
                                 return@withSyncLock SyncResult.AuthRequired("Sesi login tidak valid. Login ulang sebelum sinkronisasi.")
@@ -178,7 +184,9 @@ class SyncManager(
                     }
 
                     if (batchProcessed == 0) {
-                        val orphanTxResult = offlineCheckoutSyncService.syncPendingWithoutLocalSessionUnlocked()
+                        val orphanTxResult = offlineCheckoutSyncService.syncPendingWithoutLocalSessionUnlocked(
+                            cashierUserId = activeUserId,
+                        )
                         if (orphanTxResult.hasAuthFailure) {
                             return@withSyncLock SyncResult.AuthRequired("Sesi login tidak valid. Login ulang sebelum sinkronisasi.")
                         }
@@ -190,7 +198,9 @@ class SyncManager(
                         }
                         batchProcessed += orphanTxResult.successCount + orphanTxResult.failedCount
 
-                        val orphanExpResult = offlineCashExpenseSyncService.syncPendingWithoutLocalSessionUnlocked()
+                        val orphanExpResult = offlineCashExpenseSyncService.syncPendingWithoutLocalSessionUnlocked(
+                            cashierUserId = activeUserId,
+                        )
                         if (orphanExpResult.hasAuthFailure) {
                             return@withSyncLock SyncResult.AuthRequired("Sesi login tidak valid. Login ulang sebelum sinkronisasi.")
                         }
@@ -210,7 +220,7 @@ class SyncManager(
                         break
                     }
                 }
-                val hasMorePending = !completedAllBatches && hasRemainingPendingWork()
+                val hasMorePending = !completedAllBatches && hasRemainingPendingWork(activeUserId)
                 SyncResult.Success(
                     processedCount = totalProcessed,
                     hasMorePending = hasMorePending,
@@ -221,11 +231,11 @@ class SyncManager(
         }
     }
 
-    private suspend fun hasRemainingPendingWork(): Boolean {
-        return database.cashSessionDao().countPendingOpenSessions() > 0 ||
-            database.transactionDao().countPendingTransactions() > 0 ||
-            database.cashExpenseDao().countPendingExpenses() > 0 ||
-            database.cashSessionDao().countActionablePendingCloseSessions() > 0
+    private suspend fun hasRemainingPendingWork(cashierUserId: String?): Boolean {
+        return database.cashSessionDao().countPendingOpenSessions(cashierUserId = cashierUserId) > 0 ||
+            database.transactionDao().countPendingTransactions(cashierUserId = cashierUserId) > 0 ||
+            database.cashExpenseDao().countPendingExpenses(cashierUserId = cashierUserId) > 0 ||
+            database.cashSessionDao().countActionablePendingCloseSessions(cashierUserId = cashierUserId) > 0
     }
 
     private companion object {

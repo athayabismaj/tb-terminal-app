@@ -20,6 +20,7 @@ class OfflineCashExpenseSyncService(
     private val deviceId: String,
     private val cashSessionSyncService: OfflineCashSessionSyncService,
     private val clockMillis: () -> Long = { System.currentTimeMillis() },
+    private val activeUserIdProvider: (() -> String?)? = null,
 ) {
     suspend fun recoverStaleSyncing(nowMillis: Long = clockMillis()) {
         OfflineSyncCoordinator.withSyncLock {
@@ -56,6 +57,16 @@ class OfflineCashExpenseSyncService(
 
     internal suspend fun syncExpenseUnlocked(localExpenseId: Long): OfflineCashExpenseSyncResult {
         recoverStaleSyncingUnlocked()
+        val preflightExpense = database.cashExpenseDao().getByLocalId(localExpenseId)
+        val preflightOwner = preflightExpense?.cashSessionLocalId?.let { sessionId ->
+            database.cashSessionDao().getByLocalId(sessionId)?.cashierUserId
+        }
+        if (preflightExpense != null && !matchesActiveUser(preflightOwner)) {
+            return OfflineCashExpenseSyncResult.Failed(
+                message = "Mutasi kas milik kasir lain menunggu login akun terkait.",
+                kind = OfflineCheckoutSyncFailureKind.VALIDATION,
+            )
+        }
         if (!markSyncingIfAllowed(localExpenseId)) {
             return OfflineCashExpenseSyncResult.Failed("Pengeluaran kas sedang disinkronkan atau sudah selesai.")
         }
@@ -170,14 +181,19 @@ class OfflineCashExpenseSyncService(
 
     internal suspend fun syncPendingExpensesUnlocked(
         limit: Int = DEFAULT_AUTO_SYNC_LIMIT,
-        includeFailed: Boolean = false
+        includeFailed: Boolean = false,
+        cashierUserId: String? = resolvedActiveUserIdFilter(),
     ): OfflineCashExpenseBulkSyncResult {
+        if (activeUserIdProvider != null && cashierUserId == null) {
+            return OfflineCashExpenseBulkSyncResult(total = 0, successCount = 0, failedCount = 0)
+        }
         recoverStaleSyncingUnlocked()
         val failedStatus = if (includeFailed) SyncStatus.FAILED else SyncStatus.PENDING
         val expenses = database.cashExpenseDao().getSyncCandidates(
             pending = SyncStatus.PENDING,
             failed = failedStatus,
-            limit = limit
+            limit = limit,
+            cashierUserId = cashierUserId,
         )
         return syncBatch(expenses)
     }
@@ -185,13 +201,18 @@ class OfflineCashExpenseSyncService(
     internal suspend fun syncPendingWithoutLocalSessionUnlocked(
         limit: Int = DEFAULT_AUTO_SYNC_LIMIT,
         includeFailed: Boolean = false,
+        cashierUserId: String? = resolvedActiveUserIdFilter(),
     ): OfflineCashExpenseBulkSyncResult {
+        if (activeUserIdProvider != null && cashierUserId == null) {
+            return OfflineCashExpenseBulkSyncResult(total = 0, successCount = 0, failedCount = 0)
+        }
         recoverStaleSyncingUnlocked()
         val failedStatus = if (includeFailed) SyncStatus.FAILED else SyncStatus.PENDING
         val expenses = database.cashExpenseDao().getSyncCandidatesWithoutLocalSession(
             pending = SyncStatus.PENDING,
             failed = failedStatus,
             limit = limit,
+            cashierUserId = cashierUserId,
         )
         return syncBatch(expenses)
     }
@@ -213,17 +234,33 @@ class OfflineCashExpenseSyncService(
     internal suspend fun syncPendingExpensesForSessionUnlocked(
         cashSessionLocalId: Long,
         limit: Int = DEFAULT_AUTO_SYNC_LIMIT,
-        includeFailed: Boolean = false
+        includeFailed: Boolean = false,
+        cashierUserId: String? = resolvedActiveUserIdFilter(),
     ): OfflineCashExpenseBulkSyncResult {
+        if (activeUserIdProvider != null && cashierUserId == null) {
+            return OfflineCashExpenseBulkSyncResult(total = 0, successCount = 0, failedCount = 0)
+        }
         recoverStaleSyncingUnlocked()
         val failedStatus = if (includeFailed) SyncStatus.FAILED else SyncStatus.PENDING
         val expenses = database.cashExpenseDao().getSyncCandidatesByCashSession(
             cashSessionLocalId = cashSessionLocalId,
             pending = SyncStatus.PENDING,
             failed = failedStatus,
-            limit = limit
+            limit = limit,
+            cashierUserId = cashierUserId,
         )
         return syncBatch(expenses)
+    }
+
+    private fun resolvedActiveUserIdFilter(): String? {
+        return activeUserIdProvider?.invoke()?.trim()?.takeIf(String::isNotBlank)
+    }
+
+    private fun matchesActiveUser(sessionCashierUserId: String?): Boolean {
+        val provider = activeUserIdProvider ?: return true
+        val activeUserId = provider()?.trim()?.takeIf(String::isNotBlank) ?: return false
+        val owner = sessionCashierUserId?.trim()?.takeIf(String::isNotBlank) ?: return true
+        return owner == activeUserId
     }
 
     private suspend fun syncBatch(expenses: List<LocalCashExpenseEntity>): OfflineCashExpenseBulkSyncResult {

@@ -107,9 +107,13 @@ interface CashSessionDao {
         WHERE serverId IS NULL
           AND deletedAt IS NULL
           AND syncStatus = :pending
+          AND (:cashierUserId IS NULL OR cashierUserId = :cashierUserId)
         """
     )
-    suspend fun countPendingOpenSessions(pending: SyncStatus = SyncStatus.PENDING): Int
+    suspend fun countPendingOpenSessions(
+        pending: SyncStatus = SyncStatus.PENDING,
+        cashierUserId: String? = null,
+    ): Int
 
     @Query(
         """
@@ -118,6 +122,7 @@ interface CashSessionDao {
           AND s.serverId IS NOT NULL
           AND s.deletedAt IS NULL
           AND s.syncStatus = :pending
+          AND (:cashierUserId IS NULL OR s.cashierUserId = :cashierUserId)
           AND NOT EXISTS (
               SELECT 1 FROM local_transactions t
               WHERE t.cashSessionLocalId = s.localId
@@ -138,6 +143,7 @@ interface CashSessionDao {
         syncing: SyncStatus = SyncStatus.SYNCING,
         failed: SyncStatus = SyncStatus.FAILED,
         conflict: SyncStatus = SyncStatus.CONFLICT,
+        cashierUserId: String? = null,
     ): Int
 
     @Query(
@@ -163,6 +169,7 @@ interface CashSessionDao {
         WHERE serverId IS NULL
           AND deletedAt IS NULL
           AND (syncStatus = :pending OR syncStatus = :failed)
+          AND (:cashierUserId IS NULL OR cashierUserId = :cashierUserId)
         ORDER BY openedAt ASC
         LIMIT :limit
         """
@@ -170,7 +177,8 @@ interface CashSessionDao {
     suspend fun getOpenSyncCandidates(
         pending: SyncStatus,
         failed: SyncStatus,
-        limit: Int
+        limit: Int,
+        cashierUserId: String? = null,
     ): List<LocalCashSessionEntity>
 
     @Query(
@@ -180,6 +188,7 @@ interface CashSessionDao {
           AND serverId IS NOT NULL
           AND deletedAt IS NULL
           AND (syncStatus = :pending OR syncStatus = :failed)
+          AND (:cashierUserId IS NULL OR cashierUserId = :cashierUserId)
         ORDER BY closedAt ASC
         LIMIT :limit
         """
@@ -188,13 +197,15 @@ interface CashSessionDao {
         closedStatus: String,
         pending: SyncStatus,
         failed: SyncStatus,
-        limit: Int
+        limit: Int,
+        cashierUserId: String? = null,
     ): List<LocalCashSessionEntity>
 
     @Query(
         """
         SELECT * FROM local_cash_sessions s
         WHERE s.deletedAt IS NULL
+          AND (:cashierUserId IS NULL OR s.cashierUserId = :cashierUserId)
           AND (
               (s.serverId IS NULL AND s.syncStatus IN (:pending, :failed))
               OR (s.status = :closedStatus AND s.serverId IS NOT NULL AND s.syncStatus IN (:pending, :failed))
@@ -203,6 +214,7 @@ interface CashSessionDao {
                   WHERE t.cashSessionLocalId = s.localId
                     AND t.deletedAt IS NULL
                     AND t.syncStatus = :pending
+                    AND (:cashierUserId IS NULL OR t.cashierUserId = :cashierUserId)
               )
               OR EXISTS (
                   SELECT 1 FROM local_cash_expenses e
@@ -220,6 +232,7 @@ interface CashSessionDao {
         pending: SyncStatus = SyncStatus.PENDING,
         failed: SyncStatus = SyncStatus.FAILED,
         limit: Int = 50,
+        cashierUserId: String? = null,
     ): List<LocalCashSessionEntity>
 
     @Query(

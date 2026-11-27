@@ -379,6 +379,52 @@ class CashReconciliationViewModelOfflineTest {
         assertEquals(SyncStatus.PENDING, offlineAfter.syncStatus)
     }
 
+    @Test
+    fun sharedDevice_isolatesLocalOpenSessionAndAgeAlertByCashierUserId() = runTest(dispatcher) {
+        val expiredOpenedAt = nowMillis - 73L * 60L * 60L * 1000L
+        val sessionKasirA = database.cashSessionDao().upsert(
+            LocalCashSessionEntity(
+                clientGeneratedId = "sess-kasir-a-expired",
+                deviceId = "android-dev-1",
+                cashierUserId = "kasir-a",
+                status = "OPEN",
+                openedAt = expiredOpenedAt,
+                startingCash = ScaledDecimal2.ofWhole(100_000L),
+                syncStatus = SyncStatus.PENDING,
+                createdAt = expiredOpenedAt,
+                updatedAt = expiredOpenedAt,
+            )
+        )
+
+        val offlineRepo = FakeCashReconciliationOfflineRepo().apply {
+            activeSessionResult = RepositoryResult.Error("CONNECTION_FAILED", "offline")
+        }
+        val vmKasirB = CashReconciliationViewModel(
+            repository = offlineRepo,
+            cashSessionLocalDataSource = cashSessionLocalDataSource,
+            localCashSessionService = localCashSessionService,
+            localCashExpenseService = localCashExpenseService,
+            offlineStatusRepository = offlineStatusRepository,
+            cashierUserId = "kasir-b",
+            cashierNameFallback = "Kasir B",
+            actorRole = "KASIR",
+            clockMillis = { nowMillis },
+        )
+        advanceUntilIdle()
+
+        // Kasir B tidak boleh melihat sesi kas lokal Kasir A ataupun peringatan umur sesi Kasir A
+        assertFalse(vmKasirB.uiState.value.hasActiveSession)
+        assertEquals(null, vmKasirB.uiState.value.offlineSessionAgeAlert)
+
+        // Kasir B dapat membuka sesi kas lokalnya sendiri walaupun Kasir A masih punya sesi OPEN
+        vmKasirB.onOpeningCashChanged("150000")
+        vmKasirB.openSession()
+        advanceUntilIdle()
+        assertTrue(vmKasirB.uiState.value.hasActiveSession)
+        assertTrue(vmKasirB.uiState.value.localCashSessionId != sessionKasirA)
+        assertEquals("kasir-b", vmKasirB.uiState.value.activeSession?.userId)
+    }
+
     private fun buildVm(repository: CashReconciliationRepository): CashReconciliationViewModel {
         return CashReconciliationViewModel(
             repository = repository,
