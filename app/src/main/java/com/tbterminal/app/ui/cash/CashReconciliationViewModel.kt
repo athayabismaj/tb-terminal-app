@@ -10,6 +10,7 @@ import com.tbterminal.app.data.local.cashsession.LocalCashSessionService
 import com.tbterminal.app.data.local.database.CashSessionLocalDataSource
 import com.tbterminal.app.data.local.entity.LocalCashExpenseEntity
 import com.tbterminal.app.data.local.entity.LocalCashSessionEntity
+import com.tbterminal.app.data.local.mapper.hasUnsyncedLocalChanges
 import com.tbterminal.app.data.local.model.AppDataMode
 import com.tbterminal.app.data.local.model.SyncStatus
 import com.tbterminal.app.data.model.CashSession
@@ -22,6 +23,7 @@ import com.tbterminal.app.data.sync.OfflineSessionAgeAlert
 import com.tbterminal.app.data.sync.OfflineSessionAgePolicy
 import com.tbterminal.app.data.sync.OfflineStatus
 import com.tbterminal.app.data.sync.OfflineStatusRepository
+import com.tbterminal.app.data.sync.runSuspendCatching
 import com.tbterminal.app.navigation.AppAccessPolicy
 import com.tbterminal.app.ui.common.parseWholeRupiahInput
 import com.tbterminal.app.ui.common.sanitizeWholeRupiahInput
@@ -101,26 +103,63 @@ class CashReconciliationViewModel(
             when (val sessionResult = repository.getActiveSession()) {
                 is RepositoryResult.Success -> {
                     val session = sessionResult.data
-                    val mirroredLocalId = session?.let { mirrorRemoteSessionSafely(it) }
-                    val ageAlert = resolveOfflineSessionAgeAlert()
-                    _uiState.update {
-                        it.copy(
-                            activeSession = session,
-                            isUsingLocalActiveSession = false,
-                            localCashSessionId = mirroredLocalId,
-                            localCashSessionSyncStatus = null,
-                            offlineSessionAgeAlert = ageAlert,
-                            page = page,
-                            total = 0,
-                            totalPages = 1,
-                            transactions = emptyList()
-                        )
-                    }
-
                     if (session == null) {
-                        _uiState.update { it.copy(isLoading = false) }
+                        reconcileNoActiveRemoteSessionSafely()
+                        val ageAlert = resolveOfflineSessionAgeAlert()
+                        _uiState.update {
+                            it.copy(
+                                activeSession = null,
+                                isUsingLocalActiveSession = false,
+                                localCashSessionId = null,
+                                localCashSessionSyncStatus = null,
+                                offlineSessionAgeAlert = ageAlert,
+                                page = page,
+                                total = 0,
+                                totalPages = 1,
+                                transactions = emptyList(),
+                                isLoading = false,
+                            )
+                        }
                     } else {
-                        loadTransactionsForSession(session.id, page)
+                        val mirroredSession = mirrorRemoteSessionEntitySafely(session)
+                        val locallyClosedPending = mirroredSession != null &&
+                            mirroredSession.hasUnsyncedLocalChanges() &&
+                            !mirroredSession.status.equals("OPEN", ignoreCase = true)
+                        if (locallyClosedPending) {
+                            if (!restoreLocalOpenCashSessionIfAvailable(page, allowAnyCashier = false)) {
+                                val ageAlert = resolveOfflineSessionAgeAlert()
+                                _uiState.update {
+                                    it.copy(
+                                        activeSession = null,
+                                        isUsingLocalActiveSession = false,
+                                        localCashSessionId = null,
+                                        localCashSessionSyncStatus = null,
+                                        offlineSessionAgeAlert = ageAlert,
+                                        page = page,
+                                        total = 0,
+                                        totalPages = 1,
+                                        transactions = emptyList(),
+                                        isLoading = false,
+                                    )
+                                }
+                            }
+                        } else {
+                            val ageAlert = resolveOfflineSessionAgeAlert()
+                            _uiState.update {
+                                it.copy(
+                                    activeSession = session,
+                                    isUsingLocalActiveSession = false,
+                                    localCashSessionId = mirroredSession?.localId,
+                                    localCashSessionSyncStatus = null,
+                                    offlineSessionAgeAlert = ageAlert,
+                                    page = page,
+                                    total = 0,
+                                    totalPages = 1,
+                                    transactions = emptyList()
+                                )
+                            }
+                            loadTransactionsForSession(session.id, page)
+                        }
                     }
                 }
 
@@ -241,6 +280,7 @@ class CashReconciliationViewModel(
                 )
             ) {
                 is RepositoryResult.Success -> {
+                    mirrorRemoteSessionEntitySafely(result.data)
                     _uiState.update {
                         it.copy(
                             activeSession = result.data,
@@ -619,9 +659,21 @@ class CashReconciliationViewModel(
     }
 
     private suspend fun mirrorRemoteSessionSafely(session: CashSession): Long? {
-        return runCatching {
-            cashSessionLocalDataSource?.mirrorRemoteSession(session)?.localId
+        return mirrorRemoteSessionEntitySafely(session)?.localId
+    }
+
+    private suspend fun mirrorRemoteSessionEntitySafely(session: CashSession): LocalCashSessionEntity? {
+        return runSuspendCatching {
+            cashSessionLocalDataSource?.mirrorRemoteSession(session)
         }.getOrNull()
+    }
+
+    private suspend fun reconcileNoActiveRemoteSessionSafely() {
+        runSuspendCatching {
+            cashSessionLocalDataSource?.reconcileNoActiveRemoteSession(
+                cashierUserId = resolveCashierUserId()
+            )
+        }
     }
 
     private suspend fun resolveLocalSessionId(): Long? {

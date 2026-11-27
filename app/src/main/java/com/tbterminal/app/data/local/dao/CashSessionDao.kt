@@ -308,4 +308,29 @@ interface CashSessionDao {
         syncStatus: SyncStatus,
         updatedAt: Long
     ): Unit
+
+    @Query(
+        """
+        UPDATE local_cash_sessions
+        SET status = :closedStatus,
+            closedAt = COALESCE(closedAt, :closedAt),
+            syncStatus = :syncedStatus,
+            syncedAt = :syncedAt,
+            updatedAt = :updatedAt
+        WHERE deletedAt IS NULL
+          AND status = :openStatus
+          AND serverId IS NOT NULL
+          AND syncStatus = :syncedStatus
+          AND (:cashierUserId IS NULL OR cashierUserId = :cashierUserId OR cashierUserId IS NULL)
+        """
+    )
+    suspend fun markMirroredOpenSessionsClosed(
+        cashierUserId: String?,
+        closedAt: Long,
+        updatedAt: Long,
+        syncedAt: Long = updatedAt,
+        openStatus: String = "OPEN",
+        closedStatus: String = "CLOSED",
+        syncedStatus: SyncStatus = SyncStatus.SYNCED,
+    ): Int
 }

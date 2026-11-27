@@ -10,10 +10,21 @@ import java.time.LocalDateTime
 import java.time.OffsetDateTime
 import java.time.ZoneId
 
+/**
+ * Returns true when this local cash session row still holds unsynced offline mutations
+ * (for example an offline close, failed sync, or offline open without a serverId yet).
+ */
+fun LocalCashSessionEntity.hasUnsyncedLocalChanges(): Boolean {
+    return syncStatus != SyncStatus.SYNCED || serverId.isNullOrBlank()
+}
+
 fun CashSession.toLocalCashSessionEntity(
     existing: LocalCashSessionEntity? = null,
     now: Long = System.currentTimeMillis()
 ): LocalCashSessionEntity {
+    if (existing?.hasUnsyncedLocalChanges() == true) {
+        return existing
+    }
     return LocalCashSessionEntity(
         localId = existing?.localId ?: 0L,
         serverId = id,

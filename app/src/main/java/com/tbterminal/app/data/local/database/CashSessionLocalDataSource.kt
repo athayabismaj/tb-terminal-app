@@ -2,6 +2,7 @@ package com.tbterminal.app.data.local.database
 
 import com.tbterminal.app.data.local.dao.CashSessionDao
 import com.tbterminal.app.data.local.entity.LocalCashSessionEntity
+import com.tbterminal.app.data.local.mapper.hasUnsyncedLocalChanges
 import com.tbterminal.app.data.local.mapper.toLocalCashSessionEntity
 import com.tbterminal.app.data.model.CashSession
 
@@ -42,10 +43,26 @@ class CashSessionLocalDataSource(
 
     suspend fun mirrorRemoteSession(session: CashSession): LocalCashSessionEntity {
         val existing = cashSessionDao.getByServerId(session.id)
+        if (existing?.hasUnsyncedLocalChanges() == true) {
+            return existing
+        }
         val entity = session.toLocalCashSessionEntity(existing = existing)
         val localId = cashSessionDao.upsert(entity)
         return cashSessionDao.getByLocalId(entity.localId.takeIf { it > 0L } ?: localId)
             ?: entity.copy(localId = localId)
+    }
+
+    suspend fun reconcileNoActiveRemoteSession(
+        cashierUserId: String? = null,
+        now: Long = System.currentTimeMillis()
+    ): Int {
+        val normalizedCashierUserId = cashierUserId?.trim()?.takeIf(String::isNotBlank)
+        return cashSessionDao.markMirroredOpenSessionsClosed(
+            cashierUserId = normalizedCashierUserId,
+            closedAt = now,
+            updatedAt = now,
+            syncedAt = now,
+        )
     }
 
     private companion object {
