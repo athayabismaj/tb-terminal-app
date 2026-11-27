@@ -1,7 +1,19 @@
 package com.tbterminal.app.ui.common
 
+import com.tbterminal.app.data.local.database.PendingSubmissionRecord
+import com.tbterminal.app.data.local.database.PendingSubmissionStatus
+import com.tbterminal.app.data.local.database.PendingSubmissionStore
+import com.tbterminal.app.data.sync.runSuspendCatching
 import java.math.BigDecimal
 import java.util.UUID
+import kotlinx.serialization.KSerializer
+import kotlinx.serialization.json.Json
+
+private val TrackerPersistenceJson = Json {
+    ignoreUnknownKeys = true
+    encodeDefaults = true
+    explicitNulls = false
+}
 
 /**
  * Tracks a single submission intent and its idempotency key so retries after
@@ -9,10 +21,15 @@ import java.util.UUID
  */
 internal class SubmissionIdempotencyTracker<Intent : Any>(
     private val prefix: String,
-    private val keyGenerator: () -> String = { UUID.randomUUID().toString() }
+    private val keyGenerator: () -> String = { UUID.randomUUID().toString() },
+    private val store: PendingSubmissionStore? = null,
+    private val scope: String? = null,
+    private val intentSerializer: KSerializer<Intent>? = null,
+    private val clockMillis: () -> Long = { System.currentTimeMillis() }
 ) {
     private var activeIntent: Intent? = null
     private var activeKey: String? = null
+    private var activeCreatedAt: Long? = null
     var isOutcomeAmbiguous: Boolean = false
         private set
 
@@ -24,12 +41,49 @@ internal class SubmissionIdempotencyTracker<Intent : Any>(
         val freshKey = "$prefix-${keyGenerator()}"
         activeIntent = intent
         activeKey = freshKey
+        activeCreatedAt = null
         isOutcomeAmbiguous = false
         return freshKey
     }
 
+    suspend fun restore(): String? {
+        val backingStore = store ?: return null
+        val targetScope = scope ?: return null
+        val serializer = intentSerializer ?: return null
+
+        val record = backingStore.load(targetScope) ?: return null
+        val decodedIntent = runSuspendCatching {
+            TrackerPersistenceJson.decodeFromString(serializer, record.intentJson)
+        }.getOrElse {
+            backingStore.clear(targetScope)
+            return null
+        }
+
+        if (record.idempotencyKey.isBlank()) {
+            backingStore.clear(targetScope)
+            return null
+        }
+
+        activeIntent = decodedIntent
+        activeKey = record.idempotencyKey
+        activeCreatedAt = record.createdAt
+        // Both IN_FLIGHT (process died mid-request) and AMBIGUOUS require key reuse on retry.
+        isOutcomeAmbiguous = true
+        return record.payloadJson
+    }
+
+    suspend fun resolveKeyForSubmission(intent: Intent, payloadJson: String? = null): String {
+        val key = resolveKey(intent)
+        persist(PendingSubmissionStatus.IN_FLIGHT, payloadJson)
+        return key
+    }
+
     fun onSuccess() {
         clear()
+    }
+
+    suspend fun onSuccessAndPersist() {
+        clearAndPersist()
     }
 
     fun onError(code: String, message: String? = null) {
@@ -40,13 +94,40 @@ internal class SubmissionIdempotencyTracker<Intent : Any>(
         }
     }
 
+    suspend fun onErrorAndPersist(
+        code: String,
+        message: String? = null,
+        payloadJson: String? = null
+    ) {
+        onError(code, message)
+        if (isOutcomeAmbiguous) {
+            persist(PendingSubmissionStatus.AMBIGUOUS, payloadJson)
+        } else {
+            activeCreatedAt = null
+            clearStore()
+        }
+    }
+
     fun onException() {
         isOutcomeAmbiguous = true
+    }
+
+    suspend fun onExceptionAndPersist(payloadJson: String? = null) {
+        onException()
+        persist(PendingSubmissionStatus.AMBIGUOUS, payloadJson)
     }
 
     fun onDialogDismissed() {
         if (!isOutcomeAmbiguous) {
             clear()
+        }
+    }
+
+    suspend fun onDialogDismissedAndPersist() {
+        onDialogDismissed()
+        if (!isOutcomeAmbiguous) {
+            activeCreatedAt = null
+            clearStore()
         }
     }
 
@@ -57,7 +138,47 @@ internal class SubmissionIdempotencyTracker<Intent : Any>(
     fun clear() {
         activeIntent = null
         activeKey = null
+        activeCreatedAt = null
         isOutcomeAmbiguous = false
+    }
+
+    suspend fun clearAndPersist() {
+        clear()
+        clearStore()
+    }
+
+    private suspend fun persist(status: PendingSubmissionStatus, payloadJson: String?) {
+        val backingStore = store ?: return
+        val targetScope = scope ?: return
+        val serializer = intentSerializer ?: return
+        val intent = activeIntent ?: return
+        val key = activeKey ?: return
+
+        val now = clockMillis()
+        val createdAt = activeCreatedAt ?: now
+        activeCreatedAt = createdAt
+
+        val intentJson = runSuspendCatching {
+            TrackerPersistenceJson.encodeToString(serializer, intent)
+        }.getOrElse { return }
+
+        backingStore.save(
+            PendingSubmissionRecord(
+                scope = targetScope,
+                idempotencyKey = key,
+                intentJson = intentJson,
+                payloadJson = payloadJson,
+                status = status,
+                createdAt = createdAt,
+                updatedAt = now
+            )
+        )
+    }
+
+    private suspend fun clearStore() {
+        val backingStore = store ?: return
+        val targetScope = scope ?: return
+        backingStore.clear(targetScope)
     }
 }
 

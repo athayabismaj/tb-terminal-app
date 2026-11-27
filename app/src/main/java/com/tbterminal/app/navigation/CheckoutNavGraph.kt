@@ -370,6 +370,10 @@ private fun cashierCheckoutViewModel(
             quotationRepository = appContainer.quotationRepository,
             actorRole = appContainer.sessionManager.readSessionUser()?.role.orEmpty(),
             pinUnlockService = appContainer.pinUnlockService,
+            pendingSubmissionStore = appContainer.pendingSubmissionStore,
+            checkoutDraftStore = appContainer.checkoutDraftStore,
+            productLocalDataSource = appContainer.productLocalDataSource,
+            customerLocalDataSource = appContainer.customerLocalDataSource,
         )
     )
 }

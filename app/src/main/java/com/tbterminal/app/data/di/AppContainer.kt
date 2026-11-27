@@ -11,9 +11,13 @@ import com.tbterminal.app.data.local.checkout.LocalCheckoutLookupService
 import com.tbterminal.app.data.local.checkout.LocalCheckoutService
 import com.tbterminal.app.data.local.database.CashSessionLocalDataSource
 import com.tbterminal.app.data.local.database.CategoryLocalDataSource
+import com.tbterminal.app.data.local.database.CheckoutDraftStore
 import com.tbterminal.app.data.local.database.CustomerLocalDataSource
 import com.tbterminal.app.data.local.database.LocalAppSettingsDataSource
+import com.tbterminal.app.data.local.database.PendingSubmissionStore
 import com.tbterminal.app.data.local.database.ProductLocalDataSource
+import com.tbterminal.app.data.local.database.RoomCheckoutDraftStore
+import com.tbterminal.app.data.local.database.RoomPendingSubmissionStore
 import com.tbterminal.app.data.local.database.TbTerminalDatabase
 import com.tbterminal.app.data.local.database.UnitLocalDataSource
 import com.tbterminal.app.data.local.id.DeviceIdProvider
@@ -60,6 +64,8 @@ import com.tbterminal.app.data.sync.SyncManager
 interface AppContainer {
     val sessionManager: SessionManager
     val localDatabase: TbTerminalDatabase
+    val pendingSubmissionStore: PendingSubmissionStore
+    val checkoutDraftStore: CheckoutDraftStore
     val localAppSettingsDataSource: LocalAppSettingsDataSource
     val productLocalDataSource: ProductLocalDataSource
     val categoryLocalDataSource: CategoryLocalDataSource
@@ -122,6 +128,28 @@ class DefaultAppContainer(
 
     override val localDatabase: TbTerminalDatabase by lazy {
         TbTerminalDatabase.getInstance(appContext)
+    }
+
+    override val pendingSubmissionStore: PendingSubmissionStore by lazy {
+        RoomPendingSubmissionStore(
+            dao = localDatabase.pendingSubmissionDao(),
+            ownerUserIdProvider = ::resolveActiveOwnerUserId
+        )
+    }
+
+    override val checkoutDraftStore: CheckoutDraftStore by lazy {
+        RoomCheckoutDraftStore(
+            dao = localDatabase.checkoutDraftDao(),
+            ownerUserIdProvider = ::resolveActiveOwnerUserId
+        )
+    }
+
+    private fun resolveActiveOwnerUserId(): String {
+        val user = sessionManager.readSessionUser()
+        return user?.userId?.takeIf(String::isNotBlank)
+            ?: user?.username?.takeIf(String::isNotBlank)
+            ?: user?.name?.takeIf(String::isNotBlank)
+            ?: RoomPendingSubmissionStore.DEFAULT_OWNER_USER_ID
     }
 
     override val localAppSettingsDataSource: LocalAppSettingsDataSource by lazy {

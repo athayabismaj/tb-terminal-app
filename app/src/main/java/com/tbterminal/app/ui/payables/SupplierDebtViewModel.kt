@@ -3,6 +3,8 @@ package com.tbterminal.app.ui.payables
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
+import com.tbterminal.app.data.local.database.PendingSubmissionScopes
+import com.tbterminal.app.data.local.database.PendingSubmissionStore
 import com.tbterminal.app.data.model.CreateOpeningPayableCommand
 import com.tbterminal.app.data.model.CreatePayableAdjustmentCommand
 import com.tbterminal.app.data.model.CreateSupplierPaymentCommand
@@ -10,6 +12,7 @@ import com.tbterminal.app.data.model.Supplier
 import com.tbterminal.app.data.model.SupplierPayable
 import com.tbterminal.app.data.repository.PurchasingRepository
 import com.tbterminal.app.data.repository.RepositoryResult
+import com.tbterminal.app.data.sync.runSuspendCatching
 import com.tbterminal.app.ui.common.SubmissionIdempotencyTracker
 import com.tbterminal.app.ui.common.parseWholeRupiahOrExactRemainingInput
 import com.tbterminal.app.ui.common.sanitizeWholeRupiahInput
@@ -19,12 +22,23 @@ import com.tbterminal.app.ui.common.viewModelFactory
 import java.math.BigDecimal
 import java.time.LocalDate
 import java.util.UUID
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import kotlinx.serialization.Serializable
+import kotlinx.serialization.encodeToString
+import kotlinx.serialization.json.Json
 
+private val SupplierPaymentDraftJson = Json {
+    ignoreUnknownKeys = true
+    encodeDefaults = true
+    explicitNulls = false
+}
+
+@Serializable
 internal data class SupplierPaymentIntent(
     val payableId: String,
     val normalizedAmount: String,
@@ -41,22 +55,89 @@ internal data class SupplierPaymentDraft(
     val notesInput: String
 )
 
+@Serializable
+internal data class PersistedSupplierPaymentDraft(
+    val payableId: String,
+    val amountInput: String,
+    val methodApiValue: String,
+    val referenceInput: String = "",
+    val notesInput: String = ""
+) {
+    fun toDomainOrNull(): SupplierPaymentDraft? {
+        if (payableId.isBlank()) return null
+        val method = SupplierPaymentMethod.entries.firstOrNull {
+            it.apiValue.equals(methodApiValue, ignoreCase = true) ||
+                it.name.equals(methodApiValue, ignoreCase = true)
+        } ?: SupplierPaymentMethod.Cash
+        return SupplierPaymentDraft(
+            payableId = payableId,
+            amountInput = amountInput,
+            method = method,
+            referenceInput = referenceInput,
+            notesInput = notesInput
+        )
+    }
+}
+
+internal fun SupplierPaymentDraft.toPersistedJson(): String {
+    return SupplierPaymentDraftJson.encodeToString(
+        PersistedSupplierPaymentDraft(
+            payableId = payableId,
+            amountInput = amountInput,
+            methodApiValue = method.apiValue,
+            referenceInput = referenceInput,
+            notesInput = notesInput
+        )
+    )
+}
+
+internal fun decodeSupplierPaymentDraft(payloadJson: String?): SupplierPaymentDraft? {
+    val raw = payloadJson?.takeIf(String::isNotBlank) ?: return null
+    return runSuspendCatching {
+        SupplierPaymentDraftJson.decodeFromString<PersistedSupplierPaymentDraft>(raw).toDomainOrNull()
+    }.getOrNull()
+}
+
 class SupplierDebtViewModel(
     private val purchasingRepository: PurchasingRepository,
-    private val idempotencyKeyGenerator: () -> String = { UUID.randomUUID().toString() }
+    private val idempotencyKeyGenerator: () -> String = { UUID.randomUUID().toString() },
+    private val pendingSubmissionStore: PendingSubmissionStore? = null,
+    private val clockMillis: () -> Long = { System.currentTimeMillis() }
 ) : ViewModel() {
     private val _uiState = MutableStateFlow(SupplierDebtUiState(isLoading = true))
     val uiState: StateFlow<SupplierDebtUiState> = _uiState.asStateFlow()
 
     private val paymentIdempotency = SubmissionIdempotencyTracker<SupplierPaymentIntent>(
         prefix = "supplier-pay",
-        keyGenerator = idempotencyKeyGenerator
+        keyGenerator = idempotencyKeyGenerator,
+        store = pendingSubmissionStore,
+        scope = PendingSubmissionScopes.SUPPLIER_PAYMENT_LIST,
+        intentSerializer = SupplierPaymentIntent.serializer(),
+        clockMillis = clockMillis
     )
     private var pendingAmbiguousDraft: SupplierPaymentDraft? = null
+    private val restoreJob: Job
 
     init {
+        restoreJob = viewModelScope.launch {
+            restorePendingPayment()
+        }
         loadPayables()
         loadSuppliers()
+    }
+
+    private suspend fun restorePendingPayment() {
+        val payloadJson = paymentIdempotency.restore() ?: return
+        val draft = decodeSupplierPaymentDraft(payloadJson)
+        if (draft == null) {
+            paymentIdempotency.clearAndPersist()
+            return
+        }
+        if (pendingAmbiguousDraft == null &&
+            (_uiState.value.selectedPayable == null || _uiState.value.selectedPayable?.id == draft.payableId)
+        ) {
+            pendingAmbiguousDraft = draft
+        }
     }
 
     fun loadPayables(page: Int = _uiState.value.page) {
@@ -141,7 +222,11 @@ class SupplierDebtViewModel(
             pendingDraft
         } else {
             pendingAmbiguousDraft = null
-            paymentIdempotency.clear()
+            if (restoreJob.isCompleted) {
+                viewModelScope.launch { paymentIdempotency.clearAndPersist() }
+            } else {
+                paymentIdempotency.clear()
+            }
             null
         }
         _uiState.update {
@@ -161,6 +246,7 @@ class SupplierDebtViewModel(
         paymentIdempotency.onDialogDismissed()
         if (!paymentIdempotency.isOutcomeAmbiguous) {
             pendingAmbiguousDraft = null
+            viewModelScope.launch { paymentIdempotency.clearAndPersist() }
         }
         _uiState.update { it.copy(selectedPayable = null, isSubmittingPayment = false) }
     }
@@ -193,6 +279,7 @@ class SupplierDebtViewModel(
 
         viewModelScope.launch {
             _uiState.update { it.copy(isSubmittingPayment = true, errorMessage = null, message = null) }
+            restoreJob.join()
             val normalizedReference = state.referenceInput.trim().takeIf(String::isNotBlank)
             val normalizedNotes = state.notesInput.trim().takeIf(String::isNotBlank)
             val intent = SupplierPaymentIntent(
@@ -202,7 +289,15 @@ class SupplierDebtViewModel(
                 reference = normalizedReference,
                 notes = normalizedNotes
             )
-            val idempotencyKey = paymentIdempotency.resolveKey(intent)
+            val draft = SupplierPaymentDraft(
+                payableId = payable.id,
+                amountInput = state.paymentAmountInput,
+                method = state.paymentMethod,
+                referenceInput = state.referenceInput,
+                notesInput = state.notesInput
+            )
+            val draftJson = draft.toPersistedJson()
+            val idempotencyKey = paymentIdempotency.resolveKeyForSubmission(intent, draftJson)
             val command = CreateSupplierPaymentCommand(
                 payableId = payable.id,
                 amount = amount,
@@ -214,7 +309,7 @@ class SupplierDebtViewModel(
 
             when (val result = purchasingRepository.createSupplierPayment(command)) {
                 is RepositoryResult.Success -> {
-                    paymentIdempotency.onSuccess()
+                    paymentIdempotency.onSuccessAndPersist()
                     pendingAmbiguousDraft = null
                     _uiState.update {
                         it.copy(
@@ -227,30 +322,14 @@ class SupplierDebtViewModel(
                 }
 
                 is RepositoryResult.Error -> {
-                    paymentIdempotency.onError(result.code, result.message)
-                    pendingAmbiguousDraft = if (paymentIdempotency.isOutcomeAmbiguous) {
-                        SupplierPaymentDraft(
-                            payableId = payable.id,
-                            amountInput = state.paymentAmountInput,
-                            method = state.paymentMethod,
-                            referenceInput = state.referenceInput,
-                            notesInput = state.notesInput
-                        )
-                    } else {
-                        null
-                    }
+                    paymentIdempotency.onErrorAndPersist(result.code, result.message, draftJson)
+                    pendingAmbiguousDraft = if (paymentIdempotency.isOutcomeAmbiguous) draft else null
                     setActionError(result.message)
                 }
 
                 is RepositoryResult.Exception -> {
-                    paymentIdempotency.onException()
-                    pendingAmbiguousDraft = SupplierPaymentDraft(
-                        payableId = payable.id,
-                        amountInput = state.paymentAmountInput,
-                        method = state.paymentMethod,
-                        referenceInput = state.referenceInput,
-                        notesInput = state.notesInput
-                    )
+                    paymentIdempotency.onExceptionAndPersist(draftJson)
+                    pendingAmbiguousDraft = draft
                     setActionError("Pembayaran gagal dicatat karena koneksi bermasalah.")
                 }
             }
@@ -543,9 +622,15 @@ class SupplierDebtViewModel(
     }
 
     companion object {
-        fun factory(purchasingRepository: PurchasingRepository): ViewModelProvider.Factory {
+        fun factory(
+            purchasingRepository: PurchasingRepository,
+            pendingSubmissionStore: PendingSubmissionStore? = null
+        ): ViewModelProvider.Factory {
             return viewModelFactory {
-                SupplierDebtViewModel(purchasingRepository)
+                SupplierDebtViewModel(
+                    purchasingRepository = purchasingRepository,
+                    pendingSubmissionStore = pendingSubmissionStore
+                )
             }
         }
     }
