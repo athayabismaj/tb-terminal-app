@@ -6,6 +6,7 @@ import androidx.lifecycle.viewModelScope
 import com.tbterminal.app.data.repository.AuthRepository
 import com.tbterminal.app.data.repository.PinUnlockResult
 import com.tbterminal.app.data.repository.RepositoryResult
+import com.tbterminal.app.data.sync.defaultElapsedRealtimeMillis
 import com.tbterminal.app.data.validation.CredentialValidator
 import com.tbterminal.app.ui.common.viewModelFactory
 import kotlinx.coroutines.Job
@@ -52,7 +53,8 @@ sealed interface ResetPinState {
 class AuthViewModel(
     private val authRepository: AuthRepository,
     private val clockMillis: () -> Long = { System.currentTimeMillis() },
-    private val tickIntervalMillis: Long = 1_000L
+    private val tickIntervalMillis: Long = 1_000L,
+    private val elapsedRealtimeMillis: () -> Long = { defaultElapsedRealtimeMillis() },
 ) : ViewModel() {
 
     private val _authState = MutableStateFlow<AuthState>(AuthState.Idle)
@@ -269,13 +271,19 @@ class AuthViewModel(
             }
 
             is PinUnlockResult.Failed -> {
-                val lockedUntil = result.lockedUntilEpochMillis
-                if (result.isLocked && lockedUntil != null) {
-                    val remaining = remainingSecondsUntil(lockedUntil)
-                    if (remaining > 0L) {
-                        startLockoutCountdown(result.message, lockedUntil, remaining)
-                        return
-                    }
+                val initialRemainingMillis = result.remainingLockMillis
+                    ?: result.lockedUntilEpochMillis?.let { (it - clockMillis()).coerceAtLeast(0L) }
+                    ?: 0L
+                if (result.isLocked && initialRemainingMillis > 0L) {
+                    val deadlineElapsedMillis = elapsedRealtimeMillis() + initialRemainingMillis
+                    val initialRemainingSeconds = remainingSecondsFromMillis(initialRemainingMillis)
+                    startLockoutCountdown(
+                        message = result.message,
+                        displayLockedUntilEpochMillis = result.lockedUntilEpochMillis ?: 0L,
+                        deadlineElapsedMillis = deadlineElapsedMillis,
+                        initialRemainingSeconds = initialRemainingSeconds,
+                    )
+                    return
                 }
                 _unlockState.value = if (result.isLocked) {
                     UnlockState.Error(result.message)
@@ -291,24 +299,25 @@ class AuthViewModel(
 
     private fun startLockoutCountdown(
         message: String,
-        lockedUntilEpochMillis: Long,
+        displayLockedUntilEpochMillis: Long,
+        deadlineElapsedMillis: Long,
         initialRemainingSeconds: Long
     ) {
         lockoutCountdownJob?.cancel()
         _unlockState.value = UnlockState.LockedOut(
             message = message,
-            lockedUntilEpochMillis = lockedUntilEpochMillis,
+            lockedUntilEpochMillis = displayLockedUntilEpochMillis,
             remainingSeconds = initialRemainingSeconds
         )
         lockoutCountdownJob = viewModelScope.launch {
             var remaining = initialRemainingSeconds
             while (remaining > 0L) {
                 delay(tickIntervalMillis)
-                remaining = remainingSecondsUntil(lockedUntilEpochMillis)
+                remaining = remainingSecondsUntilElapsed(deadlineElapsedMillis)
                 if (remaining > 0L) {
                     _unlockState.value = UnlockState.LockedOut(
                         message = message,
-                        lockedUntilEpochMillis = lockedUntilEpochMillis,
+                        lockedUntilEpochMillis = displayLockedUntilEpochMillis,
                         remainingSeconds = remaining
                     )
                 }
@@ -317,8 +326,11 @@ class AuthViewModel(
         }
     }
 
-    private fun remainingSecondsUntil(lockedUntilEpochMillis: Long): Long {
-        val diffMillis = lockedUntilEpochMillis - clockMillis()
+    private fun remainingSecondsUntilElapsed(deadlineElapsedMillis: Long): Long {
+        return remainingSecondsFromMillis(deadlineElapsedMillis - elapsedRealtimeMillis())
+    }
+
+    private fun remainingSecondsFromMillis(diffMillis: Long): Long {
         if (diffMillis <= 0L) return 0L
         return (diffMillis + 999L) / 1000L
     }
@@ -431,7 +443,10 @@ class AuthViewModel(
 
         fun factory(authRepository: AuthRepository): ViewModelProvider.Factory {
             return viewModelFactory {
-                AuthViewModel(authRepository = authRepository)
+                AuthViewModel(
+                    authRepository = authRepository,
+                    elapsedRealtimeMillis = { defaultElapsedRealtimeMillis() },
+                )
             }
         }
     }

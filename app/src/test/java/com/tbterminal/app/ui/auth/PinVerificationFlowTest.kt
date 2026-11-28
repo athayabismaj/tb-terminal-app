@@ -123,6 +123,7 @@ class PinVerificationFlowTest {
     @Test
     fun reachingLimitLocksOutWithCountdownAndEscalatingBackoff() = runTest {
         var nowMillis = 1_795_000_000_000L
+        var elapsedMillis = 10_000L
         val backoffSchedule = listOf(30L, 60L, 300L, 900L)
         var callIndex = 0
         val api = FakeUnlockAuthApi {
@@ -137,8 +138,13 @@ class PinVerificationFlowTest {
             )
         }
         val sessionManager = seededSessionManager()
-        val repo = RemoteAuthRepository(sessionManager, { api }, { "android-dev-1" }, testDispatcher)
-        val viewModel = AuthViewModel(repo, clockMillis = { nowMillis }, tickIntervalMillis = 100L)
+        val repo = RemoteAuthRepository(sessionManager, { api }, { "android-dev-1" }, testDispatcher, clockMillis = { nowMillis })
+        val viewModel = AuthViewModel(
+            authRepository = repo,
+            clockMillis = { nowMillis },
+            tickIntervalMillis = 100L,
+            elapsedRealtimeMillis = { elapsedMillis },
+        )
 
         for (expectedSeconds in backoffSchedule) {
             viewModel.unlock("999999")
@@ -148,12 +154,63 @@ class PinVerificationFlowTest {
             assertEquals(expectedSeconds, locked.remainingSeconds)
             assertTrue(sessionManager.hasAccessToken())
 
-            // Simulate server lock window expiring
+            // Simulate monotonic lock window expiring
             nowMillis += expectedSeconds * 1000L + 10L
+            elapsedMillis += expectedSeconds * 1000L + 10L
             advanceTimeBy(150L)
             testDispatcher.scheduler.runCurrent()
             assertEquals(UnlockState.Idle, viewModel.unlockState.value)
         }
+    }
+
+    @Test
+    fun lockoutCountdown_ignoresWallClockForwardAndBackwardJumps() = runTest {
+        var wallMillis = 1_795_000_000_000L
+        var elapsedMillis = 50_000L
+        val api = FakeUnlockAuthApi {
+            val lockedUntil = Instant.ofEpochMilli(wallMillis + 30_000L).toString()
+            errorResponse(
+                httpCode = 423,
+                code = "PIN_LOCKED",
+                error = "PIN terkunci",
+                data = PinUnlockResponse(valid = false, attemptsLeft = 0, lockedUntil = lockedUntil, forceLogout = false)
+            )
+        }
+        val sessionManager = seededSessionManager()
+        val repo = RemoteAuthRepository(sessionManager, { api }, { "android-dev-1" }, testDispatcher, clockMillis = { wallMillis })
+        val viewModel = AuthViewModel(
+            authRepository = repo,
+            clockMillis = { wallMillis },
+            tickIntervalMillis = 100L,
+            elapsedRealtimeMillis = { elapsedMillis },
+        )
+
+        viewModel.unlock("999999")
+        testDispatcher.scheduler.runCurrent()
+        val initial = viewModel.unlockState.value as UnlockState.LockedOut
+        assertEquals(30L, initial.remainingSeconds)
+
+        // Advance wall clock by +1 hour while monotonic time only moves 1 second -> alert must stay at 29s
+        wallMillis += 3_600_000L
+        elapsedMillis += 1_000L
+        advanceTimeBy(100L)
+        testDispatcher.scheduler.runCurrent()
+        val afterForwardJump = viewModel.unlockState.value as UnlockState.LockedOut
+        assertEquals(29L, afterForwardJump.remainingSeconds)
+
+        // Move wall clock backward by 2 hours (-1h relative to start) while monotonic time moves +1s -> 28s, never +1h
+        wallMillis -= 7_200_000L
+        elapsedMillis += 1_000L
+        advanceTimeBy(100L)
+        testDispatcher.scheduler.runCurrent()
+        val afterBackwardJump = viewModel.unlockState.value as UnlockState.LockedOut
+        assertEquals(28L, afterBackwardJump.remainingSeconds)
+
+        // Expires strictly after remaining 28s of monotonic time pass
+        elapsedMillis += 28_001L
+        advanceTimeBy(100L)
+        testDispatcher.scheduler.runCurrent()
+        assertEquals(UnlockState.Idle, viewModel.unlockState.value)
     }
 
     @Test

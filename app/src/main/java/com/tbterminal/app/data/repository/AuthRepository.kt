@@ -27,7 +27,8 @@ sealed interface PinUnlockResult {
         val message: String,
         val attemptsLeft: Int,
         val lockedUntilEpochMillis: Long? = null,
-        val isLocked: Boolean = false
+        val isLocked: Boolean = false,
+        val remainingLockMillis: Long? = null,
     ) : PinUnlockResult
     data class ForceLogout(val message: String) : PinUnlockResult
 }

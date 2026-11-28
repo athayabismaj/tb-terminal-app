@@ -47,6 +47,7 @@ import com.tbterminal.app.data.repository.SystemRepository
 import com.tbterminal.app.data.sync.BackendStatus
 import com.tbterminal.app.data.sync.InternetStatus
 import com.tbterminal.app.data.sync.OfflineSyncScheduler
+import com.tbterminal.app.data.sync.defaultElapsedRealtimeMillis
 import com.tbterminal.app.data.sync.runSuspendCatching
 import com.tbterminal.app.data.sync.OfflineStatus
 import com.tbterminal.app.data.sync.OfflineStatusRepository
@@ -101,6 +102,7 @@ class CheckoutViewModel(
     private val actorRole: String = "KASIR",
     private val pinUnlockService: PinUnlockService? = null,
     private val clockMillis: () -> Long = { System.currentTimeMillis() },
+    private val elapsedRealtimeMillis: () -> Long = { defaultElapsedRealtimeMillis() },
     private val lockoutTickIntervalMillis: Long = 1_000L,
     private val pendingSubmissionStore: PendingSubmissionStore? = null,
     private val checkoutDraftStore: CheckoutDraftStore? = null,
@@ -1929,14 +1931,17 @@ class CheckoutViewModel(
             }
 
             is PinUnlockResult.Failed -> {
-                val lockedUntil = result.lockedUntilEpochMillis
-                val remaining = if (result.isLocked && lockedUntil != null) {
-                    remainingLockSecondsUntil(lockedUntil)
-                } else {
-                    0L
-                }
-                if (result.isLocked && lockedUntil != null && remaining > 0L) {
-                    startLockScreenCountdown(lockedUntil, remaining)
+                val initialRemainingMillis = result.remainingLockMillis
+                    ?: result.lockedUntilEpochMillis?.let { (it - clockMillis()).coerceAtLeast(0L) }
+                    ?: 0L
+                if (result.isLocked && initialRemainingMillis > 0L) {
+                    val deadlineElapsedMillis = elapsedRealtimeMillis() + initialRemainingMillis
+                    val initialRemainingSeconds = remainingLockSecondsFromMillis(initialRemainingMillis)
+                    startLockScreenCountdown(
+                        displayLockedUntilEpochMillis = result.lockedUntilEpochMillis ?: 0L,
+                        deadlineElapsedMillis = deadlineElapsedMillis,
+                        initialRemainingSeconds = initialRemainingSeconds,
+                    )
                 } else {
                     val errorText = when {
                         result.isLocked -> result.message
@@ -1957,30 +1962,32 @@ class CheckoutViewModel(
     }
 
     private fun startLockScreenCountdown(
-        lockedUntilEpochMillis: Long,
+        displayLockedUntilEpochMillis: Long,
+        deadlineElapsedMillis: Long,
         initialRemainingSeconds: Long,
     ) {
         lockScreenCountdownJob?.cancel()
+        val storedLockedUntil = displayLockedUntilEpochMillis.takeIf { it > 0L }
         _uiState.update {
             it.copy(
                 isScreenLocked = true,
                 lockPinInput = "",
                 isUnlockingScreen = false,
-                lockScreenLockedUntilEpochMillis = lockedUntilEpochMillis,
+                lockScreenLockedUntilEpochMillis = storedLockedUntil,
                 lockScreenRemainingSeconds = initialRemainingSeconds,
-                lockPinError = formatPinLockoutMessage(lockedUntilEpochMillis, initialRemainingSeconds),
+                lockPinError = formatPinLockoutMessage(displayLockedUntilEpochMillis, initialRemainingSeconds),
             )
         }
         lockScreenCountdownJob = viewModelScope.launch {
             var remaining = initialRemainingSeconds
             while (remaining > 0L) {
                 delay(lockoutTickIntervalMillis)
-                remaining = remainingLockSecondsUntil(lockedUntilEpochMillis)
+                remaining = remainingLockSecondsUntilElapsed(deadlineElapsedMillis)
                 if (remaining > 0L) {
                     _uiState.update {
                         it.copy(
                             lockScreenRemainingSeconds = remaining,
-                            lockPinError = formatPinLockoutMessage(lockedUntilEpochMillis, remaining),
+                            lockPinError = formatPinLockoutMessage(displayLockedUntilEpochMillis, remaining),
                         )
                     }
                 }
@@ -1995,8 +2002,11 @@ class CheckoutViewModel(
         }
     }
 
-    private fun remainingLockSecondsUntil(lockedUntilEpochMillis: Long): Long {
-        val diffMillis = lockedUntilEpochMillis - clockMillis()
+    private fun remainingLockSecondsUntilElapsed(deadlineElapsedMillis: Long): Long {
+        return remainingLockSecondsFromMillis(deadlineElapsedMillis - elapsedRealtimeMillis())
+    }
+
+    private fun remainingLockSecondsFromMillis(diffMillis: Long): Long {
         if (diffMillis <= 0L) return 0L
         return (diffMillis + 999L) / 1000L
     }
@@ -3104,6 +3114,7 @@ class CheckoutViewModel(
                     quotationRepository = quotationRepository,
                     actorRole = actorRole,
                     pinUnlockService = pinUnlockService,
+                    elapsedRealtimeMillis = { defaultElapsedRealtimeMillis() },
                     pendingSubmissionStore = pendingSubmissionStore,
                     checkoutDraftStore = checkoutDraftStore,
                     productLocalDataSource = productLocalDataSource,

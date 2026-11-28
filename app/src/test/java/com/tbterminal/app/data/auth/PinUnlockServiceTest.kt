@@ -130,6 +130,7 @@ class PinUnlockServiceTest {
         val lockedRes = (service3.unlock("123456") as RepositoryResult.Success).data as PinUnlockResult.Failed
         assertTrue(lockedRes.isLocked)
         assertEquals(nowMillis + 60_000L, lockedRes.lockedUntilEpochMillis)
+        assertEquals(60_000L, lockedRes.remainingLockMillis)
         assertTrue(session3.requiresPinUnlock())
 
         // 4. Server returns 401 max attempts -> revokes session AND deletes verifier
@@ -501,22 +502,29 @@ class PinUnlockServiceTest {
         store.saveVerifier("kasir-clk", "123456", wallMillis, verifiedAtElapsedMillis = elapsedMillis, verifiedAtBootCount = bootCount)
 
         // Trigger 30s offline lockout on 5th wrong attempt
-        repeat(5) {
+        repeat(4) {
             service.unlock("000000")
         }
+        val triggeredLock = (service.unlock("000000") as RepositoryResult.Success).data as PinUnlockResult.Failed
+        assertTrue(triggeredLock.isLocked)
+        assertEquals(30_000L, triggeredLock.remainingLockMillis)
+
         val lockedBeforeJump = (service.unlock("123456") as RepositoryResult.Success).data as PinUnlockResult.Failed
         assertTrue(lockedBeforeJump.isLocked)
+        assertEquals(30_000L, lockedBeforeJump.remainingLockMillis)
 
-        // User advances wall-clock by +5 hours without monotonic time passing -> MUST remain locked!
+        // User advances wall-clock by +5 hours without monotonic time passing -> MUST remain locked with 30s remaining!
         wallMillis += 5L * 60L * 60L * 1000L
         val stillLockedAfterForwardJump = (service.unlock("123456") as RepositoryResult.Success).data as PinUnlockResult.Failed
         assertTrue(stillLockedAfterForwardJump.isLocked)
+        assertEquals(30_000L, stillLockedAfterForwardJump.remainingLockMillis)
 
         // Device reboots during active lockout (bootCount increments, elapsed resets to 5_000L) -> Opsi B re-arms FULL 30s, verifier preserved
         bootCount = 11L
         elapsedMillis = 5_000L
         val lockedAfterReboot = (service.unlock("123456") as RepositoryResult.Success).data as PinUnlockResult.Failed
         assertTrue(lockedAfterReboot.isLocked)
+        assertEquals(30_000L, lockedAfterReboot.remainingLockMillis)
         assertNotNull(store.readVerifier("kasir-clk"))
 
         // Still locked at +29s on new boot, unlocked at +30s + 1ms

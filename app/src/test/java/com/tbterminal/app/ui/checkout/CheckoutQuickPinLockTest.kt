@@ -174,6 +174,7 @@ class CheckoutQuickPinLockTest {
     @Test
     fun lockoutResponseStartsCountdownAndBlocksInputUntilExpired() = runTest(testDispatcher) {
         var nowMillis = 1_800_000_000_000L
+        var elapsedMillis = 20_000L
         val fakeService = FakeCheckoutPinUnlockService {
             RepositoryResult.Success(
                 PinUnlockResult.Failed(
@@ -181,12 +182,14 @@ class CheckoutQuickPinLockTest {
                     attemptsLeft = 0,
                     lockedUntilEpochMillis = nowMillis + 30_000L,
                     isLocked = true,
+                    remainingLockMillis = 30_000L,
                 )
             )
         }
         val vm = buildViewModel(
             pinUnlockService = fakeService,
             clockMillis = { nowMillis },
+            elapsedRealtimeMillis = { elapsedMillis },
             lockoutTickIntervalMillis = 100L,
         )
         advanceUntilIdle()
@@ -206,12 +209,72 @@ class CheckoutQuickPinLockTest {
         testDispatcher.scheduler.runCurrent()
         assertEquals(1, fakeService.submittedPins.size)
 
-        // Advance past lockout expiry so countdown ends cleanly
+        // Advance past monotonic lockout expiry so countdown ends cleanly
         nowMillis += 30_010L
+        elapsedMillis += 30_010L
         advanceTimeBy(150L)
         testDispatcher.scheduler.runCurrent()
         assertEquals(0L, vm.uiState.value.lockScreenRemainingSeconds)
         assertTrue(vm.uiState.value.isScreenLocked)
+    }
+
+    @Test
+    fun quickPinLockoutCountdown_ignoresWallClockForwardAndBackwardJumps() = runTest(testDispatcher) {
+        var wallMillis = 1_800_000_000_000L
+        var elapsedMillis = 20_000L
+        val fakeService = FakeCheckoutPinUnlockService {
+            RepositoryResult.Success(
+                PinUnlockResult.Failed(
+                    message = "PIN terkunci",
+                    attemptsLeft = 0,
+                    lockedUntilEpochMillis = wallMillis + 30_000L,
+                    isLocked = true,
+                    remainingLockMillis = 30_000L,
+                )
+            )
+        }
+        val vm = buildViewModel(
+            pinUnlockService = fakeService,
+            clockMillis = { wallMillis },
+            elapsedRealtimeMillis = { elapsedMillis },
+            lockoutTickIntervalMillis = 100L,
+        )
+        advanceUntilIdle()
+
+        vm.lockScreen()
+        vm.updateLockPinInput("999999")
+        vm.unlockScreen()
+        testDispatcher.scheduler.runCurrent()
+        assertEquals(30L, vm.uiState.value.lockScreenRemainingSeconds)
+
+        // Advance wall clock +1 hour while monotonic elapsed advances 1s -> remains locked at 29s
+        wallMillis += 3_600_000L
+        elapsedMillis += 1_000L
+        advanceTimeBy(100L)
+        testDispatcher.scheduler.runCurrent()
+        assertEquals(29L, vm.uiState.value.lockScreenRemainingSeconds)
+        assertTrue(vm.uiState.value.lockPinError?.contains("00:29") == true)
+
+        // Move wall clock back -2 hours while monotonic elapsed advances 1s -> 28s, does NOT jump by +1 hour
+        wallMillis -= 7_200_000L
+        elapsedMillis += 1_000L
+        advanceTimeBy(100L)
+        testDispatcher.scheduler.runCurrent()
+        assertEquals(28L, vm.uiState.value.lockScreenRemainingSeconds)
+        assertTrue(vm.uiState.value.lockPinError?.contains("00:28") == true)
+
+        // Input remains blocked during monotonic lockout
+        vm.updateLockPinInput("654321")
+        vm.unlockScreen()
+        testDispatcher.scheduler.runCurrent()
+        assertEquals(1, fakeService.submittedPins.size)
+
+        // After monotonic 28s+ pass -> countdown ends
+        elapsedMillis += 28_001L
+        advanceTimeBy(100L)
+        testDispatcher.scheduler.runCurrent()
+        assertEquals(0L, vm.uiState.value.lockScreenRemainingSeconds)
+        assertNull(vm.uiState.value.lockPinError)
     }
 
     @Test
@@ -255,6 +318,7 @@ class CheckoutQuickPinLockTest {
     private fun buildViewModel(
         pinUnlockService: PinUnlockService?,
         clockMillis: () -> Long = { System.currentTimeMillis() },
+        elapsedRealtimeMillis: () -> Long = clockMillis,
         lockoutTickIntervalMillis: Long = 1_000L,
     ): CheckoutViewModel {
         return CheckoutViewModel(
@@ -318,6 +382,7 @@ class CheckoutQuickPinLockTest {
             },
             pinUnlockService = pinUnlockService,
             clockMillis = clockMillis,
+            elapsedRealtimeMillis = elapsedRealtimeMillis,
             lockoutTickIntervalMillis = lockoutTickIntervalMillis,
         )
     }

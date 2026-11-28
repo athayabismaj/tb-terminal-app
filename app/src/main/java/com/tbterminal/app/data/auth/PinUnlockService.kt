@@ -236,9 +236,12 @@ class DefaultPinUnlockService(
             sessionManager.markPinUnlocked()
             return RepositoryResult.Success(PinUnlockResult.Unlocked)
         }
-        val lockedMillis = data.lockedUntil?.let(::parseIsoEpochMillis)
-            ?: retryAfterSeconds?.let { clockMillis() + it * 1000L }
-        val isLocked = lockedMillis != null || code == "PIN_LOCKED"
+        val nowWall = clockMillis()
+        val parsedLockedUntil = data.lockedUntil?.let(::parseIsoEpochMillis)
+        val remainingLockMillis = retryAfterSeconds?.takeIf { it > 0L }?.times(1000L)
+            ?: parsedLockedUntil?.let { (it - nowWall).coerceAtLeast(0L) }
+        val lockedMillis = parsedLockedUntil ?: remainingLockMillis?.let { nowWall + it }
+        val isLocked = lockedMillis != null || (remainingLockMillis != null && remainingLockMillis > 0L) || code == "PIN_LOCKED"
         val message = if (isLocked) {
             UserFacingErrorMapper.message(
                 httpStatus = 423,
@@ -254,6 +257,7 @@ class DefaultPinUnlockService(
                 attemptsLeft = data.attemptsLeft.coerceAtLeast(0),
                 lockedUntilEpochMillis = lockedMillis,
                 isLocked = isLocked,
+                remainingLockMillis = remainingLockMillis?.takeIf { it > 0L },
             )
         )
     }
@@ -367,6 +371,7 @@ class DefaultPinUnlockService(
                                     attemptsLeft = 0,
                                     lockedUntilEpochMillis = displayLockedUntilWall,
                                     isLocked = true,
+                                    remainingLockMillis = remainingMillis,
                                 )
                             )
                         }
@@ -393,6 +398,7 @@ class DefaultPinUnlockService(
                                 attemptsLeft = 0,
                                 lockedUntilEpochMillis = rearmedUntilWall,
                                 isLocked = true,
+                                remainingLockMillis = fallbackDurationMillis,
                             )
                         )
                     }
@@ -438,6 +444,7 @@ class DefaultPinUnlockService(
                             attemptsLeft = 0,
                             lockedUntilEpochMillis = lockedUntilWall,
                             isLocked = true,
+                            remainingLockMillis = durationMillis,
                         )
                     )
                 }
