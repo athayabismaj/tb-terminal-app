@@ -661,6 +661,206 @@ class PinUnlockServiceTest {
         }
     }
 
+    @Test
+    fun allLockedPathsAlwaysPopulatePositiveRemainingLockMillis() = runTest(testDispatcher) {
+        var wallMillis = 1_800_000_000_000L
+        var elapsedMillis = 100_000L
+        var bootCount = 1L
+        val store = InMemoryOfflinePinVerifierStore(pbkdf2Iterations = 100)
+
+        // 1. Offline KASIR (5th failure -> 30s), mid-window, and reboot re-arm
+        val offlineApi = StubUnlockAuthApi { throw ConnectException("offline") }
+        val kasirSession = seededSessionManager(userId = "kasir-rem", role = "KASIR")
+        val offlineKasir = DefaultPinUnlockService(
+            authApiProvider = { offlineApi },
+            sessionManager = kasirSession,
+            deviceIdProvider = { "android-dev" },
+            verifierStore = store,
+            ioDispatcher = testDispatcher,
+            clockMillis = { wallMillis },
+            elapsedRealtimeMillis = { elapsedMillis },
+            bootCountProvider = { bootCount },
+        )
+        store.saveVerifier("kasir-rem", "123456", wallMillis, verifiedAtElapsedMillis = elapsedMillis, verifiedAtBootCount = bootCount)
+        repeat(4) { offlineKasir.unlock("000000") }
+        val kasirNewLock = (offlineKasir.unlock("000000") as RepositoryResult.Success).data as PinUnlockResult.Failed
+        assertTrue(kasirNewLock.isLocked)
+        assertEquals(30_000L, kasirNewLock.remainingLockMillis)
+
+        elapsedMillis += 12_000L
+        wallMillis += 12_000L
+        val kasirActiveLock = (offlineKasir.unlock("000000") as RepositoryResult.Success).data as PinUnlockResult.Failed
+        assertTrue(kasirActiveLock.isLocked)
+        assertEquals(18_000L, kasirActiveLock.remainingLockMillis)
+
+        bootCount = 2L
+        elapsedMillis = 1_000L
+        val kasirRearm = (offlineKasir.unlock("000000") as RepositoryResult.Success).data as PinUnlockResult.Failed
+        assertTrue(kasirRearm.isLocked)
+        assertEquals(30_000L, kasirRearm.remainingLockMillis)
+
+        // Legacy lockout without monotonic anchor -> re-arms > 0
+        store.saveLockout(OfflinePinLockoutRecord(userId = "kasir-rem", failedAttempts = 5, lockedUntilEpochMillis = wallMillis - 5_000L))
+        val legacyRearm = (offlineKasir.unlock("000000") as RepositoryResult.Success).data as PinUnlockResult.Failed
+        assertTrue(legacyRearm.isLocked)
+        assertEquals(30_000L, legacyRearm.remainingLockMillis)
+
+        // 2. Offline OWNER (3rd failure -> 60s)
+        val ownerSession = seededSessionManager(userId = "owner-rem", role = "OWNER")
+        val offlineOwner = DefaultPinUnlockService(
+            authApiProvider = { offlineApi },
+            sessionManager = ownerSession,
+            deviceIdProvider = { "android-dev" },
+            verifierStore = store,
+            ioDispatcher = testDispatcher,
+            clockMillis = { wallMillis },
+            elapsedRealtimeMillis = { elapsedMillis },
+            bootCountProvider = { bootCount },
+        )
+        store.saveVerifier("owner-rem", "654321", wallMillis, verifiedAtElapsedMillis = elapsedMillis, verifiedAtBootCount = bootCount)
+        repeat(2) { offlineOwner.unlock("000000") }
+        val ownerNewLock = (offlineOwner.unlock("000000") as RepositoryResult.Success).data as PinUnlockResult.Failed
+        assertTrue(ownerNewLock.isLocked)
+        assertEquals(60_000L, ownerNewLock.remainingLockMillis)
+
+        // 3. Online 423 with Retry-After, skewed past locked_until, and missing both timestamp and Retry-After
+        val retryAfterApi = StubUnlockAuthApi {
+            val raw = Response.error<ApiResponse<PinUnlockResponse>>(
+                423,
+                """{"success":false,"code":"PIN_LOCKED","message":"Locked"}""".toResponseBody("application/json".toMediaType()),
+            ).raw().newBuilder().header("Retry-After", "45").build()
+            Response.error("""{"success":false,"code":"PIN_LOCKED","message":"Locked"}""".toResponseBody("application/json".toMediaType()), raw)
+        }
+        val onlineRetryService = DefaultPinUnlockService({ retryAfterApi }, kasirSession, { "dev" }, store, testDispatcher, clockMillis = { wallMillis })
+        val onlineRetryLock = (onlineRetryService.unlock("000000") as RepositoryResult.Success).data as PinUnlockResult.Failed
+        assertTrue(onlineRetryLock.isLocked)
+        assertEquals(45_000L, onlineRetryLock.remainingLockMillis)
+
+        val skewedPastIso = Instant.ofEpochMilli(wallMillis - 10_000L).toString()
+        val skewedLockedApi = StubUnlockAuthApi {
+            Response.error(
+                423,
+                """{"success":false,"code":"PIN_LOCKED","error":"Terkunci","data":{"valid":false,"attempts_left":0,"locked_until":"$skewedPastIso"}}"""
+                    .toResponseBody("application/json".toMediaType()),
+            )
+        }
+        val skewedService = DefaultPinUnlockService({ skewedLockedApi }, kasirSession, { "dev" }, store, testDispatcher, clockMillis = { wallMillis })
+        val skewedLock = (skewedService.unlock("000000") as RepositoryResult.Success).data as PinUnlockResult.Failed
+        assertTrue(skewedLock.isLocked)
+        assertTrue((skewedLock.remainingLockMillis ?: 0L) > 0L)
+
+        val bareLockedApi = StubUnlockAuthApi {
+            Response.error(
+                423,
+                """{"success":false,"code":"PIN_LOCKED","message":"PIN terkunci"}""".toResponseBody("application/json".toMediaType()),
+            )
+        }
+        val bareLockedService = DefaultPinUnlockService({ bareLockedApi }, kasirSession, { "dev" }, store, testDispatcher, clockMillis = { wallMillis })
+        val bareLock = (bareLockedService.unlock("000000") as RepositoryResult.Success).data as PinUnlockResult.Failed
+        assertTrue(bareLock.isLocked)
+        assertTrue((bareLock.remainingLockMillis ?: 0L) > 0L)
+    }
+
+    @Test
+    fun offlineLockoutRejectsCorrectPinBeforeVerification_unlocksAfterExpiry_andOnlineUnlockClearsOfflineLockout() = runTest(testDispatcher) {
+        var wallMillis = 1_800_000_000_000L
+        var elapsedMillis = 50_000L
+        var isOnline = false
+        val store = InMemoryOfflinePinVerifierStore(pbkdf2Iterations = 100)
+        val sessionManager = seededSessionManager(userId = "kasir-phone", role = "KASIR")
+        val api = StubUnlockAuthApi {
+            if (!isOnline) {
+                throw ConnectException("server offline")
+            }
+            Response.success(ApiResponse(success = true, data = PinUnlockResponse(valid = true, attemptsLeft = 5)))
+        }
+        val service = DefaultPinUnlockService(
+            authApiProvider = { api },
+            sessionManager = sessionManager,
+            deviceIdProvider = { "android-phone" },
+            verifierStore = store,
+            ioDispatcher = testDispatcher,
+            clockMillis = { wallMillis },
+            elapsedRealtimeMillis = { elapsedMillis },
+            bootCountProvider = { 1L },
+        )
+        store.saveVerifier("kasir-phone", "123456", wallMillis, verifiedAtElapsedMillis = elapsedMillis, verifiedAtBootCount = 1L)
+
+        // 1. Offline: wrong PIN 5x triggers lockout
+        repeat(4) { idx ->
+            val wrong = (service.unlock("000000") as RepositoryResult.Success).data as PinUnlockResult.Failed
+            assertFalse(wrong.isLocked)
+            assertEquals(4 - idx, wrong.attemptsLeft)
+        }
+        val locked = (service.unlock("000000") as RepositoryResult.Success).data as PinUnlockResult.Failed
+        assertTrue(locked.isLocked)
+        assertEquals(30_000L, locked.remainingLockMillis)
+
+        // 2. Security check: correct PIN offline MUST be rejected BEFORE verification while locked
+        val correctWhileLocked = (service.unlock("123456") as RepositoryResult.Success).data as PinUnlockResult.Failed
+        assertTrue(correctWhileLocked.isLocked)
+        assertEquals(30_000L, correctWhileLocked.remainingLockMillis)
+        assertTrue(sessionManager.requiresPinUnlock())
+
+        elapsedMillis += 29_000L
+        wallMillis += 29_000L
+        val stillLocked = (service.unlock("123456") as RepositoryResult.Success).data as PinUnlockResult.Failed
+        assertTrue(stillLocked.isLocked)
+        assertEquals(1_000L, stillLocked.remainingLockMillis)
+
+        // 3. After duration expires -> correct PIN unlocks offline
+        elapsedMillis += 1_001L
+        wallMillis += 1_001L
+        assertEquals(RepositoryResult.Success(PinUnlockResult.Unlocked), service.unlock("123456"))
+        assertFalse(sessionManager.requiresPinUnlock())
+        assertNull(store.readLockout("kasir-phone"))
+
+        // 4. Trigger offline lockout again, then unlock ONLINE -> offline lockout state must be cleared
+        sessionManager.lockForResume()
+        repeat(5) { service.unlock("000000") }
+        assertNotNull(store.readLockout("kasir-phone"))
+
+        isOnline = true
+        assertEquals(RepositoryResult.Success(PinUnlockResult.Unlocked), service.unlock("123456"))
+        assertNull(store.readLockout("kasir-phone"))
+
+        // Going offline again starts fresh with 0 prior failed attempts
+        sessionManager.lockForResume()
+        isOnline = false
+        val freshWrong = (service.unlock("000000") as RepositoryResult.Success).data as PinUnlockResult.Failed
+        assertFalse(freshWrong.isLocked)
+        assertEquals(4, freshWrong.attemptsLeft)
+        assertEquals(RepositoryResult.Success(PinUnlockResult.Unlocked), service.unlock("123456"))
+
+        // 5. Online response mapped with valid = true & validPin = null also clears offline lockout
+        sessionManager.lockForResume()
+        store.saveLockout(
+            OfflinePinLockoutRecord(
+                userId = "kasir-phone",
+                failedAttempts = 5,
+                lockedUntilEpochMillis = wallMillis + 30_000L,
+                lockedUntilElapsedMillis = elapsedMillis + 30_000L,
+                lockDurationMillis = 30_000L,
+                lockBootCount = 1L,
+            )
+        )
+        val validWithoutSuccessFlagApi = StubUnlockAuthApi {
+            Response.success(ApiResponse(success = false, data = PinUnlockResponse(valid = true, attemptsLeft = 5)))
+        }
+        val mappedValidService = DefaultPinUnlockService(
+            authApiProvider = { validWithoutSuccessFlagApi },
+            sessionManager = sessionManager,
+            deviceIdProvider = { "android-phone" },
+            verifierStore = store,
+            ioDispatcher = testDispatcher,
+            clockMillis = { wallMillis },
+            elapsedRealtimeMillis = { elapsedMillis },
+            bootCountProvider = { 1L },
+        )
+        assertEquals(RepositoryResult.Success(PinUnlockResult.Unlocked), mappedValidService.unlock("123456"))
+        assertNull(store.readLockout("kasir-phone"))
+    }
+
     private fun seededSessionManager(userId: String, role: String): SessionManager {
         val store = InMemoryTestTokenStore().apply {
             saveTokens("access-token", "refresh-token")

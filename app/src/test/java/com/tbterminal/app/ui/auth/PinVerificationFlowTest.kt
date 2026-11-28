@@ -1,5 +1,7 @@
 package com.tbterminal.app.ui.auth
 
+import com.tbterminal.app.data.auth.DefaultPinUnlockService
+import com.tbterminal.app.data.auth.InMemoryOfflinePinVerifierStore
 import com.tbterminal.app.data.remote.ApiResponse
 import com.tbterminal.app.data.remote.AuthApi
 import com.tbterminal.app.data.remote.ChangePasswordRequestDto
@@ -11,11 +13,14 @@ import com.tbterminal.app.data.remote.PinUnlockResponse
 import com.tbterminal.app.data.remote.ResetPinRequestDto
 import com.tbterminal.app.data.remote.UnlockRequest
 import com.tbterminal.app.data.remote.UserDto
+import com.tbterminal.app.data.repository.PinUnlockResult
 import com.tbterminal.app.data.repository.RemoteAuthRepository
+import com.tbterminal.app.data.repository.RepositoryResult
 import com.tbterminal.app.data.session.SessionEvent
 import com.tbterminal.app.data.session.SessionManager
 import com.tbterminal.app.data.session.SessionUser
 import com.tbterminal.app.data.session.TokenStore
+import java.net.ConnectException
 import java.time.Instant
 import java.time.ZoneOffset
 import kotlinx.coroutines.Dispatchers
@@ -381,6 +386,165 @@ class PinVerificationFlowTest {
             listOf(SessionEvent.Unauthorized("Batas percobaan PIN terlampaui. Silakan login kembali.")),
             events
         )
+    }
+
+    @Test
+    fun offlineWrongPinPhoneFlow_locksWithMonotonicCountdown_rejectsCorrectPinWhileLocked_unlocksAfterExpiry_andOnlineClearsLockout() = runTest(testDispatcher) {
+        var wallMillis = 1_795_000_000_000L
+        var elapsedMillis = 50_000L
+        var isOnline = true
+        val api = FakeUnlockAuthApi {
+            if (!isOnline) {
+                throw ConnectException("server dead")
+            }
+            Response.success(ApiResponse(success = true, data = PinUnlockResponse(valid = true, attemptsLeft = 5)))
+        }
+        val sessionManager = seededSessionManager()
+        val verifierStore = InMemoryOfflinePinVerifierStore(pbkdf2Iterations = 100)
+        val service = DefaultPinUnlockService(
+            authApiProvider = { api },
+            sessionManager = sessionManager,
+            deviceIdProvider = { "android-phone" },
+            verifierStore = verifierStore,
+            ioDispatcher = testDispatcher,
+            clockMillis = { wallMillis },
+            elapsedRealtimeMillis = { elapsedMillis },
+            bootCountProvider = { 1L },
+        )
+        val repo = RemoteAuthRepository(
+            sessionManager = sessionManager,
+            authApiProvider = { api },
+            deviceIdProvider = { "android-phone" },
+            ioDispatcher = testDispatcher,
+            clockMillis = { wallMillis },
+            pinUnlockService = service,
+        )
+        val viewModel = AuthViewModel(
+            authRepository = repo,
+            clockMillis = { wallMillis },
+            tickIntervalMillis = 100L,
+            elapsedRealtimeMillis = { elapsedMillis },
+        )
+
+        // Seed offline verifier via initial online unlock, then lock app & kill server
+        viewModel.unlock("654321")
+        testDispatcher.scheduler.runCurrent()
+        assertEquals(UnlockState.Success, viewModel.unlockState.value)
+        viewModel.forceClearUnlockState()
+        sessionManager.lockForResume()
+        isOnline = false
+
+        // Wrong PIN 4x -> WrongPin with attemptsLeft 4..1
+        for (attempt in 1..4) {
+            viewModel.unlock("999999")
+            testDispatcher.scheduler.runCurrent()
+            val wrong = viewModel.unlockState.value as UnlockState.WrongPin
+            assertEquals(5 - attempt, wrong.attemptsLeft)
+        }
+
+        // 5th wrong PIN offline -> LockedOut with 30s countdown
+        viewModel.unlock("999999")
+        testDispatcher.scheduler.runCurrent()
+        val locked = viewModel.unlockState.value as UnlockState.LockedOut
+        assertEquals(30L, locked.remainingSeconds)
+
+        // Correct PIN blocked by UI guard AND rejected directly by PinUnlockService while locked
+        viewModel.unlock("654321")
+        testDispatcher.scheduler.runCurrent()
+        assertTrue(viewModel.unlockState.value is UnlockState.LockedOut)
+        val directCorrectWhileLocked = (service.unlock("654321") as RepositoryResult.Success).data as com.tbterminal.app.data.repository.PinUnlockResult.Failed
+        assertTrue(directCorrectWhileLocked.isLocked)
+        assertTrue((directCorrectWhileLocked.remainingLockMillis ?: 0L) > 0L)
+
+        // Advance monotonic time 1s + expire remaining 29s
+        elapsedMillis += 1_000L
+        wallMillis += 1_000L
+        advanceTimeBy(100L)
+        testDispatcher.scheduler.runCurrent()
+        assertEquals(29L, (viewModel.unlockState.value as UnlockState.LockedOut).remainingSeconds)
+
+        elapsedMillis += 29_001L
+        wallMillis += 29_001L
+        advanceTimeBy(100L)
+        testDispatcher.scheduler.runCurrent()
+        assertEquals(UnlockState.Idle, viewModel.unlockState.value)
+
+        // After monotonic lockout expires -> correct PIN unlocks offline
+        viewModel.unlock("654321")
+        testDispatcher.scheduler.runCurrent()
+        assertEquals(UnlockState.Success, viewModel.unlockState.value)
+        assertFalse(sessionManager.requiresPinUnlock())
+
+        // Lock again, trigger offline lockout again, then server comes back online -> online unlock clears offline lockout
+        viewModel.forceClearUnlockState()
+        sessionManager.lockForResume()
+        repeat(5) {
+            viewModel.unlock("999999")
+            testDispatcher.scheduler.runCurrent()
+        }
+        assertTrue(viewModel.unlockState.value is UnlockState.LockedOut)
+
+        viewModel.forceClearUnlockState()
+        isOnline = true
+        viewModel.unlock("654321")
+        testDispatcher.scheduler.runCurrent()
+        assertEquals(UnlockState.Success, viewModel.unlockState.value)
+        assertEquals(null, verifierStore.readLockout("u1"))
+
+        // Offline again -> stale lockout must NOT reappear
+        viewModel.forceClearUnlockState()
+        sessionManager.lockForResume()
+        isOnline = false
+        viewModel.unlock("999999")
+        testDispatcher.scheduler.runCurrent()
+        val freshWrong = viewModel.unlockState.value as UnlockState.WrongPin
+        assertEquals(4, freshWrong.attemptsLeft)
+    }
+
+    @Test
+    fun lockedResultWithNullOrZeroRemainingMillisStillEntersCountdownLockout() = runTest(testDispatcher) {
+        val nowMillis = 1_795_000_000_000L
+        var elapsedMillis = 10_000L
+        var returnZeroRemaining = false
+        val sessionManager = seededSessionManager()
+        val fakeRepo = object : com.tbterminal.app.data.repository.AuthRepository {
+            override suspend fun login(username: String, password: String) = error("unused")
+            override suspend fun unlock(pin: String): RepositoryResult<com.tbterminal.app.data.repository.PinUnlockResult> {
+                return RepositoryResult.Success(
+                    com.tbterminal.app.data.repository.PinUnlockResult.Failed(
+                        message = "PIN terkunci sementara",
+                        attemptsLeft = 0,
+                        lockedUntilEpochMillis = if (returnZeroRemaining) nowMillis - 5_000L else null,
+                        isLocked = true,
+                        remainingLockMillis = if (returnZeroRemaining) 0L else null,
+                    )
+                )
+            }
+            override suspend fun resetPinWithPassword(currentPassword: String, newPin: String) = error("unused")
+            override suspend fun getProfile() = error("unused")
+            override suspend fun changeMyPassword(oldPassword: String, newPassword: String) = error("unused")
+            override suspend fun changeMyPin(oldPin: String, newPin: String) = error("unused")
+        }
+        val vm = AuthViewModel(
+            authRepository = fakeRepo,
+            clockMillis = { nowMillis },
+            tickIntervalMillis = 100L,
+            elapsedRealtimeMillis = { elapsedMillis },
+        )
+
+        vm.unlock("999999")
+        testDispatcher.scheduler.runCurrent()
+        val firstLock = vm.unlockState.value as UnlockState.LockedOut
+        assertEquals(30L, firstLock.remainingSeconds)
+        vm.forceClearUnlockState()
+
+        returnZeroRemaining = true
+        vm.unlock("999999")
+        testDispatcher.scheduler.runCurrent()
+        val secondLock = vm.unlockState.value as UnlockState.LockedOut
+        assertEquals(30L, secondLock.remainingSeconds)
+        assertTrue(sessionManager.hasAccessToken())
+        vm.forceClearUnlockState()
     }
 
     private fun seededSessionManager(): SessionManager {

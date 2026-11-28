@@ -9,6 +9,7 @@ import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.test.SemanticsMatcher
 import androidx.compose.ui.test.assert
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.getBoundsInRoot
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithContentDescription
@@ -16,12 +17,30 @@ import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.unit.dp
+import com.tbterminal.app.data.auth.DefaultPinUnlockService
+import com.tbterminal.app.data.auth.InMemoryOfflinePinVerifierStore
 import com.tbterminal.app.data.model.AuthenticatedSession
 import com.tbterminal.app.data.model.UserProfile
+import com.tbterminal.app.data.remote.ApiResponse
+import com.tbterminal.app.data.remote.AuthApi
+import com.tbterminal.app.data.remote.ChangePasswordRequestDto
+import com.tbterminal.app.data.remote.ChangePinRequestDto
+import com.tbterminal.app.data.remote.CurrentUserDto
+import com.tbterminal.app.data.remote.LoginRequest
+import com.tbterminal.app.data.remote.LoginResponse
+import com.tbterminal.app.data.remote.PinUnlockResponse
+import com.tbterminal.app.data.remote.ResetPinRequestDto
+import com.tbterminal.app.data.remote.UnlockRequest
 import com.tbterminal.app.data.repository.AuthRepository
 import com.tbterminal.app.data.repository.PinUnlockResult
+import com.tbterminal.app.data.repository.RemoteAuthRepository
 import com.tbterminal.app.data.repository.RepositoryResult
+import com.tbterminal.app.data.session.SessionManager
+import com.tbterminal.app.data.session.SessionUser
+import com.tbterminal.app.data.session.TokenStore
 import com.tbterminal.app.ui.theme.TbterminalappTheme
+import java.net.ConnectException
+import kotlinx.coroutines.Dispatchers
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Rule
@@ -30,6 +49,7 @@ import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
 import org.robolectric.annotation.GraphicsMode
+import retrofit2.Response
 
 @RunWith(RobolectricTestRunner::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
@@ -296,5 +316,106 @@ class PinScreenBehaviorTest {
 
         composeRule.onNodeWithText("Butuh koneksi untuk membuka kunci").assertIsDisplayed()
         composeRule.onNodeWithText("Periksa koneksi internet.").assertDoesNotExist()
+    }
+
+    @Test
+    @Config(qualifiers = "w390dp-h844dp-mdpi")
+    fun offlineWrongPinFiveTimesShowsLockoutCountdownAndDisablesKeypad() {
+        var wallMillis = 1_800_000_000_000L
+        var elapsedMillis = 50_000L
+        var unlockApiCalls = 0
+        val tokenStore = object : TokenStore {
+            private var access: String? = "access-token"
+            private var refresh: String? = "refresh-token"
+            private var user: SessionUser? = SessionUser("Kasir", "kasir", true, "2026-01-01", null, userId = "kasir-ui")
+            override fun readAccessToken(): String? = access
+            override fun readRefreshToken(): String? = refresh
+            override fun saveAccessToken(token: String) { access = token }
+            override fun saveTokens(accessToken: String, refreshToken: String) {
+                access = accessToken
+                refresh = refreshToken
+            }
+            override fun readSessionUser(): SessionUser? = user
+            override fun saveSessionUser(user: SessionUser) { this.user = user }
+            override fun clearAccessToken() {
+                access = null
+                refresh = null
+                user = null
+            }
+        }
+        val sessionManager = SessionManager(tokenStore).apply { lockForResume() }
+        val verifierStore = InMemoryOfflinePinVerifierStore(pbkdf2Iterations = 10)
+        verifierStore.saveVerifier(
+            userId = "kasir-ui",
+            pin = "123456",
+            verifiedAtMillis = wallMillis,
+            verifiedAtElapsedMillis = elapsedMillis,
+            verifiedAtBootCount = 1L,
+        )
+        val offlineApi = object : AuthApi {
+            override suspend fun login(request: LoginRequest): Response<ApiResponse<LoginResponse>> = error("unused")
+            override suspend fun unlock(request: UnlockRequest): Response<ApiResponse<PinUnlockResponse>> {
+                unlockApiCalls++
+                throw ConnectException("offline")
+            }
+            override suspend fun resetPinWithPassword(request: ResetPinRequestDto): Response<ApiResponse<Unit>> = error("unused")
+            override suspend fun getMe(): Response<ApiResponse<CurrentUserDto>> = error("unused")
+            override suspend fun changeMyPassword(request: ChangePasswordRequestDto): Response<ApiResponse<Unit>> = error("unused")
+            override suspend fun changeMyPin(request: ChangePinRequestDto): Response<ApiResponse<Unit>> = error("unused")
+        }
+        val pinUnlockService = DefaultPinUnlockService(
+            authApiProvider = { offlineApi },
+            sessionManager = sessionManager,
+            verifierStore = verifierStore,
+            ioDispatcher = Dispatchers.Main.immediate,
+            elapsedRealtimeMillis = { elapsedMillis },
+            bootCountProvider = { 1L },
+            clockMillis = { wallMillis },
+        )
+        val repo = RemoteAuthRepository(
+            sessionManager = sessionManager,
+            authApiProvider = { offlineApi },
+            ioDispatcher = Dispatchers.Main.immediate,
+            clockMillis = { wallMillis },
+            pinUnlockService = pinUnlockService,
+        )
+        val viewModel = AuthViewModel(
+            authRepository = repo,
+            clockMillis = { wallMillis },
+            tickIntervalMillis = 1_000L,
+            elapsedRealtimeMillis = { elapsedMillis },
+        )
+
+        composeRule.setContent {
+            TbterminalappTheme {
+                PinScreen(
+                    viewModel = viewModel,
+                    userName = "Kasir",
+                    onUnlockSuccess = {},
+                    onBackToLogin = {},
+                )
+            }
+        }
+
+        // Submit wrong PIN 5 times via UI keypad
+        repeat(5) {
+            repeat(6) {
+                composeRule.onNodeWithTag("pin-key-9").performClick()
+            }
+            composeRule.waitForIdle()
+        }
+
+        assertEquals(5, unlockApiCalls)
+        assertTrue(viewModel.unlockState.value is UnlockState.LockedOut)
+        composeRule.onNodeWithText("00:30", substring = true).assertIsDisplayed()
+        composeRule.onNodeWithTag("pin-key-1").assertIsNotEnabled()
+        composeRule.onNodeWithTag("pin-key-backspace").assertIsNotEnabled()
+
+        // Tapping keypad while locked does not enter digits or trigger unlock
+        composeRule.onNodeWithTag("pin-key-1").performClick()
+        composeRule.waitForIdle()
+        composeRule.onNodeWithContentDescription("0 dari 6 digit terisi").assertIsDisplayed()
+        assertEquals(5, unlockApiCalls)
+        viewModel.forceClearUnlockState()
     }
 }

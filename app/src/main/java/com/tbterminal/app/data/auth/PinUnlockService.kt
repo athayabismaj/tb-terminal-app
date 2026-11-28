@@ -85,13 +85,25 @@ class DefaultPinUnlockService(
         val userKey = resolvePinVerifierUserId(sessionManager.readSessionUser()) ?: return
         offlineMutex.withLock {
             withContext(ioDispatcher) {
-                verifierStore.saveVerifier(
-                    userId = userKey,
-                    pin = pin,
-                    verifiedAtMillis = clockMillis(),
-                    verifiedAtElapsedMillis = resolvedElapsedRealtimeMillis(),
-                    verifiedAtBootCount = bootCountProvider(),
-                )
+                try {
+                    verifierStore.saveVerifier(
+                        userId = userKey,
+                        pin = pin,
+                        verifiedAtMillis = clockMillis(),
+                        verifiedAtElapsedMillis = resolvedElapsedRealtimeMillis(),
+                        verifiedAtBootCount = bootCountProvider(),
+                    )
+                } finally {
+                    verifierStore.clearLockout(userKey)
+                }
+            }
+        }
+    }
+
+    private suspend fun clearOfflineLockoutForCurrentUser() {
+        val userKey = resolvePinVerifierUserId(sessionManager.readSessionUser()) ?: return
+        offlineMutex.withLock {
+            withContext(ioDispatcher) {
                 verifierStore.clearLockout(userKey)
             }
         }
@@ -232,21 +244,41 @@ class DefaultPinUnlockService(
         if (data.valid) {
             if (validPin != null) {
                 recordOnlineVerifiedPin(validPin)
+            } else {
+                clearOfflineLockoutForCurrentUser()
             }
             sessionManager.markPinUnlocked()
             return RepositoryResult.Success(PinUnlockResult.Unlocked)
         }
         val nowWall = clockMillis()
         val parsedLockedUntil = data.lockedUntil?.let(::parseIsoEpochMillis)
-        val remainingLockMillis = retryAfterSeconds?.takeIf { it > 0L }?.times(1000L)
-            ?: parsedLockedUntil?.let { (it - nowWall).coerceAtLeast(0L) }
-        val lockedMillis = parsedLockedUntil ?: remainingLockMillis?.let { nowWall + it }
-        val isLocked = lockedMillis != null || (remainingLockMillis != null && remainingLockMillis > 0L) || code == "PIN_LOCKED"
+        val computedRemainingMillis = retryAfterSeconds?.takeIf { it > 0L }?.times(1000L)
+            ?: parsedLockedUntil?.let { (it - nowWall).takeIf { diff -> diff > 0L } }
+        val isLocked = parsedLockedUntil != null ||
+            (computedRemainingMillis != null && computedRemainingMillis > 0L) ||
+            code == "PIN_LOCKED"
+        val effectiveRemainingLockMillis: Long?
+        val lockedMillis: Long?
+        val effectiveRetryAfterSeconds: Long?
+        if (isLocked) {
+            val fallbackLockoutMillis =
+                offlineLockoutPolicyForRole(sessionManager.readSessionUser()?.role).lockoutSeconds.first() * 1000L
+            val resolvedRemaining = (computedRemainingMillis ?: fallbackLockoutMillis)
+                .coerceAtLeast(MIN_LOCKOUT_MILLIS)
+            effectiveRemainingLockMillis = resolvedRemaining
+            lockedMillis = parsedLockedUntil?.takeIf { it > nowWall } ?: (nowWall + resolvedRemaining)
+            effectiveRetryAfterSeconds = retryAfterSeconds?.takeIf { it > 0L }
+                ?: ((resolvedRemaining + 999L) / 1000L)
+        } else {
+            effectiveRemainingLockMillis = null
+            lockedMillis = null
+            effectiveRetryAfterSeconds = null
+        }
         val message = if (isLocked) {
             UserFacingErrorMapper.message(
                 httpStatus = 423,
                 code = "PIN_LOCKED",
-                retryAfterSeconds = retryAfterSeconds,
+                retryAfterSeconds = effectiveRetryAfterSeconds,
             )
         } else {
             "PIN salah"
@@ -257,7 +289,7 @@ class DefaultPinUnlockService(
                 attemptsLeft = data.attemptsLeft.coerceAtLeast(0),
                 lockedUntilEpochMillis = lockedMillis,
                 isLocked = isLocked,
-                remainingLockMillis = remainingLockMillis?.takeIf { it > 0L },
+                remainingLockMillis = effectiveRemainingLockMillis,
             )
         )
     }
@@ -350,8 +382,9 @@ class DefaultPinUnlockService(
                 if (hasPersistedLock) {
                     val lockedUntilElapsed = existingLockout!!.lockedUntilElapsedMillis
                     val lockDuration = existingLockout.lockDurationMillis?.takeIf { it > 0L }
-                    val fallbackDurationMillis = lockDuration
-                        ?: policyDurationMillisForFailures(policy, existingLockout.failedAttempts)
+                    val fallbackDurationMillis = (lockDuration
+                        ?: policyDurationMillisForFailures(policy, existingLockout.failedAttempts))
+                        .coerceAtLeast(MIN_LOCKOUT_MILLIS)
                     val sameBootLock = lockedUntilElapsed != null &&
                         lockDuration != null &&
                         isSameBootSession(existingLockout.lockBootCount, bootNow) &&
@@ -421,6 +454,7 @@ class DefaultPinUnlockService(
 
                 if (nextFailures >= policy.threshold) {
                     val durationMillis = policyDurationMillisForFailures(policy, nextFailures)
+                        .coerceAtLeast(MIN_LOCKOUT_MILLIS)
                     val durationSeconds = durationMillis / 1000L
                     val lockedUntilWall = wallNow + durationMillis
                     val lockedUntilElapsed = elapsedNow + durationMillis
@@ -506,6 +540,7 @@ class DefaultPinUnlockService(
         const val OFFLINE_VERIFIER_REQUIRED_MESSAGE = "Butuh koneksi untuk membuka kunci"
         const val OFFLINE_MAX_FAILED_ATTEMPTS = 10
         const val CLOCK_BACKWARD_TOLERANCE_MILLIS = 5L * 60L * 1000L
+        private const val MIN_LOCKOUT_MILLIS = 1_000L
         private const val OFFLINE_VERIFIER_UNAVAILABLE_CODE = "OFFLINE_VERIFIER_UNAVAILABLE"
         private const val OFFLINE_VERIFIER_EXPIRED_CODE = "OFFLINE_VERIFIER_EXPIRED"
         private const val OFFLINE_MAX_ATTEMPTS_CODE = "OFFLINE_MAX_ATTEMPTS"

@@ -258,10 +258,14 @@ class EncryptedOfflinePinVerifierStore(
 
     override fun readLockout(userId: String): OfflinePinLockoutRecord? {
         if (userId.isBlank()) return null
-        val encrypted = synchronized(lock) { keyValueStore.getString(LOCKOUT_KEY) } ?: return null
+        return synchronized(lock) { readLockoutLocked(userId) }
+    }
+
+    private fun readLockoutLocked(userId: String): OfflinePinLockoutRecord? {
+        val encrypted = keyValueStore.getString(LOCKOUT_KEY) ?: return null
         val decrypted = crypto.decrypt(encrypted)
         if (decrypted.isNullOrBlank()) {
-            synchronized(lock) { keyValueStore.remove(LOCKOUT_KEY) }
+            keyValueStore.remove(LOCKOUT_KEY)
             return null
         }
         val record = runCatching { json.decodeFromString<OfflinePinLockoutRecord>(decrypted) }.getOrNull()
@@ -284,9 +288,11 @@ class EncryptedOfflinePinVerifierStore(
 
     override fun clearLockout(userId: String) {
         if (userId.isBlank()) return
-        val existing = readLockout(userId) ?: return
-        if (existing.userId == userId) {
-            synchronized(lock) { keyValueStore.remove(LOCKOUT_KEY) }
+        synchronized(lock) {
+            val existing = readLockoutLocked(userId) ?: return
+            if (existing.userId == userId) {
+                keyValueStore.remove(LOCKOUT_KEY)
+            }
         }
     }
 

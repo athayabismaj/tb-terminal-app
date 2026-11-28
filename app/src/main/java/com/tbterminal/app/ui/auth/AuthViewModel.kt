@@ -271,28 +271,26 @@ class AuthViewModel(
             }
 
             is PinUnlockResult.Failed -> {
-                val initialRemainingMillis = result.remainingLockMillis
-                    ?: result.lockedUntilEpochMillis?.let { (it - clockMillis()).coerceAtLeast(0L) }
-                    ?: 0L
-                if (result.isLocked && initialRemainingMillis > 0L) {
+                if (result.isLocked) {
+                    val nowWall = clockMillis()
+                    val initialRemainingMillis = result.remainingLockMillis?.takeIf { it > 0L }
+                        ?: result.lockedUntilEpochMillis?.let { (it - nowWall).takeIf { diff -> diff > 0L } }
+                        ?: DEFAULT_LOCKOUT_FALLBACK_MILLIS
                     val deadlineElapsedMillis = elapsedRealtimeMillis() + initialRemainingMillis
                     val initialRemainingSeconds = remainingSecondsFromMillis(initialRemainingMillis)
+                    val displayLockedUntil = result.lockedUntilEpochMillis?.takeIf { it > nowWall } ?: 0L
                     startLockoutCountdown(
                         message = result.message,
-                        displayLockedUntilEpochMillis = result.lockedUntilEpochMillis ?: 0L,
+                        displayLockedUntilEpochMillis = displayLockedUntil,
                         deadlineElapsedMillis = deadlineElapsedMillis,
                         initialRemainingSeconds = initialRemainingSeconds,
                     )
                     return
                 }
-                _unlockState.value = if (result.isLocked) {
-                    UnlockState.Error(result.message)
-                } else {
-                    UnlockState.WrongPin(
-                        message = result.message,
-                        attemptsLeft = result.attemptsLeft
-                    )
-                }
+                _unlockState.value = UnlockState.WrongPin(
+                    message = result.message,
+                    attemptsLeft = result.attemptsLeft
+                )
             }
         }
     }
@@ -440,6 +438,7 @@ class AuthViewModel(
 
     companion object {
         const val PASSWORD_CHANGED_LOGIN_MESSAGE = "Password diubah, silakan login kembali"
+        private const val DEFAULT_LOCKOUT_FALLBACK_MILLIS = 30_000L
 
         fun factory(authRepository: AuthRepository): ViewModelProvider.Factory {
             return viewModelFactory {

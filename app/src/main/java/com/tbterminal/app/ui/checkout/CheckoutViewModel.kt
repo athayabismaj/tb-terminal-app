@@ -1931,20 +1931,21 @@ class CheckoutViewModel(
             }
 
             is PinUnlockResult.Failed -> {
-                val initialRemainingMillis = result.remainingLockMillis
-                    ?: result.lockedUntilEpochMillis?.let { (it - clockMillis()).coerceAtLeast(0L) }
-                    ?: 0L
-                if (result.isLocked && initialRemainingMillis > 0L) {
+                if (result.isLocked) {
+                    val nowWall = clockMillis()
+                    val initialRemainingMillis = result.remainingLockMillis?.takeIf { it > 0L }
+                        ?: result.lockedUntilEpochMillis?.let { (it - nowWall).takeIf { diff -> diff > 0L } }
+                        ?: DEFAULT_LOCKOUT_FALLBACK_MILLIS
                     val deadlineElapsedMillis = elapsedRealtimeMillis() + initialRemainingMillis
                     val initialRemainingSeconds = remainingLockSecondsFromMillis(initialRemainingMillis)
+                    val displayLockedUntil = result.lockedUntilEpochMillis?.takeIf { it > nowWall } ?: 0L
                     startLockScreenCountdown(
-                        displayLockedUntilEpochMillis = result.lockedUntilEpochMillis ?: 0L,
+                        displayLockedUntilEpochMillis = displayLockedUntil,
                         deadlineElapsedMillis = deadlineElapsedMillis,
                         initialRemainingSeconds = initialRemainingSeconds,
                     )
                 } else {
                     val errorText = when {
-                        result.isLocked -> result.message
                         result.attemptsLeft > 0 -> "PIN salah. Sisa percobaan: ${result.attemptsLeft}."
                         else -> "PIN salah. Coba lagi."
                     }
@@ -3151,6 +3152,7 @@ class CheckoutViewModel(
         }
 
         private const val MAX_CASH_INPUT_LENGTH = 12
+        private const val DEFAULT_LOCKOUT_FALLBACK_MILLIS = 30_000L
     }
 
     private fun CheckoutUiState.withCart(items: List<CartItem>): CheckoutUiState =

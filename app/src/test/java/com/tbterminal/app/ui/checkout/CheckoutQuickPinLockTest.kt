@@ -1,10 +1,13 @@
 package com.tbterminal.app.ui.checkout
 
 import android.app.Application
+import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
+import com.tbterminal.app.data.auth.DefaultPinUnlockService
+import com.tbterminal.app.data.auth.InMemoryOfflinePinVerifierStore
 import com.tbterminal.app.data.auth.PinUnlockService
 import com.tbterminal.app.data.model.CashExpense
 import com.tbterminal.app.data.model.CashExpensePage
@@ -36,15 +39,30 @@ import com.tbterminal.app.data.model.StockCard
 import com.tbterminal.app.data.model.TransactionRefundResult
 import com.tbterminal.app.data.model.TransactionVoidResult
 import com.tbterminal.app.data.model.UpdateProductCommand
+import com.tbterminal.app.data.remote.ApiResponse
+import com.tbterminal.app.data.remote.AuthApi
+import com.tbterminal.app.data.remote.ChangePasswordRequestDto
+import com.tbterminal.app.data.remote.ChangePinRequestDto
+import com.tbterminal.app.data.remote.CurrentUserDto
+import com.tbterminal.app.data.remote.LoginRequest
+import com.tbterminal.app.data.remote.LoginResponse
+import com.tbterminal.app.data.remote.PinUnlockResponse
+import com.tbterminal.app.data.remote.ResetPinRequestDto
+import com.tbterminal.app.data.remote.UnlockRequest
 import com.tbterminal.app.data.repository.CashReconciliationRepository
 import com.tbterminal.app.data.repository.CheckoutRepository
 import com.tbterminal.app.data.repository.CustomerRepository
 import com.tbterminal.app.data.repository.InventoryRepository
 import com.tbterminal.app.data.repository.PinUnlockResult
 import com.tbterminal.app.data.repository.RepositoryResult
+import com.tbterminal.app.data.session.SessionManager
+import com.tbterminal.app.data.session.SessionUser
+import com.tbterminal.app.data.session.TokenStore
 import com.tbterminal.app.ui.checkout.components.QuickPinLockOverlay
 import com.tbterminal.app.ui.theme.TbterminalappTheme
 import java.math.BigDecimal
+import java.net.ConnectException
+import retrofit2.Response
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -313,6 +331,196 @@ class CheckoutQuickPinLockTest {
         composeRule.onNodeWithText("1").performClick()
         assertEquals(0, pinChanges)
         assertEquals(0, unlockClicks)
+    }
+
+    @Test
+    fun quickPinLockOverlay_disablesKeypadAndButtonWhileLockedOut() {
+        var pinChanges = 0
+        var unlockClicks = 0
+        composeRule.setContent {
+            TbterminalappTheme {
+                QuickPinLockOverlay(
+                    cashierName = "Budi",
+                    pinInput = "",
+                    errorMessage = "PIN terkunci hingga 10:00:30 · 00:30",
+                    onPinChange = { pinChanges++ },
+                    onUnlock = { unlockClicks++ },
+                    isLoading = false,
+                    isLockedOut = true,
+                )
+            }
+        }
+
+        composeRule.onNodeWithText("00:30", substring = true).assertIsDisplayed()
+        composeRule.onNodeWithText("Buka Kunci Layar").assertIsNotEnabled()
+        composeRule.onNodeWithText("1").performClick()
+        composeRule.onNodeWithText("C").performClick()
+        assertEquals(0, pinChanges)
+        assertEquals(0, unlockClicks)
+    }
+
+    @Test
+    fun quickPinLockedResultWithMissingRemainingMillisStillEntersCountdown() = runTest(testDispatcher) {
+        val nowMillis = 1_800_000_000_000L
+        var elapsedMillis = 20_000L
+        var zeroRemaining = false
+        val fakeService = FakeCheckoutPinUnlockService {
+            RepositoryResult.Success(
+                PinUnlockResult.Failed(
+                    message = "PIN terkunci",
+                    attemptsLeft = 0,
+                    lockedUntilEpochMillis = if (zeroRemaining) null else nowMillis - 5_000L,
+                    isLocked = true,
+                    remainingLockMillis = if (zeroRemaining) 0L else null,
+                )
+            )
+        }
+        val vm = buildViewModel(
+            pinUnlockService = fakeService,
+            clockMillis = { nowMillis },
+            elapsedRealtimeMillis = { elapsedMillis },
+            lockoutTickIntervalMillis = 100L,
+        )
+        advanceUntilIdle()
+
+        vm.lockScreen()
+        vm.updateLockPinInput("999999")
+        vm.unlockScreen()
+        testDispatcher.scheduler.runCurrent()
+
+        assertTrue(vm.uiState.value.isScreenLocked)
+        assertEquals(30L, vm.uiState.value.lockScreenRemainingSeconds)
+
+        elapsedMillis += 30_001L
+        advanceTimeBy(150L)
+        testDispatcher.scheduler.runCurrent()
+        assertEquals(0L, vm.uiState.value.lockScreenRemainingSeconds)
+
+        zeroRemaining = true
+        vm.updateLockPinInput("999999")
+        vm.unlockScreen()
+        testDispatcher.scheduler.runCurrent()
+        assertEquals(30L, vm.uiState.value.lockScreenRemainingSeconds)
+
+        elapsedMillis += 30_001L
+        advanceTimeBy(150L)
+        testDispatcher.scheduler.runCurrent()
+        assertEquals(0L, vm.uiState.value.lockScreenRemainingSeconds)
+    }
+
+    @Test
+    fun offlineQuickPinPhoneFlow_locksCountdownDisablesInput_rejectsCorrectPinUntilExpiry_andOnlineClearsLockout() = runTest(testDispatcher) {
+        var wallMillis = 1_800_000_000_000L
+        var elapsedMillis = 20_000L
+        var isOnline = true
+        val tokenStore = object : TokenStore {
+            private var access: String? = "access-token"
+            private var refresh: String? = "refresh-token"
+            private var user: SessionUser? = SessionUser("Kasir", "KASIR", true, "2026-01-01", null, userId = "kasir-quick")
+            override fun readAccessToken(): String? = access
+            override fun readRefreshToken(): String? = refresh
+            override fun saveAccessToken(token: String) { access = token }
+            override fun saveTokens(accessToken: String, refreshToken: String) {
+                access = accessToken
+                refresh = refreshToken
+            }
+            override fun readSessionUser(): SessionUser? = user
+            override fun saveSessionUser(user: SessionUser) { this.user = user }
+            override fun clearAccessToken() {
+                access = null
+                refresh = null
+                user = null
+            }
+        }
+        val sessionManager = SessionManager(tokenStore)
+        val verifierStore = InMemoryOfflinePinVerifierStore(pbkdf2Iterations = 100)
+        val api = object : AuthApi {
+            override suspend fun login(request: LoginRequest): Response<ApiResponse<LoginResponse>> = error("unused")
+            override suspend fun unlock(request: UnlockRequest): Response<ApiResponse<PinUnlockResponse>> {
+                if (!isOnline) throw ConnectException("offline")
+                return Response.success(ApiResponse(success = true, data = PinUnlockResponse(valid = true, attemptsLeft = 5)))
+            }
+            override suspend fun resetPinWithPassword(request: ResetPinRequestDto): Response<ApiResponse<Unit>> = error("unused")
+            override suspend fun getMe(): Response<ApiResponse<CurrentUserDto>> = error("unused")
+            override suspend fun changeMyPassword(request: ChangePasswordRequestDto): Response<ApiResponse<Unit>> = error("unused")
+            override suspend fun changeMyPin(request: ChangePinRequestDto): Response<ApiResponse<Unit>> = error("unused")
+        }
+        val service = DefaultPinUnlockService(
+            authApiProvider = { api },
+            sessionManager = sessionManager,
+            verifierStore = verifierStore,
+            ioDispatcher = testDispatcher,
+            elapsedRealtimeMillis = { elapsedMillis },
+            bootCountProvider = { 1L },
+            clockMillis = { wallMillis },
+        )
+        service.recordOnlineVerifiedPin("654321")
+
+        val vm = buildViewModel(
+            pinUnlockService = service,
+            clockMillis = { wallMillis },
+            elapsedRealtimeMillis = { elapsedMillis },
+            lockoutTickIntervalMillis = 100L,
+        )
+        advanceUntilIdle()
+
+        // Lock POS & go offline
+        vm.lockScreen()
+        isOnline = false
+
+        for (attempt in 1..4) {
+            vm.updateLockPinInput("000000")
+            vm.unlockScreen()
+            testDispatcher.scheduler.runCurrent()
+            assertEquals("PIN salah. Sisa percobaan: ${5 - attempt}.", vm.uiState.value.lockPinError)
+        }
+
+        // 5th wrong attempt -> 30s lockout countdown
+        vm.updateLockPinInput("000000")
+        vm.unlockScreen()
+        testDispatcher.scheduler.runCurrent()
+        assertEquals(30L, vm.uiState.value.lockScreenRemainingSeconds)
+        assertTrue(vm.uiState.value.lockPinError?.contains("00:30") == true)
+
+        // Input is blocked in UI, AND direct service call with correct PIN is rejected while locked
+        vm.updateLockPinInput("654321")
+        assertEquals("", vm.uiState.value.lockPinInput)
+        val directWhileLocked = (service.unlock("654321") as RepositoryResult.Success).data as PinUnlockResult.Failed
+        assertTrue(directWhileLocked.isLocked)
+
+        // Advance past monotonic expiry -> unlocks offline
+        elapsedMillis += 30_001L
+        wallMillis += 30_001L
+        advanceTimeBy(150L)
+        testDispatcher.scheduler.runCurrent()
+        assertEquals(0L, vm.uiState.value.lockScreenRemainingSeconds)
+
+        vm.updateLockPinInput("654321")
+        vm.unlockScreen()
+        advanceUntilIdle()
+        assertFalse(vm.uiState.value.isScreenLocked)
+
+        // Lock again, trigger offline lockout, unlock ONLINE -> offline lockout cleared
+        vm.lockScreen()
+        repeat(5) {
+            vm.updateLockPinInput("000000")
+            vm.unlockScreen()
+            testDispatcher.scheduler.runCurrent()
+        }
+        assertTrue(vm.uiState.value.lockScreenRemainingSeconds > 0L)
+        isOnline = true
+        assertEquals(RepositoryResult.Success(PinUnlockResult.Unlocked), service.unlock("654321"))
+        assertNull(verifierStore.readLockout("kasir-quick"))
+
+        // Offline again starts fresh with 4 attemptsLeft after 1 wrong PIN
+        elapsedMillis += 30_001L
+        advanceTimeBy(150L)
+        testDispatcher.scheduler.runCurrent()
+        isOnline = false
+        vm.updateLockPinInput("000000")
+        vm.unlockScreen()
+        testDispatcher.scheduler.runCurrent()
+        assertEquals("PIN salah. Sisa percobaan: 4.", vm.uiState.value.lockPinError)
     }
 
     private fun buildViewModel(
