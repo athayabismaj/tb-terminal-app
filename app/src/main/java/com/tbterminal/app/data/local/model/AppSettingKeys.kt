@@ -22,4 +22,5 @@ object AppSettingKeys {
     const val CACHED_TAX_LABEL = "store_cached_tax_label"
     const val CACHED_CASH_ROUNDING_UNIT = "store_cached_cash_rounding_unit"
     const val CACHED_CASH_ROUNDING_RULE = "store_cached_cash_rounding_rule"
+    const val SYNC_LAST_SUCCESS_PREFIX = "sync_last_success_at_"
 }

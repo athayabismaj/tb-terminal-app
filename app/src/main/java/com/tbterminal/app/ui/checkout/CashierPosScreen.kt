@@ -97,6 +97,7 @@ import com.tbterminal.app.data.local.database.DevicePreferences
 import com.tbterminal.app.data.model.Customer
 import com.tbterminal.app.data.sync.BackendStatus
 import com.tbterminal.app.data.sync.OfflineStatus
+import com.tbterminal.app.navigation.LocalCashierSyncNavigator
 import com.tbterminal.app.ui.barcode.CameraBarcodeScannerDialog
 import com.tbterminal.app.ui.barcode.hardwareBarcodeScanner
 import com.tbterminal.app.ui.checkout.components.MaterialEstimatorDialog
@@ -194,10 +195,12 @@ fun CashierPosScreen(
     }
 
     val isOnline = offlineStatus.isInternetOnline && offlineStatus.backendStatus == BackendStatus.CONNECTED
-    val hasPending = offlineStatus.pendingSyncCount > 0
+    val syncPendingCount = offlineStatus.totalSyncBadgeCount
+    val hasPending = syncPendingCount > 0
     val hasOtherUsersPending = offlineStatus.otherUsersPendingSyncCount > 0
     val isPrinterReady = devicePreferences.printerBluetoothAddress.isNotBlank()
     val hasSystemIssue = !isOnline || hasPending || hasOtherUsersPending || !isPrinterReady
+    val cashierSyncNavigator = LocalCashierSyncNavigator.current
 
     val allCategory = "Semua Kategori"
     val categories = remember(state.products) {
@@ -245,11 +248,13 @@ fun CashierPosScreen(
                     // ── 0. THIN ALERT BANNER (Kondisi Offline / Belum Sinkron / Printer Terputus) ──
                     // Sesuai Keputusan 6: Hanya tampil sebagai banner tipis saat ada masalah, agar POS tetap lega.
                     if (hasSystemIssue) {
+                        val canOpenSyncFromBanner = !isOnline || hasPending || hasOtherUsersPending
                         PosThinAlertBanner(
                             isOnline = isOnline,
-                            pendingSyncCount = offlineStatus.pendingSyncCount,
+                            pendingSyncCount = syncPendingCount,
                             otherUsersPendingSyncCount = offlineStatus.otherUsersPendingSyncCount,
-                            isPrinterReady = isPrinterReady
+                            isPrinterReady = isPrinterReady,
+                            onClick = if (canOpenSyncFromBanner) cashierSyncNavigator else null,
                         )
                         Spacer(modifier = Modifier.height(4.dp))
                     }
@@ -456,6 +461,7 @@ private fun PosThinAlertBanner(
     pendingSyncCount: Int,
     otherUsersPendingSyncCount: Int = 0,
     isPrinterReady: Boolean,
+    onClick: (() -> Unit)? = null,
     modifier: Modifier = Modifier
 ) {
     val otherInfo = if (otherUsersPendingSyncCount > 0) {
@@ -504,6 +510,8 @@ private fun PosThinAlertBanner(
     }
 
     Surface(
+        onClick = { onClick?.invoke() },
+        enabled = onClick != null,
         shape = RoundedCornerShape(8.dp),
         color = style.bg,
         border = BorderStroke(1.dp, style.border),

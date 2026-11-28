@@ -33,6 +33,7 @@ internal enum class AppCapability {
     DEVICE_SETTINGS,
     SYNC,
     RETRY_SYNC,
+    CASHIER_SYNC,
     ACCOUNT,
 }
 
@@ -71,6 +72,7 @@ internal object AppAccessPolicy {
         AppCapability.OWN_TRANSACTIONS,
         AppCapability.APPROVED_TRANSACTION_CORRECTION,
         AppCapability.CASHIER_SHIFT,
+        AppCapability.CASHIER_SYNC,
     )
 
     private val adminCapabilities = (ownerCapabilities + setOf(
@@ -97,6 +99,7 @@ internal object AppAccessPolicy {
         AppCapability.CASH_SESSIONS,
         AppCapability.CASHIER_SHIFT,
         AppCapability.DEVICE_SETTINGS,
+        AppCapability.CASHIER_SYNC,
         AppCapability.ACCOUNT,
         AppCapability.APPROVED_TRANSACTION_CORRECTION,
     )
@@ -139,6 +142,7 @@ internal object AppRouteAccessPolicy {
 
             value == AppRoute.CashierPos.route || value == AppRoute.CashierCart.route || value == AppRoute.CashierPayment.route -> AppCapability.POS
             value == AppRoute.CashierCashSession.route -> AppCapability.CASHIER_SHIFT
+            value == AppRoute.CashierSync.route -> AppCapability.CASHIER_SYNC
             value == AppRoute.CashierStockCheck.route -> AppCapability.STOCK
             value == AppRoute.CashierTransactionHistory.route ||
                 value.matchesRoute(AppRoute.CashierReceiptDetail.route) -> AppCapability.OWN_TRANSACTIONS

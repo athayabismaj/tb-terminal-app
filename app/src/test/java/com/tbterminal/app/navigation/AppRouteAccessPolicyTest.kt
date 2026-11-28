@@ -167,4 +167,14 @@ class AppRouteAccessPolicyTest {
         assertTrue(AppRouteAccessPolicy.isAllowed(AppRoute.CashReconciliation.route, "admin"))
         assertTrue(AppRouteAccessPolicy.isAllowed(AppRoute.CashReconciliation.route, "owner"))
     }
+
+    @Test
+    fun cashierSyncRouteIsAllowedOnlyForCashier() {
+        assertTrue(AppRouteAccessPolicy.isAllowed(AppRoute.CashierSync.route, "kasir"))
+        assertTrue(AppRouteAccessPolicy.isAllowed(AppRoute.CashierSync.route, "KASIR"))
+        assertFalse(AppRouteAccessPolicy.isAllowed(AppRoute.CashierSync.route, "admin"))
+        assertFalse(AppRouteAccessPolicy.isAllowed(AppRoute.CashierSync.route, "owner"))
+        assertFalse(AppRouteAccessPolicy.isAllowed(AppRoute.CashierSync.route, "guest"))
+        assertFalse(AppRouteAccessPolicy.isAllowed(AppRoute.CashierSync.route, null))
+    }
 }

@@ -119,6 +119,10 @@ sealed interface AppRoute {
         override val route = "cashier/stock-check"
     }
 
+    data object CashierSync : AppRoute {
+        override val route = "cashier/sync"
+    }
+
     data object CashierTransactionHistory : AppRoute {
         override val route = "cashier/transactions"
     }

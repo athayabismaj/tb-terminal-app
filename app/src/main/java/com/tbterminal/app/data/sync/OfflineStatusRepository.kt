@@ -2,15 +2,19 @@ package com.tbterminal.app.data.sync
 
 import com.tbterminal.app.data.local.dao.CashExpenseDao
 import com.tbterminal.app.data.local.dao.CashSessionDao
+import com.tbterminal.app.data.local.dao.PendingSubmissionDao
 import com.tbterminal.app.data.local.dao.SyncQueueDao
 import com.tbterminal.app.data.local.dao.TransactionDao
 import com.tbterminal.app.data.local.database.LocalAppSettingsDataSource
 import com.tbterminal.app.data.local.model.AppDataMode
 import com.tbterminal.app.data.local.model.SyncStatus
+import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.flowOf
+import kotlinx.coroutines.flow.map
 
 enum class OfflineConnectionStatus {
     ONLINE,
@@ -32,8 +36,13 @@ data class OfflineStatus(
     val pendingSyncCount: Int = 0,
     val failedSyncCount: Int = 0,
     val otherUsersPendingSyncCount: Int = 0,
-)
+    val pendingSubmissionCount: Int = 0,
+) {
+    val totalSyncBadgeCount: Int
+        get() = pendingSyncCount + pendingSubmissionCount
+}
 
+@OptIn(ExperimentalCoroutinesApi::class)
 class OfflineStatusRepository(
     private val networkMonitor: NetworkConnectivity,
     private val backendHealthMonitor: BackendHealthMonitor,
@@ -43,6 +52,10 @@ class OfflineStatusRepository(
     private val transactionDao: TransactionDao? = null,
     private val cashExpenseDao: CashExpenseDao? = null,
     activeUserIdFlow: Flow<String?>? = null,
+    private val pendingSubmissionDao: PendingSubmissionDao? = null,
+    private val clockMillis: () -> Long = { System.currentTimeMillis() },
+    private val monotonicClockMillis: () -> Long = clockMillis,
+    private val bootCountProvider: () -> Long? = { 1L },
 ) {
     private val connectivityStatus: Flow<ConnectivityStatus> = combine(
         networkMonitor.observeOnline(),
@@ -84,10 +97,40 @@ class OfflineStatusRepository(
         }
     }
 
+    private val pendingSubmissionCountFlow: Flow<Int> =
+        if (activeUserIdFlow == null || pendingSubmissionDao == null) {
+            flowOf(0)
+        } else {
+            activeUserIdFlow
+                .distinctUntilChanged()
+                .flatMapLatest { activeUserId ->
+                    val normalizedOwner = activeUserId?.trim()?.takeIf(String::isNotBlank)
+                    if (normalizedOwner == null) {
+                        flowOf(0)
+                    } else {
+                        pendingSubmissionDao.observeForOwner(normalizedOwner).map { entities ->
+                            val wallNow = clockMillis()
+                            val elapsedNow = monotonicClockMillis()
+                            val bootNow = bootCountProvider()
+                            entities.count { entity ->
+                                isCashierPendingSubmissionScope(entity.scope) &&
+                                    isPendingSubmissionActive(
+                                        entity = entity,
+                                        wallNow = wallNow,
+                                        elapsedNow = elapsedNow,
+                                        bootNow = bootNow,
+                                    )
+                            }
+                        }
+                    }
+                }
+        }
+
     val status: Flow<OfflineStatus> = combine(
         connectivityStatus,
-        syncQueueStatus
-    ) { connectivity, syncQueue ->
+        syncQueueStatus,
+        pendingSubmissionCountFlow,
+    ) { connectivity, syncQueue, pendingSubmissionCount ->
         val isOnline = connectivity.isOnline
         val backendStatus = connectivity.backendStatus
         val dataMode = connectivity.dataMode
@@ -126,6 +169,7 @@ class OfflineStatusRepository(
             pendingSyncCount = pendingCount,
             failedSyncCount = failedCount,
             otherUsersPendingSyncCount = otherUsersPendingCount,
+            pendingSubmissionCount = pendingSubmissionCount,
         )
     }.distinctUntilChanged()
 

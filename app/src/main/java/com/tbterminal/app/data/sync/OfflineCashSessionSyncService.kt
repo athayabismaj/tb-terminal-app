@@ -30,8 +30,11 @@ class OfflineCashSessionSyncService(
         }
     }
 
-    internal suspend fun recoverStaleSyncingUnlocked(nowMillis: Long = clockMillis()) {
-        val cutoff = nowMillis - SYNC_STALE_TIMEOUT_MS
+    internal suspend fun recoverStaleSyncingUnlocked(
+        nowMillis: Long = clockMillis(),
+        recoverAll: Boolean = false,
+    ) {
+        val cutoff = if (recoverAll) Long.MAX_VALUE else nowMillis - SYNC_STALE_TIMEOUT_MS
         database.withTransaction {
             database.syncQueueDao().recoverStaleSyncingCashSessions(
                 syncing = SyncStatus.SYNCING,

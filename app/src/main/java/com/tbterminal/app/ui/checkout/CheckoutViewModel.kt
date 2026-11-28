@@ -47,6 +47,7 @@ import com.tbterminal.app.data.repository.SystemRepository
 import com.tbterminal.app.data.sync.BackendStatus
 import com.tbterminal.app.data.sync.InternetStatus
 import com.tbterminal.app.data.sync.OfflineSyncScheduler
+import com.tbterminal.app.data.sync.SyncNowScheduleResult
 import com.tbterminal.app.data.sync.defaultElapsedRealtimeMillis
 import com.tbterminal.app.data.sync.runSuspendCatching
 import com.tbterminal.app.data.sync.OfflineStatus
@@ -603,7 +604,7 @@ class CheckoutViewModel(
             )
         ) {
             is LocalCashSessionResult.Success -> {
-                offlineSyncScheduler?.scheduleIfEnabled()
+                triggerAutoSyncAfterLocalSave()
                 _uiState.update { state ->
                     state.copy(
                         activeCashSession = result.session.toActiveCashSessionUi(),
@@ -623,6 +624,13 @@ class CheckoutViewModel(
                     )
                 }
             }
+        }
+    }
+
+    private suspend fun triggerAutoSyncAfterLocalSave() {
+        val scheduler = offlineSyncScheduler ?: return
+        if (scheduler.scheduleSyncNowIfConnected(includeFailed = false) != SyncNowScheduleResult.ENQUEUED) {
+            scheduler.scheduleIfEnabled()
         }
     }
 
@@ -2690,7 +2698,7 @@ class CheckoutViewModel(
 
                 when (val result = service.saveCheckout(buildResult.command)) {
                     is LocalCheckoutResult.Success -> {
-                        offlineSyncScheduler?.scheduleIfEnabled()
+                        triggerAutoSyncAfterLocalSave()
                         _uiState.update { state ->
                             state.resetAfterSuccessfulCheckout().copy(
                                 errorEvent = UiText.DynamicString(

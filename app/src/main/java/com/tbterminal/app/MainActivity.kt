@@ -25,6 +25,7 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.compose.rememberNavController
 import com.tbterminal.app.data.session.SessionEvent
 import com.tbterminal.app.data.sync.BackendStatus
+import com.tbterminal.app.data.sync.observeAutoSyncTriggers
 import com.tbterminal.app.navigation.AppNavGraph
 import com.tbterminal.app.navigation.AppRoute
 import com.tbterminal.app.navigation.resolveStartDestination
@@ -112,18 +113,29 @@ class MainActivity : ComponentActivity() {
                                     .stateIn(this)
                                 appContainer.backendHealthMonitor.refreshAsync(force = true)
                                 launch {
-                                    onlineState.collect { isOnline ->
-                                        if (isOnline && !sessionManager.requiresPinUnlock()) {
-                                            appContainer.offlineSyncScheduler.scheduleIfEnabled()
-                                        }
-                                    }
+                                    observeAutoSyncTriggers(
+                                        onlineFlow = onlineState,
+                                        backendStatusFlow = appContainer.backendHealthMonitor.status,
+                                        pinUnlockRequiredFlow = sessionManager.pinUnlockRequiredFlow,
+                                        onTriggerSyncNow = {
+                                            appContainer.offlineSyncScheduler.scheduleSyncNowIfConnected(includeFailed = false)
+                                        },
+                                    )
                                 }
                                 launch {
-                                    appContainer.backendHealthMonitor.status.collect { backendStatus ->
-                                        if (backendStatus == BackendStatus.CONNECTED && !sessionManager.requiresPinUnlock()) {
-                                            appContainer.offlineSyncScheduler.scheduleIfEnabled()
-                                        }
+                                    combine(
+                                        onlineState,
+                                        sessionManager.pinUnlockRequiredFlow,
+                                        appContainer.backendHealthMonitor.status,
+                                    ) { isOnline, requiresPin, backendStatus ->
+                                        isOnline && !requiresPin && backendStatus != BackendStatus.CONNECTED
                                     }
+                                        .distinctUntilChanged()
+                                        .collect { shouldScheduleFallback ->
+                                            if (shouldScheduleFallback) {
+                                                appContainer.offlineSyncScheduler.scheduleIfEnabled()
+                                            }
+                                        }
                                 }
                                 launch {
                                     combine(

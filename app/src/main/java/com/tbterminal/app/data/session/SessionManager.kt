@@ -276,6 +276,8 @@ class SessionManager(
     private val beforeSessionClearedListeners = CopyOnWriteArrayList<() -> Unit>()
     private val _activeUserIdFlow = MutableStateFlow(resolveOwnerUserId())
     val activeUserIdFlow: StateFlow<String?> = _activeUserIdFlow.asStateFlow()
+    private val _pinUnlockRequiredFlow = MutableStateFlow(requiresPinUnlock)
+    val pinUnlockRequiredFlow: StateFlow<Boolean> = _pinUnlockRequiredFlow.asStateFlow()
 
     private val _events = MutableSharedFlow<SessionEvent>(
         replay = 0,
@@ -319,6 +321,7 @@ class SessionManager(
         tokenStore.saveSessionUser(user)
         _activeUserIdFlow.value = nextIdentity
         requiresPinUnlock = false
+        _pinUnlockRequiredFlow.value = false
     }
 
     fun updateTokens(accessToken: String, refreshToken: String) {
@@ -341,12 +344,14 @@ class SessionManager(
     fun lockForResume() {
         if (hasAccessToken()) {
             requiresPinUnlock = true
+            _pinUnlockRequiredFlow.value = true
         }
     }
 
     fun markPinUnlocked() {
         if (hasAccessToken()) {
             requiresPinUnlock = false
+            _pinUnlockRequiredFlow.value = false
         }
     }
 
@@ -358,6 +363,7 @@ class SessionManager(
         notifyBeforeSessionClearedListeners()
         tokenStore.clearAccessToken()
         requiresPinUnlock = false
+        _pinUnlockRequiredFlow.value = false
         _activeUserIdFlow.value = null
         notifySessionClearedListeners()
     }

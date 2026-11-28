@@ -2,9 +2,10 @@ package com.tbterminal.app.data.sync
 
 import com.tbterminal.app.data.remote.parseRetryAfterSeconds
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.jsonObject
-import kotlinx.serialization.json.jsonPrimitive
 import retrofit2.Response
 
 internal data class ParsedSyncError(
@@ -28,9 +29,12 @@ internal object SyncErrorResponseParser {
         val jsonObj = rawBody.takeIf(String::isNotBlank)?.let { raw ->
             runCatching { json.parseToJsonElement(raw).jsonObject }.getOrNull()
         }
-        val code = jsonObj?.get("code")?.jsonPrimitive?.contentOrNull?.takeIf(String::isNotBlank)
-        val parsedMessage = jsonObj?.get("message")?.jsonPrimitive?.contentOrNull?.takeIf(String::isNotBlank)
-            ?: jsonObj?.get("error")?.jsonPrimitive?.contentOrNull?.takeIf(String::isNotBlank)
+        val nestedErrorObj = jsonObj?.get("error") as? JsonObject
+        val code = (jsonObj?.get("code") as? JsonPrimitive)?.contentOrNull?.takeIf(String::isNotBlank)
+            ?: (nestedErrorObj?.get("code") as? JsonPrimitive)?.contentOrNull?.takeIf(String::isNotBlank)
+        val parsedMessage = (jsonObj?.get("message") as? JsonPrimitive)?.contentOrNull?.takeIf(String::isNotBlank)
+            ?: (nestedErrorObj?.get("message") as? JsonPrimitive)?.contentOrNull?.takeIf(String::isNotBlank)
+            ?: (jsonObj?.get("error") as? JsonPrimitive)?.contentOrNull?.takeIf(String::isNotBlank)
         val retryAfterSeconds = parseRetryAfterSeconds(response.headers()["Retry-After"], clockMillis)
         val message = when {
             parsedMessage != null -> parsedMessage

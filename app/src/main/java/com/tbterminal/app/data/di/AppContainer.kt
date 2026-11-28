@@ -51,6 +51,7 @@ import com.tbterminal.app.data.repository.PurchasingRepository
 import com.tbterminal.app.data.repository.ReceivableRepository
 import com.tbterminal.app.data.repository.UserRepository
 import com.tbterminal.app.data.repository.AnalyticsRepository
+import com.tbterminal.app.data.repository.CashierSyncRepository
 import com.tbterminal.app.data.repository.RemoteAnalyticsRepository
 import com.tbterminal.app.data.session.SessionManager
 import com.tbterminal.app.data.sync.BackendHealthMonitor
@@ -85,6 +86,7 @@ interface AppContainer {
     val networkMonitor: NetworkMonitor
     val backendHealthMonitor: BackendHealthMonitor
     val offlineStatusRepository: OfflineStatusRepository
+    val cashierSyncRepository: CashierSyncRepository
     val syncMonitoringRepository: SyncMonitoringRepository
     val offlineDashboardRepository: OfflineDashboardRepository
     val offlineReportRepository: OfflineReportRepository
@@ -278,6 +280,25 @@ class DefaultAppContainer(
             transactionDao = localDatabase.transactionDao(),
             cashExpenseDao = localDatabase.cashExpenseDao(),
             activeUserIdFlow = sessionManager.activeUserIdFlow,
+            pendingSubmissionDao = localDatabase.pendingSubmissionDao(),
+            monotonicClockMillis = { SystemClock.elapsedRealtime() },
+            bootCountProvider = { readDeviceBootCount(appContext) },
+        )
+    }
+
+    override val cashierSyncRepository: CashierSyncRepository by lazy {
+        CashierSyncRepository(
+            offlineStatusRepository = offlineStatusRepository,
+            syncQueueDao = localDatabase.syncQueueDao(),
+            cashSessionDao = localDatabase.cashSessionDao(),
+            transactionDao = localDatabase.transactionDao(),
+            cashExpenseDao = localDatabase.cashExpenseDao(),
+            pendingSubmissionDao = localDatabase.pendingSubmissionDao(),
+            localAppSettingsDataSource = localAppSettingsDataSource,
+            activeUserIdFlow = sessionManager.activeUserIdFlow,
+            activeUserIdProvider = { sessionManager.resolveOwnerUserId() },
+            monotonicClockMillis = { SystemClock.elapsedRealtime() },
+            bootCountProvider = { readDeviceBootCount(appContext) },
         )
     }
 
@@ -339,7 +360,8 @@ class DefaultAppContainer(
         OfflineSyncScheduler(
             context = appContext,
             localAppSettingsDataSource = localAppSettingsDataSource,
-            networkMonitor = networkMonitor
+            networkMonitor = networkMonitor,
+            backendHealthMonitor = backendHealthMonitor,
         )
     }
 

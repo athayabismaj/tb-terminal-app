@@ -60,7 +60,8 @@ import com.tbterminal.app.data.sync.OfflineStatus
 @Composable
 fun OfflineStatusIndicatorHost(
     modifier: Modifier = Modifier,
-    alwaysShow: Boolean = false
+    alwaysShow: Boolean = false,
+    onClick: (() -> Unit)? = null,
 ) {
     val app = LocalContext.current.applicationContext as? TbTerminalApplication ?: return
     val statusFlow = remember(app) { app.appContainer.offlineStatusRepository.status }
@@ -83,6 +84,7 @@ fun OfflineStatusIndicatorHost(
     ) {
         OfflineStatusIndicator(
             status = status,
+            onClick = onClick,
             modifier = modifier
         )
     }
@@ -153,12 +155,15 @@ fun OfflineStatusMiniDot(
 @Composable
 private fun OfflineStatusIndicator(
     status: OfflineStatus,
+    onClick: (() -> Unit)? = null,
     modifier: Modifier = Modifier
 ) {
     val style = offlineStatusStyle(status)
     val detailText = offlineStatusDetail(status)
 
     Surface(
+        onClick = { onClick?.invoke() },
+        enabled = onClick != null,
         modifier = modifier.fillMaxWidth(),
         shape = RoundedCornerShape(12.dp),
         color = Color.White,

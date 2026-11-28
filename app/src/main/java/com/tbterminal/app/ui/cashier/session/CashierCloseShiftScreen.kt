@@ -7,6 +7,7 @@ import com.tbterminal.app.data.local.database.CashSessionLocalDataSource
 import com.tbterminal.app.data.printer.ThermalPrinterManager
 import com.tbterminal.app.data.repository.CashReconciliationRepository
 import com.tbterminal.app.data.sync.OfflineStatusRepository
+import com.tbterminal.app.data.sync.OfflineSyncScheduler
 
 @Composable
 fun CashierCloseShiftScreen(
@@ -17,6 +18,7 @@ fun CashierCloseShiftScreen(
     localCashSessionService: LocalCashSessionService? = null,
     localCashExpenseService: LocalCashExpenseService? = null,
     offlineStatusRepository: OfflineStatusRepository? = null,
+    offlineSyncScheduler: OfflineSyncScheduler? = null,
     thermalPrinterManager: ThermalPrinterManager? = null,
     cashierUserId: String? = null,
     cashierNameFallback: String? = null,
@@ -36,6 +38,7 @@ fun CashierCloseShiftScreen(
         localCashSessionService = localCashSessionService,
         localCashExpenseService = localCashExpenseService,
         offlineStatusRepository = offlineStatusRepository,
+        offlineSyncScheduler = offlineSyncScheduler,
         thermalPrinterManager = thermalPrinterManager,
         cashierUserId = cashierUserId,
         cashierNameFallback = cashierNameFallback,

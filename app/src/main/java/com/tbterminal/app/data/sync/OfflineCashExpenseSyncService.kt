@@ -28,8 +28,11 @@ class OfflineCashExpenseSyncService(
         }
     }
 
-    internal suspend fun recoverStaleSyncingUnlocked(nowMillis: Long = clockMillis()) {
-        val cutoff = nowMillis - SYNC_STALE_TIMEOUT_MS
+    internal suspend fun recoverStaleSyncingUnlocked(
+        nowMillis: Long = clockMillis(),
+        recoverAll: Boolean = false,
+    ) {
+        val cutoff = if (recoverAll) Long.MAX_VALUE else nowMillis - SYNC_STALE_TIMEOUT_MS
         database.withTransaction {
             database.syncQueueDao().recoverStaleSyncingCashExpenses(
                 syncing = SyncStatus.SYNCING,
@@ -201,6 +204,7 @@ class OfflineCashExpenseSyncService(
     internal suspend fun syncPendingWithoutLocalSessionUnlocked(
         limit: Int = DEFAULT_AUTO_SYNC_LIMIT,
         includeFailed: Boolean = false,
+        excludeLocalIds: Set<Long> = emptySet(),
         cashierUserId: String? = resolvedActiveUserIdFilter(),
     ): OfflineCashExpenseBulkSyncResult {
         if (activeUserIdProvider != null && cashierUserId == null) {
@@ -213,7 +217,7 @@ class OfflineCashExpenseSyncService(
             failed = failedStatus,
             limit = limit,
             cashierUserId = cashierUserId,
-        )
+        ).filterNot { it.localId in excludeLocalIds }
         return syncBatch(expenses)
     }
 
@@ -235,6 +239,7 @@ class OfflineCashExpenseSyncService(
         cashSessionLocalId: Long,
         limit: Int = DEFAULT_AUTO_SYNC_LIMIT,
         includeFailed: Boolean = false,
+        excludeLocalIds: Set<Long> = emptySet(),
         cashierUserId: String? = resolvedActiveUserIdFilter(),
     ): OfflineCashExpenseBulkSyncResult {
         if (activeUserIdProvider != null && cashierUserId == null) {
@@ -248,7 +253,7 @@ class OfflineCashExpenseSyncService(
             failed = failedStatus,
             limit = limit,
             cashierUserId = cashierUserId,
-        )
+        ).filterNot { it.localId in excludeLocalIds }
         return syncBatch(expenses)
     }
 
@@ -274,11 +279,13 @@ class OfflineCashExpenseSyncService(
         var transientFailureCount = 0
         var validationFailureCount = 0
         var maxRetryAfterSeconds: Long? = null
+        val failedLocalIds = mutableSetOf<Long>()
         expenses.forEach { expense ->
             when (val result = syncExpenseUnlocked(expense.localId)) {
                 is OfflineCashExpenseSyncResult.Success -> successCount += 1
                 is OfflineCashExpenseSyncResult.Failed -> {
                     failedCount += 1
+                    failedLocalIds += expense.localId
                     maxRetryAfterSeconds = maxNullableSeconds(maxRetryAfterSeconds, result.retryAfterSeconds)
                     when (result.kind) {
                         OfflineCheckoutSyncFailureKind.AUTH -> authFailureCount += 1
@@ -296,6 +303,7 @@ class OfflineCashExpenseSyncService(
                             transientFailureCount = transientFailureCount,
                             validationFailureCount = validationFailureCount,
                             maxRetryAfterSeconds = maxRetryAfterSeconds,
+                            failedLocalIds = failedLocalIds,
                         )
                     }
                 }
@@ -310,6 +318,7 @@ class OfflineCashExpenseSyncService(
             transientFailureCount = transientFailureCount,
             validationFailureCount = validationFailureCount,
             maxRetryAfterSeconds = maxRetryAfterSeconds,
+            failedLocalIds = failedLocalIds,
         )
     }
 
@@ -548,6 +557,7 @@ data class OfflineCashExpenseBulkSyncResult(
     val transientFailureCount: Int = 0,
     val validationFailureCount: Int = 0,
     val maxRetryAfterSeconds: Long? = null,
+    val failedLocalIds: Set<Long> = emptySet(),
 ) {
     val hasAuthFailure: Boolean get() = authFailureCount > 0
     val hasTransientFailure: Boolean get() = transientFailureCount > 0

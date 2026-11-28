@@ -7,6 +7,7 @@ import androidx.work.ExistingWorkPolicy
 import androidx.work.NetworkType
 import androidx.work.OneTimeWorkRequestBuilder
 import androidx.work.WorkManager
+import androidx.work.workDataOf
 import com.tbterminal.app.data.local.database.LocalAppSettingsDataSource
 import com.tbterminal.app.data.local.model.AppDataMode
 import java.util.concurrent.TimeUnit
@@ -14,11 +15,18 @@ import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
+enum class SyncNowScheduleResult {
+    ENQUEUED,
+    SKIPPED_OFFLINE_OR_DISCONNECTED,
+    SKIPPED_MODE_DISABLED,
+}
+
 class OfflineSyncScheduler(
     context: Context,
     private val localAppSettingsDataSource: LocalAppSettingsDataSource,
     private val networkMonitor: NetworkConnectivity,
     private val ioDispatcher: CoroutineDispatcher = Dispatchers.IO,
+    private val backendHealthMonitor: BackendHealthMonitor? = null,
 ) {
     private val appContext = context.applicationContext
 
@@ -26,6 +34,39 @@ class OfflineSyncScheduler(
         if (localAppSettingsDataSource.getDataMode() != AppDataMode.SYNC_SERVER) return@withContext
         if (!networkMonitor.isOnline()) return@withContext
         schedule()
+    }
+
+    suspend fun scheduleSyncNowIfConnected(
+        includeFailed: Boolean = false,
+    ): SyncNowScheduleResult = withContext(ioDispatcher) {
+        if (localAppSettingsDataSource.getDataMode() != AppDataMode.SYNC_SERVER) {
+            return@withContext SyncNowScheduleResult.SKIPPED_MODE_DISABLED
+        }
+        if (!networkMonitor.isOnline()) {
+            return@withContext SyncNowScheduleResult.SKIPPED_OFFLINE_OR_DISCONNECTED
+        }
+        val health = backendHealthMonitor
+        if (health != null && health.status.value != BackendStatus.CONNECTED) {
+            return@withContext SyncNowScheduleResult.SKIPPED_OFFLINE_OR_DISCONNECTED
+        }
+        scheduleSyncNow(includeFailed = includeFailed)
+        SyncNowScheduleResult.ENQUEUED
+    }
+
+    fun scheduleSyncNow(includeFailed: Boolean = false) {
+        val request = OneTimeWorkRequestBuilder<SyncWorker>()
+            .setInputData(
+                workDataOf(
+                    SyncWorker.KEY_IS_SYNC_NOW to true,
+                    SyncWorker.KEY_INCLUDE_FAILED to includeFailed,
+                )
+            )
+            .build()
+        WorkManager.getInstance(appContext).enqueueUniqueWork(
+            SyncWorker.SYNC_NOW_WORK_NAME,
+            ExistingWorkPolicy.KEEP,
+            request,
+        )
     }
 
     fun schedule() {

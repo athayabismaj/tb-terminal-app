@@ -71,7 +71,7 @@ interface TransactionDao {
         FROM local_transactions
         WHERE cashSessionLocalId = :cashSessionLocalId
           AND deletedAt IS NULL
-          AND syncStatus = :pending
+          AND syncStatus IN (:pending, :failed)
           AND (:cashierUserId IS NULL OR cashierUserId = :cashierUserId)
         ORDER BY occurredAt ASC, localId ASC
         LIMIT :limit
@@ -80,6 +80,7 @@ interface TransactionDao {
     suspend fun getPendingLocalIdsForSession(
         cashSessionLocalId: Long,
         pending: SyncStatus = SyncStatus.PENDING,
+        failed: SyncStatus = SyncStatus.PENDING,
         limit: Int,
         cashierUserId: String? = null,
     ): List<Long>
@@ -90,7 +91,7 @@ interface TransactionDao {
         FROM local_transactions
         WHERE cashSessionLocalId IS NULL
           AND deletedAt IS NULL
-          AND syncStatus = :pending
+          AND syncStatus IN (:pending, :failed)
           AND (:cashierUserId IS NULL OR cashierUserId = :cashierUserId)
         ORDER BY occurredAt ASC, localId ASC
         LIMIT :limit
@@ -98,6 +99,7 @@ interface TransactionDao {
     )
     suspend fun getPendingLocalIdsWithoutLocalSession(
         pending: SyncStatus = SyncStatus.PENDING,
+        failed: SyncStatus = SyncStatus.PENDING,
         limit: Int,
         cashierUserId: String? = null,
     ): List<Long>

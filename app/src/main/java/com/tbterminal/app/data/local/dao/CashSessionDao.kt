@@ -213,14 +213,14 @@ interface CashSessionDao {
                   SELECT 1 FROM local_transactions t
                   WHERE t.cashSessionLocalId = s.localId
                     AND t.deletedAt IS NULL
-                    AND t.syncStatus = :pending
+                    AND t.syncStatus IN (:pending, :failed)
                     AND (:cashierUserId IS NULL OR t.cashierUserId = :cashierUserId)
               )
               OR EXISTS (
                   SELECT 1 FROM local_cash_expenses e
                   WHERE e.cashSessionLocalId = s.localId
                     AND e.deletedAt IS NULL
-                    AND e.syncStatus = :pending
+                    AND e.syncStatus IN (:pending, :failed)
               )
           )
         ORDER BY s.openedAt ASC, s.localId ASC

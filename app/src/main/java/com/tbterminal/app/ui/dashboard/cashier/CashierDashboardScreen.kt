@@ -73,6 +73,7 @@ import com.tbterminal.app.data.local.database.CashSessionLocalDataSource
 import com.tbterminal.app.data.model.CashTransaction
 import com.tbterminal.app.data.repository.CashReconciliationRepository
 import com.tbterminal.app.data.sync.OfflineStatusRepository
+import com.tbterminal.app.data.sync.OfflineSyncScheduler
 import com.tbterminal.app.ui.cash.CashReconciliationViewModel
 import com.tbterminal.app.ui.cashier.session.components.CashierBukaShiftView
 import com.tbterminal.app.ui.checkout.components.MaterialEstimatorDialog
@@ -123,6 +124,7 @@ fun CashierDashboardScreen(
     localCashSessionService: LocalCashSessionService? = null,
     localCashExpenseService: LocalCashExpenseService? = null,
     offlineStatusRepository: OfflineStatusRepository? = null,
+    offlineSyncScheduler: OfflineSyncScheduler? = null,
     cashierUserId: String? = null,
     cashierNameFallback: String? = null,
     onDashboardClick: () -> Unit = {},
@@ -157,6 +159,7 @@ fun CashierDashboardScreen(
             cashierUserId = cashierUserId ?: name,
             cashierNameFallback = cashierNameFallback ?: name,
             actorRole = role,
+            offlineSyncScheduler = offlineSyncScheduler,
         )
     )
     val cashUiState by cashViewModel.uiState.collectAsStateWithLifecycle()

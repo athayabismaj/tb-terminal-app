@@ -151,4 +151,38 @@ class LocalAppSettingsDataSource(
             )
         )
     }
+
+    suspend fun setLastSuccessfulSyncAt(ownerUserId: String, timestampMillis: Long) {
+        val normalizedOwner = ownerUserId.trim().takeIf(String::isNotBlank) ?: return
+        appSettingDao.upsert(
+            AppSettingEntity(
+                key = lastSuccessSettingKey(normalizedOwner),
+                value = timestampMillis.toString(),
+                updatedAt = timestampMillis,
+            )
+        )
+    }
+
+    suspend fun getLastSuccessfulSyncAt(ownerUserId: String): Long? {
+        val normalizedOwner = ownerUserId.trim().takeIf(String::isNotBlank) ?: return null
+        return appSettingDao.getValue(lastSuccessSettingKey(normalizedOwner))?.toLongOrNull()
+    }
+
+    fun observeLastSuccessfulSyncAt(ownerUserId: String): Flow<Long?> {
+        val normalizedOwner = ownerUserId.trim()
+        val key = lastSuccessSettingKey(normalizedOwner)
+        return appSettingDao.observeSettings()
+            .map { settings ->
+                if (normalizedOwner.isBlank()) {
+                    null
+                } else {
+                    settings.firstOrNull { it.key == key }?.value?.toLongOrNull()
+                }
+            }
+            .distinctUntilChanged()
+    }
+
+    private fun lastSuccessSettingKey(normalizedOwner: String): String {
+        return "${AppSettingKeys.SYNC_LAST_SUCCESS_PREFIX}$normalizedOwner"
+    }
 }

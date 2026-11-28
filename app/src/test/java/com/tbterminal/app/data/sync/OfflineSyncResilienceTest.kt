@@ -147,6 +147,7 @@ class OfflineSyncResilienceTest {
             offlineCashSessionSyncService = cashSessionSync,
             offlineCheckoutSyncService = checkoutSync,
             offlineCashExpenseSyncService = cashExpenseSync,
+            clockMillis = { fakeClockMillis },
         )
     }
 
@@ -1124,6 +1125,199 @@ class OfflineSyncResilienceTest {
         assertEquals(SyncStatus.SYNCING, database.cashSessionDao().getByLocalId(freshSessId)!!.syncStatus)
         assertEquals(SyncStatus.PENDING, database.cashExpenseDao().getByLocalId(staleExpId)!!.syncStatus)
         assertEquals(SyncStatus.PENDING, database.transactionDao().getByLocalId(staleTxId)!!.syncStatus)
+    }
+
+    @Test
+    fun runOnceRecoversRecentOrphanedSyncingItemsAndReusesSameIdempotencyKey() = runBlocking {
+        val recentTimestamp = fakeClockMillis - 5_000L
+        val sessionClientId = "sess-orphan-syncing"
+        val sessionId = database.cashSessionDao().upsert(
+            LocalCashSessionEntity(
+                clientGeneratedId = sessionClientId,
+                deviceId = "android-dev-1",
+                cashierUserId = "kasir-1",
+                status = "OPEN",
+                openedAt = recentTimestamp,
+                startingCash = ScaledDecimal2.ofWhole(100_000L),
+                syncStatus = SyncStatus.SYNCING,
+                updatedAt = recentTimestamp,
+            )
+        )
+        database.syncQueueDao().enqueue(
+            SyncQueueEntity(
+                entityType = SyncEntityType.CASH_SESSION,
+                entityLocalId = sessionId,
+                operation = SyncOperation.CREATE,
+                payloadJson = "{}",
+                status = SyncStatus.SYNCING,
+                updatedAt = recentTimestamp,
+            )
+        )
+        val txClientId = "tx-orphan-syncing"
+        val txId = database.transactionDao().upsert(
+            LocalTransactionEntity(
+                clientGeneratedId = txClientId,
+                deviceId = "android-dev-1",
+                transactionCode = "TRX-ORPHAN",
+                cashSessionLocalId = sessionId,
+                cashierUserId = "kasir-1",
+                status = "PAID",
+                subtotal = ScaledDecimal2.ofWhole(25_000L),
+                total = ScaledDecimal2.ofWhole(25_000L),
+                paidAmount = ScaledDecimal2.ofWhole(25_000L),
+                remainingAmount = ScaledDecimal2.ZERO,
+                occurredAt = recentTimestamp + 1_000L,
+                syncStatus = SyncStatus.SYNCING,
+                updatedAt = recentTimestamp,
+            )
+        )
+        database.transactionItemDao().upsert(
+            LocalTransactionItemEntity(
+                transactionLocalId = txId,
+                productServerId = "prod-1",
+                productNameSnapshot = "Paku 5cm",
+                quantity = ScaledDecimal2.ofWhole(1L),
+                priceAtTransaction = ScaledDecimal2.ofWhole(25_000L),
+                cogsAtTransaction = ScaledDecimal2.ofWhole(20_000L),
+                subtotal = ScaledDecimal2.ofWhole(25_000L),
+                syncStatus = SyncStatus.SYNCING,
+                updatedAt = recentTimestamp,
+            )
+        )
+        database.paymentDao().upsert(
+            LocalPaymentEntity(
+                clientGeneratedId = "pay-orphan-syncing",
+                transactionLocalId = txId,
+                method = "tunai",
+                amount = ScaledDecimal2.ofWhole(25_000L),
+                syncStatus = SyncStatus.SYNCING,
+                updatedAt = recentTimestamp,
+            )
+        )
+        database.syncQueueDao().enqueue(
+            SyncQueueEntity(
+                entityType = SyncEntityType.TRANSACTION,
+                entityLocalId = txId,
+                operation = SyncOperation.CREATE,
+                payloadJson = "{}",
+                status = SyncStatus.SYNCING,
+                updatedAt = recentTimestamp,
+            )
+        )
+
+        enqueueOpenSessionSuccess("srv-sess-orphan")
+        enqueueCheckoutSuccess("srv-tx-orphan")
+
+        val result = syncManager.runOnce(includeFailed = false)
+        assertTrue(result is SyncResult.Success)
+
+        val openReqBody = server.takeRequest().body.readUtf8()
+        val txReqBody = server.takeRequest().body.readUtf8()
+        assertTrue(openReqBody.contains(sessionClientId))
+        assertTrue(txReqBody.contains(txClientId))
+        assertEquals(SyncStatus.SYNCED, database.cashSessionDao().getByLocalId(sessionId)!!.syncStatus)
+        assertEquals(SyncStatus.SYNCED, database.transactionDao().getByLocalId(txId)!!.syncStatus)
+    }
+
+    @Test
+    fun runOnceIncludeFailedRetriesFailedInChronologicalOrderReusesKeySkipsConflictAndRecordsLastSync() = runBlocking {
+        // 1. Session with FAILED open -> FAILED tx -> FAILED expense + 1 CONFLICT tx (must NOT be retried)
+        val failedSessionClientId = "sess-failed-manual"
+        val sessionId = database.cashSessionDao().upsert(
+            LocalCashSessionEntity(
+                clientGeneratedId = failedSessionClientId,
+                deviceId = "android-dev-1",
+                cashierUserId = "kasir-1",
+                status = "OPEN",
+                openedAt = fakeClockMillis - 120_000L,
+                startingCash = ScaledDecimal2.ofWhole(100_000L),
+                syncStatus = SyncStatus.FAILED,
+                updatedAt = fakeClockMillis - 100_000L,
+            )
+        )
+        database.syncQueueDao().enqueue(
+            SyncQueueEntity(
+                entityType = SyncEntityType.CASH_SESSION,
+                entityLocalId = sessionId,
+                operation = SyncOperation.CREATE,
+                payloadJson = "{}",
+                status = SyncStatus.FAILED,
+                lastError = "Validasi gagal",
+            )
+        )
+
+        val failedTxClientId = "tx-failed-manual"
+        val failedTxId = insertCheckout(sessionId, failedTxClientId, occurredAt = fakeClockMillis - 90_000L)
+        database.transactionDao().updateSyncStatus(failedTxId, SyncStatus.FAILED, null, fakeClockMillis - 80_000L)
+        val failedTxQueue = database.syncQueueDao().getLatestForEntity(failedTxId, SyncEntityType.TRANSACTION)!!
+        database.syncQueueDao().updateStatus(failedTxQueue.id, SyncStatus.FAILED, "Gagal kirim", null, 0, fakeClockMillis - 80_000L)
+
+        val conflictTxClientId = "tx-conflict-untouched"
+        val conflictTxId = insertCheckout(sessionId, conflictTxClientId, occurredAt = fakeClockMillis - 85_000L)
+        database.transactionDao().updateSyncStatus(conflictTxId, SyncStatus.CONFLICT, null, fakeClockMillis - 80_000L)
+        val conflictTxQueue = database.syncQueueDao().getLatestForEntity(conflictTxId, SyncEntityType.TRANSACTION)!!
+        database.syncQueueDao().updateStatus(conflictTxQueue.id, SyncStatus.CONFLICT, "Konflik harga", "OFFLINE_PRICE_CONFLICT", 0, fakeClockMillis - 80_000L)
+
+        val failedExpClientId = "exp-failed-manual"
+        val failedExpId = insertExpense(sessionId, failedExpClientId, occurredAt = fakeClockMillis - 60_000L)
+        database.cashExpenseDao().updateSyncStatus(failedExpId, SyncStatus.FAILED, null, fakeClockMillis - 50_000L)
+        val failedExpQueue = database.syncQueueDao().getLatestForEntity(failedExpId, SyncEntityType.CASH_EXPENSE)!!
+        database.syncQueueDao().updateStatus(failedExpQueue.id, SyncStatus.FAILED, "Gagal pengeluaran", null, 0, fakeClockMillis - 50_000L)
+
+        // Auto sync (includeFailed = false) must NOT touch FAILED or CONFLICT items
+        val autoResult = syncManager.runOnce(includeFailed = false)
+        assertTrue(autoResult is SyncResult.Success)
+        assertEquals(0, server.requestCount)
+        assertEquals(SyncStatus.FAILED, database.cashSessionDao().getByLocalId(sessionId)!!.syncStatus)
+
+        // Manual sync (includeFailed = true) syncs open -> failed tx -> failed expense in order, skipping CONFLICT
+        enqueueOpenSessionSuccess("srv-sess-manual")
+        enqueueCheckoutSuccess("srv-tx-manual")
+        enqueueExpenseSuccess("srv-exp-manual")
+
+        val manualResult = syncManager.runOnce(includeFailed = true)
+        assertTrue(manualResult is SyncResult.Success)
+        manualResult as SyncResult.Success
+        assertEquals(3, manualResult.successCount)
+        assertEquals(0, manualResult.failedCount)
+
+        assertEquals(3, server.requestCount)
+        val openReq = server.takeRequest()
+        val txReq = server.takeRequest()
+        val expReq = server.takeRequest()
+        assertEquals("/api/sales/sessions/sync/open", openReq.path)
+        assertTrue(openReq.body.readUtf8().contains(failedSessionClientId))
+        assertEquals("/api/sales/checkout/sync", txReq.path)
+        assertTrue(txReq.body.readUtf8().contains(failedTxClientId))
+        assertEquals("/api/sales/cash-expenses/sync", expReq.path)
+        assertTrue(expReq.body.readUtf8().contains(failedExpClientId))
+
+        assertEquals(SyncStatus.CONFLICT, database.transactionDao().getByLocalId(conflictTxId)!!.syncStatus)
+        assertEquals(fakeClockMillis, settings.getLastSuccessfulSyncAt("kasir-1"))
+    }
+
+    @Test
+    fun runOnceIncludeFailedTerminatesCleanlyWithoutInfiniteLoopWhenFailedItemErrorsAgain() = runBlocking {
+        val openSessionId = insertSyncedOpenSession("srv-sess-loop-guard")
+        val failedTxId = insertCheckout(openSessionId, "tx-failed-again", occurredAt = fakeClockMillis - 30_000L)
+        database.transactionDao().updateSyncStatus(failedTxId, SyncStatus.FAILED, null, fakeClockMillis - 20_000L)
+        val queue = database.syncQueueDao().getLatestForEntity(failedTxId, SyncEntityType.TRANSACTION)!!
+        database.syncQueueDao().updateStatus(queue.id, SyncStatus.FAILED, "Validasi gagal", null, 0, fakeClockMillis - 20_000L)
+
+        server.enqueue(
+            MockResponse()
+                .setResponseCode(400)
+                .setHeader("Content-Type", "application/json")
+                .setBody("""{"success":false,"error":{"message":"Nominal diskon tidak valid"}}""")
+        )
+
+        val result = syncManager.runOnce(includeFailed = true)
+        assertTrue(result is SyncResult.Success)
+        result as SyncResult.Success
+        assertEquals(0, result.successCount)
+        assertEquals(1, result.failedCount)
+        assertEquals(1, server.requestCount)
+        assertEquals(SyncStatus.FAILED, database.transactionDao().getByLocalId(failedTxId)!!.syncStatus)
     }
 }
 

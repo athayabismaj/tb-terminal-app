@@ -5,9 +5,13 @@ import androidx.room.Insert
 import androidx.room.OnConflictStrategy
 import androidx.room.Query
 import com.tbterminal.app.data.local.entity.PendingSubmissionEntity
+import kotlinx.coroutines.flow.Flow
 
 @Dao
 interface PendingSubmissionDao {
+    @Query("SELECT * FROM pending_submissions WHERE ownerUserId = :ownerUserId ORDER BY updatedAt DESC")
+    fun observeForOwner(ownerUserId: String): Flow<List<PendingSubmissionEntity>>
+
     @Query("SELECT * FROM pending_submissions WHERE ownerUserId = :ownerUserId AND scope = :scope LIMIT 1")
     suspend fun get(ownerUserId: String, scope: String): PendingSubmissionEntity?
 

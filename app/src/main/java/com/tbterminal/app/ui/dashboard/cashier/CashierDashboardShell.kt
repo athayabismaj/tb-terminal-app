@@ -71,6 +71,7 @@ import com.tbterminal.app.TbTerminalApplication
 import com.tbterminal.app.data.local.database.DevicePreferences
 import com.tbterminal.app.data.sync.BackendStatus
 import com.tbterminal.app.data.sync.OfflineStatus
+import com.tbterminal.app.navigation.LocalCashierSyncNavigator
 import com.tbterminal.app.ui.dashboard.BrandedRoleTopBar
 import com.tbterminal.app.ui.dashboard.LocalBackofficePageNavigation
 import com.tbterminal.app.ui.dashboard.RoleHeaderDropdownItem
@@ -103,6 +104,7 @@ enum class CashierDestination {
     Receivables,
     ReceivablePayments,
     StockCheck,
+    SyncData,
     Profile,
     Settings
 }
@@ -116,6 +118,7 @@ internal fun CashierDestination.isCashierRootDestination(): Boolean = when (this
     CashierDestination.Customers,
     CashierDestination.ReceivablePayments,
     CashierDestination.StockCheck,
+    CashierDestination.SyncData,
     CashierDestination.Profile,
     CashierDestination.Settings -> false
 }
@@ -135,6 +138,8 @@ fun CashierDashboardShell(
     onReceivablePaymentsClick: (() -> Unit)? = null,
     onProfileClick: () -> Unit = {},
     onSettingsClick: () -> Unit = {},
+    onSyncDataClick: (() -> Unit)? = null,
+    onBackClick: (() -> Unit)? = null,
     onLogout: () -> Unit,
     onLockScreen: (() -> Unit)? = null,
     showHeader: Boolean = true,
@@ -171,6 +176,12 @@ fun CashierDashboardShell(
     var showAccountBottomSheet by rememberSaveable { mutableStateOf(false) }
     val effectiveShowProfileMenu = false
     val adminNavigator = LocalAdminDestinationNavigator.current
+    val cashierSyncNavigator = LocalCashierSyncNavigator.current
+    val openSyncData: () -> Unit = onSyncDataClick ?: {
+        cashierSyncNavigator?.invoke()
+        Unit
+    }
+    val syncBadgeCount = offlineStatus.totalSyncBadgeCount
     val openReceivables: () -> Unit = onReceivablesClick ?: {
         adminNavigator?.invoke(AdminDestination.Receivables)
         Unit
@@ -221,6 +232,8 @@ fun CashierDashboardShell(
                     onReceivablePaymentsClick = openReceivablePayments,
                     onProfileClick = onProfileClick,
                     onSettingsClick = onSettingsClick,
+                    onSyncDataClick = openSyncData,
+                    syncBadgeCount = syncBadgeCount,
                     onLogout = onLogout,
                     onLockClick = handleLock,
                     onTerminalInfoClick = { showTerminalModal = true },
@@ -246,6 +259,7 @@ fun CashierDashboardShell(
                             offlineStatus = offlineStatus,
                             devicePreferences = devicePreferences,
                             onAccountClick = { showAccountBottomSheet = true },
+                            onSyncDataClick = openSyncData,
                             onLockClick = handleLock
                         )
                     } else {
@@ -258,11 +272,13 @@ fun CashierDashboardShell(
                                 CashierDestination.Receivables -> "Piutang Pelanggan"
                                 CashierDestination.ReceivablePayments -> "Riwayat Pembayaran Piutang"
                                 CashierDestination.Customers -> "Pelanggan"
+                                CashierDestination.SyncData -> "Sinkron Data"
                                 else -> "POS"
                             },
                             subtitle = "Terminal Barokah Jaya",
                             topBarActions = topBarActions,
                             showProfileMenu = false,
+                            onBackClick = onBackClick,
                             onTerminalInfoClick = { showTerminalModal = true },
                             onProfileClick = onProfileClick,
                             onSettingsClick = onSettingsClick,
@@ -298,6 +314,8 @@ fun CashierDashboardShell(
                 onSwitchCashier = handleLock,
                 onChangePin = onProfileClick,
                 onSettingsClick = onSettingsClick,
+                onSyncDataClick = openSyncData,
+                syncBadgeCount = syncBadgeCount,
                 onLogout = onLogout
             )
         }
@@ -305,6 +323,8 @@ fun CashierDashboardShell(
         if (showTerminalModal) {
             CashierTerminalInfoModalSheet(
                 userName = userName,
+                syncBadgeCount = syncBadgeCount,
+                onSyncDataClick = openSyncData,
                 onDismiss = { showTerminalModal = false }
             )
         }
@@ -341,6 +361,7 @@ internal fun CashierKasTopBar(
     offlineStatus: OfflineStatus,
     devicePreferences: DevicePreferences,
     onAccountClick: () -> Unit,
+    onSyncDataClick: () -> Unit = onAccountClick,
     onLockClick: () -> Unit
 ) {
     val displayName = remember(userName) {
@@ -458,7 +479,7 @@ internal fun CashierKasTopBar(
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                CashierNetworkStatusChip(status = offlineStatus, onClick = onAccountClick)
+                CashierNetworkStatusChip(status = offlineStatus, onClick = onSyncDataClick)
                 CashierPrinterStatusChip(preferences = devicePreferences, onClick = onAccountClick)
             }
         }
@@ -472,7 +493,8 @@ fun CashierNetworkStatusChip(
     modifier: Modifier = Modifier
 ) {
     val isOnline = status.isInternetOnline && status.backendStatus == BackendStatus.CONNECTED
-    val hasPending = status.pendingSyncCount > 0
+    val syncCount = status.totalSyncBadgeCount
+    val hasPending = syncCount > 0
     val dotColor = when {
         !status.isInternetOnline || status.backendStatus == BackendStatus.UNREACHABLE -> Color(0xFFD97706)
         hasPending -> Color(0xFF2563EB)
@@ -496,7 +518,7 @@ fun CashierNetworkStatusChip(
     val label = when {
         !status.isInternetOnline -> "Offline"
         status.backendStatus == BackendStatus.UNREACHABLE -> "Server Terputus"
-        hasPending -> "Sync (${status.pendingSyncCount})"
+        hasPending -> "Sync ($syncCount)"
         else -> "Online"
     }
 
@@ -572,6 +594,7 @@ private fun CashierCompactTopBar(
     subtitle: String = "Terminal Kasir",
     topBarActions: (@Composable () -> Unit)? = null,
     showProfileMenu: Boolean = true,
+    onBackClick: (() -> Unit)? = null,
     onTerminalInfoClick: () -> Unit,
     onProfileClick: () -> Unit,
     onSettingsClick: () -> Unit,
@@ -600,6 +623,7 @@ private fun CashierCompactTopBar(
         statusBadgeText = "Online",
         title = title,
         subtitle = subtitle,
+        onBackClick = onBackClick,
         onBrandClick = onTerminalInfoClick,
         showProfileMenu = showProfileMenu,
         actions = barActions,
@@ -773,6 +797,8 @@ private fun CashierShellSidebar(
     onReceivablePaymentsClick: () -> Unit,
     onProfileClick: () -> Unit = {},
     onSettingsClick: () -> Unit,
+    onSyncDataClick: () -> Unit = {},
+    syncBadgeCount: Int = 0,
     onLogout: () -> Unit,
     onLockClick: () -> Unit = {},
     onTerminalInfoClick: () -> Unit = {},
@@ -833,9 +859,17 @@ private fun CashierShellSidebar(
                 isActive = activeDestination == CashierDestination.ReceivablePayments,
                 onClick = onReceivablePaymentsClick
             )
+            CashierShellSidebarItem(
+                icon = Icons.Outlined.Sync,
+                text = "Sinkron Data",
+                isActive = activeDestination == CashierDestination.SyncData,
+                badgeCount = syncBadgeCount,
+                onClick = onSyncDataClick
+            )
         }
         OfflineStatusIndicatorHost(
-            modifier = Modifier.padding(horizontal = 18.dp, vertical = 10.dp)
+            modifier = Modifier.padding(horizontal = 18.dp, vertical = 10.dp),
+            onClick = onSyncDataClick,
         )
         HorizontalDivider(color = CashierSidebarLine)
         CashierSidebarProfileSection(
@@ -924,6 +958,7 @@ private fun CashierShellSidebarItem(
     text: String,
     isActive: Boolean = false,
     tint: Color = CashierSidebarTextPrimary,
+    badgeCount: Int = 0,
     onClick: () -> Unit
 ) {
     val contentColor = if (isActive) CashierSidebarTeal else tint
@@ -945,8 +980,26 @@ private fun CashierShellSidebarItem(
             fontSize = 14.sp,
             fontWeight = FontWeight.Medium,
             maxLines = 1,
-            overflow = TextOverflow.Ellipsis
+            overflow = TextOverflow.Ellipsis,
+            modifier = Modifier.weight(1f)
         )
+        if (badgeCount > 0) {
+            Box(
+                modifier = Modifier
+                    .clip(RoundedCornerShape(999.dp))
+                    .background(Color(0xFFFEF3C7))
+                    .border(1.dp, Color(0xFFFDE68A), RoundedCornerShape(999.dp))
+                    .padding(horizontal = 7.dp, vertical = 2.dp),
+                contentAlignment = Alignment.Center
+            ) {
+                Text(
+                    text = badgeCount.toString(),
+                    fontSize = 11.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = Color(0xFFB45309)
+                )
+            }
+        }
     }
 }
 
@@ -1090,6 +1143,8 @@ private fun CashierSidebarProfileSection(
 @Composable
 fun CashierTerminalInfoModalSheet(
     userName: String,
+    syncBadgeCount: Int = 0,
+    onSyncDataClick: () -> Unit = {},
     onDismiss: () -> Unit
 ) {
     ModalBottomSheet(
@@ -1387,10 +1442,13 @@ fun CashierTerminalInfoModalSheet(
                 verticalArrangement = Arrangement.spacedBy(8.dp)
             ) {
                 OutlinedButton(
-                    onClick = onDismiss,
+                    onClick = {
+                        onDismiss()
+                        onSyncDataClick()
+                    },
                     modifier = Modifier
                         .fillMaxWidth()
-                        .height(44.dp),
+                        .heightIn(min = 48.dp),
                     shape = RoundedCornerShape(12.dp),
                     border = BorderStroke(1.dp, Color(0xFFCBD5E1))
                 ) {
@@ -1402,7 +1460,7 @@ fun CashierTerminalInfoModalSheet(
                     )
                     Spacer(modifier = Modifier.width(8.dp))
                     Text(
-                        text = "Cek Status Koneksi Server",
+                        text = if (syncBadgeCount > 0) "Sinkron Data ($syncBadgeCount)" else "Sinkron Data",
                         fontSize = 12.sp,
                         fontWeight = FontWeight.Bold,
                         color = Color(0xFF334155)

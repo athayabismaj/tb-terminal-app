@@ -26,6 +26,7 @@ import com.tbterminal.app.data.printer.PrinterResult
 import com.tbterminal.app.data.printer.ThermalPrinterManager
 import com.tbterminal.app.data.repository.CashReconciliationRepository
 import com.tbterminal.app.data.sync.OfflineStatusRepository
+import com.tbterminal.app.data.sync.OfflineSyncScheduler
 import com.tbterminal.app.ui.cash.CashReconciliationViewModel
 import com.tbterminal.app.ui.cashier.session.components.SuccessModalOverlay
 import com.tbterminal.app.ui.dashboard.cashier.CashierDashboardShell
@@ -41,6 +42,7 @@ fun CashierCashSessionRoute(
     localCashSessionService: LocalCashSessionService? = null,
     localCashExpenseService: LocalCashExpenseService? = null,
     offlineStatusRepository: OfflineStatusRepository? = null,
+    offlineSyncScheduler: OfflineSyncScheduler? = null,
     thermalPrinterManager: ThermalPrinterManager? = null,
     cashierUserId: String? = null,
     cashierNameFallback: String? = null,
@@ -61,6 +63,7 @@ fun CashierCashSessionRoute(
             cashierUserId = cashierUserId,
             cashierNameFallback = cashierNameFallback,
             actorRole = role,
+            offlineSyncScheduler = offlineSyncScheduler,
         )
     )
 ) {

@@ -31,8 +31,11 @@ class OfflineCheckoutSyncService(
         }
     }
 
-    internal suspend fun recoverStaleSyncingUnlocked(nowMillis: Long = clockMillis()) {
-        val cutoff = nowMillis - SYNC_STALE_TIMEOUT_MS
+    internal suspend fun recoverStaleSyncingUnlocked(
+        nowMillis: Long = clockMillis(),
+        recoverAll: Boolean = false,
+    ) {
+        val cutoff = if (recoverAll) Long.MAX_VALUE else nowMillis - SYNC_STALE_TIMEOUT_MS
         database.withTransaction {
             database.transactionItemDao().recoverStaleSyncingItems(
                 syncing = SyncStatus.SYNCING,
@@ -347,6 +350,8 @@ class OfflineCheckoutSyncService(
     internal suspend fun syncPendingForSessionUnlocked(
         cashSessionLocalId: Long,
         limit: Int = DEFAULT_AUTO_SYNC_LIMIT,
+        includeFailed: Boolean = false,
+        excludeLocalIds: Set<Long> = emptySet(),
         cashierUserId: String? = resolvedActiveUserIdFilter(),
         onProgress: ((current: Int, total: Int) -> Unit)? = null,
     ): OfflineCheckoutBulkSyncResult {
@@ -354,12 +359,14 @@ class OfflineCheckoutSyncService(
             return OfflineCheckoutBulkSyncResult(total = 0, successCount = 0, failedCount = 0)
         }
         recoverStaleSyncingUnlocked()
+        val failedStatus = if (includeFailed) SyncStatus.FAILED else SyncStatus.PENDING
         val localIds = database.transactionDao().getPendingLocalIdsForSession(
             cashSessionLocalId = cashSessionLocalId,
             pending = SyncStatus.PENDING,
+            failed = failedStatus,
             limit = limit,
             cashierUserId = cashierUserId,
-        )
+        ).filterNot { it in excludeLocalIds }
         return syncBatch(
             localIds = localIds,
             onProgress = onProgress,
@@ -368,6 +375,8 @@ class OfflineCheckoutSyncService(
 
     internal suspend fun syncPendingWithoutLocalSessionUnlocked(
         limit: Int = DEFAULT_AUTO_SYNC_LIMIT,
+        includeFailed: Boolean = false,
+        excludeLocalIds: Set<Long> = emptySet(),
         cashierUserId: String? = resolvedActiveUserIdFilter(),
         onProgress: ((current: Int, total: Int) -> Unit)? = null,
     ): OfflineCheckoutBulkSyncResult {
@@ -375,11 +384,13 @@ class OfflineCheckoutSyncService(
             return OfflineCheckoutBulkSyncResult(total = 0, successCount = 0, failedCount = 0)
         }
         recoverStaleSyncingUnlocked()
+        val failedStatus = if (includeFailed) SyncStatus.FAILED else SyncStatus.PENDING
         val localIds = database.transactionDao().getPendingLocalIdsWithoutLocalSession(
             pending = SyncStatus.PENDING,
+            failed = failedStatus,
             limit = limit,
             cashierUserId = cashierUserId,
-        )
+        ).filterNot { it in excludeLocalIds }
         return syncBatch(
             localIds = localIds,
             onProgress = onProgress,
@@ -411,12 +422,14 @@ class OfflineCheckoutSyncService(
         var transientFailureCount = 0
         var validationFailureCount = 0
         var maxRetryAfterSeconds: Long? = null
+        val failedLocalIds = mutableSetOf<Long>()
         localIds.forEachIndexed { index, localId ->
             onProgress?.invoke(index + 1, localIds.size)
             when (val result = syncOneInternal(localId)) {
                 is OfflineCheckoutSyncResult.Success -> successCount += 1
                 is OfflineCheckoutSyncResult.Failed -> {
                     failedCount += 1
+                    failedLocalIds += localId
                     maxRetryAfterSeconds = maxNullableSeconds(maxRetryAfterSeconds, result.retryAfterSeconds)
                     when (result.kind) {
                         OfflineCheckoutSyncFailureKind.AUTH -> authFailureCount += 1
@@ -434,6 +447,7 @@ class OfflineCheckoutSyncService(
                             transientFailureCount = transientFailureCount,
                             validationFailureCount = validationFailureCount,
                             maxRetryAfterSeconds = maxRetryAfterSeconds,
+                            failedLocalIds = failedLocalIds,
                         )
                     }
                 }
@@ -448,6 +462,7 @@ class OfflineCheckoutSyncService(
             transientFailureCount = transientFailureCount,
             validationFailureCount = validationFailureCount,
             maxRetryAfterSeconds = maxRetryAfterSeconds,
+            failedLocalIds = failedLocalIds,
         )
     }
 
@@ -545,7 +560,7 @@ class OfflineCheckoutSyncService(
     }
 
     private suspend fun markSyncingIfAllowed(transactionLocalId: Long): Boolean {
-        val now = System.currentTimeMillis()
+        val now = clockMillis()
         var locked = false
         database.withTransaction {
             locked = database.transactionDao().markSyncingIfPendingOrFailed(
@@ -727,6 +742,7 @@ data class OfflineCheckoutBulkSyncResult(
     val transientFailureCount: Int = 0,
     val validationFailureCount: Int = 0,
     val maxRetryAfterSeconds: Long? = null,
+    val failedLocalIds: Set<Long> = emptySet(),
 ) {
     val hasAuthFailure: Boolean get() = authFailureCount > 0
     val hasTransientFailure: Boolean get() = transientFailureCount > 0

@@ -26,6 +26,8 @@ internal val LocalPendingProductSearch = staticCompositionLocalOf<MutableState<S
     mutableStateOf(null)
 }
 
+internal val LocalCashierSyncNavigator = staticCompositionLocalOf<(() -> Unit)?> { null }
+
 @Composable
 fun AppNavGraph(
     navController: NavHostController,
@@ -53,9 +55,23 @@ fun AppNavGraph(
         }
     }
 
+    val isCashierSession = sessionRole?.trim()?.equals("kasir", ignoreCase = true) == true
+    val cashierSyncNavigator: (() -> Unit)? = if (isCashierSession) {
+        {
+            if (navController.currentBackStackEntry?.destination?.route != AppRoute.CashierSync.route) {
+                navController.navigate(AppRoute.CashierSync.route) {
+                    launchSingleTop = true
+                }
+            }
+        }
+    } else {
+        null
+    }
+
     CompositionLocalProvider(
         LocalBackofficeSidebarState provides backofficeSidebarState,
         LocalPendingProductSearch provides pendingProductSearch,
+        LocalCashierSyncNavigator provides cashierSyncNavigator,
         LocalBackofficePageNavigation provides BackofficePageNavigation(
             title = if (isOwnerPersona(sessionRole)) {
                 backofficeRouteTitleRes(currentRoute, sessionRole)?.let { stringResource(it) }

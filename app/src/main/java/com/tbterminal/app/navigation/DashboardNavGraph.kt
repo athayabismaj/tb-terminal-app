@@ -27,6 +27,7 @@ import com.tbterminal.app.ui.cashexpenses.AdminCashExpenseHistoryScreen
 import com.tbterminal.app.ui.cashhistory.AdminCashSessionHistoryScreen
 import com.tbterminal.app.ui.cashier.session.CashierCloseShiftScreen
 import com.tbterminal.app.ui.cashier.stock.CashierStockCheckScreen
+import com.tbterminal.app.ui.cashier.sync.CashierSyncRoute
 import com.tbterminal.app.ui.cashier.transactions.CashierReceiptDetailScreen
 import com.tbterminal.app.ui.cashier.transactions.CashierTransactionHistoryScreen
 import com.tbterminal.app.ui.checkout.CashierCartScreen
@@ -343,6 +344,7 @@ internal fun NavGraphBuilder.dashboardGraph(navController: NavHostController, se
                             localCashSessionService = appContainer.localCashSessionService,
                             localCashExpenseService = appContainer.localCashExpenseService,
                             offlineStatusRepository = appContainer.offlineStatusRepository,
+                            offlineSyncScheduler = appContainer.offlineSyncScheduler,
                             cashierUserId = sessionUser.userId ?: sessionUser.name,
                             cashierNameFallback = sessionUser.name,
                             onDashboardClick = {},
@@ -664,6 +666,83 @@ internal fun NavGraphBuilder.dashboardGraph(navController: NavHostController, se
                             launchSingleTop = true
                         }
                     }
+                )
+            }
+        }
+
+        composable(AppRoute.CashierSync.route) {
+            val sessionUser = sessionManager.readSessionUser()
+
+            if (sessionUser == null) {
+                LaunchedEffect(Unit) {
+                    sessionManager.logout()
+                    navController.navigate(AppRoute.Login.route) {
+                        popUpTo(0)
+                        launchSingleTop = true
+                    }
+                }
+            } else if (!sessionUser.role.trim().equals("kasir", ignoreCase = true)) {
+                LaunchedEffect(sessionUser.role) {
+                    navController.navigate(AppRoute.Dashboard.route) {
+                        popUpTo(AppRoute.CashierSync.route) { inclusive = true }
+                        launchSingleTop = true
+                    }
+                }
+            } else {
+                CashierSyncRoute(
+                    name = sessionUser.name,
+                    role = sessionUser.role,
+                    cashierSyncRepository = appContainer.cashierSyncRepository,
+                    offlineSyncScheduler = appContainer.offlineSyncScheduler,
+                    syncManager = appContainer.syncManager,
+                    backendHealthMonitor = appContainer.backendHealthMonitor,
+                    onBack = {
+                        if (!navController.popBackStack()) {
+                            navController.navigate(AppRoute.Dashboard.route) {
+                                popUpTo(AppRoute.Dashboard.route) { inclusive = true }
+                            }
+                        }
+                    },
+                    onDashboardClick = {
+                        navController.navigate(AppRoute.Dashboard.route) {
+                            popUpTo(AppRoute.Dashboard.route) { inclusive = true }
+                        }
+                    },
+                    onPosClick = {
+                        navController.navigate(AppRoute.CashierPos.route) {
+                            popUpTo(AppRoute.Dashboard.route)
+                            launchSingleTop = true
+                        }
+                    },
+                    onCashSessionClick = {
+                        navController.navigate(AppRoute.CashierCashSession.route) {
+                            popUpTo(AppRoute.Dashboard.route)
+                            launchSingleTop = true
+                        }
+                    },
+                    onTransactionHistoryClick = {
+                        navController.navigate(AppRoute.CashierTransactionHistory.route) {
+                            popUpTo(AppRoute.Dashboard.route)
+                            launchSingleTop = true
+                        }
+                    },
+                    onProfileClick = {
+                        navController.navigate(AppRoute.CashierProfile.route) {
+                            launchSingleTop = true
+                        }
+                    },
+                    onSettingsClick = {
+                        navController.navigate(AppRoute.CashierSettings.route) {
+                            launchSingleTop = true
+                        }
+                    },
+                    onLogout = {
+                        sessionManager.logout()
+                        navController.navigate(AppRoute.Login.route) {
+                            popUpTo(0)
+                            launchSingleTop = true
+                        }
+                    },
                 )
             }
         }

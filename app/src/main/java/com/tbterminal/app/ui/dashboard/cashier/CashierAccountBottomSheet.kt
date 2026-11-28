@@ -27,6 +27,7 @@ import androidx.compose.material.icons.outlined.Password
 import androidx.compose.material.icons.outlined.Person
 import androidx.compose.material.icons.outlined.Print
 import androidx.compose.material.icons.outlined.Settings
+import androidx.compose.material.icons.outlined.Sync
 import androidx.compose.material.icons.outlined.Warning
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
@@ -73,6 +74,8 @@ fun CashierAccountBottomSheet(
     onSwitchCashier: () -> Unit,
     onChangePin: () -> Unit,
     onSettingsClick: () -> Unit,
+    onSyncDataClick: () -> Unit = {},
+    syncBadgeCount: Int = offlineStatus.totalSyncBadgeCount,
     onLogout: () -> Unit
 ) {
     var showLogoutConfirmDialog by remember { mutableStateOf(false) }
@@ -227,6 +230,10 @@ fun CashierAccountBottomSheet(
                 // Status Cloud / Sync
                 val isOnline = offlineStatus.isInternetOnline && offlineStatus.backendStatus == BackendStatus.CONNECTED
                 Surface(
+                    onClick = {
+                        onDismiss()
+                        onSyncDataClick()
+                    },
                     shape = RoundedCornerShape(10.dp),
                     color = if (isOnline) Color(0xFFF0FDF4) else Color(0xFFFEF3C7),
                     border = BorderStroke(1.dp, if (isOnline) Color(0xFFBBF7D0) else Color(0xFFFDE68A)),
@@ -252,8 +259,8 @@ fun CashierAccountBottomSheet(
                                 letterSpacing = 0.5.sp
                             )
                             Text(
-                                text = if (offlineStatus.pendingSyncCount > 0) {
-                                    "${offlineStatus.pendingSyncCount} antrean"
+                                text = if (syncBadgeCount > 0) {
+                                    "$syncBadgeCount antrean"
                                 } else if (isOnline) {
                                     "Tersinkron"
                                 } else {
@@ -261,7 +268,7 @@ fun CashierAccountBottomSheet(
                                 },
                                 fontSize = 11.sp,
                                 fontWeight = FontWeight.Bold,
-                                color = if (isOnline && offlineStatus.pendingSyncCount == 0) Color(0xFF15803D) else Color(0xFFB45309)
+                                color = if (isOnline && syncBadgeCount == 0) Color(0xFF15803D) else Color(0xFFB45309)
                             )
                         }
                     }
@@ -328,6 +335,21 @@ fun CashierAccountBottomSheet(
                 modifier = Modifier.fillMaxWidth(),
                 verticalArrangement = Arrangement.spacedBy(6.dp)
             ) {
+                AccountActionRow(
+                    icon = Icons.Outlined.Sync,
+                    title = "Sinkron Data",
+                    subtitle = if (syncBadgeCount > 0) {
+                        "$syncBadgeCount data menunggu dikirim ke server"
+                    } else {
+                        "Pantau status & kirim data offline"
+                    },
+                    badge = if (syncBadgeCount > 0) syncBadgeCount.toString() else null,
+                    badgeColor = Color(0xFFD97706),
+                    onClick = {
+                        onDismiss()
+                        onSyncDataClick()
+                    }
+                )
                 val isPrinterConfigured = devicePreferences.printerBluetoothAddress.isNotBlank()
                 AccountActionRow(
                     icon = Icons.Outlined.Print,

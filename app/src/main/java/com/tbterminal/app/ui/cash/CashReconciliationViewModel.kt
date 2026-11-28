@@ -24,6 +24,8 @@ import com.tbterminal.app.data.sync.OfflineSessionAgeAlert
 import com.tbterminal.app.data.sync.OfflineSessionAgePolicy
 import com.tbterminal.app.data.sync.OfflineStatus
 import com.tbterminal.app.data.sync.OfflineStatusRepository
+import com.tbterminal.app.data.sync.OfflineSyncScheduler
+import com.tbterminal.app.data.sync.SyncNowScheduleResult
 import com.tbterminal.app.data.sync.runSuspendCatching
 import com.tbterminal.app.navigation.AppAccessPolicy
 import com.tbterminal.app.ui.common.parseWholeRupiahInput
@@ -50,6 +52,7 @@ class CashReconciliationViewModel(
     private val cashierNameFallback: String? = null,
     private val actorRole: String = "KASIR",
     private val clockMillis: () -> Long = { System.currentTimeMillis() },
+    private val offlineSyncScheduler: OfflineSyncScheduler? = null,
 ) : ViewModel() {
     private val _uiState = MutableStateFlow(
         CashReconciliationUiState(
@@ -448,6 +451,7 @@ class CashReconciliationViewModel(
             )
         ) {
             is LocalCashSessionResult.Success -> {
+                triggerAutoSyncAfterLocalSave()
                 val ageAlert = resolveOfflineSessionAgeAlert(result.session)
                 _uiState.update {
                     it.copy(
@@ -480,6 +484,7 @@ class CashReconciliationViewModel(
             )
         ) {
             is LocalCashSessionResult.Success -> {
+                triggerAutoSyncAfterLocalSave()
                 val sessionModel = result.session.toCashSession()
                 val ageAlert = resolveOfflineSessionAgeAlert(result.session)
                 _uiState.update {
@@ -667,6 +672,7 @@ class CashReconciliationViewModel(
             )
         ) {
             is com.tbterminal.app.data.local.cashexpense.LocalCashExpenseResult.Success -> {
+                triggerAutoSyncAfterLocalSave()
                 _uiState.update {
                     it.copy(
                         isPettyCashDialogOpen = false,
@@ -936,6 +942,13 @@ class CashReconciliationViewModel(
             ?: _uiState.value.activeSession?.userId?.takeIf(String::isNotBlank)
     }
 
+    private suspend fun triggerAutoSyncAfterLocalSave() {
+        val scheduler = offlineSyncScheduler ?: return
+        if (scheduler.scheduleSyncNowIfConnected(includeFailed = false) != SyncNowScheduleResult.ENQUEUED) {
+            scheduler.scheduleIfEnabled()
+        }
+    }
+
     private fun resolveCashierNameFallback(): String? {
         return cashierNameFallback
             ?.trim()
@@ -953,6 +966,7 @@ class CashReconciliationViewModel(
             cashierNameFallback: String? = null,
             actorRole: String = "KASIR",
             clockMillis: () -> Long = { System.currentTimeMillis() },
+            offlineSyncScheduler: OfflineSyncScheduler? = null,
         ): ViewModelProvider.Factory {
             return viewModelFactory {
                 CashReconciliationViewModel(
@@ -965,6 +979,7 @@ class CashReconciliationViewModel(
                     cashierNameFallback = cashierNameFallback,
                     actorRole = actorRole,
                     clockMillis = clockMillis,
+                    offlineSyncScheduler = offlineSyncScheduler,
                 )
             }
         }
