@@ -25,7 +25,8 @@ class LocalCashSessionService(
     suspend fun openLocalSession(
         cashierUserId: String,
         startingCash: BigDecimal,
-        openingNote: String? = null
+        openingNote: String? = null,
+        adoptRemoteIfActive: Boolean = false,
     ): LocalCashSessionResult {
         if (!AppAccessPolicy.canOpenCashSession(roleProvider())) {
             return LocalCashSessionResult.Failed("Hanya kasir yang dapat membuka sesi kas.")
@@ -69,7 +70,7 @@ class LocalCashSessionService(
                         entityType = SyncEntityType.CASH_SESSION,
                         entityLocalId = localId,
                         operation = SyncOperation.CREATE,
-                        payloadJson = session.toOpenSyncPayloadJson(),
+                        payloadJson = session.toOpenSyncPayloadJson(adoptRemoteIfActive = adoptRemoteIfActive),
                         status = SyncStatus.PENDING,
                         createdAt = now,
                         updatedAt = now
@@ -161,7 +162,9 @@ class LocalCashSessionService(
         return null
     }
 
-    internal fun LocalCashSessionEntity.toOpenSyncPayloadJson(): String {
+    internal fun LocalCashSessionEntity.toOpenSyncPayloadJson(
+        adoptRemoteIfActive: Boolean = false,
+    ): String {
         val payload = LocalCashSessionOpenSyncPayload(
             clientGeneratedId = clientGeneratedId,
             deviceId = deviceId.orEmpty(),
@@ -169,6 +172,7 @@ class LocalCashSessionService(
             openedAt = openedAt,
             startingCash = startingCash.toBigDecimal(),
             openingNote = openingNote,
+            adoptRemoteIfActive = adoptRemoteIfActive,
         )
         return SYNC_PAYLOAD_JSON.encodeToString(payload)
     }
@@ -212,6 +216,7 @@ internal data class LocalCashSessionOpenSyncPayload(
     val openedAt: Long,
     @Serializable(with = BigDecimalStringSerializer::class) val startingCash: BigDecimal,
     val openingNote: String? = null,
+    val adoptRemoteIfActive: Boolean = false,
 )
 
 @Serializable

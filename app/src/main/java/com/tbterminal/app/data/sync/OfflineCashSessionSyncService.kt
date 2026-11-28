@@ -86,6 +86,16 @@ class OfflineCashSessionSyncService(
             }
             val lockedSession = database.cashSessionDao().getByLocalId(localSessionId)
                 ?: return@runSuspendCatching fail(localSessionId, "Sesi kas lokal tidak ditemukan.", 1)
+            val openQueue = database.syncQueueDao().getLatestForEntityAndOperation(
+                entityLocalId = localSessionId,
+                entityType = SyncEntityType.CASH_SESSION,
+                operation = SyncOperation.CREATE,
+            )
+            if (CashSessionAdoptionPolicy.parseAdoptRemoteIfActive(openQueue?.payloadJson)) {
+                tryAdoptActiveRemoteSessionUnlocked(lockedSession)?.let { adoptionResult ->
+                    return@runSuspendCatching adoptionResult
+                }
+            }
             val request = when (val buildResult = buildRequest(lockedSession)) {
                 is BuildOpenSessionRequestResult.Success -> buildResult.request
                 is BuildOpenSessionRequestResult.Error -> {
@@ -468,6 +478,83 @@ class OfflineCashSessionSyncService(
             validationFailureCount = validationFailureCount,
             maxRetryAfterSeconds = maxRetryAfterSeconds,
         )
+    }
+
+    private suspend fun tryAdoptActiveRemoteSessionUnlocked(
+        localSession: LocalCashSessionEntity,
+    ): OfflineCashSessionSyncResult? {
+        val activeResponse = salesApi.getActiveSession()
+        if (!activeResponse.isSuccessful) {
+            val parsedError = SyncErrorResponseParser.parseHttpError(
+                response = activeResponse,
+                defaultMessage = if (activeResponse.code() in 400..499) {
+                    "Server menolak pemeriksaan sesi kas (${activeResponse.code()})"
+                } else {
+                    "Gagal terhubung ke server (${activeResponse.code()})"
+                },
+                clockMillis = clockMillis,
+            )
+            val message = if (activeResponse.code() >= 500) {
+                "Gagal terhubung ke server (${activeResponse.code()})"
+            } else {
+                parsedError.message
+            }
+            val errorCode = if (activeResponse.code() >= 500) null else parsedError.code
+            return fail(
+                localSessionId = localSession.localId,
+                message = message,
+                errorCode = errorCode,
+                retryIncrement = 1,
+                kind = SyncErrorClassifier.classify(
+                    httpCode = activeResponse.code(),
+                    message = message,
+                    errorCode = errorCode,
+                ).toFailureKind(),
+                retryAfterSeconds = parsedError.retryAfterSeconds,
+            )
+        }
+
+        val body = activeResponse.body()
+        if (body?.success != true) {
+            val errorCode = body?.code?.takeIf(String::isNotBlank)
+            val message = body?.message ?: body?.error ?: "Response cek sesi kas tidak valid"
+            return fail(
+                localSessionId = localSession.localId,
+                message = message,
+                errorCode = errorCode,
+                retryIncrement = 1,
+                kind = SyncErrorClassifier.classifyMessage(message, errorCode).toFailureKind(),
+            )
+        }
+
+        val remote = body.data ?: return null
+        val existingByServerId = database.cashSessionDao().getByServerId(remote.id)
+        val transactions = database.transactionDao().getByCashSession(localSession.localId)
+        val expenses = database.cashExpenseDao().getByCashSession(localSession.localId)
+        return when (
+            val decision = CashSessionAdoptionPolicy.evaluateAdoption(
+                localSession = localSession,
+                remoteServerId = remote.id,
+                remoteCashierUserId = remote.userId,
+                remoteStatus = remote.status,
+                remoteOpenedAtMillis = CashSessionAdoptionPolicy.parseIsoTimestampMillis(remote.openedAt),
+                existingByServerId = existingByServerId,
+                transactions = transactions,
+                expenses = expenses,
+            )
+        ) {
+            CashSessionAdoptionDecision.Eligible -> {
+                markOpenSynced(localSession.localId, remote.id)
+                OfflineCashSessionSyncResult.Success(remote.id, "ADOPTED")
+            }
+            is CashSessionAdoptionDecision.Rejected -> {
+                deferBlockingOpen(
+                    localSessionId = localSession.localId,
+                    message = decision.reason,
+                )
+            }
+            CashSessionAdoptionDecision.NotApplicable -> null
+        }
     }
 
     private suspend fun markOpenSyncingIfAllowed(localSessionId: Long): Boolean {

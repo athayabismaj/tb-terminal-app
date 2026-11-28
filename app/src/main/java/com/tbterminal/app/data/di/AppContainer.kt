@@ -180,7 +180,12 @@ class DefaultAppContainer(
     }
 
     override val cashSessionLocalDataSource: CashSessionLocalDataSource by lazy {
-        CashSessionLocalDataSource(localDatabase.cashSessionDao())
+        CashSessionLocalDataSource(
+            cashSessionDao = localDatabase.cashSessionDao(),
+            transactionDao = localDatabase.transactionDao(),
+            cashExpenseDao = localDatabase.cashExpenseDao(),
+            syncQueueDao = localDatabase.syncQueueDao(),
+        )
     }
 
     override val localCashExpenseService: LocalCashExpenseService by lazy {

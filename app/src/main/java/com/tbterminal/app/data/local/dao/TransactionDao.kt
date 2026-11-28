@@ -21,6 +21,16 @@ interface TransactionDao {
     @Query("SELECT * FROM local_transactions WHERE serverId = :serverId LIMIT 1")
     suspend fun getByServerId(serverId: String): LocalTransactionEntity?
 
+    @Query(
+        """
+        SELECT * FROM local_transactions
+        WHERE cashSessionLocalId = :cashSessionLocalId
+          AND deletedAt IS NULL
+        ORDER BY occurredAt ASC
+        """
+    )
+    suspend fun getByCashSession(cashSessionLocalId: Long): List<LocalTransactionEntity>
+
     @Query("SELECT * FROM local_transactions WHERE syncStatus = :status ORDER BY createdAt ASC LIMIT :limit")
     suspend fun getBySyncStatus(status: SyncStatus, limit: Int): List<LocalTransactionEntity>
 

@@ -244,9 +244,58 @@ class CashReconciliationViewModel(
         viewModelScope.launch {
             _uiState.update { it.copy(isSubmitting = true, errorMessage = null, message = null) }
 
-            if (!hasAmbiguousOpenSessionSubmit && shouldUseLocalForMutation()) {
-                openLocalSession(startingCash)
+            val wasAmbiguous = hasAmbiguousOpenSessionSubmit
+            if (shouldUseLocalForMutation(forceProbe = wasAmbiguous)) {
+                hasAmbiguousOpenSessionSubmit = false
+                openLocalSession(startingCash, adoptRemoteIfActive = wasAmbiguous)
                 return@launch
+            }
+
+            if (wasAmbiguous) {
+                when (val activeCheck = repository.getActiveSession()) {
+                    is RepositoryResult.Success -> {
+                        val existingRemote = activeCheck.data
+                        if (existingRemote != null && existingRemote.status.equals("OPEN", ignoreCase = true)) {
+                            hasAmbiguousOpenSessionSubmit = false
+                            val mirroredLocalId = mirrorRemoteSessionSafely(existingRemote)
+                            _uiState.update {
+                                it.copy(
+                                    activeSession = existingRemote,
+                                    openingCashInput = "",
+                                    isSubmitting = false,
+                                    isUsingLocalActiveSession = false,
+                                    localCashSessionId = mirroredLocalId,
+                                    localCashSessionSyncStatus = null,
+                                    message = "Sesi kas berhasil dibuka."
+                                )
+                            }
+                            loadCash(page = 1)
+                            return@launch
+                        }
+                    }
+                    is RepositoryResult.Error -> {
+                        if (ServerUnavailabilityClassifier.isDefinitelyUnprocessedServerUnavailable(activeCheck)) {
+                            hasAmbiguousOpenSessionSubmit = false
+                            markBackendUnreachableAndSyncState()
+                            openLocalSession(startingCash, adoptRemoteIfActive = true)
+                            return@launch
+                        }
+                        if (ServerUnavailabilityClassifier.isServerUnavailable(activeCheck)) {
+                            markBackendUnreachableAndSyncState()
+                        }
+                    }
+                    is RepositoryResult.Exception -> {
+                        if (ServerUnavailabilityClassifier.isDefinitelyUnprocessedServerUnavailable(activeCheck)) {
+                            hasAmbiguousOpenSessionSubmit = false
+                            markBackendUnreachableAndSyncState()
+                            openLocalSession(startingCash, adoptRemoteIfActive = true)
+                            return@launch
+                        }
+                        if (ServerUnavailabilityClassifier.isServerUnavailable(activeCheck)) {
+                            markBackendUnreachableAndSyncState()
+                        }
+                    }
+                }
             }
 
             when (val result = repository.openSession(startingCash)) {
@@ -356,7 +405,10 @@ class CashReconciliationViewModel(
         }
     }
 
-    private suspend fun openLocalSession(startingCash: BigDecimal) {
+    private suspend fun openLocalSession(
+        startingCash: BigDecimal,
+        adoptRemoteIfActive: Boolean = false,
+    ) {
         val localCashierId = resolveCashierUserId()
             ?: return setActionError("Kasir sesi lokal belum valid.")
 
@@ -391,7 +443,8 @@ class CashReconciliationViewModel(
         when (
             val result = service.openLocalSession(
                 cashierUserId = localCashierId,
-                startingCash = startingCash
+                startingCash = startingCash,
+                adoptRemoteIfActive = adoptRemoteIfActive,
             )
         ) {
             is LocalCashSessionResult.Success -> {
@@ -704,7 +757,7 @@ class CashReconciliationViewModel(
         val dataSource = cashSessionLocalDataSource ?: return null
         val effectiveCashierId = cashierId?.trim()?.takeIf(String::isNotBlank)
             ?: return null
-        return runCatching {
+        return runSuspendCatching {
             dataSource.getLatestOpenSession(effectiveCashierId)
                 ?: resolveCashierNameFallback()?.let { fallbackCashierId ->
                     if (fallbackCashierId == effectiveCashierId) {
@@ -852,12 +905,12 @@ class CashReconciliationViewModel(
      * otherwise runs a quick /api/readiness probe so dead local forwards (e.g. adb reverse)
      * switch to the local path before sending the mutation request.
      */
-    private suspend fun shouldUseLocalForMutation(): Boolean {
+    private suspend fun shouldUseLocalForMutation(forceProbe: Boolean = false): Boolean {
         val repository = offlineStatusRepository ?: return false
         val status = latestOfflineStatus
         if (status.appDataMode == AppDataMode.OFFLINE_ONLY) return true
         if (!repository.isOnline()) return true
-        if (repository.currentBackendStatus() == BackendStatus.UNREACHABLE && !repository.isBackendHealthStale()) {
+        if (!forceProbe && repository.currentBackendStatus() == BackendStatus.UNREACHABLE && !repository.isBackendHealthStale()) {
             return true
         }
         val refreshed = repository.refreshBackendHealth(force = true)

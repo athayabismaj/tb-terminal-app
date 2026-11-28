@@ -1,6 +1,7 @@
 package com.tbterminal.app.data.remote
 
 import android.content.Context
+import android.os.Build
 import com.tbterminal.app.BuildConfig
 import com.tbterminal.app.data.session.SessionManager
 import com.tbterminal.app.data.session.SharedPreferencesTokenStore
@@ -49,7 +50,9 @@ class NetworkModule(
                     activeDevHost?.let { add(it) }
                     add(primaryHost)
                     add("127.0.0.1")
-                    add("10.0.2.2")
+                    if (isAndroidEmulator()) {
+                        add("10.0.2.2")
+                    }
                 }.toList()
 
                 var lastException: java.io.IOException? = null
@@ -296,6 +299,19 @@ class NetworkModule(
             .writeTimeout(WRITE_TIMEOUT_SECONDS, TimeUnit.SECONDS)
             .callTimeout(CALL_TIMEOUT_SECONDS, TimeUnit.SECONDS)
     }
+}
+
+private fun isAndroidEmulator(): Boolean {
+    return Build.FINGERPRINT.startsWith("generic") ||
+        Build.FINGERPRINT.startsWith("unknown") ||
+        Build.MODEL.contains("google_sdk") ||
+        Build.MODEL.contains("Emulator") ||
+        Build.MODEL.contains("Android SDK built for x86") ||
+        Build.MANUFACTURER.contains("Genymotion") ||
+        (Build.BRAND.startsWith("generic") && Build.DEVICE.startsWith("generic")) ||
+        Build.PRODUCT == "google_sdk" ||
+        Build.HARDWARE.contains("ranchu") ||
+        Build.HARDWARE.contains("goldfish")
 }
 
 private fun String.asRetrofitBaseUrl(): String {

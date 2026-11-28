@@ -32,6 +32,7 @@ import com.tbterminal.app.data.repository.CashReconciliationRepository
 import com.tbterminal.app.data.repository.RepositoryResult
 import com.tbterminal.app.data.sync.BackendHealthMonitor
 import com.tbterminal.app.data.sync.BackendStatus
+import com.tbterminal.app.data.sync.CashSessionAdoptionPolicy
 import com.tbterminal.app.data.sync.NetworkConnectivity
 import com.tbterminal.app.data.sync.OfflineStatusRepository
 import java.io.EOFException
@@ -90,7 +91,12 @@ class CashReconciliationViewModelOfflineTest {
             .setQueryExecutor { command -> command.run() }
             .setTransactionExecutor { command -> command.run() }
             .build()
-        cashSessionLocalDataSource = CashSessionLocalDataSource(database.cashSessionDao())
+        cashSessionLocalDataSource = CashSessionLocalDataSource(
+            cashSessionDao = database.cashSessionDao(),
+            transactionDao = database.transactionDao(),
+            cashExpenseDao = database.cashExpenseDao(),
+            syncQueueDao = database.syncQueueDao(),
+        )
         localCashSessionService = LocalCashSessionService(database, "device-test", roleProvider = { "KASIR" })
         localCashExpenseService = LocalCashExpenseService(database, "device-test")
         val connectivity = object : NetworkConnectivity {
@@ -509,19 +515,22 @@ class CashReconciliationViewModelOfflineTest {
         advanceUntilIdle()
         assertEquals(2, localCashExpenseService.getLocalExpenses(mirroredLocalId).size)
 
-        // 3. Ambiguous errors on openSession -> NO local session opened
-        val openRepo = FakeCashReconciliationOfflineRepo().apply {
-            activeSessionResult = RepositoryResult.Success(null)
-        }
-        val openVm = buildVm(openRepo)
-        advanceUntilIdle()
-
+        // 3. Ambiguous errors on openSession -> wait on first attempt, then unlock local (with adoptRemoteIfActive=true) when readiness fails
         listOf(
             RepositoryResult.Error("NETWORK_TIMEOUT", "Timeout"),
             RepositoryResult.Error("CONNECTION_INTERRUPTED", "Interrupted"),
             RepositoryResult.Error("HTTP_504", "Gateway timeout"),
             RepositoryResult.Exception(SocketTimeoutException("read timed out")),
         ).forEach { ambiguousResult ->
+            database.openHelper.writableDatabase.execSQL("DELETE FROM sync_queue")
+            database.openHelper.writableDatabase.execSQL("DELETE FROM local_cash_sessions")
+            readinessResponder = { Response.success(HealthResponseDto(status = "ready", database = "up")) }
+            val openRepo = FakeCashReconciliationOfflineRepo().apply {
+                activeSessionResult = RepositoryResult.Success(null)
+            }
+            val openVm = buildVm(openRepo)
+            advanceUntilIdle()
+
             backendHealthMonitor.markConnected()
             openRepo.openSessionResult = ambiguousResult
             openVm.onOpeningCashChanged("100000")
@@ -532,19 +541,82 @@ class CashReconciliationViewModelOfflineTest {
             assertEquals(null, cashSessionLocalDataSource.getLatestOpenSession("kasir-1"))
             assertNotNull(openVm.uiState.value.errorMessage)
 
-            // Immediate retry without changing amount does not bypass online into local openSession
+            // Retry while readiness is STILL 200 stays on server check path (no premature local open)
             openVm.openSession()
             advanceUntilIdle()
             assertEquals(null, cashSessionLocalDataSource.getLatestOpenSession("kasir-1"))
+
+            // Retry WITHOUT changing nominal when readiness confirms server unreachable -> opens locally with adoptRemoteIfActive=true
+            readinessResponder = { throw EOFException("server down after ambiguous open") }
+            val openCallsBeforeOfflineRetry = openRepo.openSessionCalls
+            openVm.openSession()
+            advanceUntilIdle()
+
+            assertEquals(openCallsBeforeOfflineRetry, openRepo.openSessionCalls)
+            assertTrue(openVm.uiState.value.hasActiveSession)
+            val adoptedLocal = cashSessionLocalDataSource.getLatestOpenSession("kasir-1")
+            assertNotNull(adoptedLocal)
+            val openQueue = database.syncQueueDao().getLatestForEntityAndOperation(
+                entityLocalId = adoptedLocal!!.localId,
+                entityType = SyncEntityType.CASH_SESSION,
+                operation = SyncOperation.CREATE,
+            )!!
+            assertTrue(CashSessionAdoptionPolicy.parseAdoptRemoteIfActive(openQueue.payloadJson))
         }
 
-        // 4. HTTP_502 / ConnectException on openSession -> DO fallback locally
-        backendHealthMonitor.markConnected()
-        openRepo.openSessionResult = RepositoryResult.Error("HTTP_502", "Bad Gateway")
-        openVm.onOpeningCashChanged("100000")
-        openVm.openSession()
+        // 4. Ambiguous openSession when server ALREADY opened session -> immediate retry adopts remote without re-calling openSession()
+        database.openHelper.writableDatabase.execSQL("DELETE FROM sync_queue")
+        database.openHelper.writableDatabase.execSQL("DELETE FROM local_cash_sessions")
+        readinessResponder = { Response.success(HealthResponseDto(status = "ready", database = "up")) }
+        backendHealthMonitor.refresh(force = true)
+        val serverCreatedRepo = FakeCashReconciliationOfflineRepo().apply {
+            activeSessionResult = RepositoryResult.Success(null)
+            openSessionResult = RepositoryResult.Error("NETWORK_TIMEOUT", "Timeout")
+        }
+        val serverCreatedVm = buildVm(serverCreatedRepo)
         advanceUntilIdle()
-        assertTrue(openVm.uiState.value.hasActiveSession)
+
+        serverCreatedVm.onOpeningCashChanged("100000")
+        serverCreatedVm.openSession()
+        advanceUntilIdle()
+        assertFalse(serverCreatedVm.uiState.value.hasActiveSession)
+
+        val remoteAlreadyOpened = CashSession(
+            id = "srv-created-during-timeout",
+            userId = "kasir-1",
+            userName = "Kasir Satu",
+            openedAt = "2026-11-27T08:00:00+07:00",
+            closedAt = null,
+            openingCash = BigDecimal("100000"),
+            closingCash = null,
+            systemCash = BigDecimal("100000"),
+            difference = null,
+            totalExpenses = BigDecimal.ZERO,
+            notes = null,
+            status = "OPEN",
+        )
+        serverCreatedRepo.activeSessionResult = RepositoryResult.Success(remoteAlreadyOpened)
+        serverCreatedVm.openSession()
+        advanceUntilIdle()
+
+        assertEquals(1, serverCreatedRepo.openSessionCalls)
+        assertTrue(serverCreatedVm.uiState.value.hasActiveSession)
+        assertEquals("srv-created-during-timeout", serverCreatedVm.uiState.value.activeSession?.id)
+
+        // 5. HTTP_502 / ConnectException on openSession -> DO fallback locally
+        database.openHelper.writableDatabase.execSQL("DELETE FROM sync_queue")
+        database.openHelper.writableDatabase.execSQL("DELETE FROM local_cash_sessions")
+        val fallbackRepo = FakeCashReconciliationOfflineRepo().apply {
+            activeSessionResult = RepositoryResult.Success(null)
+            openSessionResult = RepositoryResult.Error("HTTP_502", "Bad Gateway")
+        }
+        val fallbackVm = buildVm(fallbackRepo)
+        advanceUntilIdle()
+        backendHealthMonitor.markConnected()
+        fallbackVm.onOpeningCashChanged("100000")
+        fallbackVm.openSession()
+        advanceUntilIdle()
+        assertTrue(fallbackVm.uiState.value.hasActiveSession)
         assertNotNull(cashSessionLocalDataSource.getLatestOpenSession("kasir-1"))
     }
 
@@ -728,6 +800,80 @@ class CashReconciliationViewModelOfflineTest {
         advanceUntilIdle()
         assertFalse(vm.uiState.value.hasActiveSession)
         assertEquals(1L, vm.uiState.value.closeSessionSuccessEventId)
+    }
+
+    @Test
+    fun openSessionOffline_phoneStepsWithDeadServerOverUsbOrWifi_succeedsEvenWithStaleMirrorOrOtherCashierOpen() = runTest(dispatcher) {
+        // Simulasi HP nyata:
+        // 1) Stale mirror OPEN/SYNCED sesi lama di DB lokal + sesi kasir lain OPEN di DB lokal
+        database.cashSessionDao().upsert(
+            LocalCashSessionEntity(
+                serverId = "srv-stale-old",
+                clientGeneratedId = "srv-stale-old",
+                cashierUserId = "kasir-1",
+                status = "OPEN",
+                startingCash = ScaledDecimal2.ofWhole(50_000L),
+                expectedCash = ScaledDecimal2.ofWhole(50_000L),
+                openedAt = nowMillis - 86_400_000L,
+                syncStatus = SyncStatus.SYNCED,
+                createdAt = nowMillis - 86_400_000L,
+                updatedAt = nowMillis - 86_400_000L,
+            )
+        )
+        database.cashSessionDao().upsert(
+            LocalCashSessionEntity(
+                serverId = null,
+                clientGeneratedId = "sess-other-kasir",
+                cashierUserId = "kasir-2",
+                status = "OPEN",
+                startingCash = ScaledDecimal2.ofWhole(75_000L),
+                expectedCash = ScaledDecimal2.ofWhole(75_000L),
+                openedAt = nowMillis - 60_000L,
+                syncStatus = SyncStatus.PENDING,
+                createdAt = nowMillis - 60_000L,
+                updatedAt = nowMillis - 60_000L,
+            )
+        )
+
+        // Scenario A: Online load sees Success(null) (reconciling stale mirror), then USB adb reverse mati -> openSession lokal berhasil
+        backendHealthMonitor.markConnected()
+        val usbRepo = FakeCashReconciliationOfflineRepo().apply {
+            activeSessionResult = RepositoryResult.Success(null)
+        }
+        val usbVm = buildVm(usbRepo)
+        advanceUntilIdle()
+
+        assertFalse(usbVm.uiState.value.hasActiveSession)
+        assertEquals("CLOSED", database.cashSessionDao().getByServerId("srv-stale-old")?.status)
+
+        readinessResponder = { throw EOFException("adb reverse tunnel closed") }
+        usbVm.onOpeningCashChanged("200000")
+        usbVm.openSession()
+        advanceUntilIdle()
+
+        assertTrue(usbVm.uiState.value.hasActiveSession)
+        assertEquals(0, usbRepo.openSessionCalls)
+        assertNotNull(cashSessionLocalDataSource.getLatestOpenSession("kasir-1"))
+        assertNotNull(cashSessionLocalDataSource.getLatestOpenSession("kasir-2"))
+
+        // Scenario B: WiFi server mati (ConnectException pada readiness / openSession) -> tetap bisa buka lokal
+        database.openHelper.writableDatabase.execSQL("DELETE FROM sync_queue")
+        database.openHelper.writableDatabase.execSQL("DELETE FROM local_cash_sessions WHERE cashierUserId = 'kasir-1'")
+        backendHealthMonitor.markConnected()
+        readinessResponder = { throw ConnectException("Failed to connect to /192.168.1.10:3000") }
+        val wifiRepo = FakeCashReconciliationOfflineRepo().apply {
+            activeSessionResult = RepositoryResult.Exception(ConnectException("Failed to connect"))
+        }
+        val wifiVm = buildVm(wifiRepo)
+        advanceUntilIdle()
+
+        wifiVm.onOpeningCashChanged("175000")
+        wifiVm.openSession()
+        advanceUntilIdle()
+
+        assertTrue(wifiVm.uiState.value.hasActiveSession)
+        assertEquals(0, wifiRepo.openSessionCalls)
+        assertEquals(BigDecimal("175000.00"), cashSessionLocalDataSource.getLatestOpenSession("kasir-1")?.startingCash?.toBigDecimal())
     }
 
     private fun buildVm(repository: CashReconciliationRepository): CashReconciliationViewModel {

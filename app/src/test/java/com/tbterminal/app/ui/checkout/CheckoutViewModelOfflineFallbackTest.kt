@@ -21,6 +21,8 @@ import com.tbterminal.app.data.local.database.TbTerminalDatabase
 import com.tbterminal.app.data.local.entity.LocalCashSessionEntity
 import com.tbterminal.app.data.local.entity.LocalProductEntity
 import com.tbterminal.app.data.local.model.ScaledDecimal2
+import com.tbterminal.app.data.local.model.SyncEntityType
+import com.tbterminal.app.data.local.model.SyncOperation
 import com.tbterminal.app.data.local.model.SyncStatus
 import com.tbterminal.app.data.model.CashExpense
 import com.tbterminal.app.data.model.CashExpensePage
@@ -65,6 +67,7 @@ import com.tbterminal.app.data.repository.InventoryRepository
 import com.tbterminal.app.data.repository.RepositoryResult
 import com.tbterminal.app.data.sync.BackendHealthMonitor
 import com.tbterminal.app.data.sync.BackendStatus
+import com.tbterminal.app.data.sync.CashSessionAdoptionPolicy
 import com.tbterminal.app.data.sync.NetworkConnectivity
 import com.tbterminal.app.data.sync.OfflineStatusRepository
 import com.tbterminal.app.ui.common.UiText
@@ -125,7 +128,12 @@ class CheckoutViewModelOfflineFallbackTest {
             .build()
         productLocalDataSource = ProductLocalDataSource(database.productDao())
         customerLocalDataSource = CustomerLocalDataSource(database.customerDao())
-        cashSessionLocalDataSource = CashSessionLocalDataSource(database.cashSessionDao())
+        cashSessionLocalDataSource = CashSessionLocalDataSource(
+            cashSessionDao = database.cashSessionDao(),
+            transactionDao = database.transactionDao(),
+            cashExpenseDao = database.cashExpenseDao(),
+            syncQueueDao = database.syncQueueDao(),
+        )
         localCashSessionService = LocalCashSessionService(database, "device-test", roleProvider = { "KASIR" })
         pendingSubmissionStore = RoomPendingSubmissionStore(
             dao = database.pendingSubmissionDao(),
@@ -383,22 +391,27 @@ class CheckoutViewModelOfflineFallbackTest {
 
     @Test
     fun openCashSession_ambiguousErrorsDoNotFallbackLocally_while502AndRefusedDo() = runTest(dispatcher) {
-        backendHealthMonitor.refresh(force = true)
-        val cashRepo = FakeOfflineFallbackCashRepo().apply {
-            activeSessionResult = RepositoryResult.Success(null)
-        }
-        val vm = buildVm(cashRepo = cashRepo, actorRole = "KASIR")
-        advanceUntilIdle()
-
-        // Ambiguous errors (NETWORK_TIMEOUT, CONNECTION_INTERRUPTED, HTTP_504, SocketTimeoutException) -> NO local session
+        // Ambiguous errors (NETWORK_TIMEOUT, CONNECTION_INTERRUPTED, HTTP_504, SocketTimeoutException):
+        // 1) first attempt shows error without opening locally
+        // 2) retry while readiness still returns 200 stays online
+        // 3) retry without changing amount when readiness fails opens locally with adoptRemoteIfActive=true
         listOf(
             RepositoryResult.Error("NETWORK_TIMEOUT", "Timeout"),
             RepositoryResult.Error("CONNECTION_INTERRUPTED", "Interrupted"),
             RepositoryResult.Error("HTTP_504", "Gateway timeout"),
             RepositoryResult.Exception(SocketTimeoutException("read timeout")),
         ).forEach { ambiguous ->
-            backendHealthMonitor.markConnected()
-            cashRepo.openSessionResult = ambiguous
+            database.openHelper.writableDatabase.execSQL("DELETE FROM sync_queue")
+            database.openHelper.writableDatabase.execSQL("DELETE FROM local_cash_sessions")
+            healthApi.nextResponse = Response.success(HealthResponseDto(status = "ready", database = "up"))
+            backendHealthMonitor.refresh(force = true)
+            val cashRepo = FakeOfflineFallbackCashRepo().apply {
+                activeSessionResult = RepositoryResult.Success(null)
+                openSessionResult = ambiguous
+            }
+            val vm = buildVm(cashRepo = cashRepo, actorRole = "KASIR")
+            advanceUntilIdle()
+
             vm.onStartingCashChanged("150000")
             vm.openCashSession()
             advanceUntilIdle()
@@ -407,20 +420,86 @@ class CheckoutViewModelOfflineFallbackTest {
             assertNull(cashSessionLocalDataSource.getLatestOpenSession("kasir-1"))
             assertNotNull(vm.uiState.value.cashSessionError)
 
-            // Immediate retry does not silently open local session
+            // Retry while server readiness is STILL 200 stays online
             vm.openCashSession()
             advanceUntilIdle()
             assertNull(cashSessionLocalDataSource.getLatestOpenSession("kasir-1"))
+
+            // Server now unreachable on readiness probe -> immediate retry WITHOUT changing amount opens locally
+            healthApi.nextResponse = Response.error(503, "down".toResponseBody())
+            val callsBeforeOfflineRetry = cashRepo.openSessionCalls
+            vm.openCashSession()
+            advanceUntilIdle()
+
+            assertEquals(callsBeforeOfflineRetry, cashRepo.openSessionCalls)
+            assertTrue(vm.uiState.value.hasActiveCashSession)
+            val local = cashSessionLocalDataSource.getLatestOpenSession("kasir-1")
+            assertNotNull(local)
+            val openQueue = database.syncQueueDao().getLatestForEntityAndOperation(
+                entityLocalId = local!!.localId,
+                entityType = SyncEntityType.CASH_SESSION,
+                operation = SyncOperation.CREATE,
+            )!!
+            assertTrue(CashSessionAdoptionPolicy.parseAdoptRemoteIfActive(openQueue.payloadJson))
         }
 
-        // Definitely unprocessed errors (HTTP_502, NETWORK_UNAVAILABLE, ConnectException, CONNECT_TIMEOUT, PreDispatchIOException) -> DO fallback locally
-        backendHealthMonitor.markConnected()
-        cashRepo.openSessionResult = RepositoryResult.Exception(ConnectException("Connection refused"))
-        vm.onStartingCashChanged("150000")
-        vm.openCashSession()
+        // Ambiguous openSession when server ALREADY opened -> immediate retry adopts remote without re-calling openSession()
+        database.openHelper.writableDatabase.execSQL("DELETE FROM sync_queue")
+        database.openHelper.writableDatabase.execSQL("DELETE FROM local_cash_sessions")
+        healthApi.nextResponse = Response.success(HealthResponseDto(status = "ready", database = "up"))
+        backendHealthMonitor.refresh(force = true)
+        val serverOpenedRepo = FakeOfflineFallbackCashRepo().apply {
+            activeSessionResult = RepositoryResult.Success(null)
+            openSessionResult = RepositoryResult.Error("HTTP_504", "Gateway timeout")
+        }
+        val serverOpenedVm = buildVm(cashRepo = serverOpenedRepo, actorRole = "KASIR")
         advanceUntilIdle()
 
-        assertTrue(vm.uiState.value.hasActiveCashSession)
+        serverOpenedVm.onStartingCashChanged("150000")
+        serverOpenedVm.openCashSession()
+        advanceUntilIdle()
+        assertFalse(serverOpenedVm.uiState.value.hasActiveCashSession)
+
+        serverOpenedRepo.activeSessionResult = RepositoryResult.Success(
+            CashSession(
+                id = "srv-checkout-timeout-created",
+                userId = "kasir-1",
+                userName = "Kasir Satu",
+                openedAt = "2026-11-27T08:00:00+07:00",
+                closedAt = null,
+                openingCash = BigDecimal("150000"),
+                closingCash = null,
+                systemCash = BigDecimal("150000"),
+                difference = null,
+                totalExpenses = BigDecimal.ZERO,
+                notes = null,
+                status = "OPEN",
+            )
+        )
+        serverOpenedVm.openCashSession()
+        advanceUntilIdle()
+        assertEquals(1, serverOpenedRepo.openSessionCalls)
+        assertTrue(serverOpenedVm.uiState.value.hasActiveCashSession)
+        assertEquals(
+            "srv-checkout-timeout-created",
+            cashSessionLocalDataSource.getLatestOpenSession("kasir-1")?.serverId,
+        )
+
+        // Definitely unprocessed errors (HTTP_502, NETWORK_UNAVAILABLE, ConnectException, CONNECT_TIMEOUT, PreDispatchIOException) -> DO fallback locally
+        database.openHelper.writableDatabase.execSQL("DELETE FROM sync_queue")
+        database.openHelper.writableDatabase.execSQL("DELETE FROM local_cash_sessions")
+        val fallbackRepo = FakeOfflineFallbackCashRepo().apply {
+            activeSessionResult = RepositoryResult.Success(null)
+            openSessionResult = RepositoryResult.Exception(ConnectException("Connection refused"))
+        }
+        val fallbackVm = buildVm(cashRepo = fallbackRepo, actorRole = "KASIR")
+        advanceUntilIdle()
+        backendHealthMonitor.markConnected()
+        fallbackVm.onStartingCashChanged("150000")
+        fallbackVm.openCashSession()
+        advanceUntilIdle()
+
+        assertTrue(fallbackVm.uiState.value.hasActiveCashSession)
         assertNotNull(cashSessionLocalDataSource.getLatestOpenSession("kasir-1"))
     }
 
@@ -662,6 +741,78 @@ class CheckoutViewModelOfflineFallbackTest {
         assertEquals(BackendStatus.CONNECTED, backendHealthMonitor.status.value)
         assertFalse(vm.uiState.value.hasAmbiguousCheckout)
         assertNull(pendingSubmissionStore.load(PendingSubmissionScopes.CHECKOUT))
+    }
+
+    @Test
+    fun openCashSession_phoneStepsWithDeadServerOverUsbOrWifi_succeedsEvenWithStaleMirrorOrOtherCashierOpen() = runTest(dispatcher) {
+        // Seed stale OPEN/SYNCED mirror + open local session belonging to kasir-2
+        database.cashSessionDao().upsert(
+            LocalCashSessionEntity(
+                serverId = "srv-pos-stale",
+                clientGeneratedId = "srv-pos-stale",
+                cashierUserId = "kasir-1",
+                status = "OPEN",
+                startingCash = ScaledDecimal2.ofWhole(100_000L),
+                expectedCash = ScaledDecimal2.ofWhole(100_000L),
+                openedAt = nowMillis - 86_400_000L,
+                syncStatus = SyncStatus.SYNCED,
+                createdAt = nowMillis - 86_400_000L,
+                updatedAt = nowMillis - 86_400_000L,
+            )
+        )
+        database.cashSessionDao().upsert(
+            LocalCashSessionEntity(
+                serverId = null,
+                clientGeneratedId = "srv-pos-other-kasir",
+                cashierUserId = "kasir-2",
+                status = "OPEN",
+                startingCash = ScaledDecimal2.ofWhole(50_000L),
+                expectedCash = ScaledDecimal2.ofWhole(50_000L),
+                openedAt = nowMillis - 30_000L,
+                syncStatus = SyncStatus.PENDING,
+                createdAt = nowMillis - 30_000L,
+                updatedAt = nowMillis - 30_000L,
+            )
+        )
+
+        // Scenario A: Online load sees Success(null) (reconciling stale mirror), then USB adb reverse down -> openCashSession succeeds locally
+        val usbRepo = FakeOfflineFallbackCashRepo().apply {
+            activeSessionResult = RepositoryResult.Success(null)
+        }
+        val usbVm = buildVm(cashRepo = usbRepo, actorRole = "KASIR")
+        advanceUntilIdle()
+
+        assertFalse(usbVm.uiState.value.hasActiveCashSession)
+        assertEquals("CLOSED", database.cashSessionDao().getByServerId("srv-pos-stale")?.status)
+
+        healthApi.nextResponse = Response.error(503, "adb reverse closed".toResponseBody())
+        usbVm.onStartingCashChanged("125000")
+        usbVm.openCashSession()
+        advanceUntilIdle()
+
+        assertTrue(usbVm.uiState.value.hasActiveCashSession)
+        assertEquals(0, usbRepo.openSessionCalls)
+        assertNotNull(cashSessionLocalDataSource.getLatestOpenSession("kasir-1"))
+        assertNotNull(cashSessionLocalDataSource.getLatestOpenSession("kasir-2"))
+
+        // Scenario B: WiFi server unreachable (ConnectException) even while readiness wasn't updated
+        database.openHelper.writableDatabase.execSQL("DELETE FROM sync_queue")
+        database.openHelper.writableDatabase.execSQL("DELETE FROM local_cash_sessions WHERE cashierUserId = 'kasir-1'")
+        healthApi.nextResponse = Response.success(HealthResponseDto(status = "ready", database = "up"))
+        backendHealthMonitor.refresh(force = true)
+        val wifiRepo = FakeOfflineFallbackCashRepo().apply {
+            activeSessionResult = RepositoryResult.Exception(ConnectException("Connection refused"))
+            openSessionResult = RepositoryResult.Exception(ConnectException("Failed to connect"))
+        }
+        val wifiVm = buildVm(cashRepo = wifiRepo, actorRole = "KASIR")
+        advanceUntilIdle()
+
+        wifiVm.onStartingCashChanged("160000")
+        wifiVm.openCashSession()
+        advanceUntilIdle()
+
+        assertTrue(wifiVm.uiState.value.hasActiveCashSession)
+        assertNotNull(cashSessionLocalDataSource.getLatestOpenSession("kasir-1"))
     }
 
     private suspend fun seedProductAndOpenSession(serverSessionId: String) {
