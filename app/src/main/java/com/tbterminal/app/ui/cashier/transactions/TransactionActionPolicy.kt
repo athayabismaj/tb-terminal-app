@@ -70,3 +70,35 @@ internal fun isAmbiguousTransactionActionError(code: String): Boolean =
         "INVALID_RESPONSE",
         "EMPTY_BODY",
     )
+
+internal fun isTransactionAlreadyRefundedError(code: String, message: String): Boolean {
+    val normalizedCode = code.trim().uppercase()
+    if (normalizedCode == "TRANSACTION_ALREADY_REFUNDED" || normalizedCode == "DUPLICATE_DATA") {
+        return true
+    }
+    val lowerMessage = message.trim().lowercase()
+    return normalizedCode in setOf("VALIDATION_ERROR", "HTTP_400", "HTTP_409") &&
+        (lowerMessage.contains("sudah pernah direfund") || lowerMessage.contains("sudah direfund"))
+}
+
+internal fun isTransactionAlreadyVoidedError(code: String, message: String): Boolean {
+    val normalizedCode = code.trim().uppercase()
+    if (normalizedCode == "TRANSACTION_ALREADY_VOIDED" || normalizedCode == "DUPLICATE_DATA") {
+        return true
+    }
+    val lowerMessage = message.trim().lowercase()
+    return normalizedCode in setOf("VALIDATION_ERROR", "HTTP_400", "HTTP_409") &&
+        (lowerMessage.contains("sudah pernah dibatalkan") ||
+            lowerMessage.contains("sudah dibatalkan") ||
+            lowerMessage.contains("sudah di-void") ||
+            lowerMessage.contains("sudah divoid"))
+}
+
+internal fun isTransactionActionIdempotencyConflictError(code: String, message: String): Boolean {
+    val normalizedCode = code.trim().uppercase()
+    if (normalizedCode !in setOf("VALIDATION_ERROR", "HTTP_400", "IDEMPOTENCY_CONFLICT")) {
+        return false
+    }
+    val lowerMessage = message.trim().lowercase()
+    return lowerMessage.contains("idempotencykey") || lowerMessage.contains("idempotency key")
+}

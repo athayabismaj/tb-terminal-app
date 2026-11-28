@@ -20,6 +20,10 @@ import com.tbterminal.app.data.model.CreateReceivableAdjustmentCommand
 import com.tbterminal.app.data.model.CreateReceivablePaymentCommand
 import com.tbterminal.app.data.model.CreateSupplierPaymentCommand
 import com.tbterminal.app.data.model.CustomerReceivableSummaryPage
+import com.tbterminal.app.data.model.ManagerApprovalAction
+import com.tbterminal.app.data.model.ManagerApprovalGrant
+import com.tbterminal.app.data.model.ManagerApprovalResourceType
+import com.tbterminal.app.data.model.ManagerApprovalStatus
 import com.tbterminal.app.data.model.Product
 import com.tbterminal.app.data.model.ProductCategory
 import com.tbterminal.app.data.model.ProductCategoryPage
@@ -679,6 +683,144 @@ class SubmissionIdempotencyPersistenceTest {
         advanceUntilIdle()
         assertEquals(2, cashRepo.recordedRefundKeys.size)
         assertEquals(oldRefundKey, cashRepo.recordedRefundKeys[1])
+    }
+
+    @Test
+    fun cashierRefundAndVoid_reuseKeyWhenApprovalRenewedOrDetailsChanged_andRecoverOnConflict() = runTest(dispatcher) {
+        val store = FakePendingSubmissionStore()
+        val cashRepo = FakeCashRepo(initialStatus = "LUNAS")
+        var seq = 0
+
+        // 1. Cashier triggers refund with approval-1, gets MANAGER_APPROVAL_EXPIRED, then renews to approval-2 -> same key!
+        val vm1 = CashierTransactionHistoryViewModel(
+            repository = cashRepo,
+            actorRole = "KASIR",
+            idempotencyKeyGenerator = { "k-${++seq}" },
+            pendingSubmissionStore = store,
+        )
+        vm1.loadReceipt("tx-debt-1")
+        advanceUntilIdle()
+        vm1.showRefundDialog()
+        vm1.onRefundDispositionChanged(RefundDisposition.DAMAGED)
+        vm1.onRefundReasonChanged("Kemasan rusak")
+        vm1.submitRefund()
+        cashRepo.nextRefundResult = RepositoryResult.Error("MANAGER_APPROVAL_EXPIRED", "Kedaluwarsa")
+        vm1.onManagerApprovalGranted(
+            ManagerApprovalGrant(
+                approvalId = "approval-1",
+                action = ManagerApprovalAction.REFUND_TRANSACTION,
+                resourceType = ManagerApprovalResourceType.TRANSACTION,
+                resourceId = "tx-debt-1",
+                status = ManagerApprovalStatus.APPROVED,
+                createdAt = "2026-11-28T00:00:00Z",
+                expiresAt = "2026-11-28T00:05:00Z",
+            )
+        )
+        advanceUntilIdle()
+
+        val firstRefundKey = cashRepo.recordedRefundKeys.single()
+        assertTrue(vm1.uiState.value.isRefundOutcomeAmbiguous)
+        assertNull(vm1.uiState.value.refundManagerApprovalId)
+        assertEquals(firstRefundKey, vm1.uiState.value.refundIdempotencyKey)
+        assertEquals(PendingSubmissionStatus.AMBIGUOUS, store.records[PendingSubmissionScopes.CASHIER_REFUND]?.status)
+
+        // Force-close & restart -> new VM opens receipt -> obtains approval-2 -> reuses exact same key
+        val vm2 = CashierTransactionHistoryViewModel(
+            repository = cashRepo,
+            actorRole = "KASIR",
+            idempotencyKeyGenerator = { "k-${++seq}" },
+            pendingSubmissionStore = store,
+        )
+        vm2.loadReceipt("tx-debt-1")
+        advanceUntilIdle()
+        vm2.showRefundDialog()
+        vm2.submitRefund()
+        assertEquals(ManagerApprovalAction.REFUND_TRANSACTION, vm2.uiState.value.pendingManagerApprovalAction)
+
+        // Simulate backend answering 409 DUPLICATE_DATA (uq_transaction_refund_transaction) -> recovers cleanly
+        cashRepo.detail = cashRepo.detail.copy(status = "REFUNDED")
+        cashRepo.nextRefundResult = RepositoryResult.Error("DUPLICATE_DATA", "Data sudah ada")
+        vm2.onManagerApprovalGranted(
+            ManagerApprovalGrant(
+                approvalId = "approval-2",
+                action = ManagerApprovalAction.REFUND_TRANSACTION,
+                resourceType = ManagerApprovalResourceType.TRANSACTION,
+                resourceId = "tx-debt-1",
+                status = ManagerApprovalStatus.APPROVED,
+                createdAt = "2026-11-28T00:01:00Z",
+                expiresAt = "2026-11-28T00:06:00Z",
+            )
+        )
+        advanceUntilIdle()
+
+        assertEquals(listOf(firstRefundKey, firstRefundKey), cashRepo.recordedRefundKeys)
+        assertNull(store.records[PendingSubmissionScopes.CASHIER_REFUND])
+        assertFalse(vm2.uiState.value.isRefundDialogOpen)
+        assertFalse(vm2.uiState.value.isRefundOutcomeAmbiguous)
+        assertEquals("Transaksi sudah pernah direfund.", vm2.uiState.value.receiptMessage)
+        assertEquals("REFUNDED", vm2.uiState.value.selectedTransaction?.status)
+
+        // 2. Void: expired approval preserves key across restart and recovers on TRANSACTION_ALREADY_VOIDED
+        cashRepo.detail = cashRepo.detail.copy(status = "LUNAS")
+        val vm3 = CashierTransactionHistoryViewModel(
+            repository = cashRepo,
+            actorRole = "KASIR",
+            idempotencyKeyGenerator = { "k-${++seq}" },
+            pendingSubmissionStore = store,
+        )
+        vm3.loadReceipt("tx-debt-1")
+        advanceUntilIdle()
+        vm3.showVoidDialog()
+        vm3.onVoidReasonChanged("Salah input barang")
+        vm3.submitVoid()
+        cashRepo.nextVoidResult = RepositoryResult.Error("MANAGER_APPROVAL_ALREADY_USED", "Sudah dipakai")
+        vm3.onManagerApprovalGranted(
+            ManagerApprovalGrant(
+                approvalId = "approval-v1",
+                action = ManagerApprovalAction.VOID_TRANSACTION,
+                resourceType = ManagerApprovalResourceType.TRANSACTION,
+                resourceId = "tx-debt-1",
+                status = ManagerApprovalStatus.APPROVED,
+                createdAt = "2026-11-28T00:02:00Z",
+                expiresAt = "2026-11-28T00:07:00Z",
+            )
+        )
+        advanceUntilIdle()
+
+        val firstVoidKey = cashRepo.recordedVoidKeys.single()
+        assertEquals(PendingSubmissionStatus.AMBIGUOUS, store.records[PendingSubmissionScopes.CASHIER_VOID]?.status)
+
+        val vm4 = CashierTransactionHistoryViewModel(
+            repository = cashRepo,
+            actorRole = "KASIR",
+            idempotencyKeyGenerator = { "k-${++seq}" },
+            pendingSubmissionStore = store,
+        )
+        vm4.loadReceipt("tx-debt-1")
+        advanceUntilIdle()
+        vm4.showVoidDialog()
+        vm4.submitVoid()
+        cashRepo.detail = cashRepo.detail.copy(status = "VOIDED")
+        cashRepo.nextVoidResult = RepositoryResult.Error("TRANSACTION_ALREADY_VOIDED", "Transaksi sudah pernah dibatalkan")
+        vm4.onManagerApprovalGranted(
+            ManagerApprovalGrant(
+                approvalId = "approval-v2",
+                action = ManagerApprovalAction.VOID_TRANSACTION,
+                resourceType = ManagerApprovalResourceType.TRANSACTION,
+                resourceId = "tx-debt-1",
+                status = ManagerApprovalStatus.APPROVED,
+                createdAt = "2026-11-28T00:03:00Z",
+                expiresAt = "2026-11-28T00:08:00Z",
+            )
+        )
+        advanceUntilIdle()
+
+        assertEquals(listOf(firstVoidKey, firstVoidKey), cashRepo.recordedVoidKeys)
+        assertNull(store.records[PendingSubmissionScopes.CASHIER_VOID])
+        assertFalse(vm4.uiState.value.isVoidDialogOpen)
+        assertFalse(vm4.uiState.value.isVoidOutcomeAmbiguous)
+        assertEquals("Transaksi sudah pernah dibatalkan.", vm4.uiState.value.receiptMessage)
+        assertEquals("VOIDED", vm4.uiState.value.selectedTransaction?.status)
     }
 
     @Test

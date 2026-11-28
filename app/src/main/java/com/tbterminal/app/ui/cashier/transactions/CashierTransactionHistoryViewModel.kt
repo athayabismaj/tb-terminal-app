@@ -657,6 +657,14 @@ class CashierTransactionHistoryViewModel(
             when (val result = repository.getTransactionById(transactionId)) {
                 is RepositoryResult.Success -> {
                     pendingActionsRestoreJob.join()
+                    val isTerminalVoided = result.data.status.equals("VOIDED", ignoreCase = true)
+                    val isTerminalRefunded = result.data.status.equals("REFUNDED", ignoreCase = true)
+                    if (isTerminalVoided && restoredVoid?.transactionId == result.data.id) {
+                        clearPersistedVoidState()
+                    }
+                    if (isTerminalRefunded && restoredRefund?.transactionId == result.data.id) {
+                        clearPersistedRefundState()
+                    }
                     val pendingForReceipt = restoredPayDebt?.takeIf { it.transactionId == result.data.id }
                     val pendingKey = restoredPayDebtKey?.takeIf { pendingForReceipt != null && it.isNotBlank() }
                     if (pendingForReceipt != null && pendingKey != null) {
@@ -687,15 +695,17 @@ class CashierTransactionHistoryViewModel(
                             payDebtMethodInput = pendingForReceipt?.method ?: state.payDebtMethodInput,
                             payDebtIdempotencyKey = pendingKey ?: state.payDebtIdempotencyKey,
                             isPayDebtOutcomeAmbiguous = if (pendingKey != null) true else state.isPayDebtOutcomeAmbiguous,
+                            isVoidDialogOpen = if (isTerminalVoided) false else state.isVoidDialogOpen,
                             voidReasonInput = pendingVoid?.takeIf { pendingVoidKey != null }?.reason ?: state.voidReasonInput,
-                            voidIdempotencyKey = pendingVoidKey ?: state.voidIdempotencyKey,
-                            voidManagerApprovalId = pendingVoid?.takeIf { pendingVoidKey != null }?.managerApprovalId ?: state.voidManagerApprovalId,
-                            isVoidOutcomeAmbiguous = if (pendingVoidKey != null) true else state.isVoidOutcomeAmbiguous,
+                            voidIdempotencyKey = if (isTerminalVoided) null else pendingVoidKey ?: state.voidIdempotencyKey,
+                            voidManagerApprovalId = if (isTerminalVoided) null else pendingVoid?.takeIf { pendingVoidKey != null }?.managerApprovalId ?: state.voidManagerApprovalId,
+                            isVoidOutcomeAmbiguous = if (isTerminalVoided) false else if (pendingVoidKey != null) true else state.isVoidOutcomeAmbiguous,
+                            isRefundDialogOpen = if (isTerminalRefunded) false else state.isRefundDialogOpen,
                             refundReasonInput = pendingRefund?.takeIf { pendingRefundKey != null && pendingRefundDisposition != null }?.reason ?: state.refundReasonInput,
                             refundDisposition = pendingRefundDisposition?.takeIf { pendingRefundKey != null } ?: state.refundDisposition,
-                            refundIdempotencyKey = pendingRefundKey?.takeIf { pendingRefundDisposition != null } ?: state.refundIdempotencyKey,
-                            refundManagerApprovalId = pendingRefund?.takeIf { pendingRefundKey != null && pendingRefundDisposition != null }?.managerApprovalId ?: state.refundManagerApprovalId,
-                            isRefundOutcomeAmbiguous = if (pendingRefundKey != null && pendingRefundDisposition != null) true else state.isRefundOutcomeAmbiguous,
+                            refundIdempotencyKey = if (isTerminalRefunded) null else pendingRefundKey?.takeIf { pendingRefundDisposition != null } ?: state.refundIdempotencyKey,
+                            refundManagerApprovalId = if (isTerminalRefunded) null else pendingRefund?.takeIf { pendingRefundKey != null && pendingRefundDisposition != null }?.managerApprovalId ?: state.refundManagerApprovalId,
+                            isRefundOutcomeAmbiguous = if (isTerminalRefunded) false else if (pendingRefundKey != null && pendingRefundDisposition != null) true else state.isRefundOutcomeAmbiguous,
                         )
                     }
                 }
@@ -757,16 +767,20 @@ class CashierTransactionHistoryViewModel(
     fun onVoidReasonChanged(value: String) {
         if (_uiState.value.isVoidOutcomeAmbiguous) return
         if (value.length <= 1000) {
-            if (pendingActionsRestoreJob.isCompleted && (restoredVoid != null || restoredVoidKey != null)) {
+            val selectedId = _uiState.value.selectedTransaction?.id
+            val pendingSameTransaction = selectedId != null &&
+                restoredVoid?.transactionId == selectedId &&
+                !restoredVoidKey.isNullOrBlank()
+            if (pendingActionsRestoreJob.isCompleted && (restoredVoid != null || restoredVoidKey != null) && !pendingSameTransaction) {
                 viewModelScope.launch { clearPersistedVoidState() }
             }
             _uiState.update {
                 it.copy(
                     voidReasonInput = value,
-                    voidIdempotencyKey = if (pendingActionsRestoreJob.isCompleted) {
-                        "void-mobile-${idempotencyKeyGenerator()}"
-                    } else {
-                        null
+                    voidIdempotencyKey = when {
+                        pendingSameTransaction -> restoredVoidKey
+                        pendingActionsRestoreJob.isCompleted -> "void-mobile-${idempotencyKeyGenerator()}"
+                        else -> null
                     },
                     voidErrorMessage = null,
                 )
@@ -817,10 +831,13 @@ class CashierTransactionHistoryViewModel(
         }
         viewModelScope.launch {
             pendingActionsRestoreJob.join()
-            val pendingMatches = restoredVoid?.let {
-                it.transactionId == transactionId && it.reason == reason && !restoredVoidKey.isNullOrBlank()
+            // Satu transaksi hanya dapat di-void penuh satu kali. Selama hasil permintaan sebelumnya
+            // untuk transactionId yang sama masih belum pasti, idempotencyKey lama wajib dipakai ulang
+            // meskipun alasan atau managerApprovalId berubah (mis. setelah restart / perpanjangan approval).
+            val pendingSameTransaction = restoredVoid?.let {
+                it.transactionId == transactionId && !restoredVoidKey.isNullOrBlank()
             } == true
-            val resolvedKey = if (pendingMatches) {
+            val resolvedKey = if (pendingSameTransaction) {
                 activeVoidCreatedAt = restoredVoidCreatedAt
                 restoredVoidKey!!
             } else {
@@ -830,7 +847,7 @@ class CashierTransactionHistoryViewModel(
                 }
                 candidate
             }
-            val resolvedApprovalId = managerApprovalId ?: restoredVoid?.takeIf { pendingMatches }?.managerApprovalId
+            val resolvedApprovalId = managerApprovalId ?: restoredVoid?.takeIf { pendingSameTransaction }?.managerApprovalId
             val pendingDto = PersistedCashierVoidPending(
                 transactionId = transactionId,
                 reason = reason,
@@ -881,11 +898,61 @@ class CashierTransactionHistoryViewModel(
                     loadReceipt(transactionId, preserveMessage = true)
                 }
                 is RepositoryResult.Error -> {
+                    if (isTransactionAlreadyVoidedError(result.code, result.message)) {
+                        clearPersistedVoidState()
+                        _uiState.update {
+                            it.copy(
+                                isSubmittingVoid = false,
+                                isVoidDialogOpen = false,
+                                voidIdempotencyKey = null,
+                                voidManagerApprovalId = null,
+                                isVoidOutcomeAmbiguous = false,
+                                voidErrorMessage = null,
+                                receiptMessage = transactionActionErrorMessage("TRANSACTION_ALREADY_VOIDED", result.message),
+                            )
+                        }
+                        loadReceipt(transactionId, preserveMessage = true)
+                        return@launch
+                    }
+                    if (isTransactionActionIdempotencyConflictError(result.code, result.message)) {
+                        val latestResult = repository.getTransactionById(transactionId)
+                        if (latestResult is RepositoryResult.Success &&
+                            latestResult.data.status.equals("VOIDED", ignoreCase = true)
+                        ) {
+                            clearPersistedVoidState()
+                            _uiState.update {
+                                it.copy(
+                                    selectedTransaction = latestResult.data,
+                                    isSubmittingVoid = false,
+                                    isVoidDialogOpen = false,
+                                    voidIdempotencyKey = null,
+                                    voidManagerApprovalId = null,
+                                    isVoidOutcomeAmbiguous = false,
+                                    voidErrorMessage = null,
+                                    receiptMessage = transactionActionErrorMessage("TRANSACTION_ALREADY_VOIDED", result.message),
+                                )
+                            }
+                            return@launch
+                        }
+                        clearPersistedVoidState()
+                        _uiState.update {
+                            it.copy(
+                                isSubmittingVoid = false,
+                                isVoidDialogOpen = true,
+                                voidIdempotencyKey = null,
+                                voidManagerApprovalId = null,
+                                isVoidOutcomeAmbiguous = false,
+                                voidErrorMessage = transactionActionErrorMessage(result.code, result.message),
+                            )
+                        }
+                        return@launch
+                    }
                     val approvalInvalid = requiresNewActionApproval(result.code)
                     val ambiguous = isAmbiguousTransactionActionError(result.code)
-                    if (ambiguous) {
+                    val keepPendingKey = ambiguous || approvalInvalid
+                    if (keepPendingKey) {
                         val dtoToSave = pendingDto.copy(
-                            managerApprovalId = if (approvalInvalid) null else managerApprovalId
+                            managerApprovalId = if (approvalInvalid) null else resolvedApprovalId
                         )
                         persistPendingVoid(dtoToSave, resolvedKey, PendingSubmissionStatus.AMBIGUOUS)
                     } else {
@@ -895,8 +962,9 @@ class CashierTransactionHistoryViewModel(
                         it.copy(
                             isSubmittingVoid = false,
                             isVoidDialogOpen = true,
+                            voidIdempotencyKey = if (keepPendingKey) resolvedKey else null,
                             voidManagerApprovalId = if (approvalInvalid) null else it.voidManagerApprovalId,
-                            isVoidOutcomeAmbiguous = ambiguous,
+                            isVoidOutcomeAmbiguous = keepPendingKey,
                             voidErrorMessage = transactionActionErrorMessage(result.code, result.message),
                         )
                     }
@@ -975,16 +1043,20 @@ class CashierTransactionHistoryViewModel(
     fun onRefundReasonChanged(value: String) {
         if (_uiState.value.isRefundOutcomeAmbiguous) return
         if (value.length <= 1000) {
-            if (pendingActionsRestoreJob.isCompleted && (restoredRefund != null || restoredRefundKey != null)) {
+            val selectedId = _uiState.value.selectedTransaction?.id
+            val pendingSameTransaction = selectedId != null &&
+                restoredRefund?.transactionId == selectedId &&
+                !restoredRefundKey.isNullOrBlank()
+            if (pendingActionsRestoreJob.isCompleted && (restoredRefund != null || restoredRefundKey != null) && !pendingSameTransaction) {
                 viewModelScope.launch { clearPersistedRefundState() }
             }
             _uiState.update {
                 it.copy(
                     refundReasonInput = value,
-                    refundIdempotencyKey = if (pendingActionsRestoreJob.isCompleted) {
-                        "refund-mobile-${idempotencyKeyGenerator()}"
-                    } else {
-                        null
+                    refundIdempotencyKey = when {
+                        pendingSameTransaction -> restoredRefundKey
+                        pendingActionsRestoreJob.isCompleted -> "refund-mobile-${idempotencyKeyGenerator()}"
+                        else -> null
                     },
                     refundErrorMessage = null,
                 )
@@ -994,16 +1066,20 @@ class CashierTransactionHistoryViewModel(
 
     fun onRefundDispositionChanged(disposition: RefundDisposition) {
         if (_uiState.value.isRefundOutcomeAmbiguous) return
-        if (pendingActionsRestoreJob.isCompleted && (restoredRefund != null || restoredRefundKey != null)) {
+        val selectedId = _uiState.value.selectedTransaction?.id
+        val pendingSameTransaction = selectedId != null &&
+            restoredRefund?.transactionId == selectedId &&
+            !restoredRefundKey.isNullOrBlank()
+        if (pendingActionsRestoreJob.isCompleted && (restoredRefund != null || restoredRefundKey != null) && !pendingSameTransaction) {
             viewModelScope.launch { clearPersistedRefundState() }
         }
         _uiState.update {
             it.copy(
                 refundDisposition = disposition,
-                refundIdempotencyKey = if (pendingActionsRestoreJob.isCompleted) {
-                    "refund-mobile-${idempotencyKeyGenerator()}"
-                } else {
-                    null
+                refundIdempotencyKey = when {
+                    pendingSameTransaction -> restoredRefundKey
+                    pendingActionsRestoreJob.isCompleted -> "refund-mobile-${idempotencyKeyGenerator()}"
+                    else -> null
                 },
                 refundErrorMessage = null,
             )
@@ -1060,13 +1136,16 @@ class CashierTransactionHistoryViewModel(
         }
         viewModelScope.launch {
             pendingActionsRestoreJob.join()
-            val pendingMatches = restoredRefund?.let {
-                it.transactionId == transactionId &&
-                    it.reason == reason &&
-                    it.dispositionName.equals(disposition.name, ignoreCase = true) &&
-                    !restoredRefundKey.isNullOrBlank()
+            // Satu transaksi hanya dapat direfund penuh satu kali (uq_transaction_refund_transaction).
+            // Selama hasil permintaan sebelumnya untuk transactionId yang sama masih belum pasti,
+            // idempotencyKey lama wajib dipakai ulang meskipun alasan, disposisi, atau managerApprovalId
+            // berubah (mis. setelah tutup paksa/restart atau saat meminta manager approval baru).
+            // CATATAN: Jika kelak fitur refund sebagian (partial refund) ditambahkan, aturan reuse per
+            // transactionId ini wajib ditinjau ulang agar tidak mencampur dua refund berbeda.
+            val pendingSameTransaction = restoredRefund?.let {
+                it.transactionId == transactionId && !restoredRefundKey.isNullOrBlank()
             } == true
-            val resolvedKey = if (pendingMatches) {
+            val resolvedKey = if (pendingSameTransaction) {
                 activeRefundCreatedAt = restoredRefundCreatedAt
                 restoredRefundKey!!
             } else {
@@ -1076,7 +1155,7 @@ class CashierTransactionHistoryViewModel(
                 }
                 candidate
             }
-            val resolvedApprovalId = managerApprovalId ?: restoredRefund?.takeIf { pendingMatches }?.managerApprovalId
+            val resolvedApprovalId = managerApprovalId ?: restoredRefund?.takeIf { pendingSameTransaction }?.managerApprovalId
             val pendingDto = PersistedCashierRefundPending(
                 transactionId = transactionId,
                 reason = reason,
@@ -1130,11 +1209,61 @@ class CashierTransactionHistoryViewModel(
                     loadReceipt(transactionId, preserveMessage = true)
                 }
                 is RepositoryResult.Error -> {
+                    if (isTransactionAlreadyRefundedError(result.code, result.message)) {
+                        clearPersistedRefundState()
+                        _uiState.update {
+                            it.copy(
+                                isSubmittingRefund = false,
+                                isRefundDialogOpen = false,
+                                refundIdempotencyKey = null,
+                                refundManagerApprovalId = null,
+                                isRefundOutcomeAmbiguous = false,
+                                refundErrorMessage = null,
+                                receiptMessage = transactionActionErrorMessage("TRANSACTION_ALREADY_REFUNDED", result.message),
+                            )
+                        }
+                        loadReceipt(transactionId, preserveMessage = true)
+                        return@launch
+                    }
+                    if (isTransactionActionIdempotencyConflictError(result.code, result.message)) {
+                        val latestResult = repository.getTransactionById(transactionId)
+                        if (latestResult is RepositoryResult.Success &&
+                            latestResult.data.status.equals("REFUNDED", ignoreCase = true)
+                        ) {
+                            clearPersistedRefundState()
+                            _uiState.update {
+                                it.copy(
+                                    selectedTransaction = latestResult.data,
+                                    isSubmittingRefund = false,
+                                    isRefundDialogOpen = false,
+                                    refundIdempotencyKey = null,
+                                    refundManagerApprovalId = null,
+                                    isRefundOutcomeAmbiguous = false,
+                                    refundErrorMessage = null,
+                                    receiptMessage = transactionActionErrorMessage("TRANSACTION_ALREADY_REFUNDED", result.message),
+                                )
+                            }
+                            return@launch
+                        }
+                        clearPersistedRefundState()
+                        _uiState.update {
+                            it.copy(
+                                isSubmittingRefund = false,
+                                isRefundDialogOpen = true,
+                                refundIdempotencyKey = null,
+                                refundManagerApprovalId = null,
+                                isRefundOutcomeAmbiguous = false,
+                                refundErrorMessage = transactionActionErrorMessage(result.code, result.message),
+                            )
+                        }
+                        return@launch
+                    }
                     val approvalInvalid = requiresNewActionApproval(result.code)
                     val ambiguous = isAmbiguousTransactionActionError(result.code)
-                    if (ambiguous) {
+                    val keepPendingKey = ambiguous || approvalInvalid
+                    if (keepPendingKey) {
                         val dtoToSave = pendingDto.copy(
-                            managerApprovalId = if (approvalInvalid) null else managerApprovalId
+                            managerApprovalId = if (approvalInvalid) null else resolvedApprovalId
                         )
                         persistPendingRefund(dtoToSave, resolvedKey, PendingSubmissionStatus.AMBIGUOUS)
                     } else {
@@ -1144,8 +1273,9 @@ class CashierTransactionHistoryViewModel(
                         it.copy(
                             isSubmittingRefund = false,
                             isRefundDialogOpen = true,
+                            refundIdempotencyKey = if (keepPendingKey) resolvedKey else null,
                             refundManagerApprovalId = if (approvalInvalid) null else it.refundManagerApprovalId,
-                            isRefundOutcomeAmbiguous = ambiguous,
+                            isRefundOutcomeAmbiguous = keepPendingKey,
                             refundErrorMessage = transactionActionErrorMessage(result.code, result.message),
                         )
                     }
