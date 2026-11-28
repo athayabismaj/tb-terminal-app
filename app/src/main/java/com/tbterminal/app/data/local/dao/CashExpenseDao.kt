@@ -123,7 +123,7 @@ interface CashExpenseDao {
         SET cashSessionServerId = :serverId,
             updatedAt = :updatedAt
         WHERE cashSessionLocalId = :cashSessionLocalId
-            AND cashSessionServerId IS NULL
+            AND (cashSessionServerId IS NULL OR TRIM(cashSessionServerId) = '')
         """
     )
     suspend fun updateCashSessionServerIdForLocalSession(
@@ -222,6 +222,30 @@ interface CashExpenseDao {
         targetStatus: SyncStatus,
         cutoffUpdatedAt: Long,
         updatedAt: Long,
+    ): Int
+
+    @Query("SELECT MAX(occurredAt) FROM local_cash_expenses WHERE cashSessionLocalId = :cashSessionLocalId AND deletedAt IS NULL")
+    suspend fun getMaxOccurredAtByCashSession(cashSessionLocalId: Long): Long?
+
+    @Query(
+        """
+        SELECT COUNT(*)
+        FROM local_cash_expenses
+        WHERE deletedAt IS NULL
+            AND syncStatus != :syncedStatus
+            AND (
+                :cashierUserId IS NULL
+                OR EXISTS (
+                    SELECT 1 FROM local_cash_sessions s
+                    WHERE s.localId = local_cash_expenses.cashSessionLocalId
+                      AND s.cashierUserId = :cashierUserId
+                )
+            )
+        """
+    )
+    suspend fun countAllUnsyncedForUser(
+        cashierUserId: String?,
+        syncedStatus: SyncStatus = SyncStatus.SYNCED,
     ): Int
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)

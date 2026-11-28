@@ -22,6 +22,13 @@ interface SyncQueueDao {
         limit: Int
     ): List<SyncQueueEntity>
 
+    @Query("SELECT * FROM sync_queue WHERE status = :status AND UPPER(lastErrorCode) = UPPER(:errorCode) ORDER BY createdAt ASC LIMIT :limit")
+    suspend fun getByStatusAndErrorCode(
+        status: SyncStatus,
+        errorCode: String,
+        limit: Int = 100,
+    ): List<SyncQueueEntity>
+
     @Query("SELECT * FROM sync_queue WHERE id = :id LIMIT 1")
     suspend fun getById(id: Long): SyncQueueEntity?
 

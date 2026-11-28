@@ -23,6 +23,7 @@ class BackendHealthMonitor(
     private val timeoutMillis: Long = DEFAULT_TIMEOUT_MILLIS,
     private val clockMillis: () -> Long = { defaultElapsedRealtimeMillis() },
     private val ioDispatcher: CoroutineDispatcher? = null,
+    private val trustedOfflineClock: TrustedOfflineClock? = null,
 ) {
     private val scope = CoroutineScope(SupervisorJob() + (ioDispatcher ?: Dispatchers.IO))
     private val refreshMutex = Mutex()
@@ -117,11 +118,23 @@ class BackendHealthMonitor(
                 return@withLock _status.value
             }
 
-            lastCheckedAtMillis = lockedNow
+            val requestElapsedMillis = clockMillis()
             val response = withTimeoutOrNull(timeoutMillis) {
                 runSuspendCatching { healthApi.getReadiness() }.getOrNull()
             }
+            val responseElapsedMillis = clockMillis()
+            lastCheckedAtMillis = responseElapsedMillis
             val nextStatus = response.toBackendStatus()
+            if (nextStatus == BackendStatus.CONNECTED) {
+                val serverTimeIso = response?.body()?.time
+                if (!serverTimeIso.isNullOrBlank()) {
+                    trustedOfflineClock?.recordServerSample(
+                        serverTimeIso = serverTimeIso,
+                        requestElapsedMillis = requestElapsedMillis,
+                        responseElapsedMillis = responseElapsedMillis,
+                    )
+                }
+            }
             _status.value = nextStatus
             nextStatus
         }

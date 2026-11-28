@@ -22,6 +22,7 @@ import com.tbterminal.app.data.local.model.SyncOperation
 import com.tbterminal.app.data.local.model.SyncStatus
 import com.tbterminal.app.data.remote.HealthApi
 import com.tbterminal.app.data.remote.HealthResponseDto
+import com.tbterminal.app.data.repository.CashierClockWarningKind
 import com.tbterminal.app.data.repository.CashierSyncItemKind
 import com.tbterminal.app.data.repository.CashierSyncItemStatus
 import com.tbterminal.app.data.repository.CashierSyncRepository
@@ -30,11 +31,17 @@ import com.tbterminal.app.data.session.SessionUser
 import com.tbterminal.app.data.session.TokenStore
 import com.tbterminal.app.data.sync.BackendHealthMonitor
 import com.tbterminal.app.data.sync.BackendStatus
+import com.tbterminal.app.data.sync.CashSessionActiveBlockingMatcher
 import com.tbterminal.app.data.sync.NetworkConnectivity
 import com.tbterminal.app.data.sync.OfflineStatusRepository
 import com.tbterminal.app.data.sync.SyncNowScheduleResult
 import com.tbterminal.app.data.sync.SyncRunOutcome
 import com.tbterminal.app.data.sync.SyncRunSummary
+import com.tbterminal.app.data.sync.TrustedOfflineClock
+import java.time.Instant
+import java.time.ZoneId
+import java.time.format.DateTimeFormatter
+import java.util.Locale
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.Flow
@@ -414,6 +421,275 @@ class CashierSyncRepositoryAndViewModelTest {
             } finally {
                 store.clear()
             }
+        }
+    }
+
+    @Test
+    fun blockingChainAttributesFiveBlockedItemsToRootConflictAndShowsBlockedFeedback() = runBlocking {
+        withTimeout(10_000L) {
+            val s4 = database.cashSessionDao().upsert(
+                LocalCashSessionEntity(
+                    serverId = "srv-s4",
+                    clientGeneratedId = "sess-4",
+                    cashierUserId = "kasir-a",
+                    status = "CLOSED",
+                    openedAt = fakeClockMillis - 3_600_000L,
+                    closedAt = fakeClockMillis - 1_800_000L,
+                    startingCash = ScaledDecimal2.ofWhole(500_000L),
+                    actualCash = ScaledDecimal2.ofWhole(490_000L),
+                    syncStatus = SyncStatus.PENDING,
+                )
+            )
+            val exp2 = database.cashExpenseDao().upsert(
+                LocalCashExpenseEntity(
+                    clientGeneratedId = "exp-2",
+                    cashSessionLocalId = s4,
+                    cashSessionServerId = "srv-s4",
+                    category = "CASH_OUT: Bensin Armada",
+                    description = "Bensin Armada",
+                    amount = ScaledDecimal2.ofWhole(10_000L),
+                    occurredAt = fakeClockMillis - 2_000_000L,
+                    syncStatus = SyncStatus.CONFLICT,
+                )
+            )
+            val qExp = database.syncQueueDao().enqueue(
+                SyncQueueEntity(
+                    entityType = SyncEntityType.CASH_EXPENSE,
+                    entityLocalId = exp2,
+                    operation = SyncOperation.CREATE,
+                    payloadJson = "{}",
+                    status = SyncStatus.CONFLICT,
+                    lastErrorCode = "OFFLINE_OCCURRED_AT_INVALID",
+                )
+            )
+            val qClose4 = database.syncQueueDao().enqueue(
+                SyncQueueEntity(
+                    entityType = SyncEntityType.CASH_SESSION,
+                    entityLocalId = s4,
+                    operation = SyncOperation.UPDATE,
+                    payloadJson = "{}",
+                    status = SyncStatus.PENDING,
+                )
+            )
+            val s5 = database.cashSessionDao().upsert(
+                LocalCashSessionEntity(
+                    clientGeneratedId = "sess-5",
+                    cashierUserId = "kasir-a",
+                    status = "CLOSED",
+                    openedAt = fakeClockMillis - 1_200_000L,
+                    closedAt = fakeClockMillis - 1_100_000L,
+                    startingCash = ScaledDecimal2.ofWhole(500_000L),
+                    actualCash = ScaledDecimal2.ofWhole(500_000L),
+                    syncStatus = SyncStatus.PENDING,
+                )
+            )
+            val qOpen5 = database.syncQueueDao().enqueue(
+                SyncQueueEntity(
+                    entityType = SyncEntityType.CASH_SESSION,
+                    entityLocalId = s5,
+                    operation = SyncOperation.CREATE,
+                    payloadJson = "{}",
+                    status = SyncStatus.PENDING,
+                    lastErrorCode = CashSessionActiveBlockingMatcher.ERROR_CODE_ACTIVE_SESSION_BLOCKING_OPEN,
+                )
+            )
+            val qClose5 = database.syncQueueDao().enqueue(
+                SyncQueueEntity(
+                    entityType = SyncEntityType.CASH_SESSION,
+                    entityLocalId = s5,
+                    operation = SyncOperation.UPDATE,
+                    payloadJson = "{}",
+                    status = SyncStatus.PENDING,
+                )
+            )
+            val s6 = database.cashSessionDao().upsert(
+                LocalCashSessionEntity(
+                    clientGeneratedId = "sess-6",
+                    cashierUserId = "kasir-a",
+                    status = "OPEN",
+                    openedAt = fakeClockMillis - 900_000L,
+                    startingCash = ScaledDecimal2.ofWhole(500_000L),
+                    syncStatus = SyncStatus.PENDING,
+                )
+            )
+            val qOpen6 = database.syncQueueDao().enqueue(
+                SyncQueueEntity(
+                    entityType = SyncEntityType.CASH_SESSION,
+                    entityLocalId = s6,
+                    operation = SyncOperation.CREATE,
+                    payloadJson = "{}",
+                    status = SyncStatus.PENDING,
+                    lastErrorCode = CashSessionActiveBlockingMatcher.ERROR_CODE_ACTIVE_SESSION_BLOCKING_OPEN,
+                )
+            )
+            val tx8 = database.transactionDao().upsert(
+                LocalTransactionEntity(
+                    clientGeneratedId = "tx-8",
+                    transactionCode = "TRX-8",
+                    cashSessionLocalId = s6,
+                    cashierUserId = "kasir-a",
+                    status = "PAID",
+                    total = ScaledDecimal2.ofWhole(40_000L),
+                    paidAmount = ScaledDecimal2.ofWhole(40_000L),
+                    occurredAt = fakeClockMillis - 600_000L,
+                    syncStatus = SyncStatus.PENDING,
+                )
+            )
+            val qTx8 = database.syncQueueDao().enqueue(
+                SyncQueueEntity(
+                    entityType = SyncEntityType.TRANSACTION,
+                    entityLocalId = tx8,
+                    operation = SyncOperation.CREATE,
+                    payloadJson = "{}",
+                    status = SyncStatus.PENDING,
+                )
+            )
+
+            val snapshot = repository.observeSnapshot().first { it.items.size == 6 }
+            assertEquals(5, snapshot.blockedCount)
+            val expItem = snapshot.items.first { it.id == "queue-$qExp" }
+            assertTrue(expItem.isConflict)
+            assertEquals(5, expItem.blockingCount)
+            assertEquals(null, expItem.blockedByLabel)
+
+            listOf(qClose4, qOpen5, qClose5, qOpen6, qTx8).forEach { queueId ->
+                val dependent = snapshot.items.first { it.id == "queue-$queueId" }
+                assertEquals(0, dependent.blockingCount)
+                assertEquals("Pengeluaran Kas Offline · Bensin Armada", dependent.blockedByLabel)
+            }
+
+            val runner = FakeCashierSyncRunner()
+            val store = ViewModelStore()
+            try {
+                val viewModel = createViewModel(store, runner)
+                viewModel.uiState.first { !it.isInitialLoading && it.blockedCount == 5 }
+                viewModel.onSyncNowClick()
+                runner.completeRun(
+                    SyncRunSummary(
+                        runId = 1L,
+                        ownerUserId = "kasir-a",
+                        includedFailed = true,
+                        syncedCount = 0,
+                        failedCount = 0,
+                        outcome = SyncRunOutcome.SUCCESS,
+                        completedAtMillis = fakeClockMillis,
+                    )
+                )
+                val finishedState = viewModel.uiState.first {
+                    !it.isSyncing && it.feedbackMessage?.startsWith("Belum ada data yang terkirim") == true
+                }
+                assertEquals(
+                    "Belum ada data yang terkirim. 5 data tertahan oleh 1 data yang perlu dicek.",
+                    finishedState.feedbackMessage,
+                )
+                assertTrue(finishedState.isFeedbackError)
+            } finally {
+                store.clear()
+            }
+        }
+    }
+
+    @Test
+    fun deferredFutureClockItemShowsHhmmMessageAndRepositoryEmitsClockWarnings() = runBlocking {
+        withTimeout(10_000L) {
+            var wallMillis = fakeClockMillis + 3_600_000L // +1h skew
+            var elapsedMillis = 100_000L
+            var currentBoot = 1L
+            val trustedClock = TrustedOfflineClock(
+                localAppSettingsDataSource = settings,
+                wallClockMillis = { wallMillis },
+                elapsedRealtimeMillis = { elapsedMillis },
+                bootCountProvider = { currentBoot },
+            )
+            trustedClock.recordServerSample(
+                serverTimeIso = Instant.ofEpochMilli(fakeClockMillis).toString(),
+                requestElapsedMillis = 100_000L,
+                responseElapsedMillis = 100_000L,
+            )
+
+            val clockRepo = CashierSyncRepository(
+                offlineStatusRepository = offlineStatusRepository,
+                syncQueueDao = database.syncQueueDao(),
+                cashSessionDao = database.cashSessionDao(),
+                transactionDao = database.transactionDao(),
+                cashExpenseDao = database.cashExpenseDao(),
+                pendingSubmissionDao = database.pendingSubmissionDao(),
+                localAppSettingsDataSource = settings,
+                activeUserIdFlow = sessionManager.activeUserIdFlow,
+                activeUserIdProvider = { sessionManager.resolveOwnerUserId() },
+                clockMillis = { wallMillis },
+                monotonicClockMillis = { elapsedMillis },
+                bootCountProvider = { currentBoot },
+                trustedOfflineClock = trustedClock,
+            )
+
+            val sess = database.cashSessionDao().upsert(
+                LocalCashSessionEntity(
+                    serverId = "srv-clock",
+                    clientGeneratedId = "sess-clock",
+                    cashierUserId = "kasir-a",
+                    status = "OPEN",
+                    openedAt = fakeClockMillis - 600_000L,
+                    startingCash = ScaledDecimal2.ofWhole(100_000L),
+                    syncStatus = SyncStatus.SYNCED,
+                )
+            )
+            val futureOccurredAt = fakeClockMillis + 300_000L
+            val expId = database.cashExpenseDao().upsert(
+                LocalCashExpenseEntity(
+                    clientGeneratedId = "exp-future-ui",
+                    cashSessionLocalId = sess,
+                    cashSessionServerId = "srv-clock",
+                    category = "CASH_OUT: Bensin",
+                    description = "Bensin",
+                    amount = ScaledDecimal2.ofWhole(10_000L),
+                    occurredAt = futureOccurredAt,
+                    syncStatus = SyncStatus.PENDING,
+                )
+            )
+            val qId = database.syncQueueDao().enqueue(
+                SyncQueueEntity(
+                    entityType = SyncEntityType.CASH_EXPENSE,
+                    entityLocalId = expId,
+                    operation = SyncOperation.CREATE,
+                    payloadJson = "{}",
+                    status = SyncStatus.PENDING,
+                    lastError = "Waktu pengeluaran kas di masa depan",
+                    lastErrorCode = "OFFLINE_OCCURRED_AT_INVALID",
+                )
+            )
+
+            val expectedHhmm = Instant.ofEpochMilli(futureOccurredAt + 60_000L)
+                .atZone(ZoneId.systemDefault())
+                .format(DateTimeFormatter.ofPattern("HH:mm", Locale.forLanguageTag("id-ID")))
+
+            val skewedSnapshot = clockRepo.observeSnapshot().first { it.items.size == 1 }
+            assertEquals(CashierClockWarningKind.DEVICE_CLOCK_SKEWED, skewedSnapshot.clockWarning?.kind)
+            val item = skewedSnapshot.items.first { it.id == "queue-$qId" }
+            assertTrue(item.isDeferredByClock)
+            assertEquals(
+                "Jam data lebih maju dari jam server. Akan dikirim otomatis setelah $expectedHhmm.",
+                item.failureReason,
+            )
+
+            // Simulate reboot -> UNCALIBRATED_AFTER_REBOOT warning
+            currentBoot = 2L
+            elapsedMillis = 1_000L
+            wallMillis = fakeClockMillis
+            trustedClock.recordServerSample(
+                serverTimeIso = Instant.ofEpochMilli(fakeClockMillis).toString(),
+                requestElapsedMillis = 1_000L,
+                responseElapsedMillis = 1_000L,
+            )
+            currentBoot = 3L
+            elapsedMillis = 500L
+            val rebootSnapshot = clockRepo.observeSnapshot().first {
+                it.clockWarning?.kind == CashierClockWarningKind.UNCALIBRATED_AFTER_REBOOT
+            }
+            assertEquals(
+                CashierClockWarningKind.UNCALIBRATED_AFTER_REBOOT,
+                rebootSnapshot.clockWarning?.kind,
+            )
         }
     }
 

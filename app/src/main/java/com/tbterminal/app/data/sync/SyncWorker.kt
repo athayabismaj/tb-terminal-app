@@ -52,6 +52,8 @@ class SyncWorker(
                 is SyncResult.Success -> {
                     if (result.hasMorePending) {
                         scheduleContinuation()
+                    } else if (!isSyncNow && result.deferredRetryAfterSeconds != null) {
+                        scheduleDelayed(result.deferredRetryAfterSeconds)
                     }
                     if (isSyncNow) {
                         Result.success(

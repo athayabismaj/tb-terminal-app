@@ -20,12 +20,21 @@ import com.tbterminal.app.data.sync.OfflineSessionAgeAlert
 import com.tbterminal.app.data.sync.OfflineSessionAgePolicy
 import com.tbterminal.app.data.sync.OfflineStatus
 import com.tbterminal.app.data.sync.OfflineStatusRepository
+import com.tbterminal.app.data.sync.OfflineTimeConflictPolicy
+import com.tbterminal.app.data.sync.TrustedClockStatus
+import com.tbterminal.app.data.sync.TrustedOfflineClock
 import com.tbterminal.app.data.sync.isCashierPendingSubmissionScope
 import com.tbterminal.app.data.sync.isPendingSubmissionActive
 import com.tbterminal.app.data.sync.partitionSyncQueueByUser
 import com.tbterminal.app.ui.cashier.sync.CashierSyncErrorFormatter
 import com.tbterminal.app.ui.common.toRupiahText
 import java.math.BigDecimal
+import java.time.Instant
+import java.time.ZoneId
+import java.time.format.DateTimeFormatter
+import java.util.Locale
+import kotlin.math.abs
+import kotlin.math.max
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.combine
@@ -59,6 +68,16 @@ enum class CashierSyncItemStatus {
     NEEDS_CHECK,
 }
 
+enum class CashierClockWarningKind {
+    DEVICE_CLOCK_SKEWED,
+    UNCALIBRATED_AFTER_REBOOT,
+}
+
+data class CashierClockWarning(
+    val kind: CashierClockWarningKind,
+    val message: String,
+)
+
 data class CashierSyncItemUi(
     val id: String,
     val kind: CashierSyncItemKind,
@@ -68,6 +87,10 @@ data class CashierSyncItemUi(
     val status: CashierSyncItemStatus,
     val failureReason: String? = null,
     val isPendingSubmission: Boolean = false,
+    val isConflict: Boolean = false,
+    val isDeferredByClock: Boolean = false,
+    val blockingCount: Int = 0,
+    val blockedByLabel: String? = null,
 )
 
 data class CashierSyncSnapshot(
@@ -79,8 +102,11 @@ data class CashierSyncSnapshot(
     val sendingCount: Int = 0,
     val failedCount: Int = 0,
     val needsCheckCount: Int = 0,
+    val blockedCount: Int = 0,
+    val deferredClockCount: Int = 0,
     val items: List<CashierSyncItemUi> = emptyList(),
     val offlineSessionAgeAlert: OfflineSessionAgeAlert? = null,
+    val clockWarning: CashierClockWarning? = null,
     val otherUsersPendingSyncCount: Int = 0,
 )
 
@@ -98,6 +124,7 @@ class CashierSyncRepository(
     private val clockMillis: () -> Long = { System.currentTimeMillis() },
     private val monotonicClockMillis: () -> Long = clockMillis,
     private val bootCountProvider: () -> Long? = { 1L },
+    private val trustedOfflineClock: TrustedOfflineClock? = null,
 ) {
     private val jsonParser = Json {
         ignoreUnknownKeys = true
@@ -139,12 +166,14 @@ class CashierSyncRepository(
         }
 
     fun observeSnapshot(): Flow<CashierSyncSnapshot> {
+        val clockUpdatesFlow = trustedOfflineClock?.anchorUpdates ?: flowOf(null)
         return combine(
             offlineStatusRepository.status,
             syncQueueDao.observeQueue(),
             cashSessionDao.observeSessions(),
             userScopedFlow,
-        ) { status, queue, sessions, userScoped ->
+            clockUpdatesFlow,
+        ) { status, queue, sessions, userScoped, _ ->
             buildSnapshot(
                 status = status,
                 queue = queue,
@@ -171,9 +200,35 @@ class CashierSyncRepository(
             applyIsolationFilter = true,
         )
 
-        val queueUiItems = partitioned.ownItems
+        val sessionsById = sessions.associateBy { it.localId }
+        val supportedQueueItems = partitioned.ownItems
             .filter { it.status != SyncStatus.SYNCED && it.entityType.isSupported }
-            .map { mapQueueItem(it, sessions) }
+        val resolvedItems = supportedQueueItems.map { item ->
+            resolveQueueItemMeta(item, sessionsById)
+        }
+        val blockingByQueueId = CashierSyncBlockingAnalyzer.analyze(
+            resolvedItems.map { resolved ->
+                SyncBlockingNode(
+                    queueId = resolved.queue.id,
+                    entityType = resolved.queue.entityType,
+                    entityLocalId = resolved.queue.entityLocalId,
+                    operation = resolved.queue.operation,
+                    status = resolved.queue.status,
+                    lastErrorCode = resolved.queue.lastErrorCode,
+                    sessionLocalId = resolved.sessionLocalId,
+                    sessionServerId = resolved.sessionServerId,
+                    sessionOpenedAtMillis = resolved.sessionOpenedAtMillis,
+                    createdAtMillis = resolved.meta.createdAtMillis,
+                    displayLabel = resolved.displayLabel,
+                )
+            }
+        )
+        val queueUiItems = resolvedItems.map { resolved ->
+            mapResolvedQueueItem(
+                resolved = resolved,
+                blockingInfo = blockingByQueueId[resolved.queue.id],
+            )
+        }
 
         val wallNow = clockMillis()
         val elapsedNow = monotonicClockMillis()
@@ -208,9 +263,10 @@ class CashierSyncRepository(
         } else {
             OfflineSessionAgePolicy.evaluateUnsyncedSessions(
                 sessions = ownUnsyncedSessions,
-                nowMillis = wallNow,
+                nowMillis = trustedOfflineClock?.nowMillis() ?: wallNow,
             )
         }
+        val clockWarning = buildClockWarning()
 
         val isServerOnline = status.isInternetOnline && status.backendStatus == BackendStatus.CONNECTED
 
@@ -223,36 +279,60 @@ class CashierSyncRepository(
             sendingCount = allItems.count { it.status == CashierSyncItemStatus.SENDING },
             failedCount = allItems.count { it.status == CashierSyncItemStatus.FAILED },
             needsCheckCount = allItems.count { it.status == CashierSyncItemStatus.NEEDS_CHECK },
+            blockedCount = queueUiItems.count { !it.blockedByLabel.isNullOrBlank() },
+            deferredClockCount = queueUiItems.count { it.isDeferredByClock },
             items = allItems,
             offlineSessionAgeAlert = ageAlert,
+            clockWarning = clockWarning,
             otherUsersPendingSyncCount = partitioned.otherUsersPendingSyncCount,
         )
     }
 
-    private suspend fun mapQueueItem(
-        item: SyncQueueEntity,
-        sessions: List<LocalCashSessionEntity>,
-    ): CashierSyncItemUi {
-        val sessionsById = sessions.associateBy { it.localId }
-        val status = when (item.status) {
-            SyncStatus.PENDING -> CashierSyncItemStatus.PENDING
-            SyncStatus.SYNCING -> CashierSyncItemStatus.SENDING
-            SyncStatus.FAILED -> CashierSyncItemStatus.FAILED
-            SyncStatus.CONFLICT -> CashierSyncItemStatus.NEEDS_CHECK
-            SyncStatus.SYNCED -> CashierSyncItemStatus.PENDING
+    private suspend fun buildClockWarning(): CashierClockWarning? {
+        val reading = trustedOfflineClock?.readNow() ?: return null
+        return when (reading.status) {
+            TrustedClockStatus.DEVICE_CLOCK_SKEWED -> {
+                val diffMinutes = max(1L, abs(reading.skewMillis ?: 0L) / 60_000L)
+                CashierClockWarning(
+                    kind = CashierClockWarningKind.DEVICE_CLOCK_SKEWED,
+                    message = "Jam HP melenceng ±$diffMinutes menit dari jam server. Data offline tetap memakai jam terpercaya; sesuaikan jam perangkat.",
+                )
+            }
+            TrustedClockStatus.UNCALIBRATED_AFTER_REBOOT -> CashierClockWarning(
+                kind = CashierClockWarningKind.UNCALIBRATED_AFTER_REBOOT,
+                message = "Jam belum terkalibrasi sejak perangkat dinyalakan ulang. Hubungkan ke server untuk menyelaraskan jam.",
+            )
+            TrustedClockStatus.CALIBRATED,
+            TrustedClockStatus.NO_ANCHOR -> null
         }
+    }
 
-        val (kind, title, summary, createdAt) = when (item.entityType) {
+    private suspend fun resolveQueueItemMeta(
+        item: SyncQueueEntity,
+        sessionsById: Map<Long, LocalCashSessionEntity>,
+    ): ResolvedQueueItem {
+        return when (item.entityType) {
             SyncEntityType.TRANSACTION -> {
                 val tx = transactionDao.getByLocalId(item.entityLocalId)
                 val code = tx?.transactionCode?.takeIf(String::isNotBlank) ?: "Transaksi #${item.entityLocalId}"
                 val totalText = tx?.total?.toBigDecimal()?.toRupiahText() ?: "-"
                 val paymentStatus = if (tx != null && tx.remainingAmount.isPositive) "Piutang/DP" else "Lunas"
-                ItemMeta(
-                    kind = CashierSyncItemKind.TRANSACTION,
-                    title = "Transaksi Offline",
-                    summary = "$code · $totalText ($paymentStatus)",
-                    createdAtMillis = tx?.occurredAt ?: item.createdAt,
+                val session = tx?.cashSessionLocalId?.let { sid ->
+                    sessionsById[sid] ?: cashSessionDao.getByLocalId(sid)
+                }
+                val occurredAt = tx?.occurredAt ?: item.createdAt
+                ResolvedQueueItem(
+                    queue = item,
+                    meta = ItemMeta(
+                        kind = CashierSyncItemKind.TRANSACTION,
+                        title = "Transaksi Offline",
+                        summary = "$code · $totalText ($paymentStatus)",
+                        createdAtMillis = occurredAt,
+                    ),
+                    sessionLocalId = tx?.cashSessionLocalId,
+                    sessionServerId = session?.serverId ?: tx?.cashSessionServerId,
+                    sessionOpenedAtMillis = session?.openedAt,
+                    displayLabel = "Transaksi Offline · $code",
                 )
             }
 
@@ -260,19 +340,35 @@ class CashierSyncRepository(
                 val session = sessionsById[item.entityLocalId] ?: cashSessionDao.getByLocalId(item.entityLocalId)
                 if (item.operation == SyncOperation.UPDATE) {
                     val actualText = (session?.actualCash ?: ScaledDecimal2.ZERO).toBigDecimal().toRupiahText()
-                    ItemMeta(
-                        kind = CashierSyncItemKind.CLOSE_CASH_SESSION,
-                        title = "Tutup Sesi Kas",
-                        summary = "Kas fisik akhir $actualText",
-                        createdAtMillis = session?.closedAt ?: item.createdAt,
+                    val closedAt = session?.closedAt ?: item.createdAt
+                    ResolvedQueueItem(
+                        queue = item,
+                        meta = ItemMeta(
+                            kind = CashierSyncItemKind.CLOSE_CASH_SESSION,
+                            title = "Tutup Sesi Kas",
+                            summary = "Kas fisik akhir $actualText",
+                            createdAtMillis = closedAt,
+                        ),
+                        sessionLocalId = item.entityLocalId,
+                        sessionServerId = session?.serverId,
+                        sessionOpenedAtMillis = session?.openedAt,
+                        displayLabel = "Tutup Sesi Kas (${formatShortTime(closedAt)})",
                     )
                 } else {
                     val openingText = (session?.startingCash ?: ScaledDecimal2.ZERO).toBigDecimal().toRupiahText()
-                    ItemMeta(
-                        kind = CashierSyncItemKind.OPEN_CASH_SESSION,
-                        title = "Buka Sesi Kas",
-                        summary = "Modal awal $openingText",
-                        createdAtMillis = session?.openedAt ?: item.createdAt,
+                    val openedAt = session?.openedAt ?: item.createdAt
+                    ResolvedQueueItem(
+                        queue = item,
+                        meta = ItemMeta(
+                            kind = CashierSyncItemKind.OPEN_CASH_SESSION,
+                            title = "Buka Sesi Kas",
+                            summary = "Modal awal $openingText",
+                            createdAtMillis = openedAt,
+                        ),
+                        sessionLocalId = item.entityLocalId,
+                        sessionServerId = session?.serverId,
+                        sessionOpenedAtMillis = session?.openedAt,
+                        displayLabel = "Buka Sesi Kas (${formatShortTime(openedAt)})",
                     )
                 }
             }
@@ -285,38 +381,90 @@ class CashierSyncRepository(
                 val amountText = (expense?.amount ?: ScaledDecimal2.ZERO).toBigDecimal().toRupiahText()
                 val note = expense?.description?.trim()?.takeIf(String::isNotBlank)
                 val fallbackLabel = if (isCashIn) "Kas masuk" else "Pengeluaran kas"
-                ItemMeta(
-                    kind = if (isCashIn) CashierSyncItemKind.CASH_IN else CashierSyncItemKind.CASH_EXPENSE,
-                    title = if (isCashIn) "Kas Masuk Offline" else "Pengeluaran Kas Offline",
-                    summary = "${note ?: fallbackLabel} · $amountText",
-                    createdAtMillis = expense?.occurredAt ?: item.createdAt,
+                val title = if (isCashIn) "Kas Masuk Offline" else "Pengeluaran Kas Offline"
+                val session = expense?.cashSessionLocalId?.let { sid ->
+                    sessionsById[sid] ?: cashSessionDao.getByLocalId(sid)
+                }
+                val occurredAt = expense?.occurredAt ?: item.createdAt
+                ResolvedQueueItem(
+                    queue = item,
+                    meta = ItemMeta(
+                        kind = if (isCashIn) CashierSyncItemKind.CASH_IN else CashierSyncItemKind.CASH_EXPENSE,
+                        title = title,
+                        summary = "${note ?: fallbackLabel} · $amountText",
+                        createdAtMillis = occurredAt,
+                    ),
+                    sessionLocalId = expense?.cashSessionLocalId,
+                    sessionServerId = session?.serverId ?: expense?.cashSessionServerId,
+                    sessionOpenedAtMillis = session?.openedAt,
+                    displayLabel = "$title · ${note ?: fallbackLabel}",
                 )
             }
 
-            SyncEntityType.UNSUPPORTED -> ItemMeta(
-                kind = CashierSyncItemKind.TRANSACTION,
-                title = "Data Lokal",
-                summary = "Item #${item.entityLocalId}",
-                createdAtMillis = item.createdAt,
+            SyncEntityType.UNSUPPORTED -> ResolvedQueueItem(
+                queue = item,
+                meta = ItemMeta(
+                    kind = CashierSyncItemKind.TRANSACTION,
+                    title = "Data Lokal",
+                    summary = "Item #${item.entityLocalId}",
+                    createdAtMillis = item.createdAt,
+                ),
+                sessionLocalId = null,
+                sessionServerId = null,
+                sessionOpenedAtMillis = null,
+                displayLabel = "Data Lokal #${item.entityLocalId}",
             )
+        }
+    }
+
+    private fun mapResolvedQueueItem(
+        resolved: ResolvedQueueItem,
+        blockingInfo: SyncBlockingInfo?,
+    ): CashierSyncItemUi {
+        val item = resolved.queue
+        val status = when (item.status) {
+            SyncStatus.PENDING -> CashierSyncItemStatus.PENDING
+            SyncStatus.SYNCING -> CashierSyncItemStatus.SENDING
+            SyncStatus.FAILED -> CashierSyncItemStatus.FAILED
+            SyncStatus.CONFLICT -> CashierSyncItemStatus.NEEDS_CHECK
+            SyncStatus.SYNCED -> CashierSyncItemStatus.PENDING
+        }
+
+        val isDeferredByClock = item.status == SyncStatus.PENDING &&
+            OfflineTimeConflictPolicy.isOccurredAtInvalidCode(item.lastErrorCode)
+        val deferredUntilMillis = if (isDeferredByClock) {
+            OfflineTimeConflictPolicy.eligibleAtMillis(resolved.meta.createdAtMillis)
+        } else {
+            null
         }
 
         val failureReason = CashierSyncErrorFormatter.formatReason(
             syncStatus = item.status,
             lastError = item.lastError,
             lastErrorCode = item.lastErrorCode,
+            deferredUntilMillis = deferredUntilMillis,
         )
 
         return CashierSyncItemUi(
             id = "queue-${item.id}",
-            kind = kind,
-            title = title,
-            summary = summary,
-            createdAtMillis = createdAt,
+            kind = resolved.meta.kind,
+            title = resolved.meta.title,
+            summary = resolved.meta.summary,
+            createdAtMillis = resolved.meta.createdAtMillis,
             status = status,
             failureReason = failureReason,
             isPendingSubmission = false,
+            isConflict = item.status == SyncStatus.CONFLICT,
+            isDeferredByClock = isDeferredByClock,
+            blockingCount = blockingInfo?.blockingCount ?: 0,
+            blockedByLabel = blockingInfo?.blockedByRootLabel,
         )
+    }
+
+    private fun formatShortTime(timestampMillis: Long): String {
+        return Instant.ofEpochMilli(timestampMillis)
+            .atZone(ZoneId.systemDefault())
+            .format(SHORT_TIME_FORMATTER)
     }
 
     private fun mapPendingSubmissionItem(entity: PendingSubmissionEntity): CashierSyncItemUi {
@@ -412,6 +560,20 @@ class CashierSyncRepository(
         val summary: String,
         val createdAtMillis: Long,
     )
+
+    private data class ResolvedQueueItem(
+        val queue: SyncQueueEntity,
+        val meta: ItemMeta,
+        val sessionLocalId: Long?,
+        val sessionServerId: String?,
+        val sessionOpenedAtMillis: Long?,
+        val displayLabel: String,
+    )
+
+    private companion object {
+        val SHORT_TIME_FORMATTER: DateTimeFormatter =
+            DateTimeFormatter.ofPattern("HH:mm", Locale.forLanguageTag("id-ID"))
+    }
 }
 
 private fun CashierSyncItemStatus.sortPriority(): Int = when (this) {

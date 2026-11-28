@@ -24,6 +24,7 @@ class OfflineCheckoutSyncService(
     private val cashExpenseSyncService: OfflineCashExpenseSyncService? = null,
     private val clockMillis: () -> Long = { System.currentTimeMillis() },
     private val activeUserIdProvider: (() -> String?)? = null,
+    private val trustedOfflineClock: TrustedOfflineClock? = null,
 ) {
     suspend fun recoverStaleSyncing(nowMillis: Long = clockMillis()) {
         OfflineSyncCoordinator.withSyncLock {
@@ -93,6 +94,31 @@ class OfflineCheckoutSyncService(
                 kind = OfflineCheckoutSyncFailureKind.VALIDATION,
             )
         }
+        if (preflightTx != null) {
+            val preflightQueue = database.syncQueueDao().getLatestForEntity(
+                entityLocalId = transactionLocalId,
+                entityType = SyncEntityType.TRANSACTION,
+            )
+            val validTrustedNow = trustedOfflineClock?.readValidNowMillis()
+            if (OfflineTimeConflictPolicy.shouldDeferBeforeSend(
+                    queueStatus = preflightQueue?.status,
+                    queueErrorCode = preflightQueue?.lastErrorCode,
+                    occurredAtMillis = preflightTx.occurredAt,
+                    trustedNowMillis = validTrustedNow,
+                )
+            ) {
+                val nowMillis = validTrustedNow!!
+                return OfflineCheckoutSyncResult.Deferred(
+                    message = preflightQueue?.lastError
+                        ?: "Menunggu jam server melewati waktu transaksi.",
+                    eligibleAtMillis = OfflineTimeConflictPolicy.eligibleAtMillis(preflightTx.occurredAt),
+                    retryAfterSeconds = OfflineTimeConflictPolicy.secondsUntilEligible(
+                        occurredAtMillis = preflightTx.occurredAt,
+                        trustedNowMillis = nowMillis,
+                    ),
+                )
+            }
+        }
         if (!markSyncingIfAllowed(transactionLocalId)) {
             return OfflineCheckoutSyncResult.Failed("Transaksi sedang disinkronkan atau sudah selesai.")
         }
@@ -143,6 +169,21 @@ class OfflineCheckoutSyncService(
                     parsedError.message
                 }
                 val errorCode = if (response.code() >= 500) null else parsedError.code
+                val validTrustedNow = trustedOfflineClock?.readValidNowMillis()
+                if (OfflineTimeConflictPolicy.isFutureTimeRejection(
+                        errorCode = errorCode,
+                        occurredAtMillis = transactionForSync.occurredAt,
+                        trustedNowMillis = validTrustedNow,
+                    )
+                ) {
+                    return@runSuspendCatching deferFutureOccurredAt(
+                        transactionLocalId = transactionLocalId,
+                        message = message,
+                        errorCode = errorCode!!,
+                        occurredAtMillis = transactionForSync.occurredAt,
+                        trustedNowMillis = validTrustedNow!!,
+                    )
+                }
                 return@runSuspendCatching fail(
                     transactionLocalId = transactionLocalId,
                     message = message,
@@ -418,15 +459,26 @@ class OfflineCheckoutSyncService(
 
         var successCount = 0
         var failedCount = 0
+        var deferredCount = 0
         var authFailureCount = 0
         var transientFailureCount = 0
         var validationFailureCount = 0
         var maxRetryAfterSeconds: Long? = null
+        var minDeferredRetryAfterSeconds: Long? = null
         val failedLocalIds = mutableSetOf<Long>()
+        val deferredLocalIds = mutableSetOf<Long>()
         localIds.forEachIndexed { index, localId ->
             onProgress?.invoke(index + 1, localIds.size)
             when (val result = syncOneInternal(localId)) {
                 is OfflineCheckoutSyncResult.Success -> successCount += 1
+                is OfflineCheckoutSyncResult.Deferred -> {
+                    deferredCount += 1
+                    deferredLocalIds += localId
+                    minDeferredRetryAfterSeconds = minNullableSeconds(
+                        current = minDeferredRetryAfterSeconds,
+                        candidate = result.retryAfterSeconds,
+                    )
+                }
                 is OfflineCheckoutSyncResult.Failed -> {
                     failedCount += 1
                     failedLocalIds += localId
@@ -443,11 +495,14 @@ class OfflineCheckoutSyncService(
                             total = localIds.size,
                             successCount = successCount,
                             failedCount = failedCount,
+                            deferredCount = deferredCount,
                             authFailureCount = authFailureCount,
                             transientFailureCount = transientFailureCount,
                             validationFailureCount = validationFailureCount,
                             maxRetryAfterSeconds = maxRetryAfterSeconds,
+                            minDeferredRetryAfterSeconds = minDeferredRetryAfterSeconds,
                             failedLocalIds = failedLocalIds,
+                            deferredLocalIds = deferredLocalIds,
                         )
                     }
                 }
@@ -458,11 +513,14 @@ class OfflineCheckoutSyncService(
             total = localIds.size,
             successCount = successCount,
             failedCount = failedCount,
+            deferredCount = deferredCount,
             authFailureCount = authFailureCount,
             transientFailureCount = transientFailureCount,
             validationFailureCount = validationFailureCount,
             maxRetryAfterSeconds = maxRetryAfterSeconds,
+            minDeferredRetryAfterSeconds = minDeferredRetryAfterSeconds,
             failedLocalIds = failedLocalIds,
+            deferredLocalIds = deferredLocalIds,
         )
     }
 
@@ -623,6 +681,38 @@ class OfflineCheckoutSyncService(
         return OfflineCheckoutSyncResult.Failed(message, kind, retryAfterSeconds)
     }
 
+    private suspend fun deferFutureOccurredAt(
+        transactionLocalId: Long,
+        message: String,
+        errorCode: String,
+        occurredAtMillis: Long,
+        trustedNowMillis: Long,
+    ): OfflineCheckoutSyncResult.Deferred {
+        database.withTransaction {
+            val queue = database.syncQueueDao().getLatestForEntity(
+                entityLocalId = transactionLocalId,
+                entityType = SyncEntityType.TRANSACTION,
+            )
+            updateFailureStatusWithChildren(
+                transactionLocalId = transactionLocalId,
+                queueId = queue?.id,
+                status = SyncStatus.PENDING,
+                message = message,
+                retryIncrement = 0,
+                errorCode = errorCode,
+                now = trustedNowMillis,
+            )
+        }
+        return OfflineCheckoutSyncResult.Deferred(
+            message = message,
+            eligibleAtMillis = OfflineTimeConflictPolicy.eligibleAtMillis(occurredAtMillis),
+            retryAfterSeconds = OfflineTimeConflictPolicy.secondsUntilEligible(
+                occurredAtMillis = occurredAtMillis,
+                trustedNowMillis = trustedNowMillis,
+            ),
+        )
+    }
+
     private suspend fun updateFailureStatusWithChildren(
         transactionLocalId: Long,
         queueId: Long?,
@@ -709,6 +799,12 @@ sealed interface OfflineCheckoutSyncResult {
         val syncStatus: String
     ) : OfflineCheckoutSyncResult
 
+    data class Deferred(
+        val message: String,
+        val eligibleAtMillis: Long,
+        val retryAfterSeconds: Long? = null,
+    ) : OfflineCheckoutSyncResult
+
     data class Failed(
         val message: String,
         val kind: OfflineCheckoutSyncFailureKind = OfflineCheckoutSyncFailureKind.UNKNOWN,
@@ -738,11 +834,14 @@ data class OfflineCheckoutBulkSyncResult(
     val total: Int,
     val successCount: Int,
     val failedCount: Int,
+    val deferredCount: Int = 0,
     val authFailureCount: Int = 0,
     val transientFailureCount: Int = 0,
     val validationFailureCount: Int = 0,
     val maxRetryAfterSeconds: Long? = null,
+    val minDeferredRetryAfterSeconds: Long? = null,
     val failedLocalIds: Set<Long> = emptySet(),
+    val deferredLocalIds: Set<Long> = emptySet(),
 ) {
     val hasAuthFailure: Boolean get() = authFailureCount > 0
     val hasTransientFailure: Boolean get() = transientFailureCount > 0

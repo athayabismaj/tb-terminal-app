@@ -2,8 +2,12 @@ package com.tbterminal.app.ui.cashier.sync
 
 import com.tbterminal.app.data.local.model.SyncStatus
 import com.tbterminal.app.data.sync.CashSessionActiveBlockingMatcher
+import com.tbterminal.app.data.sync.OfflineTimeConflictPolicy
 import com.tbterminal.app.data.sync.SyncErrorCategory
 import com.tbterminal.app.data.sync.SyncErrorClassifier
+import java.time.Instant
+import java.time.ZoneId
+import java.time.format.DateTimeFormatter
 import java.util.Locale
 
 object CashierSyncErrorFormatter {
@@ -11,10 +15,21 @@ object CashierSyncErrorFormatter {
         syncStatus: SyncStatus,
         lastError: String?,
         lastErrorCode: String?,
+        deferredUntilMillis: Long? = null,
     ): String? {
         if (syncStatus == SyncStatus.SYNCED) return null
         val normalizedCode = lastErrorCode?.trim()?.uppercase(Locale.ROOT).orEmpty()
         val rawMessage = lastError?.trim().orEmpty()
+
+        if (syncStatus == SyncStatus.PENDING &&
+            OfflineTimeConflictPolicy.isOccurredAtInvalidCode(normalizedCode) &&
+            deferredUntilMillis != null
+        ) {
+            val hhmm = Instant.ofEpochMilli(deferredUntilMillis)
+                .atZone(ZoneId.systemDefault())
+                .format(TIME_FORMATTER)
+            return "Jam data lebih maju dari jam server. Akan dikirim otomatis setelah $hhmm."
+        }
 
         if (normalizedCode == CashSessionActiveBlockingMatcher.ERROR_CODE_ACTIVE_SESSION_BLOCKING_OPEN) {
             return "Menunggu sesi kas sebelumnya selesai ditutup di server."
@@ -82,4 +97,7 @@ object CashierSyncErrorFormatter {
         "RATE_LIMITED" to "Server sedang sibuk. Coba sinkronkan lagi beberapa saat lagi.",
         "TOO_MANY_REQUESTS" to "Server sedang sibuk. Coba sinkronkan lagi beberapa saat lagi.",
     )
+
+    private val TIME_FORMATTER: DateTimeFormatter =
+        DateTimeFormatter.ofPattern("HH:mm", Locale.forLanguageTag("id-ID"))
 }

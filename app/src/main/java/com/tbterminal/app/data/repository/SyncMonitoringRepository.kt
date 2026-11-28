@@ -239,6 +239,7 @@ class SyncMonitoringRepository(
             SyncEntityType.TRANSACTION -> {
                 when (val result = offlineCheckoutSyncService.syncOne(item.entityLocalId)) {
                     is OfflineCheckoutSyncResult.Success -> SyncRetryResult.Success("Transaksi tersinkron.")
+                    is OfflineCheckoutSyncResult.Deferred -> SyncRetryResult.Failed(result.message)
                     is OfflineCheckoutSyncResult.Failed -> SyncRetryResult.Failed(result.message)
                 }
             }
@@ -261,6 +262,9 @@ class SyncMonitoringRepository(
                 when (val result = offlineCashExpenseSyncService.syncExpense(item.entityLocalId)) {
                     is com.tbterminal.app.data.sync.OfflineCashExpenseSyncResult.Success -> {
                         SyncRetryResult.Success("Pengeluaran kas tersinkron.")
+                    }
+                    is com.tbterminal.app.data.sync.OfflineCashExpenseSyncResult.Deferred -> {
+                        SyncRetryResult.Failed(result.message)
                     }
                     is com.tbterminal.app.data.sync.OfflineCashExpenseSyncResult.Failed -> {
                         SyncRetryResult.Failed(result.message)

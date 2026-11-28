@@ -15,6 +15,7 @@ import com.tbterminal.app.data.local.model.SyncOperation
 import com.tbterminal.app.data.local.model.SyncStatus
 import com.tbterminal.app.data.remote.BigDecimalStringSerializer
 import com.tbterminal.app.data.sync.OfflineSessionAgePolicy
+import com.tbterminal.app.data.sync.TrustedOfflineClock
 import com.tbterminal.app.data.sync.runSuspendCatching
 import java.math.BigDecimal
 import java.math.RoundingMode
@@ -31,6 +32,7 @@ class LocalCheckoutService(
     private val database: TbTerminalDatabase,
     private val deviceId: String? = null,
     private val clockMillis: () -> Long = { System.currentTimeMillis() },
+    private val trustedOfflineClock: TrustedOfflineClock? = null,
 ) {
     suspend fun saveCheckout(command: LocalCheckoutCommand): LocalCheckoutResult {
         val validationError = validate(command)
@@ -40,9 +42,9 @@ class LocalCheckoutService(
 
         return runSuspendCatching {
             database.withTransaction {
-                val now = clockMillis()
+                val rawNow = trustedOfflineClock?.nowMillis() ?: clockMillis()
                 val cashSessionLocalId = command.cashSessionLocalId
-                if (cashSessionLocalId != null) {
+                val now = if (cashSessionLocalId != null) {
                     val session = database.cashSessionDao().getByLocalId(cashSessionLocalId)
                         ?: return@withTransaction LocalCheckoutResult.Failed("Sesi kas lokal tidak ditemukan.")
                     if (!session.status.equals(CASH_SESSION_OPEN, ignoreCase = true)) {
@@ -51,20 +53,28 @@ class LocalCheckoutService(
                     if (session.serverId.isNullOrBlank()) {
                         val ageAlert = OfflineSessionAgePolicy.evaluateOpenedAt(
                             openedAtMillis = session.openedAt,
-                            nowMillis = now,
+                            nowMillis = rawNow,
                         )
                         if (ageAlert?.isExpired == true) {
                             return@withTransaction LocalCheckoutResult.Failed(ageAlert.message)
                         }
                     }
+                    val maxTx = database.transactionDao().getMaxOccurredAtByCashSession(cashSessionLocalId) ?: 0L
+                    val maxExp = database.cashExpenseDao().getMaxOccurredAtByCashSession(cashSessionLocalId) ?: 0L
+                    val sessionFloor = maxOf(session.openedAt, maxTx, maxExp)
+                    maxOf(rawNow, sessionFloor)
+                } else {
+                    rawNow
                 }
+                trustedOfflineClock?.advanceLastTrustedFloor(now)
+                val effectiveOccurredAt = command.occurredAt ?: now
                 val remainingAmount = (command.remainingAmount ?: command.total.subtract(command.paidAmount))
                     .coerceAtLeast(BigDecimal.ZERO)
                 val remainingScaled = ScaledDecimal2.ofExact(remainingAmount)
                 val totalScaled = ScaledDecimal2.ofExact(command.total)
                 val paidScaled = ScaledDecimal2.ofExact(command.paidAmount)
                 val transactionClientId = LocalIdGenerator.clientGeneratedId("TRX")
-                val transactionCode = localTransactionCode(command.occurredAt)
+                val transactionCode = localTransactionCode(effectiveOccurredAt)
 
                 val transactionLocalId = database.transactionDao().upsert(
                     LocalTransactionEntity(
@@ -92,7 +102,7 @@ class LocalCheckoutService(
                         syncStatus = SyncStatus.PENDING,
                         createdAt = now,
                         updatedAt = now,
-                        occurredAt = command.occurredAt
+                        occurredAt = effectiveOccurredAt
                     )
                 )
 
@@ -120,7 +130,7 @@ class LocalCheckoutService(
                                 method = line.method,
                                 amount = ScaledDecimal2.ofExact(line.amount),
                                 reference = line.reference,
-                                paidAt = command.occurredAt,
+                                paidAt = effectiveOccurredAt,
                                 syncStatus = SyncStatus.PENDING,
                                 createdAt = now,
                                 updatedAt = now
@@ -130,13 +140,13 @@ class LocalCheckoutService(
                     }
                     firstId
                 } else if (command.paidAmount > BigDecimal.ZERO) {
-                    database.paymentDao().upsert(command.toPaymentEntity(transactionLocalId, now))
+                    database.paymentDao().upsert(command.toPaymentEntity(transactionLocalId, effectiveOccurredAt, now))
                 } else {
                     null
                 }
 
                 val receivableLocalId = if (shouldCreateReceivable(command.paymentMethod, remainingScaled)) {
-                    database.receivableDao().upsert(command.toReceivableEntity(transactionLocalId, remainingScaled, now))
+                    database.receivableDao().upsert(command.toReceivableEntity(transactionLocalId, remainingScaled, effectiveOccurredAt, now))
                 } else {
                     null
                 }
@@ -150,7 +160,8 @@ class LocalCheckoutService(
                             transactionLocalId = transactionLocalId,
                             transactionClientGeneratedId = transactionClientId,
                             transactionCode = transactionCode,
-                            remainingAmount = remainingAmount
+                            remainingAmount = remainingAmount,
+                            occurredAt = effectiveOccurredAt,
                         ),
                         status = SyncStatus.PENDING,
                         createdAt = now,
@@ -171,7 +182,7 @@ class LocalCheckoutService(
                             put("transactionCode", transactionCode)
                             put("total", command.total.setScale(2, RoundingMode.HALF_UP).toPlainString())
                         }.toString(),
-                        occurredAt = command.occurredAt,
+                        occurredAt = effectiveOccurredAt,
                         syncStatus = SyncStatus.PENDING,
                         createdAt = now,
                         updatedAt = now
@@ -276,6 +287,7 @@ class LocalCheckoutService(
 
     private fun LocalCheckoutCommand.toPaymentEntity(
         transactionLocalId: Long,
+        occurredAt: Long,
         now: Long
     ): LocalPaymentEntity {
         return LocalPaymentEntity(
@@ -294,6 +306,7 @@ class LocalCheckoutService(
     private fun LocalCheckoutCommand.toReceivableEntity(
         transactionLocalId: Long,
         remainingAmount: ScaledDecimal2,
+        occurredAt: Long,
         now: Long
     ): LocalReceivableEntity {
         return LocalReceivableEntity(
@@ -317,7 +330,8 @@ class LocalCheckoutService(
         transactionLocalId: Long,
         transactionClientGeneratedId: String,
         transactionCode: String,
-        remainingAmount: BigDecimal
+        remainingAmount: BigDecimal,
+        occurredAt: Long = this.occurredAt ?: 0L,
     ): String {
         val payload = LocalCheckoutSyncPayload(
             transactionLocalId = transactionLocalId,

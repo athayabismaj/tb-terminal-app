@@ -50,6 +50,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.tbterminal.app.data.repository.CashierClockWarning
 import com.tbterminal.app.data.repository.CashierSyncItemKind
 import com.tbterminal.app.data.repository.CashierSyncItemStatus
 import com.tbterminal.app.data.repository.CashierSyncItemUi
@@ -67,6 +68,42 @@ private val Slate500 = Color(0xFF64748B)
 private val Slate200 = Color(0xFFE2E8F0)
 private val Slate100 = Color(0xFFF1F5F9)
 private val Slate50 = Color(0xFFF8FAFC)
+
+@Composable
+internal fun CashierClockWarningBanner(
+    warning: CashierClockWarning,
+    modifier: Modifier = Modifier,
+) {
+    Surface(
+        modifier = modifier
+            .fillMaxWidth()
+            .testTag("cashier-sync-clock-warning"),
+        shape = RoundedCornerShape(12.dp),
+        color = Color(0xFFFFFBEB),
+        border = BorderStroke(1.dp, Color(0xFFFDE68A)),
+    ) {
+        Row(
+            modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp),
+            verticalAlignment = Alignment.Top,
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            Icon(
+                imageVector = Icons.Outlined.Schedule,
+                contentDescription = null,
+                tint = Color(0xFFB45309),
+                modifier = Modifier
+                    .padding(top = 1.dp)
+                    .size(16.dp),
+            )
+            Text(
+                text = warning.message,
+                fontSize = 12.sp,
+                color = Color(0xFF92400E),
+                lineHeight = 16.sp,
+            )
+        }
+    }
+}
 
 @Composable
 internal fun CashierSyncStatusCard(
@@ -123,7 +160,10 @@ internal fun CashierSyncStatusCard(
                             ServerStatusBadge(isOnline = uiState.isServerOnline)
                         }
                         Text(
-                            text = formatLastSyncText(uiState.lastSuccessfulSyncAtMillis),
+                            text = formatLastSyncText(
+                                timestampMillis = uiState.lastSuccessfulSyncAtMillis,
+                                blockedCount = uiState.blockedCount,
+                            ),
                             fontSize = 12.sp,
                             color = Slate500,
                         )
@@ -482,7 +522,40 @@ internal fun CashierSyncItemCard(
                 )
             }
 
-            if (!item.failureReason.isNullOrBlank()) {
+            if (item.blockingCount > 0) {
+                Surface(
+                    shape = RoundedCornerShape(8.dp),
+                    color = Color(0xFFFEF3C7),
+                    border = BorderStroke(1.dp, Color(0xFFFDE68A)),
+                ) {
+                    Text(
+                        text = "Menahan ${item.blockingCount} data lain",
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.SemiBold,
+                        color = Color(0xFFB45309),
+                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+                    )
+                }
+            }
+
+            if (!item.blockedByLabel.isNullOrBlank()) {
+                Surface(
+                    shape = RoundedCornerShape(8.dp),
+                    color = Slate100,
+                    modifier = Modifier.fillMaxWidth(),
+                ) {
+                    Text(
+                        text = "Tertahan oleh: ${item.blockedByLabel}",
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.Medium,
+                        color = Slate700,
+                        lineHeight = 15.sp,
+                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
+                    )
+                }
+            }
+
+            if (item.isConflict || !item.failureReason.isNullOrBlank()) {
                 val isAttention = item.status == CashierSyncItemStatus.FAILED ||
                     item.status == CashierSyncItemStatus.NEEDS_CHECK
                 val boxBg = when (item.status) {
@@ -513,12 +586,25 @@ internal fun CashierSyncItemCard(
                                 .padding(top = 1.dp)
                                 .size(15.dp),
                         )
-                        Text(
-                            text = item.failureReason,
-                            fontSize = 11.5.sp,
-                            color = textColor,
-                            lineHeight = 16.sp,
-                        )
+                        Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                            if (item.isConflict) {
+                                Text(
+                                    text = "Perlu dicek — hubungi admin/owner",
+                                    fontSize = 11.5.sp,
+                                    fontWeight = FontWeight.SemiBold,
+                                    color = textColor,
+                                    lineHeight = 16.sp,
+                                )
+                            }
+                            if (!item.failureReason.isNullOrBlank()) {
+                                Text(
+                                    text = item.failureReason,
+                                    fontSize = 11.5.sp,
+                                    color = textColor,
+                                    lineHeight = 16.sp,
+                                )
+                            }
+                        }
                     }
                 }
             }
@@ -612,11 +698,20 @@ private fun CashierSyncItemKind.icon(): ImageVector = when (this) {
     CashierSyncItemKind.REFUND_TRANSACTION -> Icons.AutoMirrored.Outlined.ReceiptLong
 }
 
-private fun formatLastSyncText(timestampMillis: Long?): String {
-    if (timestampMillis == null || timestampMillis <= 0L) {
-        return "Belum pernah sinkron"
+private fun formatLastSyncText(
+    timestampMillis: Long?,
+    blockedCount: Int = 0,
+): String {
+    val base = if (timestampMillis == null || timestampMillis <= 0L) {
+        "Belum pernah sinkron"
+    } else {
+        "Sinkron terakhir: ${formatTimestamp(timestampMillis)}"
     }
-    return "Sinkron terakhir: ${formatTimestamp(timestampMillis)}"
+    return if (blockedCount > 0) {
+        "$base · $blockedCount data tertahan"
+    } else {
+        base
+    }
 }
 
 private fun formatTimestamp(timestampMillis: Long): String {

@@ -34,3 +34,11 @@ internal fun maxNullableSeconds(current: Long?, candidate: Long?): Long? {
         else -> maxOf(current, candidate)
     }
 }
+
+internal fun minNullableSeconds(current: Long?, candidate: Long?): Long? {
+    return when {
+        current == null -> candidate
+        candidate == null -> current
+        else -> minOf(current, candidate)
+    }
+}

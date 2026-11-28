@@ -13,6 +13,7 @@ import com.tbterminal.app.data.local.model.SyncOperation
 import com.tbterminal.app.data.local.model.SyncStatus
 import com.tbterminal.app.data.remote.BigDecimalStringSerializer
 import com.tbterminal.app.data.sync.OfflineSessionAgePolicy
+import com.tbterminal.app.data.sync.TrustedOfflineClock
 import com.tbterminal.app.data.sync.runSuspendCatching
 import java.math.BigDecimal
 import kotlinx.serialization.Serializable
@@ -28,6 +29,7 @@ class LocalCashExpenseService(
     private val database: TbTerminalDatabase,
     private val deviceId: String? = null,
     private val clockMillis: () -> Long = { System.currentTimeMillis() },
+    private val trustedOfflineClock: TrustedOfflineClock? = null,
 ) {
     suspend fun addLocalCashMovement(
         cashSessionLocalId: Long,
@@ -67,7 +69,12 @@ class LocalCashExpenseService(
                     return@withTransaction LocalCashExpenseResult.Failed("Mutasi kas hanya bisa dicatat pada sesi kas lokal terbuka.")
                 }
 
-                val now = clockMillis()
+                val maxTx = database.transactionDao().getMaxOccurredAtByCashSession(cashSessionLocalId) ?: 0L
+                val maxExp = database.cashExpenseDao().getMaxOccurredAtByCashSession(cashSessionLocalId) ?: 0L
+                val sessionFloor = maxOf(session.openedAt, maxTx, maxExp)
+                val rawNow = trustedOfflineClock?.nowMillis() ?: clockMillis()
+                val now = maxOf(rawNow, sessionFloor)
+                trustedOfflineClock?.advanceLastTrustedFloor(now)
                 if (session.serverId.isNullOrBlank()) {
                     val ageAlert = OfflineSessionAgePolicy.evaluateOpenedAt(
                         openedAtMillis = session.openedAt,

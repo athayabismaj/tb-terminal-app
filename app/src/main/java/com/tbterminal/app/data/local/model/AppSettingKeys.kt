@@ -23,4 +23,9 @@ object AppSettingKeys {
     const val CACHED_CASH_ROUNDING_UNIT = "store_cached_cash_rounding_unit"
     const val CACHED_CASH_ROUNDING_RULE = "store_cached_cash_rounding_rule"
     const val SYNC_LAST_SUCCESS_PREFIX = "sync_last_success_at_"
+    const val TRUSTED_CLOCK_SERVER_ANCHOR_MILLIS = "trusted_clock_server_anchor_millis"
+    const val TRUSTED_CLOCK_ELAPSED_ANCHOR_MILLIS = "trusted_clock_elapsed_anchor_millis"
+    const val TRUSTED_CLOCK_BOOT_COUNT = "trusted_clock_boot_count"
+    const val TRUSTED_CLOCK_LAST_TRUSTED_MILLIS = "trusted_clock_last_trusted_millis"
+    const val SYNC_TIME_CONFLICT_RECOVERED_PREFIX = "sync_time_conflict_recovered_"
 }

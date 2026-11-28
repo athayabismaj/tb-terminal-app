@@ -184,7 +184,7 @@ interface TransactionDao {
         SET cashSessionServerId = :serverId,
             updatedAt = :updatedAt
         WHERE cashSessionLocalId = :cashSessionLocalId
-            AND cashSessionServerId IS NULL
+            AND (cashSessionServerId IS NULL OR TRIM(cashSessionServerId) = '')
         """
     )
     suspend fun updateCashSessionServerIdForLocalSession(
@@ -263,6 +263,15 @@ interface TransactionDao {
         syncedAt: Long,
         updatedAt: Long
     ): Unit
+
+    @Query("SELECT COUNT(*) FROM local_transactions WHERE deletedAt IS NULL AND syncStatus != :syncedStatus AND (:cashierUserId IS NULL OR cashierUserId = :cashierUserId)")
+    suspend fun countAllUnsyncedForUser(
+        cashierUserId: String?,
+        syncedStatus: SyncStatus = SyncStatus.SYNCED,
+    ): Int
+
+    @Query("SELECT MAX(occurredAt) FROM local_transactions WHERE cashSessionLocalId = :cashSessionLocalId AND deletedAt IS NULL")
+    suspend fun getMaxOccurredAtByCashSession(cashSessionLocalId: Long): Long?
 
     @Query("UPDATE local_transactions SET deletedAt = :deletedAt, syncStatus = :status, updatedAt = :updatedAt WHERE localId = :localId")
     suspend fun markDeleted(localId: Long, deletedAt: Long, status: SyncStatus, updatedAt: Long): Unit

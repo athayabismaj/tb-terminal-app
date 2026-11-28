@@ -11,6 +11,7 @@ import com.tbterminal.app.data.local.model.SyncEntityType
 import com.tbterminal.app.data.local.model.SyncOperation
 import com.tbterminal.app.data.local.model.SyncStatus
 import com.tbterminal.app.data.remote.BigDecimalStringSerializer
+import com.tbterminal.app.data.sync.TrustedOfflineClock
 import com.tbterminal.app.navigation.AppAccessPolicy
 import java.math.BigDecimal
 import kotlinx.serialization.Serializable
@@ -20,8 +21,14 @@ import kotlinx.serialization.json.Json
 class LocalCashSessionService(
     private val database: TbTerminalDatabase,
     private val deviceId: String? = null,
+    private val clockMillis: () -> Long = { System.currentTimeMillis() },
+    private val trustedOfflineClock: TrustedOfflineClock? = null,
     private val roleProvider: () -> String? = { "KASIR" },
 ) {
+    private suspend fun resolveNowMillis(): Long {
+        return trustedOfflineClock?.nowMillis() ?: clockMillis()
+    }
+
     suspend fun openLocalSession(
         cashierUserId: String,
         startingCash: BigDecimal,
@@ -39,7 +46,8 @@ class LocalCashSessionService(
 
         return runCatching {
             database.withTransaction {
-                val now = System.currentTimeMillis()
+                val now = resolveNowMillis()
+                trustedOfflineClock?.advanceLastTrustedFloor(now)
                 val startingScaled = ScaledDecimal2.ofExact(startingCash)
                 val localId = database.cashSessionDao().upsert(
                     LocalCashSessionEntity(
@@ -104,7 +112,11 @@ class LocalCashSessionService(
                     return@withTransaction LocalCashSessionResult.Failed("Sesi kas lokal sudah ditutup.")
                 }
 
-                val now = System.currentTimeMillis()
+                val maxTx = database.transactionDao().getMaxOccurredAtByCashSession(localId) ?: 0L
+                val maxExp = database.cashExpenseDao().getMaxOccurredAtByCashSession(localId) ?: 0L
+                val sessionFloor = maxOf(session.openedAt, maxTx, maxExp)
+                val now = maxOf(resolveNowMillis(), sessionFloor)
+                trustedOfflineClock?.advanceLastTrustedFloor(now)
                 val cashSales = database.paymentDao().sumCashPaymentsByCashSession(localId)
                 val cashIn = database.cashExpenseDao().sumCashInByCashSession(localId)
                 val cashOut = database.cashExpenseDao().sumCashOutByCashSession(localId)

@@ -37,6 +37,13 @@ data class CachedStoreConfig(
     val cashRoundingRule: String = "NEAREST"
 )
 
+data class TrustedClockAnchor(
+    val serverAnchorMillis: Long,
+    val elapsedAnchorMillis: Long,
+    val bootCount: Long?,
+    val lastTrustedMillis: Long,
+)
+
 class LocalAppSettingsDataSource(
     private val appSettingDao: AppSettingDao
 ) {
@@ -184,5 +191,93 @@ class LocalAppSettingsDataSource(
 
     private fun lastSuccessSettingKey(normalizedOwner: String): String {
         return "${AppSettingKeys.SYNC_LAST_SUCCESS_PREFIX}$normalizedOwner"
+    }
+
+    suspend fun getTrustedClockAnchor(): TrustedClockAnchor? {
+        val serverAnchor = appSettingDao.getValue(AppSettingKeys.TRUSTED_CLOCK_SERVER_ANCHOR_MILLIS)
+            ?.toLongOrNull() ?: return null
+        val elapsedAnchor = appSettingDao.getValue(AppSettingKeys.TRUSTED_CLOCK_ELAPSED_ANCHOR_MILLIS)
+            ?.toLongOrNull() ?: return null
+        val bootCount = appSettingDao.getValue(AppSettingKeys.TRUSTED_CLOCK_BOOT_COUNT)
+            ?.toLongOrNull()
+        val lastTrusted = appSettingDao.getValue(AppSettingKeys.TRUSTED_CLOCK_LAST_TRUSTED_MILLIS)
+            ?.toLongOrNull() ?: serverAnchor
+        return TrustedClockAnchor(
+            serverAnchorMillis = serverAnchor,
+            elapsedAnchorMillis = elapsedAnchor,
+            bootCount = bootCount,
+            lastTrustedMillis = maxOf(lastTrusted, serverAnchor),
+        )
+    }
+
+    suspend fun setTrustedClockAnchor(anchor: TrustedClockAnchor) {
+        val entries = buildList {
+            add(
+                AppSettingEntity(
+                    key = AppSettingKeys.TRUSTED_CLOCK_SERVER_ANCHOR_MILLIS,
+                    value = anchor.serverAnchorMillis.toString(),
+                    updatedAt = anchor.serverAnchorMillis,
+                )
+            )
+            add(
+                AppSettingEntity(
+                    key = AppSettingKeys.TRUSTED_CLOCK_ELAPSED_ANCHOR_MILLIS,
+                    value = anchor.elapsedAnchorMillis.toString(),
+                    updatedAt = anchor.serverAnchorMillis,
+                )
+            )
+            add(
+                AppSettingEntity(
+                    key = AppSettingKeys.TRUSTED_CLOCK_BOOT_COUNT,
+                    value = anchor.bootCount?.toString().orEmpty(),
+                    updatedAt = anchor.serverAnchorMillis,
+                )
+            )
+            add(
+                AppSettingEntity(
+                    key = AppSettingKeys.TRUSTED_CLOCK_LAST_TRUSTED_MILLIS,
+                    value = anchor.lastTrustedMillis.toString(),
+                    updatedAt = anchor.serverAnchorMillis,
+                )
+            )
+        }
+        appSettingDao.upsertAll(entries)
+    }
+
+    suspend fun updateLastTrustedClockMillis(timestampMillis: Long) {
+        val current = appSettingDao.getValue(AppSettingKeys.TRUSTED_CLOCK_LAST_TRUSTED_MILLIS)
+            ?.toLongOrNull() ?: 0L
+        if (timestampMillis <= current) return
+        appSettingDao.upsert(
+            AppSettingEntity(
+                key = AppSettingKeys.TRUSTED_CLOCK_LAST_TRUSTED_MILLIS,
+                value = timestampMillis.toString(),
+                updatedAt = timestampMillis,
+            )
+        )
+    }
+
+    suspend fun isTimeConflictAlreadyRecovered(entityType: String, clientGeneratedId: String): Boolean {
+        val key = timeConflictRecoveredKey(entityType, clientGeneratedId)
+        return appSettingDao.getValue(key)?.isNotBlank() == true
+    }
+
+    suspend fun markTimeConflictRecovered(
+        entityType: String,
+        clientGeneratedId: String,
+        recoveredAtMillis: Long,
+    ) {
+        val key = timeConflictRecoveredKey(entityType, clientGeneratedId)
+        appSettingDao.upsert(
+            AppSettingEntity(
+                key = key,
+                value = recoveredAtMillis.toString(),
+                updatedAt = recoveredAtMillis,
+            )
+        )
+    }
+
+    private fun timeConflictRecoveredKey(entityType: String, clientGeneratedId: String): String {
+        return "${AppSettingKeys.SYNC_TIME_CONFLICT_RECOVERED_PREFIX}${entityType.trim().uppercase()}_${clientGeneratedId.trim()}"
     }
 }

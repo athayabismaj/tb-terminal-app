@@ -237,8 +237,14 @@ class AdminTransactionHistoryViewModel(
                     _uiState.update { it.copy(localSyncMessage = "Transaksi lokal berhasil disinkronkan") }
                     loadTransactions(page = 1)
                 }
+                is OfflineCheckoutSyncResult.Deferred,
                 is OfflineCheckoutSyncResult.Failed -> {
-                    _uiState.update { it.copy(localSyncMessage = result.message) }
+                    val message = when (result) {
+                        is OfflineCheckoutSyncResult.Deferred -> result.message
+                        is OfflineCheckoutSyncResult.Failed -> result.message
+                        is OfflineCheckoutSyncResult.Success -> null
+                    }
+                    _uiState.update { it.copy(localSyncMessage = message) }
                 }
             }
         }

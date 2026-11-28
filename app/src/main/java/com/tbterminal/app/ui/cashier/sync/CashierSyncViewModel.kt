@@ -6,6 +6,7 @@ import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import androidx.work.WorkInfo
 import androidx.work.WorkManager
+import com.tbterminal.app.data.repository.CashierClockWarning
 import com.tbterminal.app.data.repository.CashierSyncItemUi
 import com.tbterminal.app.data.repository.CashierSyncRepository
 import com.tbterminal.app.data.repository.CashierSyncSnapshot
@@ -80,8 +81,11 @@ data class CashierSyncUiState(
     val sendingCount: Int = 0,
     val failedCount: Int = 0,
     val needsCheckCount: Int = 0,
+    val blockedCount: Int = 0,
+    val deferredClockCount: Int = 0,
     val items: List<CashierSyncItemUi> = emptyList(),
     val offlineSessionAgeAlert: OfflineSessionAgeAlert? = null,
+    val clockWarning: CashierClockWarning? = null,
     val otherUsersPendingSyncCount: Int = 0,
     val isSyncing: Boolean = false,
     val feedbackMessage: String? = null,
@@ -133,7 +137,7 @@ class CashierSyncViewModel(
                 if (shouldFinalize) {
                     awaitingRunCompletion = false
                     sawRunningDuringAwait = false
-                    val (msg, isError) = formatCompletionFeedback(summary, hasNewSummary, snapshot.failedCount)
+                    val (msg, isError) = formatCompletionFeedback(summary, hasNewSummary, snapshot)
                     nextFeedback = msg
                     nextFeedbackError = isError
                 }
@@ -149,8 +153,11 @@ class CashierSyncViewModel(
                         sendingCount = snapshot.sendingCount,
                         failedCount = snapshot.failedCount,
                         needsCheckCount = snapshot.needsCheckCount,
+                        blockedCount = snapshot.blockedCount,
+                        deferredClockCount = snapshot.deferredClockCount,
                         items = snapshot.items,
                         offlineSessionAgeAlert = snapshot.offlineSessionAgeAlert,
+                        clockWarning = snapshot.clockWarning,
                         otherUsersPendingSyncCount = snapshot.otherUsersPendingSyncCount,
                         isSyncing = runnerRunning || awaitingRunCompletion,
                         feedbackMessage = nextFeedback,
@@ -249,8 +256,9 @@ class CashierSyncViewModel(
     private fun formatCompletionFeedback(
         summary: SyncRunSummary?,
         hasNewSummary: Boolean,
-        remainingFailedCount: Int,
+        snapshot: CashierSyncSnapshot,
     ): Pair<String, Boolean> {
+        val remainingFailedCount = snapshot.failedCount
         if (!hasNewSummary || summary == null) {
             return if (remainingFailedCount > 0) {
                 "Sinkron selesai. Masih ada $remainingFailedCount data gagal. Tekan lagi untuk mencoba ulang data yang gagal." to true
@@ -267,12 +275,29 @@ class CashierSyncViewModel(
 
         return when (summary.outcome) {
             SyncRunOutcome.SUCCESS -> {
-                val base = if (summary.syncedCount == 0 && summary.failedCount == 0) {
-                    "Sinkron selesai: berhasil 0, gagal 0."
+                if (summary.syncedCount == 0 && summary.failedCount == 0) {
+                    when {
+                        snapshot.blockedCount > 0 -> {
+                            val cause = when {
+                                snapshot.needsCheckCount > 0 -> "${snapshot.needsCheckCount} data yang perlu dicek"
+                                snapshot.deferredClockCount > 0 -> "${snapshot.deferredClockCount} data yang menunggu jam server"
+                                snapshot.failedCount > 0 -> "${snapshot.failedCount} data yang gagal"
+                                else -> "data sebelumnya yang belum selesai"
+                            }
+                            "Belum ada data yang terkirim. ${snapshot.blockedCount} data tertahan oleh $cause." to true
+                        }
+                        snapshot.needsCheckCount > 0 -> {
+                            "Belum ada data yang terkirim. ${snapshot.needsCheckCount} data perlu dicek — hubungi admin/owner." to true
+                        }
+                        snapshot.deferredClockCount > 0 -> {
+                            "Belum ada data yang terkirim. ${snapshot.deferredClockCount} data menunggu jam server." to false
+                        }
+                        else -> "Sinkron selesai: berhasil 0, gagal 0.$retryFailedHint" to false
+                    }
                 } else {
-                    "Sinkron selesai: berhasil ${summary.syncedCount}, gagal ${summary.failedCount}."
+                    val base = "Sinkron selesai: berhasil ${summary.syncedCount}, gagal ${summary.failedCount}."
+                    "$base$retryFailedHint" to (summary.failedCount > 0)
                 }
-                "$base$retryFailedHint" to (summary.failedCount > 0)
             }
 
             SyncRunOutcome.RETRY -> {

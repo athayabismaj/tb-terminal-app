@@ -62,6 +62,7 @@ import com.tbterminal.app.data.sync.OfflineCheckoutSyncService
 import com.tbterminal.app.data.sync.OfflineSyncScheduler
 import com.tbterminal.app.data.sync.OfflineStatusRepository
 import com.tbterminal.app.data.sync.SyncManager
+import com.tbterminal.app.data.sync.TrustedOfflineClock
 import com.tbterminal.app.data.sync.readDeviceBootCount
 import kotlinx.coroutines.Dispatchers
 
@@ -85,6 +86,7 @@ interface AppContainer {
     val offlineCheckoutSyncService: OfflineCheckoutSyncService
     val networkMonitor: NetworkMonitor
     val backendHealthMonitor: BackendHealthMonitor
+    val trustedOfflineClock: TrustedOfflineClock
     val offlineStatusRepository: OfflineStatusRepository
     val cashierSyncRepository: CashierSyncRepository
     val syncMonitoringRepository: SyncMonitoringRepository
@@ -192,10 +194,19 @@ class DefaultAppContainer(
         )
     }
 
+    override val trustedOfflineClock: TrustedOfflineClock by lazy {
+        TrustedOfflineClock(
+            localAppSettingsDataSource = localAppSettingsDataSource,
+            elapsedRealtimeMillis = { SystemClock.elapsedRealtime() },
+            bootCountProvider = { readDeviceBootCount(appContext) },
+        )
+    }
+
     override val localCashExpenseService: LocalCashExpenseService by lazy {
         LocalCashExpenseService(
             database = localDatabase,
-            deviceId = deviceIdProvider.deviceId
+            deviceId = deviceIdProvider.deviceId,
+            trustedOfflineClock = trustedOfflineClock,
         )
     }
 
@@ -204,6 +215,7 @@ class DefaultAppContainer(
             database = localDatabase,
             deviceId = deviceIdProvider.deviceId,
             roleProvider = { sessionManager.readSessionUser()?.role },
+            trustedOfflineClock = trustedOfflineClock,
         )
     }
 
@@ -222,7 +234,8 @@ class DefaultAppContainer(
     override val localCheckoutService: LocalCheckoutService by lazy {
         LocalCheckoutService(
             database = localDatabase,
-            deviceId = deviceIdProvider.deviceId
+            deviceId = deviceIdProvider.deviceId,
+            trustedOfflineClock = trustedOfflineClock,
         )
     }
 
@@ -243,6 +256,7 @@ class DefaultAppContainer(
             deviceId = deviceIdProvider.deviceId,
             cashSessionSyncService = offlineCashSessionSyncService,
             activeUserIdProvider = { sessionManager.resolveOwnerUserId() },
+            trustedOfflineClock = trustedOfflineClock,
         )
     }
 
@@ -254,6 +268,7 @@ class DefaultAppContainer(
             cashSessionSyncService = offlineCashSessionSyncService,
             cashExpenseSyncService = offlineCashExpenseSyncService,
             activeUserIdProvider = { sessionManager.resolveOwnerUserId() },
+            trustedOfflineClock = trustedOfflineClock,
         )
     }
 
@@ -267,6 +282,7 @@ class DefaultAppContainer(
             networkMonitor = networkMonitor,
             clockMillis = { SystemClock.elapsedRealtime() },
             ioDispatcher = Dispatchers.IO,
+            trustedOfflineClock = trustedOfflineClock,
         )
     }
 
@@ -299,6 +315,7 @@ class DefaultAppContainer(
             activeUserIdProvider = { sessionManager.resolveOwnerUserId() },
             monotonicClockMillis = { SystemClock.elapsedRealtime() },
             bootCountProvider = { readDeviceBootCount(appContext) },
+            trustedOfflineClock = trustedOfflineClock,
         )
     }
 
@@ -352,7 +369,9 @@ class DefaultAppContainer(
             sessionManager = sessionManager,
             offlineCashSessionSyncService = offlineCashSessionSyncService,
             offlineCheckoutSyncService = offlineCheckoutSyncService,
-            offlineCashExpenseSyncService = offlineCashExpenseSyncService
+            offlineCashExpenseSyncService = offlineCashExpenseSyncService,
+            trustedOfflineClock = trustedOfflineClock,
+            deviceId = deviceIdProvider.deviceId,
         )
     }
 

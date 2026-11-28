@@ -1,8 +1,11 @@
 package com.tbterminal.app.data.sync
 
+import androidx.room.withTransaction
 import com.tbterminal.app.data.local.database.TbTerminalDatabase
+import com.tbterminal.app.data.local.entity.LocalAuditLogEntity
 import com.tbterminal.app.data.local.entity.SyncQueueEntity
 import com.tbterminal.app.data.local.database.LocalAppSettingsDataSource
+import com.tbterminal.app.data.local.id.LocalIdGenerator
 import com.tbterminal.app.data.local.model.AppDataMode
 import com.tbterminal.app.data.local.model.SyncEntityType
 import com.tbterminal.app.data.local.model.SyncOperation
@@ -12,6 +15,8 @@ import java.util.concurrent.atomic.AtomicLong
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.put
 
 enum class SyncRunOutcome {
     SUCCESS,
@@ -42,6 +47,8 @@ class SyncManager(
     private val offlineCheckoutSyncService: OfflineCheckoutSyncService,
     private val offlineCashExpenseSyncService: OfflineCashExpenseSyncService,
     private val clockMillis: () -> Long = { System.currentTimeMillis() },
+    private val trustedOfflineClock: TrustedOfflineClock? = null,
+    private val deviceId: String? = null,
 ) {
     private val runCounter = AtomicLong(0L)
     private val _lastRunSummary = MutableStateFlow<SyncRunSummary?>(null)
@@ -110,7 +117,8 @@ class SyncManager(
             ) { SyncResult.Retry("Perangkat sedang offline.") }
         }
 
-        val forceHealthRefresh = backendHealthMonitor.status.value == BackendStatus.UNREACHABLE
+        val needsClockCalibration = trustedOfflineClock != null && !trustedOfflineClock.hasValidAnchor()
+        val forceHealthRefresh = backendHealthMonitor.status.value == BackendStatus.UNREACHABLE || needsClockCalibration
         if (backendHealthMonitor.refresh(force = forceHealthRefresh) != BackendStatus.CONNECTED) {
             return recordSummary(
                 ownerUserId = activeUserId,
@@ -131,9 +139,11 @@ class SyncManager(
                 offlineCashSessionSyncService.recoverStaleSyncingUnlocked(recoverAll = true)
                 offlineCheckoutSyncService.recoverStaleSyncingUnlocked(recoverAll = true)
                 offlineCashExpenseSyncService.recoverStaleSyncingUnlocked(recoverAll = true)
+                recoverEligibleLegacyTimeConflictsUnlocked(activeUserId)
 
                 var totalProcessed = 0
                 var completedAllBatches = false
+                var minDeferredRetryAfterSeconds: Long? = null
                 val deferredSessionIds = mutableSetOf<Long>()
                 val failedTxIds = mutableSetOf<Long>()
                 val failedExpenseIds = mutableSetOf<Long>()
@@ -211,7 +221,11 @@ class SyncManager(
                                 excludeLocalIds = failedTxIds,
                                 cashierUserId = activeUserId,
                             )
-                            failedTxIds += txResult.failedLocalIds
+                            failedTxIds += txResult.failedLocalIds + txResult.deferredLocalIds
+                            minDeferredRetryAfterSeconds = minNullableSeconds(
+                                minDeferredRetryAfterSeconds,
+                                txResult.minDeferredRetryAfterSeconds,
+                            )
                             totalSucceeded += txResult.successCount
                             totalFailed += txResult.failedCount
                             if (txResult.hasAuthFailure) {
@@ -249,7 +263,11 @@ class SyncManager(
                                 excludeLocalIds = failedExpenseIds,
                                 cashierUserId = activeUserId,
                             )
-                            failedExpenseIds += expResult.failedLocalIds
+                            failedExpenseIds += expResult.failedLocalIds + expResult.deferredLocalIds
+                            minDeferredRetryAfterSeconds = minNullableSeconds(
+                                minDeferredRetryAfterSeconds,
+                                expResult.minDeferredRetryAfterSeconds,
+                            )
                             totalSucceeded += expResult.successCount
                             totalFailed += expResult.failedCount
                             if (expResult.hasAuthFailure) {
@@ -348,7 +366,11 @@ class SyncManager(
                             excludeLocalIds = failedTxIds,
                             cashierUserId = activeUserId,
                         )
-                        failedTxIds += orphanTxResult.failedLocalIds
+                        failedTxIds += orphanTxResult.failedLocalIds + orphanTxResult.deferredLocalIds
+                        minDeferredRetryAfterSeconds = minNullableSeconds(
+                            minDeferredRetryAfterSeconds,
+                            orphanTxResult.minDeferredRetryAfterSeconds,
+                        )
                         totalSucceeded += orphanTxResult.successCount
                         totalFailed += orphanTxResult.failedCount
                         if (orphanTxResult.hasAuthFailure) {
@@ -385,7 +407,11 @@ class SyncManager(
                             excludeLocalIds = failedExpenseIds,
                             cashierUserId = activeUserId,
                         )
-                        failedExpenseIds += orphanExpResult.failedLocalIds
+                        failedExpenseIds += orphanExpResult.failedLocalIds + orphanExpResult.deferredLocalIds
+                        minDeferredRetryAfterSeconds = minNullableSeconds(
+                            minDeferredRetryAfterSeconds,
+                            orphanExpResult.minDeferredRetryAfterSeconds,
+                        )
                         totalSucceeded += orphanExpResult.successCount
                         totalFailed += orphanExpResult.failedCount
                         if (orphanExpResult.hasAuthFailure) {
@@ -425,7 +451,8 @@ class SyncManager(
                         break
                     }
                 }
-                if (totalSucceeded > 0 || totalFailed == 0) {
+                val remainingUnsynced = countRemainingUnsyncedWork(activeUserId)
+                if (totalSucceeded > 0 || remainingUnsynced == 0) {
                     localAppSettingsDataSource.setLastSuccessfulSyncAt(activeUserId, clockMillis())
                 }
                 val hasMorePending = !completedAllBatches && hasRemainingPendingWork(activeUserId)
@@ -442,6 +469,7 @@ class SyncManager(
                         hasMorePending = hasMorePending,
                         successCount = totalSucceeded,
                         failedCount = totalFailed,
+                        deferredRetryAfterSeconds = minDeferredRetryAfterSeconds,
                     )
                 }
             }
@@ -479,6 +507,214 @@ class SyncManager(
         return buildResult()
     }
 
+    private suspend fun countRemainingUnsyncedWork(cashierUserId: String): Int {
+        return database.cashSessionDao().countAllUnsyncedForUser(cashierUserId = cashierUserId) +
+            database.transactionDao().countAllUnsyncedForUser(cashierUserId = cashierUserId) +
+            database.cashExpenseDao().countAllUnsyncedForUser(cashierUserId = cashierUserId)
+    }
+
+    private suspend fun recoverEligibleLegacyTimeConflictsUnlocked(activeUserId: String): Int {
+        val trustedNow = trustedOfflineClock?.readValidNowMillis() ?: return 0
+        val candidates = database.syncQueueDao().getByStatusAndErrorCode(
+            status = SyncStatus.CONFLICT,
+            errorCode = OfflineTimeConflictPolicy.CODE_OFFLINE_OCCURRED_AT_INVALID,
+            limit = MAX_LEGACY_RECOVERY_SCAN_LIMIT,
+        )
+        if (candidates.isEmpty()) return 0
+
+        var recoveredCount = 0
+        for (queue in candidates) {
+            when (queue.entityType) {
+                SyncEntityType.CASH_EXPENSE -> {
+                    val expense = database.cashExpenseDao().getByLocalId(queue.entityLocalId) ?: continue
+                    if (expense.deletedAt != null) continue
+                    val sessionLocalId = expense.cashSessionLocalId ?: continue
+                    val session = database.cashSessionDao().getByLocalId(sessionLocalId) ?: continue
+                    if (session.deletedAt != null) continue
+                    val owner = session.cashierUserId.trim().takeIf(String::isNotBlank)
+                    if (owner != null && owner != activeUserId) continue
+                    if (!OfflineTimeConflictPolicy.isLegacyConflictEligibleForAutoRecovery(
+                            errorCode = queue.lastErrorCode,
+                            occurredAtMillis = expense.occurredAt,
+                            sessionOpenedAtMillis = session.openedAt,
+                            sessionServerId = session.serverId,
+                            trustedNowMillis = trustedNow,
+                        )
+                    ) {
+                        continue
+                    }
+                    if (localAppSettingsDataSource.isTimeConflictAlreadyRecovered(
+                            entityType = queue.entityType.name,
+                            clientGeneratedId = expense.clientGeneratedId,
+                        )
+                    ) {
+                        continue
+                    }
+                    val recovered = database.withTransaction {
+                        if (localAppSettingsDataSource.isTimeConflictAlreadyRecovered(
+                                entityType = queue.entityType.name,
+                                clientGeneratedId = expense.clientGeneratedId,
+                            )
+                        ) {
+                            return@withTransaction false
+                        }
+                        database.cashExpenseDao().updateSyncStatus(
+                            localId = expense.localId,
+                            status = SyncStatus.PENDING,
+                            syncedAt = null,
+                            updatedAt = trustedNow,
+                        )
+                        database.syncQueueDao().updateStatus(
+                            id = queue.id,
+                            status = SyncStatus.PENDING,
+                            lastError = null,
+                            lastErrorCode = null,
+                            retryIncrement = 0,
+                            updatedAt = trustedNow,
+                        )
+                        localAppSettingsDataSource.markTimeConflictRecovered(
+                            entityType = queue.entityType.name,
+                            clientGeneratedId = expense.clientGeneratedId,
+                            recoveredAtMillis = trustedNow,
+                        )
+                        database.localAuditLogDao().upsert(
+                            LocalAuditLogEntity(
+                                clientGeneratedId = LocalIdGenerator.clientGeneratedId("AUDIT"),
+                                deviceId = expense.deviceId ?: deviceId,
+                                actorUserId = activeUserId,
+                                action = ACTION_AUTO_RECOVER_TIME_CONFLICT,
+                                tableName = "sales.cash_expenses",
+                                recordId = expense.clientGeneratedId,
+                                description = "Pemulihan otomatis konflik waktu pengeluaran kas ke PENDING",
+                                metadataJson = buildJsonObject {
+                                    put("entityType", queue.entityType.name)
+                                    put("entityLocalId", expense.localId)
+                                    put("queueId", queue.id)
+                                    put("clientGeneratedId", expense.clientGeneratedId)
+                                    put("occurredAt", expense.occurredAt)
+                                    put("sessionOpenedAt", session.openedAt)
+                                    put("sessionServerId", session.serverId.orEmpty())
+                                    put("trustedNow", trustedNow)
+                                    put("previousErrorCode", queue.lastErrorCode.orEmpty())
+                                }.toString(),
+                                occurredAt = trustedNow,
+                                syncStatus = SyncStatus.PENDING,
+                                createdAt = trustedNow,
+                                updatedAt = trustedNow,
+                            )
+                        )
+                        true
+                    }
+                    if (recovered) recoveredCount += 1
+                }
+
+                SyncEntityType.TRANSACTION -> {
+                    val tx = database.transactionDao().getByLocalId(queue.entityLocalId) ?: continue
+                    if (tx.deletedAt != null) continue
+                    val sessionLocalId = tx.cashSessionLocalId ?: continue
+                    val session = database.cashSessionDao().getByLocalId(sessionLocalId) ?: continue
+                    if (session.deletedAt != null) continue
+                    val owner = (tx.cashierUserId ?: session.cashierUserId).trim().takeIf(String::isNotBlank)
+                    if (owner != null && owner != activeUserId) continue
+                    if (!OfflineTimeConflictPolicy.isLegacyConflictEligibleForAutoRecovery(
+                            errorCode = queue.lastErrorCode,
+                            occurredAtMillis = tx.occurredAt,
+                            sessionOpenedAtMillis = session.openedAt,
+                            sessionServerId = session.serverId,
+                            trustedNowMillis = trustedNow,
+                        )
+                    ) {
+                        continue
+                    }
+                    if (localAppSettingsDataSource.isTimeConflictAlreadyRecovered(
+                            entityType = queue.entityType.name,
+                            clientGeneratedId = tx.clientGeneratedId,
+                        )
+                    ) {
+                        continue
+                    }
+                    val recovered = database.withTransaction {
+                        if (localAppSettingsDataSource.isTimeConflictAlreadyRecovered(
+                                entityType = queue.entityType.name,
+                                clientGeneratedId = tx.clientGeneratedId,
+                            )
+                        ) {
+                            return@withTransaction false
+                        }
+                        database.transactionDao().updateSyncStatus(
+                            localId = tx.localId,
+                            status = SyncStatus.PENDING,
+                            syncedAt = null,
+                            updatedAt = trustedNow,
+                        )
+                        database.transactionItemDao().markTransactionItemsFailed(
+                            transactionLocalId = tx.localId,
+                            status = SyncStatus.PENDING,
+                            syncedStatus = SyncStatus.SYNCED,
+                            updatedAt = trustedNow,
+                        )
+                        database.paymentDao().markPaymentsFailed(
+                            transactionLocalId = tx.localId,
+                            status = SyncStatus.PENDING,
+                            syncedStatus = SyncStatus.SYNCED,
+                            updatedAt = trustedNow,
+                        )
+                        database.receivableDao().markReceivablesFailed(
+                            transactionLocalId = tx.localId,
+                            syncStatus = SyncStatus.PENDING,
+                            syncedStatus = SyncStatus.SYNCED,
+                            updatedAt = trustedNow,
+                        )
+                        database.syncQueueDao().updateStatus(
+                            id = queue.id,
+                            status = SyncStatus.PENDING,
+                            lastError = null,
+                            lastErrorCode = null,
+                            retryIncrement = 0,
+                            updatedAt = trustedNow,
+                        )
+                        localAppSettingsDataSource.markTimeConflictRecovered(
+                            entityType = queue.entityType.name,
+                            clientGeneratedId = tx.clientGeneratedId,
+                            recoveredAtMillis = trustedNow,
+                        )
+                        database.localAuditLogDao().upsert(
+                            LocalAuditLogEntity(
+                                clientGeneratedId = LocalIdGenerator.clientGeneratedId("AUDIT"),
+                                deviceId = tx.deviceId ?: deviceId,
+                                actorUserId = activeUserId,
+                                action = ACTION_AUTO_RECOVER_TIME_CONFLICT,
+                                tableName = "sales.transactions",
+                                recordId = tx.clientGeneratedId,
+                                description = "Pemulihan otomatis konflik waktu transaksi ke PENDING",
+                                metadataJson = buildJsonObject {
+                                    put("entityType", queue.entityType.name)
+                                    put("entityLocalId", tx.localId)
+                                    put("queueId", queue.id)
+                                    put("clientGeneratedId", tx.clientGeneratedId)
+                                    put("occurredAt", tx.occurredAt)
+                                    put("sessionOpenedAt", session.openedAt)
+                                    put("sessionServerId", session.serverId.orEmpty())
+                                    put("trustedNow", trustedNow)
+                                    put("previousErrorCode", queue.lastErrorCode.orEmpty())
+                                }.toString(),
+                                occurredAt = trustedNow,
+                                syncStatus = SyncStatus.PENDING,
+                                createdAt = trustedNow,
+                                updatedAt = trustedNow,
+                            )
+                        )
+                        true
+                    }
+                    if (recovered) recoveredCount += 1
+                }
+
+                else -> Unit
+            }
+        }
+        return recoveredCount
+    }
+
     private suspend fun hasRemainingPendingWork(cashierUserId: String?): Boolean {
         return database.cashSessionDao().countPendingOpenSessions(cashierUserId = cashierUserId) > 0 ||
             database.transactionDao().countPendingTransactions(cashierUserId = cashierUserId) > 0 ||
@@ -489,7 +725,9 @@ class SyncManager(
     private companion object {
         const val MAX_BATCHES_PER_RUN = 10
         const val MAX_SESSION_SCAN_LIMIT = 50
+        const val MAX_LEGACY_RECOVERY_SCAN_LIMIT = 100
         const val CASH_SESSION_CLOSED = "CLOSED"
+        const val ACTION_AUTO_RECOVER_TIME_CONFLICT = "AUTO_RECOVER_TIME_CONFLICT"
     }
 }
 
@@ -499,6 +737,7 @@ sealed interface SyncResult {
         val hasMorePending: Boolean = false,
         val successCount: Int = processedCount,
         val failedCount: Int = 0,
+        val deferredRetryAfterSeconds: Long? = null,
     ) : SyncResult
     data class Skipped(val reason: String) : SyncResult
     data class Retry(

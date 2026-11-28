@@ -30,7 +30,7 @@ data class LocalCheckoutCommand(
     val paidAmount: BigDecimal,
     val remainingAmount: BigDecimal? = null,
     val items: List<LocalCheckoutItemCommand>,
-    val occurredAt: Long = System.currentTimeMillis(),
+    val occurredAt: Long? = null,
     val note: String? = null
 )
 

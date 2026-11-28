@@ -25,6 +25,7 @@ import com.tbterminal.app.data.repository.CashierSyncItemKind
 import com.tbterminal.app.data.repository.CashierSyncItemStatus
 import com.tbterminal.app.data.repository.CashierSyncItemUi
 import com.tbterminal.app.data.sync.BackendStatus
+import com.tbterminal.app.ui.cashier.sync.components.CashierClockWarningBanner
 import com.tbterminal.app.ui.cashier.sync.components.CashierSyncEmptyCard
 import com.tbterminal.app.ui.cashier.sync.components.CashierSyncItemCard
 import com.tbterminal.app.ui.cashier.sync.components.CashierSyncStatusCard
@@ -72,6 +73,15 @@ fun CashierSyncScreen(
                     item {
                         OfflineSessionAgeBanner(
                             alert = alert,
+                            modifier = Modifier.fillMaxWidth(),
+                        )
+                    }
+                }
+
+                uiState.clockWarning?.let { warning ->
+                    item {
+                        CashierClockWarningBanner(
+                            warning = warning,
                             modifier = Modifier.fillMaxWidth(),
                         )
                     }

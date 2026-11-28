@@ -425,9 +425,15 @@ class CashierTransactionHistoryViewModel(
                     }
                     loadTransactions(page = 1)
                 }
+                is OfflineCheckoutSyncResult.Deferred,
                 is OfflineCheckoutSyncResult.Failed -> {
+                    val message = when (result) {
+                        is OfflineCheckoutSyncResult.Deferred -> result.message
+                        is OfflineCheckoutSyncResult.Failed -> result.message
+                        is OfflineCheckoutSyncResult.Success -> null
+                    }
                     _uiState.update {
-                        it.copy(localSyncMessage = result.message)
+                        it.copy(localSyncMessage = message)
                     }
                 }
             }

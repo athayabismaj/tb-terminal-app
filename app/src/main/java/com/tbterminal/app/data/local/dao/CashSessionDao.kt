@@ -399,6 +399,19 @@ interface CashSessionDao {
 
     @Query(
         """
+        SELECT COUNT(*) FROM local_cash_sessions
+        WHERE deletedAt IS NULL
+          AND syncStatus != :syncedStatus
+          AND (:cashierUserId IS NULL OR cashierUserId = :cashierUserId)
+        """
+    )
+    suspend fun countAllUnsyncedForUser(
+        cashierUserId: String?,
+        syncedStatus: SyncStatus = SyncStatus.SYNCED,
+    ): Int
+
+    @Query(
+        """
         UPDATE local_cash_sessions
         SET status = :closedStatus,
             closedAt = COALESCE(closedAt, :closedAt),
