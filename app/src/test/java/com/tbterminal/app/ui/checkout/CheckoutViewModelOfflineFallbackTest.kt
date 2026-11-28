@@ -57,6 +57,7 @@ import com.tbterminal.app.data.model.TransactionVoidResult
 import com.tbterminal.app.data.model.UpdateProductCommand
 import com.tbterminal.app.data.remote.HealthApi
 import com.tbterminal.app.data.remote.HealthResponseDto
+import com.tbterminal.app.data.remote.PreDispatchIOException
 import com.tbterminal.app.data.repository.CashReconciliationRepository
 import com.tbterminal.app.data.repository.CheckoutRepository
 import com.tbterminal.app.data.repository.CustomerRepository
@@ -67,6 +68,7 @@ import com.tbterminal.app.data.sync.BackendStatus
 import com.tbterminal.app.data.sync.NetworkConnectivity
 import com.tbterminal.app.data.sync.OfflineStatusRepository
 import com.tbterminal.app.ui.common.UiText
+import java.io.EOFException
 import java.io.IOException
 import java.math.BigDecimal
 import java.net.ConnectException
@@ -411,7 +413,7 @@ class CheckoutViewModelOfflineFallbackTest {
             assertNull(cashSessionLocalDataSource.getLatestOpenSession("kasir-1"))
         }
 
-        // Definitely unprocessed errors (HTTP_502, NETWORK_UNAVAILABLE, ConnectException) -> DO fallback locally
+        // Definitely unprocessed errors (HTTP_502, NETWORK_UNAVAILABLE, ConnectException, CONNECT_TIMEOUT, PreDispatchIOException) -> DO fallback locally
         backendHealthMonitor.markConnected()
         cashRepo.openSessionResult = RepositoryResult.Exception(ConnectException("Connection refused"))
         vm.onStartingCashChanged("150000")
@@ -419,6 +421,61 @@ class CheckoutViewModelOfflineFallbackTest {
         advanceUntilIdle()
 
         assertTrue(vm.uiState.value.hasActiveCashSession)
+        assertNotNull(cashSessionLocalDataSource.getLatestOpenSession("kasir-1"))
+    }
+
+    @Test
+    fun openCashSession_preflightReadinessFailureSkipsOnlineMutation_andConnectTimeoutFallsBackLocally() = runTest(dispatcher) {
+        // 1. Fresh CONNECTED cache, then readiness probe fails (e.g. adb reverse down -> 503/EOF) -> opens locally with 0 online openSession calls
+        backendHealthMonitor.refresh(force = true)
+        val cashRepo = FakeOfflineFallbackCashRepo().apply {
+            activeSessionResult = RepositoryResult.Success(null)
+        }
+        val vm = buildVm(cashRepo = cashRepo, actorRole = "KASIR")
+        advanceUntilIdle()
+
+        healthApi.nextResponse = Response.error(503, "down".toResponseBody())
+        val readinessBefore = healthApi.calls
+        vm.onStartingCashChanged("150000")
+        vm.openCashSession()
+        advanceUntilIdle()
+
+        assertEquals(readinessBefore + 1, healthApi.calls)
+        assertEquals(0, cashRepo.openSessionCalls)
+        assertTrue(vm.uiState.value.hasActiveCashSession)
+        assertNotNull(cashSessionLocalDataSource.getLatestOpenSession("kasir-1"))
+
+        // 2. Clean local DB + fresh CONNECTED, server connect timeout (CONNECT_TIMEOUT) -> falls back locally
+        database.openHelper.writableDatabase.execSQL("DELETE FROM local_cash_sessions")
+        healthApi.nextResponse = Response.success(HealthResponseDto(status = "ready", database = "up"))
+        backendHealthMonitor.refresh(force = true)
+        cashRepo.openSessionCalls = 0
+        cashRepo.openSessionResult = RepositoryResult.Error("CONNECT_TIMEOUT", "Koneksi bermasalah")
+        val vm2 = buildVm(cashRepo = cashRepo, actorRole = "KASIR")
+        advanceUntilIdle()
+
+        vm2.onStartingCashChanged("150000")
+        vm2.openCashSession()
+        advanceUntilIdle()
+
+        assertEquals(1, cashRepo.openSessionCalls)
+        assertTrue(vm2.uiState.value.hasActiveCashSession)
+        assertNotNull(cashSessionLocalDataSource.getLatestOpenSession("kasir-1"))
+
+        // 3. Clean local DB + PreDispatchIOException(EOFException) -> falls back locally
+        database.openHelper.writableDatabase.execSQL("DELETE FROM local_cash_sessions")
+        backendHealthMonitor.markConnected()
+        cashRepo.openSessionCalls = 0
+        cashRepo.openSessionResult = RepositoryResult.Exception(PreDispatchIOException(EOFException("dropped before headers")))
+        val vm3 = buildVm(cashRepo = cashRepo, actorRole = "KASIR")
+        advanceUntilIdle()
+
+        vm3.onStartingCashChanged("150000")
+        vm3.openCashSession()
+        advanceUntilIdle()
+
+        assertEquals(1, cashRepo.openSessionCalls)
+        assertTrue(vm3.uiState.value.hasActiveCashSession)
         assertNotNull(cashSessionLocalDataSource.getLatestOpenSession("kasir-1"))
     }
 
@@ -693,7 +750,11 @@ private class FakeCheckoutConnectivity(initial: Boolean) : NetworkConnectivity {
 private class FakeCheckoutHealthApi(
     var nextResponse: Response<HealthResponseDto>,
 ) : HealthApi {
-    override suspend fun getReadiness(): Response<HealthResponseDto> = nextResponse
+    var calls = 0
+    override suspend fun getReadiness(): Response<HealthResponseDto> {
+        calls++
+        return nextResponse
+    }
 }
 
 private class FakeOfflineFallbackCheckoutRepo : CheckoutRepository {
@@ -752,6 +813,7 @@ private class FakeOfflineFallbackCheckoutRepo : CheckoutRepository {
 }
 
 private class FakeOfflineFallbackCashRepo : CashReconciliationRepository {
+    var openSessionCalls = 0
     var activeSessionResult: RepositoryResult<CashSession?> = RepositoryResult.Success(
         CashSession(
             id = "srv-sess-1",
@@ -771,7 +833,10 @@ private class FakeOfflineFallbackCashRepo : CashReconciliationRepository {
     var openSessionResult: RepositoryResult<CashSession> = RepositoryResult.Error("CONNECTION_FAILED", "Koneksi bermasalah")
 
     override suspend fun getActiveSession(): RepositoryResult<CashSession?> = activeSessionResult
-    override suspend fun openSession(startingCash: BigDecimal): RepositoryResult<CashSession> = openSessionResult
+    override suspend fun openSession(startingCash: BigDecimal): RepositoryResult<CashSession> {
+        openSessionCalls++
+        return openSessionResult
+    }
     override suspend fun getSessions(page: Int, limit: Int, status: String?, startDate: String?, endDate: String?): RepositoryResult<CashSessionPage> = error("unused")
     override suspend fun getSessionById(id: String): RepositoryResult<CashSession> = error("unused")
     override suspend fun closeSession(endingCashPhysical: BigDecimal, notes: String?): RepositoryResult<CashSession> = error("unused")

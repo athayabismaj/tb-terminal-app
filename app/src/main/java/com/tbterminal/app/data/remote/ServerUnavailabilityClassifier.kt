@@ -19,6 +19,7 @@ import java.util.Locale
 object ServerUnavailabilityClassifier {
     private val TRANSPORT_AND_GATEWAY_CODES = setOf(
         "CONNECTION_FAILED",
+        "CONNECT_TIMEOUT",
         "CONNECTION_INTERRUPTED",
         "NETWORK_UNAVAILABLE",
         "NETWORK_TIMEOUT",
@@ -32,6 +33,7 @@ object ServerUnavailabilityClassifier {
 
     private val PRE_DISPATCH_UNAVAILABLE_CODES = setOf(
         "CONNECTION_FAILED",
+        "CONNECT_TIMEOUT",
         "NETWORK_UNAVAILABLE",
         "HTTP_502",
         "HTTP_503",
@@ -80,7 +82,8 @@ object ServerUnavailabilityClassifier {
 
     private fun isDefinitelyUnprocessedThrowable(throwable: Throwable?): Boolean {
         return hasCauseMatching(throwable) {
-            it is ConnectException ||
+            it is PreDispatchIOException ||
+                it is ConnectException ||
                 it is UnknownHostException ||
                 it is NoRouteToHostException
         }

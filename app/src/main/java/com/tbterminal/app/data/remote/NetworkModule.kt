@@ -126,9 +126,13 @@ class NetworkModule(
             .create(TokenRefreshApi::class.java)
     }
 
+    private val preDispatchTracker = PreDispatchRequestTracker()
+
     val okHttpClient: OkHttpClient by lazy {
         OkHttpClient.Builder()
             .applyStandardTimeouts()
+            .eventListenerFactory(preDispatchTracker.eventListenerFactory)
+            .addInterceptor(preDispatchTracker.interceptor)
             .addInterceptor(devAutoHostInterceptor)
             .addInterceptor(AuthInterceptor(tokenStore))
             .authenticator(RefreshTokenAuthenticator(tokenStore, sessionManager, refreshApi))

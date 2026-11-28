@@ -452,7 +452,7 @@ class CheckoutViewModel(
                 state.copy(isOpeningCashSession = true, cashSessionError = null)
             }
 
-            if (!hasAmbiguousOpenCashSession && shouldUseLocalCheckout()) {
+            if (!hasAmbiguousOpenCashSession && shouldUseLocalForMutation()) {
                 openOrReuseLocalCashSession(startingCash)
                 return@launch
             }
@@ -2674,6 +2674,30 @@ class CheckoutViewModel(
                 refreshedStatus != BackendStatus.CONNECTED
             }
         }
+    }
+
+    /**
+     * Pre-flight check for cash mutations: trusts fresh UNREACHABLE without probing,
+     * otherwise runs a quick /api/readiness probe so dead local forwards (e.g. adb reverse)
+     * switch to the local path before sending the mutation request.
+     */
+    private suspend fun shouldUseLocalForMutation(): Boolean {
+        val repository = offlineStatusRepository ?: return false
+        if (!repository.isOnline()) return true
+        val status = latestOfflineStatus
+        if (status.appDataMode == AppDataMode.OFFLINE_ONLY) return true
+        if (!status.isOnline || !status.isInternetOnline || status.internetStatus == InternetStatus.OFFLINE) {
+            return true
+        }
+        if (repository.currentBackendStatus() == BackendStatus.UNREACHABLE && !repository.isBackendHealthStale()) {
+            return true
+        }
+        val refreshedStatus = repository.refreshBackendHealth(force = true)
+        latestOfflineStatus = status.copy(
+            backendStatus = refreshedStatus,
+            isServerReachable = refreshedStatus == BackendStatus.CONNECTED
+        )
+        return refreshedStatus != BackendStatus.CONNECTED
     }
 
     private fun markBackendUnreachableAndSyncState() {

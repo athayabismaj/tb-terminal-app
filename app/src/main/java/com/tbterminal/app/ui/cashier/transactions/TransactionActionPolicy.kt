@@ -65,6 +65,7 @@ internal fun isAmbiguousTransactionActionError(code: String): Boolean =
         "NETWORK_TIMEOUT",
         "NETWORK_UNAVAILABLE",
         "CONNECTION_FAILED",
+        "CONNECT_TIMEOUT",
         "CONNECTION_INTERRUPTED",
         "INVALID_RESPONSE",
         "EMPTY_BODY",

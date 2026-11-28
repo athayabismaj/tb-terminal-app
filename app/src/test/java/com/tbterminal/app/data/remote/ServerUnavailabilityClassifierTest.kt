@@ -1,6 +1,7 @@
 package com.tbterminal.app.data.remote
 
 import com.tbterminal.app.data.repository.RepositoryResult
+import java.io.EOFException
 import java.io.IOException
 import java.net.ConnectException
 import java.net.NoRouteToHostException
@@ -16,6 +17,7 @@ class ServerUnavailabilityClassifierTest {
     fun transportAndGateway502To504AreClassifiedAsServerUnavailable() {
         val unavailableCodes = listOf(
             "CONNECTION_FAILED",
+            "CONNECT_TIMEOUT",
             "CONNECTION_INTERRUPTED",
             "NETWORK_UNAVAILABLE",
             "NETWORK_TIMEOUT",
@@ -76,6 +78,7 @@ class ServerUnavailabilityClassifierTest {
     fun definitelyUnprocessedServerUnavailable_excludesAmbiguousTimeoutsAnd504() {
         listOf(
             "CONNECTION_FAILED",
+            "CONNECT_TIMEOUT",
             "NETWORK_UNAVAILABLE",
             "HTTP_502",
             "HTTP_503",
@@ -119,6 +122,16 @@ class ServerUnavailabilityClassifierTest {
         assertTrue(
             ServerUnavailabilityClassifier.isDefinitelyUnprocessedServerUnavailable(
                 RepositoryResult.Exception(NoRouteToHostException("no route"))
+            )
+        )
+        assertTrue(
+            ServerUnavailabilityClassifier.isDefinitelyUnprocessedServerUnavailable(
+                RepositoryResult.Exception(PreDispatchIOException(SocketTimeoutException("connect timed out")))
+            )
+        )
+        assertTrue(
+            ServerUnavailabilityClassifier.isDefinitelyUnprocessedServerUnavailable(
+                RepositoryResult.Exception(PreDispatchIOException(EOFException("dropped before headers")))
             )
         )
         assertFalse(

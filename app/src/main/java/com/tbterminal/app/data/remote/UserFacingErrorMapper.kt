@@ -93,6 +93,7 @@ internal object UserFacingErrorMapper {
     private val NETWORK_CODES = setOf(
         "NETWORK_UNAVAILABLE",
         "CONNECTION_FAILED",
+        "CONNECT_TIMEOUT",
         "CONNECTION_INTERRUPTED",
     )
     private val INVALID_RESPONSE_CODES = setOf("INVALID_RESPONSE", "EMPTY_BODY")

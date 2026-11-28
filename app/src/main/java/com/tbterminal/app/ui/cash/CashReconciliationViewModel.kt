@@ -230,7 +230,7 @@ class CashReconciliationViewModel(
         viewModelScope.launch {
             _uiState.update { it.copy(isSubmitting = true, errorMessage = null, message = null) }
 
-            if (!hasAmbiguousOpenSessionSubmit && shouldUseLocalCashSession()) {
+            if (!hasAmbiguousOpenSessionSubmit && shouldUseLocalForMutation()) {
                 openLocalSession(startingCash)
                 return@launch
             }
@@ -525,7 +525,7 @@ class CashReconciliationViewModel(
         viewModelScope.launch {
             _uiState.update { it.copy(isSubmitting = true, errorMessage = null, message = null) }
 
-            if (_uiState.value.isUsingLocalActiveSession || (!hasAmbiguousPettyCashSubmit && shouldUseLocalCashSession())) {
+            if (_uiState.value.isUsingLocalActiveSession || (!hasAmbiguousPettyCashSubmit && shouldUseLocalForMutation())) {
                 addLocalCashMovement(type, amount, cat, desc)
                 return@launch
             }
@@ -829,6 +829,27 @@ class CashReconciliationViewModel(
                 refreshed != BackendStatus.CONNECTED
             }
         }
+    }
+
+    /**
+     * Pre-flight check for cash mutations: trusts fresh UNREACHABLE without probing,
+     * otherwise runs a quick /api/readiness probe so dead local forwards (e.g. adb reverse)
+     * switch to the local path before sending the mutation request.
+     */
+    private suspend fun shouldUseLocalForMutation(): Boolean {
+        val repository = offlineStatusRepository ?: return false
+        val status = latestOfflineStatus
+        if (status.appDataMode == AppDataMode.OFFLINE_ONLY) return true
+        if (!repository.isOnline()) return true
+        if (repository.currentBackendStatus() == BackendStatus.UNREACHABLE && !repository.isBackendHealthStale()) {
+            return true
+        }
+        val refreshed = repository.refreshBackendHealth(force = true)
+        latestOfflineStatus = status.copy(
+            backendStatus = refreshed,
+            isServerReachable = refreshed == BackendStatus.CONNECTED,
+        )
+        return refreshed != BackendStatus.CONNECTED
     }
 
     private fun markBackendUnreachableAndSyncState() {

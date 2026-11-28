@@ -73,6 +73,13 @@ private inline fun <T> executeSafeCall(
         block()
     } catch (cancellation: CancellationException) {
         throw cancellation
+    } catch (preDispatch: PreDispatchIOException) {
+        val code = when (preDispatch.cause) {
+            is UnknownHostException -> "NETWORK_UNAVAILABLE"
+            is SocketTimeoutException -> "CONNECT_TIMEOUT"
+            else -> "CONNECTION_FAILED"
+        }
+        NetworkResult.Error(code, UserFacingErrorMapper.message(code = code))
     } catch (timeout: SocketTimeoutException) {
         NetworkResult.Error("NETWORK_TIMEOUT", UserFacingErrorMapper.message(code = "NETWORK_TIMEOUT"))
     } catch (unknownHost: UnknownHostException) {

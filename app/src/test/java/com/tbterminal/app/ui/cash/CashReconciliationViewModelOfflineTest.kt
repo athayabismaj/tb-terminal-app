@@ -27,12 +27,14 @@ import com.tbterminal.app.data.model.TransactionRefundResult
 import com.tbterminal.app.data.model.TransactionVoidResult
 import com.tbterminal.app.data.remote.HealthApi
 import com.tbterminal.app.data.remote.HealthResponseDto
+import com.tbterminal.app.data.remote.PreDispatchIOException
 import com.tbterminal.app.data.repository.CashReconciliationRepository
 import com.tbterminal.app.data.repository.RepositoryResult
 import com.tbterminal.app.data.sync.BackendHealthMonitor
 import com.tbterminal.app.data.sync.BackendStatus
 import com.tbterminal.app.data.sync.NetworkConnectivity
 import com.tbterminal.app.data.sync.OfflineStatusRepository
+import java.io.EOFException
 import java.io.IOException
 import java.math.BigDecimal
 import java.net.ConnectException
@@ -69,11 +71,19 @@ class CashReconciliationViewModelOfflineTest {
     private lateinit var localCashExpenseService: LocalCashExpenseService
     private lateinit var backendHealthMonitor: BackendHealthMonitor
     private lateinit var offlineStatusRepository: OfflineStatusRepository
+    private var readinessCalls = 0
+    private var readinessResponder: suspend () -> Response<HealthResponseDto> = {
+        Response.success(HealthResponseDto(status = "ready", database = "up"))
+    }
     private var nowMillis = 1_800_000_000_000L
 
     @Before
     fun setUp() {
         Dispatchers.setMain(dispatcher)
+        readinessCalls = 0
+        readinessResponder = {
+            Response.success(HealthResponseDto(status = "ready", database = "up"))
+        }
         val context = ApplicationProvider.getApplicationContext<Context>()
         database = Room.inMemoryDatabaseBuilder(context, TbTerminalDatabase::class.java)
             .allowMainThreadQueries()
@@ -90,8 +100,10 @@ class CashReconciliationViewModelOfflineTest {
         }
         backendHealthMonitor = BackendHealthMonitor(
             healthApi = object : HealthApi {
-                override suspend fun getReadiness(): Response<HealthResponseDto> =
-                    Response.success(HealthResponseDto(status = "ready", database = "up"))
+                override suspend fun getReadiness(): Response<HealthResponseDto> {
+                    readinessCalls++
+                    return readinessResponder()
+                }
             },
             networkMonitor = connectivity,
             throttleMillis = 30_000L,
@@ -581,6 +593,119 @@ class CashReconciliationViewModelOfflineTest {
         assertEquals("OPEN", cashSessionLocalDataSource.getCachedCashSessionByServerId("srv-cash-local-ex")?.status)
     }
 
+    @Test
+    fun preflightReadiness_skipsMutationRequestWhenFreshUnreachableOrReadinessProbeFails() = runTest(dispatcher) {
+        // 1. Fresh CONNECTED cache, then server dies behind adb reverse -> /api/readiness probe throws EOFException
+        backendHealthMonitor.refresh(force = true)
+        assertEquals(BackendStatus.CONNECTED, backendHealthMonitor.status.value)
+
+        val openRepo = FakeCashReconciliationOfflineRepo().apply {
+            activeSessionResult = RepositoryResult.Success(null)
+        }
+        val openVm = buildVm(openRepo)
+        advanceUntilIdle()
+
+        readinessResponder = { throw EOFException("adb reverse closed") }
+        val readinessBeforeOpen = readinessCalls
+        openVm.onOpeningCashChanged("100000")
+        openVm.openSession()
+        advanceUntilIdle()
+
+        assertEquals(readinessBeforeOpen + 1, readinessCalls)
+        assertEquals(0, openRepo.openSessionCalls)
+        assertTrue(openVm.uiState.value.hasActiveSession)
+        assertNotNull(cashSessionLocalDataSource.getLatestOpenSession("kasir-1"))
+        assertEquals(BackendStatus.UNREACHABLE, backendHealthMonitor.status.value)
+
+        // 2. Fresh UNREACHABLE -> skips readiness probe AND skips addExpense mutation call
+        val remoteOpenSession = CashSession(
+            id = "srv-preflight-expense",
+            userId = "kasir-1",
+            userName = "Kasir Satu",
+            openedAt = "2026-11-27T08:00:00+07:00",
+            closedAt = null,
+            openingCash = BigDecimal("250000"),
+            closingCash = null,
+            systemCash = BigDecimal("250000"),
+            difference = null,
+            totalExpenses = BigDecimal.ZERO,
+            notes = null,
+            status = "OPEN",
+        )
+        readinessResponder = { Response.success(HealthResponseDto(status = "ready", database = "up")) }
+        backendHealthMonitor.refresh(force = true)
+        val expenseRepo = FakeCashReconciliationOfflineRepo().apply {
+            activeSessionResult = RepositoryResult.Success(remoteOpenSession)
+        }
+        val expenseVm = buildVm(expenseRepo)
+        advanceUntilIdle()
+        val mirroredLocalId = expenseVm.uiState.value.localCashSessionId!!
+
+        backendHealthMonitor.markUnreachable()
+        val readinessBeforeExpense = readinessCalls
+        expenseVm.showPettyCashDialog(CashMovementType.CASH_OUT)
+        expenseVm.onPettyCashAmountChanged("15000")
+        expenseVm.onPettyCashDescriptionChanged("Parkir")
+        expenseVm.addPettyCash()
+        advanceUntilIdle()
+
+        assertEquals(readinessBeforeExpense, readinessCalls)
+        assertEquals(0, expenseRepo.addExpenseCalls)
+        assertEquals(1, localCashExpenseService.getLocalExpenses(mirroredLocalId).size)
+    }
+
+    @Test
+    fun preDispatchConnectTimeoutAndPreDispatchEof_fallbackLocallyOnOpenSessionAndExpense() = runTest(dispatcher) {
+        backendHealthMonitor.refresh(force = true)
+        val openRepo = FakeCashReconciliationOfflineRepo().apply {
+            activeSessionResult = RepositoryResult.Success(null)
+            openSessionResult = RepositoryResult.Error("CONNECT_TIMEOUT", "Koneksi bermasalah")
+        }
+        val openVm = buildVm(openRepo)
+        advanceUntilIdle()
+
+        openVm.onOpeningCashChanged("100000")
+        openVm.openSession()
+        advanceUntilIdle()
+
+        assertEquals(1, openRepo.openSessionCalls)
+        assertTrue(openVm.uiState.value.hasActiveSession)
+        assertNotNull(cashSessionLocalDataSource.getLatestOpenSession("kasir-1"))
+
+        val expenseRepo = FakeCashReconciliationOfflineRepo().apply {
+            activeSessionResult = RepositoryResult.Success(
+                CashSession(
+                    id = "srv-predispatch-exp",
+                    userId = "kasir-1",
+                    userName = "Kasir Satu",
+                    openedAt = "2026-11-27T08:00:00+07:00",
+                    closedAt = null,
+                    openingCash = BigDecimal("250000"),
+                    closingCash = null,
+                    systemCash = BigDecimal("250000"),
+                    difference = null,
+                    totalExpenses = BigDecimal.ZERO,
+                    notes = null,
+                    status = "OPEN",
+                )
+            )
+            addExpenseResult = RepositoryResult.Exception(PreDispatchIOException(EOFException("dropped before headers")))
+        }
+        backendHealthMonitor.markConnected()
+        val expenseVm = buildVm(expenseRepo)
+        advanceUntilIdle()
+        val mirroredLocalId = expenseVm.uiState.value.localCashSessionId!!
+
+        expenseVm.showPettyCashDialog(CashMovementType.CASH_OUT)
+        expenseVm.onPettyCashAmountChanged("20000")
+        expenseVm.onPettyCashDescriptionChanged("Bensin")
+        expenseVm.addPettyCash()
+        advanceUntilIdle()
+
+        assertEquals(1, expenseRepo.addExpenseCalls)
+        assertEquals(1, localCashExpenseService.getLocalExpenses(mirroredLocalId).size)
+    }
+
     private fun buildVm(repository: CashReconciliationRepository): CashReconciliationViewModel {
         return CashReconciliationViewModel(
             repository = repository,
@@ -597,15 +722,23 @@ class CashReconciliationViewModelOfflineTest {
 }
 
 private class FakeCashReconciliationOfflineRepo : CashReconciliationRepository {
+    var openSessionCalls = 0
+    var addExpenseCalls = 0
     var activeSessionResult: RepositoryResult<CashSession?> = RepositoryResult.Success(null)
     var openSessionResult: RepositoryResult<CashSession> = RepositoryResult.Error("CONNECTION_FAILED", "offline")
     var closeSessionResult: RepositoryResult<CashSession> = RepositoryResult.Error("CONNECTION_FAILED", "offline")
     var addExpenseResult: RepositoryResult<CashExpense> = RepositoryResult.Error("CONNECTION_FAILED", "offline")
 
     override suspend fun getActiveSession(): RepositoryResult<CashSession?> = activeSessionResult
-    override suspend fun openSession(startingCash: BigDecimal): RepositoryResult<CashSession> = openSessionResult
+    override suspend fun openSession(startingCash: BigDecimal): RepositoryResult<CashSession> {
+        openSessionCalls++
+        return openSessionResult
+    }
     override suspend fun closeSession(endingCashPhysical: BigDecimal, notes: String?): RepositoryResult<CashSession> = closeSessionResult
-    override suspend fun addExpense(amount: BigDecimal, description: String): RepositoryResult<CashExpense> = addExpenseResult
+    override suspend fun addExpense(amount: BigDecimal, description: String): RepositoryResult<CashExpense> {
+        addExpenseCalls++
+        return addExpenseResult
+    }
     override suspend fun getTransactions(page: Int, limit: Int, sessionId: String?, search: String?, receiptNumber: String?, cashierId: String?, customerId: String?, paymentMethod: String?, status: String?, startDate: String?, endDate: String?): RepositoryResult<CashTransactionPage> =
         RepositoryResult.Success(CashTransactionPage(emptyList(), 0L, page, limit, 1))
     override suspend fun getExpenses(sessionId: String): RepositoryResult<List<CashExpense>> =
