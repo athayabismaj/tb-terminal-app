@@ -89,11 +89,15 @@ class SharedPreferencesPinVerifierKeyValueStore(
     override fun putString(key: String, value: String): Boolean =
         preferences.edit().putString(key, value).commit()
 
-    override fun remove(key: String): Boolean =
-        preferences.edit().remove(key).commit()
+    override fun remove(key: String): Boolean {
+        preferences.edit().remove(key).apply()
+        return true
+    }
 
-    override fun clear(): Boolean =
-        preferences.edit().clear().commit()
+    override fun clear(): Boolean {
+        preferences.edit().clear().apply()
+        return true
+    }
 
     private companion object {
         const val PREFERENCES_NAME = "tb_terminal_pin_verifier_secure"

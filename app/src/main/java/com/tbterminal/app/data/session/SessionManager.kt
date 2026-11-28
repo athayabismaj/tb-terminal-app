@@ -48,13 +48,33 @@ class SharedPreferencesTokenStore(
     context: Context
 ) : TokenStore {
     private val preferences = context.getSharedPreferences(PREFERENCES_NAME, Context.MODE_PRIVATE)
+    private val cacheLock = Any()
+
+    @Volatile
+    private var hasStoredAccessTokenLoaded = false
+
+    @Volatile
+    private var cachedHasStoredAccessToken = false
+
+    @Volatile
+    private var sessionUserLoaded = false
+
+    @Volatile
+    private var cachedSessionUser: SessionUser? = null
 
     override fun readAccessToken(): String? {
         return readSecret(ACCESS_TOKEN_KEY)
     }
 
     override fun hasStoredAccessToken(): Boolean {
-        return !preferences.getString(ACCESS_TOKEN_KEY, null).isNullOrBlank()
+        if (hasStoredAccessTokenLoaded) return cachedHasStoredAccessToken
+        return synchronized(cacheLock) {
+            if (!hasStoredAccessTokenLoaded) {
+                cachedHasStoredAccessToken = !preferences.getString(ACCESS_TOKEN_KEY, null).isNullOrBlank()
+                hasStoredAccessTokenLoaded = true
+            }
+            cachedHasStoredAccessToken
+        }
     }
 
     override fun saveAccessToken(token: String) {
@@ -72,45 +92,65 @@ class SharedPreferencesTokenStore(
                 .putString(REFRESH_TOKEN_KEY, encrypt(refreshToken))
                 .commit()
         ) { "Token terenkripsi gagal disimpan" }
+        synchronized(cacheLock) {
+            cachedHasStoredAccessToken = accessToken.isNotBlank()
+            hasStoredAccessTokenLoaded = true
+        }
     }
 
     override fun readSessionUser(): SessionUser? {
-        val name = preferences.getString(USER_NAME_KEY, null)
-        val role = preferences.getString(USER_ROLE_KEY, null)
-        val userId = preferences.getString(USER_ID_KEY, null)
-        val username = preferences.getString(USER_USERNAME_KEY, null)
-        val email = preferences.getString(USER_EMAIL_KEY, null)
-        val isActive = preferences.getBoolean(USER_IS_ACTIVE_KEY, true)
-        val joinedAt = preferences.getString(USER_JOINED_AT_KEY, null)
-        val lastLoginAt = preferences.getString(USER_LAST_LOGIN_KEY, null)
+        if (sessionUserLoaded) return cachedSessionUser
+        return synchronized(cacheLock) {
+            if (!sessionUserLoaded) {
+                val name = preferences.getString(USER_NAME_KEY, null)
+                val role = preferences.getString(USER_ROLE_KEY, null)
+                val userId = preferences.getString(USER_ID_KEY, null)
+                val username = preferences.getString(USER_USERNAME_KEY, null)
+                val email = preferences.getString(USER_EMAIL_KEY, null)
+                val isActive = preferences.getBoolean(USER_IS_ACTIVE_KEY, true)
+                val joinedAt = preferences.getString(USER_JOINED_AT_KEY, null)
+                val lastLoginAt = preferences.getString(USER_LAST_LOGIN_KEY, null)
 
-        if (name.isNullOrBlank() || role.isNullOrBlank() || joinedAt.isNullOrBlank()) {
-            return null
+                cachedSessionUser = if (name.isNullOrBlank() || role.isNullOrBlank() || joinedAt.isNullOrBlank()) {
+                    null
+                } else {
+                    SessionUser(
+                        name = name,
+                        role = role,
+                        isActive = isActive,
+                        joinedAt = joinedAt,
+                        lastLoginAt = lastLoginAt,
+                        userId = userId?.takeIf(String::isNotBlank),
+                        username = username?.takeIf(String::isNotBlank),
+                        email = email?.takeIf(String::isNotBlank)
+                    )
+                }
+                sessionUserLoaded = true
+            }
+            cachedSessionUser
         }
-
-        return SessionUser(
-            name = name, 
-            role = role, 
-            isActive = isActive, 
-            joinedAt = joinedAt, 
-            lastLoginAt = lastLoginAt,
-            userId = userId?.takeIf(String::isNotBlank),
-            username = username?.takeIf(String::isNotBlank),
-            email = email?.takeIf(String::isNotBlank)
-        )
     }
 
     override fun saveSessionUser(user: SessionUser) {
+        val normalizedUserId = user.userId?.takeIf(String::isNotBlank)
+        val normalizedUsername = user.username?.takeIf(String::isNotBlank)
+        val normalizedEmail = user.email?.takeIf(String::isNotBlank)
+        val normalizedUser = user.copy(
+            userId = normalizedUserId,
+            username = normalizedUsername,
+            email = normalizedEmail,
+        )
+        synchronized(cacheLock) {
+            cachedSessionUser = normalizedUser
+            sessionUserLoaded = true
+        }
         preferences.edit().apply {
-            val normalizedUserId = user.userId?.takeIf(String::isNotBlank)
             if (normalizedUserId == null) {
                 remove(USER_ID_KEY)
             } else {
                 putString(USER_ID_KEY, normalizedUserId)
             }
-            val normalizedUsername = user.username?.takeIf(String::isNotBlank)
             if (normalizedUsername == null) remove(USER_USERNAME_KEY) else putString(USER_USERNAME_KEY, normalizedUsername)
-            val normalizedEmail = user.email?.takeIf(String::isNotBlank)
             if (normalizedEmail == null) remove(USER_EMAIL_KEY) else putString(USER_EMAIL_KEY, normalizedEmail)
         }
             .putString(USER_NAME_KEY, user.name)
@@ -118,10 +158,16 @@ class SharedPreferencesTokenStore(
             .putBoolean(USER_IS_ACTIVE_KEY, user.isActive)
             .putString(USER_JOINED_AT_KEY, user.joinedAt)
             .putString(USER_LAST_LOGIN_KEY, user.lastLoginAt)
-            .commit()
+            .apply()
     }
 
     override fun clearAccessToken() {
+        synchronized(cacheLock) {
+            cachedHasStoredAccessToken = false
+            hasStoredAccessTokenLoaded = true
+            cachedSessionUser = null
+            sessionUserLoaded = true
+        }
         preferences.edit()
             .remove(ACCESS_TOKEN_KEY)
             .remove(REFRESH_TOKEN_KEY)
@@ -133,11 +179,17 @@ class SharedPreferencesTokenStore(
             .remove(USER_IS_ACTIVE_KEY)
             .remove(USER_JOINED_AT_KEY)
             .remove(USER_LAST_LOGIN_KEY)
-            .commit()
+            .apply()
     }
 
     private fun writeSecret(key: String, value: String) {
         check(preferences.edit().putString(key, encrypt(value)).commit()) { "Token terenkripsi gagal disimpan" }
+        if (key == ACCESS_TOKEN_KEY) {
+            synchronized(cacheLock) {
+                cachedHasStoredAccessToken = value.isNotBlank()
+                hasStoredAccessTokenLoaded = true
+            }
+        }
     }
 
     private fun encrypt(value: String): String {

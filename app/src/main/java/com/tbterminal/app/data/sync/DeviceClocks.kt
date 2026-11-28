@@ -13,10 +13,29 @@ internal fun defaultElapsedRealtimeMillis(): Long {
         .getOrElse { System.nanoTime() / 1_000_000L }
 }
 
+private object ProcessBootCountCache {
+    @Volatile
+    private var loaded: Boolean = false
+
+    @Volatile
+    private var cachedBootCount: Long? = null
+
+    fun getOrLoad(context: Context): Long? {
+        if (loaded) return cachedBootCount
+        return synchronized(this) {
+            if (!loaded) {
+                cachedBootCount = runCatching {
+                    Settings.Global.getInt(context.contentResolver, Settings.Global.BOOT_COUNT, -1)
+                }.getOrNull()?.takeIf { it >= 0 }?.toLong()
+                loaded = true
+            }
+            cachedBootCount
+        }
+    }
+}
+
 internal fun readDeviceBootCount(context: Context): Long? {
-    return runCatching {
-        Settings.Global.getInt(context.contentResolver, Settings.Global.BOOT_COUNT, -1)
-    }.getOrNull()?.takeIf { it >= 0 }?.toLong()
+    return ProcessBootCountCache.getOrLoad(context.applicationContext)
 }
 
 internal fun isSameBootSession(savedBootCount: Long?, currentBootCount: Long?): Boolean {

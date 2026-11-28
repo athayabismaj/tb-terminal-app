@@ -64,8 +64,10 @@ import java.time.Instant
 import java.time.ZoneId
 import java.util.UUID
 import kotlinx.coroutines.CoroutineDispatcher
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.channels.BufferOverflow
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
@@ -79,7 +81,6 @@ import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.runBlocking
 
 sealed interface CheckoutEvent {
     data class NavigateToReceipt(val transactionId: String) : CheckoutEvent
@@ -163,8 +164,9 @@ class CheckoutViewModel(
                 val snapshotState = _uiState.value
                 val pendingKey = pendingOnlineCheckout
                 val pendingCmd = ambiguousOnlineCheckout
-                runBlocking(logoutFlushDispatcher) {
-                    cartDraftCoordinator?.flushAndStopForOwner(outgoingOwner, snapshotState)
+                cartDraftCoordinator?.stopForLogout()
+                CoroutineScope(SupervisorJob() + logoutFlushDispatcher).launch {
+                    cartDraftCoordinator?.flushForOwner(outgoingOwner, snapshotState)
                     if (outgoingOwner != null && pendingKey != null && pendingCmd != null) {
                         pendingSubmissionPersistence?.saveForOwner(
                             ownerUserId = outgoingOwner,
@@ -642,16 +644,16 @@ class CheckoutViewModel(
     ): LocalCashSessionEntity? {
         val dataSource = cashSessionLocalDataSource ?: return null
         val effectiveCashierId = cashierId?.trim()?.takeIf(String::isNotBlank)
-            ?: return null
+        val fallbackCashierId = resolveCashierNameFallback()
         return runSuspendCatching {
-            dataSource.getLatestOpenSession(effectiveCashierId)
-                ?: resolveCashierNameFallback()?.let { fallbackCashierId ->
-                    if (fallbackCashierId == effectiveCashierId) {
-                        null
-                    } else {
-                        dataSource.getLatestOpenSession(fallbackCashierId)
-                    }
-                }
+            if (effectiveCashierId == null) {
+                dataSource.getLatestOpenSession(fallbackCashierId)
+            } else {
+                dataSource.getLatestOpenSession(effectiveCashierId)
+                    ?: fallbackCashierId
+                        ?.takeIf { it != effectiveCashierId }
+                        ?.let { dataSource.getLatestOpenSession(it) }
+            }
         }.getOrNull()
     }
 

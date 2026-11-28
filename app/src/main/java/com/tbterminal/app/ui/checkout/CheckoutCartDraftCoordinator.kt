@@ -118,14 +118,22 @@ internal class CheckoutCartDraftCoordinator(
         persistIfChanged(encodePair(state))
     }
 
-    suspend fun flushAndStopForOwner(ownerUserId: String?, state: CheckoutUiState) {
+    fun stopForLogout() {
         stoppedForLogout = true
         observeJob?.cancel()
         observeJob = null
+    }
+
+    suspend fun flushForOwner(ownerUserId: String?, state: CheckoutUiState) {
+        stopForLogout()
         val resolvedOwner = ownerUserId?.trim()?.takeIf(String::isNotBlank) ?: return
         val pair = encodePair(state)
         lastSavedPair = pair
         store.saveForOwner(resolvedOwner, pair.first, pair.second)
+    }
+
+    suspend fun flushAndStopForOwner(ownerUserId: String?, state: CheckoutUiState) {
+        flushForOwner(ownerUserId, state)
     }
 
     fun stop() {

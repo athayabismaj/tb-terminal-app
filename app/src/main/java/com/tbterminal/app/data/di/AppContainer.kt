@@ -62,6 +62,7 @@ import com.tbterminal.app.data.sync.OfflineSyncScheduler
 import com.tbterminal.app.data.sync.OfflineStatusRepository
 import com.tbterminal.app.data.sync.SyncManager
 import com.tbterminal.app.data.sync.readDeviceBootCount
+import kotlinx.coroutines.Dispatchers
 
 interface AppContainer {
     val sessionManager: SessionManager
@@ -140,6 +141,7 @@ class DefaultAppContainer(
             skipWhenOwnerBlank = true,
             monotonicClockMillis = { SystemClock.elapsedRealtime() },
             bootCountProvider = { readDeviceBootCount(appContext) },
+            ioDispatcher = Dispatchers.IO,
         )
     }
 
@@ -262,6 +264,7 @@ class DefaultAppContainer(
             healthApi = networkModule.healthApi,
             networkMonitor = networkMonitor,
             clockMillis = { SystemClock.elapsedRealtime() },
+            ioDispatcher = Dispatchers.IO,
         )
     }
 

@@ -27,16 +27,24 @@ import com.tbterminal.app.data.session.SessionEvent
 import com.tbterminal.app.data.sync.BackendStatus
 import com.tbterminal.app.navigation.AppNavGraph
 import com.tbterminal.app.navigation.AppRoute
-import com.tbterminal.app.navigation.AppRouteAccessPolicy
 import com.tbterminal.app.navigation.resolveStartDestination
 import com.tbterminal.app.ui.auth.AuthViewModel
 import com.tbterminal.app.ui.auth.SplashScreen
 import com.tbterminal.app.ui.theme.TbterminalappTheme
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
+
+internal fun shouldNavigateToPinOnStart(
+    requiresPinUnlock: Boolean,
+    currentRoute: String?,
+): Boolean = requiresPinUnlock && currentRoute != AppRoute.Pin.route
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -96,52 +104,44 @@ class MainActivity : ComponentActivity() {
                         }
                     }
 
-                    LaunchedEffect(navController, sessionManager) {
-                        navController.currentBackStackEntryFlow.collect { entry ->
-                            val route = entry.destination.route
-                            val role = sessionManager.readSessionUser()?.role
-                            if (!AppRouteAccessPolicy.isAllowed(route, role)) {
-                                navController.navigate(AppRoute.Dashboard.route) {
-                                    popUpTo(route ?: AppRoute.Dashboard.route) { inclusive = true }
-                                    launchSingleTop = true
-                                }
-                            }
-                        }
-                    }
-
-                    LaunchedEffect(appContainer) {
+                    LaunchedEffect(appContainer, sessionManager) {
                         lifecycle.repeatOnLifecycle(Lifecycle.State.STARTED) {
-                            appContainer.backendHealthMonitor.refreshAsync(force = true)
-                            launch {
-                                appContainer.networkMonitor.observeOnline().collect { isOnline ->
-                                    if (isOnline) {
-                                        appContainer.offlineSyncScheduler.scheduleIfEnabled()
-                                    }
-                                }
-                            }
-                            launch {
-                                appContainer.backendHealthMonitor.status.collect { backendStatus ->
-                                    if (backendStatus == BackendStatus.CONNECTED) {
-                                        appContainer.offlineSyncScheduler.scheduleIfEnabled()
-                                    }
-                                }
-                            }
-                            launch {
-                                combine(
-                                    appContainer.networkMonitor.observeOnline(),
-                                    appContainer.backendHealthMonitor.status,
-                                ) { online, backendStatus ->
-                                    online && backendStatus == BackendStatus.UNREACHABLE
-                                }
-                                    .distinctUntilChanged()
-                                    .collectLatest { shouldPoll ->
-                                        if (shouldPoll) {
-                                            while (true) {
-                                                delay(30_000L)
-                                                appContainer.backendHealthMonitor.refresh(force = true)
-                                            }
+                            withContext(Dispatchers.IO) {
+                                val onlineState = appContainer.networkMonitor
+                                    .observeOnline()
+                                    .stateIn(this)
+                                appContainer.backendHealthMonitor.refreshAsync(force = true)
+                                launch {
+                                    onlineState.collect { isOnline ->
+                                        if (isOnline && !sessionManager.requiresPinUnlock()) {
+                                            appContainer.offlineSyncScheduler.scheduleIfEnabled()
                                         }
                                     }
+                                }
+                                launch {
+                                    appContainer.backendHealthMonitor.status.collect { backendStatus ->
+                                        if (backendStatus == BackendStatus.CONNECTED && !sessionManager.requiresPinUnlock()) {
+                                            appContainer.offlineSyncScheduler.scheduleIfEnabled()
+                                        }
+                                    }
+                                }
+                                launch {
+                                    combine(
+                                        onlineState,
+                                        appContainer.backendHealthMonitor.status,
+                                    ) { online, backendStatus ->
+                                        online && backendStatus == BackendStatus.UNREACHABLE
+                                    }
+                                        .distinctUntilChanged()
+                                        .collectLatest { shouldPoll ->
+                                            if (shouldPoll) {
+                                                while (true) {
+                                                    delay(30_000L)
+                                                    appContainer.backendHealthMonitor.refresh(force = true)
+                                                }
+                                            }
+                                        }
+                                }
                             }
                         }
                     }
@@ -151,9 +151,10 @@ class MainActivity : ComponentActivity() {
                             when (event) {
                                 Lifecycle.Event.ON_STOP -> sessionManager.lockForResume()
                                 Lifecycle.Event.ON_START -> {
-                                    if (sessionManager.requiresPinUnlock()) {
+                                    val currentRoute = navController.currentDestination?.route
+                                    if (shouldNavigateToPinOnStart(sessionManager.requiresPinUnlock(), currentRoute)) {
                                         navController.navigate(AppRoute.Pin.route) {
-                                            popUpTo(0)
+                                            popUpTo(navController.graph.id) { inclusive = true }
                                             launchSingleTop = true
                                         }
                                     }

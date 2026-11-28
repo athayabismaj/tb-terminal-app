@@ -4,6 +4,9 @@ import com.tbterminal.app.data.local.dao.PendingSubmissionDao
 import com.tbterminal.app.data.local.entity.PendingSubmissionEntity
 import com.tbterminal.app.data.sync.isSameBootSession
 import com.tbterminal.app.data.sync.runSuspendCatching
+import kotlinx.coroutines.CoroutineDispatcher
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 
 object PendingSubmissionScopes {
     const val CHECKOUT = "checkout"
@@ -65,20 +68,26 @@ class RoomPendingSubmissionStore(
     private val skipWhenOwnerBlank: Boolean = false,
     private val monotonicClockMillis: () -> Long = clockMillis,
     private val bootCountProvider: () -> Long? = { 1L },
+    private val ioDispatcher: CoroutineDispatcher? = null,
 ) : PendingSubmissionStore {
 
-    override suspend fun load(scope: String): PendingSubmissionRecord? {
-        val ownerUserId = resolveOwnerUserIdOrNull() ?: return null
-        val entity = runSuspendCatching { dao.get(ownerUserId, scope) }.getOrElse { return null }
-            ?: return null
-        return validateOrDeleteEntity(ownerUserId, entity)
+    private suspend fun <T> withConfiguredIo(block: suspend () -> T): T {
+        val dispatcher = ioDispatcher ?: return block()
+        return withContext(dispatcher) { block() }
     }
 
-    override suspend fun loadByScopePrefix(scopePrefix: String): List<PendingSubmissionRecord> {
-        val ownerUserId = resolveOwnerUserIdOrNull() ?: return emptyList()
+    override suspend fun load(scope: String): PendingSubmissionRecord? = withConfiguredIo {
+        val ownerUserId = resolveOwnerUserIdOrNull() ?: return@withConfiguredIo null
+        val entity = runSuspendCatching { dao.get(ownerUserId, scope) }.getOrElse { return@withConfiguredIo null }
+            ?: return@withConfiguredIo null
+        validateOrDeleteEntity(ownerUserId, entity)
+    }
+
+    override suspend fun loadByScopePrefix(scopePrefix: String): List<PendingSubmissionRecord> = withConfiguredIo {
+        val ownerUserId = resolveOwnerUserIdOrNull() ?: return@withConfiguredIo emptyList()
         val entities = runSuspendCatching { dao.getByScopePrefix(ownerUserId, scopePrefix) }
-            .getOrElse { return emptyList() }
-        return entities.mapNotNull { entity -> validateOrDeleteEntity(ownerUserId, entity) }
+            .getOrElse { return@withConfiguredIo emptyList() }
+        entities.mapNotNull { entity -> validateOrDeleteEntity(ownerUserId, entity) }
     }
 
     private suspend fun validateOrDeleteEntity(
@@ -122,45 +131,50 @@ class RoomPendingSubmissionStore(
         return saveForOwner(ownerUserId, record)
     }
 
-    override suspend fun saveForOwner(ownerUserId: String, record: PendingSubmissionRecord): Boolean {
-        val resolvedOwner = ownerUserId.trim().takeIf(String::isNotBlank) ?: return false
-        val existing = runSuspendCatching { dao.get(resolvedOwner, record.scope) }.getOrNull()
-        val sameKeyExisting = existing?.takeIf { it.idempotencyKey == record.idempotencyKey }
-        val resolvedElapsed = record.createdAtElapsedMillis
-            ?: sameKeyExisting?.createdAtElapsedMillis
-            ?: monotonicClockMillis()
-        val resolvedBootCount = record.bootCount
-            ?: sameKeyExisting?.bootCount
-            ?: bootCountProvider()
-        val entity = PendingSubmissionEntity(
-            ownerUserId = resolvedOwner,
-            scope = record.scope,
-            idempotencyKey = record.idempotencyKey,
-            intentJson = record.intentJson,
-            payloadJson = record.payloadJson,
-            status = record.status.name,
-            schemaVersion = record.schemaVersion,
-            createdAt = record.createdAt,
-            updatedAt = record.updatedAt,
-            createdAtElapsedMillis = resolvedElapsed,
-            bootCount = resolvedBootCount,
-        )
-        return runSuspendCatching { dao.upsert(entity) }.isSuccess
-    }
+    override suspend fun saveForOwner(ownerUserId: String, record: PendingSubmissionRecord): Boolean =
+        withConfiguredIo {
+            val resolvedOwner = ownerUserId.trim().takeIf(String::isNotBlank) ?: return@withConfiguredIo false
+            val existing = runSuspendCatching { dao.get(resolvedOwner, record.scope) }.getOrNull()
+            val sameKeyExisting = existing?.takeIf { it.idempotencyKey == record.idempotencyKey }
+            val resolvedElapsed = record.createdAtElapsedMillis
+                ?: sameKeyExisting?.createdAtElapsedMillis
+                ?: monotonicClockMillis()
+            val resolvedBootCount = record.bootCount
+                ?: sameKeyExisting?.bootCount
+                ?: bootCountProvider()
+            val entity = PendingSubmissionEntity(
+                ownerUserId = resolvedOwner,
+                scope = record.scope,
+                idempotencyKey = record.idempotencyKey,
+                intentJson = record.intentJson,
+                payloadJson = record.payloadJson,
+                status = record.status.name,
+                schemaVersion = record.schemaVersion,
+                createdAt = record.createdAt,
+                updatedAt = record.updatedAt,
+                createdAtElapsedMillis = resolvedElapsed,
+                bootCount = resolvedBootCount,
+            )
+            runSuspendCatching { dao.upsert(entity) }.isSuccess
+        }
 
     override suspend fun clear(scope: String) {
-        val ownerUserId = resolveOwnerUserIdOrNull() ?: return
-        runSuspendCatching { dao.delete(ownerUserId, scope) }
+        withConfiguredIo {
+            val ownerUserId = resolveOwnerUserIdOrNull() ?: return@withConfiguredIo
+            runSuspendCatching { dao.delete(ownerUserId, scope) }
+        }
     }
 
     override suspend fun purgeExpired() {
-        val wallNow = clockMillis()
-        val elapsedNow = monotonicClockMillis()
-        val bootNow = bootCountProvider()
-        val allEntities = runSuspendCatching { dao.getAll() }.getOrElse { return }
-        for (entity in allEntities) {
-            if (isEntityExpired(entity, wallNow, elapsedNow, bootNow)) {
-                runSuspendCatching { dao.delete(entity.ownerUserId, entity.scope) }
+        withConfiguredIo {
+            val wallNow = clockMillis()
+            val elapsedNow = monotonicClockMillis()
+            val bootNow = bootCountProvider()
+            val allEntities = runSuspendCatching { dao.getAll() }.getOrElse { return@withConfiguredIo }
+            for (entity in allEntities) {
+                if (isEntityExpired(entity, wallNow, elapsedNow, bootNow)) {
+                    runSuspendCatching { dao.delete(entity.ownerUserId, entity.scope) }
+                }
             }
         }
     }

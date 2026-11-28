@@ -1,6 +1,7 @@
 package com.tbterminal.app.data.sync
 
 import com.tbterminal.app.data.remote.HealthApi
+import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -11,6 +12,7 @@ import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
+import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeoutOrNull
 import retrofit2.Response
 
@@ -20,11 +22,15 @@ class BackendHealthMonitor(
     private val throttleMillis: Long = DEFAULT_THROTTLE_MILLIS,
     private val timeoutMillis: Long = DEFAULT_TIMEOUT_MILLIS,
     private val clockMillis: () -> Long = { defaultElapsedRealtimeMillis() },
+    private val ioDispatcher: CoroutineDispatcher? = null,
 ) {
-    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+    private val scope = CoroutineScope(SupervisorJob() + (ioDispatcher ?: Dispatchers.IO))
     private val refreshMutex = Mutex()
     private val _status = MutableStateFlow(BackendStatus.UNKNOWN)
     private var lastCheckedAtMillis: Long? = null
+
+    @Volatile
+    private var lastKnownOnline: Boolean = true
 
     val status: StateFlow<BackendStatus> = _status.asStateFlow()
 
@@ -33,6 +39,7 @@ class BackendHealthMonitor(
             networkMonitor.observeOnline()
                 .distinctUntilChanged()
                 .collect { isOnline ->
+                    lastKnownOnline = isOnline
                     if (isOnline) {
                         refresh(force = true)
                     } else {
@@ -69,7 +76,18 @@ class BackendHealthMonitor(
     }
 
     suspend fun refresh(force: Boolean = false): BackendStatus {
-        if (!networkMonitor.isOnline()) {
+        val dispatcher = ioDispatcher
+        return if (dispatcher != null) {
+            withContext(dispatcher) { refreshInternal(force) }
+        } else {
+            refreshInternal(force)
+        }
+    }
+
+    private suspend fun refreshInternal(force: Boolean): BackendStatus {
+        val online = networkMonitor.isOnline()
+        lastKnownOnline = online
+        if (!online) {
             _status.value = BackendStatus.UNKNOWN
             return _status.value
         }

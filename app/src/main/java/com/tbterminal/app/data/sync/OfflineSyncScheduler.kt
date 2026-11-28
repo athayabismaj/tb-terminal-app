@@ -10,17 +10,21 @@ import androidx.work.WorkManager
 import com.tbterminal.app.data.local.database.LocalAppSettingsDataSource
 import com.tbterminal.app.data.local.model.AppDataMode
 import java.util.concurrent.TimeUnit
+import kotlinx.coroutines.CoroutineDispatcher
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 
 class OfflineSyncScheduler(
     context: Context,
     private val localAppSettingsDataSource: LocalAppSettingsDataSource,
-    private val networkMonitor: NetworkConnectivity
+    private val networkMonitor: NetworkConnectivity,
+    private val ioDispatcher: CoroutineDispatcher = Dispatchers.IO,
 ) {
     private val appContext = context.applicationContext
 
-    suspend fun scheduleIfEnabled() {
-        if (localAppSettingsDataSource.getDataMode() != AppDataMode.SYNC_SERVER) return
-        if (!networkMonitor.isOnline()) return
+    suspend fun scheduleIfEnabled() = withContext(ioDispatcher) {
+        if (localAppSettingsDataSource.getDataMode() != AppDataMode.SYNC_SERVER) return@withContext
+        if (!networkMonitor.isOnline()) return@withContext
         schedule()
     }
 
