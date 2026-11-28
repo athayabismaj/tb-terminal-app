@@ -4,8 +4,11 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.tbterminal.app.data.local.cashexpense.LocalCashExpenseService
+import com.tbterminal.app.data.local.cashsession.LocalCashSessionService
 import com.tbterminal.app.data.local.database.CashSessionLocalDataSource
 import com.tbterminal.app.data.repository.CashReconciliationRepository
+import com.tbterminal.app.data.sync.OfflineStatusRepository
 import com.tbterminal.app.ui.dashboard.cashier.CashierDashboardShell
 import com.tbterminal.app.ui.dashboard.cashier.CashierDestination
 
@@ -15,6 +18,11 @@ fun CashierCashReconciliationScreen(
     role: String,
     cashReconciliationRepository: CashReconciliationRepository,
     cashSessionLocalDataSource: CashSessionLocalDataSource? = null,
+    localCashSessionService: LocalCashSessionService? = null,
+    localCashExpenseService: LocalCashExpenseService? = null,
+    offlineStatusRepository: OfflineStatusRepository? = null,
+    cashierUserId: String? = null,
+    cashierNameFallback: String? = null,
     onDashboardClick: () -> Unit,
     onPosClick: () -> Unit,
     onCashSessionClick: () -> Unit = {},
@@ -27,6 +35,11 @@ fun CashierCashReconciliationScreen(
         factory = CashReconciliationViewModel.factory(
             repository = cashReconciliationRepository,
             cashSessionLocalDataSource = cashSessionLocalDataSource,
+            localCashSessionService = localCashSessionService,
+            localCashExpenseService = localCashExpenseService,
+            offlineStatusRepository = offlineStatusRepository,
+            cashierUserId = cashierUserId,
+            cashierNameFallback = cashierNameFallback ?: name,
             actorRole = role,
         )
     )

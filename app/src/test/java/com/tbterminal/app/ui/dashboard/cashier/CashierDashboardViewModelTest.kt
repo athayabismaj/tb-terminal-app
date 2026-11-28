@@ -1,5 +1,15 @@
 package com.tbterminal.app.ui.dashboard.cashier
 
+import android.app.Application
+import android.content.Context
+import androidx.room.Room
+import androidx.test.core.app.ApplicationProvider
+import com.tbterminal.app.data.local.database.CashSessionLocalDataSource
+import com.tbterminal.app.data.local.database.LocalAppSettingsDataSource
+import com.tbterminal.app.data.local.database.TbTerminalDatabase
+import com.tbterminal.app.data.local.entity.LocalCashSessionEntity
+import com.tbterminal.app.data.local.model.ScaledDecimal2
+import com.tbterminal.app.data.local.model.SyncStatus
 import com.tbterminal.app.data.model.CashExpense
 import com.tbterminal.app.data.model.CashExpensePage
 import com.tbterminal.app.data.model.CashSession
@@ -10,10 +20,17 @@ import com.tbterminal.app.data.model.CashTransactionPage
 import com.tbterminal.app.data.model.RefundDisposition
 import com.tbterminal.app.data.model.TransactionRefundResult
 import com.tbterminal.app.data.model.TransactionVoidResult
+import com.tbterminal.app.data.remote.HealthApi
+import com.tbterminal.app.data.remote.HealthResponseDto
 import com.tbterminal.app.data.repository.CashReconciliationRepository
 import com.tbterminal.app.data.repository.RepositoryResult
+import com.tbterminal.app.data.sync.BackendHealthMonitor
+import com.tbterminal.app.data.sync.NetworkConnectivity
+import com.tbterminal.app.data.sync.OfflineStatusRepository
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.resetMain
@@ -26,9 +43,15 @@ import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
 import org.junit.Before
 import org.junit.Test
+import org.junit.runner.RunWith
+import org.robolectric.RobolectricTestRunner
+import org.robolectric.annotation.Config
+import retrofit2.Response
 import java.math.BigDecimal
 
 @OptIn(ExperimentalCoroutinesApi::class)
+@RunWith(RobolectricTestRunner::class)
+@Config(sdk = [34], application = Application::class)
 class CashierDashboardViewModelTest {
 
     private val dispatcher = StandardTestDispatcher()
@@ -157,6 +180,110 @@ class CashierDashboardViewModelTest {
         assertEquals("Server error", viewModel.uiState.value.errorMessage)
         viewModel.clearErrorMessage()
         assertNull(viewModel.uiState.value.errorMessage)
+    }
+
+    @Test
+    fun loadDashboardData_remoteNullWithStaleSyncedMirror_reconcilesClosedAndDoesNotRedirect() = runTest(dispatcher) {
+        val context = ApplicationProvider.getApplicationContext<Context>()
+        val db = Room.inMemoryDatabaseBuilder(context, TbTerminalDatabase::class.java)
+            .allowMainThreadQueries()
+            .setQueryExecutor { it.run() }
+            .setTransactionExecutor { it.run() }
+            .build()
+        try {
+            val staleId = db.cashSessionDao().upsert(
+                LocalCashSessionEntity(
+                    serverId = "srv-stale-1",
+                    clientGeneratedId = "sess-stale-1",
+                    deviceId = "android-test",
+                    cashierUserId = "kasir-1",
+                    status = "OPEN",
+                    openedAt = 1_795_000_000_000L,
+                    startingCash = ScaledDecimal2.ofWhole(100_000L),
+                    syncStatus = SyncStatus.SYNCED,
+                )
+            )
+            fakeCashRepo.activeSession = null
+
+            val viewModel = CashierDashboardViewModel(
+                repository = fakeCashRepo,
+                cashSessionLocalDataSource = CashSessionLocalDataSource(db.cashSessionDao()),
+                cashierUserId = "kasir-1",
+                cashierNameFallback = "Kasir Satu",
+            )
+            advanceUntilIdle()
+
+            assertFalse(viewModel.uiState.value.isLoading)
+            assertNull(viewModel.uiState.value.activeSession)
+            assertEquals("CLOSED", db.cashSessionDao().getByLocalId(staleId)?.status)
+        } finally {
+            db.close()
+        }
+    }
+
+    @Test
+    fun loadDashboardData_offlineFallback_isolatesSessionsByCashierUserId() = runTest(dispatcher) {
+        val context = ApplicationProvider.getApplicationContext<Context>()
+        val db = Room.inMemoryDatabaseBuilder(context, TbTerminalDatabase::class.java)
+            .allowMainThreadQueries()
+            .setQueryExecutor { it.run() }
+            .setTransactionExecutor { it.run() }
+            .build()
+        try {
+            db.cashSessionDao().upsert(
+                LocalCashSessionEntity(
+                    clientGeneratedId = "sess-kasir-a",
+                    deviceId = "android-test",
+                    cashierUserId = "kasir-a",
+                    status = "OPEN",
+                    openedAt = 1_795_000_000_000L,
+                    startingCash = ScaledDecimal2.ofWhole(100_000L),
+                    syncStatus = SyncStatus.PENDING,
+                )
+            )
+            val connectivity = object : NetworkConnectivity {
+                override fun isOnline(): Boolean = false
+                override fun observeOnline(): Flow<Boolean> = MutableStateFlow(false)
+            }
+            val healthMonitor = BackendHealthMonitor(
+                healthApi = object : HealthApi {
+                    override suspend fun getReadiness(): Response<HealthResponseDto> =
+                        Response.error(503, okhttp3.ResponseBody.Companion.create(null, ""))
+                },
+                networkMonitor = connectivity,
+            )
+            val offlineStatusRepo = OfflineStatusRepository(
+                networkMonitor = connectivity,
+                backendHealthMonitor = healthMonitor,
+                localAppSettingsDataSource = LocalAppSettingsDataSource(db.appSettingDao()),
+                syncQueueDao = db.syncQueueDao(),
+            )
+
+            val vmKasirB = CashierDashboardViewModel(
+                repository = fakeCashRepo,
+                cashSessionLocalDataSource = CashSessionLocalDataSource(db.cashSessionDao()),
+                offlineStatusRepository = offlineStatusRepo,
+                cashierUserId = "kasir-b",
+                cashierNameFallback = "Kasir B",
+            )
+            advanceUntilIdle()
+
+            assertNull(vmKasirB.uiState.value.activeSession)
+
+            val vmKasirA = CashierDashboardViewModel(
+                repository = fakeCashRepo,
+                cashSessionLocalDataSource = CashSessionLocalDataSource(db.cashSessionDao()),
+                offlineStatusRepository = offlineStatusRepo,
+                cashierUserId = "kasir-a",
+                cashierNameFallback = "Kasir A",
+            )
+            advanceUntilIdle()
+
+            assertNotNull(vmKasirA.uiState.value.activeSession)
+            assertEquals("kasir-a", vmKasirA.uiState.value.activeSession?.userId)
+        } finally {
+            db.close()
+        }
     }
 }
 

@@ -706,6 +706,30 @@ class CashReconciliationViewModelOfflineTest {
         assertEquals(1, localCashExpenseService.getLocalExpenses(mirroredLocalId).size)
     }
 
+    @Test
+    fun offlineLoadWithoutActiveSession_neverEmitsCloseSuccessEvent_onlyCloseSessionDoes() = runTest(dispatcher) {
+        backendHealthMonitor.markUnreachable()
+        val repo = FakeCashReconciliationOfflineRepo()
+        val vm = buildVm(repo)
+        advanceUntilIdle()
+
+        assertFalse(vm.uiState.value.hasActiveSession)
+        assertNotNull(vm.uiState.value.message)
+        assertEquals(0L, vm.uiState.value.closeSessionSuccessEventId)
+
+        vm.onOpeningCashChanged("100000")
+        vm.openSession()
+        advanceUntilIdle()
+        assertTrue(vm.uiState.value.hasActiveSession)
+        assertEquals(0L, vm.uiState.value.closeSessionSuccessEventId)
+
+        vm.onClosingCashChanged("100000")
+        vm.closeSession()
+        advanceUntilIdle()
+        assertFalse(vm.uiState.value.hasActiveSession)
+        assertEquals(1L, vm.uiState.value.closeSessionSuccessEventId)
+    }
+
     private fun buildVm(repository: CashReconciliationRepository): CashReconciliationViewModel {
         return CashReconciliationViewModel(
             repository = repository,

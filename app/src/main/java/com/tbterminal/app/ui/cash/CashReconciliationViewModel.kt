@@ -32,6 +32,7 @@ import com.tbterminal.app.ui.common.viewModelFactory
 import java.math.BigDecimal
 import java.time.Instant
 import java.time.ZoneId
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -60,6 +61,8 @@ class CashReconciliationViewModel(
     private var latestOfflineStatus = OfflineStatus()
     private var hasAmbiguousOpenSessionSubmit = false
     private var hasAmbiguousPettyCashSubmit = false
+    private var loadCashJob: Job? = null
+    private var hasCompletedInitialLoad = false
 
     init {
         observeOfflineStatus()
@@ -75,120 +78,131 @@ class CashReconciliationViewModel(
         }
     }
 
+    fun refreshOnResume() {
+        if (!hasCompletedInitialLoad) return
+        if (loadCashJob?.isActive == true) return
+        loadCash()
+    }
+
     fun loadCash(page: Int = _uiState.value.page) {
-        viewModelScope.launch {
-            _uiState.update { it.copy(isLoading = true, errorMessage = null) }
+        loadCashJob?.cancel()
+        loadCashJob = viewModelScope.launch {
+            try {
+                _uiState.update { it.copy(isLoading = true, errorMessage = null) }
 
-            if (shouldUseLocalCashSession()) {
-                if (!restoreLocalOpenCashSessionIfAvailable(page)) {
-                    val ageAlert = resolveOfflineSessionAgeAlert()
-                    _uiState.update {
-                        it.copy(
-                            activeSession = null,
-                            transactions = emptyList(),
-                            isLoading = false,
-                            isSubmitting = false,
-                            isUsingLocalActiveSession = false,
-                            localCashSessionId = null,
-                            localCashSessionSyncStatus = null,
-                            offlineSessionAgeAlert = ageAlert,
-                            message = if (it.canOpenCashSession) {
-                                "Mode kas lokal aktif. Buka sesi lokal untuk mulai transaksi offline."
-                            } else {
-                                "Mode kas lokal aktif. Hanya kasir yang dapat membuka sesi kas."
-                            }
-                        )
-                    }
-                }
-                return@launch
-            }
-
-            when (val sessionResult = repository.getActiveSession()) {
-                is RepositoryResult.Success -> {
-                    hasAmbiguousOpenSessionSubmit = false
-                    hasAmbiguousPettyCashSubmit = false
-                    val session = sessionResult.data
-                    if (session == null) {
-                        reconcileNoActiveRemoteSessionSafely()
+                if (shouldUseLocalCashSession()) {
+                    if (!restoreLocalOpenCashSessionIfAvailable(page)) {
                         val ageAlert = resolveOfflineSessionAgeAlert()
                         _uiState.update {
                             it.copy(
                                 activeSession = null,
+                                transactions = emptyList(),
+                                isLoading = false,
+                                isSubmitting = false,
                                 isUsingLocalActiveSession = false,
                                 localCashSessionId = null,
                                 localCashSessionSyncStatus = null,
                                 offlineSessionAgeAlert = ageAlert,
-                                page = page,
-                                total = 0,
-                                totalPages = 1,
-                                transactions = emptyList(),
-                                isLoading = false,
+                                message = if (it.canOpenCashSession) {
+                                    "Mode kas lokal aktif. Buka sesi lokal untuk mulai transaksi offline."
+                                } else {
+                                    "Mode kas lokal aktif. Hanya kasir yang dapat membuka sesi kas."
+                                }
                             )
                         }
-                    } else {
-                        val mirroredSession = mirrorRemoteSessionEntitySafely(session)
-                        val locallyClosedPending = mirroredSession != null &&
-                            mirroredSession.hasUnsyncedLocalChanges() &&
-                            !mirroredSession.status.equals("OPEN", ignoreCase = true)
-                        if (locallyClosedPending) {
-                            if (!restoreLocalOpenCashSessionIfAvailable(page)) {
-                                val ageAlert = resolveOfflineSessionAgeAlert()
-                                _uiState.update {
-                                    it.copy(
-                                        activeSession = null,
-                                        isUsingLocalActiveSession = false,
-                                        localCashSessionId = null,
-                                        localCashSessionSyncStatus = null,
-                                        offlineSessionAgeAlert = ageAlert,
-                                        page = page,
-                                        total = 0,
-                                        totalPages = 1,
-                                        transactions = emptyList(),
-                                        isLoading = false,
-                                    )
-                                }
-                            }
-                        } else {
+                    }
+                    return@launch
+                }
+
+                when (val sessionResult = repository.getActiveSession()) {
+                    is RepositoryResult.Success -> {
+                        hasAmbiguousOpenSessionSubmit = false
+                        hasAmbiguousPettyCashSubmit = false
+                        val session = sessionResult.data
+                        if (session == null) {
+                            reconcileNoActiveRemoteSessionSafely()
                             val ageAlert = resolveOfflineSessionAgeAlert()
                             _uiState.update {
                                 it.copy(
-                                    activeSession = session,
+                                    activeSession = null,
                                     isUsingLocalActiveSession = false,
-                                    localCashSessionId = mirroredSession?.localId,
+                                    localCashSessionId = null,
                                     localCashSessionSyncStatus = null,
                                     offlineSessionAgeAlert = ageAlert,
                                     page = page,
                                     total = 0,
                                     totalPages = 1,
-                                    transactions = emptyList()
+                                    transactions = emptyList(),
+                                    isLoading = false,
                                 )
                             }
-                            loadTransactionsForSession(session.id, page)
+                        } else {
+                            val mirroredSession = mirrorRemoteSessionEntitySafely(session)
+                            val locallyClosedPending = mirroredSession != null &&
+                                mirroredSession.hasUnsyncedLocalChanges() &&
+                                !mirroredSession.status.equals("OPEN", ignoreCase = true)
+                            if (locallyClosedPending) {
+                                if (!restoreLocalOpenCashSessionIfAvailable(page)) {
+                                    val ageAlert = resolveOfflineSessionAgeAlert()
+                                    _uiState.update {
+                                        it.copy(
+                                            activeSession = null,
+                                            isUsingLocalActiveSession = false,
+                                            localCashSessionId = null,
+                                            localCashSessionSyncStatus = null,
+                                            offlineSessionAgeAlert = ageAlert,
+                                            page = page,
+                                            total = 0,
+                                            totalPages = 1,
+                                            transactions = emptyList(),
+                                            isLoading = false,
+                                        )
+                                    }
+                                }
+                            } else {
+                                val ageAlert = resolveOfflineSessionAgeAlert()
+                                _uiState.update {
+                                    it.copy(
+                                        activeSession = session,
+                                        isUsingLocalActiveSession = false,
+                                        localCashSessionId = mirroredSession?.localId,
+                                        localCashSessionSyncStatus = null,
+                                        offlineSessionAgeAlert = ageAlert,
+                                        page = page,
+                                        total = 0,
+                                        totalPages = 1,
+                                        transactions = emptyList()
+                                    )
+                                }
+                                loadTransactionsForSession(session.id, page)
+                            }
+                        }
+                    }
+
+                    is RepositoryResult.Error -> {
+                        val serverUnavailable = ServerUnavailabilityClassifier.isServerUnavailable(sessionResult)
+                        if (serverUnavailable) {
+                            markBackendUnreachableAndSyncState()
+                        }
+                        if (!serverUnavailable || !restoreLocalOpenCashSessionIfAvailable(page)) {
+                            setLoadError(sessionResult.message, resolveOfflineSessionAgeAlert())
+                        }
+                    }
+                    is RepositoryResult.Exception -> {
+                        val serverUnavailable = ServerUnavailabilityClassifier.isServerUnavailable(sessionResult)
+                        if (serverUnavailable) {
+                            markBackendUnreachableAndSyncState()
+                        }
+                        if (!serverUnavailable || !restoreLocalOpenCashSessionIfAvailable(page)) {
+                            setLoadError(
+                                "Server kas tidak tersambung. Kas harian online belum dapat dimuat.",
+                                resolveOfflineSessionAgeAlert()
+                            )
                         }
                     }
                 }
-
-                is RepositoryResult.Error -> {
-                    val serverUnavailable = ServerUnavailabilityClassifier.isServerUnavailable(sessionResult)
-                    if (serverUnavailable) {
-                        markBackendUnreachableAndSyncState()
-                    }
-                    if (!serverUnavailable || !restoreLocalOpenCashSessionIfAvailable(page)) {
-                        setLoadError(sessionResult.message, resolveOfflineSessionAgeAlert())
-                    }
-                }
-                is RepositoryResult.Exception -> {
-                    val serverUnavailable = ServerUnavailabilityClassifier.isServerUnavailable(sessionResult)
-                    if (serverUnavailable) {
-                        markBackendUnreachableAndSyncState()
-                    }
-                    if (!serverUnavailable || !restoreLocalOpenCashSessionIfAvailable(page)) {
-                        setLoadError(
-                            "Server kas tidak tersambung. Kas harian online belum dapat dimuat.",
-                            resolveOfflineSessionAgeAlert()
-                        )
-                    }
-                }
+            } finally {
+                hasCompletedInitialLoad = true
             }
         }
     }
@@ -315,6 +329,7 @@ class CashReconciliationViewModel(
                             isUsingLocalActiveSession = false,
                             localCashSessionId = null,
                             localCashSessionSyncStatus = null,
+                            closeSessionSuccessEventId = it.closeSessionSuccessEventId + 1L,
                             message = "Sesi kas berhasil ditutup."
                         )
                     }
@@ -425,6 +440,7 @@ class CashReconciliationViewModel(
                         localCashSessionId = result.session.localId,
                         localCashSessionSyncStatus = result.session.syncStatus.name,
                         offlineSessionAgeAlert = ageAlert,
+                        closeSessionSuccessEventId = it.closeSessionSuccessEventId + 1L,
                         errorMessage = null,
                         message = "Sesi kas lokal berhasil ditutup. Belum tersinkron ke server."
                     )

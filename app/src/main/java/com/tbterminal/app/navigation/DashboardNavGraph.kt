@@ -340,10 +340,15 @@ internal fun NavGraphBuilder.dashboardGraph(navController: NavHostController, se
                             role = sessionUser.role,
                             cashReconciliationRepository = appContainer.cashReconciliationRepository,
                             cashSessionLocalDataSource = appContainer.cashSessionLocalDataSource,
+                            localCashSessionService = appContainer.localCashSessionService,
                             localCashExpenseService = appContainer.localCashExpenseService,
+                            offlineStatusRepository = appContainer.offlineStatusRepository,
+                            cashierUserId = sessionUser.userId ?: sessionUser.name,
+                            cashierNameFallback = sessionUser.name,
                             onDashboardClick = {},
                             onPosClick = {
                                 navController.navigate(AppRoute.CashierPos.route) {
+                                    popUpTo(AppRoute.Dashboard.route) { inclusive = false }
                                     launchSingleTop = true
                                 }
                             },

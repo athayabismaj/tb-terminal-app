@@ -82,6 +82,8 @@ import com.tbterminal.app.ui.theme.TbBackground
 import com.tbterminal.app.ui.theme.TbGreen
 import com.tbterminal.app.ui.theme.TbGreenLight
 import com.tbterminal.app.ui.theme.TbSurface
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 
 private val CashierShellBackground = TbBackground
 private val CashierSidebarBackground = TbSurface
@@ -149,11 +151,20 @@ fun CashierDashboardShell(
     val offlineStatus by (offlineStatusFlow?.collectAsState(initial = OfflineStatus()) ?: remember { mutableStateOf(OfflineStatus()) })
     var devicePreferences by remember { mutableStateOf(DevicePreferences()) }
     LaunchedEffect(appContainer) {
-        devicePreferences = appContainer?.localAppSettingsDataSource?.getDevicePreferences() ?: DevicePreferences()
+        devicePreferences = withContext(Dispatchers.IO) {
+            appContainer?.localAppSettingsDataSource?.getDevicePreferences() ?: DevicePreferences()
+        }
     }
     var hasActiveShift by remember { mutableStateOf(false) }
-    LaunchedEffect(activeDestination) {
-        val session = appContainer?.cashSessionLocalDataSource?.getLatestOpenSession()
+    LaunchedEffect(activeDestination, appContainer) {
+        val session = withContext(Dispatchers.IO) {
+            val cashierId = appContainer?.sessionManager?.resolveOwnerUserId()
+            if (cashierId.isNullOrBlank()) {
+                null
+            } else {
+                appContainer.cashSessionLocalDataSource.getLatestOpenSession(cashierId)
+            }
+        }
         hasActiveShift = (session != null)
     }
 

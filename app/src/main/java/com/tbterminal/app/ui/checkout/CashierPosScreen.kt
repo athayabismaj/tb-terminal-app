@@ -44,6 +44,7 @@ import androidx.compose.material.icons.outlined.Calculate
 import androidx.compose.material.icons.outlined.Check
 import androidx.compose.material.icons.outlined.Clear
 import androidx.compose.material.icons.outlined.Close
+import androidx.compose.material.icons.outlined.LockOpen
 import androidx.compose.material.icons.outlined.PauseCircleOutline
 import androidx.compose.material.icons.outlined.PrintDisabled
 import androidx.compose.material.icons.outlined.QrCodeScanner
@@ -157,6 +158,7 @@ fun CashierPosScreen(
     onStartingCashChanged: (String) -> Unit,
     onOpenCashSession: () -> Unit,
     onRefreshCashSession: () -> Unit,
+    onCashSessionClick: () -> Unit = {},
     onCheckout: () -> Unit,
     onNavigateToCart: () -> Unit,
     onScanBarcode: (String) -> Unit = {},
@@ -248,6 +250,14 @@ fun CashierPosScreen(
                             pendingSyncCount = offlineStatus.pendingSyncCount,
                             otherUsersPendingSyncCount = offlineStatus.otherUsersPendingSyncCount,
                             isPrinterReady = isPrinterReady
+                        )
+                        Spacer(modifier = Modifier.height(4.dp))
+                    }
+
+                    if (!state.isCashSessionLoading && !state.hasActiveCashSession) {
+                        PosNoActiveSessionBanner(
+                            canOpenCashSession = state.canOpenCashSession,
+                            onNavigateToCashSession = onCashSessionClick,
                         )
                         Spacer(modifier = Modifier.height(4.dp))
                     }
@@ -529,6 +539,64 @@ private data class AlertBannerStyle(
     val icon: ImageVector,
     val msg: String
 )
+
+@Composable
+internal fun PosNoActiveSessionBanner(
+    canOpenCashSession: Boolean,
+    onNavigateToCashSession: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    Surface(
+        shape = RoundedCornerShape(8.dp),
+        color = AmberBg,
+        border = BorderStroke(1.dp, Color(0xFFFDE68A)),
+        modifier = modifier
+            .fillMaxWidth()
+            .testTag("pos-no-cash-session-banner")
+    ) {
+        Row(
+            modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            Icon(
+                imageVector = Icons.Outlined.LockOpen,
+                contentDescription = null,
+                tint = Amber700,
+                modifier = Modifier.size(14.dp)
+            )
+            Text(
+                text = if (canOpenCashSession) {
+                    "Shift kasir belum dibuka"
+                } else {
+                    "Shift kasir belum dibuka. Hanya kasir yang dapat membuka sesi kas."
+                },
+                fontSize = 11.5.sp,
+                fontWeight = FontWeight.SemiBold,
+                color = Amber700,
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.weight(1f)
+            )
+            if (canOpenCashSession) {
+                Surface(
+                    onClick = onNavigateToCashSession,
+                    shape = RoundedCornerShape(6.dp),
+                    color = BrandForest,
+                    modifier = Modifier.testTag("pos-open-cash-session-nav-button")
+                ) {
+                    Text(
+                        text = "Buka Shift",
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = Color.White,
+                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp)
+                    )
+                }
+            }
+        }
+    }
+}
 
 // ═════════════════════════════════════════════════════════════════════════════
 // SUB-KOMPONEN 1: UNIFIED SINGLE-ROW HEADER (SEARCH + BARCODE + PARKIR NOTA)

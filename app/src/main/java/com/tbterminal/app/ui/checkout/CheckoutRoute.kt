@@ -272,6 +272,7 @@ fun CashierPosRoute(
                 onStartingCashChanged = viewModel::onStartingCashChanged,
                 onOpenCashSession = viewModel::openCashSession,
                 onRefreshCashSession = viewModel::loadCashSession,
+                onCashSessionClick = onCashSessionClick,
                 onCheckout = {
                     val preview = uiState.checkoutPreview
                     if (uiState.hasAmbiguousCheckout) {

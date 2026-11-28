@@ -2,14 +2,20 @@ package com.tbterminal.app.ui.cashier.session
 
 import android.content.Intent
 import android.widget.Toast
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.platform.LocalContext
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.tbterminal.app.data.local.cashexpense.LocalCashExpenseService
@@ -61,11 +67,28 @@ fun CashierCashSessionRoute(
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+    val currentRefreshOnResume by rememberUpdatedState(viewModel::refreshOnResume)
+    val lifecycleOwner = LocalLifecycleOwner.current
+    DisposableEffect(lifecycleOwner) {
+        val observer = LifecycleEventObserver { _, event ->
+            if (event == Lifecycle.Event.ON_RESUME) {
+                currentRefreshOnResume()
+            }
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose {
+            lifecycleOwner.lifecycle.removeObserver(observer)
+        }
+    }
+
     var showSuccessModal by remember { mutableStateOf(false) }
+    var lastHandledCloseSuccessEventId by remember { mutableLongStateOf(0L) }
     var isPrinting by remember { mutableStateOf(false) }
 
-    LaunchedEffect(uiState.message) {
-        if (uiState.message != null && uiState.errorMessage == null && !uiState.hasActiveSession) {
+    LaunchedEffect(uiState.closeSessionSuccessEventId) {
+        val eventId = uiState.closeSessionSuccessEventId
+        if (eventId > 0L && eventId != lastHandledCloseSuccessEventId) {
+            lastHandledCloseSuccessEventId = eventId
             showSuccessModal = true
             viewModel.clearMessage()
         }
@@ -136,7 +159,6 @@ fun CashierCashSessionRoute(
             isPrinting = isPrinting,
             onDismiss = {
                 showSuccessModal = false
-                onDashboardClick()
             },
             onPrint = {
                 if (targetSession != null && thermalPrinterManager != null) {

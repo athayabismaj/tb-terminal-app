@@ -62,12 +62,17 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.lifecycle.compose.currentStateAsState
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.tbterminal.app.data.local.cashexpense.LocalCashExpenseService
+import com.tbterminal.app.data.local.cashsession.LocalCashSessionService
 import com.tbterminal.app.data.local.database.CashSessionLocalDataSource
 import com.tbterminal.app.data.model.CashTransaction
 import com.tbterminal.app.data.repository.CashReconciliationRepository
+import com.tbterminal.app.data.sync.OfflineStatusRepository
 import com.tbterminal.app.ui.cash.CashReconciliationViewModel
 import com.tbterminal.app.ui.cashier.session.components.CashierBukaShiftView
 import com.tbterminal.app.ui.checkout.components.MaterialEstimatorDialog
@@ -115,7 +120,11 @@ fun CashierDashboardScreen(
     role: String,
     cashReconciliationRepository: CashReconciliationRepository,
     cashSessionLocalDataSource: CashSessionLocalDataSource? = null,
+    localCashSessionService: LocalCashSessionService? = null,
     localCashExpenseService: LocalCashExpenseService? = null,
+    offlineStatusRepository: OfflineStatusRepository? = null,
+    cashierUserId: String? = null,
+    cashierNameFallback: String? = null,
     onDashboardClick: () -> Unit = {},
     onPosClick: () -> Unit = {},
     onCashSessionClick: () -> Unit = {},
@@ -129,7 +138,10 @@ fun CashierDashboardScreen(
         factory = CashierDashboardViewModel.factory(
             repository = cashReconciliationRepository,
             cashSessionLocalDataSource = cashSessionLocalDataSource,
-            localCashExpenseService = localCashExpenseService
+            localCashExpenseService = localCashExpenseService,
+            offlineStatusRepository = offlineStatusRepository,
+            cashierUserId = cashierUserId ?: name,
+            cashierNameFallback = cashierNameFallback ?: name,
         )
     )
 ) {
@@ -139,24 +151,38 @@ fun CashierDashboardScreen(
         factory = CashReconciliationViewModel.factory(
             repository = cashReconciliationRepository,
             cashSessionLocalDataSource = cashSessionLocalDataSource,
+            localCashSessionService = localCashSessionService,
             localCashExpenseService = localCashExpenseService,
-            cashierNameFallback = name,
+            offlineStatusRepository = offlineStatusRepository,
+            cashierUserId = cashierUserId ?: name,
+            cashierNameFallback = cashierNameFallback ?: name,
             actorRole = role,
         )
     )
     val cashUiState by cashViewModel.uiState.collectAsStateWithLifecycle()
+    val lifecycleOwner = LocalLifecycleOwner.current
+    val lifecycleState by lifecycleOwner.lifecycle.currentStateAsState()
+    var openedShiftFromDashboard by rememberSaveable { mutableStateOf(false) }
 
-    // Keputusan Desain 2: Saat shift aktif, kasir langsung mendarat di POS.
-    LaunchedEffect(uiState.isLoading, uiState.activeSession, cashUiState.hasActiveSession) {
-        if ((!uiState.isLoading && uiState.activeSession != null) || cashUiState.hasActiveSession) {
-            onPosClick()
+    // Bila kasir membuka shift dari Dashboard, selesaikan di layar Kas; bila sudah punya shift saat masuk, mendarat di POS.
+    LaunchedEffect(
+        lifecycleState,
+        uiState.isLoading,
+        uiState.activeSession,
+        cashUiState.hasActiveSession,
+        openedShiftFromDashboard,
+    ) {
+        if (!lifecycleState.isAtLeast(Lifecycle.State.RESUMED)) return@LaunchedEffect
+        when {
+            openedShiftFromDashboard && cashUiState.hasActiveSession -> onCashSessionClick()
+            !openedShiftFromDashboard && !uiState.isLoading && uiState.activeSession != null -> onPosClick()
         }
     }
 
     CashierDashboardShell(
         userName = name,
         role = role,
-        activeDestination = CashierDestination.Pos,
+        activeDestination = CashierDestination.CashSession,
         onDashboardClick = onDashboardClick,
         onPosClick = onPosClick,
         onCashSessionClick = onCashSessionClick,
@@ -207,7 +233,10 @@ fun CashierDashboardScreen(
                             terminalName = "Terminal Barokah Jaya",
                             openingCashInput = cashUiState.openingCashInput,
                             onOpeningCashChanged = cashViewModel::onOpeningCashChanged,
-                            onOpenSession = cashViewModel::openSession,
+                            onOpenSession = {
+                                openedShiftFromDashboard = true
+                                cashViewModel.openSession()
+                            },
                             isSubmitting = cashUiState.isSubmitting,
                             errorMessage = cashUiState.errorMessage
                         )

@@ -33,6 +33,7 @@ data class CashReconciliationUiState(
     val lastClosedSession: CashSession? = null,
     val canOpenCashSession: Boolean = true,
     val offlineSessionAgeAlert: OfflineSessionAgeAlert? = null,
+    val closeSessionSuccessEventId: Long = 0L,
     val errorMessage: String? = null,
     val message: String? = null
 ) {

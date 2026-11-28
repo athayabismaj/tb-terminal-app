@@ -5,10 +5,16 @@ import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import com.tbterminal.app.data.local.cashexpense.LocalCashExpenseService
 import com.tbterminal.app.data.local.database.CashSessionLocalDataSource
+import com.tbterminal.app.data.local.model.AppDataMode
 import com.tbterminal.app.data.model.CashSession
 import com.tbterminal.app.data.model.CashTransaction
+import com.tbterminal.app.data.remote.ServerUnavailabilityClassifier
 import com.tbterminal.app.data.repository.CashReconciliationRepository
 import com.tbterminal.app.data.repository.RepositoryResult
+import com.tbterminal.app.data.sync.BackendStatus
+import com.tbterminal.app.data.sync.OfflineStatus
+import com.tbterminal.app.data.sync.OfflineStatusRepository
+import com.tbterminal.app.data.sync.runSuspendCatching
 import com.tbterminal.app.ui.common.viewModelFactory
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -43,18 +49,37 @@ data class CashierDashboardUiState(
 class CashierDashboardViewModel(
     private val repository: CashReconciliationRepository,
     private val cashSessionLocalDataSource: CashSessionLocalDataSource? = null,
-    private val localCashExpenseService: LocalCashExpenseService? = null
+    private val localCashExpenseService: LocalCashExpenseService? = null,
+    private val offlineStatusRepository: OfflineStatusRepository? = null,
+    private val cashierUserId: String? = null,
+    private val cashierNameFallback: String? = null,
 ) : ViewModel() {
     private val _uiState = MutableStateFlow(CashierDashboardUiState())
     val uiState: StateFlow<CashierDashboardUiState> = _uiState.asStateFlow()
+    private var latestOfflineStatus: OfflineStatus = OfflineStatus()
 
     init {
+        observeOfflineStatus()
         loadDashboardData()
+    }
+
+    private fun observeOfflineStatus() {
+        val statusRepo = offlineStatusRepository ?: return
+        viewModelScope.launch {
+            statusRepo.status.collect { status ->
+                latestOfflineStatus = status
+            }
+        }
     }
 
     fun loadDashboardData() {
         viewModelScope.launch {
             _uiState.update { it.copy(isLoading = true, errorMessage = null) }
+
+            if (shouldUseLocal()) {
+                checkFallbackLocalSession()
+                return@launch
+            }
 
             when (val sessionResult = repository.getActiveSession()) {
                 is RepositoryResult.Success -> {
@@ -62,16 +87,25 @@ class CashierDashboardViewModel(
                     if (session != null) {
                         loadSessionTransactions(session)
                     } else {
-                        checkFallbackLocalSession()
+                        reconcileNoActiveRemoteSessionSafely()
+                        resetEmptySessionState()
                     }
                 }
                 is RepositoryResult.Error -> {
-                    if (!checkFallbackLocalSession()) {
+                    val serverUnavailable = ServerUnavailabilityClassifier.isServerUnavailable(sessionResult)
+                    if (serverUnavailable) {
+                        offlineStatusRepository?.markBackendUnreachable()
+                    }
+                    if (!serverUnavailable || !checkFallbackLocalSession()) {
                         _uiState.update { it.copy(isLoading = false, errorMessage = sessionResult.message) }
                     }
                 }
                 is RepositoryResult.Exception -> {
-                    if (!checkFallbackLocalSession()) {
+                    val serverUnavailable = ServerUnavailabilityClassifier.isServerUnavailable(sessionResult)
+                    if (serverUnavailable) {
+                        offlineStatusRepository?.markBackendUnreachable()
+                    }
+                    if (!serverUnavailable || !checkFallbackLocalSession()) {
                         _uiState.update { it.copy(isLoading = false, errorMessage = "Koneksi bermasalah. Gagal memuat dashboard.") }
                     }
                 }
@@ -79,8 +113,55 @@ class CashierDashboardViewModel(
         }
     }
 
+    private suspend fun shouldUseLocal(): Boolean {
+        val statusRepo = offlineStatusRepository ?: return false
+        val status = latestOfflineStatus
+        if (status.appDataMode == AppDataMode.OFFLINE_ONLY) return true
+        if (!statusRepo.isOnline()) return true
+        return when (statusRepo.currentBackendStatus()) {
+            BackendStatus.CONNECTED -> {
+                if (statusRepo.isBackendHealthStale()) {
+                    statusRepo.refreshBackendHealth(force = false) != BackendStatus.CONNECTED
+                } else {
+                    false
+                }
+            }
+            BackendStatus.UNREACHABLE -> true
+            BackendStatus.UNKNOWN -> statusRepo.refreshBackendHealth(force = true) != BackendStatus.CONNECTED
+        }
+    }
+
+    private suspend fun reconcileNoActiveRemoteSessionSafely() {
+        val dataSource = cashSessionLocalDataSource ?: return
+        val primaryId = resolveCashierUserId()
+        runSuspendCatching {
+            dataSource.reconcileNoActiveRemoteSession(cashierUserId = primaryId)
+        }
+        val fallbackId = resolveCashierNameFallback()
+        if (fallbackId != null && fallbackId != primaryId) {
+            runSuspendCatching {
+                dataSource.reconcileNoActiveRemoteSession(cashierUserId = fallbackId)
+            }
+        }
+    }
+
     private suspend fun checkFallbackLocalSession(): Boolean {
-        val localSession = cashSessionLocalDataSource?.getLatestOpenSession()
+        val dataSource = cashSessionLocalDataSource
+        val localSession = if (dataSource == null) {
+            null
+        } else {
+            val primaryId = resolveCashierUserId()
+            if (primaryId == null) {
+                null
+            } else {
+                runSuspendCatching {
+                    dataSource.getLatestOpenSession(primaryId)
+                        ?: resolveCashierNameFallback()?.takeIf { it != primaryId }?.let { fallbackId ->
+                            dataSource.getLatestOpenSession(fallbackId)
+                        }
+                }.getOrNull()
+            }
+        }
         return if (localSession != null) {
             val session = CashSession(
                 id = localSession.serverId ?: localSession.clientGeneratedId,
@@ -112,27 +193,39 @@ class CashierDashboardViewModel(
             }
             true
         } else {
-            _uiState.update {
-                it.copy(
-                    isLoading = false,
-                    activeSession = null,
-                    systemCash = BigDecimal.ZERO,
-                    openingCash = BigDecimal.ZERO,
-                    totalExpenses = BigDecimal.ZERO,
-                    totalCashIn = BigDecimal.ZERO,
-                    cashRevenue = BigDecimal.ZERO,
-                    qrisRevenue = BigDecimal.ZERO,
-                    receivableRevenue = BigDecimal.ZERO,
-                    shiftOpenedTimeFormatted = null,
-                    shiftDurationFormatted = null,
-                    averageTicket = BigDecimal.ZERO,
-                    todayTransactionsCount = 0,
-                    todaySalesRevenue = BigDecimal.ZERO,
-                    recentTransactions = emptyList()
-                )
-            }
+            resetEmptySessionState()
             false
         }
+    }
+
+    private fun resetEmptySessionState() {
+        _uiState.update {
+            it.copy(
+                isLoading = false,
+                activeSession = null,
+                systemCash = BigDecimal.ZERO,
+                openingCash = BigDecimal.ZERO,
+                totalExpenses = BigDecimal.ZERO,
+                totalCashIn = BigDecimal.ZERO,
+                cashRevenue = BigDecimal.ZERO,
+                qrisRevenue = BigDecimal.ZERO,
+                receivableRevenue = BigDecimal.ZERO,
+                shiftOpenedTimeFormatted = null,
+                shiftDurationFormatted = null,
+                averageTicket = BigDecimal.ZERO,
+                todayTransactionsCount = 0,
+                todaySalesRevenue = BigDecimal.ZERO,
+                recentTransactions = emptyList()
+            )
+        }
+    }
+
+    private fun resolveCashierUserId(): String? {
+        return cashierUserId?.trim()?.takeIf(String::isNotBlank)
+    }
+
+    private fun resolveCashierNameFallback(): String? {
+        return cashierNameFallback?.trim()?.takeIf(String::isNotBlank)
     }
 
     private fun formatShiftDuration(isoDate: String): String {
@@ -228,13 +321,19 @@ class CashierDashboardViewModel(
         fun factory(
             repository: CashReconciliationRepository,
             cashSessionLocalDataSource: CashSessionLocalDataSource? = null,
-            localCashExpenseService: LocalCashExpenseService? = null
+            localCashExpenseService: LocalCashExpenseService? = null,
+            offlineStatusRepository: OfflineStatusRepository? = null,
+            cashierUserId: String? = null,
+            cashierNameFallback: String? = null,
         ): ViewModelProvider.Factory {
             return viewModelFactory {
                 CashierDashboardViewModel(
                     repository = repository,
                     cashSessionLocalDataSource = cashSessionLocalDataSource,
-                    localCashExpenseService = localCashExpenseService
+                    localCashExpenseService = localCashExpenseService,
+                    offlineStatusRepository = offlineStatusRepository,
+                    cashierUserId = cashierUserId,
+                    cashierNameFallback = cashierNameFallback,
                 )
             }
         }
